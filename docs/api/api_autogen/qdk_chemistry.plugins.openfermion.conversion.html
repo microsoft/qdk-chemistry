@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.openfermion.conversion module &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.openfermion.conversion module &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -67,10 +68,14 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#plugins">Plugins</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#purpose-and-benefits">Purpose and Benefits</a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#available-plugins">Available Plugins</a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#using-plugins">Using Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#external-plugins">External plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#bundled-integrations">Bundled integrations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.ChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">ChemistryPlugin</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError"><code class="docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.PluginRegistrar"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.QdkChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.plugins.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#submodules">Submodules</a></li>
 </ul>
 </li>
 </ul>
@@ -133,23 +138,20 @@ and OpenFermion operator representations:</p>
 and then converts it to a <code class="docutils literal notranslate"><span class="pre">FermionOperator</span></code> using
 <code class="docutils literal notranslate"><span class="pre">openfermion.transforms.get_fermion_operator</span></code>.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hamiltonian</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></span>) – The QDK/Chemistry Hamiltonian to convert.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The electronic Hamiltonian as a FermionOperator.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">FermionOperator</span></code></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><em>Hamiltonian</em></a>) – The QDK/Chemistry Hamiltonian to convert.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The electronic Hamiltonian as a FermionOperator.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>openfermion.FermionOperator</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_fermion_operator</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fop</span> <span class="o">=</span> <span class="n">hamiltonian_to_fermion_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of terms: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fop</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Number of terms: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">fop</span><span class="o">.</span><span class="n">terms</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -165,23 +167,20 @@ integrals from all spin channels.</p>
 <p>The resulting operator uses OpenFermion’s interleaved spin-orbital ordering:
 spin-orbital <code class="docutils literal notranslate"><span class="pre">2p</span></code> = spatial orbital <code class="docutils literal notranslate"><span class="pre">p</span></code> alpha, <code class="docutils literal notranslate"><span class="pre">2p+1</span></code> = spatial orbital <code class="docutils literal notranslate"><span class="pre">p</span></code> beta.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>hamiltonian</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></span>) – The QDK/Chemistry Hamiltonian to convert.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The electronic Hamiltonian as an InteractionOperator.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">InteractionOperator</span></code></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><em>Hamiltonian</em></a>) – The QDK/Chemistry Hamiltonian to convert.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The electronic Hamiltonian as an InteractionOperator.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>openfermion.InteractionOperator</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_interaction_operator</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">iop</span> <span class="o">=</span> <span class="n">hamiltonian_to_interaction_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of spin-orbitals: </span><span class="si">{</span><span class="n">iop</span><span class="o">.</span><span class="n">n_qubits</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Number of spin-orbitals: </span><span class="si">{</span><span class="n">iop</span><span class="o">.</span><span class="n">n_qubits</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -193,17 +192,14 @@ spin-orbital <code class="docutils literal notranslate"><span class="pre">2p</sp
 <p>Translates the dense Pauli string format (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;XZII&quot;</span></code>) to OpenFermion’s
 sparse tuple format (e.g., <code class="docutils literal notranslate"><span class="pre">((0,</span> <span class="pre">'X'),</span> <span class="pre">(1,</span> <span class="pre">'Z'))</span></code>).</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>qubit_hamiltonian</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.qubit_operator.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a></span>) – The QDK/Chemistry QubitOperator to convert.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The equivalent OpenFermion QubitOperator.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>qubit_hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.qubit_operator.QubitOperator"><em>QubitOperator</em></a>) – The QDK/Chemistry QubitOperator to convert.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The equivalent OpenFermion QubitOperator.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>openfermion.QubitOperator</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -220,30 +216,27 @@ sparse tuple format (e.g., <code class="docutils literal notranslate"><span clas
 <p>Translates OpenFermion’s Pauli term format (e.g., <code class="docutils literal notranslate"><span class="pre">((0,</span> <span class="pre">'X'),</span> <span class="pre">(1,</span> <span class="pre">'Z'))</span></code>)
 to the dense Pauli string format used by QDK/Chemistry (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;XZI...&quot;</span></code>).</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>qubit_op</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></span>) – The OpenFermion QubitOperator to convert.</p></li>
+<li><p><strong>encoding</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – Optional encoding label (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code>) to attach to the resulting QubitOperator.</p></li>
+<li><p><strong>fermion_mode_order</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.enums.fermion_mode_order.html#qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder" title="qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder"><code class="xref py py-class docutils literal notranslate"><span class="pre">FermionModeOrder</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – Fermion mode ordering (<code class="docutils literal notranslate"><span class="pre">&quot;blocked&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;interleaved&quot;</span></code>) for the <code class="docutils literal notranslate"><span class="pre">QubitOperator</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A QDK/Chemistry QubitOperator.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.qubit_operator.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a></span></p>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>qubit_op</strong> (<em>openfermion.QubitOperator</em>) – The OpenFermion QubitOperator to convert.</p></li>
-<li><p><strong>encoding</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Optional encoding label (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code>) to attach to the resulting QubitOperator.</p></li>
-<li><p><strong>fermion_mode_order</strong> (<a class="reference internal" href="qdk_chemistry.data.enums.fermion_mode_order.html#qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder" title="qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder"><em>FermionModeOrder</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – Fermion mode ordering (<code class="docutils literal notranslate"><span class="pre">&quot;blocked&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;interleaved&quot;</span></code>) for the <code class="docutils literal notranslate"><span class="pre">QubitOperator</span></code>.</p></li>
-</ul>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A QDK/Chemistry QubitOperator.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator">QubitOperator</a></p>
-</dd>
-<dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the QubitOperator has no terms.</p>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the QubitOperator has no terms.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">openfermion</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">of</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">qop</span> <span class="o">=</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">(</span><span class="s2">&quot;X0 Z1&quot;</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">+</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">(</span><span class="s2">&quot;Y0 Y1&quot;</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">qh</span> <span class="o">=</span> <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">(</span><span class="n">qop</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qop</span> <span class="o">=</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">(</span><span class="s2">"X0 Z1"</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">+</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">(</span><span class="s2">"Y0 Y1"</span><span class="p">,</span> <span class="mf">0.3</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qh</span> <span class="o">=</span> <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">(</span><span class="n">qop</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"jordan-wigner"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>

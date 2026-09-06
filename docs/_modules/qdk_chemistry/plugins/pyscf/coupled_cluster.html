@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -96,7 +97,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.plugins.pyscf.coupled_cluster</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;PySCF-based Coupled Cluster calculator implementation for qdk_chemistry.</span>
+<span></span><span class="sd">"""PySCF-based Coupled Cluster calculator implementation for qdk_chemistry.</span>
 
 <span class="sd">This module provides integration between QDK/Chemistry and PySCF for performing</span>
 <span class="sd">Coupled Cluster (CC) calculations. It implements a CCSD (Coupled Cluster Singles and Doubles)</span>
@@ -106,14 +107,14 @@
 
 <span class="sd">* :class:`PyscfCoupledClusterSettings`: Configuration class for CC calculation parameters</span>
 <span class="sd">* :class:`PyscfCoupledClusterCalculator`: Main calculator class that performs CC calculations</span>
-<span class="sd">* Registration utilities to integrate the calculator with QDK/Chemistry&#39;s plugin system</span>
+<span class="sd">* Registration utilities to integrate the calculator with QDK/Chemistry's plugin system</span>
 
 <span class="sd">The calculator handles automatic conversion between QDK/Chemistry Hamiltonian objects and PySCF</span>
 <span class="sd">format, performs the CC calculation, and returns results (energy and wavefunction)</span>
 <span class="sd">in QDK/Chemistry-compatible format.</span>
 
-<span class="sd">Upon import, this module automatically registers the PySCF CC calculator with QDK/Chemistry&#39;s</span>
-<span class="sd">CC calculator registry under the name &quot;pyscf_coupled_cluster&quot;.</span>
+<span class="sd">Upon import, this module automatically registers the PySCF CC calculator with QDK/Chemistry's</span>
+<span class="sd">CC calculator registry under the name "pyscf_coupled_cluster".</span>
 
 <span class="sd">Examples:</span>
 <span class="sd">    Basic usage::</span>
@@ -125,13 +126,13 @@
 <span class="sd">    Computing the bra wavefunction (lambda/gamma amplitudes)::</span>
 
 <span class="sd">        &gt;&gt;&gt; cc_calculator = PyscfCoupledClusterCalculator()</span>
-<span class="sd">        &gt;&gt;&gt; cc_calculator.settings().set(&quot;compute_bra&quot;, True)</span>
-<span class="sd">        &gt;&gt;&gt; cc_calculator.settings().set(&quot;store_amplitudes&quot;, True)</span>
+<span class="sd">        &gt;&gt;&gt; cc_calculator.settings().set("compute_bra", True)</span>
+<span class="sd">        &gt;&gt;&gt; cc_calculator.settings().set("store_amplitudes", True)</span>
 <span class="sd">        &gt;&gt;&gt; energy, ket_wavefunction, bra_wavefunction = cc_calculator.run(ansatz)</span>
 
 <span class="sd">This module requires both QDK/Chemistry and PySCF to be installed.</span>
 
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -146,13 +147,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">hamiltonian_to_scf</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PyscfCoupledClusterCalculator&quot;</span><span class="p">,</span> <span class="s2">&quot;PyscfCoupledClusterSettings&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"PyscfCoupledClusterCalculator"</span><span class="p">,</span> <span class="s2">"PyscfCoupledClusterSettings"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="PyscfCoupledClusterSettings">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PyscfCoupledClusterSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for the PySCF Coupled Cluster calculator.</span>
+<span class="w">    </span><span class="sd">"""Settings configuration for the PySCF Coupled Cluster calculator.</span>
 
 <span class="sd">    This class manages the configuration parameters for the PySCF Coupled Cluster</span>
 <span class="sd">    calculator, providing default settings and allowing customization of</span>
@@ -178,26 +179,26 @@
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; settings = PyscfCoupledClusterSettings()</span>
-<span class="sd">        &gt;&gt;&gt; settings.set(&quot;max_cycle&quot;, 100)</span>
+<span class="sd">        &gt;&gt;&gt; settings.set("max_cycle", 100)</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="PyscfCoupledClusterSettings.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings with default values.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the settings with default values."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;conv_tol&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-7</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;conv_tol_normt&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;diis_space&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;diis_start_cycle&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;async_io&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;incore_complete&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;store_amplitudes&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;compute_bra&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"conv_tol"</span><span class="p">,</span> <span class="s2">"double"</span><span class="p">,</span> <span class="mf">1e-7</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"conv_tol_normt"</span><span class="p">,</span> <span class="s2">"double"</span><span class="p">,</span> <span class="mf">1e-5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"max_cycle"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"diis_space"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="mi">6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"diis_start_cycle"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"direct"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"async_io"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"incore_complete"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"store_amplitudes"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"compute_bra"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span></div>
 </div>
 
 
@@ -205,7 +206,7 @@
 <div class="viewcode-block" id="PyscfCoupledClusterCalculator">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PyscfCoupledClusterCalculator</span><span class="p">(</span><span class="n">DynamicalCorrelationCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;PySCF-based Coupled Cluster calculator for quantum chemistry calculations.</span>
+<span class="w">    </span><span class="sd">"""PySCF-based Coupled Cluster calculator for quantum chemistry calculations.</span>
 
 <span class="sd">    This class provides an interface between QDK/Chemistry and PySCF for performing</span>
 <span class="sd">    Coupled Cluster calculations on molecular systems. It handles the conversion</span>
@@ -214,12 +215,12 @@
 
 <span class="sd">    The calculator uses CCSD (Coupled Cluster Singles and Doubles) method.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="PyscfCoupledClusterCalculator.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the calculator with default settings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the calculator with default settings."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PyscfCoupledClusterSettings</span><span class="p">()</span></div>
@@ -228,13 +229,13 @@
 <div class="viewcode-block" id="PyscfCoupledClusterCalculator.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.coupled_cluster.html#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterCalculator.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of this coupled cluster implementation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return the name of this coupled cluster implementation."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="k">return</span> <span class="s2">&quot;pyscf_coupled_cluster&quot;</span></div>
+        <span class="k">return</span> <span class="s2">"pyscf_coupled_cluster"</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ansatz</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform a Coupled Cluster calculation using PySCF.</span>
+<span class="w">        </span><span class="sd">"""Perform a Coupled Cluster calculation using PySCF.</span>
 
 <span class="sd">        This method takes a QDK/Chemistry Ansatz object, converts it to the PySCF format,</span>
 <span class="sd">        performs a CCSD calculation, and returns the results as a pair of total energy and</span>
@@ -255,7 +256,7 @@
 <span class="sd">            RuntimeError: If the CCSD calculation does not converge.</span>
 <span class="sd">            RuntimeError: If the lambda equation solver does not converge (when compute_bra=True).</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ansatz</span><span class="o">.</span><span class="n">get_hamiltonian</span><span class="p">()</span>
 
@@ -263,28 +264,28 @@
         <span class="n">pyscf_scf</span> <span class="o">=</span> <span class="n">hamiltonian_to_scf</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">)</span>
         <span class="n">pyscf_cc</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">CCSD</span><span class="p">(</span><span class="n">pyscf_scf</span><span class="p">)</span>
 
-        <span class="n">store_amplitudes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;store_amplitudes&quot;</span><span class="p">)</span>
-        <span class="n">compute_bra</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;compute_bra&quot;</span><span class="p">)</span>
+        <span class="n">store_amplitudes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"store_amplitudes"</span><span class="p">)</span>
+        <span class="n">compute_bra</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"compute_bra"</span><span class="p">)</span>
 
         <span class="c1"># Handle Settings</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
-            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">))</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;max_memory&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
-            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">max_memory</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_memory&quot;</span><span class="p">))</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;frozen&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
-            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">frozen</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;frozen&quot;</span><span class="p">)</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">conv_tol</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;conv_tol&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">conv_tol_normt</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;conv_tol_normt&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">max_cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_cycle&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">diis_space</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;diis_space&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">diis_start_cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;diis_start_cycle&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">direct</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">async_io</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;async_io&quot;</span><span class="p">))</span>
-        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">incore_complete</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;incore_complete&quot;</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"verbose"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">verbose</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"verbose"</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"max_memory"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">max_memory</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_memory"</span><span class="p">))</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"frozen"</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">frozen</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"frozen"</span><span class="p">)</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">conv_tol</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"conv_tol"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">conv_tol_normt</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"conv_tol_normt"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">max_cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_cycle"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">diis_space</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"diis_space"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">diis_start_cycle</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"diis_start_cycle"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">direct</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"direct"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">async_io</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"async_io"</span><span class="p">))</span>
+        <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">incore_complete</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"incore_complete"</span><span class="p">))</span>
 
         <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">kernel</span><span class="p">()</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">converged</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;CCSD calculation did not converge&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"CCSD calculation did not converge"</span><span class="p">)</span>
 
         <span class="n">original_wavefunction</span> <span class="o">=</span> <span class="n">ansatz</span><span class="o">.</span><span class="n">get_wavefunction</span><span class="p">()</span>
         <span class="n">orbitals</span> <span class="o">=</span> <span class="n">original_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
@@ -317,7 +318,7 @@
                     <span class="n">t2_aabb</span><span class="p">,</span>
                     <span class="n">t2_aaaa</span><span class="p">,</span>
                     <span class="n">t2_bbbb</span><span class="p">,</span>
-                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
@@ -325,7 +326,7 @@
                     <span class="n">orbitals</span><span class="p">,</span>
                     <span class="n">original_wavefunction</span><span class="p">,</span>
                     <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
-                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Restricted case: t1 and t2 are single arrays</span>
@@ -344,7 +345,7 @@
                     <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
                     <span class="n">t1</span><span class="p">,</span>
                     <span class="n">t2</span><span class="p">,</span>
-                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                 <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
@@ -352,7 +353,7 @@
                     <span class="n">orbitals</span><span class="p">,</span>
                     <span class="n">original_wavefunction</span><span class="p">,</span>
                     <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
-                    <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                    <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                 <span class="p">)</span>
 
         <span class="c1"># Create a new wavefunction with the CC container</span>
@@ -365,7 +366,7 @@
         <span class="k">if</span> <span class="n">compute_bra</span><span class="p">:</span>
             <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">solve_lambda</span><span class="p">()</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">converged_lambda</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Lambda equation solver did not converge&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Lambda equation solver did not converge"</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="n">is_unrestricted</span><span class="p">:</span>
                 <span class="c1"># Unrestricted case: l1 = (l1_aa, l1_bb), l2 = (l2_aaaa, l2_aabb, l2_bbbb)</span>
@@ -390,7 +391,7 @@
                         <span class="n">l2_aabb</span><span class="p">,</span>
                         <span class="n">l2_aaaa</span><span class="p">,</span>
                         <span class="n">l2_bbbb</span><span class="p">,</span>
-                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
@@ -398,7 +399,7 @@
                         <span class="n">orbitals</span><span class="p">,</span>
                         <span class="n">original_wavefunction</span><span class="p">,</span>
                         <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
-                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                     <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="c1"># Restricted case: l1 and l2 are single arrays</span>
@@ -417,7 +418,7 @@
                         <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
                         <span class="n">l1</span><span class="p">,</span>
                         <span class="n">l2</span><span class="p">,</span>
-                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">else</span><span class="p">:</span>
                     <span class="c1"># Create AmplitudeContainer without storing amplitudes</span>
@@ -425,7 +426,7 @@
                         <span class="n">orbitals</span><span class="p">,</span>
                         <span class="n">original_wavefunction</span><span class="p">,</span>
                         <span class="n">AmplitudeType</span><span class="o">.</span><span class="n">CoupledCluster</span><span class="p">,</span>
-                        <span class="n">sector</span><span class="o">=</span><span class="s2">&quot;electrons&quot;</span><span class="p">,</span>
+                        <span class="n">sector</span><span class="o">=</span><span class="s2">"electrons"</span><span class="p">,</span>
                     <span class="p">)</span>
 
             <span class="n">bra_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">bra_container</span><span class="p">)</span>

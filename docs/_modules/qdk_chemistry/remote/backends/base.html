@@ -1,0 +1,793 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.remote.backends.base &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.remote.backends.base</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.remote.backends.base</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Remote execution of QDK/Chemistry. Base classes for remote backends.</span>
+
+<span class="sd">This module provides the abstract base class for remote execution backends.</span>
+<span class="sd">Backends transfer serialized inputs, submit the worker process, poll its</span>
+<span class="sd">status, and retrieve serialized outputs.</span>
+<span class="sd">"""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">Type</span>  <span class="c1"># noqa: UP035</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core</span><span class="w"> </span><span class="kn">import</span> <span class="n">DuplicateRegistrationError</span> <span class="k">as</span> <span class="n">_DuplicateRegistrationError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseInsensitiveStrEnum</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">DEFAULT_POLL_INTERVAL</span> <span class="o">=</span> <span class="mf">5.0</span>
+<span class="n">DEFAULT_TIMEOUT</span> <span class="o">=</span> <span class="mf">3600.0</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"DEFAULT_POLL_INTERVAL"</span><span class="p">,</span>
+    <span class="s2">"DEFAULT_TIMEOUT"</span><span class="p">,</span>
+    <span class="s2">"JobState"</span><span class="p">,</span>
+    <span class="s2">"JobStatus"</span><span class="p">,</span>
+    <span class="s2">"RemoteBackend"</span><span class="p">,</span>
+    <span class="s2">"available_backends"</span><span class="p">,</span>
+    <span class="s2">"create_remote"</span><span class="p">,</span>
+    <span class="s2">"get_backend"</span><span class="p">,</span>
+    <span class="s2">"get_mcp_safe_config_options"</span><span class="p">,</span>
+    <span class="s2">"register_backend"</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="JobState">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobState">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">JobState</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Canonical states in the remote job lifecycle."""</span>
+
+    <span class="n">SUBMITTED</span> <span class="o">=</span> <span class="s2">"submitted"</span>
+    <span class="n">RUNNING</span> <span class="o">=</span> <span class="s2">"running"</span>
+    <span class="n">SUCCEEDED</span> <span class="o">=</span> <span class="s2">"succeeded"</span>
+    <span class="n">FAILED</span> <span class="o">=</span> <span class="s2">"failed"</span>
+    <span class="n">CANCELED</span> <span class="o">=</span> <span class="s2">"canceled"</span>
+    <span class="n">CANCELLED</span> <span class="o">=</span> <span class="s2">"cancelled"</span>
+    <span class="n">RETRIEVED</span> <span class="o">=</span> <span class="s2">"retrieved"</span></div>
+
+
+
+<div class="viewcode-block" id="JobStatus">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">JobStatus</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Status of a remote job.</span>
+
+<span class="sd">    Returned by :meth:`RemoteBackend.check` and related helpers.</span>
+<span class="sd">    """</span>
+
+    <span class="n">TERMINAL_STATUSES</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">SUCCEEDED</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">CANCELED</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">CANCELLED</span><span class="p">,</span>
+            <span class="n">JobState</span><span class="o">.</span><span class="n">RETRIEVED</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+    <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">status</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># Case-insensitive: submitted, running, succeeded, failed, canceled, retrieved.</span>
+    <span class="n">logs</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
+    <span class="n">error</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">elapsed_seconds</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">metadata</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+
+<div class="viewcode-block" id="JobStatus.normalize_status">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus.normalize_status">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">normalize_status</span><span class="p">(</span><span class="n">status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the canonical form of a status string.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            status: Status string to normalize. If *None*, it is treated as an empty string.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The case-folded status string.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">status</span> <span class="ow">or</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">casefold</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="JobStatus.is_terminal_status">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus.is_terminal_status">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_terminal_status</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return whether a status string represents a terminal state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            status: Status string to check.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            *True* if the status represents a terminal state; otherwise, *False*.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">normalize_status</span><span class="p">(</span><span class="n">status</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">TERMINAL_STATUSES</span></div>
+
+
+<div class="viewcode-block" id="JobStatus.is_successful_status">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus.is_successful_status">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_successful_status</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">status</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return whether a status string represents successful execution.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            status: Status string to check.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            *True* if the status represents successful execution; otherwise, *False*.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">normalize_status</span><span class="p">(</span><span class="n">status</span><span class="p">)</span> <span class="o">==</span> <span class="n">JobState</span><span class="o">.</span><span class="n">SUCCEEDED</span></div>
+
+
+<div class="viewcode-block" id="JobStatus.is_terminal">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus.is_terminal">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_terminal</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Whether the job has reached a terminal state.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            *True* if the job has reached a terminal state; otherwise, *False*.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_terminal_status</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="JobStatus.is_successful">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus.is_successful">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_successful</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Whether the job completed successfully.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            *True* if the job completed successfully; otherwise, *False*.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_successful_status</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">status</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="RemoteBackend">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RemoteBackend</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for remote execution backends.</span>
+
+<span class="sd">    Backends must implement these core operations:</span>
+
+<span class="sd">    - **connect** / **disconnect**: lifecycle management</span>
+<span class="sd">    - **upload** / **download**: default file transfer to/from the remote system</span>
+<span class="sd">    - **_submit**: launch a job asynchronously (returns job_id + state)</span>
+<span class="sd">    - **check**: poll job status</span>
+<span class="sd">    - **fetch**: download and deserialize results</span>
+
+<span class="sd">    Backends may optionally implement:</span>
+
+<span class="sd">    - **cancel**: cancel a running or queued job</span>
+<span class="sd">    - **cleanup_job**: remove artifacts for a terminal job</span>
+
+<span class="sd">    :meth:`upload` and :meth:`download` are the normal transport for serialized</span>
+<span class="sd">    job files. A backend with access to a cache shared by the client and compute</span>
+<span class="sd">    node may use it instead for cache-backed artifacts, avoiding redundant file</span>
+<span class="sd">    transfers. Files unavailable through that cache still use the default</span>
+<span class="sd">    transport.</span>
+
+<span class="sd">    The remote node executes ``python -m qdk_chemistry.remote.worker`` which handles</span>
+<span class="sd">    input deserialization, algorithm execution, caching, and output</span>
+<span class="sd">    serialization.</span>
+
+<span class="sd">    Backend artifacts are retained after a job reaches a terminal state. Callers</span>
+<span class="sd">    are responsible for removing them with</span>
+<span class="sd">    :meth:`~qdk_chemistry.remote.job.Job.cleanup` or</span>
+<span class="sd">    :meth:`~qdk_chemistry.remote.job.Job.fetch` with ``cleanup=True``. Backend cleanup does not remove</span>
+<span class="sd">    caller-owned local job records or result directories.</span>
+
+<span class="sd">    To create a custom backend:</span>
+
+<span class="sd">    1. Subclass RemoteBackend</span>
+<span class="sd">    2. Implement the methods above</span>
+<span class="sd">    3. Register it from a QdkChemistryPlugin</span>
+<span class="sd">    4. Optionally declare ``mcp_safe_config_options`` for constructor options</span>
+<span class="sd">       that MCP clients may control. The default is deny-all.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin</span>
+<span class="sd">        &gt;&gt;&gt; class SlurmBackend(RemoteBackend):</span>
+<span class="sd">        ...     name = "slurm"</span>
+<span class="sd">        ...     mcp_safe_config_options = frozenset({"poll_interval", "timeout"})</span>
+<span class="sd">        ...</span>
+<span class="sd">        ...     def __init__(self, *, host, partition="default", poll_interval=5.0, timeout=3600.0):</span>
+<span class="sd">        ...         super().__init__(</span>
+<span class="sd">        ...             host=host,</span>
+<span class="sd">        ...             partition=partition,</span>
+<span class="sd">        ...             poll_interval=poll_interval,</span>
+<span class="sd">        ...             timeout=timeout,</span>
+<span class="sd">        ...         )</span>
+<span class="sd">        ...         self.host = host</span>
+<span class="sd">        ...         self.partition = partition</span>
+<span class="sd">        ...</span>
+<span class="sd">        ...     def connect(self):</span>
+<span class="sd">        ...         self._client = SlurmClient(self.host)</span>
+<span class="sd">        ...</span>
+<span class="sd">        ...     def upload(self, local_path, remote_path):</span>
+<span class="sd">        ...         self._client.sftp_put(local_path, remote_path)</span>
+<span class="sd">        ...</span>
+<span class="sd">        ...     def download(self, remote_path, local_path):</span>
+<span class="sd">        ...         self._client.sftp_get(remote_path, local_path)</span>
+<span class="sd">        ...</span>
+<span class="sd">        ...     def disconnect(self):</span>
+<span class="sd">        ...         self._client.close()</span>
+<span class="sd">        ...</span>
+<span class="sd">        &gt;&gt;&gt; class SlurmPlugin(QdkChemistryPlugin):</span>
+<span class="sd">        ...     def register(self, registrar: PluginRegistrar):</span>
+<span class="sd">        ...         registrar.register_remote_backend("slurm", SlurmBackend)</span>
+
+<span class="sd">    """</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>  <span class="c1"># Backend name (e.g., "scheduler", "local")</span>
+    <span class="n">mcp_safe_config_options</span><span class="p">:</span> <span class="n">ClassVar</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">()</span>
+<span class="w">    </span><span class="sd">"""Constructor options that MCP clients may control.</span>
+
+<span class="sd">    Concrete backends must declare this attribute directly on the class to</span>
+<span class="sd">    expose any options through MCP. The default is deny-all.</span>
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="RemoteBackend.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">**</span><span class="n">backend_args</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Store the arguments needed to recreate the concrete backend.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            **backend_args: Constructor arguments supplied by the concrete backend.</span>
+<span class="sd">                Persisted jobs normalize path-like values to strings and require</span>
+<span class="sd">                every remaining value to be JSON-serializable.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_backend_args</span> <span class="o">=</span> <span class="n">backend_args</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.connect">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.connect">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Establish connection to the remote system.</span>
+
+<span class="sd">        This is called once before any upload/execute/download operations.</span>
+<span class="sd">        Use this to set up network connections, authenticate with cloud services, etc.</span>
+
+<span class="sd">        """</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.disconnect">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.disconnect">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Close the connection to the remote system.</span>
+
+<span class="sd">        Called after connection-scoped operations are complete. This must not</span>
+<span class="sd">        cancel submitted jobs or remove artifacts referenced by persisted jobs.</span>
+
+<span class="sd">        """</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.upload">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.upload">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">upload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Upload a file from local system to remote system.</span>
+
+<span class="sd">        Backend implementations normally call this while staging the files</span>
+<span class="sd">        produced by input serialization. Cache-backed files may be omitted</span>
+<span class="sd">        when the compute node can read them from a shared cache.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            local_path: Path to the local file.</span>
+<span class="sd">            remote_path: Destination path on the remote system.</span>
+
+<span class="sd">        """</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.download">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.download">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">download</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">local_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Download a file from remote system to local system.</span>
+
+<span class="sd">        Backend implementations normally call this from :meth:`fetch` for</span>
+<span class="sd">        serialized outputs that were not retrieved through a shared cache.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            remote_path: Path to the file on the remote system.</span>
+<span class="sd">            local_path: Destination path on the local system.</span>
+
+<span class="sd">        """</span></div>
+
+
+    <span class="c1"># ── Async job primitives ─────────────────────────────────────────────</span>
+
+<div class="viewcode-block" id="RemoteBackend.submit">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.submit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">job_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Job</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Submit a job and return immediately with a ``Job``.</span>
+
+<span class="sd">        This method does **not** block.</span>
+<span class="sd">        The returned ``Job`` is self-contained: it can be</span>
+<span class="sd">        saved to disk, loaded in a different process, and used to</span>
+<span class="sd">        ``Job.check()``, ``Job.cancel()``, or</span>
+<span class="sd">        ``Job.fetch()`` results.</span>
+
+<span class="sd">        Subclasses must override ``_submit()`` to provide the</span>
+<span class="sd">        backend-specific implementation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            payload: Execution request containing algorithm metadata and inputs.</span>
+<span class="sd">            job_dir: Optional directory where the job file is saved</span>
+<span class="sd">                automatically (as ``&lt;id&gt;.job.json``).  If *None* the job</span>
+<span class="sd">                is returned in-memory only.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A ``Job`` that tracks this submission.</span>
+
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span><span class="p">,</span> <span class="n">_prepare_persisted_value</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">backend_name</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="s2">"backend"</span><span class="p">)</span>
+        <span class="n">backend_config</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_backend_args</span><span class="p">),</span> <span class="s2">"backend_config"</span><span class="p">)</span>
+        <span class="n">algorithm_info</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">"type"</span><span class="p">:</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"algorithm_type"</span><span class="p">),</span>
+                <span class="s2">"name"</span><span class="p">:</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"algorithm_name"</span><span class="p">),</span>
+                <span class="s2">"settings"</span><span class="p">:</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"settings"</span><span class="p">),</span>
+            <span class="p">},</span>
+            <span class="s2">"algorithm_info"</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">run_hash</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"run_hash"</span><span class="p">),</span> <span class="s2">"run_hash"</span><span class="p">)</span>
+        <span class="n">input_hashes</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_hashes"</span><span class="p">),</span> <span class="s2">"input_hashes"</span><span class="p">)</span>
+        <span class="n">owner</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"owner"</span><span class="p">),</span> <span class="s2">"owner"</span><span class="p">)</span>
+
+        <span class="n">job_id</span><span class="p">,</span> <span class="n">backend_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submit</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">persisted_job_id</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="s2">"job_id"</span><span class="p">)</span>
+            <span class="n">persisted_backend_state</span> <span class="o">=</span> <span class="n">_prepare_persisted_value</span><span class="p">(</span><span class="n">backend_state</span><span class="p">,</span> <span class="s2">"backend_state"</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">operation</span><span class="p">,</span> <span class="n">label</span> <span class="ow">in</span> <span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">cancel</span><span class="p">,</span> <span class="s2">"cancel"</span><span class="p">),</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">cleanup_job</span><span class="p">,</span> <span class="s2">"clean up"</span><span class="p">)):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">operation</span><span class="p">(</span><span class="n">backend_state</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="s2">"Failed to </span><span class="si">%s</span><span class="s2"> remote job </span><span class="si">%s</span><span class="s2"> after metadata validation failed"</span><span class="p">,</span>
+                        <span class="n">label</span><span class="p">,</span>
+                        <span class="n">job_id</span><span class="p">,</span>
+                        <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="p">)</span>
+            <span class="k">raise</span>
+
+        <span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span>
+            <span class="n">job_id</span><span class="o">=</span><span class="n">persisted_job_id</span><span class="p">,</span>
+            <span class="n">backend</span><span class="o">=</span><span class="n">backend_name</span><span class="p">,</span>
+            <span class="n">backend_config</span><span class="o">=</span><span class="n">backend_config</span><span class="p">,</span>
+            <span class="n">backend_state</span><span class="o">=</span><span class="n">persisted_backend_state</span><span class="p">,</span>
+            <span class="n">algorithm_info</span><span class="o">=</span><span class="n">algorithm_info</span><span class="p">,</span>
+            <span class="n">run_hash</span><span class="o">=</span><span class="n">run_hash</span><span class="p">,</span>
+            <span class="n">input_hashes</span><span class="o">=</span><span class="n">input_hashes</span><span class="p">,</span>
+            <span class="n">owner</span><span class="o">=</span><span class="n">owner</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">job</span><span class="o">.</span><span class="n">attach_backend</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">job_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">job_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">job_dir</span><span class="p">)</span>
+            <span class="n">job</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">job_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">.job.json"</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">job</span></div>
+
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Backend-specific async submission.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            payload: Execution request.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A ``(job_id, backend_state)`` tuple where *backend_state* is</span>
+<span class="sd">            an opaque dict that will be passed back to :meth:`check`,</span>
+<span class="sd">            :meth:`cancel`, and :meth:`fetch`. Its values must be</span>
+<span class="sd">            JSON-serializable or path-like. Lifecycle methods must accept the</span>
+<span class="sd">            persisted representation, in which path-like values are strings.</span>
+
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Backend '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' does not support async submission"</span><span class="p">)</span>
+
+<div class="viewcode-block" id="RemoteBackend.check">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.check">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JobStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Query the current status of a previously submitted job.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: The opaque state dict produced by ``_submit()``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A ``JobStatus`` describing the job's current state.</span>
+
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Backend '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' does not support status checks"</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.cancel">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.cancel">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Cancel a running or queued job.</span>
+
+<span class="sd">        This operation is optional. The default implementation raises</span>
+<span class="sd">        :class:`NotImplementedError`.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: The opaque state dict produced by ``_submit()``.</span>
+
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Backend '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' does not support cancellation"</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.fetch">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.fetch">[docs]</a>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+        <span class="n">local_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Download and deserialize results for a completed job.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: The opaque state dict produced by ``_submit()``.</span>
+<span class="sd">            local_dir: Optional directory to download result files into.</span>
+<span class="sd">                If *None*, a temporary directory is used and cleaned up</span>
+<span class="sd">                after deserialization.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The deserialized algorithm results (same format as the return</span>
+<span class="sd">            value of the completed algorithm run).</span>
+
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Backend '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' does not support result fetching"</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="RemoteBackend.cleanup_job">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend.cleanup_job">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Remove artifacts owned by a terminal job.</span>
+
+<span class="sd">        This operation is optional. Implementations must make repeated calls</span>
+<span class="sd">        safe and must not remove shared backend work directories. The default</span>
+<span class="sd">        implementation raises :class:`NotImplementedError`.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: The opaque state dict produced by ``_submit()``.</span>
+
+<span class="sd">        """</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Backend '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">' does not support job cleanup"</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="c1"># ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="c1"># Backend Registry</span>
+<span class="c1"># ─────────────────────────────────────────────────────────────────────────────</span>
+
+<span class="n">_BACKENDS</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_declared_mcp_safe_config_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return MCP-safe options declared directly by a backend class.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cls: Concrete backend class to inspect.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The class's declared MCP-safe constructor options, or an empty set</span>
+<span class="sd">        when the class does not declare any.</span>
+
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="vm">__dict__</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"mcp_safe_config_options"</span><span class="p">,</span> <span class="nb">frozenset</span><span class="p">())</span>
+
+
+<div class="viewcode-block" id="get_mcp_safe_config_options">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.get_mcp_safe_config_options">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_mcp_safe_config_options</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return MCP-safe constructor options for a registered backend.</span>
+
+<span class="sd">    Unknown backends and those without a direct declaration expose no</span>
+<span class="sd">    configurable options to MCP clients.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: Registered backend name.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The explicitly declared MCP-safe constructor options. Returns an empty</span>
+<span class="sd">        set when the backend is unknown or has no direct declaration.</span>
+
+<span class="sd">    """</span>
+    <span class="bp">cls</span> <span class="o">=</span> <span class="n">_BACKENDS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="bp">cls</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">frozenset</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">_declared_mcp_safe_config_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_register_backend</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="bp">cls</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">]:</span>  <span class="c1"># noqa: UP006</span>
+<span class="w">    </span><span class="sd">"""Register one backend class after validating registry ownership.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: Registry name for the backend.</span>
+<span class="sd">        cls: Backend class to register.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_BACKENDS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">_DuplicateRegistrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Remote backend name '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' is already registered"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">registered_name</span><span class="p">,</span> <span class="n">registered_cls</span> <span class="ow">in</span> <span class="n">_BACKENDS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">registered_cls</span> <span class="ow">is</span> <span class="bp">cls</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">_DuplicateRegistrationError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Remote backend class '</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__module__</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__qualname__</span><span class="si">}</span><span class="s2">' is already registered "</span>
+                <span class="sa">f</span><span class="s2">"with name '</span><span class="si">{</span><span class="n">registered_name</span><span class="si">}</span><span class="s2">'"</span>
+            <span class="p">)</span>
+
+    <span class="c1"># Declarations are intentionally not inherited: a subclass may change the</span>
+    <span class="c1"># meaning of constructor parameters and must make its own trust decision.</span>
+    <span class="n">safe_options</span> <span class="o">=</span> <span class="n">_declared_mcp_safe_config_options</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">safe_options</span><span class="p">,</span> <span class="nb">frozenset</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="nb">isinstance</span><span class="p">(</span><span class="n">option</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="n">option</span> <span class="k">for</span> <span class="n">option</span> <span class="ow">in</span> <span class="n">safe_options</span>
+    <span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Remote backend '</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__module__</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__qualname__</span><span class="si">}</span><span class="s2">' must declare "</span>
+            <span class="s2">"mcp_safe_config_options as a frozenset of non-empty strings"</span>
+        <span class="p">)</span>
+
+    <span class="n">constructor_parameters</span> <span class="o">=</span> <span class="n">inspect</span><span class="o">.</span><span class="n">signature</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="fm">__init__</span><span class="p">)</span><span class="o">.</span><span class="n">parameters</span>
+    <span class="n">keyword_parameters</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="n">parameter_name</span>
+        <span class="k">for</span> <span class="n">parameter_name</span><span class="p">,</span> <span class="n">parameter</span> <span class="ow">in</span> <span class="n">constructor_parameters</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">parameter_name</span> <span class="o">!=</span> <span class="s2">"self"</span>
+        <span class="ow">and</span> <span class="n">parameter</span><span class="o">.</span><span class="n">kind</span> <span class="ow">in</span> <span class="p">(</span><span class="n">inspect</span><span class="o">.</span><span class="n">Parameter</span><span class="o">.</span><span class="n">POSITIONAL_OR_KEYWORD</span><span class="p">,</span> <span class="n">inspect</span><span class="o">.</span><span class="n">Parameter</span><span class="o">.</span><span class="n">KEYWORD_ONLY</span><span class="p">)</span>
+    <span class="p">}</span>
+    <span class="n">unknown_options</span> <span class="o">=</span> <span class="n">safe_options</span> <span class="o">-</span> <span class="n">keyword_parameters</span>
+    <span class="k">if</span> <span class="n">unknown_options</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Remote backend '</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__module__</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__qualname__</span><span class="si">}</span><span class="s2">' declares MCP-safe options that are not "</span>
+            <span class="sa">f</span><span class="s2">"named constructor parameters: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">unknown_options</span><span class="p">))</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+
+    <span class="bp">cls</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+    <span class="n">_BACKENDS</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span>
+    <span class="k">return</span> <span class="bp">cls</span>
+
+
+<div class="viewcode-block" id="register_backend">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.register_backend">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">register_backend</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">]],</span> <span class="n">Type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">]]:</span>  <span class="c1"># noqa: UP006</span>
+<span class="w">    </span><span class="sd">"""Decorator to register a backend class with a name.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; @register_backend("custom")</span>
+<span class="sd">        ... class CustomBackend(RemoteBackend):</span>
+<span class="sd">        ...     ...</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: The backend name (e.g., "custom" or "local").</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Decorator function that registers the backend class.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        DuplicateRegistrationError: If the remote backend name or class is already registered.</span>
+
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="bp">cls</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Type</span><span class="p">[</span><span class="n">RemoteBackend</span><span class="p">]:</span>  <span class="c1"># noqa: UP006</span>
+        <span class="k">return</span> <span class="n">_register_backend</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="bp">cls</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">decorator</span></div>
+
+
+
+<div class="viewcode-block" id="get_backend">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.get_backend">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_backend</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RemoteBackend</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Create a backend instance by name.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: Backend name (e.g., "custom" or "local")</span>
+<span class="sd">        **config: Backend-specific configuration.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Configured RemoteBackend instance</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If no backend is registered with that name</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_BACKENDS</span><span class="p">:</span>
+        <span class="n">available</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_BACKENDS</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span> <span class="ow">or</span> <span class="s2">"(none)"</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"No backend registered with name '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">'. Available backends: </span><span class="si">{</span><span class="n">available</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">_BACKENDS</span><span class="p">[</span><span class="n">name</span><span class="p">](</span><span class="o">**</span><span class="n">config</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="create_remote">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.create_remote">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_remote</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RemoteBackend</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Create a configured remote backend instance.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: Backend name (e.g., "custom" or "local")</span>
+<span class="sd">        **config: Backend-specific configuration options.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Configured RemoteBackend instance ready for use</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.remote import create_remote</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; remote = create_remote("local", timeout=7200, poll_interval=10.0)</span>
+<span class="sd">        &gt;&gt;&gt; scf = create("scf_solver")</span>
+<span class="sd">        &gt;&gt;&gt; energy, wfn = scf.run(structure, 0, 1, "cc-pvdz",</span>
+<span class="sd">        ...                       cache="./cache", remote=remote)</span>
+
+<span class="sd">    """</span>
+    <span class="n">backend</span> <span class="o">=</span> <span class="n">get_backend</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">)</span>
+    <span class="n">backend</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">backend</span></div>
+
+
+
+<div class="viewcode-block" id="available_backends">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.available_backends">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">available_backends</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return list of registered backend names."""</span>
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">_BACKENDS</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

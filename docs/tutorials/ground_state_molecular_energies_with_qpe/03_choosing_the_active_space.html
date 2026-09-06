@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Choosing the active space &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Choosing the active space &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -144,11 +145,10 @@ Record the evidence used to select the active space, not only the final orbital 
 Explain what the energy comparison establishes within the chosen basis and identify the energy that will serve as the algorithmic reference.</p>
 </div>
 </section>
-<section id="example-download">
-<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
-<p>First download <a class="reference download internal" download="" href="../../_downloads/2f07e2323e1906c3922876467343a044/tutorial_orbital_coordinates.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code></a>, which contains the reusable numerical machinery for choosing coordinates inside degenerate orbital subspaces.
-Then download <a class="reference download internal" download="" href="../../_downloads/1a2f7bdf060308bbc54b67c9f1cf67d1/tutorial_choose_active_space.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code></a> and <a class="reference download internal" download="" href="../../_downloads/ec60a60bc1cbe30d2cf2d739a93145e2/tutorial_choose_active_space.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.ipynb</span></code></a>, and save all three files in your tutorial working directory.
-Open all three files in Visual Studio Code and review the complete scripts, including imports and setup code omitted from the excerpts below.
+<section id="example-files">
+<h2>Example files<a class="headerlink" href="#example-files" title="Link to this heading"></a></h2>
+<p>Add <a class="reference download internal" download="" href="../../_downloads/1a2f7bdf060308bbc54b67c9f1cf67d1/tutorial_choose_active_space.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code></a> and <a class="reference download internal" download="" href="../../_downloads/ec60a60bc1cbe30d2cf2d739a93145e2/tutorial_choose_active_space.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.ipynb</span></code></a> to your tutorial working folder.
+Open both files in Visual Studio Code and review the complete script and notebook, including imports and setup code omitted from the excerpts below.
 The script resumes the stretched N<sub>2</sub> workflow from <a class="reference internal" href="02_describing_the_molecule.html"><span class="doc">Describing the molecule</span></a> before constructing and refining the correlated model.
 Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive Jupyter notebook use the same tested chemistry workflow rather than duplicate it.</p>
 </section>
@@ -184,7 +184,7 @@ If that model contains <span class="math notranslate nohighlight">\(n_o\)</span>
 <section id="the-active-space">
 <span id="tutorial-active-space-definition"></span><h2>The active space<a class="headerlink" href="#the-active-space" title="Link to this heading"></a></h2>
 <figure class="align-center" id="id5">
-<span id="tutorial-orbital-partition"></span><div class="graphviz"><img src="../../_images/graphviz-2c32275df5bb1eb4a47a5cef7404aa067735ca03.png" alt="The spatial molecular orbitals are partitioned into inactive orbitals that remain doubly occupied and contribute to the core energy, active orbitals whose occupations vary among determinants and whose correlation is treated explicitly, and virtual orbitals that remain empty and are excluded from the correlated calculation." class="graphviz" /></div>
+<span id="tutorial-orbital-partition"></span><img alt="The spatial molecular orbitals are partitioned into inactive orbitals that remain doubly occupied and contribute to the core energy, active orbitals whose occupations vary among determinants and whose correlation is treated explicitly, and virtual orbitals that remain empty and are excluded from the correlated calculation." src="../../_images/tutorial_qpe_orbital_partition.svg" />
 <figcaption>
 <p><span class="caption-text">An active-space calculation varies occupations only among the active orbitals; inactive and virtual occupations remain fixed across determinants.</span><a class="headerlink" href="#id5" title="Link to this image"></a></p>
 </figcaption>
@@ -206,8 +206,8 @@ Orbitals near this boundary are the most accessible when low-energy configuratio
     <span class="n">hartree_fock_wavefunction</span><span class="p">,</span> <span class="n">charge</span>
 <span class="p">)</span>
 <span class="n">valence_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;qdk_valence&quot;</span><span class="p">,</span>
+    <span class="s2">"active_space_selector"</span><span class="p">,</span>
+    <span class="s2">"qdk_valence"</span><span class="p">,</span>
     <span class="n">num_active_electrons</span><span class="o">=</span><span class="n">num_valence_electrons</span><span class="p">,</span>
     <span class="n">num_active_orbitals</span><span class="o">=</span><span class="n">num_valence_orbitals</span><span class="p">,</span>
 <span class="p">)</span>
@@ -232,11 +232,11 @@ Use these values with the total number of <code class="docutils literal notransl
 <h2>A correlated active-space wavefunction<a class="headerlink" href="#a-correlated-active-space-wavefunction" title="Link to this heading"></a></h2>
 <p>The active-space selector labels orbitals but does not determine how strongly each orbital participates in correlation.
 That evidence must come from a correlated wavefunction.
-The script constructs the molecular Hamiltonian in the initial valence space and solves it with the <a class="reference internal" href="../../user/comprehensive/algorithms/mc_calculator.html#macis-cas"><span class="std std-ref">MACIS CASCI implementation</span></a> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id12" title="David B. Williams-Young, Norm M. Tubman, Carlos Mejuto-Zaera, and Wibe A. de Jong. A parallel, distributed memory implementation of the adaptive sampling configuration interaction method. The Journal of Chemical Physics, 158:214109, 2023. URL: https://arxiv.org/abs/2303.05688, doi:10.1063/5.0148650.">WYTMZdJ23</a>]</span>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+The script constructs the molecular Hamiltonian in the initial valence space and solves it with the <a class="reference internal" href="../../user/comprehensive/algorithms/mc_calculator.html#macis-cas"><span class="std std-ref">MACIS CASCI implementation</span></a> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id13" title="David B. Williams-Young, Norm M. Tubman, Carlos Mejuto-Zaera, and Wibe A. de Jong. A parallel, distributed memory implementation of the adaptive sampling configuration interaction method. The Journal of Chemical Physics, 158:214109, 2023. URL: https://arxiv.org/abs/2303.05688, doi:10.1063/5.0148650.">WYTMZdJ23</a>]</span>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 <span class="n">casci_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;macis_cas&quot;</span><span class="p">,</span>
+    <span class="s2">"multi_configuration_calculator"</span><span class="p">,</span>
+    <span class="s2">"macis_cas"</span><span class="p">,</span>
     <span class="c1"># Tight convergence keeps the RDM-derived natural subspaces stable</span>
     <span class="c1"># across numerical backends before their orbital gauge is selected.</span>
     <span class="n">ci_residual_tolerance</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span>
@@ -273,7 +273,7 @@ If the important determinants give an orbital the same occupation, one probabili
 <p>Different sets of molecular orbitals can describe the same active space.
 Changing to natural orbitals changes the individual orbital shapes but not the exact <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> energy for that active space.
 Orbital-resolved quantities, however, can change because they describe the chosen orbital representation.</p>
-<p>Natural orbitals diagonalize the one-particle <a class="reference internal" href="../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id44" title="Per-Olov Löwdin and Harrison Shull. Natural orbitals in the quantum theory of two-electron systems. Physical Review, 101:1730–1739, Mar 1956. URL: https://link.aps.org/doi/10.1103/PhysRev.101.1730, doi:10.1103/PhysRev.101.1730.">LowdinS56</a>]</span>.
+<p>Natural orbitals diagonalize the one-particle <a class="reference internal" href="../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id47" title="Per-Olov Löwdin and Harrison Shull. Natural orbitals in the quantum theory of two-electron systems. Physical Review, 101:1730–1739, Mar 1956. URL: https://link.aps.org/doi/10.1103/PhysRev.101.1730, doi:10.1103/PhysRev.101.1730.">LowdinS56</a>]</span>.
 Their eigenvalues are natural-orbital occupation numbers between zero and two for spatial orbitals.
 In this basis, the off-diagonal elements vanish, so each occupation number is associated directly with one natural orbital rather than being mixed among several orbitals.
 Occupations near two identify nearly doubly occupied orbitals, occupations near zero identify nearly empty orbitals, and fractional occupations can reveal orbitals that require multiple electron configurations.
@@ -283,7 +283,7 @@ It rotates the active orbitals into the natural-orbital representation described
 The script then rebuilds and resolves the initial valence-space Hamiltonian so that both <a class="reference internal" href="../../glossary.html#term-RDM"><span class="xref std std-term">RDMs</span></a> and the orbital diagnostics are expressed consistently in the natural-orbital representation:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Rotate the valence orbitals using the CASCI one-particle RDM so each</span>
 <span class="c1"># natural orbital has a well-defined correlated occupation.</span>
-<span class="n">natural_orbital_localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;orbital_localizer&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_natural_orbitals&quot;</span><span class="p">)</span>
+<span class="n">natural_orbital_localizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"orbital_localizer"</span><span class="p">,</span> <span class="s2">"qdk_natural_orbitals"</span><span class="p">)</span>
 <span class="n">natural_orbital_wavefunction</span> <span class="o">=</span> <span class="n">natural_orbital_localizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">valence_casci_wavefunction</span><span class="p">,</span>
     <span class="n">valence_indices</span><span class="p">,</span>
@@ -344,12 +344,12 @@ The resulting data flow is therefore: the correlated wavefunction determines the
 <p>The selector uses single-orbital entropies derived from local occupation probabilities.
 Those probabilities require one- and two-particle <a class="reference internal" href="../../glossary.html#term-RDM"><span class="xref std std-term">RDMs</span></a> from a correlated wavefunction; a Hartree–Fock determinant alone does not provide the required correlation evidence.</p>
 </details>
-<p>The QDK/Chemistry <a class="reference internal" href="../../user/comprehensive/algorithms/active_space.html#qdk-autocas-eos"><span class="std std-ref">qdk_autocas_eos selector</span></a> sorts the orbital entropies and selects a high-entropy group separated from the remaining orbitals by a sufficiently large gap <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../references.html#id34" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../references.html#id35" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.
+<p>The QDK/Chemistry <a class="reference internal" href="../../user/comprehensive/algorithms/active_space.html#qdk-autocas-eos"><span class="std std-ref">qdk_autocas_eos selector</span></a> sorts the orbital entropies and selects a high-entropy group separated from the remaining orbitals by a sufficiently large gap <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../references.html#id37" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../references.html#id38" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>.
 The thresholds are configurable; see <a class="reference internal" href="../../user/comprehensive/algorithms/active_space.html"><span class="doc">Active-space selection</span></a> for their defaults and use with less clearly separated entropy values.
 The selector then repartitions the orbitals according to the selected group:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># autoCAS uses the RDM-derived orbital entropies to retain the orbitals that</span>
 <span class="c1"># carry the strongest correlation in a smaller active space.</span>
-<span class="n">autocas_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_autocas_eos&quot;</span><span class="p">)</span>
+<span class="n">autocas_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"active_space_selector"</span><span class="p">,</span> <span class="s2">"qdk_autocas_eos"</span><span class="p">)</span>
 <span class="n">refined_wavefunction</span> <span class="o">=</span> <span class="n">autocas_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">natural_orbital_casci_wavefunction</span><span class="p">)</span>
 <span class="n">refined_orbitals</span> <span class="o">=</span> <span class="n">refined_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
@@ -358,9 +358,9 @@ The selector then repartitions the orbitals according to the selected group:</p>
 <span class="n">refined_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">refined_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">alpha_channel</span><span class="p">))</span>
 <span class="k">if</span> <span class="ow">not</span> <span class="n">refined_indices</span><span class="p">:</span>
     <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-        <span class="s2">&quot;autoCAS selected no active orbitals. Set refined_wavefunction to &quot;</span>
-        <span class="s2">&quot;natural_orbital_wavefunction to retain the complete valence space, &quot;</span>
-        <span class="s2">&quot;or adjust the autoCAS thresholds before continuing.&quot;</span>
+        <span class="s2">"autoCAS selected no active orbitals. Set refined_wavefunction to "</span>
+        <span class="s2">"natural_orbital_wavefunction to retain the complete valence space, "</span>
+        <span class="s2">"or adjust the autoCAS thresholds before continuing."</span>
     <span class="p">)</span>
 <span class="n">inactive_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">refined_orbitals</span><span class="o">.</span><span class="n">inactive_indices</span><span class="p">()</span><span class="o">.</span><span class="n">indices</span><span class="p">(</span><span class="n">alpha_channel</span><span class="p">))</span>
 <span class="n">num_refined_alpha</span><span class="p">,</span> <span class="n">num_refined_beta</span> <span class="o">=</span> <span class="p">(</span>
@@ -375,18 +375,27 @@ The selector then repartitions the orbitals according to the selected group:</p>
 <span class="p">)</span>
 
 <span class="c1"># Natural occupations can be degenerate, leaving the corresponding orbital</span>
-<span class="c1"># vectors free to rotate. Choose that gauge only after autoCAS has selected</span>
-<span class="c1"># the final active subspace, because lambda belongs to its mapped Hamiltonian.</span>
-<span class="n">coordinate_minimization</span> <span class="o">=</span> <span class="n">coordinate_minimize_natural_orbital_coefficient_norm</span><span class="p">(</span>
-    <span class="n">valence_casci_wavefunction</span><span class="p">,</span>
-    <span class="n">refined_orbitals</span><span class="p">,</span>
-    <span class="n">valence_indices</span><span class="p">,</span>
+<span class="c1"># vectors free to rotate. Fix the selected complete blocks deterministically</span>
+<span class="c1"># before applying the reduced autoCAS partition to the transformed orbitals.</span>
+<span class="n">gauge_fixer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"orbital_localizer"</span><span class="p">,</span> <span class="s2">"qdk_gauge_fixing"</span><span class="p">)</span>
+<span class="n">gauge_fixed_wavefunction</span> <span class="o">=</span> <span class="n">gauge_fixer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">natural_orbital_casci_wavefunction</span><span class="p">,</span>
+    <span class="n">refined_indices</span><span class="p">,</span>
+    <span class="n">refined_indices</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">refined_orbitals</span> <span class="o">=</span> <span class="n">coordinate_minimization</span><span class="o">.</span><span class="n">orbitals</span>
+<span class="n">gauge_fixed_orbitals</span> <span class="o">=</span> <span class="n">gauge_fixed_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+<span class="n">refined_orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span>
+    <span class="n">coefficients</span><span class="o">=</span><span class="n">gauge_fixed_orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">(),</span>
+    <span class="n">energies</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">ao_overlap</span><span class="o">=</span><span class="n">gauge_fixed_orbitals</span><span class="o">.</span><span class="n">get_overlap_matrix</span><span class="p">(),</span>
+    <span class="n">basis_set</span><span class="o">=</span><span class="n">gauge_fixed_orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">(),</span>
+    <span class="n">active_indices</span><span class="o">=</span><span class="n">refined_orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">(),</span>
+    <span class="n">inactive_indices</span><span class="o">=</span><span class="n">refined_orbitals</span><span class="o">.</span><span class="n">inactive_indices</span><span class="p">(),</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 <figure class="align-center" id="id6">
-<a class="reference internal image-reference" href="../../_images/tutorial_qpe_orbital_entropy.png"><img alt="Entropy-ranked candidate orbitals. Selected orbitals 8, 7, 5, 6, 9, and 4 have entropies of approximately 0.966, 0.966, 0.964, 0.964, 0.554, and 0.548. Excluded orbitals 3 and 2 have entropies of approximately 0.030 and 0.022. A dashed vertical cut separates the sixth and seventh entropy ranks." src="../../_images/tutorial_qpe_orbital_entropy.png" style="width: 90%;" />
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_orbital_entropy.svg"><img alt="Entropy-ranked candidate orbitals. Selected orbitals 8, 7, 5, 6, 9, and 4 have entropies of approximately 0.966, 0.966, 0.964, 0.964, 0.554, and 0.548. Excluded orbitals 3 and 2 have entropies of approximately 0.030 and 0.022. A dashed vertical cut separates the sixth and seventh entropy ranks." src="../../_images/tutorial_qpe_orbital_entropy.svg" style="width: 90%;" />
 </a>
 <figcaption>
 <p><span class="caption-text">Candidate natural orbitals sorted by decreasing single-orbital entropy. autoCAS retains the high-entropy group to the left of the dashed cut.</span><a class="headerlink" href="#id6" title="Link to this image"></a></p>
@@ -395,7 +404,10 @@ The selector then repartitions the orbitals according to the selected group:</p>
 <p>The asterisks in the script output identify the selected orbitals.
 The selected high-entropy group determines the refined active space.
 Equal natural-orbital occupations can leave the corresponding orbital vectors free to rotate within a degenerate subspace.
-The script chooses a reproducible representation within each selected degenerate block by coordinate-minimizing the mapped Hamiltonian coefficient norm <span class="math notranslate nohighlight">\(\lambda=\sum_\ell\lvert h_\ell\rvert\)</span>, without changing the orbital subspace or its exact <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> energy.
+The script passes the complete autoCAS-selected blocks to the native <a class="reference internal" href="../../user/comprehensive/algorithms/localizer.html#localizer-qdk-gauge-fixing"><span class="std std-ref">qdk_gauge_fixing localizer</span></a>.
+This localizer first anchors each selected block to the atomic-orbital basis and then rotates those blocks to minimize the valence-space mapped Hamiltonian coefficient norm <span class="math notranslate nohighlight">\(\lambda=\sum_\ell\lvert h_\ell\rvert\)</span>, without changing the orbital subspace or its exact <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> energy.
+Gauge fixing uses the correlated natural-orbital wavefunction because its one-particle <a class="reference internal" href="../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> defines the occupation-degenerate blocks.
+The script then applies the refined autoCAS partition to the gauge-fixed orbitals before constructing the final selected-space Hamiltonian.
 Among the unselected orbitals, those below the occupied–virtual boundary of the reference determinant become inactive, while those above the boundary become virtual.
 Freezing these low-entropy orbitals is still an approximation because low entropy does not mean that their correlation contribution is exactly zero, so the energy comparison below measures part of its cost.
 Their entropies are small rather than exactly zero, and allowing excitations involving them can still lower the correlated energy.</p>
@@ -466,7 +478,7 @@ Use the final selected-space energy as the algorithmic reference, while retainin
 </section>
 <section id="candidate-orbital-visualization">
 <h2>Candidate-orbital visualization<a class="headerlink" href="#candidate-orbital-visualization" title="Link to this heading"></a></h2>
-<p>Download and open <a class="reference download internal" download="" href="../../_downloads/ec60a60bc1cbe30d2cf2d739a93145e2/tutorial_choose_active_space.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.ipynb</span></code></a> in Visual Studio Code.
+<p>Open <a class="reference download internal" download="" href="../../_downloads/ec60a60bc1cbe30d2cf2d739a93145e2/tutorial_choose_active_space.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.ipynb</span></code></a> in Visual Studio Code.
 Choose <strong>Select Kernel</strong>, select <strong>Python Environments</strong>, and choose the <code class="docutils literal notranslate"><span class="pre">.venv</span></code> environment created in <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a>.
 If <code class="docutils literal notranslate"><span class="pre">.venv</span></code> does not appear, open the Command Palette, run <strong>Developer: Reload Window</strong>, and reopen the kernel selector.
 Then select <strong>Run All</strong> to execute the shared active-space calculation and generate an interactive molecular-orbital viewer.</p>

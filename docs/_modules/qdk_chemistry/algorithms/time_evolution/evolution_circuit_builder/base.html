@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Base classes for evolution circuit builders.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""Base classes for evolution circuit builders."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -115,51 +116,51 @@
 <span class="p">)</span>
 
 <span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;EvolutionCircuitBuilder&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;EvolutionCircuitBuilderFactory&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;EvolutionCircuitBuilderSettings&quot;</span><span class="p">,</span>
+    <span class="s2">"EvolutionCircuitBuilder"</span><span class="p">,</span>
+    <span class="s2">"EvolutionCircuitBuilderFactory"</span><span class="p">,</span>
+    <span class="s2">"EvolutionCircuitBuilderSettings"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
 <div class="viewcode-block" id="EvolutionCircuitBuilderSettings">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EvolutionCircuitBuilderSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the evolution circuit builder.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Settings for the evolution circuit builder."""</span>
 
 <div class="viewcode-block" id="EvolutionCircuitBuilderSettings.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize defaults for evolution circuit builder.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize defaults for evolution circuit builder."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;evolution_builder&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Time evolution builder used to construct the unitary.&quot;</span><span class="p">,</span>
+            <span class="s2">"evolution_builder"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">),</span>
+            <span class="s2">"Time evolution builder used to construct the unitary."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;circuit_mapper&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Circuit mapper used to convert the unitary to a circuit.&quot;</span><span class="p">,</span>
+            <span class="s2">"circuit_mapper"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"circuit_mapper"</span><span class="p">,</span> <span class="s2">"pauli_sequence"</span><span class="p">),</span>
+            <span class="s2">"Circuit mapper used to convert the unitary to a circuit."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;propagator&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;propagator&quot;</span><span class="p">,</span> <span class="s2">&quot;magnus&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Propagator used to evaluate the effective Hamiltonian over each dt interval.&quot;</span><span class="p">,</span>
+            <span class="s2">"propagator"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"propagator"</span><span class="p">,</span> <span class="s2">"magnus"</span><span class="p">),</span>
+            <span class="s2">"Propagator used to evaluate the effective Hamiltonian over each dt interval."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;total_time&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;float&quot;</span><span class="p">,</span>
+            <span class="s2">"total_time"</span><span class="p">,</span>
+            <span class="s2">"float"</span><span class="p">,</span>
             <span class="mf">1.0</span><span class="p">,</span>
-            <span class="s2">&quot;Total evolution time.&quot;</span><span class="p">,</span>
+            <span class="s2">"Total evolution time."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;dt&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;float&quot;</span><span class="p">,</span>
+            <span class="s2">"dt"</span><span class="p">,</span>
+            <span class="s2">"float"</span><span class="p">,</span>
             <span class="mf">0.0</span><span class="p">,</span>
-            <span class="s2">&quot;Time step for time-dependent evolution. Each step is passed to the builder.&quot;</span><span class="p">,</span>
+            <span class="s2">"Time step for time-dependent evolution. Each step is passed to the builder."</span><span class="p">,</span>
         <span class="p">)</span></div>
 </div>
 
@@ -168,16 +169,16 @@
 <div class="viewcode-block" id="EvolutionCircuitBuilder">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EvolutionCircuitBuilder</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for evolution circuit builders.</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for evolution circuit builders.</span>
 
 <span class="sd">    An evolution circuit builder constructs a quantum circuit for</span>
 <span class="sd">    time evolution without executing it.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="EvolutionCircuitBuilder.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the evolution circuit builder.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the evolution circuit builder."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">EvolutionCircuitBuilderSettings</span><span class="p">()</span></div>
 
@@ -185,8 +186,8 @@
 <div class="viewcode-block" id="EvolutionCircuitBuilder.type_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder.type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name as evolution_circuit_builder.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;evolution_circuit_builder&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the algorithm type name as evolution_circuit_builder."""</span>
+        <span class="k">return</span> <span class="s2">"evolution_circuit_builder"</span></div>
 
 
     <span class="nd">@abstractmethod</span>
@@ -195,7 +196,7 @@
         <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">TimeDependentQubitHamiltonian</span><span class="p">,</span>
         <span class="n">state_prep</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the evolution circuit.</span>
+<span class="w">        </span><span class="sd">"""Build the evolution circuit.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            hamiltonian: Time-dependent Hamiltonian.</span>
@@ -204,27 +205,27 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The combined state-prep + evolution circuit.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 
 <div class="viewcode-block" id="EvolutionCircuitBuilderFactory">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderFactory">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">EvolutionCircuitBuilderFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory class for creating evolution circuit builder instances.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Factory class for creating evolution circuit builder instances."""</span>
 
 <div class="viewcode-block" id="EvolutionCircuitBuilderFactory.algorithm_type_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderFactory.algorithm_type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name as evolution_circuit_builder.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;evolution_circuit_builder&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the algorithm type name as evolution_circuit_builder."""</span>
+        <span class="k">return</span> <span class="s2">"evolution_circuit_builder"</span></div>
 
 
 <div class="viewcode-block" id="EvolutionCircuitBuilderFactory.default_algorithm_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.html#qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilderFactory.default_algorithm_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return euler as the default algorithm name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;euler&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return euler as the default algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"euler"</span></div>
 </div>
 
 </pre></div>

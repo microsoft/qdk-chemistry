@@ -1,0 +1,789 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.ui.plugin_installer &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.ui.plugin_installer</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.ui.plugin_installer</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Install QDK Chemistry Copilot plugins with venv-bound MCP commands."""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sysconfig</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">._mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCP_INSTALL_MESSAGE</span><span class="p">,</span> <span class="n">require_mcp</span>
+
+<span class="n">_PLUGIN_SERVER_SCRIPTS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"qdk-chemistry"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"qdk_chemistry"</span><span class="p">:</span> <span class="s2">"qcmcp"</span><span class="p">}}</span>
+<span class="n">_MANIFEST_PATHS</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">"plugin.json"</span><span class="p">),</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">".plugin/plugin.json"</span><span class="p">),</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">".github/plugin/plugin.json"</span><span class="p">),</span>
+    <span class="n">Path</span><span class="p">(</span><span class="s2">".claude-plugin/plugin.json"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">_BINDINGS_FILE</span> <span class="o">=</span> <span class="s2">"qdk-chemistry-plugin-bindings.json"</span>
+<span class="n">_WORKSPACE_STATE_DIR</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">".qdk_chem"</span><span class="p">)</span>
+<span class="n">_MARKETPLACE_MANIFEST</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">".github"</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"plugin"</span> <span class="o">/</span> <span class="s2">"marketplace.json"</span>
+
+
+<div class="viewcode-block" id="PluginInstallError">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.PluginInstallError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PluginInstallError</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Raised when the QDK Chemistry plugin cannot be installed or bound."""</span></div>
+
+
+
+<div class="viewcode-block" id="plugin_names">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.plugin_names">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plugin_names</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return the QDK Chemistry plugins supported by the installer."""</span>
+    <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_object</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot read </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"expected a JSON object in </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_manifest_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">relative_path</span> <span class="ow">in</span> <span class="n">_MANIFEST_PATHS</span><span class="p">:</span>
+        <span class="n">candidate</span> <span class="o">=</span> <span class="n">plugin_dir</span> <span class="o">/</span> <span class="n">relative_path</span>
+        <span class="k">if</span> <span class="n">candidate</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">candidate</span>
+    <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"no Copilot plugin manifest found in </span><span class="si">{</span><span class="n">plugin_dir</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_plugin_name_from_source</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">explicit_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">explicit_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">explicit_name</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">source_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">source_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">_load_object</span><span class="p">(</span><span class="n">_manifest_path</span><span class="p">(</span><span class="n">source_path</span><span class="p">))</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">,</span> <span class="s2">""</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="s2">"@"</span> <span class="ow">in</span> <span class="n">source</span> <span class="ow">and</span> <span class="s2">"/"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"@"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"@"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source</span><span class="o">.</span><span class="n">removesuffix</span><span class="p">(</span><span class="s2">".git"</span><span class="p">))</span><span class="o">.</span><span class="n">name</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">:</span>
+        <span class="n">supported</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"cannot identify a supported QDK Chemistry plugin from </span><span class="si">{</span><span class="n">source</span><span class="si">!r}</span><span class="s2">; use --name (</span><span class="si">{</span><span class="n">supported</span><span class="si">}</span><span class="s2">)"</span>
+        <span class="p">)</span>
+    <span class="k">return</span> <span class="n">name</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_local_marketplace</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">source_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">source</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">source_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">plugin_dir</span> <span class="o">=</span> <span class="n">source_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">root</span> <span class="ow">in</span> <span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="o">*</span><span class="n">plugin_dir</span><span class="o">.</span><span class="n">parents</span><span class="p">):</span>
+        <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">root</span> <span class="o">/</span> <span class="n">_MARKETPLACE_MANIFEST</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">continue</span>
+        <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+        <span class="n">marketplace_name</span> <span class="o">=</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span>
+        <span class="n">plugins</span> <span class="o">=</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"plugins"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">marketplace_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">marketplace_name</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plugins</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"invalid Copilot marketplace manifest: </span><span class="si">{</span><span class="n">manifest_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">plugins</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">entry</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="o">!=</span> <span class="n">plugin_name</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">configured_source</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"source"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">configured_source</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">root</span> <span class="o">/</span> <span class="n">configured_source</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span> <span class="o">==</span> <span class="n">plugin_dir</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">root</span><span class="p">,</span> <span class="n">marketplace_name</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">plugin_name</span><span class="si">}</span><span class="s2">@</span><span class="si">{</span><span class="n">marketplace_name</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"local plugin directory </span><span class="si">{</span><span class="n">plugin_dir</span><span class="si">}</span><span class="s2"> is not listed in an ancestor Copilot marketplace"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copilot_home</span><span class="p">(</span><span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">target_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="o">/</span> <span class="n">_WORKSPACE_STATE_DIR</span> <span class="o">/</span> <span class="s2">"copilot"</span>
+    <span class="n">configured</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"COPILOT_HOME"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">configured</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">configured</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">Path</span><span class="o">.</span><span class="n">home</span><span class="p">()</span> <span class="o">/</span> <span class="s2">".copilot"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_state_root</span><span class="p">(</span><span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">home</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">target_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">home</span>
+    <span class="k">return</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="o">/</span> <span class="n">_WORKSPACE_STATE_DIR</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_copilot</span><span class="p">(</span><span class="n">arguments</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">home</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">executable</span> <span class="o">=</span> <span class="n">shutil</span><span class="o">.</span><span class="n">which</span><span class="p">(</span><span class="s2">"copilot"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">executable</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="s2">"copilot is not installed or is not on PATH"</span><span class="p">)</span>
+    <span class="n">env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">env</span><span class="p">[</span><span class="s2">"COPILOT_HOME"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">home</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="p">[</span><span class="n">executable</span><span class="p">,</span> <span class="o">*</span><span class="n">arguments</span><span class="p">],</span>
+        <span class="n">env</span><span class="o">=</span><span class="n">env</span><span class="p">,</span>
+        <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">detail</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="sa">f</span><span class="s2">"exit code </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">returncode</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"copilot </span><span class="si">{</span><span class="s1">' '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">arguments</span><span class="p">)</span><span class="si">}</span><span class="s2"> failed: </span><span class="si">{</span><span class="n">detail</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">stdout</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ensure_local_marketplace</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">marketplace_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">home</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">output</span> <span class="o">=</span> <span class="n">_run_copilot</span><span class="p">([</span><span class="s2">"plugin"</span><span class="p">,</span> <span class="s2">"marketplace"</span><span class="p">,</span> <span class="s2">"list"</span><span class="p">],</span> <span class="n">home</span><span class="o">=</span><span class="n">home</span><span class="p">)</span>
+    <span class="n">expected</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">marketplace_name</span><span class="si">}</span><span class="s2"> (Local: </span><span class="si">{</span><span class="n">root</span><span class="si">}</span><span class="s2">)"</span>
+    <span class="n">name_marker</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">marketplace_name</span><span class="si">}</span><span class="s2"> ("</span>
+    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="n">output</span><span class="o">.</span><span class="n">splitlines</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">expected</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">name_marker</span> <span class="ow">in</span> <span class="n">line</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Copilot marketplace </span><span class="si">{</span><span class="n">marketplace_name</span><span class="si">!r}</span><span class="s2"> is already registered from a different source beneath </span><span class="si">{</span><span class="n">home</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+    <span class="n">_run_copilot</span><span class="p">([</span><span class="s2">"plugin"</span><span class="p">,</span> <span class="s2">"marketplace"</span><span class="p">,</span> <span class="s2">"add"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">root</span><span class="p">)],</span> <span class="n">home</span><span class="o">=</span><span class="n">home</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_installed_plugin_dir</span><span class="p">(</span><span class="n">home</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">home</span> <span class="o">/</span> <span class="s2">"installed-plugins"</span>
+    <span class="n">matches</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">root</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">marketplace_dir</span> <span class="ow">in</span> <span class="n">root</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">marketplace_dir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                <span class="k">continue</span>
+            <span class="k">for</span> <span class="n">plugin_dir</span> <span class="ow">in</span> <span class="n">marketplace_dir</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">plugin_dir</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                    <span class="k">continue</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">_manifest_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">))</span>
+                <span class="k">except</span> <span class="n">PluginInstallError</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span> <span class="o">==</span> <span class="n">plugin_name</span><span class="p">:</span>
+                    <span class="n">matches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">plugin_dir</span><span class="o">.</span><span class="n">absolute</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">matches</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Copilot did not install </span><span class="si">{</span><span class="n">plugin_name</span><span class="si">!r}</span><span class="s2"> beneath </span><span class="si">{</span><span class="n">root</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">matches</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">locations</span> <span class="o">=</span> <span class="s2">", "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">matches</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"multiple installed copies of </span><span class="si">{</span><span class="n">plugin_name</span><span class="si">!r}</span><span class="s2"> found: </span><span class="si">{</span><span class="n">locations</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_script_path</span><span class="p">(</span><span class="n">scripts_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">script_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="p">[</span><span class="n">scripts_dir</span> <span class="o">/</span> <span class="n">script_name</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="s2">"nt"</span><span class="p">:</span>
+        <span class="n">candidates</span><span class="o">.</span><span class="n">extend</span><span class="p">((</span><span class="n">scripts_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">script_name</span><span class="si">}</span><span class="s2">.exe"</span><span class="p">,</span> <span class="n">scripts_dir</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">script_name</span><span class="si">}</span><span class="s2">.cmd"</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">candidate</span> <span class="ow">in</span> <span class="n">candidates</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">candidate</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">return</span> <span class="n">candidate</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span>
+    <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"required MCP command </span><span class="si">{</span><span class="n">script_name</span><span class="si">!r}</span><span class="s2"> is not installed in the active environment at </span><span class="si">{</span><span class="n">scripts_dir</span><span class="si">}</span><span class="s2">"</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_commands_for_current_environment</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">prefix</span> <span class="o">==</span> <span class="n">sys</span><span class="o">.</span><span class="n">base_prefix</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">"real_prefix"</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span>
+            <span class="s2">"QDK Chemistry plugin installation requires a virtual environment; "</span>
+            <span class="s2">"activate the venv and rerun with the 'qc' command from that environment"</span>
+        <span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">require_mcp</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="n">MCP_INSTALL_MESSAGE</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+    <span class="n">scripts_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">sysconfig</span><span class="o">.</span><span class="n">get_path</span><span class="p">(</span><span class="s2">"scripts"</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="n">server_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">_script_path</span><span class="p">(</span><span class="n">scripts_dir</span><span class="p">,</span> <span class="n">script_name</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">server_name</span><span class="p">,</span> <span class="n">script_name</span> <span class="ow">in</span> <span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">[</span><span class="n">plugin_name</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+    <span class="p">}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_mcp_config_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">_manifest_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">))</span>
+    <span class="n">configured</span> <span class="o">=</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"mcpServers"</span><span class="p">,</span> <span class="s2">".mcp.json"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">configured</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">plugin_dir</span><span class="si">}</span><span class="s2"> uses inline MCP configuration, which cannot be bound"</span><span class="p">)</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">plugin_dir</span> <span class="o">/</span> <span class="n">configured</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"MCP configuration not found: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bind_mcp_commands</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">commands</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">_mcp_config_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">)</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="n">servers</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"mcpServers"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">servers</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"expected an mcpServers object in </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">server_name</span> <span class="ow">in</span> <span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">[</span><span class="n">plugin_name</span><span class="p">]:</span>
+        <span class="n">server</span> <span class="o">=</span> <span class="n">servers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">server_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"required MCP server </span><span class="si">{</span><span class="n">server_name</span><span class="si">!r}</span><span class="s2"> is missing from </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">server</span><span class="p">[</span><span class="s2">"command"</span><span class="p">]</span> <span class="o">=</span> <span class="n">commands</span><span class="p">[</span><span class="n">server_name</span><span class="p">]</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">path</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_jsonc_to_json</span><span class="p">(</span><span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Remove comments and trailing commas from JSONC text."""</span>
+    <span class="n">without_comments</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">in_string</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">escaped</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+        <span class="n">character</span> <span class="o">=</span> <span class="n">text</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="n">next_character</span> <span class="o">=</span> <span class="n">text</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">index</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="k">else</span> <span class="s2">""</span>
+        <span class="k">if</span> <span class="n">in_string</span><span class="p">:</span>
+            <span class="n">without_comments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">character</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">escaped</span><span class="p">:</span>
+                <span class="n">escaped</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">character</span> <span class="o">==</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">"</span><span class="p">:</span>
+                <span class="n">escaped</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">character</span> <span class="o">==</span> <span class="s1">'"'</span><span class="p">:</span>
+                <span class="n">in_string</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">character</span> <span class="o">==</span> <span class="s1">'"'</span><span class="p">:</span>
+            <span class="n">in_string</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">without_comments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">character</span><span class="p">)</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">character</span> <span class="o">==</span> <span class="s2">"/"</span> <span class="ow">and</span> <span class="n">next_character</span> <span class="o">==</span> <span class="s2">"/"</span><span class="p">:</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">2</span>
+            <span class="k">while</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="ow">and</span> <span class="n">text</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="s2">"</span><span class="se">\r\n</span><span class="s2">"</span><span class="p">:</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">character</span> <span class="o">==</span> <span class="s2">"/"</span> <span class="ow">and</span> <span class="n">next_character</span> <span class="o">==</span> <span class="s2">"*"</span><span class="p">:</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">2</span>
+            <span class="k">while</span> <span class="n">index</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">text</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"*"</span> <span class="ow">and</span> <span class="n">text</span><span class="p">[</span><span class="n">index</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"/"</span><span class="p">):</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">index</span> <span class="o">+</span> <span class="mi">2</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+            <span class="k">continue</span>
+        <span class="n">without_comments</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">character</span><span class="p">)</span>
+        <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="n">stripped</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">without_comments</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">in_string</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">escaped</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">index</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">stripped</span><span class="p">):</span>
+        <span class="n">character</span> <span class="o">=</span> <span class="n">stripped</span><span class="p">[</span><span class="n">index</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">in_string</span><span class="p">:</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">character</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">escaped</span><span class="p">:</span>
+                <span class="n">escaped</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="k">elif</span> <span class="n">character</span> <span class="o">==</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">"</span><span class="p">:</span>
+                <span class="n">escaped</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">elif</span> <span class="n">character</span> <span class="o">==</span> <span class="s1">'"'</span><span class="p">:</span>
+                <span class="n">in_string</span> <span class="o">=</span> <span class="kc">False</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">character</span> <span class="o">==</span> <span class="s1">'"'</span><span class="p">:</span>
+            <span class="n">in_string</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">character</span><span class="p">)</span>
+            <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">continue</span>
+        <span class="k">if</span> <span class="n">character</span> <span class="o">==</span> <span class="s2">","</span><span class="p">:</span>
+            <span class="n">next_index</span> <span class="o">=</span> <span class="n">index</span> <span class="o">+</span> <span class="mi">1</span>
+            <span class="k">while</span> <span class="n">next_index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">stripped</span><span class="p">)</span> <span class="ow">and</span> <span class="n">stripped</span><span class="p">[</span><span class="n">next_index</span><span class="p">]</span><span class="o">.</span><span class="n">isspace</span><span class="p">():</span>
+                <span class="n">next_index</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">next_index</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">stripped</span><span class="p">)</span> <span class="ow">and</span> <span class="n">stripped</span><span class="p">[</span><span class="n">next_index</span><span class="p">]</span> <span class="ow">in</span> <span class="s2">"}]"</span><span class="p">:</span>
+                <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+                <span class="k">continue</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">character</span><span class="p">)</span>
+        <span class="n">index</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_workspace_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">servers_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">servers_key</span><span class="p">:</span> <span class="p">{}}</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_jsonc_to_json</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)))</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot read workspace MCP configuration </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"expected a JSON object in </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">servers</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">servers_key</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">servers</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"expected a </span><span class="si">{</span><span class="n">servers_key</span><span class="si">}</span><span class="s2"> object in </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_workspace_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">servers_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">servers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">_load_workspace_config</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">servers_key</span><span class="p">)</span>
+    <span class="n">config</span><span class="p">[</span><span class="n">servers_key</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">servers</span><span class="p">)</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">config</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_component_directories</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">manifest</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">field</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+    <span class="n">configured</span> <span class="o">=</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">field</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s2">/"</span><span class="p">)</span>
+    <span class="n">values</span> <span class="o">=</span> <span class="p">[</span><span class="n">configured</span><span class="p">]</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">configured</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">configured</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"plugin field </span><span class="si">{</span><span class="n">field</span><span class="si">!r}</span><span class="s2"> must be a path or list of paths"</span><span class="p">)</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">plugin_dir</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">directories</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">values</span><span class="p">:</span>
+        <span class="n">directory</span> <span class="o">=</span> <span class="p">(</span><span class="n">plugin_dir</span> <span class="o">/</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">directory</span><span class="o">.</span><span class="n">is_relative_to</span><span class="p">(</span><span class="n">root</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"plugin field </span><span class="si">{</span><span class="n">field</span><span class="si">!r}</span><span class="s2"> points outside </span><span class="si">{</span><span class="n">plugin_dir</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">directory</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"plugin </span><span class="si">{</span><span class="n">field</span><span class="si">}</span><span class="s2"> directory not found: </span><span class="si">{</span><span class="n">directory</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">directories</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">directories</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_copy_component_directories</span><span class="p">(</span><span class="n">sources</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">],</span> <span class="n">destination</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="n">copied</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">source</span> <span class="ow">in</span> <span class="n">sources</span><span class="p">:</span>
+        <span class="n">source_root</span> <span class="o">=</span> <span class="n">source</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">source_file</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">path</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">rglob</span><span class="p">(</span><span class="s2">"*"</span><span class="p">)</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span> <span class="ow">or</span> <span class="n">path</span><span class="o">.</span><span class="n">is_symlink</span><span class="p">()):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">candidate</span> <span class="o">=</span> <span class="n">source_file</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="n">source_file</span><span class="o">.</span><span class="n">readlink</span><span class="p">()</span> <span class="k">if</span> <span class="n">source_file</span><span class="o">.</span><span class="n">is_symlink</span><span class="p">()</span> <span class="k">else</span> <span class="n">source_file</span>
+                <span class="n">resolved_source_file</span> <span class="o">=</span> <span class="n">candidate</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot resolve plugin component file </span><span class="si">{</span><span class="n">source_file</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+            <span class="k">if</span> <span class="n">resolved_source_file</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"plugin component file </span><span class="si">{</span><span class="n">source_file</span><span class="si">}</span><span class="s2"> resolves to a directory"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">resolved_source_file</span><span class="o">.</span><span class="n">is_relative_to</span><span class="p">(</span><span class="n">source_root</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"plugin component file </span><span class="si">{</span><span class="n">source_file</span><span class="si">}</span><span class="s2"> resolves outside </span><span class="si">{</span><span class="n">source_root</span><span class="si">}</span><span class="s2"> "</span>
+                    <span class="s2">"(symlink traversal is not allowed)"</span>
+                <span class="p">)</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">destination</span> <span class="o">/</span> <span class="n">source_file</span><span class="o">.</span><span class="n">relative_to</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+            <span class="n">target</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">resolved_source_file</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot copy plugin component file </span><span class="si">{</span><span class="n">source_file</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">exc</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+            <span class="n">copied</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">target</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">copied</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_workspace_server_configs</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+    <span class="n">config_path</span> <span class="o">=</span> <span class="n">_mcp_config_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">)</span>
+    <span class="n">config</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">config_path</span><span class="p">)</span>
+    <span class="n">plugin_servers</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"mcpServers"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">plugin_servers</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"expected an mcpServers object in </span><span class="si">{</span><span class="n">config_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">vscode_servers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">github_servers</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">server_name</span> <span class="ow">in</span> <span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">[</span><span class="n">plugin_name</span><span class="p">]:</span>
+        <span class="n">server</span> <span class="o">=</span> <span class="n">plugin_servers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">server_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"required MCP server </span><span class="si">{</span><span class="n">server_name</span><span class="si">!r}</span><span class="s2"> is missing from the plugin"</span><span class="p">)</span>
+        <span class="n">vscode_entry</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
+        <span class="n">vscode_entry</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"stdio"</span>
+        <span class="n">vscode_entry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"tools"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">vscode_servers</span><span class="p">[</span><span class="n">server_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">vscode_entry</span>
+
+        <span class="n">github_entry</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
+        <span class="n">github_entry</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"local"</span>
+        <span class="n">github_entry</span><span class="p">[</span><span class="s2">"tools"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"*"</span><span class="p">]</span>
+        <span class="n">github_servers</span><span class="p">[</span><span class="n">server_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">github_entry</span>
+    <span class="k">return</span> <span class="n">vscode_servers</span><span class="p">,</span> <span class="n">github_servers</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_ignore_workspace_state</span><span class="p">(</span><span class="n">workspace</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">workspace</span> <span class="o">/</span> <span class="n">_WORKSPACE_STATE_DIR</span> <span class="o">/</span> <span class="s2">".gitignore"</span>
+    <span class="n">ignored</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"/copilot/"</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"/</span><span class="si">{</span><span class="n">_BINDINGS_FILE</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="n">existing</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()</span> <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">else</span> <span class="p">[]</span>
+    <span class="n">missing</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">ignored</span><span class="o">.</span><span class="n">difference</span><span class="p">(</span><span class="n">existing</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">missing</span><span class="p">:</span>
+        <span class="k">return</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="o">*</span><span class="n">existing</span><span class="p">,</span> <span class="o">*</span><span class="n">missing</span><span class="p">])</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_deploy_workspace</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">workspace</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">_manifest_path</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">))</span>
+    <span class="n">workspace</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">agents</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="s2">"agents"</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">:</span>
+        <span class="n">agents</span> <span class="o">=</span> <span class="n">_copy_component_directories</span><span class="p">(</span>
+            <span class="n">_component_directories</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">manifest</span><span class="p">,</span> <span class="s2">"agents"</span><span class="p">),</span> <span class="n">workspace</span> <span class="o">/</span> <span class="s2">".github"</span> <span class="o">/</span> <span class="s2">"agents"</span>
+        <span class="p">)</span>
+    <span class="n">skills</span> <span class="o">=</span> <span class="n">_copy_component_directories</span><span class="p">(</span>
+        <span class="n">_component_directories</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">manifest</span><span class="p">,</span> <span class="s2">"skills"</span><span class="p">),</span> <span class="n">workspace</span> <span class="o">/</span> <span class="s2">".github"</span> <span class="o">/</span> <span class="s2">"skills"</span>
+    <span class="p">)</span>
+    <span class="n">vscode_servers</span><span class="p">,</span> <span class="n">github_servers</span> <span class="o">=</span> <span class="n">_workspace_server_configs</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">)</span>
+    <span class="n">vscode_mcp</span> <span class="o">=</span> <span class="n">workspace</span> <span class="o">/</span> <span class="s2">".vscode"</span> <span class="o">/</span> <span class="s2">"mcp.json"</span>
+    <span class="n">github_mcp</span> <span class="o">=</span> <span class="n">workspace</span> <span class="o">/</span> <span class="s2">".github"</span> <span class="o">/</span> <span class="s2">"mcp.json"</span>
+    <span class="n">_write_workspace_config</span><span class="p">(</span><span class="n">vscode_mcp</span><span class="p">,</span> <span class="s2">"servers"</span><span class="p">,</span> <span class="n">vscode_servers</span><span class="p">)</span>
+    <span class="n">_write_workspace_config</span><span class="p">(</span><span class="n">github_mcp</span><span class="p">,</span> <span class="s2">"mcpServers"</span><span class="p">,</span> <span class="n">github_servers</span><span class="p">)</span>
+    <span class="n">_ignore_workspace_state</span><span class="p">(</span><span class="n">workspace</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"agents"</span><span class="p">:</span> <span class="n">agents</span><span class="p">,</span> <span class="s2">"skills"</span><span class="p">:</span> <span class="n">skills</span><span class="p">,</span> <span class="s2">"mcp_configs"</span><span class="p">:</span> <span class="p">[</span><span class="nb">str</span><span class="p">(</span><span class="n">vscode_mcp</span><span class="p">),</span> <span class="nb">str</span><span class="p">(</span><span class="n">github_mcp</span><span class="p">)]}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_binding_path</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">root</span> <span class="o">/</span> <span class="n">_BINDINGS_FILE</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_bindings</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">_binding_path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"version"</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"plugins"</span><span class="p">:</span> <span class="p">{}}</span>
+    <span class="n">state</span> <span class="o">=</span> <span class="n">_load_object</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"version"</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"plugins"</span><span class="p">),</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unsupported QDK Chemistry plugin binding state in </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">state</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_write_binding</span><span class="p">(</span><span class="n">root</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">record</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="n">state</span> <span class="o">=</span> <span class="n">_load_bindings</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+    <span class="n">state</span><span class="p">[</span><span class="s2">"plugins"</span><span class="p">][</span><span class="n">plugin_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">record</span>
+    <span class="n">path</span> <span class="o">=</span> <span class="n">_binding_path</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
+    <span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">temporary</span> <span class="o">=</span> <span class="n">path</span><span class="o">.</span><span class="n">with_suffix</span><span class="p">(</span><span class="s2">".tmp"</span><span class="p">)</span>
+    <span class="n">temporary</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+    <span class="n">temporary</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_update_spec</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">source</span> <span class="k">if</span> <span class="n">source</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">plugin_name</span><span class="si">}</span><span class="s2">@"</span><span class="p">)</span> <span class="k">else</span> <span class="n">plugin_name</span>
+
+
+<div class="viewcode-block" id="install_plugin">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.install_plugin">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">install_plugin</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Install a QDK Chemistry plugin and bind its MCP command to this environment.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        source: Copilot plugin source, plugin name, or local plugin directory.</span>
+<span class="sd">        name: Explicit supported plugin name when it cannot be inferred from</span>
+<span class="sd">            ``source``.</span>
+<span class="sd">        target_dir: Workspace directory for a workspace-scoped installation.</span>
+<span class="sd">            When omitted, installs for the current user.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Installation details including the plugin, scope, bound commands, and</span>
+<span class="sd">        MCP configuration path.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        PluginInstallError: If the plugin source, Copilot installation, or MCP</span>
+<span class="sd">            command binding is invalid.</span>
+
+<span class="sd">    """</span>
+    <span class="n">plugin_name</span> <span class="o">=</span> <span class="n">_plugin_name_from_source</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+    <span class="n">commands</span> <span class="o">=</span> <span class="n">_commands_for_current_environment</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">)</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">_copilot_home</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span>
+    <span class="n">state_root</span> <span class="o">=</span> <span class="n">_state_root</span><span class="p">(</span><span class="n">target_dir</span><span class="p">,</span> <span class="n">home</span><span class="p">)</span>
+    <span class="n">install_source</span> <span class="o">=</span> <span class="n">source</span>
+    <span class="n">local_marketplace</span> <span class="o">=</span> <span class="n">_local_marketplace</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">local_marketplace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">marketplace_root</span><span class="p">,</span> <span class="n">marketplace_name</span><span class="p">,</span> <span class="n">install_source</span> <span class="o">=</span> <span class="n">local_marketplace</span>
+        <span class="n">_ensure_local_marketplace</span><span class="p">(</span><span class="n">marketplace_root</span><span class="p">,</span> <span class="n">marketplace_name</span><span class="p">,</span> <span class="n">home</span><span class="o">=</span><span class="n">home</span><span class="p">)</span>
+    <span class="n">_run_copilot</span><span class="p">([</span><span class="s2">"plugin"</span><span class="p">,</span> <span class="s2">"install"</span><span class="p">,</span> <span class="n">install_source</span><span class="p">],</span> <span class="n">home</span><span class="o">=</span><span class="n">home</span><span class="p">)</span>
+    <span class="n">plugin_dir</span> <span class="o">=</span> <span class="n">_installed_plugin_dir</span><span class="p">(</span><span class="n">home</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">)</span>
+    <span class="n">plugin_config</span> <span class="o">=</span> <span class="n">_bind_mcp_commands</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">commands</span><span class="p">)</span>
+    <span class="n">workspace</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="k">if</span> <span class="n">target_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">deployment</span> <span class="o">=</span> <span class="n">_deploy_workspace</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">workspace</span><span class="p">)</span> <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="n">_write_binding</span><span class="p">(</span>
+        <span class="n">state_root</span><span class="p">,</span>
+        <span class="n">plugin_name</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"commands"</span><span class="p">:</span> <span class="n">commands</span><span class="p">,</span>
+            <span class="s2">"plugin_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">),</span>
+            <span class="s2">"source"</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>
+            <span class="s2">"update_spec"</span><span class="p">:</span> <span class="n">_update_spec</span><span class="p">(</span><span class="n">install_source</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">),</span>
+            <span class="o">**</span><span class="n">deployment</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"installed"</span><span class="p">,</span>
+        <span class="s2">"plugin"</span><span class="p">:</span> <span class="n">plugin_name</span><span class="p">,</span>
+        <span class="s2">"scope"</span><span class="p">:</span> <span class="s2">"workspace"</span> <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"user"</span><span class="p">,</span>
+        <span class="s2">"copilot_home"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">home</span><span class="p">),</span>
+        <span class="s2">"plugin_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">),</span>
+        <span class="s2">"mcp_config"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_config</span><span class="p">),</span>
+        <span class="s2">"commands"</span><span class="p">:</span> <span class="n">commands</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">"workspace"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">workspace</span><span class="p">),</span> <span class="o">**</span><span class="n">deployment</span><span class="p">})</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">"mcp_config"</span><span class="p">]</span> <span class="o">=</span> <span class="n">deployment</span><span class="p">[</span><span class="s2">"mcp_configs"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="update_plugin">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.update_plugin">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_plugin</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Update a plugin and restore its MCP command binding.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        plugin_name: Name of the supported QDK Chemistry plugin to update.</span>
+<span class="sd">        target_dir: Workspace directory for a workspace-scoped installation.</span>
+<span class="sd">            When omitted, updates the current user's installation.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Update details including the plugin, scope, bound commands, and MCP</span>
+<span class="sd">        configuration path.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        PluginInstallError: If the plugin is unsupported, unbound, or cannot be</span>
+<span class="sd">            updated and rebound.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">plugin_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unsupported QDK Chemistry plugin: </span><span class="si">{</span><span class="n">plugin_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">_copilot_home</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span>
+    <span class="n">state_root</span> <span class="o">=</span> <span class="n">_state_root</span><span class="p">(</span><span class="n">target_dir</span><span class="p">,</span> <span class="n">home</span><span class="p">)</span>
+    <span class="n">state</span> <span class="o">=</span> <span class="n">_load_bindings</span><span class="p">(</span><span class="n">state_root</span><span class="p">)</span>
+    <span class="n">record</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="s2">"plugins"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">record</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">plugin_name</span><span class="si">!r}</span><span class="s2"> has no QDK Chemistry binding beneath </span><span class="si">{</span><span class="n">state_root</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">commands</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"commands"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">commands</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">commands</span><span class="o">.</span><span class="n">values</span><span class="p">()):</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"invalid command binding for </span><span class="si">{</span><span class="n">plugin_name</span><span class="si">!r}</span><span class="s2"> beneath </span><span class="si">{</span><span class="n">state_root</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">command</span> <span class="ow">in</span> <span class="n">commands</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">Path</span><span class="p">(</span><span class="n">command</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"bound MCP command no longer exists: </span><span class="si">{</span><span class="n">command</span><span class="si">}</span><span class="s2">; rebind from the intended venv"</span><span class="p">)</span>
+    <span class="n">_run_copilot</span><span class="p">([</span><span class="s2">"plugin"</span><span class="p">,</span> <span class="s2">"update"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">record</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"update_spec"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">plugin_name</span><span class="p">)],</span> <span class="n">home</span><span class="o">=</span><span class="n">home</span><span class="p">)</span>
+    <span class="n">plugin_dir</span> <span class="o">=</span> <span class="n">_installed_plugin_dir</span><span class="p">(</span><span class="n">home</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">)</span>
+    <span class="n">plugin_config</span> <span class="o">=</span> <span class="n">_bind_mcp_commands</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">commands</span><span class="p">)</span>
+    <span class="n">workspace</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="k">if</span> <span class="n">target_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">deployment</span> <span class="o">=</span> <span class="n">_deploy_workspace</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">workspace</span><span class="p">)</span> <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="n">record</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">"plugin_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">),</span> <span class="o">**</span><span class="n">deployment</span><span class="p">})</span>
+    <span class="n">_write_binding</span><span class="p">(</span><span class="n">state_root</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">record</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"updated"</span><span class="p">,</span>
+        <span class="s2">"plugin"</span><span class="p">:</span> <span class="n">plugin_name</span><span class="p">,</span>
+        <span class="s2">"scope"</span><span class="p">:</span> <span class="s2">"workspace"</span> <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"user"</span><span class="p">,</span>
+        <span class="s2">"copilot_home"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">home</span><span class="p">),</span>
+        <span class="s2">"plugin_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">),</span>
+        <span class="s2">"mcp_config"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_config</span><span class="p">),</span>
+        <span class="s2">"commands"</span><span class="p">:</span> <span class="n">commands</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">"workspace"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">workspace</span><span class="p">),</span> <span class="o">**</span><span class="n">deployment</span><span class="p">})</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">"mcp_config"</span><span class="p">]</span> <span class="o">=</span> <span class="n">deployment</span><span class="p">[</span><span class="s2">"mcp_configs"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+
+<div class="viewcode-block" id="update_all_plugins">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.update_all_plugins">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">update_all_plugins</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Update every installed QDK Chemistry plugin binding.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        target_dir: Workspace directory for workspace-scoped installations.</span>
+<span class="sd">            When omitted, updates the current user's installations.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A status mapping with the update result for each bound plugin.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        PluginInstallError: If no QDK Chemistry plugin bindings are found or an</span>
+<span class="sd">            update fails.</span>
+
+<span class="sd">    """</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">_copilot_home</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span>
+    <span class="n">state</span> <span class="o">=</span> <span class="n">_load_bindings</span><span class="p">(</span><span class="n">_state_root</span><span class="p">(</span><span class="n">target_dir</span><span class="p">,</span> <span class="n">home</span><span class="p">))</span>
+    <span class="n">names</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">state</span><span class="p">[</span><span class="s2">"plugins"</span><span class="p">])</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">))</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">names</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"no QDK Chemistry plugin bindings found beneath </span><span class="si">{</span><span class="n">_state_root</span><span class="p">(</span><span class="n">target_dir</span><span class="p">,</span><span class="w"> </span><span class="n">home</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"status"</span><span class="p">:</span> <span class="s2">"updated"</span><span class="p">,</span> <span class="s2">"plugins"</span><span class="p">:</span> <span class="p">[</span><span class="n">update_plugin</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">target_dir</span><span class="o">=</span><span class="n">target_dir</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">names</span><span class="p">]}</span></div>
+
+
+
+<div class="viewcode-block" id="rebind_plugin">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.rebind_plugin">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">rebind_plugin</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">target_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Bind an installed plugin to the MCP command in the current environment.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        plugin_name: Name of the supported QDK Chemistry plugin to rebind.</span>
+<span class="sd">        target_dir: Workspace directory for a workspace-scoped installation.</span>
+<span class="sd">            When omitted, rebinds the current user's installation.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Rebinding details including the plugin, scope, bound commands, and MCP</span>
+<span class="sd">        configuration path.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        PluginInstallError: If the plugin is unsupported, missing, or the</span>
+<span class="sd">            current environment does not provide its MCP command.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">plugin_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_PLUGIN_SERVER_SCRIPTS</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">PluginInstallError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unsupported QDK Chemistry plugin: </span><span class="si">{</span><span class="n">plugin_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">home</span> <span class="o">=</span> <span class="n">_copilot_home</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span>
+    <span class="n">state_root</span> <span class="o">=</span> <span class="n">_state_root</span><span class="p">(</span><span class="n">target_dir</span><span class="p">,</span> <span class="n">home</span><span class="p">)</span>
+    <span class="n">plugin_dir</span> <span class="o">=</span> <span class="n">_installed_plugin_dir</span><span class="p">(</span><span class="n">home</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">)</span>
+    <span class="n">commands</span> <span class="o">=</span> <span class="n">_commands_for_current_environment</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">)</span>
+    <span class="n">plugin_config</span> <span class="o">=</span> <span class="n">_bind_mcp_commands</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">commands</span><span class="p">)</span>
+    <span class="n">workspace</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">target_dir</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">()</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span> <span class="k">if</span> <span class="n">target_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="n">deployment</span> <span class="o">=</span> <span class="n">_deploy_workspace</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">,</span> <span class="n">plugin_name</span><span class="p">,</span> <span class="n">workspace</span><span class="p">)</span> <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">{}</span>
+    <span class="n">previous</span> <span class="o">=</span> <span class="n">_load_bindings</span><span class="p">(</span><span class="n">state_root</span><span class="p">)[</span><span class="s2">"plugins"</span><span class="p">]</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">plugin_name</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">previous</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">previous</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"source"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">plugin_name</span><span class="p">)</span>
+        <span class="n">update_spec</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">previous</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"update_spec"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">plugin_name</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">marketplace</span> <span class="o">=</span> <span class="n">plugin_dir</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">source</span> <span class="o">=</span> <span class="n">plugin_name</span>
+        <span class="n">update_spec</span> <span class="o">=</span> <span class="n">plugin_name</span> <span class="k">if</span> <span class="n">marketplace</span> <span class="o">==</span> <span class="s2">"_direct"</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">plugin_name</span><span class="si">}</span><span class="s2">@</span><span class="si">{</span><span class="n">marketplace</span><span class="si">}</span><span class="s2">"</span>
+    <span class="n">_write_binding</span><span class="p">(</span>
+        <span class="n">state_root</span><span class="p">,</span>
+        <span class="n">plugin_name</span><span class="p">,</span>
+        <span class="p">{</span>
+            <span class="s2">"commands"</span><span class="p">:</span> <span class="n">commands</span><span class="p">,</span>
+            <span class="s2">"plugin_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">),</span>
+            <span class="s2">"source"</span><span class="p">:</span> <span class="n">source</span><span class="p">,</span>
+            <span class="s2">"update_spec"</span><span class="p">:</span> <span class="n">update_spec</span><span class="p">,</span>
+            <span class="o">**</span><span class="n">deployment</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"status"</span><span class="p">:</span> <span class="s2">"rebound"</span><span class="p">,</span>
+        <span class="s2">"plugin"</span><span class="p">:</span> <span class="n">plugin_name</span><span class="p">,</span>
+        <span class="s2">"scope"</span><span class="p">:</span> <span class="s2">"workspace"</span> <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"user"</span><span class="p">,</span>
+        <span class="s2">"copilot_home"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">home</span><span class="p">),</span>
+        <span class="s2">"plugin_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_dir</span><span class="p">),</span>
+        <span class="s2">"mcp_config"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">plugin_config</span><span class="p">),</span>
+        <span class="s2">"commands"</span><span class="p">:</span> <span class="n">commands</span><span class="p">,</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">workspace</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">"workspace"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">workspace</span><span class="p">),</span> <span class="o">**</span><span class="n">deployment</span><span class="p">})</span>
+        <span class="n">result</span><span class="p">[</span><span class="s2">"mcp_config"</span><span class="p">]</span> <span class="o">=</span> <span class="n">deployment</span><span class="p">[</span><span class="s2">"mcp_configs"</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

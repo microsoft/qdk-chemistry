@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Phase estimation circuit builder &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Phase estimation circuit builder &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -86,6 +87,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -219,46 +222,46 @@ This can be obtained from the <a class="reference internal" href="qubit_mapper.h
 
 <span class="c1"># 1. Setup molecule</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">]</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
 
 <span class="c1"># 2. SCF</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 
 <span class="c1"># 3. Hamiltonian construction</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_scf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 
 <span class="c1"># 4. Multi-configuration calculation (reference state)</span>
-<span class="n">cas_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">cas_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"multi_configuration_calculator"</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">cas_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
 <span class="c1"># 5. Qubit mapping</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
 
 <span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
-<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">)</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qubit_mapper"</span><span class="p">)</span>
 <span class="n">qubit_ham</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
 <span class="p">)</span>
 
 <span class="c1"># 6. State preparation</span>
-<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"sparse_isometry"</span><span class="p">)</span>
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">)</span>
 
 <span class="c1"># 7. Create and run IQPE circuit builder with nested algorithm settings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
 
-<span class="n">controlled_circuit_mapper</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">)</span>
-<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-<span class="n">iqpe_circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_iterative&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">controlled_circuit_mapper</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="s2">"pauli_sequence"</span><span class="p">)</span>
+<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">iqpe_circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="s2">"qdk_iterative"</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 <span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
-    <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span>
+    <span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span>
 <span class="p">)</span>
-<span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
+<span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"unitary_builder"</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
 
 <span class="n">iqpe_circuits</span> <span class="o">=</span> <span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">state_preparation</span><span class="o">=</span><span class="n">circuit</span><span class="p">,</span>
@@ -267,13 +270,13 @@ This can be obtained from the <a class="reference internal" href="qubit_mapper.h
 
 <span class="c1"># 8. Print the generated circuits for each bit (iterative)</span>
 <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">circ</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">iqpe_circuits</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bit </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2">:&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Bit </span><span class="si">{</span><span class="n">idx</span><span class="si">}</span><span class="s2">:"</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">circ</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">())</span>
 
 <span class="c1"># 9. Create and run standard QPE circuit builder</span>
-<span class="n">standard_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_standard&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-<span class="n">standard_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span><span class="p">)</span>
-<span class="n">standard_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
+<span class="n">standard_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="s2">"qdk_standard"</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">standard_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span><span class="p">)</span>
+<span class="n">standard_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"unitary_builder"</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
 
 <span class="n">standard_circuits</span> <span class="o">=</span> <span class="n">standard_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">state_preparation</span><span class="o">=</span><span class="n">circuit</span><span class="p">,</span>
@@ -281,7 +284,7 @@ This can be obtained from the <a class="reference internal" href="qubit_mapper.h
 <span class="p">)</span>
 
 <span class="c1"># 10. Print the standard QPE circuit (single circuit with all ancillas)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Standard QPE circuit:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Standard QPE circuit:"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">standard_circuits</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">())</span>
 </pre></div>
 </div>
@@ -291,7 +294,7 @@ This can be obtained from the <a class="reference internal" href="qubit_mapper.h
 </section>
 <section id="available-implementations">
 <h2>Available Implementations<a class="headerlink" href="#available-implementations" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry provides two primary implementations of <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder" title="qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeCircuitBuilder</span></code></a>:</p>
+<p>QDK/Chemistry provides three primary implementations of <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.html#qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder" title="qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">QpeCircuitBuilder</span></code></a>:</p>
 <section id="iterative-phase-estimation-circuit-builder-iqpe">
 <h3>Iterative Phase Estimation Circuit Builder (IQPE)<a class="headerlink" href="#iterative-phase-estimation-circuit-builder-iqpe" title="Link to this heading"></a></h3>
 <p class="rubric">Class: <code class="docutils literal notranslate"><span class="pre">QdkIterativeQpeCircuitBuilder</span></code> (QDK native) and <code class="docutils literal notranslate"><span class="pre">QiskitIterativeQpeCircuitBuilder</span></code> (Qiskit implementation)</p>
@@ -326,13 +329,13 @@ This can be obtained from the <a class="reference internal" href="qubit_mapper.h
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
 
 <span class="c1"># Create iterative QPE with circuit builder configuration</span>
-<span class="n">controlled_circuit_mapper</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">)</span>
-<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-<span class="n">iqpe_circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_iterative&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">controlled_circuit_mapper</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="s2">"pauli_sequence"</span><span class="p">)</span>
+<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">iqpe_circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="s2">"qdk_iterative"</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
-    <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span>
+    <span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span>
 <span class="p">)</span>
-<span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
+<span class="n">iqpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"unitary_builder"</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -366,15 +369,47 @@ This can be obtained from the <a class="reference internal" href="qubit_mapper.h
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
 
 <span class="c1"># Create standard QPE circuit builder</span>
-<span class="n">controlled_circuit_mapper</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">)</span>
-<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
-<span class="n">qpe_circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_standard&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+<span class="n">controlled_circuit_mapper</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="s2">"pauli_sequence"</span><span class="p">)</span>
+<span class="n">unitary_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">qpe_circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="s2">"qdk_standard"</span><span class="p">,</span> <span class="n">num_bits</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
 <span class="n">qpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
-    <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span>
+    <span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="n">controlled_circuit_mapper</span>
 <span class="p">)</span>
-<span class="n">qpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;unitary_builder&quot;</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
+<span class="n">qpe_circuit_builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"unitary_builder"</span><span class="p">,</span> <span class="n">unitary_builder</span><span class="p">)</span>
 </pre></div>
 </div>
+</section>
+<section id="unary-iteration-phase-estimation-circuit-builder">
+<h3>Unary-iteration Phase Estimation Circuit Builder<a class="headerlink" href="#unary-iteration-phase-estimation-circuit-builder" title="Link to this heading"></a></h3>
+<p class="rubric">Class: <code class="docutils literal notranslate"><span class="pre">QdkUnaryQpeCircuitBuilder</span></code> (QDK native)</p>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_unary&quot;</span></code></p>
+<p>Constructs one flat chain of <span class="math notranslate nohighlight">\(p\)</span> qubitized walk queries, using unary iteration over the phase register to select which interleaved reflection is omitted and so realize <span class="math notranslate nohighlight">\(W^{2a-p}\)</span> from a single chain <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id71" title="Ryan Babbush, Craig Gidney, Dominic W. Berry, Nathan Wiebe, Jarrod McClean, Alexandru Paler, Austin Fowler, and Hartmut Neven. Encoding electronic spectra in quantum circuits with linear t complexity. Phys. Rev. X, 8:041015, 2018. URL: https://link.aps.org/doi/10.1103/PhysRevX.8.041015, doi:10.1103/PhysRevX.8.041015.">BGB+18</a>]</span> <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id72" title="Joonho Lee, Dominic W. Berry, Craig Gidney, William J. Huggins, Jarrod R. McClean, Nathan Wiebe, and Ryan Babbush. Even more efficient quantum computations of chemistry through tensor hypercontraction. PRX Quantum, 2:030305, 2021. arXiv:2011.03494, doi:10.1103/PRXQuantum.2.030305.">LBG+21</a>]</span>.
+The phase register is sized to <span class="math notranslate nohighlight">\(\lceil \log_2(p+1) \rceil\)</span> and <code class="docutils literal notranslate"><span class="pre">num_bits</span></code> is ignored.
+Requires a qubitized walk, so <code class="docutils literal notranslate"><span class="pre">unitary_builder</span></code> must be an LCU builder with <code class="docutils literal notranslate"><span class="pre">quantum_walk=True</span></code> (its default here).</p>
+<p><strong>Additional settings:</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 15.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">num_queries</span></code></p></td>
+<td><p>int</p></td>
+<td><p>Number of walk queries <span class="math notranslate nohighlight">\(p\)</span>. For a target energy error <span class="math notranslate nohighlight">\(\epsilon\)</span>, the Heisenberg-limited setting is <span class="math notranslate nohighlight">\(p = \lceil \pi \lambda / (2\epsilon) \rceil\)</span> with <span class="math notranslate nohighlight">\(\lambda\)</span> the block-encoding 1-norm. Need not be a power of two.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">circuit_mapper</span></code></p></td>
+<td><p>AlgorithmRef</p></td>
+<td><p>Mapper producing the uncontrolled block encoding. It must lay the register out as <code class="docutils literal notranslate"><span class="pre">[system</span> <span class="pre">|</span> <span class="pre">ancilla]</span></code>. Default: <code class="docutils literal notranslate"><span class="pre">&quot;prepare_select_prepare&quot;</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
 </section>
 </section>
 <section id="circuit-composition-details">

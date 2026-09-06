@@ -1,0 +1,8 @@
+qdk\_chemistry.data.registry module
+===================================
+
+.. automodule:: qdk_chemistry.data.registry
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

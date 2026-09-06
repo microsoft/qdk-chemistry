@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus</h1><div class="highlight"><pre>
-<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Zassenhaus product-formula decomposition builder.</span>
+<span></span><span class="sa">r</span><span class="sd">"""Zassenhaus product-formula decomposition builder.</span>
 
 <span class="sd">This module implements the Zassenhaus time evolution builder. The Zassenhaus</span>
 <span class="sd">formula decomposes the unitary time evolution operator exp(-i H t) into a</span>
@@ -106,7 +107,7 @@
 <span class="sd">* Custom evolution order (supporting orders 2, 3, and 4).</span>
 <span class="sd">* Automatic step count computation under naive or commutator-aware bounds.</span>
 <span class="sd">* Dynamic selection of the optimal Zassenhaus order to minimize total gate count.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -143,56 +144,56 @@
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.zassenhaus_generation</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlanTerm</span><span class="p">,</span> <span class="n">zassenhaus_commutator_plan</span>
 
-<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Zassenhaus&quot;</span><span class="p">,</span> <span class="s2">&quot;ZassenhausSettings&quot;</span><span class="p">]</span>
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Zassenhaus"</span><span class="p">,</span> <span class="s2">"ZassenhausSettings"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="ZassenhausSettings">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">ZassenhausSettings</span><span class="p">(</span><span class="n">TimeEvolutionSettings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the Zassenhaus decomposition builder.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Settings for the Zassenhaus decomposition builder."""</span>
 
 <div class="viewcode-block" id="ZassenhausSettings.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.ZassenhausSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize ZassenhausSettings with default values.</span>
+<span class="w">        </span><span class="sd">"""Initialize ZassenhausSettings with default values.</span>
 
 <span class="sd">        Attributes:</span>
 <span class="sd">            order: The order of the Zassenhaus decomposition.</span>
 <span class="sd">            target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).</span>
 <span class="sd">            num_divisions: Explicit number of repeated Zassenhaus time slices (0 means automatic).</span>
-<span class="sd">            error_bound: Strategy for computing the Zassenhaus error bound (&quot;commutator&quot; or &quot;naive&quot;).</span>
+<span class="sd">            error_bound: Strategy for computing the Zassenhaus error bound ("commutator" or "naive").</span>
 <span class="sd">            weight_threshold: The absolute threshold for filtering small coefficients.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;The order of the Zassenhaus decomposition.&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"order"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">"The order of the Zassenhaus decomposition."</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;target_accuracy&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="s2">"target_accuracy"</span><span class="p">,</span>
+            <span class="s2">"double"</span><span class="p">,</span>
             <span class="mf">0.0</span><span class="p">,</span>
-            <span class="s2">&quot;Target accuracy for automatic step computation (0.0 means disabled).&quot;</span><span class="p">,</span>
+            <span class="s2">"Target accuracy for automatic step computation (0.0 means disabled)."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;num_divisions&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="s2">"num_divisions"</span><span class="p">,</span>
+            <span class="s2">"int"</span><span class="p">,</span>
             <span class="mi">0</span><span class="p">,</span>
-            <span class="s2">&quot;Explicit number of repeated Zassenhaus time slices (0 means automatic).&quot;</span><span class="p">,</span>
+            <span class="s2">"Explicit number of repeated Zassenhaus time slices (0 means automatic)."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;error_bound&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;commutator&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;Strategy for computing the Zassenhaus error bound (&#39;commutator&#39; or &#39;naive&#39;).&quot;</span><span class="p">,</span>
-            <span class="p">[</span><span class="s2">&quot;commutator&quot;</span><span class="p">,</span> <span class="s2">&quot;naive&quot;</span><span class="p">],</span>
+            <span class="s2">"error_bound"</span><span class="p">,</span>
+            <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"commutator"</span><span class="p">,</span>
+            <span class="s2">"Strategy for computing the Zassenhaus error bound ('commutator' or 'naive')."</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">"commutator"</span><span class="p">,</span> <span class="s2">"naive"</span><span class="p">],</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;weight_threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="s2">&quot;The absolute threshold for filtering small coefficients.&quot;</span>
+            <span class="s2">"weight_threshold"</span><span class="p">,</span> <span class="s2">"float"</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="s2">"The absolute threshold for filtering small coefficients."</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;term_grouper&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">,</span> <span class="s2">&quot;commuting&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Nested term partitioner algorithm reference.&quot;</span><span class="p">,</span>
+            <span class="s2">"term_grouper"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"term_grouper"</span><span class="p">,</span> <span class="s2">"commuting"</span><span class="p">),</span>
+            <span class="s2">"Nested term partitioner algorithm reference."</span><span class="p">,</span>
         <span class="p">)</span></div>
 </div>
 
@@ -201,7 +202,7 @@
 <div class="viewcode-block" id="Zassenhaus">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Zassenhaus</span><span class="p">(</span><span class="n">TimeEvolutionBuilder</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Zassenhaus decomposition builder.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Zassenhaus decomposition builder."""</span>
 
 <div class="viewcode-block" id="Zassenhaus.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus.__init__">[docs]</a>
@@ -212,42 +213,42 @@
         <span class="n">time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
         <span class="n">target_accuracy</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
         <span class="n">num_divisions</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="n">error_bound</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;commutator&quot;</span><span class="p">,</span>
+        <span class="n">error_bound</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"commutator"</span><span class="p">,</span>
         <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
         <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-        <span class="n">power_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;repeat&quot;</span><span class="p">,</span>
+        <span class="n">power_strategy</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"repeat"</span><span class="p">,</span>
         <span class="n">term_grouper</span><span class="p">:</span> <span class="n">AlgorithmRef</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Zassenhaus builder with specified Zassenhaus decomposition settings.</span>
+<span class="w">        </span><span class="sd">"""Initialize Zassenhaus builder with specified Zassenhaus decomposition settings.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            order: Zassenhaus decomposition order (1, 2, 3, 4). Defaults to 2.</span>
 <span class="sd">            time: The evolution time. Defaults to 0.0.</span>
 <span class="sd">            target_accuracy: Target accuracy for auto step computation. Use 0.0 (default) to disable.</span>
 <span class="sd">            num_divisions: Repeated Zassenhaus time slices. Max of this and auto value is used. Defaults to 0.</span>
-<span class="sd">            error_bound: Error bound strategy: ``&quot;commutator&quot;`` (default) or ``&quot;naive&quot;``.</span>
+<span class="sd">            error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.</span>
 <span class="sd">            weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.</span>
 <span class="sd">            power: The power to raise the unitary to. Defaults to 1.</span>
-<span class="sd">            power_strategy: Strategy for U^power: ``&quot;rescale&quot;`` or ``&quot;repeat&quot;`` (default).</span>
+<span class="sd">            power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).</span>
 <span class="sd">            term_grouper: Optional algorithm reference for the term grouper.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">ZassenhausSettings</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="n">power</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;power_strategy&quot;</span><span class="p">,</span> <span class="n">power_strategy</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;target_accuracy&quot;</span><span class="p">,</span> <span class="n">target_accuracy</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_divisions&quot;</span><span class="p">,</span> <span class="n">num_divisions</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;error_bound&quot;</span><span class="p">,</span> <span class="n">error_bound</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"time"</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"power"</span><span class="p">,</span> <span class="n">power</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"power_strategy"</span><span class="p">,</span> <span class="n">power_strategy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"order"</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"target_accuracy"</span><span class="p">,</span> <span class="n">target_accuracy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"num_divisions"</span><span class="p">,</span> <span class="n">num_divisions</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"error_bound"</span><span class="p">,</span> <span class="n">error_bound</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"weight_threshold"</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">term_grouper</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">,</span> <span class="n">term_grouper</span><span class="p">)</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"term_grouper"</span><span class="p">,</span> <span class="n">term_grouper</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">UnitaryRepresentation</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct the unitary representation using Zassenhaus decomposition.</span>
+<span class="w">        </span><span class="sd">"""Construct the unitary representation using Zassenhaus decomposition.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.</span>
@@ -255,21 +256,21 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">effective_time</span><span class="p">,</span> <span class="n">power_repetitions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_power</span><span class="p">()</span>
-        <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"order"</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
             <span class="c1"># Delegate order=1 to the Trotter builder to avoid code duplication.</span>
             <span class="n">trotter_builder</span> <span class="o">=</span> <span class="n">Trotter</span><span class="p">(</span>
                 <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-                <span class="n">time</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">),</span>
-                <span class="n">target_accuracy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_accuracy&quot;</span><span class="p">),</span>
-                <span class="n">num_divisions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_divisions&quot;</span><span class="p">),</span>
-                <span class="n">error_bound</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error_bound&quot;</span><span class="p">),</span>
-                <span class="n">weight_threshold</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">),</span>
-                <span class="n">power</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">),</span>
-                <span class="n">power_strategy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power_strategy&quot;</span><span class="p">),</span>
+                <span class="n">time</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"time"</span><span class="p">),</span>
+                <span class="n">target_accuracy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_accuracy"</span><span class="p">),</span>
+                <span class="n">num_divisions</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_divisions"</span><span class="p">),</span>
+                <span class="n">error_bound</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"error_bound"</span><span class="p">),</span>
+                <span class="n">weight_threshold</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"weight_threshold"</span><span class="p">),</span>
+                <span class="n">power</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"power"</span><span class="p">),</span>
+                <span class="n">power_strategy</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"power_strategy"</span><span class="p">),</span>
             <span class="p">)</span>
             <span class="k">return</span> <span class="n">trotter_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
 
@@ -277,11 +278,11 @@
             <span class="n">resolved_order</span> <span class="o">=</span> <span class="n">order</span>
             <span class="n">num_divisions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_num_divisions</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">effective_time</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Zassenhaus orders must be greater than or equal to 1.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Zassenhaus orders must be greater than or equal to 1."</span><span class="p">)</span>
 
         <span class="n">delta</span> <span class="o">=</span> <span class="n">effective_time</span> <span class="o">/</span> <span class="n">num_divisions</span>
         <span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_decompose_zassenhaus_step</span><span class="p">(</span>
-            <span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">delta</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="n">resolved_order</span>
+            <span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">delta</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"weight_threshold"</span><span class="p">),</span> <span class="n">order</span><span class="o">=</span><span class="n">resolved_order</span>
         <span class="p">)</span>
         <span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_optimize_pauli_sequence</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">1e-15</span><span class="p">)</span>
 
@@ -297,26 +298,26 @@
         <span class="k">return</span> <span class="n">UnitaryRepresentation</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">container</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_num_divisions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Determine the number of Zassenhaus divisions to use.</span>
+<span class="w">        </span><span class="sd">"""Determine the number of Zassenhaus divisions to use.</span>
 
 <span class="sd">        When both *num_divisions* and *target_accuracy* are provided, the</span>
 <span class="sd">        larger value wins.  When neither is provided, the default is 1.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">num_divisions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_divisions&quot;</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="n">num_divisions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_divisions"</span><span class="p">)</span>
         <span class="n">manual</span> <span class="o">=</span> <span class="n">num_divisions</span> <span class="k">if</span> <span class="n">num_divisions</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">1</span>
 
-        <span class="n">target_accuracy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_accuracy&quot;</span><span class="p">)</span>
+        <span class="n">target_accuracy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"target_accuracy"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">target_accuracy</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">manual</span>
 
         <span class="k">if</span> <span class="n">order</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
+            <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"order"</span><span class="p">)</span>
 
-        <span class="n">weight_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">)</span>
-        <span class="n">error_bound</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error_bound&quot;</span><span class="p">)</span>
+        <span class="n">weight_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"weight_threshold"</span><span class="p">)</span>
+        <span class="n">error_bound</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"error_bound"</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">error_bound</span> <span class="o">==</span> <span class="s2">&quot;commutator&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">error_bound</span> <span class="o">==</span> <span class="s2">"commutator"</span><span class="p">:</span>
             <span class="n">auto</span> <span class="o">=</span> <span class="n">zassenhaus_steps_commutator</span><span class="p">(</span>
                 <span class="n">hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
                 <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
@@ -342,7 +343,7 @@
         <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
         <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decompose a single Zassenhaus step into exponentiated Pauli terms.</span>
+<span class="w">        </span><span class="sd">"""Decompose a single Zassenhaus step into exponentiated Pauli terms.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The qubit Hamiltonian to be decomposed.</span>
@@ -353,24 +354,24 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">is_hermitian</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">atol</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts."</span><span class="p">)</span>
 
         <span class="c1"># If all coefficients are below the tolerance, there is nothing to decompose.</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="nb">complex</span><span class="p">(</span><span class="n">c</span><span class="p">)</span><span class="o">.</span><span class="n">real</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">atol</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">coefficients</span><span class="p">):</span>
-            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;No coefficients above the tolerance; returning empty term list.&quot;</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">"No coefficients above the tolerance; returning empty term list."</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">terms</span>
 
         <span class="k">if</span> <span class="n">order</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
+            <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"order"</span><span class="p">)</span>
 
         <span class="n">grouped_hamiltonians</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_group_terms</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="ow">not</span> <span class="n">grouped_hamiltonians</span><span class="p">:</span>
-            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Term partition produced no groups; returning empty term list.&quot;</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">"Term partition produced no groups; returning empty term list."</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">terms</span>
 
         <span class="k">for</span> <span class="n">group</span> <span class="ow">in</span> <span class="n">grouped_hamiltonians</span><span class="p">:</span>
@@ -405,7 +406,7 @@
         <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
         <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decompose higher-order Zassenhaus correction exponents.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Decompose higher-order Zassenhaus correction exponents."""</span>
         <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">leaves</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">grouped_hamiltonians</span><span class="p">)))</span>
         <span class="n">planned_exponents</span><span class="p">,</span> <span class="n">plan</span> <span class="o">=</span> <span class="n">zassenhaus_commutator_plan</span><span class="p">(</span><span class="n">leaves</span><span class="p">,</span> <span class="n">max_order</span><span class="o">=</span><span class="n">order</span><span class="p">)</span>
@@ -423,7 +424,7 @@
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
                 <span class="n">sequence</span> <span class="o">=</span> <span class="p">(</span><span class="n">ref</span><span class="p">,)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected Zassenhaus plan reference: </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unexpected Zassenhaus plan reference: </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
 
             <span class="n">leaf_sequences</span><span class="p">[</span><span class="n">ref</span><span class="p">]</span> <span class="o">=</span> <span class="n">sequence</span>
             <span class="k">return</span> <span class="n">sequence</span>
@@ -454,7 +455,7 @@
                         <span class="n">num_qubits</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">h_left</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span> <span class="n">h_right</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">)</span>
                         <span class="c1"># Avoid the expensive commutator calculation if all terms commute</span>
                         <span class="n">commutator_cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
-                            <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;I&quot;</span> <span class="o">*</span> <span class="n">num_qubits</span><span class="p">],</span>
+                            <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">"I"</span> <span class="o">*</span> <span class="n">num_qubits</span><span class="p">],</span>
                             <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">),</span>
                         <span class="p">)</span>
                     <span class="k">else</span><span class="p">:</span>
@@ -462,10 +463,10 @@
                 <span class="k">return</span> <span class="n">commutator_cache</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
 
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ref</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected Zassenhaus leaf reference: </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unexpected Zassenhaus leaf reference: </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
 
             <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Leaf </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2"> expected one subgroup choice, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Leaf </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2"> expected one subgroup choice, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">choices</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 
             <span class="k">return</span> <span class="n">grouped_hamiltonians</span><span class="p">[</span><span class="n">ref</span><span class="p">][</span><span class="n">choices</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
 
@@ -473,7 +474,7 @@
             <span class="c1"># For a degree-n correction exponent in the Zassenhaus expansion of e^{-i H t},</span>
             <span class="c1"># the symbolic Lie polynomial C_n is homogeneous of degree n in the generators {-i H_j}.</span>
             <span class="c1"># Thus, C_n has a factor of (-i)^n. Since we represent the exponentiated Pauli terms</span>
-            <span class="c1"># in the form e^{-i C&#39;_n t^n}, we factor out -i (or -1j), leaving a phase factor of</span>
+            <span class="c1"># in the form e^{-i C'_n t^n}, we factor out -i (or -1j), leaving a phase factor of</span>
             <span class="c1"># (-i)^n / (-i) = (-i)^{n-1} = i * (-i)^n.</span>
             <span class="n">phase</span> <span class="o">=</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="p">((</span><span class="o">-</span><span class="mi">1</span><span class="n">j</span><span class="p">)</span> <span class="o">**</span> <span class="n">n</span><span class="p">)</span>
             <span class="n">correction_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -503,7 +504,7 @@
         <span class="n">correction_degree</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">order</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Decompose one Zassenhaus correction exponent into Pauli rotations.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Decompose one Zassenhaus correction exponent into Pauli rotations."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">correction_terms</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span>
 
@@ -515,13 +516,13 @@
             <span class="k">return</span> <span class="n">correction_terms</span>
 
         <span class="n">correction_hamiltonian</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_terms_to_hamiltonian</span><span class="p">(</span><span class="n">correction_terms</span><span class="p">)</span>
-        <span class="n">term_grouper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">)</span>
+        <span class="n">term_grouper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">"term_grouper"</span><span class="p">)</span>
         <span class="n">grouped_correction_hamiltonian</span> <span class="o">=</span> <span class="n">term_grouper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">correction_hamiltonian</span><span class="p">)</span>
 
         <span class="n">internal_builder</span> <span class="o">=</span> <span class="n">Zassenhaus</span><span class="p">(</span>
             <span class="n">order</span><span class="o">=</span><span class="n">internal_order</span><span class="p">,</span>
             <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
-            <span class="n">term_grouper</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">),</span>
+            <span class="n">term_grouper</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"term_grouper"</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="n">internal_execution_terms</span> <span class="o">=</span> <span class="n">internal_builder</span><span class="o">.</span><span class="n">_decompose_zassenhaus_step</span><span class="p">(</span>
             <span class="n">grouped_correction_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="mf">0.0</span>
@@ -529,7 +530,7 @@
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">internal_execution_terms</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_terms_commute</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether all Pauli rotations in *terms* mutually commute.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return whether all Pauli rotations in *terms* mutually commute."""</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">left</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">terms</span><span class="p">):</span>
             <span class="k">for</span> <span class="n">right</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:]:</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="n">do_pauli_maps_commute</span><span class="p">(</span><span class="n">left</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span> <span class="n">right</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">):</span>
@@ -537,7 +538,7 @@
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_terms_to_hamiltonian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert exponentiated Pauli terms to a Hamiltonian with matching angles.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Convert exponentiated Pauli terms to a Hamiltonian with matching angles."""</span>
         <span class="n">num_qubits</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">+</span> <span class="nb">max</span><span class="p">((</span><span class="n">qubit</span> <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span> <span class="k">for</span> <span class="n">qubit</span> <span class="ow">in</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">),</span> <span class="n">default</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
         <span class="n">labels</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">coefficients</span> <span class="o">=</span> <span class="p">[]</span>
@@ -552,7 +553,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-15</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Optimize a sequence of exponentiated Pauli terms by merging adjacent and commuting terms.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Optimize a sequence of exponentiated Pauli terms by merging adjacent and commuting terms."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">terms</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span>
 
@@ -591,15 +592,15 @@
 <div class="viewcode-block" id="Zassenhaus.name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the unitary builder.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;zassenhaus&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the name of the unitary builder."""</span>
+        <span class="k">return</span> <span class="s2">"zassenhaus"</span></div>
 
 
 <div class="viewcode-block" id="Zassenhaus.type_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.html#qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus.Zassenhaus.type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return hamiltonian_unitary_builder as the algorithm type name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return hamiltonian_unitary_builder as the algorithm type name."""</span>
+        <span class="k">return</span> <span class="s2">"hamiltonian_unitary_builder"</span></div>
 </div>
 
 </pre></div>

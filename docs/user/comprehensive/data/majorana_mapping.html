@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MajoranaMapping &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>MajoranaMapping &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
@@ -218,7 +219,7 @@ See <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding
 
 <span class="c1"># Provide one sparse Pauli word per Majorana operator.</span>
 <span class="c1"># Entries are (qubit_index, operator_code), with X=1, Y=2, Z=3.</span>
-<span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_table</span><span class="p">([</span><span class="o">...</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;my-custom-encoding&quot;</span><span class="p">)</span>
+<span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_table</span><span class="p">([</span><span class="o">...</span><span class="p">],</span> <span class="n">name</span><span class="o">=</span><span class="s2">"my-custom-encoding"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -234,8 +235,8 @@ See <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding
 <span class="n">restored</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
 
 <span class="c1"># HDF5 round-trip</span>
-<span class="n">mapping</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;mapping.h5&quot;</span><span class="p">)</span>
-<span class="n">restored</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;mapping.h5&quot;</span><span class="p">)</span>
+<span class="n">mapping</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">"mapping.h5"</span><span class="p">)</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">"mapping.h5"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>

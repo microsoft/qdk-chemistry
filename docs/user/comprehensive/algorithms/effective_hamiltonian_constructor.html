@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Effective Hamiltonian construction &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Effective Hamiltonian construction &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -85,6 +86,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -201,7 +204,7 @@ These are absolute molecular-orbital indices, drawn from the same index universe
 Classifying an orbital of <span class="math notranslate nohighlight">\(Q\)</span> as virtual describes its occupation in the output orbital metadata; it does not place that orbital in the effective active space.
 Consumers of an effective Hamiltonian should not attempt to re-correlate <span class="math notranslate nohighlight">\(Q\)</span>, since its contribution is already folded in.</p>
 <p>Input validation is opt-in.
-The <code class="docutils literal notranslate"><span class="pre">run</span></code> method does not validate its arguments; each concrete implementation decides whether to check the nested-space contract <span class="math notranslate nohighlight">\(P \subseteq W_{\mathrm{ref}} \subseteq W_H\)</span> before computing.</p>
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method does not validate its arguments; each concrete implementation decides whether to check the space contract <span class="math notranslate nohighlight">\(P \subseteq W_H\)</span> and <span class="math notranslate nohighlight">\(W_{\mathrm{ref}} \subseteq W_H\)</span> before computing.</p>
 <p>The base interface defines no common settings.
 Concrete implementations can expose method-specific configuration through the <code class="docutils literal notranslate"><span class="pre">settings()</span></code> object.
 See <a class="reference internal" href="settings.html"><span class="doc">Settings</span></a> for a general treatment of algorithm settings in QDK/Chemistry.</p>

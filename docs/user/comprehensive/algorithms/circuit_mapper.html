@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Controlled circuit mapper &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Controlled circuit mapper &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -28,7 +28,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Circuit execution" href="circuit_executor.html" />
-    <link rel="prev" title="Hamiltonian Unitary Builder" href="hamiltonian_unitary_builder.html" /> 
+    <link rel="prev" title="Hamiltonian simulation" href="hamiltonian_simulation.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -78,6 +79,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Controlled circuit mapper</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#using-the-controlledcircuitmapper">Using the ControlledCircuitMapper</a></li>
@@ -186,7 +189,7 @@ This is a core component of algorithms such as <a class="reference internal" hre
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
 <span class="c1"># Create the default mapper (pauli_sequence)</span>
-<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">)</span>
+<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -200,34 +203,34 @@ This is a core component of algorithms such as <a class="reference internal" hre
 
 <span class="c1"># 1. Setup molecule</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">]</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
 
 <span class="c1"># 2. SCF</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 
 <span class="c1"># 3. Hamiltonian and qubit mapping</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_scf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
 
 <span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
-<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">)</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qubit_mapper"</span><span class="p">)</span>
 <span class="n">qubit_ham</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
 <span class="p">)</span>
 
 <span class="c1"># 4. Build time evolution unitary</span>
-<span class="n">trotter</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">trotter</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
 <span class="n">evolution</span> <span class="o">=</span> <span class="n">trotter</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_ham</span><span class="p">)</span>
 
 <span class="c1"># 5. Create a controlled version and map to a circuit</span>
-<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span><span class="p">,</span> <span class="n">control_indices</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="s2">"pauli_sequence"</span><span class="p">,</span> <span class="n">control_indices</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">evolution</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Controlled evolution circuit generated&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Controlled evolution circuit generated"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -242,8 +245,10 @@ This is a core component of algorithms such as <a class="reference internal" hre
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
 <span class="c1"># List all registered controlled circuit mapper implementations</span>
-<span class="n">implementations</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">implementations</span><span class="p">)</span>  <span class="c1"># e.g. [&#39;pauli_sequence&#39;]</span>
+<span class="n">implementations</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"controlled_circuit_mapper"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="n">implementations</span>
+<span class="p">)</span>  <span class="c1"># e.g. ['prepare_select_prepare', 'pauli_sequence', 'cswap_pauli_sequence']</span>
 </pre></div>
 </div>
 </div>
@@ -261,6 +266,114 @@ This is a core component of algorithms such as <a class="reference internal" hre
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>The current implementation supports a single control qubit.</p>
+</div>
+</section>
+<section id="controlled-swap-pauli-sequence-mapper">
+<h3>Controlled SWAP Pauli sequence mapper<a class="headerlink" href="#controlled-swap-pauli-sequence-mapper" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;cswap_pauli_sequence&quot;</span></code></p>
+<p>This mapper avoids controlling every gate. It allocates an internal <em>vacuum</em> register in
+<span class="math notranslate nohighlight">\(|0\ldots0\rangle\)</span>, conditionally swaps it with the system register, applies the
+<strong>uncontrolled</strong> evolution to the vacuum register, and uncomputes the swap.
+When the control is <span class="math notranslate nohighlight">\(|0\rangle\)</span> the evolution hits the vacuum and the system is untouched;
+when it is <span class="math notranslate nohighlight">\(|1\rangle\)</span> the system is parked in the vacuum register and evolved.
+For an <span class="math notranslate nohighlight">\(n\)</span>-qubit system, an additional <span class="math notranslate nohighlight">\(n\)</span>-qubit vacuum register and two layers of
+<span class="math notranslate nohighlight">\(n\)</span> controlled-<span class="math notranslate nohighlight">\(\mathrm{SWAP}\)</span> gates replace a fully controlled evolution circuit.
+This mapper applies to <strong>particle-conserving</strong> Hamiltonians only. It relies on
+<span class="math notranslate nohighlight">\(|0\ldots0\rangle\)</span> staying in its own particle-number sector.</p>
+<p>The <span class="math notranslate nohighlight">\(|0\rangle\)</span> branch picks up <span class="math notranslate nohighlight">\(U|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle\)</span>
+with <span class="math notranslate nohighlight">\(\varphi_0 = -E_0 t\)</span> and <span class="math notranslate nohighlight">\(E_0 = \langle 0\ldots0|H|0\ldots0\rangle\)</span>.
+Only the diagonal (<span class="math notranslate nohighlight">\(I\)</span>/<span class="math notranslate nohighlight">\(Z\)</span>) terms of the product formula phase the vacuum, so
+<span class="math notranslate nohighlight">\(\varphi_0\)</span> is known classically. The mapper cancels it with a phase gate
+<span class="math notranslate nohighlight">\(R_1(\varphi_0) = \mathrm{diag}(1, e^{i\varphi_0})\)</span> on the control, giving a genuine
+controlled-<span class="math notranslate nohighlight">\(U\)</span> up to a global phase for any <span class="math notranslate nohighlight">\(E_0\)</span>.</p>
+<p class="rubric">Why grouping is required</p>
+<p>The vacuum must remain an eigenstate of the evolution, which is exactly what particle
+conservation buys: <span class="math notranslate nohighlight">\(H\)</span> cannot connect <span class="math notranslate nohighlight">\(|0\ldots0\rangle\)</span> to any other occupation
+number. Leaked amplitude entangles the vacuum register with the control and destroys the control
+coherence, losing the very phase the algorithm is trying to measure.</p>
+<p>For a molecular Hamiltonian every fermionic term (<span class="math notranslate nohighlight">\(a_p^\dagger a_q\)</span> and
+<span class="math notranslate nohighlight">\(a_p^\dagger a_r^\dagger a_s a_q\)</span>) annihilates the vacuum. A single Pauli string is unitary
+and cannot, so the cancellation survives Trotterization only when the strings coming from one
+fermionic term are exponentiated as one contiguous block:</p>
+<div class="math notranslate nohighlight">
+\[U|0\ldots0\rangle = e^{-it\sum_i P_i}|0\ldots0\rangle
+\approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .\]</div>
+<p>The <a class="reference internal" href="index.html#algorithms-term-grouper"><span class="std std-ref">vacuum-annihilating term grouper</span></a> (factory name
+<code class="docutils literal notranslate"><span class="pre">&quot;vacuum_annihilating&quot;</span></code>) produces that ordering. A Pauli factor <em>flips</em> a qubit when it
+exchanges <span class="math notranslate nohighlight">\(|0\rangle\)</span> and <span class="math notranslate nohighlight">\(|1\rangle\)</span>, which <span class="math notranslate nohighlight">\(X\)</span> and <span class="math notranslate nohighlight">\(Y\)</span> do and
+<span class="math notranslate nohighlight">\(I\)</span> and <span class="math notranslate nohighlight">\(Z\)</span> do not. Terms flipping the same qubits are the only ones that can
+cancel, so the grouper walks them in order and closes a group as soon as the accumulated
+amplitude <span class="math notranslate nohighlight">\(\sum_j c_j i^{n_Y^{(j)}}\)</span> vanishes — each emitted group therefore annihilates
+the vacuum outright. Groups are restricted to one <span class="math notranslate nohighlight">\(Y\)</span>-count parity so that their members
+commute and can be exponentiated term by term.</p>
+<p>The mapper validates its input product formula and raises a <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code></a> when the
+ordering is not vacuum preserving, rather than returning a wrong result.</p>
+<p class="rubric">Worked example</p>
+<p>Take the two-mode Hamiltonian</p>
+<div class="math notranslate nohighlight">
+\[H = a_0^\dagger a_1 + a_1^\dagger a_0 + a_0^\dagger a_0
+  = \tfrac12 (XX + YY) + \tfrac12 (I - Z_0),
+\qquad H|00\rangle = 0 .\]</div>
+<p>For one Trotter step at <span class="math notranslate nohighlight">\(\Delta t = \pi/2\)</span>, the interleaved ordering <code class="docutils literal notranslate"><span class="pre">XX,</span> <span class="pre">Z0,</span> <span class="pre">YY,</span> <span class="pre">I</span></code>
+splits the <code class="docutils literal notranslate"><span class="pre">XX</span></code>/<code class="docutils literal notranslate"><span class="pre">YY</span></code> pair and gives</p>
+<div class="math notranslate nohighlight">
+\[U_{\text{interleaved}}|00\rangle
+= \tfrac{1-i}{2}|00\rangle + \tfrac{-1+i}{2}|11\rangle ,
+\qquad
+\bigl|\langle 11|U_{\text{interleaved}}|00\rangle\bigr|^2 = \tfrac12 ,\]</div>
+<p>so half of the vacuum amplitude leaks. Keeping the partners together instead gives</p>
+<div class="math notranslate nohighlight">
+\[U_{\text{grouped}}
+= e^{-i\frac{\pi}{4}(I - Z_0)}\, e^{-i\frac{\pi}{4}(XX + YY)},
+\qquad
+U_{\text{grouped}}|00\rangle = |00\rangle .\]</div>
+<p class="rubric">End-to-end usage</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span><span class="p">,</span> <span class="n">Structure</span>
+
+<span class="c1"># 1. Molecule and mean-field reference</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">])</span>
+<span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span>
+<span class="p">)</span>
+
+<span class="c1"># 2. Fermionic Hamiltonian, then a qubit Hamiltonian (core energy excluded,</span>
+<span class="c1">#    so the all-zero state satisfies H|0...0&gt; = 0)</span>
+<span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_scf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
+<span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+<span class="n">qubit_ham</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qubit_mapper"</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># 3. Group Pauli strings that flip the same qubits. These are the strings coming</span>
+<span class="c1">#    from the same fermionic term, whose amplitudes cancel on |0...0&gt;. Without</span>
+<span class="c1">#    this step Trotterization interleaves them and the vacuum leaks.</span>
+<span class="n">term_grouper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"term_grouper"</span><span class="p">,</span> <span class="s2">"vacuum_annihilating"</span><span class="p">)</span>
+<span class="n">grouped_ham</span> <span class="o">=</span> <span class="n">term_grouper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_ham</span><span class="p">)</span>
+
+<span class="c1"># 4. Trotterize. The builder honours the grouping, so each group is exponentiated</span>
+<span class="c1">#    as one contiguous block and the product formula still fixes |0...0&gt;.</span>
+<span class="n">trotter</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">evolution</span> <span class="o">=</span> <span class="n">trotter</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">grouped_ham</span><span class="p">)</span>
+
+<span class="c1"># 5. Control it with the CSWAP sandwich. The mapper validates the ordering and</span>
+<span class="c1">#    raises if the product formula would leak the vacuum. Qubit 0 is the control</span>
+<span class="c1">#    ancilla (the convention the QPE circuit builders use) and the remaining</span>
+<span class="c1">#    n_spin_orbitals qubits are auto-assigned as the system register.</span>
+<span class="n">cswap_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span>
+    <span class="s2">"cswap_pauli_sequence"</span><span class="p">,</span>
+    <span class="n">control_indices</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+<span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">cswap_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">evolution</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Controlled evolution circuit generated via the CSWAP sandwich"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
 </div>
 </section>
 </section>
@@ -288,7 +401,7 @@ This is a core component of algorithms such as <a class="reference internal" hre
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="hamiltonian_unitary_builder.html" class="btn btn-neutral float-left" title="Hamiltonian Unitary Builder" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="hamiltonian_simulation.html" class="btn btn-neutral float-left" title="Hamiltonian simulation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="circuit_executor.html" class="btn btn-neutral float-right" title="Circuit execution" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.state\_preparation.\_binary\_encoding\_utils module
+=============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.state_preparation._binary_encoding_utils
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

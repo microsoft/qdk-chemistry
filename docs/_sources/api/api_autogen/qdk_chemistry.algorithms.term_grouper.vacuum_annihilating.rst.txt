@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.term\_grouper.vacuum\_annihilating module
+===================================================================
+
+.. automodule:: qdk_chemistry.algorithms.term_grouper.vacuum_annihilating
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

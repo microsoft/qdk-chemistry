@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.unitary_representation.containers.pauli_product_formula module &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.data.unitary_representation.containers.pauli_product_formula module &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -129,7 +130,10 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType"><code class="docutils literal notranslate"><span class="pre">WavefunctionType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.available_dataclasses"><code class="docutils literal notranslate"><span class="pre">available_dataclasses()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.get_current_ciaaw_version"><code class="docutils literal notranslate"><span class="pre">get_current_ciaaw_version()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.get_dataclass_type"><code class="docutils literal notranslate"><span class="pre">get_dataclass_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.register_dataclass"><code class="docutils literal notranslate"><span class="pre">register_dataclass()</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.data.html#subpackages">Subpackages</a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#submodules">Submodules</a></li>
 </ul>
@@ -203,18 +207,6 @@
 </ul>
 </dd>
 </dl>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.pauli_term">
-<span class="sig-name descname"><span class="pre">pauli_term</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><span class="pre">dict</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.pauli_term" title="Link to this definition"></a></dt>
-<dd><p>A dictionary mapping qubit indices to Pauli operators (‘X’, ‘Y’, ‘Z’).</p>
-</dd></dl>
-
-<dl class="py attribute">
-<dt class="sig sig-object py" id="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.angle">
-<span class="sig-name descname"><span class="pre">angle</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.angle" title="Link to this definition"></a></dt>
-<dd><p>The rotation angle for the exponentiation.</p>
-</dd></dl>
-
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pauli_term</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">angle</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.__init__" title="Link to this definition"></a></dt>
@@ -260,20 +252,40 @@ where <code class="docutils literal notranslate"><span class="pre">step_reps</sp
 </dd>
 </dl>
 <dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.data_type_name">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">data_type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.data_type_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.data_type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the wire-format identifier for product-formula containers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">&quot;pauli_product_formula_container&quot;</span></code>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">step_terms</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step_reps</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_qubits</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.__init__" title="Link to this definition"></a></dt>
 <dd><p>Initialize a PauliProductFormulaContainer.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>step_terms</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm"><em>ExponentiatedPauliTerm</em></a><em>]</em>) – The list of exponentiated Pauli terms in a single step.</p></li>
-<li><p><strong>step_reps</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The number of repetitions of the single step.</p></li>
-<li><p><strong>num_qubits</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The number of qubits the unitary acts on.</p></li>
-<li><p><strong>scale</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – The evolution time used for eigenvalue-phase conversion.</p></li>
+<li><p><strong>step_terms</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm"><code class="xref py py-class docutils literal notranslate"><span class="pre">ExponentiatedPauliTerm</span></code></a>]</span>) – The list of exponentiated Pauli terms in a single step.</p></li>
+<li><p><strong>step_reps</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – The number of repetitions of the single step.</p></li>
+<li><p><strong>num_qubits</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – The number of qubits the unitary acts on.</p></li>
+<li><p><strong>scale</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – The evolution time used for eigenvalue-phase conversion.</p></li>
 </ul>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p>None</p>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#TypeError" title="(in Python v3.14)"><strong>TypeError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">step_reps</span></code> is not an integer.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">step_reps</span></code> is not positive.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
 </dd>
 </dl>
 </dd></dl>
@@ -286,17 +298,14 @@ where <code class="docutils literal notranslate"><span class="pre">step_reps</sp
 phase <span class="math notranslate nohighlight">\(e^{-iEt}\)</span>, so QPE measures <span class="math notranslate nohighlight">\(\varphi = (-Et / 2\pi) \bmod 1\)</span>.
 Inverting gives <code class="docutils literal notranslate"><span class="pre">E</span> <span class="pre">=</span> <span class="pre">-angle</span> <span class="pre">/</span> <span class="pre">t</span></code>.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>phase_fraction</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span>) – Measured phase fraction <span class="math notranslate nohighlight">\(\varphi \in [0, 1)\)</span>.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The corresponding Hamiltonian eigenvalue.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>phase_fraction</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Measured phase fraction <span class="math notranslate nohighlight">\(\varphi \in [0, 1)\)</span>.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>The corresponding Hamiltonian eigenvalue.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
 </dd>
 </dl>
 </dd></dl>
@@ -328,18 +337,15 @@ Inverting gives <code class="docutils literal notranslate"><span class="pre">E</
 <span class="sig-name descname"><span class="pre">reorder_terms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">permutation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.reorder_terms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.reorder_terms" title="Link to this definition"></a></dt>
 <dd><p>Reorder the Pauli terms according to a given permutation.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>permutation</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><em>list</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>]</em>) – A list where <code class="docutils literal notranslate"><span class="pre">permutation[i]</span></code> gives the old index of the term
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>permutation</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>]</span>) – A list where <code class="docutils literal notranslate"><span class="pre">permutation[i]</span></code> gives the old index of the term
 that should be placed at position <code class="docutils literal notranslate"><span class="pre">i</span></code> in the reordered list.</p>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A new container with the updated ordering.</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new container with the updated ordering.</p>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer">PauliProductFormulaContainer</a></p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
 </dd>
 </dl>
 <div class="admonition note">
@@ -360,16 +366,16 @@ string (i.e., have identical <code class="docutils literal notranslate"><span cl
 angles are summed into a single <code class="docutils literal notranslate"><span class="pre">ExponentiatedPauliTerm</span></code>. If the summed
 angle has magnitude less than <code class="docutils literal notranslate"><span class="pre">atol</span></code>, the resulting term is removed.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>other_container</strong> (<a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><em>PauliProductFormulaContainer</em></a>) – The second <code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code> appended
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>other_container</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span>) – The second <code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code> appended
 after this container.</p></li>
 <li><p><strong>atol</strong> – Absolute tolerance used when deciding whether a merged term with
 a small rotation angle should be dropped.</p></li>
 </ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>A single <code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code> representing the combined
@@ -383,14 +389,11 @@ evolution with adjacent identical terms fused.</p>
 <span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.to_json" title="Link to this definition"></a></dt>
 <dd><p>Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary representation of the PauliProductFormulaContainer</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Dictionary representation of the PauliProductFormulaContainer</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -400,11 +403,11 @@ evolution with adjacent identical terms fused.</p>
 <span class="sig-name descname"><span class="pre">to_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.to_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.to_hdf5" title="Link to this definition"></a></dt>
 <dd><p>Save the PauliProductFormulaContainer to an HDF5 group.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>group</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Group</span></code></span>) – HDF5 group or file to write data to</p>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>group</strong> (<em>h5py.Group</em>) – HDF5 group or file to write data to</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -414,11 +417,11 @@ evolution with adjacent identical terms fused.</p>
 <span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">json_data</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.from_json" title="Link to this definition"></a></dt>
 <dd><p>Create PauliProductFormulaContainer from a JSON dictionary.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>json_data</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span>) – Dictionary containing the serialized data</p>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>json_data</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a><em>]</em>) – Dictionary containing the serialized data</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>PauliProductFormulaContainer</p>
@@ -431,11 +434,11 @@ evolution with adjacent identical terms fused.</p>
 <span class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">from_hdf5</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">group</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.from_hdf5"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.from_hdf5" title="Link to this definition"></a></dt>
 <dd><p>Load an instance from an HDF5 group.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>group</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Group</span></code></span>) – HDF5 group or file to read data from</p>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>group</strong> (<em>h5py.Group</em>) – HDF5 group or file to read data from</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer" title="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a></span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>PauliProductFormulaContainer</p>
@@ -448,14 +451,11 @@ evolution with adjacent identical terms fused.</p>
 <span class="sig-name descname"><span class="pre">get_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/data/unitary_representation/containers/pauli_product_formula.html#PauliProductFormulaContainer.get_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.get_summary" title="Link to this definition"></a></dt>
 <dd><p>Get summary of PauliProductFormulaContainer.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Summary string describing the PauliProductFormulaContainer’s contents and properties</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Summary string describing the PauliProductFormulaContainer’s contents and properties</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>

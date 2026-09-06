@@ -16,3 +16,4 @@ Submodules
    qdk_chemistry.algorithms.term_grouper.base
    qdk_chemistry.algorithms.term_grouper.commuting
    qdk_chemistry.algorithms.term_grouper.identity
+   qdk_chemistry.algorithms.term_grouper.vacuum_annihilating

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.utils.qsharp &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.utils.qsharp &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,33 +96,68 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.utils.qsharp</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Q# Utilities Module.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""QDK/Chemistry Q# Utilities Module."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Iterator</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">contextmanager</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">cache</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">qdk</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">TargetProfile</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;QSHARP_UTILS&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;create_qsharp_context&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;get_qsharp_context&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;set_qsharp_context&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;use_qsharp_context&quot;</span><span class="p">,</span>
+    <span class="s2">"QSHARP_UTILS"</span><span class="p">,</span>
+    <span class="s2">"create_qsharp_context"</span><span class="p">,</span>
+    <span class="s2">"get_qsharp_context"</span><span class="p">,</span>
+    <span class="s2">"set_qsharp_context"</span><span class="p">,</span>
+    <span class="s2">"use_qsharp_context"</span><span class="p">,</span>
 <span class="p">]</span>
 
 <span class="n">_PROJECT_ROOT</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="p">)</span>
+<span class="n">_SOURCE_ROOT</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"src"</span>
+
+<span class="c1">#: Q# sources that are supported by ``TargetProfile.Base``.</span>
+<span class="n">_BASE_PROFILE_FILES</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="s2">"StatePreparation.qs"</span><span class="p">,</span>
+    <span class="s2">"BinaryEncoding.qs"</span><span class="p">,</span>
+    <span class="s2">"CircuitComposition.qs"</span><span class="p">,</span>
+    <span class="s2">"IterativePhaseEstimation.qs"</span><span class="p">,</span>
+    <span class="s2">"StandardPhaseEstimation.qs"</span><span class="p">,</span>
+    <span class="s2">"ControlledPauliExp.qs"</span><span class="p">,</span>
+    <span class="s2">"ControlledSwapPauliExp.qs"</span><span class="p">,</span>
+    <span class="s2">"HadamardTest.qs"</span><span class="p">,</span>
+    <span class="s2">"PauliExp.qs"</span><span class="p">,</span>
+    <span class="s2">"MeasurementBasis.qs"</span><span class="p">,</span>
+    <span class="s2">"Select.qs"</span><span class="p">,</span>
+    <span class="s2">"PrepSelPrep.qs"</span><span class="p">,</span>
+    <span class="s2">"AmplitudeAmplification.qs"</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="nd">@cache</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_base_project_root</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Stage the Base-supported sources as a standalone Q# project and return its root."""</span>
+    <span class="n">root</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"qdk-chemistry-qsharp-base-"</span><span class="p">))</span>
+    <span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">,</span> <span class="n">root</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">shutil</span><span class="o">.</span><span class="n">copyfile</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">_PROJECT_ROOT</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"qsharp.json"</span><span class="p">,</span> <span class="n">root</span> <span class="o">/</span> <span class="s2">"qsharp.json"</span><span class="p">)</span>
+    <span class="n">source_dir</span> <span class="o">=</span> <span class="n">root</span> <span class="o">/</span> <span class="n">_SOURCE_ROOT</span><span class="o">.</span><span class="n">name</span>
+    <span class="n">source_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_BASE_PROFILE_FILES</span><span class="p">:</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copyfile</span><span class="p">(</span><span class="n">_SOURCE_ROOT</span> <span class="o">/</span> <span class="n">name</span><span class="p">,</span> <span class="n">source_dir</span> <span class="o">/</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">root</span><span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_SharedContext</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Lock-guarded holder for the process-wide shared Q# context.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Lock-guarded holder for the process-wide shared Q# context."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">RLock</span><span class="p">()</span>
@@ -135,12 +171,12 @@
 <div class="viewcode-block" id="create_qsharp_context">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.create_qsharp_context">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">create_qsharp_context</span><span class="p">(</span>
-    <span class="n">target_profile</span><span class="p">:</span> <span class="n">TargetProfile</span> <span class="o">=</span> <span class="n">TargetProfile</span><span class="o">.</span><span class="n">Base</span><span class="p">,</span>
+    <span class="n">target_profile</span><span class="p">:</span> <span class="n">TargetProfile</span> <span class="o">=</span> <span class="n">TargetProfile</span><span class="o">.</span><span class="n">Adaptive_RIF</span><span class="p">,</span>
     <span class="n">target_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">language_features</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">qdk_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a new, isolated ``qdk.Context`` preloaded with the Q# chemistry utilities.</span>
+<span class="w">    </span><span class="sd">"""Create a new, isolated ``qdk.Context`` preloaded with the Q# chemistry utilities.</span>
 
 <span class="sd">    Every call returns a *fresh* context with its own Q# interpreter. Most users never</span>
 <span class="sd">    need this — the library maintains one shared context (see :func:`get_qsharp_context`).</span>
@@ -148,8 +184,9 @@
 <span class="sd">    (for example a non-default ``target_profile``); then register it with</span>
 <span class="sd">    :func:`set_qsharp_context` if the chemistry builders should use it too.</span>
 
-<span class="sd">    :param target_profile: Target profile the Q# interpreter compiles for. Defaults to</span>
-<span class="sd">        ``TargetProfile.Base``.</span>
+<span class="sd">    :param target_profile: Target profile the Q# interpreter compiles for. Default is</span>
+<span class="sd">        ``TargetProfile.Adaptive_RIF``. A ``TargetProfile.Base`` context loads only a</span>
+<span class="sd">        subset of the available Q# operations.</span>
 <span class="sd">    :param target_name: Optional target machine name used to infer a compatible profile.</span>
 <span class="sd">    :param language_features: Optional list of experimental Q# language feature flags.</span>
 <span class="sd">    :param qdk_config: Optional configuration values exposed to Q# code via</span>
@@ -157,14 +194,16 @@
 
 <span class="sd">    ``project_root`` is intentionally not exposed: it is fixed to the vendored Q# utility</span>
 <span class="sd">    project so the chemistry utilities are always available on the returned context.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">if</span> <span class="n">target_name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;target_name&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_name</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"target_name"</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_name</span>
     <span class="k">if</span> <span class="n">language_features</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;language_features&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">language_features</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"language_features"</span><span class="p">]</span> <span class="o">=</span> <span class="n">language_features</span>
     <span class="k">if</span> <span class="n">qdk_config</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">kwargs</span><span class="p">[</span><span class="s2">&quot;qdk_config&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">qdk_config</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="s2">"qdk_config"</span><span class="p">]</span> <span class="o">=</span> <span class="n">qdk_config</span>
+    <span class="k">if</span> <span class="n">target_profile</span> <span class="o">==</span> <span class="n">TargetProfile</span><span class="o">.</span><span class="n">Base</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">(</span><span class="n">project_root</span><span class="o">=</span><span class="n">_base_project_root</span><span class="p">(),</span> <span class="n">target_profile</span><span class="o">=</span><span class="n">target_profile</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">(</span><span class="n">project_root</span><span class="o">=</span><span class="n">_PROJECT_ROOT</span><span class="p">,</span> <span class="n">target_profile</span><span class="o">=</span><span class="n">target_profile</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
 
@@ -172,13 +211,13 @@
 <div class="viewcode-block" id="get_qsharp_context">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.get_qsharp_context">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_qsharp_context</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the shared ``qdk.Context`` that QDK/Chemistry uses for all Q# composition.</span>
+<span class="w">    </span><span class="sd">"""Return the shared ``qdk.Context`` that QDK/Chemistry uses for all Q# composition.</span>
 
 <span class="sd">    Call it when you want to define your *own* Q# operation (e.g. a custom state</span>
 <span class="sd">    preparation) and compose it with a chemistry builder. The context is created lazily</span>
 <span class="sd">    on first use and access is thread-safe.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">override</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_thread_local</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="sd">    """</span>
+    <span class="n">override</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_thread_local</span><span class="p">,</span> <span class="s2">"context"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">override</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">override</span>
 
@@ -192,7 +231,7 @@
 <div class="viewcode-block" id="set_qsharp_context">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.set_qsharp_context">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">set_qsharp_context</span><span class="p">(</span><span class="n">context</span><span class="p">:</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace the process-wide shared Q# context (pass ``None`` to reset to the default).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Replace the process-wide shared Q# context (pass ``None`` to reset to the default)."""</span>
     <span class="k">with</span> <span class="n">_shared</span><span class="o">.</span><span class="n">lock</span><span class="p">:</span>
         <span class="n">_shared</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span></div>
 
@@ -202,8 +241,8 @@
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.qsharp.html#qdk_chemistry.utils.qsharp.use_qsharp_context">[docs]</a>
 <span class="nd">@contextmanager</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">use_qsharp_context</span><span class="p">(</span><span class="n">context</span><span class="p">:</span> <span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">qdk</span><span class="o">.</span><span class="n">Context</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Temporarily use *context* as the shared Q# context on the current thread.&quot;&quot;&quot;</span>
-    <span class="n">previous</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_thread_local</span><span class="p">,</span> <span class="s2">&quot;context&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Temporarily use *context* as the shared Q# context on the current thread."""</span>
+    <span class="n">previous</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">_thread_local</span><span class="p">,</span> <span class="s2">"context"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
     <span class="n">_thread_local</span><span class="o">.</span><span class="n">context</span> <span class="o">=</span> <span class="n">context</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">yield</span> <span class="n">context</span>
@@ -213,13 +252,14 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_QSharpUtilsProxy</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Resolve the chemistry Q# utilities against the active shared context.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Resolve the chemistry Q# utilities against the active shared context."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Resolve *name* on the utilities namespace of the active context.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Resolve *name* on the utilities namespace of the active context."""</span>
         <span class="k">return</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">get_qsharp_context</span><span class="p">()</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">QDKChemistry</span><span class="o">.</span><span class="n">Utils</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
 
 
+<span class="c1"># Perform initial initialization</span>
 <span class="n">QSHARP_UTILS</span> <span class="o">=</span> <span class="n">_QSharpUtilsProxy</span><span class="p">()</span>
 </pre></div>
 

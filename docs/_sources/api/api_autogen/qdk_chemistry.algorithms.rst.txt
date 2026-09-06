@@ -13,6 +13,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.algorithms.amplitude_amplification
    qdk_chemistry.algorithms.circuit_executor
    qdk_chemistry.algorithms.circuit_mapper
    qdk_chemistry.algorithms.controlled_circuit_mapper
@@ -33,7 +34,6 @@ Submodules
    :maxdepth: 4
 
    qdk_chemistry.algorithms.active_space_selector
-   qdk_chemistry.algorithms.amplitude_amplification
    qdk_chemistry.algorithms.base
    qdk_chemistry.algorithms.dynamical_correlation_calculator
    qdk_chemistry.algorithms.effective_hamiltonian_constructor
@@ -44,6 +44,7 @@ Submodules
    qdk_chemistry.algorithms.multi_configuration_scf
    qdk_chemistry.algorithms.nuclear_derivative
    qdk_chemistry.algorithms.orbital_localizer
+   qdk_chemistry.algorithms.population_analysis
    qdk_chemistry.algorithms.projected_multi_configuration_calculator
    qdk_chemistry.algorithms.qubit_hamiltonian_solver
    qdk_chemistry.algorithms.registry

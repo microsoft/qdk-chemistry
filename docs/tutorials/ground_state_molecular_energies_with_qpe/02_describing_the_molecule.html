@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Describing the molecule &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Describing the molecule &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -143,9 +144,9 @@ Record the molecular inputs and both Hartree–Fock energies before calculating 
 Interpret the difference as basis-set sensitivity rather than as the total error of either energy.</p>
 </div>
 </section>
-<section id="example-download">
-<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
-<p>Download <a class="reference download internal" download="" href="../../_downloads/7849ec8a9760e394647cf4ceeebb67f5/tutorial_describe_n2.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_describe_n2.py</span></code></a> and save it in your tutorial working directory.
+<section id="example-files">
+<h2>Example files<a class="headerlink" href="#example-files" title="Link to this heading"></a></h2>
+<p>Add <a class="reference download internal" download="" href="../../_downloads/7849ec8a9760e394647cf4ceeebb67f5/tutorial_describe_n2.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_describe_n2.py</span></code></a> to your tutorial working folder.
 Open the file in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
 The sections below explain the inputs and calculations in this complete executable file before you run it.</p>
 </section>
@@ -163,12 +164,12 @@ The labels <span class="math notranslate nohighlight">\(\alpha\)</span> and <spa
 For the target N<sub>2</sub> singlet, <span class="math notranslate nohighlight">\(S=0\)</span>, so the multiplicity is one and the calculation contains seven <span class="math notranslate nohighlight">\(\alpha\)</span> and seven <span class="math notranslate nohighlight">\(\beta\)</span> electrons.</p>
 <p><a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry represents a molecular geometry with a <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object.
 This example constructs the <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a> object from a string in <a class="reference external" href="https://en.wikipedia.org/wiki/XYZ_file_format">XYZ file format</a>, which contains an atom count, a comment line, and one element symbol with three Cartesian coordinates for each atom:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">"""</span><span class="se">\</span>
 <span class="s2">2</span>
 <span class="s2">Stretched N2 molecule for the ground-state QPE tutorial</span>
 <span class="s2">N    0.000000    0.000000    0.000000</span>
 <span class="s2">N    0.000000    0.000000    1.850000</span>
-<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="s2">"""</span><span class="p">)</span>
 <span class="c1"># The 1.85-Angstrom bond is substantially longer than the 1.097685-Angstrom</span>
 <span class="c1"># equilibrium distance, increasing multiconfigurational character.</span>
 <span class="c1"># The target is neutral N2 in its singlet ground state, where all electrons are</span>
@@ -250,7 +251,7 @@ The larger basis gives the orbitals more radial flexibility but increases comput
 <p>This comparison does not determine the exact basis-set error.
 It measures how much the Hartree–Fock energy changes with basis size while the geometry, method, and basis-set family remain fixed.</p>
 <figure class="align-center" id="id4">
-<span id="tutorial-wavefunction-hierarchy"></span><div class="graphviz"><img src="../../_images/graphviz-337ddaa53dcec46c59d1fd7c3a17cdce466228e4.png" alt="Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients." class="graphviz" /></div>
+<span id="tutorial-wavefunction-hierarchy"></span><img alt="Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients." src="../../_images/tutorial_qpe_wavefunction_hierarchy.svg" />
 <figcaption>
 <p><span class="caption-text">Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.</span><a class="headerlink" href="#id4" title="Link to this image"></a></p>
 </figcaption>
@@ -293,7 +294,7 @@ The primary result is the <code class="docutils literal notranslate"><span class
 The <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> and <code class="docutils literal notranslate"><span class="pre">cc-pvtz</span></code> Hartree–Fock energies support the basis-set sensitivity exercise that follows.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Correlation-consistent double- and triple-zeta bases form a controlled sequence:</span>
 <span class="c1"># cc-pVTZ adds radial/angular flexibility beyond cc-pVDZ at higher cost.</span>
-<span class="n">basis_sets</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">,</span> <span class="s2">&quot;cc-pvtz&quot;</span><span class="p">)</span>
+<span class="n">basis_sets</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"cc-pvdz"</span><span class="p">,</span> <span class="s2">"cc-pvtz"</span><span class="p">)</span>
 <span class="c1"># Store each result under its basis-set name so the values from the shared loop</span>
 <span class="c1"># can be compared afterward without repeating either calculation.</span>
 <span class="n">energies</span> <span class="o">=</span> <span class="p">{}</span>
@@ -301,7 +302,7 @@ The <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span><
 
 <span class="c1"># Change only the basis set so the energy difference measures basis-set sensitivity.</span>
 <span class="k">for</span> <span class="n">basis_set</span> <span class="ow">in</span> <span class="n">basis_sets</span><span class="p">:</span>
-    <span class="n">solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+    <span class="n">solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">)</span>
     <span class="c1"># basis_or_guess accepts either a basis name or a reusable orbital guess.</span>
     <span class="c1"># Supplying a string asks the solver to build that basis from the structure.</span>
     <span class="c1"># run() returns the converged total energy and its Hartree--Fock wavefunction.</span>
@@ -313,14 +314,14 @@ The <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span><
     <span class="p">)</span>
     <span class="n">energies</span><span class="p">[</span><span class="n">basis_set</span><span class="p">]</span> <span class="o">=</span> <span class="n">energy</span>
     <span class="n">wavefunctions</span><span class="p">[</span><span class="n">basis_set</span><span class="p">]</span> <span class="o">=</span> <span class="n">wavefunction</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">basis_set</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">basis_set</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> Hartree"</span><span class="p">)</span>
 
-<span class="c1"># Record the continued workflow&#39;s orbital count. The active-space workflow later</span>
+<span class="c1"># Record the continued workflow's orbital count. The active-space workflow later</span>
 <span class="c1"># selects a subset, and each retained spatial orbital contributes two spin modes.</span>
 <span class="n">num_cc_pvdz_orbitals</span> <span class="o">=</span> <span class="p">(</span>
-    <span class="n">wavefunctions</span><span class="p">[</span><span class="s2">&quot;cc-pvdz&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
+    <span class="n">wavefunctions</span><span class="p">[</span><span class="s2">"cc-pvdz"</span><span class="p">]</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
 <span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;cc-pvdz wavefunction: </span><span class="si">{</span><span class="n">num_cc_pvdz_orbitals</span><span class="si">}</span><span class="s2"> molecular orbitals&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cc-pvdz wavefunction: </span><span class="si">{</span><span class="n">num_cc_pvdz_orbitals</span><span class="si">}</span><span class="s2"> molecular orbitals"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Run the complete script and record both fixed-geometry total energies and the number of <code class="docutils literal notranslate"><span class="pre">cc-pvdz</span></code> molecular orbitals in the lab notebook.

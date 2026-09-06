@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Serialization &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Serialization &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
@@ -180,12 +181,12 @@ In QDK/Chemistry, this is crucial for:</p>
 
 <span class="c1"># Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)</span>
 <span class="c1"># Substitute the path with your own, if needed.</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/h2.structure.xyz&quot;</span><span class="p">)</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"../data/h2.structure.xyz"</span><span class="p">)</span>
 
 <span class="c1"># For demonstration: create a structure with custom masses and charges</span>
 <span class="c1"># (requires explicit coordinates, here in Bohr)</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>  <span class="c1"># Bohr</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">]</span>
 <span class="n">custom_masses</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.001</span><span class="p">,</span> <span class="mf">0.999</span><span class="p">]</span>
 <span class="n">custom_charges</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.9</span><span class="p">,</span> <span class="mf">1.1</span><span class="p">]</span>
 <span class="n">structure_custom</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span>
@@ -196,11 +197,11 @@ In QDK/Chemistry, this is crucial for:</p>
 <span class="n">structure_data</span> <span class="o">=</span> <span class="n">structure_custom</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
 
 <span class="c1"># Deserialize from JSON object</span>
-<span class="c1"># &quot;Structure&quot; is the data type to de-serialize into (will throw, if it doesn&#39;t match)</span>
+<span class="c1"># "Structure" is the data type to de-serialize into (will throw, if it doesn't match)</span>
 <span class="n">structure_from_json</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">structure_data</span><span class="p">)</span>
 
 <span class="c1"># Write to json file</span>
-<span class="n">tmpfile</span> <span class="o">=</span> <span class="s2">&quot;example.structure.json&quot;</span>
+<span class="n">tmpfile</span> <span class="o">=</span> <span class="s2">"example.structure.json"</span>
 <span class="n">structure</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">tmpfile</span><span class="p">)</span>
 
 <span class="c1"># Read from json file</span>
@@ -219,12 +220,12 @@ In QDK/Chemistry, this is crucial for:</p>
 <span class="w">  </span><span class="c1">// Load structure from an XYZ file (the file uses Angstrom, converted to Bohr</span>
 <span class="w">  </span><span class="c1">// internally). Substitute the path with your own, if needed.</span>
 <span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure_from_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">&quot;../data/h2.structure.xyz&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s">"../data/h2.structure.xyz"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// For demonstration: create a structure with custom masses and charges</span>
 <span class="w">  </span><span class="c1">// (requires explicit coordinates, here in Bohr)</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.4</span><span class="p">}};</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">"H"</span><span class="p">,</span><span class="w"> </span><span class="s">"H"</span><span class="p">};</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">custom_masses</span><span class="p">{</span><span class="mf">1.001</span><span class="p">,</span><span class="w"> </span><span class="mf">0.999</span><span class="p">};</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">custom_charges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mf">0.9</span><span class="p">,</span><span class="w"> </span><span class="mf">1.1</span><span class="p">};</span>
 <span class="w">  </span><span class="n">Structure</span><span class="w"> </span><span class="n">structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">,</span><span class="w"> </span><span class="n">custom_masses</span><span class="p">,</span><span class="w"> </span><span class="n">custom_charges</span><span class="p">);</span>
@@ -233,11 +234,11 @@ In QDK/Chemistry, this is crucial for:</p>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
 
 <span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="o">*</span><span class="w"> </span><span class="n">filename</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="s">&quot;h2_example.structure.json&quot;</span><span class="p">;</span><span class="w">  </span><span class="c1">// Extension depends on object type</span>
+<span class="w">      </span><span class="s">"h2_example.structure.json"</span><span class="p">;</span><span class="w">  </span><span class="c1">// Extension depends on object type</span>
 
 <span class="w">  </span><span class="c1">// Deserialize from JSON object</span>
-<span class="w">  </span><span class="c1">// &quot;Structure&quot; is the data type to de-serialize into (will throw, if it</span>
-<span class="w">  </span><span class="c1">// doesn&#39;t match)</span>
+<span class="w">  </span><span class="c1">// "Structure" is the data type to de-serialize into (will throw, if it</span>
+<span class="w">  </span><span class="c1">// doesn't match)</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure_from_json</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_json</span><span class="p">(</span><span class="n">structure_data</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Write to json file</span>
@@ -270,11 +271,11 @@ In QDK/Chemistry, this is crucial for:</p>
     <span class="p">)</span>
 <span class="p">)</span>
 
-<span class="n">h2_example</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;h2_example.hamiltonian.h5&quot;</span><span class="p">)</span>
+<span class="n">h2_example</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">"h2_example.hamiltonian.h5"</span><span class="p">)</span>
 
 <span class="c1"># Deserialize from HDF5 file</span>
-<span class="n">h2_example_from_hdf5_file</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;h2_example.hamiltonian.h5&quot;</span><span class="p">)</span>
-<span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;h2_example.hamiltonian.h5&quot;</span><span class="p">)</span>
+<span class="n">h2_example_from_hdf5_file</span> <span class="o">=</span> <span class="n">Hamiltonian</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">"h2_example.hamiltonian.h5"</span><span class="p">)</span>
+<span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">"h2_example.hamiltonian.h5"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -292,11 +293,11 @@ In QDK/Chemistry, this is crucial for:</p>
 <span class="w">                         </span><span class="n">inactive_fock</span><span class="p">);</span>
 
 <span class="w">  </span><span class="n">h2_example</span><span class="p">.</span><span class="n">to_hdf5_file</span><span class="p">(</span>
-<span class="w">      </span><span class="s">&quot;h2_example.hamiltonian.h5&quot;</span><span class="p">);</span><span class="w">  </span><span class="c1">// Extension depends on object type</span>
+<span class="w">      </span><span class="s">"h2_example.hamiltonian.h5"</span><span class="p">);</span><span class="w">  </span><span class="c1">// Extension depends on object type</span>
 
 <span class="w">  </span><span class="c1">// Deserialize from HDF5 file</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">h2_example_from_hdf5_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">Hamiltonian</span><span class="o">::</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s">&quot;h2_example.hamiltonian.h5&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">Hamiltonian</span><span class="o">::</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s">"h2_example.hamiltonian.h5"</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>

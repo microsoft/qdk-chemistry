@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Hamiltonian simulation abstractions and utilities.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""QDK/Chemistry Hamiltonian simulation abstractions and utilities."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -116,36 +117,36 @@
     <span class="n">TimeDependentQubitHamiltonian</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;HamiltonianSimulation&quot;</span><span class="p">,</span> <span class="s2">&quot;HamiltonianSimulationFactory&quot;</span><span class="p">,</span> <span class="s2">&quot;HamiltonianSimulationSettings&quot;</span><span class="p">]</span>
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"HamiltonianSimulation"</span><span class="p">,</span> <span class="s2">"HamiltonianSimulationFactory"</span><span class="p">,</span> <span class="s2">"HamiltonianSimulationSettings"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="HamiltonianSimulationSettings">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HamiltonianSimulationSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for Hamiltonian simulation.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Settings for Hamiltonian simulation."""</span>
 
 <div class="viewcode-block" id="HamiltonianSimulationSettings.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize defaults for Hamiltonian simulation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize defaults for Hamiltonian simulation."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;euler&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Evolution circuit builder used to construct the state-prep + evolution circuit.&quot;</span><span class="p">,</span>
+            <span class="s2">"evolution_circuit_builder"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"evolution_circuit_builder"</span><span class="p">,</span> <span class="s2">"euler"</span><span class="p">),</span>
+            <span class="s2">"Evolution circuit builder used to construct the state-prep + evolution circuit."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_sparse_state_simulator&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Circuit executor used to run quantum circuits.&quot;</span><span class="p">,</span>
+            <span class="s2">"circuit_executor"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_sparse_state_simulator"</span><span class="p">),</span>
+            <span class="s2">"Circuit executor used to run quantum circuits."</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;observable_estimator&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;algorithm_ref&quot;</span><span class="p">,</span>
-            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;expectation_estimator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">),</span>
-            <span class="s2">&quot;Estimator used to compute observable expectation values.&quot;</span><span class="p">,</span>
+            <span class="s2">"observable_estimator"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"expectation_estimator"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">),</span>
+            <span class="s2">"Estimator used to compute observable expectation values."</span><span class="p">,</span>
         <span class="p">)</span></div>
 </div>
 
@@ -154,12 +155,12 @@
 <div class="viewcode-block" id="HamiltonianSimulation">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulation">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HamiltonianSimulation</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for Hamiltonian evolution and observable measurement.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for Hamiltonian evolution and observable measurement."""</span>
 
 <div class="viewcode-block" id="HamiltonianSimulation.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulation.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the Hamiltonian simulation settings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the Hamiltonian simulation settings."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">HamiltonianSimulationSettings</span><span class="p">()</span></div>
 
@@ -167,8 +168,8 @@
 <div class="viewcode-block" id="HamiltonianSimulation.type_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulation.type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name as hamiltonian_simulation.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;hamiltonian_simulation&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the algorithm type name as hamiltonian_simulation."""</span>
+        <span class="k">return</span> <span class="s2">"hamiltonian_simulation"</span></div>
 
 
     <span class="nd">@abstractmethod</span>
@@ -181,7 +182,7 @@
         <span class="o">*</span><span class="p">,</span>
         <span class="n">noise</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Run Hamiltonian simulation.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Run Hamiltonian simulation.</span>
 
 <span class="sd">        This method implements a quantum ODE integrator for the</span>
 <span class="sd">        Schrödinger equation :math:`i\\partial_t U = H(t)\\,U`.  The</span>
@@ -190,7 +191,7 @@
 <span class="sd">        circuit is executed to measure observable expectation values.</span>
 
 <span class="sd">        The evolution builder, circuit mapper, circuit executor, and</span>
-<span class="sd">        observable estimator are resolved from the algorithm&#39;s settings</span>
+<span class="sd">        observable estimator are resolved from the algorithm's settings</span>
 <span class="sd">        via ``AlgorithmRef``.</span>
 
 <span class="sd">        Args:</span>
@@ -203,14 +204,14 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_evolution_circuit</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">TimeDependentQubitHamiltonian</span><span class="p">,</span>
         <span class="n">state_prep</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct the evolution circuit using the configured circuit builder.</span>
+<span class="w">        </span><span class="sd">"""Construct the evolution circuit using the configured circuit builder.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            hamiltonian: Time-dependent Hamiltonian.</span>
@@ -219,15 +220,15 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The combined state-prep + evolution circuit.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
             <span class="n">EvolutionCircuitBuilder</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="n">circuit_builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">)</span>
+        <span class="n">circuit_builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">"evolution_circuit_builder"</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">circuit_builder</span><span class="p">,</span> <span class="n">EvolutionCircuitBuilder</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;evolution_circuit_builder must be an EvolutionCircuitBuilder, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">circuit_builder</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.&quot;</span>
+                <span class="sa">f</span><span class="s2">"evolution_circuit_builder must be an EvolutionCircuitBuilder, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">circuit_builder</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">."</span>
             <span class="p">)</span>
         <span class="k">return</span> <span class="n">circuit_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">state_prep</span><span class="p">)</span>
 
@@ -238,10 +239,10 @@
         <span class="n">shots</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span><span class="p">,</span>
         <span class="n">noise</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Measure a qubit observable on the provided circuit state.&quot;&quot;&quot;</span>
-        <span class="n">expectation_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">&quot;observable_estimator&quot;</span><span class="p">)</span>
-        <span class="c1"># Propagate this algorithm&#39;s circuit_executor setting to the energy estimator</span>
-        <span class="n">expectation_estimator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">))</span>
+<span class="w">        </span><span class="sd">"""Measure a qubit observable on the provided circuit state."""</span>
+        <span class="n">expectation_estimator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">"observable_estimator"</span><span class="p">)</span>
+        <span class="c1"># Propagate this algorithm's circuit_executor setting to the energy estimator</span>
+        <span class="n">expectation_estimator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">))</span>
         <span class="n">energy_result</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">expectation_estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
             <span class="n">circuit</span><span class="p">,</span>
             <span class="n">observable</span><span class="p">,</span>
@@ -255,20 +256,20 @@
 <div class="viewcode-block" id="HamiltonianSimulationFactory">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationFactory">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">HamiltonianSimulationFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory class for creating Hamiltonian simulation algorithm instances.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Factory class for creating Hamiltonian simulation algorithm instances."""</span>
 
 <div class="viewcode-block" id="HamiltonianSimulationFactory.algorithm_type_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationFactory.algorithm_type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm type name as hamiltonian_simulation.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;hamiltonian_simulation&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the algorithm type name as hamiltonian_simulation."""</span>
+        <span class="k">return</span> <span class="s2">"hamiltonian_simulation"</span></div>
 
 
 <div class="viewcode-block" id="HamiltonianSimulationFactory.default_algorithm_name">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.html#qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base.HamiltonianSimulationFactory.default_algorithm_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return euler_integrator as the default algorithm name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;euler_integrator&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return euler_integrator as the default algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"euler_integrator"</span></div>
 </div>
 
 </pre></div>

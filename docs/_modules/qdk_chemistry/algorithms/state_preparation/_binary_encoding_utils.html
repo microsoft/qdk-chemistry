@@ -1,0 +1,897 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.state_preparation._binary_encoding_utils &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.state_preparation._binary_encoding_utils</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.state_preparation._binary_encoding_utils</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Binary encoding circuit synthesiser for REF matrices."""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseInsensitiveStrEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"MatrixCompressionOp"</span><span class="p">,</span>
+    <span class="s2">"MatrixCompressionType"</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="MatrixCompressionType">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.html#qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionType">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MatrixCompressionType</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Supported operation types for matrix compression.</span>
+
+<span class="sd">    Each member carries the integer discriminator consumed by ``BinaryEncoding.qs``. Q# cannot</span>
+<span class="sd">    compare strings in QIR-emitting code, so the wire value has to be an ``Int``; declaring it</span>
+<span class="sd">    alongside the name keeps the two from drifting.</span>
+<span class="sd">    """</span>
+
+    <span class="n">qsharp_code</span><span class="p">:</span> <span class="nb">int</span>
+
+    <span class="c1"># The default keeps type checkers from demanding an opcode on value lookups such as</span>
+    <span class="c1"># ``MatrixCompressionType("CX")``, which go through ``EnumType.__call__`` rather than here.</span>
+    <span class="c1"># Every member declares its own; a missed one is caught by the opcode exhaustiveness test.</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">qsharp_code</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MatrixCompressionType</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Build a member whose string value is the Python-facing name and that carries a Q# opcode."""</span>
+        <span class="n">member</span> <span class="o">=</span> <span class="nb">str</span><span class="o">.</span><span class="fm">__new__</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+        <span class="n">member</span><span class="o">.</span><span class="n">_value_</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">member</span><span class="o">.</span><span class="n">qsharp_code</span> <span class="o">=</span> <span class="n">qsharp_code</span>
+        <span class="k">return</span> <span class="n">member</span>
+
+    <span class="n">X</span> <span class="o">=</span> <span class="s2">"X"</span><span class="p">,</span> <span class="mi">0</span>
+    <span class="n">CX</span> <span class="o">=</span> <span class="s2">"CX"</span><span class="p">,</span> <span class="mi">1</span>
+    <span class="n">SWAP</span> <span class="o">=</span> <span class="s2">"SWAP"</span><span class="p">,</span> <span class="mi">2</span>
+    <span class="n">CCX</span> <span class="o">=</span> <span class="s2">"CCX"</span><span class="p">,</span> <span class="mi">3</span>
+    <span class="n">SELECT</span> <span class="o">=</span> <span class="s2">"SELECT"</span><span class="p">,</span> <span class="mi">4</span>
+    <span class="n">SELECT_AND</span> <span class="o">=</span> <span class="s2">"SELECT_AND"</span><span class="p">,</span> <span class="mi">5</span></div>
+
+
+
+<div class="viewcode-block" id="MatrixCompressionOp">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.html#qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionOp">[docs]</a>
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MatrixCompressionOp</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Gate representation for matrix compression operations."""</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="n">MatrixCompressionType</span>
+    <span class="n">qubits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="n">control_state</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">lookup_data</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">bool</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">__post_init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Validate the operation type and SELECT lookup data.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the operation type is unknown, or SELECT/SELECT_AND has no lookup data.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">MatrixCompressionType</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">SELECT</span><span class="p">,</span> <span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">SELECT_AND</span><span class="p">}</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">lookup_data</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"lookup_data must be provided for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> operations"</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MatrixCompressionOp.to_dict">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.html#qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionOp.to_dict">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: Dictionary matching the Q# ``MatrixCompressionOp`` fields.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"kind"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">qsharp_code</span><span class="p">,</span>
+            <span class="s2">"qubits"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">qubits</span><span class="p">,</span>
+            <span class="s2">"controlState"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">control_state</span><span class="p">,</span>
+            <span class="s2">"lookupData"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">lookup_data</span><span class="p">,</span>
+        <span class="p">}</span></div>
+
+
+<div class="viewcode-block" id="MatrixCompressionOp.to_qsharp_parameter">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.html#qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionOp.to_qsharp_parameter">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_qsharp_parameter</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Convert to a Q# ``MatrixCompressionOp`` struct.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Q# MatrixCompressionOp struct instance for use in Q# interop.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">BinaryEncoding</span><span class="o">.</span><span class="n">MatrixCompressionOp</span><span class="p">(</span>
+            <span class="n">kind</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">qsharp_code</span><span class="p">,</span>
+            <span class="n">qubits</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">qubits</span><span class="p">,</span>
+            <span class="n">controlState</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">control_state</span><span class="p">,</span>
+            <span class="n">lookupData</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">lookup_data</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">RefTableau</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Binary REF tableau with in-place gate operations for synthesis simulation."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize a RefTableau from a binary matrix in row echelon form.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: A 2-D binary numpy array in row echelon form (REF).</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If data is not 2-dimensional.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Input data must be a 2-dimensional array"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_ref</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_cols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">dense_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_cols</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_cols</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pivots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">identify_pivots</span><span class="p">()</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Tableau shape: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, dense size: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">dense_size</span><span class="si">}</span><span class="s2">, pivots: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pivots</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_ref</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Validate that a binary matrix is in row echelon form (REF).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: A 2-D numpy array to validate.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the matrix violates REF constraints.</span>
+
+<span class="sd">        """</span>
+        <span class="n">num_rows</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">prev_pivot</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="n">found_zero_row</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_rows</span><span class="p">):</span>
+            <span class="n">nz</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">nz</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">found_zero_row</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">found_zero_row</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Non-zero row </span><span class="si">{</span><span class="n">row</span><span class="si">}</span><span class="s2"> appears after an all-zero row"</span><span class="p">)</span>
+            <span class="n">pivot_col</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">nz</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">pivot_col</span> <span class="o">&lt;=</span> <span class="n">prev_pivot</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Pivot at row </span><span class="si">{</span><span class="n">row</span><span class="si">}</span><span class="s2">, col </span><span class="si">{</span><span class="n">pivot_col</span><span class="si">}</span><span class="s2"> is not strictly "</span>
+                    <span class="sa">f</span><span class="s2">"to the right of previous pivot col </span><span class="si">{</span><span class="n">prev_pivot</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
+            <span class="n">prev_pivot</span> <span class="o">=</span> <span class="n">pivot_col</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">identify_pivots</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">"""Find pivot positions using vectorized operations.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[tuple[int, int]]: List of (row, col) pairs for each pivot.</span>
+
+<span class="sd">        """</span>
+        <span class="n">row_indices</span><span class="p">,</span> <span class="n">col_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">first_occurrences</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">row_indices</span><span class="p">,</span> <span class="n">return_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">row_indices</span><span class="p">[</span><span class="n">first_occurrences</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">col_indices</span><span class="p">[</span><span class="n">first_occurrences</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cx</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">control</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Apply CX: ``target ^= control``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            control: Row index of the control qubit.</span>
+<span class="sd">            target: Row index of the target qubit.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="o">^=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">control</span><span class="p">]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">swap</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">b</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Swap rows *a* and *b*.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            a: First row index.</span>
+<span class="sd">            b: Second row index.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[[</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">]]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[[</span><span class="n">b</span><span class="p">,</span> <span class="n">a</span><span class="p">]]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">x</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Apply bit-flip (X) to every entry in *row*.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            row: Row index to flip.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">]</span> <span class="o">^=</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">permute_columns</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">col_order</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">"""Reorder tableau columns and refresh derived metadata.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            col_order: New column ordering as a list of original column indices.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="n">col_order</span><span class="p">]</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_cols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pivots</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">identify_pivots</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">toffoli</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">ctrl0</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">],</span> <span class="n">ctrl1</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">bool</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">"""Apply a two-control conditional XOR into ``target``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            target: Row index of the target qubit.</span>
+<span class="sd">            ctrl0: Tuple of (row_index, polarity) for the first control.</span>
+<span class="sd">            ctrl1: Tuple of (row_index, polarity) for the second control.</span>
+
+<span class="sd">        """</span>
+        <span class="n">c0</span><span class="p">,</span> <span class="n">v0</span> <span class="o">=</span> <span class="n">ctrl0</span>
+        <span class="n">c1</span><span class="p">,</span> <span class="n">v1</span> <span class="o">=</span> <span class="n">ctrl1</span>
+        <span class="n">m0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">c0</span><span class="p">]</span> <span class="k">if</span> <span class="n">v0</span> <span class="k">else</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">c0</span><span class="p">])</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">c1</span><span class="p">]</span> <span class="k">if</span> <span class="n">v1</span> <span class="k">else</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">c1</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">target</span><span class="p">]</span> <span class="o">^=</span> <span class="n">m0</span> <span class="o">&amp;</span> <span class="n">m1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">select</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data_table</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">bool</span><span class="p">]],</span> <span class="n">addr_qubits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="n">dat_qubits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">"""Apply a SELECT lookup operation to the tableau.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data_table: 2-D boolean table indexed by address value.</span>
+<span class="sd">            addr_qubits: Row indices forming the address register.</span>
+<span class="sd">            dat_qubits: Row indices forming the data register.</span>
+
+<span class="sd">        """</span>
+        <span class="n">addr_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_cols</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">addr_qubits</span><span class="p">):</span>
+            <span class="n">addr_vals</span> <span class="o">+=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">q</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="n">i</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">dq</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">dat_qubits</span><span class="p">):</span>
+            <span class="n">mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">data_table</span><span class="p">[</span><span class="n">a</span><span class="p">][</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">addr_vals</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">dq</span><span class="p">]</span> <span class="o">^=</span> <span class="n">mask</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_BinaryEncodingSynthesizer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Internal: synthesise a circuit from a binary REF tableau using batched sparse isometry.</span>
+
+<span class="sd">    Two-stage algorithm:</span>
+<span class="sd">    * Stage 1 — diagonal encoding: unary-to-binary compression of pivot columns.</span>
+<span class="sd">    * Stage 2 — non-pivot processing: batched Toffoli + PUI lookup blocks.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">tableau</span><span class="p">:</span> <span class="n">RefTableau</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">include_negative_controls</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">measurement_based_uncompute</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the synthesizer with a REF tableau and configuration.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tableau: A validated RefTableau instance to synthesize from.</span>
+<span class="sd">            include_negative_controls: Whether to include negative (anti-) controls in PUI blocks.</span>
+<span class="sd">            measurement_based_uncompute: Whether to use measurement-based uncomputation (SELECT_AND).</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the tableau is already dense and binary encoding is not applicable.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span> <span class="o">=</span> <span class="n">tableau</span>
+        <span class="k">if</span> <span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span> <span class="o">&gt;=</span> <span class="n">tableau</span><span class="o">.</span><span class="n">num_rows</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Binary encoding is not applicable: state is already dense "</span>
+                <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span><span class="si">}</span><span class="s2"> determinant(s) require a </span><span class="si">{</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span><span class="si">}</span><span class="s2">-qubit dense register, "</span>
+                <span class="sa">f</span><span class="s2">"leaving no spare rows in a </span><span class="si">{</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_rows</span><span class="si">}</span><span class="s2">-row matrix)."</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">include_negative_controls</span> <span class="o">=</span> <span class="n">include_negative_controls</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">measurement_based_uncompute</span> <span class="o">=</span> <span class="n">measurement_based_uncompute</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">circuit</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">synthesize</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">active_qubit_indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Run full synthesis pipeline and return circuit operations.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            active_qubit_indices: Maps each tableau row index to its global qubit index.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]: A 3-tuple of (ops, bijection, dense_size).</span>
+
+<span class="sd">        """</span>
+        <span class="n">rank</span><span class="p">,</span> <span class="n">col_perm</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_permute_columns_pivots_first</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run_stage1_diagonal_encoding</span><span class="p">(</span><span class="n">rank</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span> <span class="o">-</span> <span class="n">rank</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">stage_two_start</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_choose_stage_two_start_index</span><span class="p">(</span><span class="n">rank</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_run_stage2_non_pivot_col_processing</span><span class="p">(</span><span class="n">stage_two_start</span><span class="p">)</span>
+
+        <span class="c1"># Complete bijection for any remaining unmapped columns</span>
+        <span class="n">mapped</span> <span class="o">=</span> <span class="p">{</span><span class="n">col</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">col</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span><span class="p">,</span> <span class="n">c</span><span class="p">])))),</span> <span class="n">c</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapped</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Validate final invariants</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_rows</span><span class="p">):</span>
+            <span class="k">assert</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">]),</span> <span class="sa">f</span><span class="s2">"Row </span><span class="si">{</span><span class="n">row</span><span class="si">}</span><span class="s2"> not zeroed"</span>
+        <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="p">)</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span><span class="p">,</span> <span class="s2">"Bijection incomplete"</span>
+
+        <span class="c1"># Remap bijection and tableau back to original column order</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span> <span class="o">=</span> <span class="p">[(</span><span class="n">dv</span><span class="p">,</span> <span class="n">col_perm</span><span class="p">[</span><span class="n">c</span><span class="p">])</span> <span class="k">for</span> <span class="n">dv</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="p">]</span>
+        <span class="n">inv_perm</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">col_perm</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">new_idx</span><span class="p">,</span> <span class="n">old_idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">col_perm</span><span class="p">):</span>
+            <span class="n">inv_perm</span><span class="p">[</span><span class="n">old_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_idx</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">permute_columns</span><span class="p">(</span><span class="n">inv_perm</span><span class="p">)</span>
+
+        <span class="n">ops</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_to_operations</span><span class="p">(</span><span class="n">active_qubit_indices</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">ops</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">max_batch_size</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Largest power-of-2 batch that fits in the sparse rows.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Maximum batch size as the largest power-of-2 not exceeding the sparse row count.</span>
+
+<span class="sd">        """</span>
+        <span class="n">sparse_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_rows</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span>
+        <span class="k">assert</span> <span class="n">sparse_size</span> <span class="o">&gt;</span> <span class="mi">0</span>
+        <span class="k">if</span> <span class="n">sparse_size</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">sparse_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">sparse_size</span>
+        <span class="k">return</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">sparse_size</span><span class="o">.</span><span class="n">bit_length</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">op</span><span class="p">:</span> <span class="n">MatrixCompressionOp</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Append an operation and apply it to the tableau.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            op: The gate to record, addressing tableau rows rather than global qubits.</span>
+
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">circuit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+        <span class="n">qubits</span> <span class="o">=</span> <span class="n">op</span><span class="o">.</span><span class="n">qubits</span>
+        <span class="k">if</span> <span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">CX</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">cx</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">qubits</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">SWAP</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">swap</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">qubits</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+        <span class="k">elif</span> <span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">CCX</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">toffoli</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span> <span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="kc">True</span><span class="p">),</span> <span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="kc">True</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">SELECT</span><span class="p">,</span> <span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">SELECT_AND</span><span class="p">}:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">select</span><span class="p">(</span><span class="n">op</span><span class="o">.</span><span class="n">lookup_data</span><span class="p">,</span> <span class="n">qubits</span><span class="p">[:</span> <span class="n">op</span><span class="o">.</span><span class="n">control_state</span><span class="p">],</span> <span class="n">qubits</span><span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">control_state</span> <span class="p">:])</span>
+        <span class="k">elif</span> <span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="n">MatrixCompressionType</span><span class="o">.</span><span class="n">X</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">x</span><span class="p">(</span><span class="n">qubits</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_permute_columns_pivots_first</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">"""Move pivot columns to the front; return rank and column permutation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[int, list[int]]: A pair of (rank, col_perm) where rank is the number of pivots</span>
+<span class="sd">                and col_perm is the applied column ordering.</span>
+
+<span class="sd">        """</span>
+        <span class="n">pivot_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">pivots</span><span class="p">]</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pivot_cols</span><span class="p">)</span>
+        <span class="n">pivot_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">pivot_cols</span><span class="p">)</span>
+        <span class="n">non_pivot_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pivot_set</span><span class="p">]</span>
+        <span class="n">col_perm</span> <span class="o">=</span> <span class="n">pivot_cols</span> <span class="o">+</span> <span class="n">non_pivot_cols</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">permute_columns</span><span class="p">(</span><span class="n">col_perm</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">rank</span><span class="p">,</span> <span class="n">col_perm</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_stage1_diagonal_encoding</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Convert identity pivot block to unary staircase then to binary counter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            rank: Number of pivot columns (rows with pivots).</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">logical_rows</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_unary_staircase</span><span class="p">(</span><span class="n">rank</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_convert_unary_to_binary</span><span class="p">(</span><span class="n">rank</span><span class="p">,</span> <span class="n">logical_rows</span><span class="p">)</span>
+
+        <span class="c1"># Record bijection for the contiguous pivot columns</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">):</span>
+            <span class="n">dense_val</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span>
+                <span class="nb">int</span><span class="p">(</span><span class="n">b</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span><span class="p">,</span> <span class="n">c</span><span class="p">])))</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">dense_val</span><span class="p">,</span> <span class="n">c</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_unary_staircase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Convert the pivot block into an upper-staircase pattern.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            rank: Number of pivot rows to process.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[int]: Logical row indices after staircase transformation.</span>
+
+<span class="sd">        """</span>
+        <span class="n">logical_rows</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">rank</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">j</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">logical_rows</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">j</span><span class="p">]:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">logical_rows</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">logical_rows</span><span class="p">[</span><span class="n">i</span><span class="p">]]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"X"</span><span class="p">),</span> <span class="p">[</span><span class="n">logical_rows</span><span class="p">[</span><span class="mi">0</span><span class="p">]]))</span>
+        <span class="k">return</span> <span class="n">logical_rows</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_convert_unary_to_binary</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">logical_rows</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]):</span>
+<span class="w">        </span><span class="sd">"""Fold unary rows into binary-counter dense rows via divide-and-conquer.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            limit: Number of unary rows to convert.</span>
+<span class="sd">            logical_rows: Current logical-to-physical row mapping.</span>
+
+<span class="sd">        """</span>
+        <span class="n">logical_rows</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">logical_rows</span><span class="p">[</span><span class="mi">1</span><span class="p">:],</span> <span class="n">logical_rows</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+        <span class="k">if</span> <span class="n">limit</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="n">active_unary</span> <span class="o">=</span> <span class="n">logical_rows</span><span class="p">[:</span> <span class="n">limit</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">leftover_zero</span> <span class="o">=</span> <span class="n">logical_rows</span><span class="p">[</span><span class="n">limit</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">dense_rows</span><span class="p">,</span> <span class="n">zero_rows</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">active_unary</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">accumulator</span> <span class="o">=</span> <span class="n">active_unary</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">dense_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">accumulator</span><span class="p">)</span>
+            <span class="n">unary_bits</span> <span class="o">=</span> <span class="n">active_unary</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span>
+            <span class="n">next_active_unary</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">unary_bits</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span><span class="p">):</span>
+                <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">unary_bits</span><span class="p">[</span><span class="mi">2</span> <span class="o">*</span> <span class="n">p</span><span class="p">],</span> <span class="n">unary_bits</span><span class="p">[</span><span class="mi">2</span> <span class="o">*</span> <span class="n">p</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">accumulator</span><span class="p">]))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">y</span><span class="p">,</span> <span class="n">accumulator</span><span class="p">]))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CCX"</span><span class="p">),</span> <span class="p">[</span><span class="n">accumulator</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">]))</span>
+                <span class="n">next_active_unary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+                <span class="n">zero_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unary_bits</span><span class="p">)</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">unary_bits</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">x</span><span class="p">,</span> <span class="n">accumulator</span><span class="p">]))</span>
+                <span class="n">next_active_unary</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+
+            <span class="n">active_unary</span> <span class="o">=</span> <span class="n">next_active_unary</span>
+
+        <span class="n">dense_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">active_unary</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">dense_rows</span> <span class="o">=</span> <span class="n">dense_rows</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">all_zero_rows</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">zero_rows</span><span class="p">,</span> <span class="n">leftover_zero</span><span class="p">]</span>
+        <span class="n">num_msb_padding</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">dense_rows</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">all_zero_rows</span><span class="p">))</span>
+        <span class="n">final_physical_rows</span> <span class="o">=</span> <span class="n">all_zero_rows</span><span class="p">[:</span><span class="n">num_msb_padding</span><span class="p">]</span> <span class="o">+</span> <span class="n">dense_rows</span> <span class="o">+</span> <span class="n">all_zero_rows</span><span class="p">[</span><span class="n">num_msb_padding</span><span class="p">:]</span>
+
+        <span class="c1"># Cycle sort to align physical permutations</span>
+        <span class="n">current_pos</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">limit</span><span class="p">)}</span>
+        <span class="n">row_at</span> <span class="o">=</span> <span class="p">{</span><span class="n">i</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">limit</span><span class="p">)}</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">limit</span><span class="p">):</span>
+            <span class="n">target_row</span> <span class="o">=</span> <span class="n">final_physical_rows</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">row_at</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">target_row</span><span class="p">:</span>
+                <span class="n">curr_idx</span> <span class="o">=</span> <span class="n">current_pos</span><span class="p">[</span><span class="n">target_row</span><span class="p">]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"SWAP"</span><span class="p">),</span> <span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">curr_idx</span><span class="p">]))</span>
+                <span class="n">swapped_row</span> <span class="o">=</span> <span class="n">row_at</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="n">row_at</span><span class="p">[</span><span class="n">curr_idx</span><span class="p">],</span> <span class="n">current_pos</span><span class="p">[</span><span class="n">swapped_row</span><span class="p">]</span> <span class="o">=</span> <span class="n">swapped_row</span><span class="p">,</span> <span class="n">curr_idx</span>
+                <span class="n">row_at</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">current_pos</span><span class="p">[</span><span class="n">target_row</span><span class="p">]</span> <span class="o">=</span> <span class="n">target_row</span><span class="p">,</span> <span class="n">i</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_choose_stage_two_start_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Choose start label aligned to max_batch_size boundary when possible.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            rank: Number of pivot columns already encoded in stage 1.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Starting dense-register label for stage 2 processing.</span>
+
+<span class="sd">        """</span>
+        <span class="n">mbs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_batch_size</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">mbs</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">rank</span>
+        <span class="n">next_aligned</span> <span class="o">=</span> <span class="p">((</span><span class="n">rank</span> <span class="o">+</span> <span class="n">mbs</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">mbs</span><span class="p">)</span> <span class="o">*</span> <span class="n">mbs</span>
+        <span class="k">if</span> <span class="n">next_aligned</span> <span class="o">==</span> <span class="n">rank</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">rank</span>
+        <span class="n">non_pivot_cols</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span> <span class="o">-</span> <span class="n">rank</span>
+        <span class="k">return</span> <span class="n">next_aligned</span> <span class="k">if</span> <span class="p">(</span><span class="n">next_aligned</span> <span class="o">+</span> <span class="n">non_pivot_cols</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span><span class="p">)</span> <span class="k">else</span> <span class="n">rank</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_stage2_non_pivot_col_processing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k_start</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Process non-pivot columns in batches, flushing PUI blocks at boundaries.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            k_start: Starting dense-register label for batch indexing.</span>
+
+<span class="sd">        """</span>
+        <span class="n">mbs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">max_batch_size</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span> <span class="o">=</span> <span class="n">k_start</span>
+        <span class="n">mapped_cols</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="n">col</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">col</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="p">}</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">:</span>
+                <span class="n">new_len</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">block_shift</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">new_len</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">new_len</span><span class="p">))</span>
+                <span class="n">crosses</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;&gt;</span> <span class="n">block_shift</span><span class="p">)</span> <span class="o">!=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span> <span class="o">&gt;&gt;</span> <span class="n">block_shift</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">new_len</span> <span class="o">&gt;</span> <span class="n">mbs</span> <span class="ow">or</span> <span class="n">crosses</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_clear_sparse_bits</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+            <span class="n">target_row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">)</span>
+            <span class="n">element</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_find_next_non_zero_element</span><span class="p">(</span><span class="n">target_row</span><span class="p">,</span> <span class="n">mapped_cols</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">element</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">is_direct</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">row</span> <span class="o">=</span> <span class="n">element</span>
+                <span class="k">if</span> <span class="n">is_direct</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">row</span> <span class="o">!=</span> <span class="n">target_row</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"SWAP"</span><span class="p">),</span> <span class="p">[</span><span class="n">target_row</span><span class="p">,</span> <span class="n">row</span><span class="p">]))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_synthesize_target_row</span><span class="p">(</span><span class="n">target_row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">row</span><span class="p">)</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_permute_col_and_add_to_batch</span><span class="p">(</span><span class="n">col</span><span class="p">,</span> <span class="n">target_row</span><span class="p">)</span>
+                <span class="n">mapped_cols</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">col</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_clear_sparse_bits</span><span class="p">()</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+                    <span class="k">continue</span>
+                <span class="k">break</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_find_next_non_zero_element</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">mapped_cols</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Find next actionable non-zero element in unmapped columns.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            target_row: Row index to start searching from.</span>
+<span class="sd">            mapped_cols: Set of column indices already processed.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[bool, int, int] | None: A tuple (is_direct, col, row) or None if no element found.</span>
+
+<span class="sd">        """</span>
+        <span class="n">unmapped_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">mapped_cols</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">unmapped_cols</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="c1"># Direct sparse rows</span>
+        <span class="n">sub_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">target_row</span><span class="p">:,</span> <span class="n">unmapped_cols</span><span class="p">]</span>
+        <span class="n">rows</span><span class="p">,</span> <span class="n">cols</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">sub_data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">rows</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">unmapped_cols</span><span class="p">[</span><span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]],</span> <span class="n">target_row</span> <span class="o">+</span> <span class="n">rows</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="c1"># Batch indicators</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">be</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">):</span>
+            <span class="n">brow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span> <span class="o">+</span> <span class="n">i</span>
+            <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">unmapped_cols</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">col</span> <span class="o">==</span> <span class="n">be</span><span class="p">[</span><span class="mi">0</span><span class="p">]:</span>
+                    <span class="k">continue</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">brow</span><span class="p">,</span> <span class="n">col</span><span class="p">]:</span>
+                    <span class="k">return</span> <span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">brow</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_synthesize_target_row</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">target_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">row</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Emit Toffoli to create indicator at target_row from a batched row.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            target_row: Row index where the indicator bit should be placed.</span>
+<span class="sd">            col: Column index being processed.</span>
+<span class="sd">            row: Source row index in the current batch that has the non-zero element.</span>
+
+<span class="sd">        """</span>
+        <span class="n">batch_idx</span> <span class="o">=</span> <span class="n">row</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span>
+        <span class="n">dense_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">[</span><span class="n">batch_idx</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">ds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span>
+        <span class="n">batch_element_bits</span> <span class="o">=</span> <span class="p">[</span><span class="nb">bool</span><span class="p">((</span><span class="n">dense_val</span> <span class="o">&gt;&gt;</span> <span class="n">i</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ds</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)]</span>
+        <span class="n">is_batch_index</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="o">==</span> <span class="n">batch_idx</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_rows</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span><span class="p">)]</span>
+        <span class="n">combined_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">batch_element_bits</span> <span class="o">+</span> <span class="n">is_batch_index</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+
+        <span class="n">col_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="n">col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="n">diffs</span> <span class="o">=</span> <span class="n">combined_idx</span> <span class="o">!=</span> <span class="n">col_data</span>
+        <span class="n">diffs</span><span class="p">[</span><span class="n">row</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="n">diff_row</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">diffs</span><span class="p">)[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">diff_val</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">col_data</span><span class="p">[</span><span class="n">diff_row</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">diff_val</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"X"</span><span class="p">),</span> <span class="p">[</span><span class="n">diff_row</span><span class="p">]))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CCX"</span><span class="p">),</span> <span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="n">diff_row</span><span class="p">,</span> <span class="n">target_row</span><span class="p">]))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">diff_val</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"X"</span><span class="p">),</span> <span class="p">[</span><span class="n">diff_row</span><span class="p">]))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_permute_col_and_add_to_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current_col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">ctrl_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Normalize column's dense/sparse bits and append to batch.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            current_col: Column index to normalize and add.</span>
+<span class="sd">            ctrl_row: Row index of the control qubit for CX corrections.</span>
+
+<span class="sd">        """</span>
+        <span class="n">dense_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span>
+        <span class="n">k_bits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="nb">bool</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span> <span class="o">&gt;&gt;</span> <span class="n">i</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">dense_size</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+
+        <span class="n">dense_col_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[:</span><span class="n">dense_size</span><span class="p">,</span> <span class="n">current_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">d_qubit</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">dense_col_data</span> <span class="o">!=</span> <span class="n">k_bits</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">ctrl_row</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">d_qubit</span><span class="p">)]))</span>
+
+        <span class="n">sparse_col_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">dense_size</span><span class="p">:,</span> <span class="n">current_col</span><span class="p">]</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="n">target_bits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">num_rows</span> <span class="o">-</span> <span class="n">dense_size</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+        <span class="n">target_bits</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">)]</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">for</span> <span class="n">s_qubit</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">sparse_col_data</span> <span class="o">!=</span> <span class="n">target_bits</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">ctrl_row</span><span class="p">,</span> <span class="n">dense_size</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">s_qubit</span><span class="p">)]))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">current_col</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">bijection</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span><span class="p">,</span> <span class="n">current_col</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">batch_index</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_clear_sparse_bits</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Emit PUI block to zero all sparse indicator rows for current batch.</span>
+
+<span class="sd">        The batch is lowered as one wide lookup, or as power-of-two chunks when those</span>
+<span class="sd">        cost fewer Toffolis.</span>
+<span class="sd">        """</span>
+        <span class="k">assert</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch</span>
+        <span class="n">dense_size</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tableau</span><span class="o">.</span><span class="n">dense_size</span>
+        <span class="n">num_changing</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">)))</span>
+        <span class="n">num_fixed</span> <span class="o">=</span> <span class="n">dense_size</span> <span class="o">-</span> <span class="n">num_changing</span>
+        <span class="n">k0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="n">fixed_controls</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="nb">bool</span><span class="p">((</span><span class="n">k0</span> <span class="o">&gt;&gt;</span> <span class="p">(</span><span class="n">dense_size</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">r</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_fixed</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">include_negative_controls</span> <span class="ow">or</span> <span class="p">((</span><span class="n">k0</span> <span class="o">&gt;&gt;</span> <span class="p">(</span><span class="n">dense_size</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">r</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="p">]</span>
+
+        <span class="n">rest_entries</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">be</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">batch</span><span class="p">):</span>
+            <span class="n">changing_controls</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">(</span><span class="n">num_fixed</span> <span class="o">+</span> <span class="n">off</span><span class="p">,</span> <span class="nb">bool</span><span class="p">((</span><span class="n">be</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;&gt;</span> <span class="p">(</span><span class="n">dense_size</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">num_fixed</span> <span class="o">-</span> <span class="n">off</span><span class="p">))</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">))</span>
+                <span class="k">for</span> <span class="n">off</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_changing</span><span class="p">)</span>
+            <span class="p">]</span>
+            <span class="n">rest_entries</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="n">changing_controls</span><span class="p">))</span>
+
+        <span class="n">select_ops</span><span class="p">,</span> <span class="n">mono_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_synthesize_single_pui_lookup_block</span><span class="p">(</span><span class="n">dense_size</span><span class="p">,</span> <span class="n">fixed_controls</span><span class="p">,</span> <span class="n">rest_entries</span><span class="p">)</span>
+
+        <span class="n">chunks</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">remaining</span> <span class="o">=</span> <span class="p">[],</span> <span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">rest_entries</span><span class="p">)</span>
+        <span class="k">while</span> <span class="n">remaining</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">chunk_size</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">remaining</span><span class="o">.</span><span class="n">bit_length</span><span class="p">()</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">chunks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">rest_entries</span><span class="p">[</span><span class="n">start</span> <span class="p">:</span> <span class="n">start</span> <span class="o">+</span> <span class="n">chunk_size</span><span class="p">])</span>
+            <span class="n">start</span> <span class="o">+=</span> <span class="n">chunk_size</span>
+            <span class="n">remaining</span> <span class="o">-=</span> <span class="n">chunk_size</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">chunked_ops</span><span class="p">,</span> <span class="n">chunked_count</span> <span class="o">=</span> <span class="p">[],</span> <span class="mi">0</span>
+            <span class="k">for</span> <span class="n">chunk</span> <span class="ow">in</span> <span class="n">chunks</span><span class="p">:</span>
+                <span class="n">sub_ops</span><span class="p">,</span> <span class="n">sub_count</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_synthesize_single_pui_lookup_block</span><span class="p">(</span><span class="n">dense_size</span><span class="p">,</span> <span class="n">fixed_controls</span><span class="p">,</span> <span class="n">chunk</span><span class="p">)</span>
+                <span class="n">chunked_ops</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">sub_ops</span><span class="p">)</span>
+                <span class="n">chunked_count</span> <span class="o">+=</span> <span class="n">sub_count</span>
+            <span class="k">if</span> <span class="n">chunked_count</span> <span class="o">&lt;=</span> <span class="n">mono_count</span><span class="p">:</span>
+                <span class="n">select_ops</span> <span class="o">=</span> <span class="n">chunked_ops</span>
+
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">select_ops</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">op</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_synthesize_single_pui_lookup_block</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sbs</span><span class="p">,</span> <span class="n">fixed_controls</span><span class="p">,</span> <span class="n">rest_entries</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Lower one PUI sub-block into lookup ops.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            sbs: Sparse block start row index (equal to dense_size).</span>
+<span class="sd">            fixed_controls: List of (row, polarity) pairs that are constant across the chunk.</span>
+<span class="sd">            rest_entries: List of (offset, changing_controls) pairs for this chunk.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[list[MatrixCompressionOp], int]: A pair of (ops_list, toffoli_cost).</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">rest_entries</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[],</span> <span class="mi">0</span>
+
+        <span class="c1"># Canonicalize: promote chunk-local constants to fixed</span>
+        <span class="n">n_entries</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rest_entries</span><span class="p">)</span>
+        <span class="n">fixed_map</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">fixed_controls</span><span class="p">)</span>
+        <span class="n">row_info</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">set</span><span class="p">[</span><span class="nb">bool</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">changing_controls</span> <span class="ow">in</span> <span class="n">rest_entries</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">changing_controls</span><span class="p">:</span>
+                <span class="n">count</span><span class="p">,</span> <span class="n">vals</span> <span class="o">=</span> <span class="n">row_info</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">set</span><span class="p">()))</span>
+                <span class="n">vals</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">bool</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+                <span class="n">row_info</span><span class="p">[</span><span class="n">row</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">count</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">vals</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="p">(</span><span class="n">count</span><span class="p">,</span> <span class="n">values</span><span class="p">)</span> <span class="ow">in</span> <span class="n">row_info</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">count</span> <span class="o">==</span> <span class="n">n_entries</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">promoted_val</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">values</span><span class="p">))</span>
+                <span class="k">if</span> <span class="n">row</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fixed_map</span> <span class="ow">or</span> <span class="n">fixed_map</span><span class="p">[</span><span class="n">row</span><span class="p">]</span> <span class="o">==</span> <span class="n">promoted_val</span><span class="p">:</span>
+                    <span class="n">fixed_map</span><span class="p">[</span><span class="n">row</span><span class="p">]</span> <span class="o">=</span> <span class="n">promoted_val</span>
+        <span class="n">fixed_rows</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">fixed_map</span><span class="p">)</span>
+        <span class="n">fixed_controls</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">fixed_map</span><span class="o">.</span><span class="n">items</span><span class="p">())</span>
+        <span class="n">rest_entries</span> <span class="o">=</span> <span class="p">[(</span><span class="n">off</span><span class="p">,</span> <span class="p">[(</span><span class="n">r</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ctrls</span> <span class="k">if</span> <span class="n">r</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fixed_rows</span><span class="p">])</span> <span class="k">for</span> <span class="n">off</span><span class="p">,</span> <span class="n">ctrls</span> <span class="ow">in</span> <span class="n">rest_entries</span><span class="p">]</span>
+
+        <span class="c1"># Collect address qubits</span>
+        <span class="n">all_ctrl_rows</span> <span class="o">=</span> <span class="p">{</span><span class="n">row</span> <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">fixed_controls</span><span class="p">}</span>
+        <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">changing_controls</span> <span class="ow">in</span> <span class="n">rest_entries</span><span class="p">:</span>
+            <span class="n">all_ctrl_rows</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">row</span> <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">changing_controls</span><span class="p">)</span>
+        <span class="n">data_qubits</span> <span class="o">=</span> <span class="p">[</span><span class="n">sbs</span> <span class="o">+</span> <span class="n">offset</span> <span class="k">for</span> <span class="n">offset</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">rest_entries</span><span class="p">]</span>
+
+        <span class="c1"># Build the dense lookup table. Address bit i is read from address_register[i], which is</span>
+        <span class="c1"># the significance order Q# SparseOneHotSelect and RefTableau.select both assume.</span>
+        <span class="n">address_register</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">all_ctrl_rows</span><span class="p">,</span> <span class="n">reverse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">n_outputs</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">rest_entries</span><span class="p">)</span>
+        <span class="n">lookup_data</span> <span class="o">=</span> <span class="p">[[</span><span class="kc">False</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_outputs</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">address_register</span><span class="p">))]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">changing_controls</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">rest_entries</span><span class="p">):</span>
+            <span class="n">ctrl_map</span> <span class="o">=</span> <span class="p">{</span><span class="o">**</span><span class="nb">dict</span><span class="p">(</span><span class="n">fixed_controls</span><span class="p">),</span> <span class="o">**</span><span class="nb">dict</span><span class="p">(</span><span class="n">changing_controls</span><span class="p">)}</span>
+            <span class="n">address</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">ctrl_map</span><span class="p">[</span><span class="n">row</span><span class="p">])</span> <span class="o">&lt;&lt;</span> <span class="n">bit</span> <span class="k">for</span> <span class="n">bit</span><span class="p">,</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">address_register</span><span class="p">))</span>
+            <span class="n">lookup_data</span><span class="p">[</span><span class="n">address</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">j</span> <span class="o">==</span> <span class="n">i</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_outputs</span><span class="p">)]</span>
+
+        <span class="n">op_type</span> <span class="o">=</span> <span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"SELECT_AND"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">measurement_based_uncompute</span> <span class="k">else</span> <span class="s2">"SELECT"</span><span class="p">)</span>
+        <span class="n">select_op</span> <span class="o">=</span> <span class="n">MatrixCompressionOp</span><span class="p">(</span>
+            <span class="n">op_type</span><span class="p">,</span>
+            <span class="p">[</span><span class="o">*</span><span class="n">address_register</span><span class="p">,</span> <span class="o">*</span><span class="n">data_qubits</span><span class="p">],</span>
+            <span class="n">control_state</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">address_register</span><span class="p">),</span>
+            <span class="n">lookup_data</span><span class="o">=</span><span class="n">lookup_data</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">select_op</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scs_toffoli_cost</span><span class="p">(</span><span class="n">lookup_data</span><span class="p">,</span> <span class="n">root</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_to_operations</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">active_qubit_indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Convert internal circuit to reversed MatrixCompressionOp list with global qubit indices.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            active_qubit_indices: Maps each tableau row index to its global qubit index.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            list[MatrixCompressionOp]: Circuit operations in reversed order with remapped qubit indices.</span>
+
+<span class="sd">        """</span>
+        <span class="n">ops</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">MatrixCompressionOp</span><span class="p">(</span>
+                <span class="n">op</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">active_qubit_indices</span><span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">q</span><span class="p">)])</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">op</span><span class="o">.</span><span class="n">qubits</span><span class="p">],</span>
+                <span class="n">control_state</span><span class="o">=</span><span class="n">op</span><span class="o">.</span><span class="n">control_state</span><span class="p">,</span>
+                <span class="n">lookup_data</span><span class="o">=</span><span class="n">op</span><span class="o">.</span><span class="n">lookup_data</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">circuit</span>
+        <span class="p">]</span>
+        <span class="n">ops</span><span class="o">.</span><span class="n">reverse</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">ops</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_scs_toffoli_cost</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">bool</span><span class="p">]],</span> <span class="o">*</span><span class="p">,</span> <span class="n">root</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Toffoli cost of SparseOneHotSCS recursion.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            data: 2-D boolean lookup table to estimate cost for.</span>
+<span class="sd">            root: If True, the first binary split is free (no Toffoli needed).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            int: Estimated Toffoli gate count for the SELECT tree.</span>
+
+<span class="sd">        """</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="nb">all</span><span class="p">(</span><span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">data</span><span class="p">)</span> <span class="ow">or</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="n">half</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">n</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">data</span><span class="p">[:</span><span class="n">half</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="n">half</span><span class="p">:]</span>
+        <span class="n">left_empty</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">left</span><span class="p">)</span>
+        <span class="n">right_empty</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">right</span><span class="p">)</span>
+        <span class="n">split_cost</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">root</span> <span class="k">else</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">left_empty</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">right_empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">split_cost</span>
+                <span class="o">+</span> <span class="n">_BinaryEncodingSynthesizer</span><span class="o">.</span><span class="n">_scs_toffoli_cost</span><span class="p">(</span><span class="n">left</span><span class="p">)</span>
+                <span class="o">+</span> <span class="n">_BinaryEncodingSynthesizer</span><span class="o">.</span><span class="n">_scs_toffoli_cost</span><span class="p">(</span><span class="n">right</span><span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">right_empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">split_cost</span> <span class="o">+</span> <span class="n">_BinaryEncodingSynthesizer</span><span class="o">.</span><span class="n">_scs_toffoli_cost</span><span class="p">(</span><span class="n">right</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">left_empty</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">split_cost</span> <span class="o">+</span> <span class="n">_BinaryEncodingSynthesizer</span><span class="o">.</span><span class="n">_scs_toffoli_cost</span><span class="p">(</span><span class="n">left</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">0</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

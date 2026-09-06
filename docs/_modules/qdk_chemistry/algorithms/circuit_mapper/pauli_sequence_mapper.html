@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry sequence structure evolution circuit mapper.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""QDK/Chemistry sequence structure evolution circuit mapper."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -114,18 +115,18 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitMapper</span>
 
-<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PauliSequenceMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;PauliSequenceMapperSettings&quot;</span><span class="p">]</span>
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"PauliSequenceMapper"</span><span class="p">,</span> <span class="s2">"PauliSequenceMapperSettings"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="PauliSequenceMapperSettings">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.html#qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.PauliSequenceMapperSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PauliSequenceMapperSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for PauliSequenceMapper.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Settings for PauliSequenceMapper."""</span>
 
 <div class="viewcode-block" id="PauliSequenceMapperSettings.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.html#qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.PauliSequenceMapperSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize PauliSequenceMapperSettings with default values.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize PauliSequenceMapperSettings with default values."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
 </div>
 
@@ -134,7 +135,7 @@
 <div class="viewcode-block" id="PauliSequenceMapper">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.html#qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.PauliSequenceMapper">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">PauliSequenceMapper</span><span class="p">(</span><span class="n">CircuitMapper</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Circuit mapper using Pauli product formula term sequences.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Circuit mapper using Pauli product formula term sequences.</span>
 
 <span class="sd">    Given a unitary expressed as a Pauli product formula</span>
 <span class="sd">    :math:`U \approx \left[ \prod_j e^{-i\theta_j P_j} \right]^{r}`, this mapper constructs</span>
@@ -149,12 +150,12 @@
 <span class="sd">    Notes:</span>
 <span class="sd">        * Requires a ``PauliProductFormulaContainer`` for the unitary representation.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="PauliSequenceMapper.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.html#qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.PauliSequenceMapper.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the PauliSequenceMapper.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the PauliSequenceMapper."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PauliSequenceMapperSettings</span><span class="p">()</span></div>
 
@@ -162,19 +163,19 @@
 <div class="viewcode-block" id="PauliSequenceMapper.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.html#qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.PauliSequenceMapper.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;pauli_sequence&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"pauli_sequence"</span></div>
 
 
 <div class="viewcode-block" id="PauliSequenceMapper.type_name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.html#qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper.PauliSequenceMapper.type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return circuit_mapper as the algorithm type name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;circuit_mapper&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return circuit_mapper as the algorithm type name."""</span>
+        <span class="k">return</span> <span class="s2">"circuit_mapper"</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">evolution</span><span class="p">:</span> <span class="n">UnitaryRepresentation</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Construct a quantum circuit implementing the given unitary.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Construct a quantum circuit implementing the given unitary.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            evolution: The unitary representation to map into a circuit.</span>
@@ -185,12 +186,12 @@
 <span class="sd">        Raises:</span>
 <span class="sd">            ValueError: If the unitary container type is not supported.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">unitary_container</span> <span class="o">=</span> <span class="n">evolution</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">unitary_container</span><span class="p">,</span> <span class="n">PauliProductFormulaContainer</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;The </span><span class="si">{</span><span class="n">evolution</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span><span class="si">}</span><span class="s2"> container type is not supported. &quot;</span>
-                <span class="s2">&quot;PauliSequenceMapper only supports PauliProductFormula containers.&quot;</span>
+                <span class="sa">f</span><span class="s2">"The </span><span class="si">{</span><span class="n">evolution</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span><span class="si">}</span><span class="s2"> container type is not supported. "</span>
+                <span class="s2">"PauliSequenceMapper only supports PauliProductFormula containers."</span>
             <span class="p">)</span>
 
         <span class="n">pauli_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -203,9 +204,9 @@
             <span class="n">angles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">)</span>
 
         <span class="n">evo_params</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;pauliExponents&quot;</span><span class="p">:</span> <span class="n">pauli_terms</span><span class="p">,</span>
-            <span class="s2">&quot;pauliCoefficients&quot;</span><span class="p">:</span> <span class="n">angles</span><span class="p">,</span>
-            <span class="s2">&quot;repetitions&quot;</span><span class="p">:</span> <span class="n">unitary_container</span><span class="o">.</span><span class="n">step_reps</span><span class="p">,</span>
+            <span class="s2">"pauliExponents"</span><span class="p">:</span> <span class="n">pauli_terms</span><span class="p">,</span>
+            <span class="s2">"pauliCoefficients"</span><span class="p">:</span> <span class="n">angles</span><span class="p">,</span>
+            <span class="s2">"repetitions"</span><span class="p">:</span> <span class="n">unitary_container</span><span class="o">.</span><span class="n">step_reps</span><span class="p">,</span>
         <span class="p">}</span>
 
         <span class="n">target_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">unitary_container</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">))</span>
@@ -215,10 +216,14 @@
 
         <span class="n">factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
             <span class="n">program</span><span class="o">=</span><span class="n">program</span><span class="p">,</span>
-            <span class="n">parameter</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;evo_params&quot;</span><span class="p">:</span> <span class="n">evo_params</span><span class="p">,</span> <span class="s2">&quot;target_indices&quot;</span><span class="p">:</span> <span class="n">target_indices</span><span class="p">},</span>
+            <span class="n">parameter</span><span class="o">=</span><span class="p">{</span><span class="s2">"evo_params"</span><span class="p">:</span> <span class="n">evo_params</span><span class="p">,</span> <span class="s2">"target_indices"</span><span class="p">:</span> <span class="n">target_indices</span><span class="p">},</span>
         <span class="p">)</span>
 
-        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_op</span><span class="o">=</span><span class="n">evolution_op</span><span class="p">,</span> <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">factory</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_op</span><span class="o">=</span><span class="n">evolution_op</span><span class="p">,</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">factory</span><span class="p">,</span>
+            <span class="n">num_qubits</span><span class="o">=</span><span class="n">unitary_container</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span>
+        <span class="p">)</span></div>
 
 </pre></div>
 

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.remote.cache.tiered &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.remote.cache.tiered &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -96,7 +97,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.remote.cache.tiered</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Tiered (layered) cache backend for QDK/Chemistry.</span>
+<span></span><span class="sd">"""Tiered (layered) cache backend for QDK/Chemistry.</span>
 
 <span class="sd">Chains multiple cache backends in priority order so that reads hit the</span>
 <span class="sd">fastest / closest tier first and writes propagate to every tier.</span>
@@ -104,8 +105,8 @@
 <span class="sd">Typical setup pairs a fast local cache with a shared network cache::</span>
 
 <span class="sd">    cache = TieredCache([</span>
-<span class="sd">        FolderCache(&quot;./cache&quot;),             # L1 — fast local</span>
-<span class="sd">        FolderCache(&quot;/shared/team_cache&quot;),   # L2 — shared</span>
+<span class="sd">        FolderCache("./cache"),             # L1 — fast local</span>
+<span class="sd">        FolderCache("/shared/team_cache"),   # L2 — shared</span>
 <span class="sd">    ])</span>
 
 <span class="sd">Read path</span>
@@ -114,7 +115,7 @@
 
 <span class="sd">Write path</span>
 <span class="sd">    Data is written to **every** tier (write-through).</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -128,14 +129,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">CacheBackend</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>
 
 
 <div class="viewcode-block" id="TieredCache">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">TieredCache</span><span class="p">(</span><span class="n">CacheBackend</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Composite cache that layers multiple backends.</span>
+<span class="w">    </span><span class="sd">"""Composite cache that layers multiple backends.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        tiers: Ordered list of cache backends, fastest first.</span>
@@ -148,30 +148,55 @@
 <span class="sd">        from qdk_chemistry.remote.cache import FolderCache, TieredCache</span>
 
 <span class="sd">        cache = TieredCache([</span>
-<span class="sd">            FolderCache(&quot;./local_cache&quot;),</span>
-<span class="sd">            FolderCache(&quot;/shared/team_cache&quot;),</span>
+<span class="sd">            FolderCache("./local_cache"),</span>
+<span class="sd">            FolderCache("/shared/team_cache"),</span>
 <span class="sd">        ])</span>
-<span class="sd">        energy, wfn = scf.run(mol, 0, 1, &quot;cc-pvdz&quot;, cache=cache)</span>
+<span class="sd">        energy, wfn = scf.run(mol, 0, 1, "cc-pvdz", cache=cache)</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;tiered&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"tiered"</span>
 
 <div class="viewcode-block" id="TieredCache.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.__init__">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tiers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CacheBackend</span><span class="p">],</span> <span class="o">**</span><span class="n">_kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialise with an ordered list of cache tiers.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tiers</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">CacheBackend</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span> <span class="o">**</span><span class="n">_kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialise with an ordered list of cache tiers.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tiers: Cache instances or serialized cache configurations, fastest first.</span>
+<span class="sd">            **_kwargs: Ignored compatibility configuration.</span>
+
+<span class="sd">        """</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">tiers</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;TieredCache requires at least one tier&quot;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">tiers</span><span class="p">)</span></div>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"TieredCache requires at least one tier"</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_resolve_tier</span><span class="p">(</span><span class="n">tier</span><span class="p">)</span> <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="n">tiers</span><span class="p">]</span></div>
 
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_tier</span><span class="p">(</span><span class="n">tier</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">CacheBackend</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Resolve a cache instance or serialized cache configuration.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            tier: Cache instance or configuration containing its registry name.</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tier</span><span class="p">,</span> <span class="n">CacheBackend</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">tier</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tier</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">"name"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">tier</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"TieredCache tiers must be CacheBackend instances or cache configurations"</span><span class="p">)</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_cache</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">config</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">tier</span><span class="p">)</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">config</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"name"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">get_cache</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">config</span><span class="p">)</span>
 
 <div class="viewcode-block" id="TieredCache.is_shared">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.is_shared">[docs]</a>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">is_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;A tiered cache is shared if any of its tiers is shared.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""A tiered cache is shared if any of its tiers is shared."""</span>
         <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">tier</span><span class="o">.</span><span class="n">is_shared</span> <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">)</span></div>
 
 
@@ -179,8 +204,27 @@
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.tiers">[docs]</a>
     <span class="nd">@property</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">tiers</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">CacheBackend</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a copy of the tier list.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Return a copy of the tier list."""</span>
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TieredCache.for_remote">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.for_remote">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">for_remote</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return a cache containing only tiers reachable from remote nodes."""</span>
+        <span class="n">remote_tiers</span> <span class="o">=</span> <span class="p">[</span><span class="n">remote</span> <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span> <span class="k">if</span> <span class="p">(</span><span class="n">remote</span> <span class="o">:=</span> <span class="n">tier</span><span class="o">.</span><span class="n">for_remote</span><span class="p">())</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">remote_tiers</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">remote_tiers</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">remote_tiers</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">TieredCache</span><span class="p">(</span><span class="n">remote_tiers</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="TieredCache.to_config">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.to_config">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return kwargs to reconstruct this TieredCache."""</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"tiers"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"name"</span><span class="p">:</span> <span class="n">tier</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="o">**</span><span class="n">tier</span><span class="o">.</span><span class="n">to_config</span><span class="p">()}</span> <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">]}</span></div>
 
 
     <span class="c1"># ── Job metadata ─────────────────────────────────────────────────────</span>
@@ -188,7 +232,7 @@
 <div class="viewcode-block" id="TieredCache.get_job">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.get_job">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Job</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check each tier in order; backfill faster tiers on a hit.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Check each tier in order; backfill faster tiers on a hit."""</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">tier</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">):</span>
             <span class="n">job</span> <span class="o">=</span> <span class="n">tier</span><span class="o">.</span><span class="n">get_job</span><span class="p">(</span><span class="n">run_hash</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">job</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -202,17 +246,17 @@
 <div class="viewcode-block" id="TieredCache.put_job">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.put_job">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">put_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write-through to every tier.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Write-through to every tier."""</span>
         <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">:</span>
             <span class="n">tier</span><span class="o">.</span><span class="n">put_job</span><span class="p">(</span><span class="n">run_hash</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span></div>
 
 
-    <span class="c1"># ── DataClass blobs ──────────────────────────────────────────────────</span>
+    <span class="c1"># ── Data blobs ───────────────────────────────────────────────────────</span>
 
 <div class="viewcode-block" id="TieredCache.get_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.get_data">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataClass</span> <span class="o">|</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check each tier in order; backfill faster tiers on a hit.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Check each tier in order; backfill faster tiers on a hit."""</span>
         <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">tier</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">):</span>
             <span class="n">data</span> <span class="o">=</span> <span class="n">tier</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">)</span>
             <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -224,17 +268,17 @@
 
 <div class="viewcode-block" id="TieredCache.put_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.put_data">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">put_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">DataClass</span> <span class="o">|</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write-through to every tier.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">put_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">shared_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Write through to every eligible tier."""</span>
         <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">:</span>
-            <span class="n">tier</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span></div>
+            <span class="n">tier</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">shared_only</span><span class="o">=</span><span class="n">shared_only</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="TieredCache.has_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.has_data">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">has_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return ``True`` if any tier contains the blob.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">tier</span><span class="o">.</span><span class="n">has_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">)</span> <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">)</span></div>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">shared_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return ``True`` if any eligible tier contains the blob."""</span>
+        <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">tier</span><span class="o">.</span><span class="n">has_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">shared_only</span><span class="o">=</span><span class="n">shared_only</span><span class="p">)</span> <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">)</span></div>
 
 
     <span class="c1"># ── Deletion ─────────────────────────────────────────────────────────</span>
@@ -242,7 +286,7 @@
 <div class="viewcode-block" id="TieredCache.delete_job">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.delete_job">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">delete_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove from every tier.  Returns ``True`` if any had it.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Remove from every tier.  Returns ``True`` if any had it."""</span>
         <span class="n">existed</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">tier</span><span class="o">.</span><span class="n">delete_job</span><span class="p">(</span><span class="n">run_hash</span><span class="p">):</span>
@@ -253,7 +297,7 @@
 <div class="viewcode-block" id="TieredCache.delete_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.delete_data">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">delete_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove from every tier.  Returns ``True`` if any had it.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Remove from every tier.  Returns ``True`` if any had it."""</span>
         <span class="n">existed</span> <span class="o">=</span> <span class="kc">False</span>
         <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">tier</span><span class="o">.</span><span class="n">delete_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">):</span>
@@ -264,7 +308,7 @@
 <div class="viewcode-block" id="TieredCache.clear">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.tiered.html#qdk_chemistry.remote.cache.tiered.TieredCache.clear">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Clear every tier.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Clear every tier."""</span>
         <span class="k">for</span> <span class="n">tier</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tiers</span><span class="p">:</span>
             <span class="n">tier</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
 </div>

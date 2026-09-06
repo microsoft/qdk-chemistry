@@ -16,3 +16,4 @@ Submodules
    qdk_chemistry.algorithms.controlled_circuit_mapper.base
    qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper
    qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_psp_mapper
+   qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper

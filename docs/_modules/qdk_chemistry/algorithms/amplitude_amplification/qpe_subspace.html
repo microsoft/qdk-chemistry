@@ -1,0 +1,377 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">"""QDK/Chemistry good state oracle marking a QPE phase register."""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span><span class="p">,</span> <span class="n">AlgorithmFactory</span><span class="p">,</span> <span class="n">create_from_ref</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.phase_estimation.circuit_builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">StandardQpeCircuitBuilder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QubitOperator</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.containers.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitaryContainer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.containers.quantum_walk</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumWalkContainer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"AmplitudeAmplificationOracleFactory"</span><span class="p">,</span>
+    <span class="s2">"QPESubspaceMarking"</span><span class="p">,</span>
+    <span class="s2">"QPESubspaceMarkingSettings"</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="QPESubspaceMarkingSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarkingSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QPESubspaceMarkingSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Settings for the QPE subspace marking oracle."""</span>
+
+<div class="viewcode-block" id="QPESubspaceMarkingSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarkingSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the settings for the QPE subspace marking oracle."""</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"energy_lower_bound"</span><span class="p">,</span>
+            <span class="s2">"double"</span><span class="p">,</span>
+            <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+            <span class="s2">"Lowest energy the marked subspace may hold. Required."</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"qpe_circuit_builder"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="s2">"qdk_standard"</span><span class="p">),</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QPESubspaceMarking">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QPESubspaceMarking</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Build a good state oracle that flags the eigenspace above an energy bound.</span>
+
+<span class="sd">    The nested ``qpe_circuit_builder`` estimates the phase of the register handed to the</span>
+<span class="sd">    oracle, a flag is flipped when that phase lands in a bin whose energy is at least</span>
+<span class="sd">    ``energy_lower_bound``, and the estimation is undone. No state preparation is used:</span>
+<span class="sd">    the register already holds the state under test.</span>
+
+<span class="sd">    This reflects about the marked eigenspaces only when the estimation is exact, that is</span>
+<span class="sd">    when every eigenphase of that state is a multiple of :math:`2^{-n}` for the builder's</span>
+<span class="sd">    ``num_bits`` :math:`n`. Off a bin the phase register comes back spread rather than to</span>
+<span class="sd">    :math:`|0\rangle`, leaking part of the state into the ancillas the oracle releases.</span>
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="QPESubspaceMarking.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">energy_lower_bound</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span>
+        <span class="n">qpe_circuit_builder</span><span class="p">:</span> <span class="n">AlgorithmRef</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the QPE subspace marking oracle.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            energy_lower_bound: Lowest energy the marked subspace may hold.</span>
+<span class="sd">            qpe_circuit_builder: Optional algorithm reference for the phase estimation to mark.</span>
+
+<span class="sd">        """</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QPESubspaceMarkingSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"energy_lower_bound"</span><span class="p">,</span> <span class="n">energy_lower_bound</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">qpe_circuit_builder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="n">qpe_circuit_builder</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QPESubspaceMarking.type_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the algorithm type name as amplitude_amplification_oracle."""</span>
+        <span class="k">return</span> <span class="s2">"amplitude_amplification_oracle"</span></div>
+
+
+<div class="viewcode-block" id="QPESubspaceMarking.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the algorithm name as qdk_qpe_subspace."""</span>
+        <span class="k">return</span> <span class="s2">"qdk_qpe_subspace"</span></div>
+
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_marked_phase_bins</span><span class="p">(</span>
+        <span class="n">energy_lower_bound</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">container</span><span class="p">:</span> <span class="n">UnitaryContainer</span><span class="p">,</span>
+        <span class="n">num_phase_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Return the half-open phase-bin ranges whose energy is at least ``energy_lower_bound``.</span>
+
+<span class="sd">        Every bin is tested against the encoding's phase-to-energy law, so the answer follows</span>
+<span class="sd">        that law wherever it turns or wraps.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            energy_lower_bound: The lowest energy the marked subspace may hold.</span>
+<span class="sd">            container: The unitary encoding whose phases are being marked.</span>
+<span class="sd">            num_phase_qubits: Width of the QPE phase register.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Sorted disjoint half-open bin ranges.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no bin reaches the bound, or if every bin does, because neither</span>
+<span class="sd">                names a proper subspace to amplify.</span>
+
+<span class="sd">        """</span>
+        <span class="n">phase_bin_count</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_phase_qubits</span>
+        <span class="n">ranges</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">phase_bin</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">phase_bin_count</span><span class="p">):</span>
+            <span class="n">canonical_bin</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">min</span><span class="p">(</span><span class="n">phase_bin</span><span class="p">,</span> <span class="n">phase_bin_count</span> <span class="o">-</span> <span class="n">phase_bin</span><span class="p">)</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">QuantumWalkContainer</span><span class="p">)</span>
+                <span class="k">else</span> <span class="n">phase_bin</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">container</span><span class="o">.</span><span class="n">eigenvalue_from_phase</span><span class="p">(</span><span class="n">canonical_bin</span> <span class="o">/</span> <span class="n">phase_bin_count</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">energy_lower_bound</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">ranges</span> <span class="ow">and</span> <span class="n">ranges</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">phase_bin</span><span class="p">:</span>
+                <span class="n">ranges</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">ranges</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">],</span> <span class="n">phase_bin</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">ranges</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">phase_bin</span><span class="p">,</span> <span class="n">phase_bin</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">ranges</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"No phase bin of the </span><span class="si">{</span><span class="n">phase_bin_count</span><span class="si">}</span><span class="s2">-bin register holds an energy at least </span><span class="si">{</span><span class="n">energy_lower_bound</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">ranges</span> <span class="o">==</span> <span class="p">[(</span><span class="mi">0</span><span class="p">,</span> <span class="n">phase_bin_count</span><span class="p">)]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Every phase bin of the </span><span class="si">{</span><span class="n">phase_bin_count</span><span class="si">}</span><span class="s2">-bin register holds an energy at least "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">energy_lower_bound</span><span class="si">}</span><span class="s2">, so it marks no subspace to amplify. Give a bound inside "</span>
+                <span class="sa">f</span><span class="s2">"the range the encoding represents."</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">ranges</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Build the oracle flagging the eigenspace of ``qubit_hamiltonian`` above the bound.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian whose eigenspace is marked.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The circuit to use as the ``good_state_oracle`` of ``AmplitudeAmplification``.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            KeyError: If the nested ``qpe_circuit_builder`` reference is not registered.</span>
+<span class="sd">            TypeError: If the nested ``qpe_circuit_builder`` is not a standard (QFT-based) one,</span>
+<span class="sd">                the only kind whose circuit can be undone.</span>
+<span class="sd">            ValueError: If its ``num_bits`` is not positive, if ``energy_lower_bound`` is unset</span>
+<span class="sd">                or not finite, or if it names no proper subspace of the phase register.</span>
+<span class="sd">            RuntimeError: If the phase estimation does not carry a Q# operation.</span>
+
+<span class="sd">        """</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">energy_lower_bound</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"energy_lower_bound"</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">energy_lower_bound</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"The energy_lower_bound setting must be set to the lowest energy of the subspace to mark."</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">math</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">energy_lower_bound</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The energy_lower_bound setting must be a finite energy. Got </span><span class="si">{</span><span class="n">energy_lower_bound</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+
+        <span class="n">builder</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">builder</span><span class="p">,</span> <span class="n">StandardQpeCircuitBuilder</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"qpe_circuit_builder must be a standard (QFT-based) builder. Got </span><span class="si">{</span><span class="n">builder</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+        <span class="n">num_bits</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"num_bits"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">num_bits</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The nested qpe_circuit_builder needs a positive num_bits. Got </span><span class="si">{</span><span class="n">num_bits</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+
+        <span class="n">num_system_qubits</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span>
+        <span class="n">unitary</span> <span class="o">=</span> <span class="n">create_from_ref</span><span class="p">(</span><span class="n">builder</span><span class="o">.</span><span class="n">settings</span><span class="p">(),</span> <span class="s2">"unitary_builder"</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
+        <span class="n">num_signal_ancillas</span> <span class="o">=</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_num_qubits</span><span class="p">()</span> <span class="o">-</span> <span class="n">num_system_qubits</span>
+        <span class="n">bin_ranges</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_marked_phase_bins</span><span class="p">(</span><span class="n">energy_lower_bound</span><span class="p">,</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_container</span><span class="p">(),</span> <span class="n">num_bits</span><span class="p">)</span>
+        <span class="n">lower_bounds</span> <span class="o">=</span> <span class="p">[</span><span class="n">start</span> <span class="k">for</span> <span class="n">start</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">bin_ranges</span><span class="p">]</span>
+        <span class="n">upper_bounds</span> <span class="o">=</span> <span class="p">[</span><span class="n">stop</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">stop</span> <span class="ow">in</span> <span class="n">bin_ranges</span><span class="p">]</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Marking phase bins </span><span class="si">{</span><span class="n">bin_ranges</span><span class="si">}</span><span class="s2"> for energies at least </span><span class="si">{</span><span class="n">energy_lower_bound</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+
+        <span class="n">state_prep</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span>
+        <span class="n">prep_params</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">SingleReferenceParams</span><span class="p">(</span><span class="n">bitStrings</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_system_qubits</span><span class="p">,</span> <span class="n">numQubits</span><span class="o">=</span><span class="n">num_system_qubits</span><span class="p">)</span>
+        <span class="n">prepare_nothing</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span>
+                <span class="n">program</span><span class="o">=</span><span class="n">state_prep</span><span class="o">.</span><span class="n">MakeSingleReferenceStateCircuit</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="nb">vars</span><span class="p">(</span><span class="n">prep_params</span><span class="p">)</span>
+            <span class="p">),</span>
+            <span class="n">qsharp_op</span><span class="o">=</span><span class="n">state_prep</span><span class="o">.</span><span class="n">MakePrepareSingleReferenceStateOp</span><span class="p">(</span><span class="n">prep_params</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="n">qpe_circuit</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">prepare_nothing</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">qpe_operation</span> <span class="o">=</span> <span class="n">qpe_circuit</span><span class="o">.</span><span class="n">_qsharp_op</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">if</span> <span class="n">qpe_operation</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Failed to create the subspace oracle: the Q# phase estimation is not available."</span><span class="p">)</span>
+
+        <span class="n">amplification</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">AmplitudeAmplification</span>
+        <span class="n">parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"qpe"</span><span class="p">:</span> <span class="n">qpe_operation</span><span class="p">,</span>
+            <span class="s2">"numPhaseQubits"</span><span class="p">:</span> <span class="n">num_bits</span><span class="p">,</span>
+            <span class="s2">"numSignalAncillas"</span><span class="p">:</span> <span class="n">num_signal_ancillas</span><span class="p">,</span>
+            <span class="s2">"lowerBounds"</span><span class="p">:</span> <span class="n">lower_bounds</span><span class="p">,</span>
+            <span class="s2">"upperBounds"</span><span class="p">:</span> <span class="n">upper_bounds</span><span class="p">,</span>
+            <span class="s2">"numSystemQubits"</span><span class="p">:</span> <span class="n">num_system_qubits</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span><span class="n">program</span><span class="o">=</span><span class="n">amplification</span><span class="o">.</span><span class="n">MakeMarkedPhaseCircuit</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="n">parameters</span><span class="p">),</span>
+            <span class="n">qsharp_op</span><span class="o">=</span><span class="n">amplification</span><span class="o">.</span><span class="n">MarkQPEPhaseOp</span><span class="p">(</span>
+                <span class="n">qpe_operation</span><span class="p">,</span> <span class="n">num_bits</span><span class="p">,</span> <span class="n">num_signal_ancillas</span><span class="p">,</span> <span class="n">lower_bounds</span><span class="p">,</span> <span class="n">upper_bounds</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationOracleFactory">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.AmplitudeAmplificationOracleFactory">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AmplitudeAmplificationOracleFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Factory class for creating amplitude amplification good state oracle instances."""</span>
+
+<div class="viewcode-block" id="AmplitudeAmplificationOracleFactory.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.AmplitudeAmplificationOracleFactory.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the AmplitudeAmplificationOracleFactory."""</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationOracleFactory.algorithm_type_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.AmplitudeAmplificationOracleFactory.algorithm_type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the algorithm type name as amplitude_amplification_oracle."""</span>
+        <span class="k">return</span> <span class="s2">"amplitude_amplification_oracle"</span></div>
+
+
+<div class="viewcode-block" id="AmplitudeAmplificationOracleFactory.default_algorithm_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.AmplitudeAmplificationOracleFactory.default_algorithm_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return qdk_qpe_subspace as the default algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"qdk_qpe_subspace"</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

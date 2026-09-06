@@ -62,19 +62,19 @@ The :class:`~qdk_chemistry.data.QpeResult` stores the following information:
      - Raw phase angle in radians: :math:`2\pi\varphi`.
    * - ``canonical_phase_fraction``
      - float
-     - Alias-resolved phase fraction. Equals ``phase_fraction`` when no alias resolution is performed (e.g., qubitization).
+     - Alias-resolved phase fraction consistent with the selected energy branch. Equals ``phase_fraction`` when the algorithm performs no alias resolution.
    * - ``canonical_phase_angle``
      - float
      - Alias-resolved phase angle in radians.
    * - ``raw_energy``
      - float
-     - Energy computed from the measured phase via the container's ``eigenvalue_from_phase`` method.
+     - Energy computed from ``canonical_phase_fraction`` via the container's ``eigenvalue_from_phase`` method.
    * - ``branching``
      - tuple[float, ...]
-     - Energy candidates. For the unified ``from_phase_fraction`` factory, this is a single-element tuple containing ``raw_energy``.
+     - Sorted energy candidates considered, including ``raw_energy``. A single-element tuple when the algorithm performs no alias resolution.
    * - ``resolved_energy``
      - float | None
-     - Reserved for alias resolution (currently ``None`` when using ``from_phase_fraction``).
+     - Candidate from ``branching`` picked by the algorithm's alias-resolution rule, or ``None`` when no resolution was performed.
    * - ``bits_msb_first``
      - tuple[int, ...] | None
      - Measured phase bits ordered from most significant to least significant. Available for :ref:`IQPE <iqpe-algorithm>`; may be ``None`` for other methods.

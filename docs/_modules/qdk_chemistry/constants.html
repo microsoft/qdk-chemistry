@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.constants &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.constants &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.constants</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry Physical Constants Module.</span>
+<span></span><span class="sd">"""QDK/Chemistry Physical Constants Module.</span>
 
 <span class="sd">This module provides access to physical constants from CODATA standards :cite:`Mohr2025`.</span>
 <span class="sd">The constants are sourced from the most recent CODATA recommendations</span>
@@ -129,9 +130,9 @@
 
 <span class="sd">    &gt;&gt;&gt; # Access detailed documentation (reflects current CODATA version)</span>
 <span class="sd">    &gt;&gt;&gt; from qdk_chemistry.constants import get_constant_info</span>
-<span class="sd">    &gt;&gt;&gt; info = get_constant_info(&#39;bohr_to_angstrom&#39;)</span>
-<span class="sd">    &gt;&gt;&gt; print(f&quot;{info.description} ({info.symbol}): {info.value} {info.units}&quot;)</span>
-<span class="sd">    &gt;&gt;&gt; print(f&quot;Source: {info.source}&quot;)</span>
+<span class="sd">    &gt;&gt;&gt; info = get_constant_info('bohr_to_angstrom')</span>
+<span class="sd">    &gt;&gt;&gt; print(f"{info.description} ({info.symbol}): {info.value} {info.units}")</span>
+<span class="sd">    &gt;&gt;&gt; print(f"Source: {info.source}")</span>
 
 <span class="sd">    &gt;&gt;&gt; # Or use the docstring</span>
 <span class="sd">    &gt;&gt;&gt; help(angstrom_to_bohr)</span>
@@ -140,7 +141,7 @@
 <span class="sd">    &gt;&gt;&gt; from qdk_chemistry.constants import list_constants</span>
 <span class="sd">    &gt;&gt;&gt; list_constants()</span>
 
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -181,7 +182,7 @@
 <div class="viewcode-block" id="list_constants">
 <a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.constants.html#qdk_chemistry.constants.list_constants">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">list_constants</span><span class="p">(</span><span class="n">show_values</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span> <span class="n">show_units</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;List all available constants with their documentation.</span>
+<span class="w">    </span><span class="sd">"""List all available constants with their documentation.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        show_values: Whether to display the numerical values, default True</span>
@@ -191,54 +192,54 @@
 <span class="sd">        &gt;&gt;&gt; list_constants()</span>
 <span class="sd">        &gt;&gt;&gt; list_constants(show_values=False)  # Just names and descriptions</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">codata_version</span> <span class="o">=</span> <span class="n">get_current_codata_version</span><span class="p">()</span>
     <span class="n">constants_info</span> <span class="o">=</span> <span class="n">get_constants_info</span><span class="p">()</span>
 
-    <span class="n">constants_info_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">QDK/Chemistry Physical Constants (</span><span class="si">{</span><span class="n">codata_version</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">&quot;</span>
-    <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="s2">&quot;=&quot;</span> <span class="o">*</span> <span class="mi">50</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+    <span class="n">constants_info_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">QDK/Chemistry Physical Constants (</span><span class="si">{</span><span class="n">codata_version</span><span class="si">}</span><span class="s2">)</span><span class="se">\n</span><span class="s2">"</span>
+    <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="s2">"="</span> <span class="o">*</span> <span class="mi">50</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
 
     <span class="c1"># Group constants by category</span>
     <span class="n">categories</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;Length Conversion&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;bohr_to_angstrom&quot;</span><span class="p">,</span> <span class="s2">&quot;angstrom_to_bohr&quot;</span><span class="p">],</span>
-        <span class="s2">&quot;Fundamental Constants&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;fine_structure_constant&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;speed_of_light&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;elementary_charge&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;planck_constant&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;reduced_planck_constant&quot;</span><span class="p">,</span>
+        <span class="s2">"Length Conversion"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"bohr_to_angstrom"</span><span class="p">,</span> <span class="s2">"angstrom_to_bohr"</span><span class="p">],</span>
+        <span class="s2">"Fundamental Constants"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"fine_structure_constant"</span><span class="p">,</span>
+            <span class="s2">"speed_of_light"</span><span class="p">,</span>
+            <span class="s2">"elementary_charge"</span><span class="p">,</span>
+            <span class="s2">"planck_constant"</span><span class="p">,</span>
+            <span class="s2">"reduced_planck_constant"</span><span class="p">,</span>
         <span class="p">],</span>
-        <span class="s2">&quot;Particle Masses&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;electron_mass&quot;</span><span class="p">,</span> <span class="s2">&quot;proton_mass&quot;</span><span class="p">,</span> <span class="s2">&quot;neutron_mass&quot;</span><span class="p">,</span> <span class="s2">&quot;atomic_mass_constant&quot;</span><span class="p">],</span>
-        <span class="s2">&quot;Thermodynamic Constants&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;boltzmann_constant&quot;</span><span class="p">,</span> <span class="s2">&quot;avogadro_constant&quot;</span><span class="p">],</span>
-        <span class="s2">&quot;Energy Conversion&quot;</span><span class="p">:</span> <span class="p">[</span>
-            <span class="s2">&quot;hartree_to_ev&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;ev_to_hartree&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;hartree_to_kcal_per_mol&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;kcal_per_mol_to_hartree&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;hartree_to_kj_per_mol&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;kj_per_mol_to_hartree&quot;</span><span class="p">,</span>
+        <span class="s2">"Particle Masses"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"electron_mass"</span><span class="p">,</span> <span class="s2">"proton_mass"</span><span class="p">,</span> <span class="s2">"neutron_mass"</span><span class="p">,</span> <span class="s2">"atomic_mass_constant"</span><span class="p">],</span>
+        <span class="s2">"Thermodynamic Constants"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"boltzmann_constant"</span><span class="p">,</span> <span class="s2">"avogadro_constant"</span><span class="p">],</span>
+        <span class="s2">"Energy Conversion"</span><span class="p">:</span> <span class="p">[</span>
+            <span class="s2">"hartree_to_ev"</span><span class="p">,</span>
+            <span class="s2">"ev_to_hartree"</span><span class="p">,</span>
+            <span class="s2">"hartree_to_kcal_per_mol"</span><span class="p">,</span>
+            <span class="s2">"kcal_per_mol_to_hartree"</span><span class="p">,</span>
+            <span class="s2">"hartree_to_kj_per_mol"</span><span class="p">,</span>
+            <span class="s2">"kj_per_mol_to_hartree"</span><span class="p">,</span>
         <span class="p">],</span>
     <span class="p">}</span>
 
     <span class="k">for</span> <span class="n">category</span><span class="p">,</span> <span class="n">constant_names</span> <span class="ow">in</span> <span class="n">categories</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="si">{</span><span class="n">category</span><span class="si">}</span><span class="s2">:</span><span class="se">\n</span><span class="s2">&quot;</span>
-        <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="s2">&quot;-&quot;</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="si">{</span><span class="n">category</span><span class="si">}</span><span class="s2">:</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="s2">"-"</span> <span class="o">*</span> <span class="nb">len</span><span class="p">(</span><span class="n">category</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
 
         <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">constant_names</span><span class="p">:</span>
             <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">constants_info</span><span class="p">:</span>
                 <span class="n">info</span> <span class="o">=</span> <span class="n">constants_info</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
-                <span class="n">line</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
+                <span class="n">line</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span>
                 <span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="p">:</span>
-                    <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; (</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2">)&quot;</span>
-                <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" (</span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="s2">)"</span>
+                <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">": </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">"</span>
 
                 <span class="k">if</span> <span class="n">show_values</span><span class="p">:</span>
-                    <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; = </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" = </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span>
                 <span class="k">if</span> <span class="n">show_units</span> <span class="ow">and</span> <span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="p">:</span>
-                    <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="n">line</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">" </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="s2">"</span>
 
-                <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="n">line</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="n">constants_info_string</span> <span class="o">+=</span> <span class="n">line</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">constants_info_string</span><span class="p">)</span></div>
 
 
@@ -246,7 +247,7 @@
 <div class="viewcode-block" id="find_constant">
 <a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.constants.html#qdk_chemistry.constants.find_constant">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">find_constant</span><span class="p">(</span><span class="n">search_term</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find constants matching a search term.</span>
+<span class="w">    </span><span class="sd">"""Find constants matching a search term.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        search_term: Term to search for in constant names or descriptions</span>
@@ -255,11 +256,11 @@
 <span class="sd">        Dictionary of matching constants and their info</span>
 
 <span class="sd">    Examples:</span>
-<span class="sd">        &gt;&gt;&gt; find_constant(&quot;bohr&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; find_constant(&quot;mass&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; find_constant(&quot;energy&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; find_constant("bohr")</span>
+<span class="sd">        &gt;&gt;&gt; find_constant("mass")</span>
+<span class="sd">        &gt;&gt;&gt; find_constant("energy")</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">constants_info</span> <span class="o">=</span> <span class="n">get_constants_info</span><span class="p">()</span>
     <span class="n">matches</span> <span class="o">=</span> <span class="p">{}</span>
@@ -281,61 +282,61 @@
 <div class="viewcode-block" id="show_constant_details">
 <a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.constants.html#qdk_chemistry.constants.show_constant_details">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">show_constant_details</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Print detailed information about a specific constant.</span>
+<span class="w">    </span><span class="sd">"""Print detailed information about a specific constant.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        name: Name of the constant</span>
 
 <span class="sd">    Examples:</span>
-<span class="sd">        &gt;&gt;&gt; show_constant_details(&#39;bohr_to_angstrom&#39;)</span>
-<span class="sd">        &gt;&gt;&gt; show_constant_details(&#39;fine_structure_constant&#39;)</span>
+<span class="sd">        &gt;&gt;&gt; show_constant_details('bohr_to_angstrom')</span>
+<span class="sd">        &gt;&gt;&gt; show_constant_details('fine_structure_constant')</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">info</span> <span class="o">=</span> <span class="n">get_constant_info</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
-        <span class="n">constant_details_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Constant: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">constant_details_string</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Constant: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
         <span class="k">if</span> <span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="p">:</span>
-            <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Symbol: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Value: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Description: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;Source: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">source</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"Symbol: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">symbol</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"Value: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">value</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">units</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"Description: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="n">constant_details_string</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"Source: </span><span class="si">{</span><span class="n">info</span><span class="o">.</span><span class="n">source</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="n">constant_details_string</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">KeyError</span><span class="p">:</span>
-        <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Unknown constant: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
-        <span class="n">error_msg</span> <span class="o">+=</span> <span class="s2">&quot;Use list_constants() to see all available constants.</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"Unknown constant: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="n">error_msg</span> <span class="o">+=</span> <span class="s2">"Use list_constants() to see all available constants.</span><span class="se">\n</span><span class="s2">"</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span></div>
 
 
 
 <span class="c1"># Make the new functions available</span>
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;ANGSTROM_TO_BOHR&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;ATOMIC_MASS_CONSTANT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;AVOGADRO_CONSTANT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;BOHR_TO_ANGSTROM&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;BOLTZMANN_CONSTANT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;ELECTRON_MASS&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;ELEMENTARY_CHARGE&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;EV_TO_HARTREE&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;FINE_STRUCTURE_CONSTANT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;HARTREE_TO_EV&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;HARTREE_TO_KCAL_PER_MOL&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;HARTREE_TO_KJ_PER_MOL&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;KCAL_PER_MOL_TO_HARTREE&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;KJ_PER_MOL_TO_HARTREE&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;NEUTRON_MASS&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;PLANCK_CONSTANT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;PROTON_MASS&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;REDUCED_PLANCK_CONSTANT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SPEED_OF_LIGHT&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;ConstantInfo&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;find_constant&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;get_constant_info&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;get_constants_info&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;get_current_codata_version&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;list_constants&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;show_constant_details&quot;</span><span class="p">,</span>
+    <span class="s2">"ANGSTROM_TO_BOHR"</span><span class="p">,</span>
+    <span class="s2">"ATOMIC_MASS_CONSTANT"</span><span class="p">,</span>
+    <span class="s2">"AVOGADRO_CONSTANT"</span><span class="p">,</span>
+    <span class="s2">"BOHR_TO_ANGSTROM"</span><span class="p">,</span>
+    <span class="s2">"BOLTZMANN_CONSTANT"</span><span class="p">,</span>
+    <span class="s2">"ELECTRON_MASS"</span><span class="p">,</span>
+    <span class="s2">"ELEMENTARY_CHARGE"</span><span class="p">,</span>
+    <span class="s2">"EV_TO_HARTREE"</span><span class="p">,</span>
+    <span class="s2">"FINE_STRUCTURE_CONSTANT"</span><span class="p">,</span>
+    <span class="s2">"HARTREE_TO_EV"</span><span class="p">,</span>
+    <span class="s2">"HARTREE_TO_KCAL_PER_MOL"</span><span class="p">,</span>
+    <span class="s2">"HARTREE_TO_KJ_PER_MOL"</span><span class="p">,</span>
+    <span class="s2">"KCAL_PER_MOL_TO_HARTREE"</span><span class="p">,</span>
+    <span class="s2">"KJ_PER_MOL_TO_HARTREE"</span><span class="p">,</span>
+    <span class="s2">"NEUTRON_MASS"</span><span class="p">,</span>
+    <span class="s2">"PLANCK_CONSTANT"</span><span class="p">,</span>
+    <span class="s2">"PROTON_MASS"</span><span class="p">,</span>
+    <span class="s2">"REDUCED_PLANCK_CONSTANT"</span><span class="p">,</span>
+    <span class="s2">"SPEED_OF_LIGHT"</span><span class="p">,</span>
+    <span class="s2">"ConstantInfo"</span><span class="p">,</span>
+    <span class="s2">"find_constant"</span><span class="p">,</span>
+    <span class="s2">"get_constant_info"</span><span class="p">,</span>
+    <span class="s2">"get_constants_info"</span><span class="p">,</span>
+    <span class="s2">"get_current_codata_version"</span><span class="p">,</span>
+    <span class="s2">"list_constants"</span><span class="p">,</span>
+    <span class="s2">"show_constant_details"</span><span class="p">,</span>
 <span class="p">]</span>
 </pre></div>
 

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.migrate._orbitals module &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.migrate._orbitals module &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -112,9 +113,9 @@ A shell represents a group of atomic orbitals with the same atom, angular moment
 <p class="rubric">Examples</p>
 <p>Create a simple basis set:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">OrbitalType</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;STO-3G&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"STO-3G"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span><span class="o">.</span><span class="n">add_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>  <span class="c1"># s orbital on atom 0</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of atomic orbitals: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Number of atomic orbitals: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 <dl class="py method">
@@ -142,7 +143,7 @@ single-particle SymmetryProduct.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">SymmetryProduct</span><span class="p">,</span> <span class="n">axes</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">sym</span> <span class="o">=</span> <span class="n">SymmetryProduct</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">spin</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="kc">True</span><span class="p">)])</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">sym</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"custom"</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">sym</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -161,9 +162,9 @@ single-particle SymmetryProduct.</p>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;cc-pVDZ&quot;</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis set for </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"cc-pVDZ"</span><span class="p">,</span> <span class="n">structure</span><span class="p">,</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Basis set for </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2"> atoms"</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
@@ -183,8 +184,8 @@ Default is Spherical.</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"custom"</span><span class="p">,</span> <span class="n">shells</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Created basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="4">
@@ -205,10 +206,10 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Complete basis set with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"custom"</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Complete basis set with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="5">
@@ -230,11 +231,11 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">rpow</span><span class="p">)]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"custom-ecp"</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="6">
@@ -258,12 +259,12 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">),</span> <span class="n">Shell</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">rpow</span><span class="p">)]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="s2">&quot;custom-ecp&quot;</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">ecp_electrons</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells, ECP: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"custom-ecp"</span><span class="p">,</span> <span class="n">shells</span><span class="p">,</span> <span class="s2">"custom-ecp"</span><span class="p">,</span> <span class="n">ecp_shells</span><span class="p">,</span> <span class="n">ecp_electrons</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Basis with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells, </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells, ECP: </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="7">
@@ -277,9 +278,9 @@ Default is Spherical</p></li>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">original</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">&quot;cc-pVDZ&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">original</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"cc-pVDZ"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">copy</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="n">original</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Copied basis set: </span><span class="si">{</span><span class="n">copy</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Copied basis set: </span><span class="si">{</span><span class="n">copy</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -345,7 +346,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_str</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">atomic_orbital_type_to_string</span><span class="p">(</span><span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis type: </span><span class="si">{</span><span class="n">basis_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Prints &quot;Spherical&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Basis type: </span><span class="si">{</span><span class="n">basis_str</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># Prints "Spherical"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -367,7 +368,28 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shell_idx</span><span class="p">,</span> <span class="n">local_idx</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">basis_to_shell_index</span><span class="p">(</span><span class="mi">7</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;atomic orbital 7: shell </span><span class="si">{</span><span class="n">shell_idx</span><span class="si">}</span><span class="s2">, local index </span><span class="si">{</span><span class="n">local_idx</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"atomic orbital 7: shell </span><span class="si">{</span><span class="n">shell_idx</span><span class="si">}</span><span class="s2">, local index </span><span class="si">{</span><span class="n">local_idx</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.migrate._orbitals.BasisSet.calculate_effective_nuclear_repulsion_energy">
+<span class="sig-name descname"><span class="pre">calculate_effective_nuclear_repulsion_energy</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><span class="pre">qdk_chemistry.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></span><a class="headerlink" href="#qdk_chemistry.migrate._orbitals.BasisSet.calculate_effective_nuclear_repulsion_energy" title="Link to this definition"></a></dt>
+<dd><p>Calculate nuclear repulsion using ECP-adjusted nuclear charges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Effective nuclear repulsion energy in atomic units (Hartree)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If no structure is associated with this basis set</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">calculate_effective_nuclear_repulsion_energy</span><span class="p">()</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -381,6 +403,20 @@ Default is Spherical</p></li>
 <dt class="sig sig-object py" id="qdk_chemistry.migrate._orbitals.BasisSet.custom_name">
 <span class="sig-name descname"><span class="pre">custom_name</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'custom_basis_set'</span></span><a class="headerlink" href="#qdk_chemistry.migrate._orbitals.BasisSet.custom_name" title="Link to this definition"></a></dt>
 <dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.migrate._orbitals.BasisSet.data_type_name">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">data_type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.migrate._orbitals.BasisSet.data_type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the wire-format identifier for basis sets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">&quot;basis_set&quot;</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.migrate._orbitals.BasisSet.from_basis_name">
@@ -408,9 +444,9 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_basis_name</span><span class="p">(</span><span class="s2">&quot;sto-3g&quot;</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2"> basis with </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_basis_name</span><span class="p">(</span><span class="s2">"sto-3g"</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Created </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span><span class="si">}</span><span class="s2"> basis with </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2"> shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -442,10 +478,10 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;H&quot;</span><span class="p">:</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">,</span> <span class="s2">&quot;O&quot;</span><span class="p">:</span> <span class="s2">&quot;cc-pvdz&quot;</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"H"</span><span class="p">:</span> <span class="s2">"sto-3g"</span><span class="p">,</span> <span class="s2">"O"</span><span class="p">:</span> <span class="s2">"cc-pvdz"</span><span class="p">}</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_element_map</span><span class="p">(</span><span class="n">basis_map</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created custom basis with </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Created custom basis with </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2"> shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -475,8 +511,8 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;cc-pvdz.basis_set.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.json"</span><span class="p">,</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"cc-pvdz.basis_set.h5"</span><span class="p">,</span> <span class="s2">"hdf5"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -506,8 +542,8 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.h5&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;cc-pvdz.basis_set.hdf5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.h5"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">"cc-pvdz.basis_set.hdf5"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -539,10 +575,10 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">&quot;water.xyz&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_map</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">&quot;cc-pvdz&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">}</span>  <span class="c1"># O at 0, H at 1 and 2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="s2">"water.xyz"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_map</span> <span class="o">=</span> <span class="p">{</span><span class="mi">0</span><span class="p">:</span> <span class="s2">"cc-pvdz"</span><span class="p">,</span> <span class="mi">1</span><span class="p">:</span> <span class="s2">"sto-3g"</span><span class="p">,</span> <span class="mi">2</span><span class="p">:</span> <span class="s2">"sto-3g"</span><span class="p">}</span>  <span class="c1"># O at 0, H at 1 and 2</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">basis</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_index_map</span><span class="p">(</span><span class="n">basis_map</span><span class="p">,</span> <span class="n">structure</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created custom basis with </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Created custom basis with </span><span class="si">{</span><span class="n">basis</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span><span class="si">}</span><span class="s2"> shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -568,7 +604,7 @@ The string should contain JSON data in the format produced by <code class="docut
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s1">&#39;{&quot;name&quot;: &quot;STO-3G&quot;, &quot;shells&quot;: [...]}&#39;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s1">'{"name": "STO-3G", "shells": [...]}'</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -598,8 +634,8 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;my_basis.basis_set.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"my_basis.basis_set.json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -621,7 +657,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">l</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_angular_momentum</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">D</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;D orbital has l = </span><span class="si">{</span><span class="n">l</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># l = 2</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"D orbital has l = </span><span class="si">{</span><span class="n">l</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># l = 2</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -647,7 +683,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">atom_idx</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_atom_index_for_atomic_orbital</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;atomic orbital 3 belongs to atom </span><span class="si">{</span><span class="n">atom_idx</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"atomic orbital 3 belongs to atom </span><span class="si">{</span><span class="n">atom_idx</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -671,7 +707,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">atomic_orbital_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_atomic_orbital_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has atomic orbitals: </span><span class="si">{</span><span class="n">atomic_orbital_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom 0 has atomic orbitals: </span><span class="si">{</span><span class="n">atomic_orbital_indices</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -693,7 +729,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shell_idx</span><span class="p">,</span> <span class="n">m_l</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_atomic_orbital_info</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;atomic orbital 5: shell </span><span class="si">{</span><span class="n">shell_idx</span><span class="si">}</span><span class="s2">, m_l = </span><span class="si">{</span><span class="n">m_l</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"atomic orbital 5: shell </span><span class="si">{</span><span class="n">shell_idx</span><span class="si">}</span><span class="s2">, m_l = </span><span class="si">{</span><span class="n">m_l</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -712,7 +748,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">atomic_orbital_type</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_atomic_orbital_type</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Basis type: </span><span class="si">{</span><span class="n">atomic_orbital_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Basis type: </span><span class="si">{</span><span class="n">atomic_orbital_type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -731,7 +767,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_electrons</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ECP electrons per atom: </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ECP electrons per atom: </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -750,7 +786,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_name</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ECP: </span><span class="si">{</span><span class="n">ecp_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ECP: </span><span class="si">{</span><span class="n">ecp_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -775,7 +811,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shell</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;First ECP shell has </span><span class="si">{</span><span class="n">ecp_shell</span><span class="o">.</span><span class="n">get_num_primitives</span><span class="p">()</span><span class="si">}</span><span class="s2"> primitives&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"First ECP shell has </span><span class="si">{</span><span class="n">ecp_shell</span><span class="o">.</span><span class="n">get_num_primitives</span><span class="p">()</span><span class="si">}</span><span class="s2"> primitives"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -797,7 +833,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 ECP shell indices: </span><span class="si">{</span><span class="n">ecp_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom 0 ECP shell indices: </span><span class="si">{</span><span class="n">ecp_indices</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -822,7 +858,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">p_ecp_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;P-type ECP shells on atom 0: </span><span class="si">{</span><span class="n">p_ecp_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"P-type ECP shells on atom 0: </span><span class="si">{</span><span class="n">p_ecp_indices</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -844,7 +880,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">s_ecp_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;S-type ECP shell indices: </span><span class="si">{</span><span class="n">s_ecp_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"S-type ECP shell indices: </span><span class="si">{</span><span class="n">s_ecp_indices</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -863,7 +899,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shells</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total ECP shells: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total ECP shells: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_shells</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -885,7 +921,28 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">ecp_atom_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_shells_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_atom_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom 0 has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ecp_atom_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> ECP shells"</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.migrate._orbitals.BasisSet.get_effective_nuclear_charges">
+<span class="sig-name descname"><span class="pre">get_effective_nuclear_charges</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">self</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><span class="pre">qdk_chemistry.data.BasisSet</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.NDArray</span><span class="p"><span class="pre">[</span></span><span class="pre">numpy.float64</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.migrate._orbitals.BasisSet.get_effective_nuclear_charges" title="Link to this definition"></a></dt>
+<dd><p>Get nuclear charges adjusted for ECP core electrons.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Effective nuclear charge for each atom</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)">numpy.ndarray</a></p>
+</dd>
+<dt class="field-odd">Raises<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If no structure is associated with this basis set</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">charges</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_effective_nuclear_charges</span><span class="p">()</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -904,7 +961,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">name</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Using basis set: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using basis set: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -923,7 +980,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_basis</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total atomic orbitals: </span><span class="si">{</span><span class="n">n_basis</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total atomic orbitals: </span><span class="si">{</span><span class="n">n_basis</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -945,7 +1002,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_funcs</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_atomic_orbitals_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has </span><span class="si">{</span><span class="n">n_funcs</span><span class="si">}</span><span class="s2"> atomic orbitals&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom 0 has </span><span class="si">{</span><span class="n">n_funcs</span><span class="si">}</span><span class="s2"> atomic orbitals"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -967,7 +1024,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_p_funcs</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_atomic_orbitals_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total P-type atomic orbitals: </span><span class="si">{</span><span class="n">n_p_funcs</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total P-type atomic orbitals: </span><span class="si">{</span><span class="n">n_p_funcs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -986,7 +1043,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_atoms</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atoms with atomic orbitals: </span><span class="si">{</span><span class="n">n_atoms</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atoms with atomic orbitals: </span><span class="si">{</span><span class="n">n_atoms</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1005,7 +1062,7 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_ecp_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_ecp_shells</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total ECP shells: </span><span class="si">{</span><span class="n">n_ecp_shells</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total ECP shells: </span><span class="si">{</span><span class="n">n_ecp_shells</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1033,7 +1090,7 @@ Default is Spherical</p></li>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># For d orbitals (l=2)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">n_sph</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_num_orbitals_for_l</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Spherical</span><span class="p">)</span>  <span class="c1"># 5</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">n_cart</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_num_orbitals_for_l</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Cartesian</span><span class="p">)</span>  <span class="c1"># 6</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;d orbitals: </span><span class="si">{</span><span class="n">n_sph</span><span class="si">}</span><span class="s2"> spherical, </span><span class="si">{</span><span class="n">n_cart</span><span class="si">}</span><span class="s2"> Cartesian&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"d orbitals: </span><span class="si">{</span><span class="n">n_sph</span><span class="si">}</span><span class="s2"> spherical, </span><span class="si">{</span><span class="n">n_cart</span><span class="si">}</span><span class="s2"> Cartesian"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1052,7 +1109,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">n_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_num_shells</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total shells: </span><span class="si">{</span><span class="n">n_shells</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total shells: </span><span class="si">{</span><span class="n">n_shells</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1077,7 +1134,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shell</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;First shell type: </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"First shell type: </span><span class="si">{</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1099,7 +1156,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shell_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell_indices_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has shells: </span><span class="si">{</span><span class="n">shell_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom 0 has shells: </span><span class="si">{</span><span class="n">shell_indices</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1124,7 +1181,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">p_shell_indices</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell_indices_for_atom_and_orbital_type</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;P-shells on atom 0: </span><span class="si">{</span><span class="n">p_shell_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"P-shells on atom 0: </span><span class="si">{</span><span class="n">p_shell_indices</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1146,7 +1203,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">p_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shell_indices_for_orbital_type</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;P-shell indices: </span><span class="si">{</span><span class="n">p_shells</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"P-shell indices: </span><span class="si">{</span><span class="n">p_shells</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1165,7 +1222,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shells</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total shells: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total shells: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">shells</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1187,7 +1244,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">atom_shells</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_shells_for_atom</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Atom 0 has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">atom_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom 0 has </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">atom_shells</span><span class="p">)</span><span class="si">}</span><span class="s2"> shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1209,7 +1266,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_structure</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of atoms: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Number of atoms: </span><span class="si">{</span><span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1268,8 +1325,8 @@ Default is Spherical</p></li>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">elements</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_supported_elements_for_basis_set</span><span class="p">(</span><span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;STO-3G supports: </span><span class="si">{</span><span class="p">[</span><span class="n">elem</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">elem</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">elements</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">elements</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">get_supported_elements_for_basis_set</span><span class="p">(</span><span class="s2">"sto-3g"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"STO-3G supports: </span><span class="si">{</span><span class="p">[</span><span class="n">elem</span><span class="o">.</span><span class="n">name</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">elem</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">elements</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1289,7 +1346,7 @@ Default is Spherical</p></li>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">has_ecp_electrons</span><span class="p">():</span>
 <span class="gp">... </span>    <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;ECP electrons per atom: </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"ECP electrons per atom: </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1308,7 +1365,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">has_ecp_shells</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;This basis set includes ECP shells&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">"This basis set includes ECP shells"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1329,7 +1386,7 @@ Default is Spherical</p></li>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">has_structure</span><span class="p">():</span>
 <span class="gp">... </span>    <span class="n">structure</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_structure</span><span class="p">()</span>
 <span class="gp">... </span><span class="k">else</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No structure associated with basis set&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">"No structure associated with basis set"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1354,7 +1411,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbital_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">l_to_orbital_type</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;l=2 corresponds to orbital type: </span><span class="si">{</span><span class="n">orbital_type</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># D</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"l=2 corresponds to orbital type: </span><span class="si">{</span><span class="n">orbital_type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># D</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1376,7 +1433,7 @@ Default is Spherical</p></li>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbital_str</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">orbital_type_to_string</span><span class="p">(</span><span class="n">OrbitalType</span><span class="o">.</span><span class="n">P</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital type: </span><span class="si">{</span><span class="n">orbital_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># Prints &quot;P&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Orbital type: </span><span class="si">{</span><span class="n">orbital_str</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># Prints "P"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1400,7 +1457,7 @@ Default is Spherical</p></li>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">atomic_orbital_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_atomic_orbital_type</span><span class="p">(</span><span class="s2">&quot;Cartesian&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">atomic_orbital_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_atomic_orbital_type</span><span class="p">(</span><span class="s2">"Cartesian"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">atomic_orbital_type</span><span class="p">)</span>  <span class="c1"># AOType.Cartesian</span>
 </pre></div>
 </div>
@@ -1425,7 +1482,7 @@ Default is Spherical</p></li>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbital_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s2">&quot;P&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">orbital_type</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="o">.</span><span class="n">string_to_orbital_type</span><span class="p">(</span><span class="s2">"P"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">orbital_type</span><span class="p">)</span>  <span class="c1"># OrbitalType.P</span>
 </pre></div>
 </div>
@@ -1450,10 +1507,10 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;cc-pvdz.basis_set.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.json"</span><span class="p">,</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"cc-pvdz.basis_set.h5"</span><span class="p">,</span> <span class="s2">"hdf5"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.json&quot;</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.json"</span><span class="p">),</span> <span class="s2">"json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1478,10 +1535,10 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.h5&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;cc-pvdz.basis_set.hdf5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.h5"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">"cc-pvdz.basis_set.hdf5"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.h5&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.h5"</span><span class="p">))</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1529,8 +1586,8 @@ Must have ‘.basis_set’ before the file extension (e.g., <code class="docutil
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;sto-3g.basis_set.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;my_basis.basis_set.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"sto-3g.basis_set.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">basis_set</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"my_basis.basis_set.json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>

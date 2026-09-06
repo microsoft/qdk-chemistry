@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.utils.pauli_matrix &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.utils.pauli_matrix &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.utils.pauli_matrix</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Pure-Python Pauli matrix utilities.</span>
+<span></span><span class="sd">"""Pure-Python Pauli matrix utilities.</span>
 
 <span class="sd">Provides the same functionality as the C++ pybind11 ``pauli_matrix`` module</span>
 <span class="sd">using only NumPy (and SciPy for sparse output), preserving the original</span>
@@ -103,7 +104,7 @@
 
 <span class="sd">All functions use Little-Endian label convention: ``label[0]`` corresponds to</span>
 <span class="sd">qubit *n*-1 (MSB).</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -116,16 +117,16 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">scipy.sparse</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;pauli_string_to_masks&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;pauli_to_dense_matrix&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;pauli_to_sparse_matrix&quot;</span><span class="p">,</span>
+    <span class="s2">"pauli_string_to_masks"</span><span class="p">,</span>
+    <span class="s2">"pauli_to_dense_matrix"</span><span class="p">,</span>
+    <span class="s2">"pauli_to_sparse_matrix"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
 <div class="viewcode-block" id="pauli_string_to_masks">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_string_to_masks">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">pauli_string_to_masks</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">complex</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decompose a Pauli label string into bitmasks and phase factor.</span>
+<span class="w">    </span><span class="sd">"""Decompose a Pauli label string into bitmasks and phase factor.</span>
 
 <span class="sd">    X sets a bit in *x_mask*, Z sets a bit in *z_mask*, Y sets both.</span>
 <span class="sd">    The cumulative phase factor ``(i)^(number of Y operators)`` is also</span>
@@ -138,18 +139,18 @@
 <span class="sd">        ``(x_mask, z_mask, y_phase)`` where *x_mask* and *z_mask* are</span>
 <span class="sd">        integers and *y_phase* is a complex number.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">)</span>
     <span class="n">x_mask</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">z_mask</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="n">y_count</span> <span class="o">=</span> <span class="mi">0</span>
     <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">):</span>
         <span class="n">bit</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">i</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="s2">&quot;XY&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="s2">"XY"</span><span class="p">:</span>
             <span class="n">x_mask</span> <span class="o">|=</span> <span class="n">bit</span>
-        <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="s2">&quot;ZY&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="s2">"ZY"</span><span class="p">:</span>
             <span class="n">z_mask</span> <span class="o">|=</span> <span class="n">bit</span>
-        <span class="k">if</span> <span class="n">ch</span> <span class="o">==</span> <span class="s2">&quot;Y&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">ch</span> <span class="o">==</span> <span class="s2">"Y"</span><span class="p">:</span>
             <span class="n">y_count</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">x_mask</span><span class="p">,</span> <span class="n">z_mask</span><span class="p">,</span> <span class="mi">1</span><span class="n">j</span> <span class="o">**</span> <span class="p">(</span><span class="n">y_count</span> <span class="o">&amp;</span> <span class="mi">3</span><span class="p">)</span></div>
 
@@ -161,7 +162,7 @@
     <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">coefficients</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build a dense Hamiltonian matrix from Pauli strings and coefficients.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Build a dense Hamiltonian matrix from Pauli strings and coefficients.</span>
 
 <span class="sd">    Computes :math:`H = \sum_t \mathrm{coeff}[t] \cdot P_t` where each</span>
 <span class="sd">    :math:`P_t` is a Pauli string in Little-Endian convention.</span>
@@ -173,7 +174,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        Dense complex matrix of shape ``(2**n, 2**n)``.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">n</span>
@@ -207,7 +208,7 @@
     <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">coefficients</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csr_matrix</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build a sparse CSR Hamiltonian matrix from Pauli strings and coefficients.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Build a sparse CSR Hamiltonian matrix from Pauli strings and coefficients.</span>
 
 <span class="sd">    Computes :math:`H = \sum_t \mathrm{coeff}[t] \cdot P_t` and returns the</span>
 <span class="sd">    result as a :class:`scipy.sparse.csr_matrix`.</span>
@@ -222,7 +223,7 @@
 <span class="sd">    Raises:</span>
 <span class="sd">        RuntimeError: If the matrix dimensions exceed int32 index limits.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
     <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">n</span>
@@ -242,7 +243,7 @@
     <span class="n">total_nnz</span> <span class="o">=</span> <span class="n">nnz_per_row</span> <span class="o">*</span> <span class="n">dim</span>
 
     <span class="k">if</span> <span class="n">dim</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">max</span> <span class="ow">or</span> <span class="n">total_nnz</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Matrix too large for int32 CSR indices in pauli_to_sparse_matrix.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Matrix too large for int32 CSR indices in pauli_to_sparse_matrix."</span><span class="p">)</span>
 
     <span class="c1"># Group terms by their x_mask</span>
     <span class="n">xm_to_idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">xm</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">xm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">unique_xm</span><span class="p">)}</span>

@@ -1,0 +1,8 @@
+qdk\_chemistry.data.\_type\_name module
+=======================================
+
+.. automodule:: qdk_chemistry.data._type_name
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

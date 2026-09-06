@@ -1,0 +1,25 @@
+qdk\_chemistry.ui package
+=========================
+
+.. automodule:: qdk_chemistry.ui
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.ui._mcp
+   qdk_chemistry.ui.cli
+   qdk_chemistry.ui.config
+   qdk_chemistry.ui.io
+   qdk_chemistry.ui.mcp
+   qdk_chemistry.ui.plugin_installer
+   qdk_chemistry.ui.tools
+   qdk_chemistry.ui.validation
+   qdk_chemistry.ui.visualization
+   qdk_chemistry.ui.workspace

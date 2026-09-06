@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.symmetry &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.data.symmetry &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.data.symmetry</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Single-particle symmetry types and symmetry-blocked storage primitives.</span>
+<span></span><span class="sd">"""Single-particle symmetry types and symmetry-blocked storage primitives.</span>
 
 <span class="sd">This module exposes the single-particle symmetry types used to block</span>
 <span class="sd">quantum-chemistry tensors (orbital coefficients, energies, integrals, reduced</span>
@@ -128,12 +129,14 @@
 
 <span class="sd">Errors are surfaced as standard Python exceptions mapped from the underlying</span>
 <span class="sd">C++ standard-library exceptions.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">AxisName</span><span class="p">,</span>
@@ -158,30 +161,27 @@
 <span class="p">)</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;AxisName&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SpinValue&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryAxis&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryAxisValue&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedIndexSet&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedScalarCount&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedSparseMapRank4&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank1&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank1Complex&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank2&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank2Complex&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank3&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank3Complex&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank4&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryBlockedTensorRank4Complex&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryLabel&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SymmetryProduct&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;axes&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;axis_name_to_string&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;spin_index_set&quot;</span><span class="p">,</span>
+    <span class="s2">"AxisName"</span><span class="p">,</span>
+    <span class="s2">"SpinValue"</span><span class="p">,</span>
+    <span class="s2">"SymmetryAxis"</span><span class="p">,</span>
+    <span class="s2">"SymmetryAxisValue"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedIndexSet"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedScalarCount"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedSparseMapRank4"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank1"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank1Complex"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank2"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank2Complex"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank3"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank3Complex"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank4"</span><span class="p">,</span>
+    <span class="s2">"SymmetryBlockedTensorRank4Complex"</span><span class="p">,</span>
+    <span class="s2">"SymmetryLabel"</span><span class="p">,</span>
+    <span class="s2">"SymmetryProduct"</span><span class="p">,</span>
+    <span class="s2">"axes"</span><span class="p">,</span>
+    <span class="s2">"axis_name_to_string"</span><span class="p">,</span>
+    <span class="s2">"spin_index_set"</span><span class="p">,</span>
 <span class="p">]</span>
-
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
 
 
 <div class="viewcode-block" id="spin_index_set">
@@ -193,7 +193,7 @@
     <span class="o">*</span><span class="p">,</span>
     <span class="n">equivalent</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SymmetryBlockedIndexSet</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a spin-resolved SymmetryBlockedIndexSet from alpha/beta index lists.</span>
+<span class="w">    </span><span class="sd">"""Build a spin-resolved SymmetryBlockedIndexSet from alpha/beta index lists.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        num_modes: Universe size (total number of orbitals per spin channel).</span>
@@ -204,7 +204,7 @@
 <span class="sd">    Returns:</span>
 <span class="sd">        A SymmetryBlockedIndexSet carrying the spin symmetry and per-channel indices.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">sym</span> <span class="o">=</span> <span class="n">SymmetryProduct</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">spin</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">equivalent</span><span class="p">)])</span>
     <span class="n">alpha_label</span> <span class="o">=</span> <span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()])</span>
     <span class="n">beta_label</span> <span class="o">=</span> <span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">()])</span>

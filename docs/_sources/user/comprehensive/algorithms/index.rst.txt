@@ -28,6 +28,8 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    amplitude_amplification
    evolution_circuit_builder
    hamiltonian_unitary_builder
+   propagator
+   hamiltonian_simulation
    circuit_mapper
    circuit_executor
 
@@ -95,6 +97,12 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
      - Hamiltonian simulation unitaries
      - QubitOperator → UnitaryRepresentation
+   * - :doc:`Propagator <propagator>`
+     - Effective Hamiltonians for time-dependent evolution
+     - TimeDependentQubitHamiltonian → QubitOperator
+   * - :doc:`HamiltonianSimulation <hamiltonian_simulation>`
+     - Time-dependent Hamiltonian simulation
+     - TimeDependentQubitHamiltonian + Observables + Circuit → (EnergyExpectationResult, MeasurementData) list
    * - :doc:`ControlledCircuitMapper <circuit_mapper>`
      - Controlled-unitary circuit synthesis
      - UnitaryRepresentation → Circuit
@@ -111,7 +119,7 @@ Term grouper
 The ``term_grouper`` algorithm type partitions the Pauli terms of a :class:`~qdk_chemistry.data.QubitOperator` into algorithm-relevant subsets and stores the result on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
 A grouper consumes a ``QubitOperator`` and returns a *new* ``QubitOperator`` whose ``term_partition`` field is populated; the input is not mutated.
 
-Strategies include full commutation grouping, qubit-wise commutation grouping, and trivial (identity) grouping.
+Strategies include full commutation grouping, qubit-wise commutation grouping, vacuum-annihilating grouping, and trivial (identity) grouping.
 Use ``registry.available("term_grouper")`` to list implementations.
 
 Example::

@@ -1,0 +1,8 @@
+qdk\_chemistry.remote.backends.local module
+===========================================
+
+.. automodule:: qdk_chemistry.remote.backends.local
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

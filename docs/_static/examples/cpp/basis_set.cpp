@@ -71,6 +71,11 @@ int main() {
   size_t num_atomic_orbitals = basis_set.get_num_atomic_orbitals();
   size_t num_atoms = basis_set.get_num_atoms();
 
+  // Get ECP-adjusted nuclear properties
+  Eigen::VectorXd effective_charges = basis_set.get_effective_nuclear_charges();
+  double effective_nuclear_repulsion =
+      basis_set.calculate_effective_nuclear_repulsion_energy();
+
   // Get atomic orbital information (returns std::pair<size_t, int>)
   auto [shell_index, m_quantum_number] = basis_set.get_atomic_orbital_info(2);
   size_t atom_index = basis_set.get_atom_index_for_atomic_orbital(2);

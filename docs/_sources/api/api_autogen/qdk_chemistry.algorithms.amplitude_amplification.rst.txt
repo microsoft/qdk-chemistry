@@ -1,8 +1,17 @@
-qdk\_chemistry.algorithms.amplitude\_amplification module
-=========================================================
+qdk\_chemistry.algorithms.amplitude\_amplification package
+==========================================================
 
 .. automodule:: qdk_chemistry.algorithms.amplitude_amplification
    :members:
    :private-members:
    :show-inheritance:
    :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification
+   qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace

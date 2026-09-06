@@ -24,3 +24,4 @@ Submodules
    qdk_chemistry.algorithms.phase_estimation.base
    qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation
    qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation
+   qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation

@@ -1,0 +1,1006 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.remote.serialization &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.remote.serialization</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.remote.serialization</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""File-based serialization for remote execution of QDK/Chemistry.</span>
+
+<span class="sd">This module provides serialization for all QDK Chemistry data classes,</span>
+<span class="sd">enabling efficient transfer of algorithm inputs and outputs between local</span>
+<span class="sd">and remote systems. Each DataClass object is serialized to its own HDF5 file.</span>
+<span class="sd">"""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">suppress</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Type</span>  <span class="c1"># noqa: UP035</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span> <span class="k">as</span> <span class="n">CoreDataClass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">Settings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_item_content_hash</span><span class="p">,</span> <span class="n">_numpy_scalar_to_python</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._type_name</span><span class="w"> </span><span class="kn">import</span> <span class="n">instance_data_type_name</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.registry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">available_dataclasses</span><span class="p">,</span>
+    <span class="n">get_dataclass_type</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.registry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">register_dataclass</span> <span class="k">as</span> <span class="n">_register_dataclass</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">CacheBackend</span><span class="p">,</span> <span class="n">is_cacheable</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"FileSerializer"</span><span class="p">,</span>
+    <span class="s2">"deserialize_inputs"</span><span class="p">,</span>
+    <span class="s2">"deserialize_outputs"</span><span class="p">,</span>
+    <span class="s2">"get_input_files"</span><span class="p">,</span>
+    <span class="s2">"get_output_files"</span><span class="p">,</span>
+    <span class="s2">"get_serialized_file_names"</span><span class="p">,</span>
+    <span class="s2">"serialize_inputs"</span><span class="p">,</span>
+    <span class="s2">"serialize_outputs"</span><span class="p">,</span>
+<span class="p">]</span>
+
+<span class="n">_MANIFEST_FILENAME</span> <span class="o">=</span> <span class="s2">"manifest.json"</span>
+<span class="n">_MANIFEST_VERSION</span> <span class="o">=</span> <span class="mi">1</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_load_manifest</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Load a manifest and validate its schema version."""</span>
+    <span class="k">with</span> <span class="n">path</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+        <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+
+    <span class="n">version</span> <span class="o">=</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"version"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span> <span class="ow">or</span> <span class="n">version</span> <span class="o">!=</span> <span class="n">_MANIFEST_VERSION</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unsupported manifest version </span><span class="si">{</span><span class="n">version</span><span class="si">!r}</span><span class="s2">; expected </span><span class="si">{</span><span class="n">_MANIFEST_VERSION</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">manifest</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_atomic_write_json</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Write JSON to *path* atomically via a sibling temporary file."""</span>
+    <span class="n">temporary_path</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">NamedTemporaryFile</span><span class="p">(</span>
+            <span class="n">mode</span><span class="o">=</span><span class="s2">"w"</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">,</span>
+            <span class="nb">dir</span><span class="o">=</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span>
+            <span class="n">suffix</span><span class="o">=</span><span class="s2">".tmp"</span><span class="p">,</span>
+            <span class="n">delete</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">temporary_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">file</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">json</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">file</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">temporary_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Temporary serialization file was not created"</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">temporary_path</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">temporary_path</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">temporary_path</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">raise</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_atomic_write_dataclass</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">CoreDataClass</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Write a data class atomically unless its content-addressed file already exists."""</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Serialization file path is not a file: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="n">file_descriptor</span><span class="p">,</span> <span class="n">temporary_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="sa">f</span><span class="s2">".</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">.h5"</span><span class="p">)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">file_descriptor</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">value</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">temporary_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Serialization file path is not a file: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">temporary_path</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">temporary_path</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_atomic_write_array</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Write a NumPy array atomically unless its content-addressed file already exists."""</span>
+    <span class="k">if</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">hasobject</span> <span class="ow">or</span> <span class="n">value</span><span class="o">.</span><span class="n">dtype</span><span class="o">.</span><span class="n">fields</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Cannot serialize NumPy arrays with object or structured dtype"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">return</span>
+    <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Serialization file path is not a file: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="n">file_descriptor</span><span class="p">,</span> <span class="n">temporary_path</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="n">path</span><span class="o">.</span><span class="n">parent</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">".ndarray.npy"</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">file_descriptor</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">FileExistsError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Serialization file path is not a file: </span><span class="si">{</span><span class="n">path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">temporary_path</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">Path</span><span class="p">(</span><span class="n">temporary_path</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_manifest_file_path</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Resolve a manifest file name while enforcing serialization-directory containment."""</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">filename</span> <span class="ow">or</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">"</span> <span class="ow">in</span> <span class="n">filename</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Invalid serialization file name in manifest: </span><span class="si">{</span><span class="n">filename</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="n">resolved_directory</span> <span class="o">=</span> <span class="n">directory</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="n">filepath</span> <span class="o">=</span> <span class="p">(</span><span class="n">resolved_directory</span> <span class="o">/</span> <span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">filepath</span><span class="o">.</span><span class="n">is_relative_to</span><span class="p">(</span><span class="n">resolved_directory</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Manifest file path resolves outside the serialization directory: </span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">filepath</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_commit_staged_serialization</span><span class="p">(</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">staging_directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">manifest</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">filenames</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Commit staged artifacts before atomically replacing the live manifest."""</span>
+    <span class="n">staged_manifest_path</span> <span class="o">=</span> <span class="n">staging_directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span>
+    <span class="n">_atomic_write_json</span><span class="p">(</span><span class="n">staged_manifest_path</span><span class="p">,</span> <span class="n">manifest</span><span class="p">)</span>
+
+    <span class="n">committed_files</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">new_files</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">filenames</span><span class="p">):</span>
+            <span class="n">staged_path</span> <span class="o">=</span> <span class="n">_manifest_file_path</span><span class="p">(</span><span class="n">staging_directory</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">staged_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Staged serialization file does not exist: </span><span class="si">{</span><span class="n">staged_path</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">committed_path</span> <span class="o">=</span> <span class="n">_manifest_file_path</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+            <span class="n">existed</span> <span class="o">=</span> <span class="n">committed_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">staged_path</span><span class="p">,</span> <span class="n">committed_path</span><span class="p">)</span>
+            <span class="n">committed_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">committed_path</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">existed</span><span class="p">:</span>
+                <span class="n">new_files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">committed_path</span><span class="p">)</span>
+
+        <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">staged_manifest_path</span><span class="p">,</span> <span class="n">manifest_path</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">new_file</span> <span class="ow">in</span> <span class="n">new_files</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">suppress</span><span class="p">(</span><span class="ne">OSError</span><span class="p">):</span>
+                <span class="n">new_file</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
+        <span class="k">raise</span>
+
+    <span class="k">return</span> <span class="p">[</span><span class="n">manifest_path</span><span class="p">,</span> <span class="o">*</span><span class="n">committed_files</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_jsonable_settings_value</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">setting_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Convert a settings value to the tagged JSON form understood by Settings."""</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">PathLike</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">os</span><span class="o">.</span><span class="n">fspath</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AlgorithmRef</span><span class="p">):</span>
+        <span class="n">settings</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">settings</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"__type__"</span><span class="p">:</span> <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">algorithm_type</span><span class="p">,</span>
+            <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">algorithm_name</span><span class="p">,</span>
+            <span class="s2">"settings"</span><span class="p">:</span> <span class="n">_jsonable_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span> <span class="k">if</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">key</span><span class="p">):</span> <span class="n">_jsonable_settings_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="n">empty_array_element_types</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"vector&lt;int64_t&gt;"</span><span class="p">:</span> <span class="s2">"int64"</span><span class="p">,</span>
+            <span class="s2">"vector&lt;double&gt;"</span><span class="p">:</span> <span class="s2">"double"</span><span class="p">,</span>
+            <span class="s2">"vector&lt;string&gt;"</span><span class="p">:</span> <span class="s2">"string"</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span> <span class="ow">and</span> <span class="n">setting_type</span> <span class="ow">in</span> <span class="n">empty_array_element_types</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="s2">"__type__"</span><span class="p">:</span> <span class="s2">"array"</span><span class="p">,</span>
+                <span class="s2">"__element_type__"</span><span class="p">:</span> <span class="n">empty_array_element_types</span><span class="p">[</span><span class="n">setting_type</span><span class="p">],</span>
+                <span class="s2">"__value__"</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="p">}</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">_jsonable_settings_value</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">value</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">value</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_jsonable_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">:</span> <span class="n">Settings</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Serialize setting values without relying on native nested-ref JSON support."""</span>
+    <span class="n">setting_keys</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+    <span class="k">return</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">_jsonable_settings_value</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="n">key</span><span class="p">))</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">setting_keys</span><span class="p">}</span>
+
+
+<div class="viewcode-block" id="FileSerializer">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FileSerializer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Handles file-based serialization of QDK Chemistry objects for remote transport.</span>
+
+<span class="sd">    Supported values are QDK Chemistry data classes, ``AlgorithmRef`` objects,</span>
+<span class="sd">    NumPy arrays and scalars, Python primitives, and lists or tuples recursively</span>
+<span class="sd">    containing supported values. Dictionaries are protocol structure rather than</span>
+<span class="sd">    serializable values. Nested algorithm references remain supported through</span>
+<span class="sd">    their tagged settings representation.</span>
+
+<span class="sd">    Each data class is serialized to its own .{type_name}.h5 file, and each</span>
+<span class="sd">    NumPy array to its own .ndarray.npy file. Primitives and simple types are</span>
+<span class="sd">    stored in a JSON manifest file.</span>
+
+<span class="sd">    Directory structure for inputs::</span>
+
+<span class="sd">        job_dir/</span>
+<span class="sd">            manifest.json          # Metadata and primitive values</span>
+<span class="sd">            &lt;content_hash&gt;.structure.h5</span>
+<span class="sd">            &lt;content_hash&gt;.basis_set.h5</span>
+<span class="sd">            ...</span>
+
+<span class="sd">    Directory structure for outputs::</span>
+
+<span class="sd">        job_dir/</span>
+<span class="sd">            manifest.json          # Metadata</span>
+<span class="sd">            &lt;content_hash&gt;.wavefunction.h5</span>
+<span class="sd">            &lt;content_hash&gt;.ndarray.npy</span>
+<span class="sd">            ...</span>
+
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="FileSerializer.register_dataclass">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.register_dataclass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register_dataclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">dataclass_type</span><span class="p">:</span> <span class="n">Type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">:</span>  <span class="c1"># noqa: UP006</span>
+<span class="w">        </span><span class="sd">"""Register a DataClass subclass for deserialization.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dataclass_type: A DataClass loader with a static data type name.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The registered class (allows use as decorator).</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">_register_dataclass</span><span class="p">(</span><span class="n">dataclass_type</span><span class="p">)</span></div>
+
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_dataclass_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Type</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: UP006</span>
+<span class="w">        </span><span class="sd">"""Get the DataClass type for a type name, with lazy loading."""</span>
+        <span class="k">return</span> <span class="n">get_dataclass_type</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_lazy_load_dataclasses</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Discover and register imported DataClass types."""</span>
+        <span class="n">available_dataclasses</span><span class="p">()</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_dataclass_extension</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Get the required file extension for a DataClass type.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            type_name: The wire-format identifier of the DataClass.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The extension pattern (e.g., ".structure.h5").</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">".</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">.h5"</span>
+
+<div class="viewcode-block" id="FileSerializer.is_dataclass">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.is_dataclass">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_dataclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Check if a value is a QDK Chemistry DataClass."""</span>
+        <span class="k">return</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">CoreDataClass</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FileSerializer.is_cacheable">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.is_cacheable">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">is_cacheable</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Check if a value can be stored in a shared cache."""</span>
+        <span class="k">return</span> <span class="n">is_cacheable</span><span class="p">(</span><span class="n">value</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FileSerializer.serialize_value">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.serialize_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">serialize_value</span><span class="p">(</span>  <span class="c1"># noqa: PLR0911</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">cache</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">seed_cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Serialize a single value, returning manifest entry.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            directory: Directory to write files to.</span>
+<span class="sd">            name: Logical name used to derive opaque DataClass file names while traversing nested values.</span>
+<span class="sd">            value: Value to serialize.</span>
+<span class="sd">            cache: Shared cache backend used to replace existing blobs with ``"cached"`` manifest references.</span>
+<span class="sd">            content_hash: Optional hash used to check whether *value* is cached.</span>
+<span class="sd">            seed_cache: Whether to write a cacheable value to shared storage before emitting a reference.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Manifest entry describing the serialized value.</span>
+
+<span class="sd">        """</span>
+        <span class="c1"># Handle None</span>
+        <span class="k">if</span> <span class="n">value</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"none"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">generic</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">_numpy_scalar_to_python</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">AlgorithmRef</span><span class="p">):</span>
+            <span class="n">settings</span> <span class="o">=</span> <span class="n">value</span><span class="o">.</span><span class="n">settings</span>
+            <span class="k">return</span> <span class="p">{</span>
+                <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+                <span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">algorithm_type</span><span class="p">,</span>
+                <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">algorithm_name</span><span class="p">,</span>
+                <span class="s2">"settings"</span><span class="p">:</span> <span class="n">_jsonable_settings</span><span class="p">(</span><span class="n">settings</span><span class="p">)</span> <span class="k">if</span> <span class="n">settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="p">}</span>
+
+        <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="ow">and</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">cache</span><span class="o">.</span><span class="n">is_shared</span><span class="p">:</span>
+            <span class="n">cached</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">has_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">shared_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">cached</span> <span class="ow">and</span> <span class="n">seed_cache</span><span class="p">:</span>
+                <span class="n">cache</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">shared_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">cached</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">has_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">shared_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cached</span><span class="p">:</span>
+                <span class="n">cached_type</span> <span class="o">=</span> <span class="p">(</span>
+                    <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">is_dataclass</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="s2">"ndarray"</span>
+                    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span>
+                    <span class="k">else</span> <span class="s2">"list"</span>
+                <span class="p">)</span>
+                <span class="k">return</span> <span class="p">{</span>
+                    <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"cached"</span><span class="p">,</span>
+                    <span class="s2">"dataclass_type"</span><span class="p">:</span> <span class="n">cached_type</span><span class="p">,</span>
+                    <span class="s2">"content_hash"</span><span class="p">:</span> <span class="n">content_hash</span><span class="p">,</span>
+                <span class="p">}</span>
+
+        <span class="c1"># Handle DataClass objects - serialize to individual file</span>
+        <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">is_dataclass</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+            <span class="n">type_name</span> <span class="o">=</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+            <span class="n">ext</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_get_dataclass_extension</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}{</span><span class="n">ext</span><span class="si">}</span><span class="s2">"</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">filename</span>
+            <span class="n">_atomic_write_dataclass</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">type_name</span><span class="p">)</span>
+            <span class="n">entry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"dataclass"</span><span class="p">,</span>
+                <span class="s2">"dataclass_type"</span><span class="p">:</span> <span class="n">type_name</span><span class="p">,</span>
+                <span class="s2">"file"</span><span class="p">:</span> <span class="n">filename</span><span class="p">,</span>
+            <span class="p">}</span>
+            <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"content_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_hash</span>
+            <span class="k">return</span> <span class="n">entry</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2">.ndarray.npy"</span>
+            <span class="n">_atomic_write_array</span><span class="p">(</span><span class="n">directory</span> <span class="o">/</span> <span class="n">filename</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"ndarray"</span><span class="p">,</span> <span class="s2">"file"</span><span class="p">:</span> <span class="n">filename</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"content_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_hash</span>
+            <span class="k">return</span> <span class="n">entry</span>
+
+        <span class="c1"># Handle primitives</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">bool</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="n">value</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"int"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="n">value</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"float"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="n">value</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"str"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="n">value</span><span class="p">}</span>
+
+        <span class="c1"># Handle lists</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="bp">cls</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                        <span class="n">directory</span><span class="p">,</span>
+                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_item_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+                        <span class="n">item</span><span class="p">,</span>
+                        <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+                        <span class="n">content_hash</span><span class="o">=</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">seed_cache</span><span class="o">=</span><span class="n">seed_cache</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"list"</span><span class="p">,</span> <span class="s2">"items"</span><span class="p">:</span> <span class="n">items</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"content_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_hash</span>
+            <span class="k">return</span> <span class="n">entry</span>
+
+        <span class="c1"># Handle tuples</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+                <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="bp">cls</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                        <span class="n">directory</span><span class="p">,</span>
+                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">_item_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+                        <span class="n">item</span><span class="p">,</span>
+                        <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+                        <span class="n">content_hash</span><span class="o">=</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">if</span> <span class="bp">cls</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                        <span class="n">seed_cache</span><span class="o">=</span><span class="n">seed_cache</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"tuple"</span><span class="p">,</span> <span class="s2">"items"</span><span class="p">:</span> <span class="n">items</span><span class="p">}</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                <span class="s2">"Dictionary values are not supported by remote serialization; "</span>
+                <span class="s2">"use keyword arguments, algorithm settings, or a QDK Chemistry data class"</span>
+            <span class="p">)</span>
+
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot serialize object of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="FileSerializer.deserialize_value">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.deserialize_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">deserialize_value</span><span class="p">(</span>  <span class="c1"># noqa: PLR0911</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
+        <span class="n">entry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">cache</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Deserialize a value from a manifest entry.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            directory: Directory containing the files.</span>
+<span class="sd">            entry: Manifest entry describing the value.</span>
+<span class="sd">            cache: Optional cache backend used to resolve ``"cached"`` entries omitted from uploaded files.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The deserialized value.</span>
+
+<span class="sd">        """</span>
+        <span class="n">type_tag</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"none"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"algorithm_ref"</span><span class="p">:</span>
+            <span class="n">serialized_settings</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span>
+            <span class="n">settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">serialized_settings</span><span class="p">))</span> <span class="k">if</span> <span class="n">serialized_settings</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="k">return</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"algorithm_type"</span><span class="p">],</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"algorithm_name"</span><span class="p">],</span>
+                <span class="n">settings</span><span class="o">=</span><span class="n">settings</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"cached"</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"Manifest contains a 'cached' entry but no cache backend was provided to resolve it"</span><span class="p">)</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"content_hash"</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">LookupError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Cache miss for content_hash=</span><span class="si">{</span><span class="n">entry</span><span class="p">[</span><span class="s1">'content_hash'</span><span class="p">]</span><span class="si">!r}</span><span class="s2"> (type=</span><span class="si">{</span><span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'dataclass_type'</span><span class="p">,</span><span class="w"> </span><span class="s1">'?'</span><span class="p">)</span><span class="si">}</span><span class="s2">)"</span>
+                <span class="p">)</span>
+            <span class="k">return</span> <span class="n">data</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"dataclass"</span><span class="p">,</span> <span class="s2">"ndarray"</span><span class="p">,</span> <span class="s2">"list"</span><span class="p">):</span>
+            <span class="n">content_hash</span> <span class="o">=</span> <span class="n">entry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"content_hash"</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">content_hash</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">data</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"dataclass"</span><span class="p">:</span>
+            <span class="n">dataclass_type_name</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"dataclass_type"</span><span class="p">]</span>
+            <span class="n">dataclass_type</span> <span class="o">=</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_get_dataclass_type</span><span class="p">(</span><span class="n">dataclass_type_name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">dataclass_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown DataClass type: </span><span class="si">{</span><span class="n">dataclass_type_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">_manifest_file_path</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"file"</span><span class="p">])</span>
+            <span class="c1"># All QDK Chemistry DataClass types have from_hdf5_file</span>
+            <span class="k">return</span> <span class="n">dataclass_type</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">filepath</span><span class="p">))</span>  <span class="c1"># type: ignore[attr-defined]</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"ndarray"</span><span class="p">:</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">_manifest_file_path</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"file"</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"bool"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"int"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"float"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"str"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">str</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"list"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_value</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"items"</span><span class="p">]]</span>
+
+        <span class="k">if</span> <span class="n">type_tag</span> <span class="o">==</span> <span class="s2">"tuple"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">deserialize_value</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">item</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"items"</span><span class="p">])</span>
+
+        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown type tag: </span><span class="si">{</span><span class="n">type_tag</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="get_serialized_file_names">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.get_serialized_file_names">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_serialized_file_names</span><span class="p">(</span><span class="n">entry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return every file referenced by a serialized manifest entry.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        entry: Serialized value entry from an input or output manifest.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Artifact file names in manifest order; primitive and cached entries contribute no names.</span>
+
+<span class="sd">    """</span>
+    <span class="n">type_tag</span> <span class="o">=</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">type_tag</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"dataclass"</span><span class="p">,</span> <span class="s2">"ndarray"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">entry</span><span class="p">[</span><span class="s2">"file"</span><span class="p">]]</span>
+
+    <span class="k">if</span> <span class="n">type_tag</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"list"</span><span class="p">,</span> <span class="s2">"tuple"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">filename</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">[</span><span class="s2">"items"</span><span class="p">]</span> <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">get_serialized_file_names</span><span class="p">(</span><span class="n">item</span><span class="p">)]</span>
+
+    <span class="k">if</span> <span class="n">type_tag</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"none"</span><span class="p">,</span> <span class="s2">"algorithm_ref"</span><span class="p">,</span> <span class="s2">"cached"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="s2">"float"</span><span class="p">,</span> <span class="s2">"str"</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown type tag: </span><span class="si">{</span><span class="n">type_tag</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_get_manifest_files</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">entries</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Return the manifest and each unique data file it references."""</span>
+    <span class="n">files</span> <span class="o">=</span> <span class="p">[</span><span class="n">directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span><span class="p">]</span>
+    <span class="n">seen</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">get_serialized_file_names</span><span class="p">(</span><span class="n">entry</span><span class="p">):</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="n">_manifest_file_path</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">filepath</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">filepath</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Manifest references a missing serialization file: </span><span class="si">{</span><span class="n">filepath</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">files</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">filepath</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">files</span>
+
+
+<div class="viewcode-block" id="serialize_inputs">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.serialize_inputs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">serialize_inputs</span><span class="p">(</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span>
+    <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">settings</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">job_cache_key</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">owner</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">input_hashes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force_rerun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">remote_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">remote_cache_backend</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">remote_cache_transport</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Serialize algorithm inputs to a directory of files.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        directory: Directory to write files to.</span>
+<span class="sd">        args: Positional arguments for the algorithm.</span>
+<span class="sd">        kwargs: Keyword arguments for the algorithm.</span>
+<span class="sd">        algorithm_type: Type of algorithm (e.g., "scf_solver").</span>
+<span class="sd">        algorithm_name: Name of algorithm implementation.</span>
+<span class="sd">        settings: Algorithm settings dictionary.</span>
+<span class="sd">        run_hash: Optional pre-computed algorithm run hash.</span>
+<span class="sd">        job_cache_key: Optional cache key for the remote job record.</span>
+<span class="sd">        owner: Optional workspace and project permitted to manage the job.</span>
+<span class="sd">        input_hashes: Optional dict mapping input names to their content hashes.</span>
+<span class="sd">        force_rerun: Whether the compute node must skip its cache lookup.</span>
+<span class="sd">        remote_cache: Optional coordinates passed to the remote cache factory, ``get_cache()``.</span>
+<span class="sd">        remote_cache_backend: Shared cache backend; existing cacheable values become ``"cached"`` manifest references.</span>
+<span class="sd">        remote_cache_transport: Whether to seed shared-cache misses and use the cache as artifact transport.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of all files created (for upload).</span>
+
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="n">directory</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Build manifest</span>
+    <span class="n">manifest</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"version"</span><span class="p">:</span> <span class="n">_MANIFEST_VERSION</span><span class="p">,</span>
+        <span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span>
+        <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">,</span>
+        <span class="s2">"settings"</span><span class="p">:</span> <span class="p">{},</span>
+        <span class="s2">"args"</span><span class="p">:</span> <span class="p">[],</span>
+        <span class="s2">"kwargs"</span><span class="p">:</span> <span class="p">{},</span>
+    <span class="p">}</span>
+    <span class="k">if</span> <span class="n">run_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"run_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">run_hash</span>
+    <span class="k">if</span> <span class="n">job_cache_key</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"job_cache_key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_cache_key</span>
+    <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"owner"</span><span class="p">]</span> <span class="o">=</span> <span class="n">owner</span>
+    <span class="k">if</span> <span class="n">input_hashes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"input_hashes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_hashes</span>
+    <span class="k">if</span> <span class="n">force_rerun</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"force_rerun"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">remote_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"remote_cache"</span><span class="p">]</span> <span class="o">=</span> <span class="n">remote_cache</span>
+    <span class="k">if</span> <span class="n">remote_cache_transport</span><span class="p">:</span>
+        <span class="n">manifest</span><span class="p">[</span><span class="s2">"remote_cache_transport"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="n">directory</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">".serialization-"</span><span class="p">)</span> <span class="k">as</span> <span class="n">staging_directory_name</span><span class="p">:</span>
+        <span class="n">staging_directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">staging_directory_name</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">serialization_name</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"setting_</span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+                <span class="k">if</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+                <span class="k">else</span> <span class="sa">f</span><span class="s2">"setting_</span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">manifest</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">][</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                <span class="n">staging_directory</span><span class="p">,</span>
+                <span class="n">serialization_name</span><span class="p">,</span>
+                <span class="n">value</span><span class="p">,</span>
+                <span class="n">cache</span><span class="o">=</span><span class="n">remote_cache_backend</span><span class="p">,</span>
+                <span class="n">content_hash</span><span class="o">=</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">if</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+                <span class="n">seed_cache</span><span class="o">=</span><span class="n">remote_cache_transport</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+            <span class="n">content_hash</span> <span class="o">=</span> <span class="n">input_hashes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"args.arg_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="k">if</span> <span class="n">input_hashes</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">serialization_name</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"arg_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"arg_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                <span class="n">staging_directory</span><span class="p">,</span>
+                <span class="n">serialization_name</span><span class="p">,</span>
+                <span class="n">arg</span><span class="p">,</span>
+                <span class="n">cache</span><span class="o">=</span><span class="n">remote_cache_backend</span><span class="p">,</span>
+                <span class="n">content_hash</span><span class="o">=</span><span class="n">content_hash</span><span class="p">,</span>
+                <span class="n">seed_cache</span><span class="o">=</span><span class="n">remote_cache_transport</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">and</span> <span class="s2">"content_hash"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"content_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_hash</span>
+            <span class="n">manifest</span><span class="p">[</span><span class="s2">"args"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="n">content_hash</span> <span class="o">=</span> <span class="n">input_hashes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"kwargs.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="k">if</span> <span class="n">input_hashes</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">serialization_name</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"kwarg_</span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">_item_content_hash</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">value</span><span class="p">)</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"kwarg_</span><span class="si">{</span><span class="n">index</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                <span class="n">staging_directory</span><span class="p">,</span>
+                <span class="n">serialization_name</span><span class="p">,</span>
+                <span class="n">value</span><span class="p">,</span>
+                <span class="n">cache</span><span class="o">=</span><span class="n">remote_cache_backend</span><span class="p">,</span>
+                <span class="n">content_hash</span><span class="o">=</span><span class="n">content_hash</span><span class="p">,</span>
+                <span class="n">seed_cache</span><span class="o">=</span><span class="n">remote_cache_transport</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">and</span> <span class="s2">"content_hash"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">"content_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">content_hash</span>
+            <span class="n">manifest</span><span class="p">[</span><span class="s2">"kwargs"</span><span class="p">][</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">entry</span>
+
+        <span class="n">filenames</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">filename</span>
+            <span class="k">for</span> <span class="n">entries</span> <span class="ow">in</span> <span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"args"</span><span class="p">],</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"kwargs"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">entries</span>
+            <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">get_serialized_file_names</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="p">]</span>
+        <span class="k">return</span> <span class="n">_commit_staged_serialization</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">staging_directory</span><span class="p">,</span> <span class="n">manifest</span><span class="p">,</span> <span class="n">filenames</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="deserialize_inputs">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.deserialize_inputs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">deserialize_inputs</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Deserialize algorithm inputs from a directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        directory: Directory containing the input files.</span>
+<span class="sd">        cache: Optional cache backend used to resolve ``"cached"`` entries omitted from uploaded files.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Deserialized inputs containing algorithm metadata, settings, arguments, and cache metadata.</span>
+
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_manifest</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+
+    <span class="c1"># Deserialize settings</span>
+    <span class="n">settings</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">settings</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">deserialize_value</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+
+    <span class="c1"># Deserialize positional arguments</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">FileSerializer</span><span class="o">.</span><span class="n">deserialize_value</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"args"</span><span class="p">])</span>
+
+    <span class="c1"># Deserialize keyword arguments</span>
+    <span class="n">kwargs</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"kwargs"</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">kwargs</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">deserialize_value</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"algorithm_type"</span><span class="p">],</span>
+        <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"algorithm_name"</span><span class="p">],</span>
+        <span class="s2">"settings"</span><span class="p">:</span> <span class="n">settings</span><span class="p">,</span>
+        <span class="s2">"args"</span><span class="p">:</span> <span class="n">args</span><span class="p">,</span>
+        <span class="s2">"kwargs"</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">,</span>
+        <span class="s2">"run_hash"</span><span class="p">:</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"run_hash"</span><span class="p">),</span>
+        <span class="s2">"owner"</span><span class="p">:</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"owner"</span><span class="p">),</span>
+        <span class="s2">"input_hashes"</span><span class="p">:</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_hashes"</span><span class="p">),</span>
+        <span class="s2">"force_rerun"</span><span class="p">:</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"force_rerun"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="s2">"remote_cache"</span><span class="p">:</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"remote_cache"</span><span class="p">),</span>
+        <span class="s2">"remote_cache_transport"</span><span class="p">:</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"remote_cache_transport"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="serialize_outputs">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.serialize_outputs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">serialize_outputs</span><span class="p">(</span>
+    <span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">cache_transport</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Serialize algorithm outputs to a directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        directory: Directory to write files to.</span>
+<span class="sd">        result: The result from algorithm.run() (may be a tuple or single value).</span>
+<span class="sd">        cache: Optional shared cache backend used for cacheable result values.</span>
+<span class="sd">        cache_transport: Whether to seed shared-cache misses and use the cache as artifact transport.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of all files created (for download).</span>
+
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="n">directory</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Build manifest</span>
+    <span class="n">manifest</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"version"</span><span class="p">:</span> <span class="n">_MANIFEST_VERSION</span><span class="p">,</span> <span class="s2">"is_tuple"</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"results"</span><span class="p">:</span> <span class="p">[]}</span>
+
+    <span class="k">with</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">TemporaryDirectory</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="n">directory</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">".serialization-"</span><span class="p">)</span> <span class="k">as</span> <span class="n">staging_directory_name</span><span class="p">:</span>
+        <span class="n">staging_directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">staging_directory_name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="n">manifest</span><span class="p">[</span><span class="s2">"is_tuple"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+                <span class="n">content_hash</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">if</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+                <span class="n">serialization_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"result_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="sa">f</span><span class="s2">"result_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span>
+                <span class="n">entry</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                    <span class="n">staging_directory</span><span class="p">,</span>
+                    <span class="n">serialization_name</span><span class="p">,</span>
+                    <span class="n">item</span><span class="p">,</span>
+                    <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+                    <span class="n">content_hash</span><span class="o">=</span><span class="n">content_hash</span><span class="p">,</span>
+                    <span class="n">seed_cache</span><span class="o">=</span><span class="n">cache_transport</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">manifest</span><span class="p">[</span><span class="s2">"results"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">content_hash</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="k">if</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">is_cacheable</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">serialization_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"result_</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">content_hash</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">"result"</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="n">FileSerializer</span><span class="o">.</span><span class="n">serialize_value</span><span class="p">(</span>
+                <span class="n">staging_directory</span><span class="p">,</span>
+                <span class="n">serialization_name</span><span class="p">,</span>
+                <span class="n">result</span><span class="p">,</span>
+                <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span>
+                <span class="n">content_hash</span><span class="o">=</span><span class="n">content_hash</span><span class="p">,</span>
+                <span class="n">seed_cache</span><span class="o">=</span><span class="n">cache_transport</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">manifest</span><span class="p">[</span><span class="s2">"results"</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+
+        <span class="n">filenames</span> <span class="o">=</span> <span class="p">[</span><span class="n">filename</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"results"</span><span class="p">]</span> <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">get_serialized_file_names</span><span class="p">(</span><span class="n">entry</span><span class="p">)]</span>
+        <span class="k">return</span> <span class="n">_commit_staged_serialization</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">staging_directory</span><span class="p">,</span> <span class="n">manifest</span><span class="p">,</span> <span class="n">filenames</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="deserialize_outputs">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.deserialize_outputs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">deserialize_outputs</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">cache</span><span class="p">:</span> <span class="n">CacheBackend</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Deserialize algorithm outputs from a directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        directory: Directory containing the output files.</span>
+<span class="sd">        cache: Optional cache backend used to resolve or reuse cacheable result values.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The deserialized result (tuple or single value).</span>
+
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_manifest</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">FileSerializer</span><span class="o">.</span><span class="n">deserialize_value</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entry</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"results"</span><span class="p">]]</span>
+
+    <span class="k">if</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"is_tuple"</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">results</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">results</span> <span class="k">else</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="get_input_files">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.get_input_files">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_input_files</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Get list of all input files in a directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        directory: Directory containing input files.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of all files that should be uploaded.</span>
+
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_manifest</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+    <span class="n">entries</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="n">entry</span>
+        <span class="k">for</span> <span class="n">values</span> <span class="ow">in</span> <span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"args"</span><span class="p">],</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"kwargs"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">values</span>
+    <span class="p">]</span>
+    <span class="k">return</span> <span class="n">_get_manifest_files</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">entries</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_output_files">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.get_output_files">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_output_files</span><span class="p">(</span><span class="n">directory</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Get list of all output files in a directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        directory: Directory containing output files.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List of all files that should be downloaded.</span>
+
+<span class="sd">    """</span>
+    <span class="n">directory</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">directory</span><span class="p">)</span>
+    <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">directory</span> <span class="o">/</span> <span class="n">_MANIFEST_FILENAME</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">is_file</span><span class="p">():</span>
+        <span class="k">return</span> <span class="p">[]</span>
+    <span class="n">manifest</span> <span class="o">=</span> <span class="n">_load_manifest</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">_get_manifest_files</span><span class="p">(</span><span class="n">directory</span><span class="p">,</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"results"</span><span class="p">])</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

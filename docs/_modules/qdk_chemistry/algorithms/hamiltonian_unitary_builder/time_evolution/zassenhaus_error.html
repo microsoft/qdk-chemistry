@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,12 +96,12 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error</h1><div class="highlight"><pre>
-<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Zassenhaus error bound estimation for accuracy-aware parameterization.</span>
+<span></span><span class="sa">r</span><span class="sd">"""Zassenhaus error bound estimation for accuracy-aware parameterization.</span>
 
 <span class="sd">This module provides functions to compute the number of steps</span>
 <span class="sd">required to achieve a target accuracy for Zassenhaus product-formula</span>
 <span class="sd">decompositions.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -125,10 +126,10 @@
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.zassenhaus_generation</span><span class="w"> </span><span class="kn">import</span> <span class="n">PlanExpr</span><span class="p">,</span> <span class="n">PlanTerm</span>
 
 <span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;zassenhaus_coefficient_sum&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;zassenhaus_omitted_commutator_norm&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;zassenhaus_steps_commutator&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;zassenhaus_steps_naive&quot;</span><span class="p">,</span>
+    <span class="s2">"zassenhaus_coefficient_sum"</span><span class="p">,</span>
+    <span class="s2">"zassenhaus_omitted_commutator_norm"</span><span class="p">,</span>
+    <span class="s2">"zassenhaus_steps_commutator"</span><span class="p">,</span>
+    <span class="s2">"zassenhaus_steps_naive"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
@@ -143,7 +144,7 @@
     <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
     <span class="n">commutator_exponents</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">PlanExpr</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the number of Zassenhaus steps using a naive bound.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Compute the number of Zassenhaus steps using a naive bound.</span>
 
 <span class="sd">    This triangle-inequality estimate uses the Hamiltonian coefficient</span>
 <span class="sd">    1-norm and treats an order-``p`` Zassenhaus formula as having local</span>
@@ -181,15 +182,15 @@
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If ``target_accuracy`` is not positive or ``order`` is not positive.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">target_accuracy</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;target_accuracy must be positive, got </span><span class="si">{</span><span class="n">target_accuracy</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"target_accuracy must be positive, got </span><span class="si">{</span><span class="n">target_accuracy</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">order</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Zassenhaus order must be positive, got </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Zassenhaus order must be positive, got </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 
     <span class="c1"># commutator_exponents are precomputed symbolic Zassenhaus exponents returned by</span>
     <span class="c1"># zassenhaus_commutator_plan as its first element. If provided, the mapping must</span>
-    <span class="c1"># include &#39;order + 1&#39; so the bound can use the first omitted exponent without</span>
+    <span class="c1"># include 'order + 1' so the bound can use the first omitted exponent without</span>
     <span class="c1"># regenerating the plan.</span>
     <span class="n">real_terms</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
     <span class="n">one_norm</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">)</span>
@@ -224,12 +225,12 @@
     <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute Zassenhaus steps using a commutator-aware bound.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Compute Zassenhaus steps using a commutator-aware bound.</span>
 
 <span class="sd">    An order-``p`` Zassenhaus formula keeps exponents through ``C_p``.  The</span>
 <span class="sd">    leading local remainder is the omitted exponent ``C_{p+1}``.  This bound</span>
 <span class="sd">    evaluates that omitted exponent as an actual nested-commutator expression</span>
-<span class="sd">    over the Hamiltonian&#39;s Pauli terms, rather than replacing every commutator</span>
+<span class="sd">    over the Hamiltonian's Pauli terms, rather than replacing every commutator</span>
 <span class="sd">    by a worst-case triangle-inequality estimate.  If</span>
 <span class="sd">    ``beta = ||C_{p+1}(-iH_1, ..., -iH_m)||`` is bounded by the Pauli</span>
 <span class="sd">    coefficient 1-norm, then ``N`` time slices give</span>
@@ -251,11 +252,11 @@
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If ``target_accuracy`` is not positive or ``order`` is not positive.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">target_accuracy</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;target_accuracy must be positive, got </span><span class="si">{</span><span class="n">target_accuracy</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"target_accuracy must be positive, got </span><span class="si">{</span><span class="n">target_accuracy</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">order</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Zassenhaus order must be positive, got </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Zassenhaus order must be positive, got </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 
     <span class="n">omitted_norm</span> <span class="o">=</span> <span class="n">zassenhaus_omitted_commutator_norm</span><span class="p">(</span>
         <span class="n">hamiltonian</span><span class="p">,</span>
@@ -281,13 +282,13 @@
     <span class="n">num_terms</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">commutator_exponents</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">PlanExpr</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return the absolute coefficient sum for the first omitted exponent.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Return the absolute coefficient sum for the first omitted exponent.</span>
 
 <span class="sd">    An order-``p`` Zassenhaus approximation keeps correction exponents through</span>
 <span class="sd">    ``C_p``.  The leading omitted local remainder is therefore ``C_{p+1}``.</span>
 <span class="sd">    For the naive bound we combine like symbolic commutators and use</span>
 <span class="sd">    ``sum(abs(c_w))`` over the terms in ``C_{p+1}``.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">num_terms</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">0.0</span>
 
@@ -299,7 +300,7 @@
         <span class="p">)</span>
 
     <span class="k">if</span> <span class="n">omitted_order</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">commutator_exponents</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;commutator_exponents must include Zassenhaus exponent C_</span><span class="si">{</span><span class="n">omitted_order</span><span class="si">}</span><span class="s2"> for order </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"commutator_exponents must include Zassenhaus exponent C_</span><span class="si">{</span><span class="n">omitted_order</span><span class="si">}</span><span class="s2"> for order </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="k">for</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">commutator_exponents</span><span class="p">[</span><span class="n">omitted_order</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">()))</span></div>
 
@@ -315,7 +316,7 @@
 
     <span class="n">filtered</span> <span class="o">=</span> <span class="p">[(</span><span class="n">label</span><span class="p">,</span> <span class="n">coeff</span><span class="p">)</span> <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">terms</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">weight_threshold</span><span class="p">]</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">filtered</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">QubitOperator</span><span class="p">([</span><span class="s2">&quot;I&quot;</span> <span class="o">*</span> <span class="n">num_qubits</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">QubitOperator</span><span class="p">([</span><span class="s2">"I"</span> <span class="o">*</span> <span class="n">num_qubits</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">))</span>
 
     <span class="n">labels</span><span class="p">,</span> <span class="n">coefficients</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">filtered</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">QubitOperator</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">labels</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">))</span>
@@ -329,13 +330,13 @@
     <span class="n">order</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Return a Pauli 1-norm bound for the first omitted Zassenhaus exponent.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Return a Pauli 1-norm bound for the first omitted Zassenhaus exponent.</span>
 
 <span class="sd">    The returned value bounds ``||C_{order + 1}(-i H_1, ..., -i H_m)||``.</span>
 <span class="sd">    Multiplication by powers of ``-i`` does not change the norm, so the</span>
 <span class="sd">    Hamiltonian commutator DAG can be evaluated directly and scaled by the</span>
 <span class="sd">    symbolic Zassenhaus coefficients.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">real_terms</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">real_terms</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
         <span class="k">return</span> <span class="mf">0.0</span>
@@ -360,7 +361,7 @@
             <span class="k">return</span> <span class="n">leaf_hamiltonians</span><span class="p">[</span><span class="n">ref</span><span class="p">]</span>
 
         <span class="k">if</span> <span class="n">ref</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">plan</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected Zassenhaus plan reference: </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unexpected Zassenhaus plan reference: </span><span class="si">{</span><span class="n">ref</span><span class="si">!r}</span><span class="s2">."</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">ref</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">cache</span><span class="p">:</span>
             <span class="n">left</span><span class="p">,</span> <span class="n">right</span> <span class="o">=</span> <span class="n">plan</span><span class="p">[</span><span class="n">ref</span><span class="p">]</span>

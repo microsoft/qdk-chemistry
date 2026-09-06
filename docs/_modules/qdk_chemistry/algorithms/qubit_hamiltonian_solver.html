@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.qubit_hamiltonian_solver &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.qubit_hamiltonian_solver &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,11 +96,11 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.qubit_hamiltonian_solver</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry qubit hamiltonian solver abstractions and utilities.</span>
+<span></span><span class="sd">"""QDK/Chemistry qubit hamiltonian solver abstractions and utilities.</span>
 
 <span class="sd">This module provides the base classes QubitHamiltonianSolver and QubitHamiltonianSolverFactory</span>
 <span class="sd">for solving qubit Hamiltonians for ground state energies using various algorithms.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -118,25 +119,25 @@
 <div class="viewcode-block" id="QubitHamiltonianSolver">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.QubitHamiltonianSolver">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QubitHamiltonianSolver</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">Algorithm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for solving a qubit Hamiltonian.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for solving a qubit Hamiltonian."""</span>
 
 <div class="viewcode-block" id="QubitHamiltonianSolver.__init__">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.QubitHamiltonianSolver.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the QubitHamiltonianSolver.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the QubitHamiltonianSolver."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
 
 
 <div class="viewcode-block" id="QubitHamiltonianSolver.type_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.QubitHamiltonianSolver.type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return qubit_hamiltonian_solver as the algorithm type name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;qubit_hamiltonian_solver&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return qubit_hamiltonian_solver as the algorithm type name."""</span>
+        <span class="k">return</span> <span class="s2">"qubit_hamiltonian_solver"</span></div>
 
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Solve a qubit Hamiltonian.</span>
+<span class="w">        </span><span class="sd">"""Solve a qubit Hamiltonian.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.</span>
@@ -144,27 +145,27 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 
 <div class="viewcode-block" id="QubitHamiltonianSolverFactory">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.QubitHamiltonianSolverFactory">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QubitHamiltonianSolverFactory</span><span class="p">(</span><span class="n">base</span><span class="o">.</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory class for creating QubitHamiltonianSolver instances.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Factory class for creating QubitHamiltonianSolver instances."""</span>
 
 <div class="viewcode-block" id="QubitHamiltonianSolverFactory.algorithm_type_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.QubitHamiltonianSolverFactory.algorithm_type_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return qubit_hamiltonian_solver as the algorithm type name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;qubit_hamiltonian_solver&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return qubit_hamiltonian_solver as the algorithm type name."""</span>
+        <span class="k">return</span> <span class="s2">"qubit_hamiltonian_solver"</span></div>
 
 
 <div class="viewcode-block" id="QubitHamiltonianSolverFactory.default_algorithm_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.QubitHamiltonianSolverFactory.default_algorithm_name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return qdk_sparse_matrix_solver as the default algorithm name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;qdk_sparse_matrix_solver&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return qdk_sparse_matrix_solver as the default algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"qdk_sparse_matrix_solver"</span></div>
 </div>
 
 
@@ -172,21 +173,21 @@
 <div class="viewcode-block" id="SparseMatrixSolverSettings">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.SparseMatrixSolverSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseMatrixSolverSettings</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a SparseMatrixSolver.</span>
+<span class="w">    </span><span class="sd">"""Settings configuration for a SparseMatrixSolver.</span>
 
 <span class="sd">    SparseMatrixSolver-specific settings:</span>
 <span class="sd">        tol (float, default=1e-8): Tolerance for the solver.</span>
 <span class="sd">        max_m (int, default=20): Maximum subspace dimension for the solver.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="SparseMatrixSolverSettings.__init__">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.SparseMatrixSolverSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SparseMatrixSolverSettings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize SparseMatrixSolverSettings."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tol&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_m&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"tol"</span><span class="p">,</span> <span class="s2">"float"</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"max_m"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="mi">20</span><span class="p">)</span></div>
 </div>
 
 
@@ -194,20 +195,20 @@
 <div class="viewcode-block" id="SparseMatrixSolver">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.SparseMatrixSolver">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SparseMatrixSolver</span><span class="p">(</span><span class="n">QubitHamiltonianSolver</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Qubit Hamiltonian solver using sparse matrix methods.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Qubit Hamiltonian solver using sparse matrix methods."""</span>
 
 <div class="viewcode-block" id="SparseMatrixSolver.__init__">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.SparseMatrixSolver.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">tol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-8</span><span class="p">,</span> <span class="n">max_m</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">20</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the SparseMatrixSolver.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the SparseMatrixSolver."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">SparseMatrixSolverSettings</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tol&quot;</span><span class="p">,</span> <span class="n">tol</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_m&quot;</span><span class="p">,</span> <span class="n">max_m</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"tol"</span><span class="p">,</span> <span class="n">tol</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"max_m"</span><span class="p">,</span> <span class="n">max_m</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Solve a qubit Hamiltonian using sparse matrix methods.</span>
+<span class="w">        </span><span class="sd">"""Solve a qubit Hamiltonian using sparse matrix methods.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.</span>
@@ -215,19 +216,19 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">sparse_matrix</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">(</span><span class="n">sparse</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">sparse_matrix_real</span> <span class="o">=</span> <span class="n">sparse_matrix</span><span class="o">.</span><span class="n">real</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">eigenvalue</span><span class="p">,</span> <span class="n">eigenvector</span> <span class="o">=</span> <span class="n">davidson_solver</span><span class="p">(</span>
-            <span class="n">sparse_matrix_real</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tol&quot;</span><span class="p">),</span> <span class="n">max_m</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_m&quot;</span><span class="p">)</span>
+            <span class="n">sparse_matrix_real</span><span class="p">,</span> <span class="n">tol</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tol"</span><span class="p">),</span> <span class="n">max_m</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_m"</span><span class="p">)</span>
         <span class="p">)</span>
         <span class="k">return</span> <span class="n">eigenvalue</span><span class="p">,</span> <span class="n">eigenvector</span>
 
 <div class="viewcode-block" id="SparseMatrixSolver.name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.SparseMatrixSolver.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the qubit hamiltonian solver.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;qdk_sparse_matrix_solver&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the name of the qubit hamiltonian solver."""</span>
+        <span class="k">return</span> <span class="s2">"qdk_sparse_matrix_solver"</span></div>
 </div>
 
 
@@ -235,17 +236,17 @@
 <div class="viewcode-block" id="DenseMatrixSolver">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.DenseMatrixSolver">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">DenseMatrixSolver</span><span class="p">(</span><span class="n">QubitHamiltonianSolver</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Qubit Hamiltonian solver using dense matrix methods.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Qubit Hamiltonian solver using dense matrix methods."""</span>
 
 <div class="viewcode-block" id="DenseMatrixSolver.__init__">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.DenseMatrixSolver.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the DenseMatrixSolver.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the DenseMatrixSolver."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Solve a qubit Hamiltonian using dense matrix methods.</span>
+<span class="w">        </span><span class="sd">"""Solve a qubit Hamiltonian using dense matrix methods.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The :class:`~qdk_chemistry.data.QubitOperator`.</span>
@@ -253,7 +254,7 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            tuple[float, np.ndarray]: The ground state energy and corresponding eigenstate.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">dense_matrix</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">to_matrix</span><span class="p">()</span>
         <span class="n">dense_matrix_real</span> <span class="o">=</span> <span class="n">dense_matrix</span><span class="o">.</span><span class="n">real</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
         <span class="n">eigenvalues</span><span class="p">,</span> <span class="n">eigenvectors</span> <span class="o">=</span> <span class="n">syev_solver</span><span class="p">(</span><span class="n">dense_matrix_real</span><span class="p">)</span>
@@ -264,8 +265,8 @@
 <div class="viewcode-block" id="DenseMatrixSolver.name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.qubit_hamiltonian_solver.html#qdk_chemistry.algorithms.qubit_hamiltonian_solver.DenseMatrixSolver.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the qubit hamiltonian solver.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;qdk_dense_matrix_solver&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the name of the qubit hamiltonian solver."""</span>
+        <span class="k">return</span> <span class="s2">"qdk_dense_matrix_solver"</span></div>
 </div>
 
 </pre></div>

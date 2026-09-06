@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.hashing &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.hashing &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.hashing</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Hashing utilities for algorithm run content hashing.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""Hashing utilities for algorithm run content hashing."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -107,7 +108,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_hash_arg</span><span class="p">,</span> <span class="n">_hash_str</span><span class="p">,</span> <span class="n">_hash_uint</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;run_content_hash&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"run_content_hash"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="run_content_hash">
@@ -119,15 +120,15 @@
     <span class="o">*</span><span class="n">args</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute a deterministic content hash for an algorithm run.</span>
+<span class="w">    </span><span class="sd">"""Compute a deterministic content hash for an algorithm run.</span>
 
 <span class="sd">    This function has the same logical signature as ``Algorithm.run()`` but</span>
 <span class="sd">    returns a hex hash string instead of executing the algorithm. Identical</span>
 <span class="sd">    inputs produce identical hashes.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        algorithm_type: The algorithm type name (e.g., &quot;scf_solver&quot;).</span>
-<span class="sd">        algorithm_name: The algorithm name (e.g., &quot;pyscf&quot;).</span>
+<span class="sd">        algorithm_type: The algorithm type name (e.g., "scf_solver").</span>
+<span class="sd">        algorithm_name: The algorithm name (e.g., "pyscf").</span>
 <span class="sd">        settings: The Settings object for the algorithm.</span>
 <span class="sd">        args: Positional arguments that would be passed to run().</span>
 <span class="sd">        kwargs: Keyword arguments that would be passed to run().</span>
@@ -138,11 +139,11 @@
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms.hashing import run_content_hash</span>
 <span class="sd">        &gt;&gt;&gt; hash_val = run_content_hash(</span>
-<span class="sd">        ...     &quot;scf_solver&quot;, &quot;pyscf&quot;, scf.settings(),</span>
+<span class="sd">        ...     "scf_solver", "pyscf", scf.settings(),</span>
 <span class="sd">        ...     structure, charge=0, spin_multiplicity=1,</span>
 <span class="sd">        ... )</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">h</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">()</span>
     <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">algorithm_type</span><span class="p">)</span>
     <span class="n">_hash_str</span><span class="p">(</span><span class="n">h</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">)</span>

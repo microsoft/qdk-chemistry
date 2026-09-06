@@ -1,0 +1,410 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""QDK/Chemistry CSWAP-sandwich controlled circuit mapper."""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">qsharp</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnitaryRepresentation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.unitary_representation.containers.pauli_product_formula</span><span class="w"> </span><span class="kn">import</span> <span class="n">PauliProductFormulaContainer</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">ControlledCircuitMapper</span><span class="p">,</span> <span class="n">ControlledCircuitMapperSettings</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">"ControlledSwapPauliSequenceMapper"</span><span class="p">,</span>
+    <span class="s2">"ControlledSwapPauliSequenceMapperSettings"</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_vacuum_eigenphase</span><span class="p">(</span><span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">float</span><span class="p">]],</span> <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Return the phase an *ordered* product :math:`\prod_j e^{-i\theta_j P_j}` imprints on the vacuum.</span>
+
+<span class="sd">    That is :math:`\varphi_0` in</span>
+<span class="sd">    :math:`\prod_j e^{-i\theta_j P_j}|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle`.</span>
+<span class="sd">    The vacuum stays an eigenstate when the product splits into contiguous blocks of pairwise</span>
+<span class="sd">    commuting strings, so each block equals :math:`\exp(-i\sum_j \theta_j P_j)`, whose</span>
+<span class="sd">    generator maps the all-zero state onto a multiple of itself, i.e. amplitudes cancel for every</span>
+<span class="sd">    non-empty flipped-qubit set.  Exact cancellations close a block immediately; otherwise a block</span>
+<span class="sd">    closes at the first non-commuting boundary or at the end, where its residual is charged against</span>
+<span class="sd">    ``atol``.  The phase then comes from the diagonal (:math:`I`/:math:`Z`) terms alone.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        terms: Ordered ``(pauli_map, angle)`` pairs, one per exponential factor.</span>
+<span class="sd">        atol: Absolute tolerance on the amplitude leaked out of the vacuum, aggregated over every</span>
+<span class="sd">            flipped-qubit set the product formula closes.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The imprinted phase, or ``None`` when the vacuum is not an eigenstate of the product.</span>
+
+<span class="sd">    """</span>
+    <span class="n">block</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># symplectic (X, Z) bit masks of the terms in the open block</span>
+    <span class="n">contributions</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">complex</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">leaked</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">diagonal</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">close_block</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Charge whatever the open block still leaves outstanding against the shared budget."""</span>
+        <span class="k">for</span> <span class="n">pending</span> <span class="ow">in</span> <span class="n">contributions</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+            <span class="n">residual</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">real</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">imag</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">))</span>
+            <span class="n">leaked</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">residual</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">leaked</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">atol</span>
+
+    <span class="k">for</span> <span class="n">pauli_map</span><span class="p">,</span> <span class="n">angle</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">:</span>
+        <span class="n">x_mask</span> <span class="o">=</span> <span class="n">z_mask</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">qubit</span><span class="p">,</span> <span class="n">axis</span> <span class="ow">in</span> <span class="n">pauli_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">axis</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">):</span>
+                <span class="n">x_mask</span> <span class="o">|=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">qubit</span>
+            <span class="k">if</span> <span class="n">axis</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"Y"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">):</span>
+                <span class="n">z_mask</span> <span class="o">|=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">qubit</span>
+
+        <span class="c1"># Two Pauli strings commute iff they anticommute on an even number of qubits.</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(((</span><span class="n">x_mask</span> <span class="o">&amp;</span> <span class="n">z</span><span class="p">)</span> <span class="o">^</span> <span class="p">(</span><span class="n">z_mask</span> <span class="o">&amp;</span> <span class="n">x</span><span class="p">))</span><span class="o">.</span><span class="n">bit_count</span><span class="p">()</span> <span class="o">%</span> <span class="mi">2</span> <span class="k">for</span> <span class="n">x</span><span class="p">,</span> <span class="n">z</span> <span class="ow">in</span> <span class="n">block</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">close_block</span><span class="p">():</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="n">block</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="n">contributions</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="n">block</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">x_mask</span><span class="p">,</span> <span class="n">z_mask</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">x_mask</span><span class="p">:</span>
+            <span class="c1"># P|0...0&gt; = i^{n_Y}|b&gt;, with b the bit pattern of the X/Y support.</span>
+            <span class="n">pending</span> <span class="o">=</span> <span class="n">contributions</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">x_mask</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="n">pending</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">angle</span> <span class="o">*</span> <span class="mi">1</span><span class="n">j</span> <span class="o">**</span> <span class="p">(</span><span class="n">x_mask</span> <span class="o">&amp;</span> <span class="n">z_mask</span><span class="p">)</span><span class="o">.</span><span class="n">bit_count</span><span class="p">())</span>
+            <span class="n">residual</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">real</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">),</span> <span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">imag</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">pending</span><span class="p">))</span>
+            <span class="c1"># Tolerance is charged when the complete block closes, not at a prefix boundary.</span>
+            <span class="k">if</span> <span class="n">residual</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">contributions</span><span class="p">[</span><span class="n">x_mask</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Diagonal strings act as +1 on |0...0&gt;, so they contribute phase only.</span>
+            <span class="n">diagonal</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">contributions</span><span class="p">:</span>
+            <span class="n">block</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">close_block</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">fsum</span><span class="p">(</span><span class="n">diagonal</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ControlledSwapPauliSequenceMapperSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.html#qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.ControlledSwapPauliSequenceMapperSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ControlledSwapPauliSequenceMapperSettings</span><span class="p">(</span><span class="n">ControlledCircuitMapperSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Settings for the :class:`ControlledSwapPauliSequenceMapper`.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,</span>
+<span class="sd">            aggregated over every flipped-qubit set and over all ``step_reps`` repetitions.</span>
+
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="ControlledSwapPauliSequenceMapperSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.html#qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.ControlledSwapPauliSequenceMapperSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the settings for ControlledSwapPauliSequenceMapper."""</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"vacuum_preservation_tolerance"</span><span class="p">,</span>
+            <span class="s2">"double"</span><span class="p">,</span>
+            <span class="mf">1e-9</span><span class="p">,</span>
+            <span class="s2">"Absolute tolerance on the total amplitude the repeated evolution may leak out of the vacuum."</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ControlledSwapPauliSequenceMapper">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.html#qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.ControlledSwapPauliSequenceMapper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ControlledSwapPauliSequenceMapper</span><span class="p">(</span><span class="n">ControlledCircuitMapper</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Controlled evolution circuit mapper using a CSWAP-sandwich construction.</span>
+
+<span class="sd">    Given a time evolution as a Pauli product formula</span>
+<span class="sd">    :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper builds a</span>
+<span class="sd">    controlled :math:`U(t)` without controlling every gate.  An internally allocated</span>
+<span class="sd">    ``vacuum`` register (:math:`|0\ldots0\rangle`) is conditionally swapped with the system,</span>
+<span class="sd">    the *uncontrolled* evolution runs on the vacuum (``step_reps`` times), and the swap is</span>
+<span class="sd">    uncomputed.  The eigenphase accumulates on the :math:`|1\rangle` control branch, as with</span>
+<span class="sd">    a directly controlled evolution, using an additional system-sized register and two layers</span>
+<span class="sd">    of system-wide controlled-:math:`\mathrm{SWAP}` gates.</span>
+
+<span class="sd">    **Vacuum phase.** The :math:`|0\rangle` branch acquires</span>
+<span class="sd">    :math:`U|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle` with :math:`\varphi_0 = -E_0 t`</span>
+<span class="sd">    and :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`.  Only the diagonal (:math:`I`/:math:`Z`)</span>
+<span class="sd">    terms of the product formula contribute, so :math:`\varphi_0` is known classically and is</span>
+<span class="sd">    cancelled by an :math:`R_1(\varphi_0)` on the control.  The circuit is then a genuine</span>
+<span class="sd">    :math:`C\text{-}U` up to a global phase for any :math:`E_0`.</span>
+
+<span class="sd">    **Grouping requirement.** The vacuum must stay an eigenstate, which is what particle</span>
+<span class="sd">    conservation buys: :math:`H` cannot connect :math:`|0\ldots0\rangle` to any other occupation</span>
+<span class="sd">    number.  Leaked amplitude entangles the vacuum register with the control and destroys the</span>
+<span class="sd">    control coherence.  A fermionic term annihilates the vacuum only through the</span>
+<span class="sd">    weighted sum of its Pauli strings, so a Trotterised :math:`U` preserves the vacuum only when</span>
+<span class="sd">    those strings are exponentiated as one contiguous, mutually commuting block:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        U|0\ldots0\rangle = e^{-it\sum_i P_i}|0\ldots0\rangle</span>
+<span class="sd">        \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .</span>
+
+<span class="sd">    Grouping the Hamiltonian with the ``vacuum_annihilating`` term grouper</span>
+<span class="sd">    (:class:`~qdk_chemistry.algorithms.term_grouper.VacuumAnnihilatingTermGrouper`) produces that ordering.</span>
+<span class="sd">    The incoming formula is validated and rejected otherwise; interleaving cancellation partners,</span>
+<span class="sd">    say ``XX, Z0, YY, I`` for :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)`, leaks half the</span>
+<span class="sd">    vacuum amplitude.</span>
+
+<span class="sd">    Notes:</span>
+<span class="sd">        * Applies to particle-conserving Hamiltonians.</span>
+<span class="sd">        * The requirement is on the mapped operator, not the encoding: after qubit tapering the</span>
+<span class="sd">          all-zero state belongs to the retained sector, which the Hamiltonian need not annihilate.</span>
+<span class="sd">        * Currently supports only single-control-qubit scenarios.</span>
+<span class="sd">        * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.</span>
+<span class="sd">        * The vacuum register is allocated internally by the Q# operation.</span>
+
+<span class="sd">    """</span>
+
+<div class="viewcode-block" id="ControlledSwapPauliSequenceMapper.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.html#qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.ControlledSwapPauliSequenceMapper.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the ControlledSwapPauliSequenceMapper."""</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">ControlledSwapPauliSequenceMapperSettings</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="ControlledSwapPauliSequenceMapper.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.html#qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.ControlledSwapPauliSequenceMapper.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"cswap_pauli_sequence"</span></div>
+
+
+<div class="viewcode-block" id="ControlledSwapPauliSequenceMapper.type_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.html#qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper.ControlledSwapPauliSequenceMapper.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return controlled_circuit_mapper as the algorithm type name."""</span>
+        <span class="k">return</span> <span class="s2">"controlled_circuit_mapper"</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">unitary</span><span class="p">:</span> <span class="n">UnitaryRepresentation</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Construct a quantum circuit implementing the controlled unitary.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            unitary: The unitary representation containing the Hamiltonian and evolution parameters.</span>
+<span class="sd">            Control and target indices are read from settings.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Circuit: A quantum circuit implementing the controlled unitary :math:`U` via the CSWAP sandwich,</span>
+<span class="sd">            where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the unitary container type is not supported.</span>
+<span class="sd">            ValueError: If multiple control qubits are provided.</span>
+<span class="sd">            ValueError: If the product formula ordering is not vacuum preserving.</span>
+
+<span class="sd">        """</span>
+        <span class="n">unitary_container</span> <span class="o">=</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">unitary_container</span><span class="p">,</span> <span class="n">PauliProductFormulaContainer</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"The </span><span class="si">{</span><span class="n">unitary</span><span class="o">.</span><span class="n">get_container_type</span><span class="p">()</span><span class="si">}</span><span class="s2"> container type is not supported. "</span>
+                <span class="s2">"ControlledSwapPauliSequenceMapper only supports PauliProductFormula container for the unitary."</span>
+            <span class="p">)</span>
+
+        <span class="n">control_indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_control_indices</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">control_indices</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"ControlledSwapPauliSequenceMapper currently only supports a single control qubit."</span><span class="p">)</span>
+
+        <span class="n">target_indices</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_target_indices</span><span class="p">(</span><span class="n">unitary</span><span class="p">)</span>
+
+        <span class="n">vacuum_phase</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_vacuum_phase</span><span class="p">(</span><span class="n">unitary_container</span><span class="p">)</span>
+
+        <span class="n">pauli_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">angles</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">unitary_container</span><span class="o">.</span><span class="n">step_terms</span><span class="p">:</span>
+            <span class="n">base_terms</span> <span class="o">=</span> <span class="p">[</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="o">.</span><span class="n">I</span><span class="p">]</span> <span class="o">*</span> <span class="n">unitary_container</span><span class="o">.</span><span class="n">num_qubits</span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">pauli</span> <span class="ow">in</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">base_terms</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">,</span> <span class="n">pauli</span><span class="p">)</span>
+            <span class="n">pauli_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base_terms</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">angles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">)</span>
+
+        <span class="n">controlled_evo_params</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">ControlledSwapPauliExp</span><span class="o">.</span><span class="n">RepControlledSwapPauliExpParams</span><span class="p">(</span>
+            <span class="n">pauliExponents</span><span class="o">=</span><span class="n">pauli_terms</span><span class="p">,</span>
+            <span class="n">pauliCoefficients</span><span class="o">=</span><span class="n">angles</span><span class="p">,</span>
+            <span class="n">repetitions</span><span class="o">=</span><span class="n">unitary_container</span><span class="o">.</span><span class="n">step_reps</span><span class="p">,</span>
+            <span class="n">vacuumPhase</span><span class="o">=</span><span class="n">vacuum_phase</span><span class="p">,</span>
+            <span class="n">control</span><span class="o">=</span><span class="n">control_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">systems</span><span class="o">=</span><span class="n">target_indices</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+            <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">ControlledSwapPauliExp</span><span class="o">.</span><span class="n">MakeRepControlledSwapPauliExpCircuit</span><span class="p">,</span>
+            <span class="n">parameter</span><span class="o">=</span><span class="nb">vars</span><span class="p">(</span><span class="n">controlled_evo_params</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="n">controlled_unitary_op</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">ControlledSwapPauliExp</span><span class="o">.</span><span class="n">MakeRepControlledSwapPauliExpOp</span><span class="p">(</span>
+            <span class="n">controlled_evo_params</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">,</span> <span class="n">qsharp_op</span><span class="o">=</span><span class="n">controlled_unitary_op</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_vacuum_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">container</span><span class="p">:</span> <span class="n">PauliProductFormulaContainer</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Return the phase the repeated evolution imprints on the vacuum register.</span>
+
+<span class="sd">        The vacuum must remain an eigenstate: leaked amplitude entangles the vacuum register</span>
+<span class="sd">        with the control and destroys the control coherence.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            container: The Pauli product formula to validate.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            The phase accumulated over all ``step_reps`` repetitions.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the vacuum is not an eigenstate of the product formula.</span>
+
+<span class="sd">        """</span>
+        <span class="n">terms</span> <span class="o">=</span> <span class="p">[(</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span> <span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">)</span> <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">container</span><span class="o">.</span><span class="n">step_terms</span><span class="p">]</span>
+        <span class="c1"># A residual left by one step leaks again on every repetition, so the per-step budget shrinks.</span>
+        <span class="n">atol</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"vacuum_preservation_tolerance"</span><span class="p">)</span> <span class="o">/</span> <span class="n">container</span><span class="o">.</span><span class="n">step_reps</span>
+        <span class="n">phase</span> <span class="o">=</span> <span class="n">_vacuum_eigenphase</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">atol</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">phase</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "</span>
+                <span class="s2">"Pauli terms could not be split into contiguous, mutually commuting blocks that leave "</span>
+                <span class="s2">"|0...0&gt; invariant, so the CSWAP sandwich would leak the vacuum and decohere the control. "</span>
+                <span class="s2">"The mapper applies to particle-conserving Hamiltonians; group such a Hamiltonian with "</span>
+                <span class="s2">"the 'vacuum_annihilating' term grouper before building the unitary, e.g. "</span>
+                <span class="s2">"registry.create('term_grouper', 'vacuum_annihilating').run(qubit_hamiltonian)."</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">container</span><span class="o">.</span><span class="n">step_reps</span> <span class="o">*</span> <span class="n">phase</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

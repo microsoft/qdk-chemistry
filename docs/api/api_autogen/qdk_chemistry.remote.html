@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.remote package &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.remote package &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -51,6 +51,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -97,20 +98,88 @@
              
   <section id="module-qdk_chemistry.remote">
 <span id="qdk-chemistry-remote-package"></span><h1>qdk_chemistry.remote package<a class="headerlink" href="#module-qdk_chemistry.remote" title="Link to this heading"></a></h1>
-<p>Caching for QDK/Chemistry algorithm results.</p>
-<p>This module provides result caching via the <code class="docutils literal notranslate"><span class="pre">cache</span></code> kwarg
-on <code class="docutils literal notranslate"><span class="pre">algorithm.run()</span></code>.</p>
+<p>Remote execution and result caching for QDK/Chemistry algorithms.</p>
+<p>Algorithms created through the registry accept <code class="docutils literal notranslate"><span class="pre">remote</span></code> and <code class="docutils literal notranslate"><span class="pre">cache</span></code>
+keyword arguments on <code class="docutils literal notranslate"><span class="pre">run()</span></code>.</p>
 <dl>
 <dt>Usage:</dt><dd><div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_remote</span>
 <span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Local with caching</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;cc-pvdz&quot;</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="s2">&quot;./cache&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">backend</span> <span class="o">=</span> <span class="n">create_remote</span><span class="p">(</span><span class="s2">"local"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">backend</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">try</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"cc-pvdz"</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="n">backend</span><span class="p">)</span>
+<span class="gp">... </span><span class="k">finally</span><span class="p">:</span>
+<span class="gp">... </span>    <span class="n">backend</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
 </pre></div>
 </div>
 </dd>
 </dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.remote.available_backends">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.remote.</span></span><span class="sig-name descname"><span class="pre">available_backends</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.remote.available_backends" title="Link to this definition"></a></dt>
+<dd><p>Return list of registered backend names.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.remote.create_remote">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.remote.</span></span><span class="sig-name descname"><span class="pre">create_remote</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.remote.create_remote" title="Link to this definition"></a></dt>
+<dd><p>Create a configured remote backend instance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – Backend name (e.g., “custom” or “local”)</p></li>
+<li><p><strong>**config</strong> – Backend-specific configuration options.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend" title="qdk_chemistry.remote.backends.base.RemoteBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">RemoteBackend</span></code></a></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Configured RemoteBackend instance ready for use</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_remote</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">remote</span> <span class="o">=</span> <span class="n">create_remote</span><span class="p">(</span><span class="s2">"local"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">7200</span><span class="p">,</span> <span class="n">poll_interval</span><span class="o">=</span><span class="mf">10.0</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"cc-pvdz"</span><span class="p">,</span>
+<span class="gp">... </span>                      <span class="n">cache</span><span class="o">=</span><span class="s2">"./cache"</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="n">remote</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.remote.get_backend">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.remote.</span></span><span class="sig-name descname"><span class="pre">get_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">config</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.remote.get_backend" title="Link to this definition"></a></dt>
+<dd><p>Create a backend instance by name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – Backend name (e.g., “custom” or “local”)</p></li>
+<li><p><strong>**config</strong> – Backend-specific configuration.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend" title="qdk_chemistry.remote.backends.base.RemoteBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">RemoteBackend</span></code></a></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Configured RemoteBackend instance</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If no backend is registered with that name</p>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.remote.resolve_cache">
 <span class="sig-prename descclassname"><span class="pre">qdk_chemistry.remote.</span></span><span class="sig-name descname"><span class="pre">resolve_cache</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cache</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.remote.resolve_cache" title="Link to this definition"></a></dt>
@@ -124,14 +193,90 @@ on <code class="docutils literal notranslate"><span class="pre">algorithm.run()<
 <code class="docutils literal notranslate"><span class="pre">kwargs</span></code> are forwarded to the backend constructor.</p></li>
 </ul>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.CacheBackend" title="qdk_chemistry.remote.cache.base.CacheBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">CacheBackend</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>cache</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><em>Path</em></a><em> | </em><a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.CacheBackend" title="qdk_chemistry.remote.cache.base.CacheBackend"><em>CacheBackend</em></a><em> | </em><em>None</em>)</p></li>
-<li><p><strong>kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><em>Any</em></a>)</p></li>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cache</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></a> | <a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.CacheBackend" title="qdk_chemistry.remote.cache.base.CacheBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">CacheBackend</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – Cache instance, registered backend name, filesystem path, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>**kwargs</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Backend-specific configuration for a name or filesystem path.</p></li>
 </ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.CacheBackend" title="qdk_chemistry.remote.cache.base.CacheBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">CacheBackend</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.remote.run">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.remote.</span></span><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cache</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_rerun</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_on_job_submitted</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_owner</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.remote.run" title="Link to this definition"></a></dt>
+<dd><p>Execute any algorithm with optional caching and remote backend.</p>
+<p>Works with both Python and C++ algorithm implementations — anything
+with <code class="docutils literal notranslate"><span class="pre">run()</span></code>, <code class="docutils literal notranslate"><span class="pre">hash()</span></code>, <code class="docutils literal notranslate"><span class="pre">type_name()</span></code>, <code class="docutils literal notranslate"><span class="pre">name()</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">settings()</span></code> methods.</p>
+<p>On a cache hit the result is returned immediately.  On a miss the
+algorithm is executed (locally or via <em>remote</em>) and the result is
+stored.  If a previous remote submission is still in-flight, polling
+resumes automatically — no duplicate submission.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>algorithm</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Any algorithm instance (from <code class="docutils literal notranslate"><span class="pre">create(...)</span></code>).</p></li>
+<li><p><strong>*args</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Positional arguments for <code class="docutils literal notranslate"><span class="pre">algorithm.run()</span></code>.</p></li>
+<li><p><strong>cache</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Cache backend — a <code class="docutils literal notranslate"><span class="pre">CacheBackend</span></code>, a path (<code class="docutils literal notranslate"><span class="pre">str</span></code> /
+<code class="docutils literal notranslate"><span class="pre">Path</span></code> → <code class="docutils literal notranslate"><span class="pre">FolderCache</span></code>), or <code class="docutils literal notranslate"><span class="pre">None</span></code>. For remote execution,
+complete caller-side records are cache hits whether or not the
+backend is shared. Shared backends are also used by the compute
+node as transport. A <code class="docutils literal notranslate"><span class="pre">TieredCache</span></code> can combine local and shared
+backends.</p></li>
+<li><p><strong>remote</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Remote backend name or instance, or <code class="docutils literal notranslate"><span class="pre">None</span></code> for local.</p></li>
+<li><p><strong>force_rerun</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, skip the cache lookup and re-execute,
+overwriting any previously cached result.</p></li>
+<li><p><strong>_on_job_submitted</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code></a>[[<a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job" title="qdk_chemistry.remote.job.Job"><code class="xref py py-class docutils literal notranslate"><span class="pre">Job</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – Internal callback invoked after a remote job handle
+is persisted to the local cache.</p></li>
+<li><p><strong>_owner</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a>] | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – Internal workspace and project ownership for MCP-managed jobs.</p></li>
+<li><p><strong>**kwargs</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Keyword arguments for <code class="docutils literal notranslate"><span class="pre">algorithm.run()</span></code>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The algorithm result (e.g. <code class="docutils literal notranslate"><span class="pre">(energy,</span> <span class="pre">wavefunction)</span></code>).</p>
+</dd>
+</dl>
+<p>Examples:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># "scheduler" is provided by an installed plugin</span>
+<span class="c1"># Shared cache — both sides use the same backend</span>
+<span class="n">shared</span> <span class="o">=</span> <span class="n">FolderCache</span><span class="p">(</span><span class="s2">"/mnt/shared/cache"</span><span class="p">,</span> <span class="n">is_shared</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">scf</span><span class="p">,</span> <span class="n">mol</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"cc-pvdz"</span><span class="p">,</span>
+          <span class="n">cache</span><span class="o">=</span><span class="n">shared</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="s2">"scheduler"</span><span class="p">)</span>
+
+<span class="c1"># Local cache backed by a shared cache for remote execution</span>
+<span class="n">cache</span> <span class="o">=</span> <span class="n">TieredCache</span><span class="p">([</span><span class="n">FolderCache</span><span class="p">(</span><span class="s2">"./cache"</span><span class="p">),</span> <span class="n">shared</span><span class="p">])</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">run</span><span class="p">(</span><span class="n">scf</span><span class="p">,</span> <span class="n">mol</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"cc-pvdz"</span><span class="p">,</span>
+          <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="s2">"scheduler"</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.remote.submit">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.remote.</span></span><span class="sig-name descname"><span class="pre">submit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">algorithm</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">remote</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">job_dir</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.remote.submit" title="Link to this definition"></a></dt>
+<dd><p>Submit an algorithm for remote execution without blocking.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>algorithm</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Algorithm-like object to execute remotely.</p></li>
+<li><p><strong>*args</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Positional arguments for the algorithm.</p></li>
+<li><p><strong>remote</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Remote backend name or connected backend instance.</p></li>
+<li><p><strong>job_dir</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/pathlib.html#pathlib.Path" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Path</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – Optional directory where the job record is saved.</p></li>
+<li><p><strong>**kwargs</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a></span>) – Keyword arguments for the algorithm.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job" title="qdk_chemistry.remote.job.Job"><code class="xref py py-class docutils literal notranslate"><span class="pre">Job</span></code></a></span></p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A job handle that can be checked, canceled, fetched, or waited on.</p>
 </dd>
 </dl>
 </dd></dl>
@@ -140,6 +285,32 @@ on <code class="docutils literal notranslate"><span class="pre">algorithm.run()<
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.remote.backends.html">qdk_chemistry.remote.backends package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.backends.html#qdk_chemistry.remote.backends.available_backends"><code class="docutils literal notranslate"><span class="pre">available_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.backends.html#qdk_chemistry.remote.backends.create_remote"><code class="docutils literal notranslate"><span class="pre">create_remote()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.backends.html#qdk_chemistry.remote.backends.get_backend"><code class="docutils literal notranslate"><span class="pre">get_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.backends.html#qdk_chemistry.remote.backends.get_mcp_safe_config_options"><code class="docutils literal notranslate"><span class="pre">get_mcp_safe_config_options()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.backends.html#qdk_chemistry.remote.backends.register_backend"><code class="docutils literal notranslate"><span class="pre">register_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.backends.html#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html">qdk_chemistry.remote.backends.base module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobState"><code class="docutils literal notranslate"><span class="pre">JobState</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.JobStatus"><code class="docutils literal notranslate"><span class="pre">JobStatus</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend"><code class="docutils literal notranslate"><span class="pre">RemoteBackend</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.available_backends"><code class="docutils literal notranslate"><span class="pre">available_backends()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.create_remote"><code class="docutils literal notranslate"><span class="pre">create_remote()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.get_backend"><code class="docutils literal notranslate"><span class="pre">get_backend()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.get_mcp_safe_config_options"><code class="docutils literal notranslate"><span class="pre">get_mcp_safe_config_options()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.register_backend"><code class="docutils literal notranslate"><span class="pre">register_backend()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.backends.local.html">qdk_chemistry.remote.backends.local module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend"><code class="docutils literal notranslate"><span class="pre">LocalBackend</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.remote.cache.html">qdk_chemistry.remote.cache package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.cache.html#qdk_chemistry.remote.cache.available_caches"><code class="docutils literal notranslate"><span class="pre">available_caches()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.cache.html#qdk_chemistry.remote.cache.get_cache"><code class="docutils literal notranslate"><span class="pre">get_cache()</span></code></a></li>
@@ -147,11 +318,17 @@ on <code class="docutils literal notranslate"><span class="pre">algorithm.run()<
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.cache.html#qdk_chemistry.remote.cache.resolve_cache"><code class="docutils literal notranslate"><span class="pre">resolve_cache()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.cache.html#submodules">Submodules</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.cache.base.html">qdk_chemistry.remote.cache.base module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.CoreDataClass"><code class="docutils literal notranslate"><span class="pre">CoreDataClass</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.is_cacheable"><code class="docutils literal notranslate"><span class="pre">is_cacheable()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.base.html#qdk_chemistry.remote.cache.base.CacheBackend"><code class="docutils literal notranslate"><span class="pre">CacheBackend</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html">qdk_chemistry.remote.cache.folder module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.CoreDataClass"><code class="docutils literal notranslate"><span class="pre">CoreDataClass</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.instance_data_type_name"><code class="docutils literal notranslate"><span class="pre">instance_data_type_name()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.get_dataclass_type"><code class="docutils literal notranslate"><span class="pre">get_dataclass_type()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.CacheBackend"><code class="docutils literal notranslate"><span class="pre">CacheBackend</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.is_cacheable"><code class="docutils literal notranslate"><span class="pre">is_cacheable()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache"><code class="docutils literal notranslate"><span class="pre">FolderCache</span></code></a></li>
 </ul>
 </li>
@@ -184,14 +361,82 @@ on <code class="docutils literal notranslate"><span class="pre">algorithm.run()<
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.run_hash"><code class="docutils literal notranslate"><span class="pre">Job.run_hash</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.input_hashes"><code class="docutils literal notranslate"><span class="pre">Job.input_hashes</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.output_hashes"><code class="docutils literal notranslate"><span class="pre">Job.output_hashes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.output_is_tuple"><code class="docutils literal notranslate"><span class="pre">Job.output_is_tuple</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.owner"><code class="docutils literal notranslate"><span class="pre">Job.owner</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.__init__"><code class="docutils literal notranslate"><span class="pre">Job.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.to_dict"><code class="docutils literal notranslate"><span class="pre">Job.to_dict()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.save"><code class="docutils literal notranslate"><span class="pre">Job.save()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.load"><code class="docutils literal notranslate"><span class="pre">Job.load()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.discover"><code class="docutils literal notranslate"><span class="pre">Job.discover()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.attach_backend"><code class="docutils literal notranslate"><span class="pre">Job.attach_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.detach_backend"><code class="docutils literal notranslate"><span class="pre">Job.detach_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.check"><code class="docutils literal notranslate"><span class="pre">Job.check()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.cancel"><code class="docutils literal notranslate"><span class="pre">Job.cancel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.fetch"><code class="docutils literal notranslate"><span class="pre">Job.fetch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.cleanup"><code class="docutils literal notranslate"><span class="pre">Job.cleanup()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.wait"><code class="docutils literal notranslate"><span class="pre">Job.wait()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.is_terminal"><code class="docutils literal notranslate"><span class="pre">Job.is_terminal</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.is_successful"><code class="docutils literal notranslate"><span class="pre">Job.is_successful</span></code></a></li>
 </ul>
 </li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.remote.proxy.html">qdk_chemistry.remote.proxy module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job"><code class="docutils literal notranslate"><span class="pre">Job</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.job_id"><code class="docutils literal notranslate"><span class="pre">Job.job_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.backend"><code class="docutils literal notranslate"><span class="pre">Job.backend</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.backend_config"><code class="docutils literal notranslate"><span class="pre">Job.backend_config</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.backend_state"><code class="docutils literal notranslate"><span class="pre">Job.backend_state</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.algorithm_info"><code class="docutils literal notranslate"><span class="pre">Job.algorithm_info</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.status"><code class="docutils literal notranslate"><span class="pre">Job.status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.submitted_at"><code class="docutils literal notranslate"><span class="pre">Job.submitted_at</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.file_path"><code class="docutils literal notranslate"><span class="pre">Job.file_path</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.run_hash"><code class="docutils literal notranslate"><span class="pre">Job.run_hash</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.input_hashes"><code class="docutils literal notranslate"><span class="pre">Job.input_hashes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.output_hashes"><code class="docutils literal notranslate"><span class="pre">Job.output_hashes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.output_is_tuple"><code class="docutils literal notranslate"><span class="pre">Job.output_is_tuple</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.owner"><code class="docutils literal notranslate"><span class="pre">Job.owner</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.__init__"><code class="docutils literal notranslate"><span class="pre">Job.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.to_dict"><code class="docutils literal notranslate"><span class="pre">Job.to_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.save"><code class="docutils literal notranslate"><span class="pre">Job.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.load"><code class="docutils literal notranslate"><span class="pre">Job.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.discover"><code class="docutils literal notranslate"><span class="pre">Job.discover()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.attach_backend"><code class="docutils literal notranslate"><span class="pre">Job.attach_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.detach_backend"><code class="docutils literal notranslate"><span class="pre">Job.detach_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.check"><code class="docutils literal notranslate"><span class="pre">Job.check()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.cancel"><code class="docutils literal notranslate"><span class="pre">Job.cancel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.fetch"><code class="docutils literal notranslate"><span class="pre">Job.fetch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.cleanup"><code class="docutils literal notranslate"><span class="pre">Job.cleanup()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.wait"><code class="docutils literal notranslate"><span class="pre">Job.wait()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.is_terminal"><code class="docutils literal notranslate"><span class="pre">Job.is_terminal</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.Job.is_successful"><code class="docutils literal notranslate"><span class="pre">Job.is_successful</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.submit"><code class="docutils literal notranslate"><span class="pre">submit()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.run"><code class="docutils literal notranslate"><span class="pre">run()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.remote.serialization.html">qdk_chemistry.remote.serialization module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer"><code class="docutils literal notranslate"><span class="pre">FileSerializer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.register_dataclass"><code class="docutils literal notranslate"><span class="pre">FileSerializer.register_dataclass()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.is_dataclass"><code class="docutils literal notranslate"><span class="pre">FileSerializer.is_dataclass()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.is_cacheable"><code class="docutils literal notranslate"><span class="pre">FileSerializer.is_cacheable()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.serialize_value"><code class="docutils literal notranslate"><span class="pre">FileSerializer.serialize_value()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.FileSerializer.deserialize_value"><code class="docutils literal notranslate"><span class="pre">FileSerializer.deserialize_value()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.deserialize_inputs"><code class="docutils literal notranslate"><span class="pre">deserialize_inputs()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.deserialize_outputs"><code class="docutils literal notranslate"><span class="pre">deserialize_outputs()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.get_input_files"><code class="docutils literal notranslate"><span class="pre">get_input_files()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.get_output_files"><code class="docutils literal notranslate"><span class="pre">get_output_files()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.get_serialized_file_names"><code class="docutils literal notranslate"><span class="pre">get_serialized_file_names()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.serialize_inputs"><code class="docutils literal notranslate"><span class="pre">serialize_inputs()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.serialization.html#qdk_chemistry.remote.serialization.serialize_outputs"><code class="docutils literal notranslate"><span class="pre">serialize_outputs()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.remote.worker.html">qdk_chemistry.remote.worker module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.worker.html#qdk_chemistry.remote.worker.execute_job"><code class="docutils literal notranslate"><span class="pre">execute_job()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.remote.worker.html#qdk_chemistry.remote.worker.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
 </ul>
 </li>
 </ul>

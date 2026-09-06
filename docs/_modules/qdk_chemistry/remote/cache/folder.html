@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.remote.cache.folder &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.remote.cache.folder &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -96,17 +97,19 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.remote.cache.folder</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Folder-based cache backend for QDK/Chemistry.</span>
+<span></span><span class="sd">"""Folder-based cache backend for QDK/Chemistry.</span>
 
-<span class="sd">Stores job metadata and DataClass blobs as plain files in a directory::</span>
+<span class="sd">Stores job metadata and content-addressed data as plain files in a directory::</span>
 
 <span class="sd">    cache_dir/</span>
 <span class="sd">        &lt;run_hash&gt;.job.json              # Job metadata</span>
 <span class="sd">        &lt;content_hash&gt;.&lt;type_name&gt;.h5    # DataClass blobs</span>
+<span class="sd">        &lt;content_hash&gt;.ndarray.npy       # NumPy arrays</span>
+<span class="sd">        &lt;content_hash&gt;.list.json         # Supported nested lists</span>
 
 <span class="sd">Primitives (floats, ints, strings, …) are stored inline in the Job JSON</span>
 <span class="sd">and never written as separate files.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -121,57 +124,37 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_item_content_hash</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">CacheBackend</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span> <span class="k">as</span> <span class="n">CoreDataClass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_item_content_hash</span><span class="p">,</span> <span class="n">_numpy_scalar_to_python</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._type_name</span><span class="w"> </span><span class="kn">import</span> <span class="n">instance_data_type_name</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_dataclass_type</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">CacheBackend</span><span class="p">,</span> <span class="n">is_cacheable</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>
 
 
-<span class="n">_dataclass_type_cache</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">type</span><span class="p">[</span><span class="n">DataClass</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_dataclass_type</span><span class="p">(</span><span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">type</span><span class="p">[</span><span class="n">DataClass</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Find the DataClass subclass whose ``_data_type_name`` matches *type_name*.&quot;&quot;&quot;</span>
-    <span class="n">cached</span> <span class="o">=</span> <span class="n">_dataclass_type_cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">cached</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">cached</span>
-
-    <span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span>  <span class="c1"># noqa: PLC0415, F401 — ensure all subclasses are imported</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span> <span class="k">as</span> <span class="n">_CppBase</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span> <span class="k">as</span> <span class="n">_PyBase</span>  <span class="c1"># noqa: PLC0415</span>
-
-    <span class="c1"># Walk both the Python and C++ DataClass hierarchies since C++ types</span>
-    <span class="c1"># (Orbitals, Wavefunction, …) inherit from the pybind11 base, not the</span>
-    <span class="c1"># Python base.</span>
-    <span class="n">stack</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">_PyBase</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">())</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">_CppBase</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">())</span>
-    <span class="n">seen</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-    <span class="k">while</span> <span class="n">stack</span><span class="p">:</span>
-        <span class="bp">cls</span> <span class="o">=</span> <span class="n">stack</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>
-        <span class="k">if</span> <span class="nb">id</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
-            <span class="k">continue</span>
-        <span class="n">seen</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">id</span><span class="p">(</span><span class="bp">cls</span><span class="p">))</span>
-        <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;_data_type_name&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="o">==</span> <span class="n">type_name</span><span class="p">:</span>
-            <span class="n">_dataclass_type_cache</span><span class="p">[</span><span class="n">type_name</span><span class="p">]</span> <span class="o">=</span> <span class="bp">cls</span>  <span class="c1"># type: ignore[assignment]</span>
-            <span class="k">return</span> <span class="bp">cls</span>  <span class="c1"># type: ignore[return-value]</span>
-        <span class="n">stack</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">())</span>
-    <span class="k">return</span> <span class="kc">None</span>
+<span class="w">    </span><span class="sd">"""Find the DataClass loader whose wire-format identifier matches *type_name*."""</span>
+    <span class="k">return</span> <span class="n">get_dataclass_type</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span>
 
 
 <div class="viewcode-block" id="FolderCache">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">FolderCache</span><span class="p">(</span><span class="n">CacheBackend</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Content-addressed folder cache.</span>
+<span class="w">    </span><span class="sd">"""Content-addressed folder cache.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        path: Directory to use as the cache root.  Created on first write.</span>
 <span class="sd">        is_shared: ``True`` when this directory is a network mount</span>
 <span class="sd">            reachable from remote compute nodes.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;folder&quot;</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="s2">"folder"</span>
 
 <div class="viewcode-block" id="FolderCache.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.__init__">[docs]</a>
@@ -182,7 +165,7 @@
         <span class="n">is_shared</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="o">**</span><span class="n">_kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialise with the cache directory path.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialise with the cache directory path."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">is_shared</span><span class="o">=</span><span class="n">is_shared</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">path</span><span class="p">)</span></div>
 
@@ -190,19 +173,19 @@
     <span class="c1"># ── Job metadata ─────────────────────────────────────────────────────</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_key</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;key&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reject keys containing path separators or glob metacharacters.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">key</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;/&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="se">\\</span><span class="s2">&quot;</span><span class="p">,</span> <span class="s2">&quot;..&quot;</span><span class="p">,</span> <span class="s2">&quot;*&quot;</span><span class="p">,</span> <span class="s2">&quot;?&quot;</span><span class="p">,</span> <span class="s2">&quot;[&quot;</span><span class="p">,</span> <span class="s2">&quot;]&quot;</span><span class="p">)):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid cache </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_validate_key</span><span class="p">(</span><span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"key"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Reject keys containing path separators or glob metacharacters."""</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">key</span> <span class="ow">or</span> <span class="nb">any</span><span class="p">(</span><span class="n">c</span> <span class="ow">in</span> <span class="n">key</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"/"</span><span class="p">,</span> <span class="s2">"</span><span class="se">\\</span><span class="s2">"</span><span class="p">,</span> <span class="s2">".."</span><span class="p">,</span> <span class="s2">"*"</span><span class="p">,</span> <span class="s2">"?"</span><span class="p">,</span> <span class="s2">"["</span><span class="p">,</span> <span class="s2">"]"</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Invalid cache </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">key</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_job_path</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">run_hash</span><span class="p">,</span> <span class="s2">&quot;run_hash&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">run_hash</span><span class="si">}</span><span class="s2">.job.json&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">run_hash</span><span class="p">,</span> <span class="s2">"run_hash"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">run_hash</span><span class="si">}</span><span class="s2">.job.json"</span>
 
 <div class="viewcode-block" id="FolderCache.get_job">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.get_job">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Job</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve job metadata by *run_hash*, or ``None`` on miss.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Retrieve job metadata by *run_hash*, or ``None`` on miss."""</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>  <span class="c1"># noqa: PLC0415</span>
 
         <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_path</span><span class="p">(</span><span class="n">run_hash</span><span class="p">)</span>
@@ -217,34 +200,40 @@
 <div class="viewcode-block" id="FolderCache.put_job">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.put_job">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">put_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Job</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Store (or update) job metadata keyed by *run_hash*.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Store (or update) job metadata keyed by *run_hash*."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_path</span><span class="p">(</span><span class="n">run_hash</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_atomic_write_text</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span></div>
 
 
-    <span class="c1"># ── DataClass blobs ──────────────────────────────────────────────────</span>
+    <span class="c1"># ── Data blobs ───────────────────────────────────────────────────────</span>
 
 <div class="viewcode-block" id="FolderCache.get_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.get_data">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DataClass</span> <span class="o">|</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Retrieve a DataClass object (or list) by its content hash, or ``None``.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">&quot;content_hash&quot;</span><span class="p">)</span>
-        <span class="n">generic_list_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># noqa: PLR0911</span>
+<span class="w">        </span><span class="sd">"""Retrieve cached data by its content hash, or ``None``."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">"content_hash"</span><span class="p">)</span>
+        <span class="n">generic_list_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json"</span>
         <span class="k">if</span> <span class="n">generic_list_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_generic_data_list</span><span class="p">(</span><span class="n">generic_list_path</span><span class="p">)</span>
         <span class="c1"># Check for list manifest first — escape literal brackets so glob</span>
-        <span class="c1"># doesn&#39;t treat them as a character class.</span>
-        <span class="n">list_matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[[]*].json&quot;</span><span class="p">))</span>
+        <span class="c1"># doesn't treat them as a character class.</span>
+        <span class="n">list_matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[[]*].json"</span><span class="p">))</span>
         <span class="k">if</span> <span class="n">list_matches</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_data_list</span><span class="p">(</span><span class="n">list_matches</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">array_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.ndarray.npy"</span>
+        <span class="k">if</span> <span class="n">array_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">array_path</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
+                <span class="k">return</span> <span class="kc">None</span>
         <span class="c1"># Glob for &lt;content_hash&gt;.*.h5 — the type name is in the filename</span>
-        <span class="n">matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.*.h5&quot;</span><span class="p">))</span>
+        <span class="n">matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.*.h5"</span><span class="p">))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">matches</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">filepath</span> <span class="o">=</span> <span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="c1"># Extract type name from filename: &lt;hash&gt;.&lt;type_name&gt;.h5</span>
-        <span class="n">type_name</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">removesuffix</span><span class="p">(</span><span class="s2">&quot;.h5&quot;</span><span class="p">)</span>
+        <span class="n">type_name</span> <span class="o">=</span> <span class="n">filepath</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">removeprefix</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span><span class="o">.</span><span class="n">removesuffix</span><span class="p">(</span><span class="s2">".h5"</span><span class="p">)</span>
         <span class="n">dataclass_type</span> <span class="o">=</span> <span class="n">_resolve_dataclass_type</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">dataclass_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -252,43 +241,54 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_get_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">manifest_path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reconstruct a list of DataClass objects from a manifest.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Reconstruct a list of DataClass objects from a manifest."""</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-            <span class="n">dataclass_type</span> <span class="o">=</span> <span class="n">_resolve_dataclass_type</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
-            <span class="n">item_hashes</span> <span class="o">=</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">]</span>
+            <span class="n">dataclass_type</span> <span class="o">=</span> <span class="n">_resolve_dataclass_type</span><span class="p">(</span><span class="n">manifest</span><span class="p">[</span><span class="s2">"type"</span><span class="p">])</span>
+            <span class="n">item_hashes</span> <span class="o">=</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"items"</span><span class="p">]</span>
         <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="n">dataclass_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">items</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">item_hash</span> <span class="ow">in</span> <span class="n">item_hashes</span><span class="p">:</span>
-            <span class="n">matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item_hash</span><span class="si">}</span><span class="s2">.*.h5&quot;</span><span class="p">))</span>
+            <span class="n">matches</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">item_hash</span><span class="si">}</span><span class="s2">.*.h5"</span><span class="p">))</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">matches</span><span class="p">:</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">dataclass_type</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">matches</span><span class="p">[</span><span class="mi">0</span><span class="p">])))</span>  <span class="c1"># type: ignore[attr-defined]</span>
         <span class="k">return</span> <span class="n">items</span>  <span class="c1"># type: ignore[return-value]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_get_generic_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">manifest_path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reconstruct a nested list/tuple result from a generic manifest.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_generic_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">manifest_path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Reconstruct a nested list or tuple result from a generic manifest."""</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-            <span class="k">if</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;kind&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;sequence&quot;</span> <span class="ow">or</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;sequence_type&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;list&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"sequence"</span> <span class="ow">or</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"sequence_type"</span><span class="p">)</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"list"</span><span class="p">,</span> <span class="s2">"tuple"</span><span class="p">}:</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="n">data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_node_to_data</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span>
         <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="k">return</span> <span class="n">data</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">data</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="FolderCache.put_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.put_data">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">put_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">DataClass</span> <span class="o">|</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Store a DataClass object (or list of them) by content hash.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">&quot;content_hash&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">put_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">shared_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Store data by content hash unless shared storage is required but unavailable."""</span>
+        <span class="k">if</span> <span class="n">shared_only</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shared</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">"content_hash"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_cacheable</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"FolderCache does not support caching values of type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_put_data_list</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
-        <span class="n">type_name</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">_data_type_name</span>  <span class="c1"># noqa: SLF001</span>
-        <span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">.h5&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.ndarray.npy"</span>
+            <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="k">return</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_atomic_write_array</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">type_name</span> <span class="o">=</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">filepath</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">.h5"</span>
         <span class="k">if</span> <span class="n">filepath</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># already cached</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -296,13 +296,15 @@
         <span class="k">return</span> <span class="kc">None</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_put_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Store a list of DataClass objects as individual files.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_put_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Store a sequence of DataClass objects as individual files."""</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data_list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_put_generic_data_list</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">data_list</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_homogeneous_dataclass_list</span><span class="p">(</span><span class="n">data_list</span><span class="p">):</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_put_generic_data_list</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="n">data_list</span><span class="p">)</span>
 
-        <span class="n">type_name</span> <span class="o">=</span> <span class="n">data_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_data_type_name</span>  <span class="c1"># noqa: SLF001</span>
-        <span class="n">manifest_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">].json&quot;</span>
+        <span class="n">type_name</span> <span class="o">=</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">data_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">manifest_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">].json"</span>
         <span class="k">if</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -311,12 +313,12 @@
             <span class="n">item_hash</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">content_hash</span><span class="p">()[:</span><span class="mi">16</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">item_hash</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
             <span class="n">item_hashes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item_hash</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_atomic_write_text</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">type_name</span><span class="p">,</span> <span class="s2">&quot;items&quot;</span><span class="p">:</span> <span class="n">item_hashes</span><span class="p">}))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_atomic_write_text</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">"type"</span><span class="p">:</span> <span class="n">type_name</span><span class="p">,</span> <span class="s2">"items"</span><span class="p">:</span> <span class="n">item_hashes</span><span class="p">}))</span>
         <span class="k">return</span> <span class="kc">None</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_put_generic_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Store a list containing nested tuples/lists, DataClass objects, and primitives.&quot;&quot;&quot;</span>
-        <span class="n">manifest_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_put_generic_data_list</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Store a list containing nested tuples/lists, DataClass objects, and primitives."""</span>
+        <span class="n">manifest_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json"</span>
         <span class="k">if</span> <span class="n">manifest_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -324,82 +326,97 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_atomic_write_text</span><span class="p">(</span><span class="n">manifest_path</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">manifest</span><span class="p">))</span>
 
     <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_is_homogeneous_dataclass_list</span><span class="p">(</span><span class="n">data_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return whether *data_list* can use the legacy homogeneous-list manifest.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_is_homogeneous_dataclass_list</span><span class="p">(</span><span class="n">data_list</span><span class="p">:</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return whether *data_list* can use the legacy homogeneous-list manifest."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">data_list</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data_list</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="s2">&quot;_data_type_name&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data_list</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">CoreDataClass</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">False</span>
-        <span class="n">type_name</span> <span class="o">=</span> <span class="n">data_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">_data_type_name</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">type_name</span> <span class="o">=</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">data_list</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
         <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data_list</span><span class="p">:</span>
-            <span class="k">if</span> <span class="ow">not</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="s2">&quot;_data_type_name&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">CoreDataClass</span><span class="p">):</span>
                 <span class="k">return</span> <span class="kc">False</span>
-            <span class="k">if</span> <span class="n">item</span><span class="o">.</span><span class="n">_data_type_name</span> <span class="o">!=</span> <span class="n">type_name</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+            <span class="k">if</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="o">!=</span> <span class="n">type_name</span><span class="p">:</span>
                 <span class="k">return</span> <span class="kc">False</span>
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_data_to_node</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert supported cached data into a JSON manifest node.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Convert supported cached data into a JSON manifest node."""</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">generic</span><span class="p">):</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">_numpy_scalar_to_python</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">list</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">):</span>
             <span class="k">return</span> <span class="p">{</span>
-                <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;sequence&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;sequence_type&quot;</span><span class="p">:</span> <span class="s2">&quot;tuple&quot;</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;list&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;items&quot;</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_to_node</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">],</span>
+                <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"sequence"</span><span class="p">,</span>
+                <span class="s2">"sequence_type"</span><span class="p">:</span> <span class="s2">"tuple"</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"list"</span><span class="p">,</span>
+                <span class="s2">"items"</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_data_to_node</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">data</span><span class="p">],</span>
             <span class="p">}</span>
         <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">bool</span> <span class="o">|</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">str</span><span class="p">):</span>
-            <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;primitive&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">data</span><span class="p">}</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="s2">&quot;_data_type_name&quot;</span><span class="p">):</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"primitive"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">:</span> <span class="n">data</span><span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">CoreDataClass</span><span class="p">):</span>
             <span class="n">item_hash</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">item_hash</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">{</span>
-                <span class="s2">&quot;kind&quot;</span><span class="p">:</span> <span class="s2">&quot;dataclass&quot;</span><span class="p">,</span>
-                <span class="s2">&quot;hash&quot;</span><span class="p">:</span> <span class="n">item_hash</span><span class="p">,</span>
-                <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">data</span><span class="o">.</span><span class="n">_data_type_name</span><span class="p">,</span>  <span class="c1"># noqa: SLF001</span>
+                <span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"dataclass"</span><span class="p">,</span>
+                <span class="s2">"hash"</span><span class="p">:</span> <span class="n">item_hash</span><span class="p">,</span>
+                <span class="s2">"type"</span><span class="p">:</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>
             <span class="p">}</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">):</span>
+            <span class="n">item_hash</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">item_hash</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+            <span class="k">return</span> <span class="p">{</span><span class="s2">"kind"</span><span class="p">:</span> <span class="s2">"ndarray"</span><span class="p">,</span> <span class="s2">"hash"</span><span class="p">:</span> <span class="n">item_hash</span><span class="p">}</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
-            <span class="s2">&quot;FolderCache only supports caching DataClass objects, primitives, and nested lists/tuples containing them&quot;</span>
+            <span class="s2">"FolderCache does not support this value graph; expected DataClass objects, NumPy arrays, primitives, "</span>
+            <span class="s2">"or nested lists/tuples containing them"</span>
         <span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_node_to_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Reconstruct supported cached data from a JSON manifest node.&quot;&quot;&quot;</span>
-        <span class="n">kind</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;kind&quot;</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;primitive&quot;</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;value&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;sequence&quot;</span><span class="p">:</span>
-            <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_node_to_data</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;items&quot;</span><span class="p">]]</span>
-            <span class="n">sequence_type</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">&quot;sequence_type&quot;</span><span class="p">]</span>
-            <span class="k">if</span> <span class="n">sequence_type</span> <span class="o">==</span> <span class="s2">&quot;list&quot;</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Reconstruct supported cached data from a JSON manifest node."""</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">"kind"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"primitive"</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"value"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"sequence"</span><span class="p">:</span>
+            <span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_node_to_data</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">node</span><span class="p">[</span><span class="s2">"items"</span><span class="p">]]</span>
+            <span class="n">sequence_type</span> <span class="o">=</span> <span class="n">node</span><span class="p">[</span><span class="s2">"sequence_type"</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">sequence_type</span> <span class="o">==</span> <span class="s2">"list"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">items</span>
-            <span class="k">if</span> <span class="n">sequence_type</span> <span class="o">==</span> <span class="s2">&quot;tuple&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">sequence_type</span> <span class="o">==</span> <span class="s2">"tuple"</span><span class="p">:</span>
                 <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown cached sequence type: </span><span class="si">{</span><span class="n">sequence_type</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;dataclass&quot;</span><span class="p">:</span>
-            <span class="n">dataclass_type</span> <span class="o">=</span> <span class="n">_resolve_dataclass_type</span><span class="p">(</span><span class="n">node</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown cached sequence type: </span><span class="si">{</span><span class="n">sequence_type</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"dataclass"</span><span class="p">:</span>
+            <span class="n">dataclass_type</span> <span class="o">=</span> <span class="n">_resolve_dataclass_type</span><span class="p">(</span><span class="n">node</span><span class="p">[</span><span class="s2">"type"</span><span class="p">])</span>
             <span class="k">if</span> <span class="n">dataclass_type</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown cached data type: </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;hash&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.h5&quot;</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown cached data type: </span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">'type'</span><span class="p">]</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">'hash'</span><span class="p">]</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">'type'</span><span class="p">]</span><span class="si">}</span><span class="s2">.h5"</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
                 <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">dataclass_type</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>  <span class="c1"># type: ignore[attr-defined]</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown cached manifest node kind: </span><span class="si">{</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"ndarray"</span><span class="p">:</span>
+            <span class="n">path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">'hash'</span><span class="p">]</span><span class="si">}</span><span class="s2">.ndarray.npy"</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+                <span class="k">raise</span> <span class="ne">FileNotFoundError</span><span class="p">(</span><span class="n">path</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown cached manifest node kind: </span><span class="si">{</span><span class="n">kind</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
 
 <div class="viewcode-block" id="FolderCache.has_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.has_data">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">has_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fast existence check via glob (no deserialization).&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">&quot;content_hash&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">shared_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Fast existence check via glob (no deserialization)."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">"content_hash"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">shared_only</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shared</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
         <span class="k">return</span> <span class="p">(</span>
-            <span class="nb">bool</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.*.h5&quot;</span><span class="p">)))</span>
-            <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[[]*].json&quot;</span><span class="p">)))</span>
-            <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+            <span class="nb">bool</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.*.h5"</span><span class="p">)))</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.ndarray.npy"</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+            <span class="ow">or</span> <span class="nb">bool</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[[]*].json"</span><span class="p">)))</span>
+            <span class="ow">or</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json"</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
         <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="FolderCache.to_config">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.to_config">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return kwargs to reconstruct this FolderCache.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">),</span> <span class="s2">&quot;is_shared&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shared</span><span class="p">}</span></div>
+<span class="w">        </span><span class="sd">"""Return kwargs to reconstruct this FolderCache."""</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">"path"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">),</span> <span class="s2">"is_shared"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_shared</span><span class="p">}</span></div>
 
 
     <span class="c1"># ── Deletion ────────────────────────────────────────────────────────────</span>
@@ -407,11 +424,11 @@
 <div class="viewcode-block" id="FolderCache.delete_job">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.delete_job">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">delete_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove job metadata by *run_hash*.</span>
+<span class="w">        </span><span class="sd">"""Remove job metadata by *run_hash*.</span>
 
 <span class="sd">        Only the ``.job.json`` file is deleted.  Data blobs are left intact</span>
 <span class="sd">        because they may be referenced by other jobs.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_path</span><span class="p">(</span><span class="n">run_hash</span><span class="p">)</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">p</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span> <span class="kc">False</span>
@@ -422,19 +439,20 @@
 <div class="viewcode-block" id="FolderCache.delete_data">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.delete_data">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">delete_data</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">content_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove a DataClass blob (or list manifest and its items) by content hash.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">&quot;content_hash&quot;</span><span class="p">)</span>
-        <span class="kn">import</span><span class="w"> </span><span class="nn">json</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_json</span>  <span class="c1"># noqa: PLC0415</span>
-
+<span class="w">        </span><span class="sd">"""Remove a DataClass blob (or list manifest and its items) by content hash."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_validate_key</span><span class="p">(</span><span class="n">content_hash</span><span class="p">,</span> <span class="s2">"content_hash"</span><span class="p">)</span>
         <span class="n">deleted</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">child_nodes</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
         <span class="c1"># Remove list manifests and their per-item blobs</span>
-        <span class="n">generic_manifest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json&quot;</span>
+        <span class="n">generic_manifest</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list.json"</span>
         <span class="k">if</span> <span class="n">generic_manifest</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">manifest</span> <span class="o">=</span> <span class="n">_json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">generic_manifest</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_delete_data_nodes</span><span class="p">(</span><span class="n">manifest</span><span class="p">)</span>
-            <span class="k">except</span> <span class="p">(</span><span class="n">_json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">generic_manifest</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_collect_data_nodes</span><span class="p">(</span><span class="n">manifest</span><span class="p">,</span> <span class="n">child_nodes</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                <span class="c1"># Best-effort cleanup: retain any collected child nodes and</span>
+                <span class="c1"># continue deleting even when the manifest is corrupt or unreadable.</span>
                 <span class="k">pass</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">generic_manifest</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
@@ -442,11 +460,11 @@
             <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
                 <span class="k">pass</span>
 
-        <span class="n">list_matches</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[[]*].json&quot;</span><span class="p">))</span>
+        <span class="n">list_matches</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.list[[]*].json"</span><span class="p">))</span>
         <span class="k">for</span> <span class="n">manifest_path</span> <span class="ow">in</span> <span class="n">list_matches</span><span class="p">:</span>
             <span class="k">try</span><span class="p">:</span>
-                <span class="n">manifest</span> <span class="o">=</span> <span class="n">_json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
-            <span class="k">except</span> <span class="p">(</span><span class="n">_json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
+                <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
                 <span class="k">try</span><span class="p">:</span>
                     <span class="n">manifest_path</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
                     <span class="n">deleted</span> <span class="o">=</span> <span class="kc">True</span>
@@ -454,25 +472,36 @@
                     <span class="k">pass</span>
                 <span class="k">continue</span>
 
-            <span class="k">for</span> <span class="n">item_hash</span> <span class="ow">in</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-                <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">item_hash</span><span class="si">}</span><span class="s2">.*.h5&quot;</span><span class="p">):</span>
-                    <span class="n">deleted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unlink_existing</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="ow">or</span> <span class="n">deleted</span>
+            <span class="k">for</span> <span class="n">item_hash</span> <span class="ow">in</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"items"</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">child_nodes</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="s2">"dataclass"</span><span class="p">,</span> <span class="n">item_hash</span><span class="p">))</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="n">manifest_path</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
                 <span class="n">deleted</span> <span class="o">=</span> <span class="kc">True</span>
             <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
                 <span class="k">pass</span>
 
+        <span class="k">if</span> <span class="n">child_nodes</span><span class="p">:</span>
+            <span class="n">referenced_nodes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_referenced_data_nodes</span><span class="p">()</span>
+            <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">item_hash</span> <span class="ow">in</span> <span class="n">child_nodes</span> <span class="o">-</span> <span class="n">referenced_nodes</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"dataclass"</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">item_hash</span><span class="si">}</span><span class="s2">.*.h5"</span><span class="p">):</span>
+                        <span class="n">deleted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unlink_existing</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="ow">or</span> <span class="n">deleted</span>
+                <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"ndarray"</span><span class="p">:</span>
+                    <span class="n">deleted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unlink_existing</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">item_hash</span><span class="si">}</span><span class="s2">.ndarray.npy"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">deleted</span>
+
         <span class="c1"># Remove single-object blobs</span>
-        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.*.h5&quot;</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.*.h5"</span><span class="p">):</span>
             <span class="n">deleted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unlink_existing</span><span class="p">(</span><span class="n">f</span><span class="p">)</span> <span class="ow">or</span> <span class="n">deleted</span>
+        <span class="n">array_path</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">content_hash</span><span class="si">}</span><span class="s2">.ndarray.npy"</span>
+        <span class="k">if</span> <span class="n">array_path</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">deleted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_unlink_existing</span><span class="p">(</span><span class="n">array_path</span><span class="p">)</span> <span class="ow">or</span> <span class="n">deleted</span>
 
         <span class="k">return</span> <span class="n">deleted</span></div>
 
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_unlink_existing</span><span class="p">(</span><span class="n">path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Unlink *path*, tolerating concurrent deletion.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Unlink *path*, tolerating concurrent deletion."""</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">path</span><span class="o">.</span><span class="n">unlink</span><span class="p">()</span>
             <span class="k">return</span> <span class="kc">True</span>
@@ -481,21 +510,41 @@
         <span class="k">except</span> <span class="ne">OSError</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_delete_data_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">node</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Delete DataClass blobs referenced by a generic manifest node.&quot;&quot;&quot;</span>
-        <span class="n">kind</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;kind&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;dataclass&quot;</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;hash&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">.*.h5&quot;</span><span class="p">):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_unlink_existing</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_collect_data_nodes</span><span class="p">(</span><span class="n">node</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">nodes</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Collect data blobs referenced by a generic manifest node."""</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"kind"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"dataclass"</span><span class="p">:</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">kind</span><span class="p">,</span> <span class="n">node</span><span class="p">[</span><span class="s2">"hash"</span><span class="p">]))</span>
             <span class="k">return</span>
-        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;sequence&quot;</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;items&quot;</span><span class="p">,</span> <span class="p">[]):</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_delete_data_nodes</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"ndarray"</span><span class="p">:</span>
+            <span class="n">nodes</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">kind</span><span class="p">,</span> <span class="n">node</span><span class="p">[</span><span class="s2">"hash"</span><span class="p">]))</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"sequence"</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">node</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"items"</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="n">FolderCache</span><span class="o">.</span><span class="n">_collect_data_nodes</span><span class="p">(</span><span class="n">item</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_referenced_data_nodes</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">"""Return data blobs referenced by sequence manifests in the cache."""</span>
+        <span class="n">nodes</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">manifest_path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">"*.list.json"</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_collect_data_nodes</span><span class="p">(</span><span class="n">manifest</span><span class="p">,</span> <span class="n">nodes</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                <span class="k">continue</span>
+        <span class="k">for</span> <span class="n">manifest_path</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">"*.list[[]*].json"</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">manifest_path</span><span class="o">.</span><span class="n">read_text</span><span class="p">())</span>
+                <span class="n">nodes</span><span class="o">.</span><span class="n">update</span><span class="p">((</span><span class="s2">"dataclass"</span><span class="p">,</span> <span class="n">item_hash</span><span class="p">)</span> <span class="k">for</span> <span class="n">item_hash</span> <span class="ow">in</span> <span class="n">manifest</span><span class="p">[</span><span class="s2">"items"</span><span class="p">])</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">,</span> <span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">):</span>
+                <span class="k">continue</span>
+        <span class="k">return</span> <span class="n">nodes</span>
 
 <div class="viewcode-block" id="FolderCache.clear">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache.clear">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove all cached jobs and data blobs.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Remove all cached jobs and data blobs."""</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>  <span class="c1"># noqa: PLC0415</span>
@@ -506,8 +555,8 @@
     <span class="c1"># ── Atomic write helpers ────────────────────────────────────────────────</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_atomic_write_text</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write *text* to *path* atomically via temp file + os.replace.&quot;&quot;&quot;</span>
-        <span class="n">fd</span><span class="p">,</span> <span class="n">tmp</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">&quot;.tmp&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""Write *text* to *path* atomically via temp file + os.replace."""</span>
+        <span class="n">fd</span><span class="p">,</span> <span class="n">tmp</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">".tmp"</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">os</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="n">text</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
             <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
@@ -520,14 +569,25 @@
             <span class="k">raise</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_atomic_write_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">DataClass</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write *data* to *path* atomically via temp file + os.replace.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Write *data* to *path* atomically via temp file + os.replace."""</span>
         <span class="c1"># Temp file must match the &lt;hash&gt;.&lt;type&gt;.h5 naming convention</span>
         <span class="c1"># expected by DataClass.to_hdf5_file.</span>
-        <span class="n">type_name</span> <span class="o">=</span> <span class="n">data</span><span class="o">.</span><span class="n">_data_type_name</span>  <span class="c1"># noqa: SLF001</span>
-        <span class="n">fd</span><span class="p">,</span> <span class="n">tmp</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">&quot;tmp_&quot;</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;.</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">.h5&quot;</span><span class="p">)</span>
+        <span class="n">type_name</span> <span class="o">=</span> <span class="n">instance_data_type_name</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">fd</span><span class="p">,</span> <span class="n">tmp</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">,</span> <span class="n">prefix</span><span class="o">=</span><span class="s2">"tmp_"</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="sa">f</span><span class="s2">".</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">.h5"</span><span class="p">)</span>
         <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">data</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
+            <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_atomic_write_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Write a NumPy array atomically via temp file + os.replace."""</span>
+        <span class="n">fd</span><span class="p">,</span> <span class="n">tmp</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkstemp</span><span class="p">(</span><span class="nb">dir</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_root</span><span class="p">,</span> <span class="n">suffix</span><span class="o">=</span><span class="s2">".ndarray.npy"</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">os</span><span class="o">.</span><span class="n">fdopen</span><span class="p">(</span><span class="n">fd</span><span class="p">,</span> <span class="s2">"wb"</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">file</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">allow_pickle</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
             <span class="n">os</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="n">tmp</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">BaseException</span><span class="p">:</span>
             <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">tmp</span><span class="p">)</span><span class="o">.</span><span class="n">unlink</span><span class="p">(</span><span class="n">missing_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>

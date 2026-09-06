@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Changelog &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Changelog &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=20623aea"></script>
+      <script src="_static/documentation_options.js?v=b21de401"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -70,6 +71,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="release-notes/index.html">Release Notes</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Changelog</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#version-2-2-0">Version 2.2.0</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#version-2-1-0">Version 2.1.0</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#version-2-0-0">Version 2.0.0</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#version-1-1-0">Version 1.1.0</a></li>
@@ -109,6 +111,49 @@
   <section id="changelog">
 <h1>Changelog<a class="headerlink" href="#changelog" title="Link to this heading"></a></h1>
 <p>For detailed release notes with code examples and feature walkthroughs, see the <a class="reference internal" href="release-notes/index.html"><span class="doc">Release Notes</span></a> section.</p>
+<section id="version-2-2-0">
+<h2>Version 2.2.0<a class="headerlink" href="#version-2-2-0" title="Link to this heading"></a></h2>
+<p>See <a class="reference internal" href="release-notes/v2.2.0.html#release-v2-2-0"><span class="std std-ref">What’s New in Version 2.2</span></a> for full details.</p>
+<ul class="simple">
+<li><p>Model Context Protocol server (<code class="docutils literal notranslate"><span class="pre">qcmcp</span></code>) and command-line interface (<code class="docutils literal notranslate"><span class="pre">qc</span></code>) exposing the chemistry pipeline as structured tools, plus installable Copilot skills and MCP-configuration assets</p></li>
+<li><p>Remote algorithm execution and result caching: <code class="docutils literal notranslate"><span class="pre">run()</span></code> accepts <code class="docutils literal notranslate"><span class="pre">remote</span></code> and <code class="docutils literal notranslate"><span class="pre">cache</span></code> for serializable arguments and results, backed by a file-based request format and pluggable remote and cache backends</p></li>
+<li><p>Remote backend for Microsoft Discovery, installed with the new <code class="docutils literal notranslate"><span class="pre">discovery</span></code> extra</p></li>
+<li><p>Unary-iteration phase estimation (<code class="docutils literal notranslate"><span class="pre">phase_estimation</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_unary</span></code>) over a qubitized walk; execution currently requires the sparse-state simulator</p></li>
+<li><p>Binary encoding for sparse isometry state preparation, reducing the dense amplitude-loading width when <span class="math notranslate nohighlight">\(\lceil \log_2 d \rceil\)</span> is smaller than the reduced support width, in exchange for lookup ancillas and CCZ operations</p></li>
+<li><p>Controlled-SWAP circuit mapper (<code class="docutils literal notranslate"><span class="pre">controlled_circuit_mapper</span></code> / <code class="docutils literal notranslate"><span class="pre">cswap_pauli_sequence</span></code>) with a vacuum-annihilating term grouper and an additional system-sized vacuum register</p></li>
+<li><p>Amplitude amplification (<code class="docutils literal notranslate"><span class="pre">amplitude_amplification</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_base</span></code>) with a registered QPE subspace-marking oracle</p></li>
+<li><p>Gauge-fixing orbital localizer (<code class="docutils literal notranslate"><span class="pre">qdk_gauge_fixing</span></code>) that searches occupation-degenerate blocks for a lower mapped coefficient norm, and an active-space quantum-information orbital localizer (<code class="docutils literal notranslate"><span class="pre">qdk_active_space_qio</span></code>) that optimizes total single-orbital entropy</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">effective_hamiltonian_constructor</span></code> interface for registering methods that downfold a Hamiltonian onto a target orbital space; no implementation ships in this release</p></li>
+<li><p>Mulliken population analysis (<code class="docutils literal notranslate"><span class="pre">population_analyzer</span></code>) and <code class="docutils literal notranslate"><span class="pre">Wavefunction.compute_s_squared()</span></code></p></li>
+<li><p>Native in-process cube generation for orbitals, with no third-party quantum chemistry package required</p></li>
+<li><p>Native Windows wheels for x86-64 and Arm64, subject to the optional-dependency caveats in the release notes</p></li>
+<li><p>New tutorial: ground-state molecular energies with quantum phase estimation</p></li>
+</ul>
+<p>Behavior changes:</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">state_prep</span></code> implementation <code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry_gf2x&quot;</span></code> is renamed <code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry&quot;</span></code>; the old name remains as a deprecated alias</p></li>
+<li><p>Orbital cube generation defaults to the native backend instead of PySCF, and default labels are zero-based (orbital <code class="docutils literal notranslate"><span class="pre">0</span></code> now writes <code class="docutils literal notranslate"><span class="pre">orbital_0000.cube</span></code> instead of <code class="docutils literal notranslate"><span class="pre">orbital_0001.cube</span></code>)</p></li>
+<li><p><a class="reference internal" href="glossary.html#term-ECP"><span class="xref std std-term">ECP</span></a>-adjusted nuclear charges now determine SCF electron counts, nuclear repulsion energies, and Hamiltonian core energies, changing results for systems with effective core potentials; ECP assignments are keyed by atom rather than element, and pre-2.2 cached results for these systems must be cleared</p></li>
+<li><p>When a stored one-particle <a class="reference internal" href="glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> does not match its determinant, orbital occupations are now its natural occupation numbers rather than integer mean-field occupations</p></li>
+<li><p>Duplicate algorithm, data-class, remote-backend, and cache-backend registrations now raise <code class="docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code> and preserve the existing registration</p></li>
+<li><p>Custom <code class="docutils literal notranslate"><span class="pre">DataClass</span></code> subclasses must declare a static <code class="docutils literal notranslate"><span class="pre">data_type_name()</span></code> method instead of the former <code class="docutils literal notranslate"><span class="pre">_data_type_name</span></code> class attribute</p></li>
+<li><p>Supported BLAS backends are temporarily restricted to one thread inside GauXC-backed SCF, gradient, and response operations because nested BLAS threading could cause oversubscription or wrong results</p></li>
+</ul>
+<p>Packaging and build changes:</p>
+<ul class="simple">
+<li><p>The new <code class="docutils literal notranslate"><span class="pre">mcp</span></code> extra installs the MCP server dependencies; on Windows Arm64 it is omitted from the <code class="docutils literal notranslate"><span class="pre">all</span></code> and <code class="docutils literal notranslate"><span class="pre">test</span></code> extras because <code class="docutils literal notranslate"><span class="pre">cryptography</span></code> has no native wheel</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">jupyter</span></code> extra no longer installs the <code class="docutils literal notranslate"><span class="pre">plugins</span></code> extra; plugin backends require explicit opt-in</p></li>
+<li><p>Source builds and CI now use Libint2 2.13.1 consistently</p></li>
+<li><p>Fixed a BLIS/libFLAME symbol collision in Linux wheel builds</p></li>
+</ul>
+<p>Bug fixes:</p>
+<ul class="simple">
+<li><p>Importing <code class="docutils literal notranslate"><span class="pre">qdk_chemistry</span></code> no longer emits the <code class="docutils literal notranslate"><span class="pre">MP2NaturalOrbitalLocalizer</span></code> deprecation message, while explicit use of <code class="docutils literal notranslate"><span class="pre">qdk_mp2_natural_orbitals</span></code> still warns</p></li>
+<li><p>Derived orbitals survive JSON round trips: <code class="docutils literal notranslate"><span class="pre">Orbitals.from_json</span></code> returns the concrete type instead of a sliced base <code class="docutils literal notranslate"><span class="pre">Orbitals</span></code></p></li>
+<li><p>Cache plugin discovery failures are logged instead of being swallowed</p></li>
+<li><p>Corrected exponent rendering in the controlled-IQPE tutorial diagram</p></li>
+</ul>
+</section>
 <section id="version-2-1-0">
 <h2>Version 2.1.0<a class="headerlink" href="#version-2-1-0" title="Link to this heading"></a></h2>
 <p>See <a class="reference internal" href="release-notes/v2.1.0.html#release-v2-1-0"><span class="std std-ref">What’s New in Version 2.1</span></a> for full details.</p>

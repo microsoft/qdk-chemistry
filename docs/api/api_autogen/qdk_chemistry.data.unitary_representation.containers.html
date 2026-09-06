@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.unitary_representation.containers package &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.data.unitary_representation.containers package &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -128,7 +129,10 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction"><code class="docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionContainer"><code class="docutils literal notranslate"><span class="pre">WavefunctionContainer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.WavefunctionType"><code class="docutils literal notranslate"><span class="pre">WavefunctionType</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.available_dataclasses"><code class="docutils literal notranslate"><span class="pre">available_dataclasses()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.get_current_ciaaw_version"><code class="docutils literal notranslate"><span class="pre">get_current_ciaaw_version()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.get_dataclass_type"><code class="docutils literal notranslate"><span class="pre">get_dataclass_type()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.register_dataclass"><code class="docutils literal notranslate"><span class="pre">register_dataclass()</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.data.html#subpackages">Subpackages</a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.data.html#submodules">Submodules</a></li>
 </ul>
@@ -187,6 +191,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.base.html">qdk_chemistry.data.unitary_representation.containers.base module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer"><code class="docutils literal notranslate"><span class="pre">UnitaryContainer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.data_type_name"><code class="docutils literal notranslate"><span class="pre">UnitaryContainer.data_type_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.type"><code class="docutils literal notranslate"><span class="pre">UnitaryContainer.type</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.num_qubits"><code class="docutils literal notranslate"><span class="pre">UnitaryContainer.num_qubits</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.to_json"><code class="docutils literal notranslate"><span class="pre">UnitaryContainer.to_json()</span></code></a></li>
@@ -202,18 +207,18 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html">qdk_chemistry.data.unitary_representation.containers.block_encoding module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.BlockEncodingContainer"><code class="docutils literal notranslate"><span class="pre">BlockEncodingContainer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.BlockEncodingContainer.data_type_name"><code class="docutils literal notranslate"><span class="pre">BlockEncodingContainer.data_type_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.BlockEncodingContainer.power"><code class="docutils literal notranslate"><span class="pre">BlockEncodingContainer.power</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation"><code class="docutils literal notranslate"><span class="pre">ControlledOperation</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.ctrl_state"><code class="docutils literal notranslate"><span class="pre">ControlledOperation.ctrl_state</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.operation"><code class="docutils literal notranslate"><span class="pre">ControlledOperation.operation</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.to_hdf5"><code class="docutils literal notranslate"><span class="pre">ControlledOperation.to_hdf5()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.from_hdf5"><code class="docutils literal notranslate"><span class="pre">ControlledOperation.from_hdf5()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.ControlledOperation.__init__"><code class="docutils literal notranslate"><span class="pre">ControlledOperation.__init__()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer"><code class="docutils literal notranslate"><span class="pre">LCUContainer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.data_type_name"><code class="docutils literal notranslate"><span class="pre">LCUContainer.data_type_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.__init__"><code class="docutils literal notranslate"><span class="pre">LCUContainer.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.power"><code class="docutils literal notranslate"><span class="pre">LCUContainer.power</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.LCUContainer.num_prepare_ancillas"><code class="docutils literal notranslate"><span class="pre">LCUContainer.num_prepare_ancillas</span></code></a></li>
@@ -228,12 +233,6 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select"><code class="docutils literal notranslate"><span class="pre">Select</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.controlled_operations"><code class="docutils literal notranslate"><span class="pre">Select.controlled_operations</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.phases"><code class="docutils literal notranslate"><span class="pre">Select.phases</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.num_prepare_ancillas"><code class="docutils literal notranslate"><span class="pre">Select.num_prepare_ancillas</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.num_target_qubits"><code class="docutils literal notranslate"><span class="pre">Select.num_target_qubits</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.prepare_qubits"><code class="docutils literal notranslate"><span class="pre">Select.prepare_qubits</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.target_qubits"><code class="docutils literal notranslate"><span class="pre">Select.target_qubits</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.to_hdf5"><code class="docutils literal notranslate"><span class="pre">Select.to_hdf5()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.from_hdf5"><code class="docutils literal notranslate"><span class="pre">Select.from_hdf5()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.block_encoding.html#qdk_chemistry.data.unitary_representation.containers.block_encoding.Select.__init__"><code class="docutils literal notranslate"><span class="pre">Select.__init__()</span></code></a></li>
@@ -243,12 +242,11 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html">qdk_chemistry.data.unitary_representation.containers.pauli_product_formula module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm"><code class="docutils literal notranslate"><span class="pre">ExponentiatedPauliTerm</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.pauli_term"><code class="docutils literal notranslate"><span class="pre">ExponentiatedPauliTerm.pauli_term</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.angle"><code class="docutils literal notranslate"><span class="pre">ExponentiatedPauliTerm.angle</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.ExponentiatedPauliTerm.__init__"><code class="docutils literal notranslate"><span class="pre">ExponentiatedPauliTerm.__init__()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer"><code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.data_type_name"><code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer.data_type_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.__init__"><code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.eigenvalue_from_phase"><code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer.eigenvalue_from_phase()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.html#qdk_chemistry.data.unitary_representation.containers.pauli_product_formula.PauliProductFormulaContainer.type"><code class="docutils literal notranslate"><span class="pre">PauliProductFormulaContainer.type</span></code></a></li>
@@ -266,6 +264,7 @@
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html">qdk_chemistry.data.unitary_representation.containers.quantum_walk module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer"><code class="docutils literal notranslate"><span class="pre">LCUWalkContainer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.data_type_name"><code class="docutils literal notranslate"><span class="pre">LCUWalkContainer.data_type_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.__init__"><code class="docutils literal notranslate"><span class="pre">LCUWalkContainer.__init__()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.block_encoding"><code class="docutils literal notranslate"><span class="pre">LCUWalkContainer.block_encoding</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.LCUWalkContainer.power"><code class="docutils literal notranslate"><span class="pre">LCUWalkContainer.power</span></code></a></li>
@@ -279,6 +278,7 @@
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer"><code class="docutils literal notranslate"><span class="pre">QuantumWalkContainer</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.data_type_name"><code class="docutils literal notranslate"><span class="pre">QuantumWalkContainer.data_type_name()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.eigenvalue_from_phase"><code class="docutils literal notranslate"><span class="pre">QuantumWalkContainer.eigenvalue_from_phase()</span></code></a></li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.data.unitary_representation.containers.quantum_walk.html#qdk_chemistry.data.unitary_representation.containers.quantum_walk.QuantumWalkContainer.power"><code class="docutils literal notranslate"><span class="pre">QuantumWalkContainer.power</span></code></a></li>
 </ul>

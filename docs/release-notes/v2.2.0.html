@@ -1,0 +1,446 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What’s New in Version 2.2 &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="What’s New in Version 2.1" href="v2.1.0.html" />
+    <link rel="prev" title="Release Notes" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 2.2</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#command-line-and-mcp-interfaces">Command-Line and MCP Interfaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#remote-execution-and-caching">Remote Execution and Caching</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#microsoft-discovery">Microsoft Discovery</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#algorithm-components">Algorithm Components</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#unary-iteration-phase-estimation">Unary-iteration phase estimation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#binary-encoding-for-sparse-isometry">Binary encoding for sparse isometry</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#controlled-swap-circuit-mapping">Controlled-SWAP circuit mapping</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#amplitude-amplification">Amplitude amplification</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#effective-hamiltonian-interface">Effective Hamiltonian interface</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#orbitals-analysis-and-cube-generation">Orbitals, Analysis, and Cube Generation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#molecular-qpe-tutorial">Molecular QPE Tutorial</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#platforms-and-packaging">Platforms and Packaging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#behavior-changes">Behavior Changes</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sparse-isometry-name">Sparse-isometry name</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#ecp-handling">ECP handling</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#orbital-occupations">Orbital occupations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#cube-generation">Cube generation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#registration">Registration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#nested-blas-threading">Nested BLAS threading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#bug-fixes">Bug Fixes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="v2.1.0.html">What’s New in Version 2.1</a></li>
+<li class="toctree-l2"><a class="reference internal" href="v2.0.0.html">What’s New in Version 2.0</a></li>
+<li class="toctree-l2"><a class="reference internal" href="v1.1.0.html">What’s New in Version 1.1</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Release Notes</a></li>
+      <li class="breadcrumb-item active">What’s New in Version 2.2</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/release-notes/v2.2.0.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="what-s-new-in-version-2-2">
+<span id="release-v2-2-0"></span><h1>What’s New in Version 2.2<a class="headerlink" href="#what-s-new-in-version-2-2" title="Link to this heading"></a></h1>
+<p>Version 2.2 changes several numerical and packaging behaviors; see
+<a class="reference internal" href="#v2-2-behavior-changes"><span class="std std-ref">Behavior Changes</span></a>.</p>
+<nav class="contents local" id="on-this-page">
+<p class="topic-title">On this page</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#command-line-and-mcp-interfaces" id="id1">Command-Line and MCP Interfaces</a></p></li>
+<li><p><a class="reference internal" href="#remote-execution-and-caching" id="id2">Remote Execution and Caching</a></p></li>
+<li><p><a class="reference internal" href="#algorithm-components" id="id3">Algorithm Components</a></p></li>
+<li><p><a class="reference internal" href="#orbitals-analysis-and-cube-generation" id="id4">Orbitals, Analysis, and Cube Generation</a></p></li>
+<li><p><a class="reference internal" href="#molecular-qpe-tutorial" id="id5">Molecular QPE Tutorial</a></p></li>
+<li><p><a class="reference internal" href="#platforms-and-packaging" id="id6">Platforms and Packaging</a></p></li>
+<li><p><a class="reference internal" href="#behavior-changes" id="id7">Behavior Changes</a></p></li>
+<li><p><a class="reference internal" href="#bug-fixes" id="id8">Bug Fixes</a></p></li>
+</ul>
+</nav>
+<section id="command-line-and-mcp-interfaces">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">Command-Line and MCP Interfaces</a><a class="headerlink" href="#command-line-and-mcp-interfaces" title="Link to this heading"></a></h2>
+<p>The base package installs the <code class="docutils literal notranslate"><span class="pre">qc</span></code> command-line interface. Its command groups
+run algorithms, inspect data files, manage projects, perform unit conversions,
+and query the algorithm registry. Algorithm commands accept <code class="docutils literal notranslate"><span class="pre">--cache</span></code>,
+<code class="docutils literal notranslate"><span class="pre">--remote</span></code>, and <code class="docutils literal notranslate"><span class="pre">--remote-config</span></code>. <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> displays the supplied
+parameters without executing the command.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">mcp</span></code> extra installs the dependencies required by <code class="docutils literal notranslate"><span class="pre">qcmcp</span></code>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[mcp]'</span>
+</pre></div>
+</div>
+<p>The MCP server exposes the same project and algorithm operations as structured
+tools. It uses stdio by default and also supports streamable HTTP. File-producing
+tools report whether output was created, already existed, or failed. MCP Apps
+visualization tools are registered when <code class="docutils literal notranslate"><span class="pre">qsharp_widgets</span></code> is installed.</p>
+<p>The repository contains a Copilot plugin with skills and MCP configuration:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qc<span class="w"> </span>plugin<span class="w"> </span>install<span class="w"> </span>qdk-chemistry@qdk-chemistry<span class="w"> </span>--target-dir<span class="w"> </span>.
+</pre></div>
+</div>
+<p>The command deploys the plugin into the current workspace. See
+<a class="reference internal" href="../user/agents.html"><span class="doc">Working with AI Assistants</span></a>.</p>
+</section>
+<section id="remote-execution-and-caching">
+<h2><a class="toc-backref" href="#id2" role="doc-backlink">Remote Execution and Caching</a><a class="headerlink" href="#remote-execution-and-caching" title="Link to this heading"></a></h2>
+<p>Algorithms returned by <a class="reference internal" href="../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create" title="qdk_chemistry.algorithms.create"><code class="xref py py-func docutils literal notranslate"><span class="pre">create()</span></code></a> accept
+<code class="docutils literal notranslate"><span class="pre">remote</span></code> and <code class="docutils literal notranslate"><span class="pre">cache</span></code> arguments on <code class="docutils literal notranslate"><span class="pre">run()</span></code>. Serializable arguments,
+settings, and results are transferred through a registered remote backend.
+Supported values include QDK/Chemistry data classes,
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a>, NumPy arrays, scalar values, and
+lists or tuples of those values. Unsupported values raise <code class="docutils literal notranslate"><span class="pre">TypeError</span></code> before
+submission.</p>
+<p>The built-in <code class="docutils literal notranslate"><span class="pre">&quot;local&quot;</span></code> backend runs the serialized request in a subprocess on
+the same machine:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span>
+    <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+    <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span><span class="p">,</span>
+    <span class="n">remote</span><span class="o">=</span><span class="s2">"local"</span><span class="p">,</span>
+    <span class="n">cache</span><span class="o">=</span><span class="s2">"./cache"</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Passing a path as <code class="docutils literal notranslate"><span class="pre">cache</span></code> creates a
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache" title="qdk_chemistry.remote.cache.folder.FolderCache"><code class="xref py py-class docutils literal notranslate"><span class="pre">FolderCache</span></code></a>. Completed entries are
+returned without resubmission, and an in-flight remote entry resumes polling
+instead of starting a duplicate job. <code class="docutils literal notranslate"><span class="pre">force_rerun=True</span></code> bypasses the lookup.
+A cache shared with the compute node must be configured with <code class="docutils literal notranslate"><span class="pre">is_shared=True</span></code>.</p>
+<p>Run hashes do not include the QDK/Chemistry version. Do not reuse cache entries
+across releases when algorithm behavior has changed. In particular, clear
+pre-2.2 entries for calculations that use effective core potentials.</p>
+<p>Remote and cache backends can be registered by plugins through
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar" title="qdk_chemistry.plugins.base.PluginRegistrar"><code class="xref py py-class docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a>. See
+<a class="reference internal" href="../user/comprehensive/plugins.html#adding-remote-backends"><span class="std std-ref">Implementing a remote backend</span></a> for an SSH
+example.</p>
+<section id="microsoft-discovery">
+<h3>Microsoft Discovery<a class="headerlink" href="#microsoft-discovery" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">discovery</span></code> extra installs the Microsoft Discovery backend:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[discovery]'</span>
+</pre></div>
+</div>
+<p>The backend submits a containerized tool invocation and transfers files through
+Azure Blob Storage or a shared cache. Workspace, project, tool, node-pool,
+container, storage, and authentication settings can be supplied directly or
+through <code class="docutils literal notranslate"><span class="pre">QDK_DISCOVERY_*</span></code> environment variables.</p>
+</section>
+</section>
+<section id="algorithm-components">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">Algorithm Components</a><a class="headerlink" href="#algorithm-components" title="Link to this heading"></a></h2>
+<section id="unary-iteration-phase-estimation">
+<h3>Unary-iteration phase estimation<a class="headerlink" href="#unary-iteration-phase-estimation" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">phase_estimation</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_unary</span></code> builds an arbitrary-length chain of
+qubitized-walk queries. The phase register uses a cosine window, and
+<code class="docutils literal notranslate"><span class="pre">num_queries</span></code> need not be a power of two.</p>
+<p>The walk spectrum contains conjugate branches
+<span class="math notranslate nohighlight">\(e^{\pm i\arccos(E/\lambda)}\)</span>. The result stores both energy candidates
+in <code class="docutils literal notranslate"><span class="pre">branching</span></code>; <code class="docutils literal notranslate"><span class="pre">resolve_positive_branch</span></code> selects <code class="docutils literal notranslate"><span class="pre">resolved_energy</span></code>. The
+default selects the non-positive branch used for ground-state calculations.</p>
+<p>This implementation requires a <code class="docutils literal notranslate"><span class="pre">quantum_walk</span></code> unitary builder. For execution,
+it also requires Q# state preparation and the <code class="docutils literal notranslate"><span class="pre">qdk_sparse_state_simulator</span></code>
+executor because its recursive Q# operation does not lower to QIR. The circuit
+retains a Q# representation and can still be passed to
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.estimate" title="qdk_chemistry.data.Circuit.estimate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">estimate()</span></code></a>.</p>
+</section>
+<section id="binary-encoding-for-sparse-isometry">
+<h3>Binary encoding for sparse isometry<a class="headerlink" href="#binary-encoding-for-sparse-isometry" title="Link to this heading"></a></h3>
+<p>Sparse-isometry state preparation now has a <code class="docutils literal notranslate"><span class="pre">binary_encoding</span></code> setting. The
+standard path reduces the determinant-support matrix over
+<span class="math notranslate nohighlight">\(\mathrm{GF}(2)\)</span> and loads amplitudes on the remaining rows. When
+<span class="math notranslate nohighlight">\(\lceil\log_2 d\rceil\)</span> is smaller than that width, binary encoding maps
+the <span class="math notranslate nohighlight">\(d\)</span> determinants one-to-one into the basis states of the smaller
+register.</p>
+<p>The lookup circuit adds CCZ operations and may allocate ancilla qubits, so a
+smaller amplitude-loading register does not imply a smaller complete circuit.
+<code class="docutils literal notranslate"><span class="pre">measurement_based_uncompute</span></code> replaces Toffoli-based uncomputation with
+mid-circuit measurement and feedforward and therefore requires an adaptive
+target profile. See <a class="reference internal" href="../user/comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a>.</p>
+</section>
+<section id="controlled-swap-circuit-mapping">
+<h3>Controlled-SWAP circuit mapping<a class="headerlink" href="#controlled-swap-circuit-mapping" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">controlled_circuit_mapper</span></code> / <code class="docutils literal notranslate"><span class="pre">cswap_pauli_sequence</span></code> implements controlled
+time evolution without controlling every gate in the product formula. For an
+<span class="math notranslate nohighlight">\(n\)</span>-qubit system it uses an additional <span class="math notranslate nohighlight">\(n\)</span>-qubit vacuum register
+and two layers of <span class="math notranslate nohighlight">\(n\)</span> controlled-SWAP gates.</p>
+<p>The mapper applies to particle-conserving Hamiltonians. The vacuum must remain
+an eigenstate of the grouped evolution; the mapper computes and cancels the vacuum’s
+phase. <code class="docutils literal notranslate"><span class="pre">term_grouper</span></code> / <code class="docutils literal notranslate"><span class="pre">vacuum_annihilating</span></code> keeps the Pauli cancellation
+partners from each fermionic term contiguous. The mapper rejects an ordering
+that leaks amplitude from the vacuum.</p>
+</section>
+<section id="amplitude-amplification">
+<h3>Amplitude amplification<a class="headerlink" href="#amplitude-amplification" title="Link to this heading"></a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">amplitude_amplification</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_base</span></code> applies a configurable number of
+amplification rounds to a state-preparation circuit and a marking oracle. Each
+round reflects about the marked subspace and the prepared state.</p>
+<p>The registered <code class="docutils literal notranslate"><span class="pre">amplitude_amplification_oracle</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_qpe_subspace</span></code> oracle
+marks phase-estimation bins whose energy is at least <code class="docutils literal notranslate"><span class="pre">energy_lower_bound</span></code>.
+It is an exact reflection only when the relevant eigenphases lie on
+phase-register bins.</p>
+</section>
+<section id="effective-hamiltonian-interface">
+<h3>Effective Hamiltonian interface<a class="headerlink" href="#effective-hamiltonian-interface" title="Link to this heading"></a></h3>
+<p>The new <code class="docutils literal notranslate"><span class="pre">effective_hamiltonian_constructor</span></code> algorithm type defines the
+interface for downfolding a Hamiltonian onto target orbitals. It accepts a
+reference <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, a full-window
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a>, and target indices. No implementation
+ships in this release.</p>
+</section>
+</section>
+<section id="orbitals-analysis-and-cube-generation">
+<h2><a class="toc-backref" href="#id4" role="doc-backlink">Orbitals, Analysis, and Cube Generation</a><a class="headerlink" href="#orbitals-analysis-and-cube-generation" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">orbital_localizer</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_gauge_fixing</span></code> fixes the rotational freedom
+within occupation-degenerate natural-orbital blocks. It first anchors each
+block to the atomic-orbital basis, then performs capped coordinate-descent
+sweeps that reduce
+<span class="math notranslate nohighlight">\(\lambda = \sum_\ell |h_\ell|\)</span> from the anchored gauge. Anchoring can
+raise <span class="math notranslate nohighlight">\(\lambda\)</span> relative to the input orientation, so the final value is
+not guaranteed to be below the input value.</p>
+<p>The norm excludes the separate core-energy constant and is evaluated before
+post-mapping tapering. It is invariant across linear fermion-to-qubit encodings,
+where each Majorana monomial maps to one Pauli word up to phase. Each objective
+evaluation performs an integral transformation and a qubit mapping. Run
+<code class="docutils literal notranslate"><span class="pre">qdk_natural_orbitals</span></code> before gauge fixing.</p>
+<p><code class="docutils literal notranslate"><span class="pre">orbital_localizer</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_active_space_qio</span></code> performs gradient-free Jacobi
+sweeps that reduce the sum of single-orbital entropies within a fixed active
+space. It rotates the input density matrices but does not reoptimize the
+correlated wavefunction.</p>
+<p>Both new localizers return transformed orbitals and rotated active-space 1-RDM
+data; the QIO result does not carry a rotated 2-RDM.
+See <a class="reference internal" href="../user/comprehensive/algorithms/localizer.html"><span class="doc">Orbital localization</span></a>.</p>
+<p>The new <code class="docutils literal notranslate"><span class="pre">population_analyzer</span></code> type provides Mulliken electron populations
+per atom, or site occupations for model orbitals, through native <code class="docutils literal notranslate"><span class="pre">&quot;qdk&quot;</span></code> and
+<code class="docutils literal notranslate"><span class="pre">&quot;pyscf&quot;</span></code> implementations.
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction.compute_s_squared" title="qdk_chemistry.data.Wavefunction.compute_s_squared"><code class="xref py py-meth docutils literal notranslate"><span class="pre">compute_s_squared()</span></code></a> evaluates
+<span class="math notranslate nohighlight">\(\langle\hat{S}^2\rangle\)</span>.</p>
+<p><a class="reference internal" href="../api/api_autogen/qdk_chemistry.utils.cubegen.html#qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals" title="qdk_chemistry.utils.cubegen.generate_cubefiles_from_orbitals"><code class="xref py py-func docutils literal notranslate"><span class="pre">generate_cubefiles_from_orbitals()</span></code></a> evaluates
+orbitals in process, supporting spherical and Cartesian basis sets without a
+third-party quantum chemistry package. The <code class="docutils literal notranslate"><span class="pre">&quot;pyscf&quot;</span></code> backend remains
+available for comparison.</p>
+</section>
+<section id="molecular-qpe-tutorial">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">Molecular QPE Tutorial</a><a class="headerlink" href="#molecular-qpe-tutorial" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="../tutorials/ground_state_molecular_energies_with_qpe/index.html"><span class="doc">Ground-state molecular energies with quantum phase estimation</span></a> follows stretched
+N<sub>2</sub> from molecular input through active-space selection, qubit mapping,
+trial-state preparation, and iterative phase estimation. It includes executable
+scripts and three notebooks and does not require PySCF.</p>
+<p>The propagator and Hamiltonian-simulation interfaces introduced in 2.0 are also
+documented in <a class="reference internal" href="../user/comprehensive/algorithms/propagator.html"><span class="doc">Propagator</span></a> and
+<a class="reference internal" href="../user/comprehensive/algorithms/hamiltonian_simulation.html"><span class="doc">Hamiltonian simulation</span></a>.</p>
+</section>
+<section id="platforms-and-packaging">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">Platforms and Packaging</a><a class="headerlink" href="#platforms-and-packaging" title="Link to this heading"></a></h2>
+<p>Wheels are built for Linux x86-64 and Arm64, macOS Arm64, Windows x86-64, and
+Windows Arm64. Windows x86-64 supports Python 3.10 and later; Windows Arm64
+supports Python 3.11 and later.</p>
+<p>Native Windows has the following restrictions:</p>
+<ul class="simple">
+<li><p>PySCF is unavailable because it publishes no Windows wheels.</p></li>
+<li><p>On Windows Arm64, <code class="docutils literal notranslate"><span class="pre">mcp</span></code> is omitted from <code class="docutils literal notranslate"><span class="pre">all</span></code> and <code class="docutils literal notranslate"><span class="pre">test</span></code> because
+<code class="docutils literal notranslate"><span class="pre">cryptography</span></code> publishes no native wheel. An explicit <code class="docutils literal notranslate"><span class="pre">mcp</span></code> installation
+may require an Arm64 Rust toolchain, MSVC C/C++ build tools, and Arm64 OpenSSL
+development libraries.</p></li>
+<li><p>Qiskit, PennyLane, RDKit, and the Microsoft Discovery backend are unavailable
+on Windows Arm64 through the standard extras.</p></li>
+<li><p>QDK/Chemistry OpenMP regions are disabled on Windows. Vendor libraries may
+still use their own threading.</p></li>
+</ul>
+<p>Other packaging and build changes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">jupyter</span></code> no longer includes <code class="docutils literal notranslate"><span class="pre">plugins</span></code>.</p></li>
+<li><p>Source builds and CI use Libint2 2.13.1.</p></li>
+<li><p>A BLIS/libFLAME symbol collision in Linux wheel builds is fixed.</p></li>
+</ul>
+<p>See the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md">installation instructions</a> for the
+complete extras and platform matrix.</p>
+</section>
+<section id="behavior-changes">
+<span id="v2-2-behavior-changes"></span><h2><a class="toc-backref" href="#id7" role="doc-backlink">Behavior Changes</a><a class="headerlink" href="#behavior-changes" title="Link to this heading"></a></h2>
+<section id="sparse-isometry-name">
+<h3>Sparse-isometry name<a class="headerlink" href="#sparse-isometry-name" title="Link to this heading"></a></h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">state_prep</span></code> implementation <code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry_gf2x&quot;</span></code> is renamed
+<code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry&quot;</span></code>. The old name remains available and emits a
+<code class="docutils literal notranslate"><span class="pre">DeprecationWarning</span></code>.</p>
+</section>
+<section id="ecp-handling">
+<h3>ECP handling<a class="headerlink" href="#ecp-handling" title="Link to this heading"></a></h3>
+<p>Effective nuclear charges now determine SCF electron counts, nuclear repulsion
+energies, and Hamiltonian core energies for systems with effective core
+potentials. ECP assignments are keyed by atom rather than element. Recompute
+affected results and clear pre-2.2 cache entries before doing so.</p>
+</section>
+<section id="orbital-occupations">
+<h3>Orbital occupations<a class="headerlink" href="#orbital-occupations" title="Link to this heading"></a></h3>
+<p>When a stored one-particle <a class="reference internal" href="../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> does not match its determinant,
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.StateVectorContainer" title="qdk_chemistry.data.StateVectorContainer"><code class="xref py py-class docutils literal notranslate"><span class="pre">StateVectorContainer</span></code></a> reports natural occupation
+numbers obtained by diagonalizing the RDM rather than integer determinant
+occupations. For a non-natural orbital basis these eigenvalues are not diagonal
+populations of the stored orbitals.</p>
+</section>
+<section id="cube-generation">
+<h3>Cube generation<a class="headerlink" href="#cube-generation" title="Link to this heading"></a></h3>
+<p>Orbital cube generation defaults to <code class="docutils literal notranslate"><span class="pre">backend=&quot;native&quot;</span></code> instead of
+<code class="docutils literal notranslate"><span class="pre">&quot;pyscf&quot;</span></code>. Default labels are zero-based: orbital <code class="docutils literal notranslate"><span class="pre">0</span></code> now writes
+<code class="docutils literal notranslate"><span class="pre">orbital_0000.cube</span></code> instead of <code class="docutils literal notranslate"><span class="pre">orbital_0001.cube</span></code>.</p>
+</section>
+<section id="registration">
+<h3>Registration<a class="headerlink" href="#registration" title="Link to this heading"></a></h3>
+<p>Duplicate algorithm, algorithm-type, data-class, remote-backend, and
+cache-backend registrations now raise
+<a class="reference internal" href="../api/api_autogen/qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><code class="xref py py-class docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a> and preserve the
+existing registration.</p>
+<p>Custom <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.DataClass" title="qdk_chemistry.data.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a> subclasses must declare their wire
+identifier with a static <code class="docutils literal notranslate"><span class="pre">data_type_name()</span></code> method. Replace the former
+<code class="docutils literal notranslate"><span class="pre">_data_type_name</span></code> class attribute before registering the class through a
+plugin.</p>
+</section>
+<section id="nested-blas-threading">
+<h3>Nested BLAS threading<a class="headerlink" href="#nested-blas-threading" title="Link to this heading"></a></h3>
+<p>For linked BLAS libraries with runtime thread control, QDK/Chemistry restricts
+the library to one thread inside GauXC-backed SCF, gradient, and response
+operations. Nested BLAS threading could previously cause oversubscription or
+wrong results for some backends. Other BLAS libraries emit guidance for setting
+thread limits externally. Recompute pre-2.2 results if they showed
+thread-dependent numerical behavior.</p>
+</section>
+</section>
+<section id="bug-fixes">
+<h2><a class="toc-backref" href="#id8" role="doc-backlink">Bug Fixes</a><a class="headerlink" href="#bug-fixes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Importing <code class="docutils literal notranslate"><span class="pre">qdk_chemistry</span></code> no longer emits the
+<code class="docutils literal notranslate"><span class="pre">MP2NaturalOrbitalLocalizer</span></code> deprecation message. Explicitly requesting
+<code class="docutils literal notranslate"><span class="pre">qdk_mp2_natural_orbitals</span></code> still warns.</p></li>
+<li><p>JSON deserialization preserves derived orbital types.</p></li>
+<li><p>Cache plugin discovery failures are logged instead of discarded.</p></li>
+<li><p>The controlled-IQPE tutorial diagram renders unitary powers as superscripts.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Release Notes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="v2.1.0.html" class="btn btn-neutral float-right" title="What’s New in Version 2.1" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

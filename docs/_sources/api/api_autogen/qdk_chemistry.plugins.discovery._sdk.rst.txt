@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.discovery.\_sdk module
+=============================================
+
+.. automodule:: qdk_chemistry.plugins.discovery._sdk
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

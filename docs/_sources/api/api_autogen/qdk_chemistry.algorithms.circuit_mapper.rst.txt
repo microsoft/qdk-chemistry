@@ -15,3 +15,4 @@ Submodules
 
    qdk_chemistry.algorithms.circuit_mapper.base
    qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper
+   qdk_chemistry.algorithms.circuit_mapper.psp_mapper

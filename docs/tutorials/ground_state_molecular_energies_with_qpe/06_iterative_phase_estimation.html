@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Iterative quantum phase estimation &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Iterative quantum phase estimation &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -144,11 +145,10 @@ Record the algorithm settings before starting the final simulation and record th
 Use the completed lab notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.</p>
 </div>
 </section>
-<section id="example-download">
-<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
-<p>Download <a class="reference download internal" download="" href="../../_downloads/20b7627703046d12f0d70b891d27646c/tutorial_run_iqpe.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_run_iqpe.py</span></code></a> and save it in the tutorial working directory alongside <a class="reference download internal" download="" href="../../_downloads/2f07e2323e1906c3922876467343a044/tutorial_orbital_coordinates.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code></a>, <a class="reference download internal" download="" href="../../_downloads/1a2f7bdf060308bbc54b67c9f1cf67d1/tutorial_choose_active_space.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code></a>, <a class="reference download internal" download="" href="../../_downloads/106a739e0f553cfc05fb84c9f1e2e7bc/tutorial_map_n2_to_qubits.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_map_n2_to_qubits.py</span></code></a>, and <a class="reference download internal" download="" href="../../_downloads/4d1e3a028feb8de74d109fe3e231917d/tutorial_prepare_trial_state.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code></a>.
-Also download <a class="reference download internal" download="" href="../../_downloads/38a0f691a2aed1b711fdc1987c5a0105/tutorial_visualize_iqpe_circuit.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_visualize_iqpe_circuit.ipynb</span></code></a> to the same directory.
-Open the files in Visual Studio Code and review the complete <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> script, including imports, data classes, and helper functions omitted from the excerpts below.
+<section id="example-files">
+<h2>Example files<a class="headerlink" href="#example-files" title="Link to this heading"></a></h2>
+<p>Add <a class="reference download internal" download="" href="../../_downloads/20b7627703046d12f0d70b891d27646c/tutorial_run_iqpe.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_run_iqpe.py</span></code></a> and <a class="reference download internal" download="" href="../../_downloads/38a0f691a2aed1b711fdc1987c5a0105/tutorial_visualize_iqpe_circuit.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_visualize_iqpe_circuit.ipynb</span></code></a> to your tutorial working folder.
+Open the new files in Visual Studio Code and review the complete <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> script, including imports, data classes, and helper functions omitted from the excerpts below.
 The script imports the mapping and trial-state workflows from previous chapters so every stage uses the same selected Hamiltonian and four-determinant trial state.
 The Jupyter notebook constructs and renders the shortest iteration circuit without executing the simulator.</p>
 </section>
@@ -202,7 +202,7 @@ From zero through one half, the signed angle is nonnegative, so <span class="mat
 Immediately above one half, the signed angle wraps from <span class="math notranslate nohighlight">\(+\pi\)</span> to just above <span class="math notranslate nohighlight">\(-\pi\)</span>; the corresponding energy jumps to just below <span class="math notranslate nohighlight">\(+\pi/t\)</span> and then returns toward zero along the purple branch.
 At <span class="math notranslate nohighlight">\(\varphi=1/2\)</span>, the lower filled point includes <span class="math notranslate nohighlight">\(-\pi/t\)</span>, while the upper open point excludes the equivalent <span class="math notranslate nohighlight">\(+\pi/t\)</span> representation.</p>
 <figure class="align-center" id="id1">
-<a class="reference internal image-reference" href="../../_images/tutorial_qpe_phase_wrapping.png"><img alt="Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero." src="../../_images/tutorial_qpe_phase_wrapping.png" style="width: 100%;" />
+<a class="reference internal image-reference" href="../../_images/tutorial_qpe_phase_wrapping.svg"><img alt="Signed reconstructed energy plotted against phase fraction from zero to one. Phase fractions from zero through one half map from zero down to minus pi over t. Immediately above one half, the signed branch wraps to just below plus pi over t and returns toward zero as the phase approaches one. A neutral dashed guide connects the included minus pi over t point and excluded plus pi over t point at phase one half. A red bracket beside the plot spans their energy difference of two pi over t. Phase one wraps to phase zero." src="../../_images/tutorial_qpe_phase_wrapping.svg" style="width: 100%;" />
 </a>
 <figcaption>
 <p><span class="caption-text">QDK/Chemistry converts the wrapped phase fraction to one signed energy branch. The neutral dashed guide marks the shared phase <span class="math notranslate nohighlight">\(\varphi=1/2\)</span>; the red bracket spans the <span class="math notranslate nohighlight">\(2\pi/t\)</span> energy difference between its included and excluded boundary representations. Energies separated by that amount alias to the same reported phase.</span><a class="headerlink" href="#id1" title="Link to this image"></a></p>
@@ -337,7 +337,7 @@ After the second H gate, the remaining relative phase changes the probabilities 
 <p>After the last iteration, the reported phase fraction is <span class="math notranslate nohighlight">\(\Phi_m/\pi\)</span>.
 The following figure summarizes one iteration, from fresh register preparation through repeated shots, majority voting, and the feedback update for the next phase bit.</p>
 <figure class="align-center" id="id3">
-<div class="graphviz"><img src="../../_images/graphviz-02b98a2969744bd277ec81ed85bf5cc15e19daa7.png" alt="Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1." class="graphviz" /></div>
+<img alt="Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1." src="../../_images/tutorial_qpe_iqpe_iteration.svg" />
 <figcaption>
 <p><span class="caption-text">One <a class="reference internal" href="../../glossary.html#term-IQPE"><span class="xref std std-term">IQPE</span></a> iteration estimates phase bit <span class="math notranslate nohighlight">\(b_k\)</span>. Every shot freshly prepares the trial state and readout ancilla; the majority outcome updates <span class="math notranslate nohighlight">\(\Phi_{k+1}=\Phi_k/2+\pi b_k/2\)</span> for the next controlled power.</span><a class="headerlink" href="#id3" title="Link to this image"></a></p>
 </figcaption>
@@ -351,38 +351,41 @@ The readout ancilla does not represent an additional molecular spin orbital.</p>
 The state-preparation logical circuit must therefore reload the trial state before each controlled evolution.</p>
 </details>
 <p>The script configures the native iterative circuit builder and first-order Trotter unitary through nested <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> objects:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">iqpe_circuit_builder_reference</span><span class="p">(</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># IQPE circuit construction</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_iqpe_circuit_builder</span><span class="p">(</span>
     <span class="n">evolution_time_hartree_inverse</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">num_phase_bits</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">DEFAULT_NUM_PHASE_BITS</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AlgorithmRef</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Describe native IQPE with repeated first-order Trotter evolution.</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QpeCircuitBuilder</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Configure native IQPE with repeated first-order Trotter evolution.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        evolution_time_hartree_inverse: Base simulated time in inverse Hartree.</span>
 <span class="sd">        num_phase_bits: Iteration count and number of reported binary phase places.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        A nested algorithm reference selecting the native iterative builder,</span>
+<span class="sd">        A native iterative circuit builder using</span>
 <span class="sd">        Pauli-sequence controlled-circuit mapping, one first-order Trotter</span>
 <span class="sd">        division, and repeated base-unitary powers.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
-        <span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;qdk_iterative&quot;</span><span class="p">,</span>
+<span class="sd">    """</span>
+    <span class="k">return</span> <span class="n">create</span><span class="p">(</span>
+        <span class="s2">"qpe_circuit_builder"</span><span class="p">,</span>
+        <span class="s2">"qdk_iterative"</span><span class="p">,</span>
         <span class="n">num_bits</span><span class="o">=</span><span class="n">num_phase_bits</span><span class="p">,</span>
         <span class="n">controlled_circuit_mapper</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
-            <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;pauli_sequence&quot;</span>
+            <span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="s2">"pauli_sequence"</span>
         <span class="p">),</span>
         <span class="n">unitary_builder</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
-            <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;trotter&quot;</span><span class="p">,</span>
+            <span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span>
+            <span class="s2">"trotter"</span><span class="p">,</span>
             <span class="n">time</span><span class="o">=</span><span class="n">evolution_time_hartree_inverse</span><span class="p">,</span>
             <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
             <span class="n">num_divisions</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
-            <span class="n">power_strategy</span><span class="o">=</span><span class="s2">&quot;repeat&quot;</span><span class="p">,</span>
+            <span class="n">power_strategy</span><span class="o">=</span><span class="s2">"repeat"</span><span class="p">,</span>
         <span class="p">),</span>
     <span class="p">)</span>
+
+
 </pre></div>
 </div>
 </section>
@@ -466,8 +469,9 @@ This separation lets you inspect settings and circuit counts without accidentall
 It still contains the state-preparation operations, twelve-wire compute register, one-wire readout ancilla, feedback rotation, controlled Trotter evolution, and ancilla measurement shared by every iteration.
 The companion Jupyter notebook introduced below renders this circuit without simulating it.</p>
 <p>One complete IQPE run then invokes the native phase-estimation algorithm with one simulator seed:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">run_complete_iqpe</span><span class="p">(</span><span class="n">problem</span><span class="p">:</span> <span class="n">IqpeProblem</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IqpeRun</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute one complete bitwise IQPE run with a reproducible simulator seed.</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># One complete IQPE run</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_complete_iqpe</span><span class="p">(</span><span class="n">problem</span><span class="p">:</span> <span class="n">IqpeProblem</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">IqpeRun</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Execute one complete bitwise IQPE run with a reproducible simulator seed.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        problem: Shared Hamiltonian, trial state, phase controls, and builder setup.</span>
@@ -476,16 +480,16 @@ The companion Jupyter notebook introduced below renders this circuit without sim
 <span class="sd">    Returns:</span>
 <span class="sd">        Canonical bitstring, reconstructed active/total energies, reference error,</span>
 <span class="sd">        and simulator runtime for one complete phase estimate.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">iqpe</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-        <span class="s2">&quot;phase_estimation&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;qdk_iterative&quot;</span><span class="p">,</span>
+        <span class="s2">"phase_estimation"</span><span class="p">,</span>
+        <span class="s2">"qdk_iterative"</span><span class="p">,</span>
         <span class="n">shots_per_bit</span><span class="o">=</span><span class="n">problem</span><span class="o">.</span><span class="n">shots_per_bit</span><span class="p">,</span>
     <span class="p">)</span>
-    <span class="n">iqpe</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span> <span class="n">problem</span><span class="o">.</span><span class="n">circuit_builder_reference</span><span class="p">)</span>
+    <span class="n">iqpe</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"qpe_circuit_builder"</span><span class="p">,</span> <span class="n">problem</span><span class="o">.</span><span class="n">circuit_builder_reference</span><span class="p">)</span>
     <span class="n">iqpe</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
-        <span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span>
-        <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">),</span>
+        <span class="s2">"circuit_executor"</span><span class="p">,</span>
+        <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_full_state_simulator"</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">),</span>
     <span class="p">)</span>
 
     <span class="n">start</span> <span class="o">=</span> <span class="n">perf_counter</span><span class="p">()</span>
@@ -500,7 +504,7 @@ The companion Jupyter notebook introduced below renders this circuit without sim
     <span class="c1"># binary so bitstring positions have their familiar place values.</span>
     <span class="n">grid_size</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="n">problem</span><span class="o">.</span><span class="n">num_phase_bits</span>
     <span class="n">grid_index</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span> <span class="o">*</span> <span class="n">grid_size</span><span class="p">)</span> <span class="o">%</span> <span class="n">grid_size</span>
-    <span class="n">bitstring</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">grid_index</span><span class="si">:</span><span class="s2">0</span><span class="si">{</span><span class="n">problem</span><span class="o">.</span><span class="n">num_phase_bits</span><span class="si">}</span><span class="s2">b</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="n">bitstring</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">grid_index</span><span class="si">:</span><span class="s2">0</span><span class="si">{</span><span class="n">problem</span><span class="o">.</span><span class="n">num_phase_bits</span><span class="si">}</span><span class="s2">b</span><span class="si">}</span><span class="s2">"</span>
 
     <span class="c1"># Phase estimation returns the active qubit-Hamiltonian eigenvalue. Add the</span>
     <span class="c1"># nuclear/frozen-orbital core term omitted during mapping, then compare with</span>
@@ -516,6 +520,8 @@ The companion Jupyter notebook introduced below renders this circuit without sim
         <span class="n">error_hartree</span><span class="o">=</span><span class="n">energy_error</span><span class="p">,</span>
         <span class="n">runtime_seconds</span><span class="o">=</span><span class="n">runtime_seconds</span><span class="p">,</span>
     <span class="p">)</span>
+
+
 </pre></div>
 </div>
 <p>Each iteration contributes one measured phase bit to the complete IQPE result.</p>

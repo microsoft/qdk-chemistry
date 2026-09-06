@@ -1,0 +1,8 @@
+qdk\_chemistry.ui.plugin\_installer module
+==========================================
+
+.. automodule:: qdk_chemistry.ui.plugin_installer
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
