@@ -143,7 +143,7 @@ Record the algorithm settings and final result.
 - Measured active-space energy and units:
 - Core energy added after phase estimation:
 - Total molecular energy estimate and units:
-- Difference from the algorithmic reference and units:
+- Signed algorithmic difference (:math:`E_{\mathrm{total}}^{\mathrm{IQPE}}-E_{\mathrm{CASCI}}`) and units:
 - Result relative to the :math:`1\ \mathrm{m}E_{\mathrm{h}}` teaching target:
 - Observed runtime:
 

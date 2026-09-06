@@ -266,7 +266,7 @@ The fixed-electron-number sector in this teaching example is small enough to val
 
 .. _tutorial-fixed-electron-number-subspace:
 
-A *fixed-electron-number subspace* contains only the occupation-basis states with specified numbers :math:`n_\alpha` and :math:`n_\beta` of active :math:`\alpha` and :math:`\beta` electrons.
+A *fixed-electron-number subspace*, also called a *sector*, contains only the occupation-basis states with specified numbers :math:`n_\alpha` and :math:`n_\beta` of active :math:`\alpha` and :math:`\beta` electrons.
 The script restricts :math:`\hat{H}_{\mathrm{qubit}}` to the fixed-electron-number subspace with the same electron counts as the :term:`CASCI` calculation.
 Before running the script, use the :ref:`determinant-count formula from the active-space calculation <tutorial-determinant-count>` to calculate the number of occupation-basis states in this subspace as :math:`\binom{n_o}{n_\alpha}\binom{n_o}{n_\beta}`, and record your prediction in the :ref:`qubit-representation section of the lab notebook <lab-notebook-qubits>`.
 In the integer label for an occupation-basis state, bit :math:`p` records the occupation of mode :math:`p`, with qubit 0 as the least-significant bit.

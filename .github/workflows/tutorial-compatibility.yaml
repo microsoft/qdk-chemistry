@@ -65,14 +65,20 @@ jobs:
     - name: Install published tutorial environment
       run: |
         python -m pip install --upgrade pip
-        python -m pip install "qdk-chemistry[jupyter]==${{ steps.tutorial-version.outputs.version }}" nbclient nbformat pytest pytest-env
+        python -m pip install \
+          "qdk-chemistry==${{ steps.tutorial-version.outputs.version }}" \
+          "ipykernel>=6.0" \
+          nbclient \
+          nbformat \
+          pytest \
+          pytest-env
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
-    - name: Verify published package boundary
+    - name: Verify tutorial excludes PySCF
       run: >-
         python -c "import importlib.util;
         assert importlib.util.find_spec('pyscf') is None,
-        'qdk-chemistry[jupyter] must not install PySCF'"
+        'The documented tutorial environment must not install PySCF'"
 
     - name: Verify tutorial setup
       env:

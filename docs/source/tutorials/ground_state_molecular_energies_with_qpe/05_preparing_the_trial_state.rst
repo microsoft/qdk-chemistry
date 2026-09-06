@@ -36,7 +36,7 @@ The Jupyter notebook runs that workflow, renders the one-, two-, and four-determ
 Connection to the selected-space workflow
 =========================================
 
-The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the :math:`(n_\alpha,n_\beta)=(3,3)` determinant sector introduced in :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`.
+The :ref:`selected-space CASCI calculation <tutorial-selected-space-reference>` produced a normalized ground-state wavefunction spanning the :math:`(n_\alpha,n_\beta)=(3,3)` fixed-electron-number subspace introduced in :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`.
 Each determinant represents one pattern of occupations among the selected active spin orbitals, and its coefficient is the corresponding amplitude in the wavefunction.
 The :ref:`Jordan--Wigner encoding <tutorial-occupation-encoding>` represents the same occupation patterns on the compute register sized in :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`.
 
@@ -64,7 +64,7 @@ The trial state can be written as a linear combination of the eigenstates :math:
    \qquad
    \sum_j \left\vert a_j\right\vert^2=1.
 
-To isolate the effect of the input state, first assume that the requested trial state is prepared exactly, time evolution is exact, and phase readout has enough resolution to distinguish the relevant eigenphases.
+To isolate the effect of the input state, first assume that the requested trial state is prepared exactly, time evolution is exact, and the phase grid represents each relevant eigenphase exactly.
 Under these assumptions, an input eigenstate :math:`\vert\Psi_j\rangle` produces the phase corresponding to :math:`E_j`.
 For a trial state containing several eigenstates, a textbook coherent phase-estimation measurement samples the energy :math:`E_j` with probability :math:`\left\vert a_j\right\vert^2` :cite:`vonBurg2021`.
 This probability statement assumes that one prepared system state produces one complete phase result.
@@ -88,6 +88,8 @@ As :ref:`introduced in the tutorial overview <tutorial-trial-state-fidelity>`, t
        \langle\Psi_0\vert\Psi_{\mathrm{trial}}\rangle
      \right\vert^2.
 
+The overlap :math:`\langle\Psi_0\vert\Psi_{\mathrm{trial}}\rangle` is the inner product of the two normalized states.
+It may be complex, so the fidelity uses its squared magnitude.
 Both states are normalized, so :math:`0\leq F\leq 1`.
 The fidelity :math:`F` is the weight of the target ground state in the trial-state eigenstate expansion.
 For the textbook coherent measurement described above, it is also the probability of sampling the ground-state eigenphase.
@@ -118,6 +120,8 @@ In a larger problem where exact :term:`CASCI` is unavailable, an approximate cla
 
 The script first prints the leading terms in the selected-space wavefunction.
 Each occupation string contains one symbol for each selected active spatial orbital: ``2`` means doubly occupied, ``u`` means occupied by one :math:`\alpha` electron, ``d`` means occupied by one :math:`\beta` electron, and ``0`` means unoccupied.
+Each symbol summarizes the two spin orbitals of one spatial orbital, so the same configuration appears on the compute register as a twelve-bit occupation pattern.
+Under the blocked ordering from :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>`, the six :math:`\alpha` occupations occupy the lowest bits and the six :math:`\beta` occupations occupy the next bits.
 The amplitude is the signed coefficient :math:`c_I` in :math:`\vert\Psi_0\rangle=\sum_I c_I\vert\Phi_I\rangle`, while the weight :math:`\left\vert c_I\right\vert^2` is that determinant's contribution to the squared norm.
 The cumulative weight shows how much of the norm is captured by the listed determinants.
 The script computes these quantities directly from the leading :term:`CASCI` coefficients.
