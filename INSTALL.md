@@ -29,6 +29,11 @@ Prebuilt wheels are published for the following platforms:
 | macOS | arm64 (Apple Silicon) | |
 | Windows | x86_64, arm64 | See [Windows notes](#notes-for-windows-users) |
 
+Native Windows installations require the current
+[Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist)
+for the Python architecture. Install it once before importing QDK/Chemistry. Microsoft centrally
+services the installed runtime.
+
 On Windows you can either install natively or work inside the
 [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install). Both are
 supported: WSL uses the Linux wheels and the Linux instructions throughout this document, and is the
@@ -170,6 +175,7 @@ to native Windows installs; none of them apply under
 
 | Topic | Detail |
 |-------|--------|
+| Visual C++ runtime | Install the current [Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) for the Python architecture. It is a machine-level prerequisite and may require administrator approval. |
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
 | arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |

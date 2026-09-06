@@ -45,12 +45,30 @@ import subprocess
 import sys
 import warnings
 
+
+def _import_core() -> None:
+    """Import the native extension with an actionable Windows failure message."""
+    try:
+        importlib.import_module("qdk_chemistry._core")
+    except ImportError as exc:
+        if _sys.platform == "win32" and "DLL load failed" in str(exc):
+            raise ImportError(
+                "QDK/Chemistry requires the current Microsoft Visual C++ v14 "
+                "Redistributable on Windows. Install it for "
+                "your Python architecture, restart Python, and try again: "
+                "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"
+            ) from exc
+        raise
+
+
+_import_core()
+
 # Import some tools for convenience
-import qdk_chemistry.constants
-from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
-from qdk_chemistry._core import QDKChemistryConfig
-from qdk_chemistry.utils import Logger, telemetry_events
-from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
+import qdk_chemistry.constants  # noqa: E402
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError  # noqa: E402
+from qdk_chemistry._core import QDKChemistryConfig  # noqa: E402
+from qdk_chemistry.utils import Logger, telemetry_events  # noqa: E402
+from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED  # noqa: E402
 
 if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
