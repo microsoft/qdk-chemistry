@@ -28,15 +28,13 @@ OPAQUE_PNG_FIGURES = {
     "tutorial_qpe_state_preparation_comparison.png",
 }
 PNG_FIGURES = TRANSPARENT_PNG_FIGURES | OPAQUE_PNG_FIGURES
-GRAPHVIZ_GENERATORS = {
-    "tutorial_qpe_energy_accounting.svg": "generate_tutorial_qpe_energy_accounting.py",
-    "tutorial_qpe_iqpe_iteration.svg": "generate_tutorial_qpe_graphviz.py",
-    "tutorial_qpe_jordan_wigner_parity.svg": "generate_tutorial_qpe_graphviz.py",
-    "tutorial_qpe_orbital_partition.svg": "generate_tutorial_qpe_graphviz.py",
-    "tutorial_qpe_wavefunction_hierarchy.svg": "generate_tutorial_qpe_graphviz.py",
-    "tutorial_qpe_workflow.svg": "generate_tutorial_qpe_graphviz.py",
+GRAPHVIZ_SVG_FIGURES = {
+    "tutorial_qpe_iqpe_iteration.svg",
+    "tutorial_qpe_jordan_wigner_parity.svg",
+    "tutorial_qpe_orbital_partition.svg",
+    "tutorial_qpe_wavefunction_hierarchy.svg",
+    "tutorial_qpe_workflow.svg",
 }
-GRAPHVIZ_SVG_FIGURES = set(GRAPHVIZ_GENERATORS)
 PLOT_SVG_FIGURES = {
     "tutorial_qpe_orbital_entropy.svg",
     "tutorial_qpe_phase_wrapping.svg",
@@ -106,7 +104,7 @@ def test_graphviz_sources_generate_accessible_svg_figures():
 
     assert references == {name.replace(".dot", ".svg") for name in dot_files}
     assert references == svg_files
-    assert len(directives) == 6
+    assert len(directives) == 5
     for rst_path, match in directives:
         svg_name = match.group("source")
         dot_name = svg_name.replace(".svg", ".dot")
@@ -121,11 +119,6 @@ def test_graphviz_sources_generate_accessible_svg_figures():
             assert 'χ&#160;<SUB><FONT POINT-SIZE="9">μ</FONT></SUB>' in dot_source
             assert 'Φ&#160;<SUB><FONT POINT-SIZE="9">HF</FONT></SUB>' in dot_source
             assert dot_source.count("<SUB>") == 2
-        elif dot_name == "tutorial_qpe_energy_accounting.dot":
-            assert "E<SUB>active</SUB><SUP>IQPE</SUP>" in dot_source
-            assert "E<SUB>core</SUB>" in dot_source
-            assert "E<SUB>CASCI</SUB>" in dot_source
-            assert "&#916;E<SUB>algorithm</SUB>" in dot_source
         else:
             assert "<SUB>" not in dot_source
         alt_match = ALT_PATTERN.search(match.group("options"))
@@ -138,7 +131,7 @@ def test_graphviz_sources_generate_accessible_svg_figures():
         assert root.attrib["aria-labelledby"] == f"{svg_id}-title {svg_id}-desc"
         assert root.attrib["data-source-sha256"] == source_sha256(
             dot_path,
-            DIAGRAMS_DIR / GRAPHVIZ_GENERATORS[svg_name],
+            DIAGRAMS_DIR / "generate_tutorial_qpe_graphviz.py",
             DIAGRAMS_DIR / "tutorial_qpe_svg.py",
         )
         title = root.find(f"{{{SVG_NAMESPACE}}}title")

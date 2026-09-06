@@ -445,16 +445,6 @@ Finally, compare this reconstructed total with the :term:`CASCI` energy of the s
    \Delta E_{\mathrm{algorithm}}
    =E_{\mathrm{total}}^{\mathrm{IQPE}}-E_{\mathrm{CASCI}}.
 
-The figure below separates the quantity measured by IQPE from the classically added
-core energy and the selected-space reference used for validation.
-
-.. figure:: /_static/diagrams/tutorial_qpe_energy_accounting.svg
-   :alt: Energy-accounting flow for the molecular IQPE result. The active energy measured by phase estimation and the classically added core energy combine to form the reconstructed selected-space total energy. The classical CASCI energy for the same selected-space Hamiltonian is subtracted from that total to form the signed algorithmic difference. Basis-set and active-space model errors are outside this comparison.
-   :align: center
-   :width: 100%
-
-   IQPE measures the active energy. Adding the stored core energy reconstructs the selected-space molecular total, which is compared with the matching :term:`CASCI` reference to obtain the signed algorithmic difference.
-
 The workflow meets the teaching target when :math:`\lvert\Delta E_{\mathrm{algorithm}}\rvert\leq1\ \mathrm{m}E_{\mathrm{h}}`.
 This comparison evaluates the configured quantum algorithm against its classical reference; it does not measure basis-set or active-space model error.
 
