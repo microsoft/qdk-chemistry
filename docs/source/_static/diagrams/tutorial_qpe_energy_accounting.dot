@@ -1,0 +1,26 @@
+digraph TutorialQpeEnergyAccounting {
+    rankdir=LR;
+    ranksep=0.9;
+    nodesep=0.55;
+    overlap=false;
+    splines=spline;
+    pad=0.2;
+    bgcolor="#FFFFFF";
+
+    node [shape=box, style="rounded,filled", fontname="Arial", width=3.0, height=1.1, margin="0.20,0.16", penwidth=2.5];
+    edge [penwidth=2.5, arrowsize=1.0];
+
+    Active [label=<<B>E<SUB>active</SUB><SUP>IQPE</SUP></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E0F2F1">Measured by phase estimation</FONT>>, fillcolor="#00796B", color="#004D40", fontcolor="#FFFFFF"];
+    Core [label=<<B>E<SUB>core</SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#E3F2FD">Added classically</FONT>>, fillcolor="#1976D2", color="#0D47A1", fontcolor="#FFFFFF"];
+    Total [label=<<B>E<SUB>total</SUB><SUP>IQPE</SUP> = E<SUB>active</SUB><SUP>IQPE</SUP> + E<SUB>core</SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#F3E5F5">Reconstructed selected-space total</FONT>>, fillcolor="#7B1FA2", color="#4A148C", fontcolor="#FFFFFF", width=4.2];
+    Casci [label=<<B>E<SUB>CASCI</SUB></B><BR/><BR/><FONT POINT-SIZE="11">Classical selected-space reference</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", fontcolor="#3949AB"];
+    Difference [label=<<B>&#916;E<SUB>algorithm</SUB> = E<SUB>total</SUB><SUP>IQPE</SUP> - E<SUB>CASCI</SUB></B><BR/><BR/><FONT POINT-SIZE="11" COLOR="#FFEBEE">Signed algorithmic difference</FONT>>, fillcolor="#C62828", color="#8E0000", fontcolor="#FFFFFF", width=4.4];
+
+    { rank=same; Active; Core; }
+    { rank=same; Total; Casci; }
+
+    Active -> Total [color="#00796B"];
+    Core -> Total [color="#1976D2"];
+    Total -> Difference [color="#7B1FA2"];
+    Casci -> Difference [color="#5C6BC0"];
+}

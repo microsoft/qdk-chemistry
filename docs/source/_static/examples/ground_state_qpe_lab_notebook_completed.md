@@ -92,12 +92,12 @@ This completed example records the reference results for the documented QDK/Chem
 - Readout ancillas: 1 per iteration circuit.
 - Simulator seeds: 42-61.
 - Complete-run bitstring counts: {'010000': 19, '001111': 1}.
-- Most frequent bitstring: 010000.
+- Modal bitstring: 010000.
 - Measured active-space energy: -9.652276065987 Hartree.
 - Core energy added after phase estimation: -99.117775726922 Hartree.
 - Total molecular energy estimate: -108.770051792909 Hartree.
 - Algorithmic reference: -108.771051792909 Hartree.
-- Signed difference: +0.001000000000 Hartree.
+- Signed algorithmic difference: +0.001000000000 Hartree.
 - Teaching-target result: Meets the 1 milliHartree target at its boundary.
 - Observed repeated-run phase: approximately six minutes in the measured development run; runtime varies by computer.
 

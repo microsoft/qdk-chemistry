@@ -36,13 +36,6 @@ try:
 except ImportError:
     _HAS_QRE = False
 
-try:
-    import pyscf  # noqa: F401
-
-    PYSCF_AVAILABLE = True
-except ImportError:
-    PYSCF_AVAILABLE = False
-
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
@@ -72,10 +65,6 @@ def test_factory_list():
 @pytest.mark.skipif(
     not QDK_CHEMISTRY_HAS_QISKIT,
     reason="Qiskit dependencies not available",
-)
-@pytest.mark.skipif(
-    not PYSCF_AVAILABLE,
-    reason="PySCF not available",
 )
 def test_state_prep_energy():
     """Test the state-preparation energy notebook executes without errors."""
@@ -108,10 +97,6 @@ def test_state_prep_energy():
 @pytest.mark.skipif(
     not _HAS_QRE,
     reason="qdk.qre not available",
-)
-@pytest.mark.skipif(
-    not PYSCF_AVAILABLE,
-    reason="PySCF not available",
 )
 def test_qpe_stretched_n2():
     """Test the stretched-N2 QPE notebook executes without errors."""

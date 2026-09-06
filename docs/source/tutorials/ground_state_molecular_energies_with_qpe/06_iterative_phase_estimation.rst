@@ -119,11 +119,11 @@ Increasing :math:`m` from six to ten therefore raises the largest power from :ma
 This tutorial uses six bits to keep the simulation tractable; that choice does not by itself provide :math:`\mathrm{m}E_{\mathrm{h}}` resolution.
 
 The evolution time is computed from quantities already produced by the classically tractable example chosen for this tutorial.
-If we write the mapped Hamiltonian as :math:`\hat H_{\mathrm{qubit}}=\sum_\ell h_\ell P_\ell` and define
+Using the Pauli expansion :math:`\hat H_{\mathrm{qubit}}=\sum_k c_k P_k` from :ref:`Qubit Hamiltonian in Pauli form <tutorial-qubit-hamiltonian>`, define
 
 .. math::
 
-   \lambda=\sum_\ell\lvert h_\ell\rvert.
+   \lambda=\sum_k\lvert c_k\rvert.
 
 The QDK/Chemistry application programming interface (:term:`API`) exposes this coefficient 1-norm as ``qubit_hamiltonian.schatten_norm``; the tutorial script uses it to choose the evolution time and reports it in the pre-simulation settings.
 For this Hamiltonian, the reported value is :math:`\lambda=19.610172748837\ E_{\mathrm{h}}`.
@@ -287,13 +287,13 @@ Five controls determine the approximation and sampling behavior of this workflow
 :doc:`Hamiltonian simulation <../../user/comprehensive/algorithms/hamiltonian_unitary_builder>`
    The qubit Hamiltonian is a sum of Pauli terms that generally do not commute.
    A first-order `Trotter product formula <https://en.wikipedia.org/wiki/Lie_product_formula>`_ approximates evolution under that sum by applying the exponential of each Pauli term in sequence.
-   For :math:`\hat H=\sum_\ell h_\ell P_\ell`, using :math:`r` Trotter divisions gives
+   For :math:`\hat H=\sum_k c_k P_k`, using :math:`r` Trotter divisions gives
 
    .. math::
 
       e^{-i\hat Ht}
       \approx
-      \left[\prod_\ell e^{-ih_\ell P_\ell t/r}\right]^r.
+      \left[\prod_k e^{-ic_k P_k t/r}\right]^r.
 
    One division (:math:`r=1`) is used for each base evolution in this tutorial.
    Increasing :math:`r` shortens each simulated time step and generally reduces product-formula error, but repeats the Pauli-term sequence more times and increases circuit cost.
@@ -398,6 +398,7 @@ One complete run can differ from another because every phase bit is selected fro
 The workflow therefore repeats the complete six-bit procedure with twenty deterministic simulator seeds.
 
 The final aggregation rule selects the most frequent complete bitstring, or *mode*.
+The script labels it ``Modal bitstring`` and reports the corresponding ``Modal active-space energy`` and ``Modal total energy``.
 This differs from the majority vote used inside one complete run: a per-bit majority chooses one bit from three shots, whereas the complete-run mode chooses one reconstructed bitstring from twenty runs.
 If several bitstrings tie for the highest count, the script reports that no unique mode exists instead of silently choosing one.
 
@@ -444,6 +445,16 @@ Finally, compare this reconstructed total with the :term:`CASCI` energy of the s
    \Delta E_{\mathrm{algorithm}}
    =E_{\mathrm{total}}^{\mathrm{IQPE}}-E_{\mathrm{CASCI}}.
 
+The figure below separates the quantity measured by IQPE from the classically added
+core energy and the selected-space reference used for validation.
+
+.. figure:: /_static/diagrams/tutorial_qpe_energy_accounting.svg
+   :alt: Energy-accounting flow for the molecular IQPE result. The active energy measured by phase estimation and the classically added core energy combine to form the reconstructed selected-space total energy. The classical CASCI energy for the same selected-space Hamiltonian is subtracted from that total to form the signed algorithmic difference. Basis-set and active-space model errors are outside this comparison.
+   :align: center
+   :width: 100%
+
+   IQPE measures the active energy. Adding the stored core energy reconstructs the selected-space molecular total, which is compared with the matching :term:`CASCI` reference to obtain the signed algorithmic difference.
+
 The workflow meets the teaching target when :math:`\lvert\Delta E_{\mathrm{algorithm}}\rvert\leq1\ \mathrm{m}E_{\mathrm{h}}`.
 This comparison evaluates the configured quantum algorithm against its classical reference; it does not measure basis-set or active-space model error.
 
@@ -464,7 +475,7 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_run_iqpe.py
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
-A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
+A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed algorithmic difference.
 
 .. admonition:: What bitstring distribution and energy estimate did the script produce?
    :class: quiz-question

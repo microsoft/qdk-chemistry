@@ -587,7 +587,9 @@ def print_iqpe_results(result: IqpeWorkflowResult) -> None:
         "CASCI algorithmic reference: "
         f"{result.problem.mapping.active_space_result.refined_energy:.12f} Hartree"
     )
-    print(f"Modal energy error: {result.modal_run.error_hartree:+.12f} Hartree")
+    print(
+        f"Signed algorithmic difference: {result.modal_run.error_hartree:+.12f} Hartree"
+    )
     print(f"Total IQPE runtime: {result.total_runtime_seconds:.1f} seconds")
 
 
