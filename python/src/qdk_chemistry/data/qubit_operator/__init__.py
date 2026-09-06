@@ -178,6 +178,26 @@ class QubitOperator(DataClass):
         """
         return self._forward("equiv")(other.get_container() if isinstance(other, QubitOperator) else other, atol)
 
+    def to_interleaved(self, n_spatial: int) -> QubitOperator:
+        """Return the operator reindexed from blocked to interleaved spin-orbital order.
+
+        ``__getattr__`` already reaches the container's implementation, but it hands back a
+        bare container rather than a wrapped operator, and a dynamically forwarded method is
+        invisible to Sphinx -- which is what the ``:meth:`` cross-references in
+        :mod:`~qdk_chemistry.data.term_partition` and the data guide resolve against.
+
+        Args:
+            n_spatial: Number of spatial orbitals.
+
+        Returns:
+            A new operator whose terms are indexed in interleaved order.
+
+        Raises:
+            AttributeError: If the wrapped representation does not define the reordering.
+
+        """
+        return QubitOperator(self._forward("to_interleaved")(n_spatial))
+
     def __add__(self, other: Any) -> QubitOperator:
         """Return the sum of two qubit operators, rewrapped."""
         if not isinstance(other, QubitOperator):
