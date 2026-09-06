@@ -466,15 +466,14 @@ class TestSelectFullFidelity:
             "numCopies": 1,
             "numPositiveOneBody": N,
             # x_o = 0 is the generator under test; the rest only need to be well formed.
-            "OneBodyRotationAngles": [_vector_to_givens_angles(u)]
-            + [_vector_to_givens_angles(other)] * (N - 1),
+            "OneBodyRotationAngles": [_vector_to_givens_angles(u)] + [_vector_to_givens_angles(other)] * (N - 1),
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
             "numFreeRiderBits": 2,
         }
         sv = self._run_select(select_data, xo_value=0, b_value=0)
 
-        total = int(round(math.log2(len(sv))))
+        total = round(math.log2(len(sv)))
         xo_bits = math.ceil(math.log2(N + 1)) if N + 1 > 1 else 1
         system0 = xo_bits + (1 + 2) + 2  # outer + (b bits + free-rider) + spin
         spin_dq = xo_bits + 1 + 2
