@@ -52,8 +52,6 @@ See Also:
 
 References:
     :cite:`vonBurg2021`
-    :cite:`Beebe1977`
-    :cite:`Koch2003`
 )");
 
   double_factorizer.def(py::init<>(), R"(

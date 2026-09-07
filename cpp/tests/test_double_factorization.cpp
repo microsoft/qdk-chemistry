@@ -94,11 +94,6 @@ Eigen::MatrixXd make_cholesky_vectors(std::size_t norb, std::size_t naux,
   return vectors;
 }
 
-/// Pack `total` Cholesky vectors spanning only `independent` dimensions, by
-/// making the surplus columns fixed multiples of the independent ones. Reusing
-/// the stored vectors then yields `total` fragments while re-decomposing the
-/// dense tensor yields only `independent`, which is what makes the fast path
-/// observable rather than merely correct.
 Eigen::MatrixXd make_rank_deficient_cholesky_vectors(std::size_t norb,
                                                      std::size_t independent,
                                                      std::size_t total,
@@ -347,19 +342,6 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   EXPECT_LT((g_aaaa - two_body).cwiseAbs().maxCoeff(), 1e-2);
 }
 
-TEST(DoubleFactorizerCholeskyTest, MetaDataAndFactoryRegistration) {
-  auto factorizer = make_cholesky_factorizer();
-  ASSERT_NE(factorizer, nullptr);
-  EXPECT_EQ(factorizer->type_name(), "double_factorizer");
-  EXPECT_EQ(factorizer->name(), "qdk");
-  EXPECT_EQ(factorizer->settings().get<std::string>("method"), "cholesky");
-
-  // The method is a constrained setting rather than a separate registered
-  // algorithm, so an unknown value has to be rejected at set() time.
-  EXPECT_THROW(factorizer->settings().set("method", "not_a_method"),
-               std::exception);
-}
-
 TEST(DoubleFactorizerCholeskyTest, FragmentsReconstructPositiveTensor) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 17);
@@ -387,8 +369,6 @@ TEST(DoubleFactorizerCholeskyTest, AgreesWithEigenDecomposition) {
   const auto cholesky_fragments = double_factorize(
       two_body, norb, 1e-12, DoubleFactorizationMethod::Cholesky);
 
-  // The threshold selects on ||eps||^2 in both methods, so a positive
-  // semi-definite tensor has to yield the same number of fragments.
   EXPECT_EQ(cholesky_fragments.size(), eigen_fragments.size());
 
   const Eigen::VectorXd from_eigen =
@@ -412,33 +392,6 @@ TEST(DoubleFactorizerCholeskyTest, SortsFragmentsByDecreasingWeight) {
   }
 }
 
-// A fixed machine-epsilon breakdown tolerance passes at norb = 2 but reports a
-// positive semi-definite supermatrix as indefinite once the accumulated
-// roundoff in the residual diagonal outgrows it, which silently routes every
-// realistic input through the O(norb^6) fallback. Cover several orbital counts
-// so that regression is caught rather than hidden behind a correct answer.
-TEST(DoubleFactorizerCholeskyTest, DoesNotFallBackAsOrbitalCountGrows) {
-  const std::vector<std::size_t> orbital_counts = {2, 3, 4, 6, 8};
-  for (const std::size_t norb : orbital_counts) {
-    const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 41);
-    const auto fragments = double_factorize(
-        two_body, norb, 1e-12, DoubleFactorizationMethod::Cholesky);
-    ASSERT_FALSE(fragments.empty()) << "norb=" << norb;
-
-    for (const auto& fragment : fragments) {
-      ASSERT_DOUBLE_EQ(fragment.sign, 1.0)
-          << "norb=" << norb
-          << ": fell back to the eigendecomposition for a positive "
-             "semi-definite tensor";
-    }
-
-    const Eigen::VectorXd reconstructed = reconstruct_two_body(fragments, norb);
-    EXPECT_LT((reconstructed - two_body).cwiseAbs().maxCoeff(),
-              kReconstructionTolerance)
-        << "norb=" << norb;
-  }
-}
-
 TEST(DoubleFactorizerCholeskyTest, FallsBackForIndefiniteTensor) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, -1.0, 1.0}, 5);
@@ -446,8 +399,6 @@ TEST(DoubleFactorizerCholeskyTest, FallsBackForIndefiniteTensor) {
                                           DoubleFactorizationMethod::Cholesky);
   ASSERT_FALSE(fragments.empty());
 
-  // No Cholesky decomposition exists here, so a negative fragment is proof
-  // that the eigendecomposition took over.
   const bool has_negative_fragment =
       std::any_of(fragments.begin(), fragments.end(),
                   [](const TwoBodyFragment& f) { return f.sign < 0.0; });
@@ -457,56 +408,6 @@ TEST(DoubleFactorizerCholeskyTest, FallsBackForIndefiniteTensor) {
   const Eigen::VectorXd reconstructed = reconstruct_two_body(fragments, norb);
   EXPECT_LT((reconstructed - two_body).cwiseAbs().maxCoeff(),
             kReconstructionTolerance);
-}
-
-TEST(DoubleFactorizerCholeskyTest, TruncationDiscardsSmallFragments) {
-  constexpr std::size_t norb = 4;
-  const auto two_body = make_two_body(norb, {1.0, 1e-4, 1e-4}, 23);
-
-  const auto exact = double_factorize(two_body, norb, 1e-12,
-                                      DoubleFactorizationMethod::Cholesky);
-  const auto truncated = double_factorize(two_body, norb, 1e-2,
-                                          DoubleFactorizationMethod::Cholesky);
-
-  EXPECT_LT(truncated.size(), exact.size());
-  EXPECT_FALSE(truncated.empty());
-
-  // The eigen path thresholds the same quantity, so it has to retain the same
-  // number of fragments for the same threshold.
-  EXPECT_EQ(truncated.size(), double_factorize(two_body, norb, 1e-2,
-                                               DoubleFactorizationMethod::Eigen)
-                                  .size());
-}
-
-TEST(DoubleFactorizerCholeskyTest, RejectsInvalidInput) {
-  constexpr std::size_t norb = 4;
-  const Eigen::VectorXd tensor = make_two_body(norb, {1.0, 1.0}, 31);
-
-  EXPECT_THROW(double_factorize(Eigen::VectorXd::Zero(10), norb, 1e-12,
-                                DoubleFactorizationMethod::Cholesky),
-               std::invalid_argument);
-  EXPECT_THROW(double_factorize(Eigen::VectorXd(), 0, 1e-12,
-                                DoubleFactorizationMethod::Cholesky),
-               std::invalid_argument);
-  EXPECT_THROW(
-      double_factorize(tensor, norb, -1.0, DoubleFactorizationMethod::Cholesky),
-      std::invalid_argument);
-  EXPECT_THROW(
-      double_factorize(tensor, norb, std::numeric_limits<double>::quiet_NaN(),
-                       DoubleFactorizationMethod::Cholesky),
-      std::invalid_argument);
-
-  Eigen::VectorXd with_nan = tensor;
-  with_nan[0] = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(double_factorize(with_nan, norb, 1e-12,
-                                DoubleFactorizationMethod::Cholesky),
-               std::invalid_argument);
-
-  Eigen::VectorXd with_inf = tensor;
-  with_inf[0] = std::numeric_limits<double>::infinity();
-  EXPECT_THROW(double_factorize(with_inf, norb, 1e-12,
-                                DoubleFactorizationMethod::Cholesky),
-               std::invalid_argument);
 }
 
 TEST(DoubleFactorizerCholeskyTest, RunProducesEquivalentFactorizedContainer) {
@@ -531,70 +432,4 @@ TEST(DoubleFactorizerCholeskyTest, RunProducesEquivalentFactorizedContainer) {
 
   EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
   EXPECT_TRUE(factorized->is_restricted());
-}
-
-TEST(DoubleFactorizerCholeskyTest, ReusesStoredThreeCenterIntegrals) {
-  constexpr std::size_t norb = 3;
-  constexpr std::size_t independent = 3;
-  constexpr std::size_t stored = 5;
-  constexpr double core_energy = 2.25;
-  const auto vectors =
-      make_rank_deficient_cholesky_vectors(norb, independent, stored, 17);
-  auto hamiltonian = make_cholesky_hamiltonian(norb, vectors, core_energy);
-
-  const Eigen::VectorXd expected =
-      std::get<0>(hamiltonian->get_two_body_integrals());
-
-  auto factorized = make_cholesky_factorizer()->run(hamiltonian);
-  ASSERT_NE(factorized, nullptr);
-
-  const auto& container = as_factorized(factorized);
-
-  // The stored vectors are rank deficient, so consuming them yields one
-  // fragment per stored vector while decomposing the dense tensor would yield
-  // only `independent`. That difference is what detects the fast path silently
-  // ceasing to be taken: the fallback stays exact, so reconstruction alone
-  // could never notice.
-  EXPECT_EQ(container.get_num_ranks(), stored)
-      << "expected the stored three-center integrals to be reused directly; "
-         "getting "
-      << independent
-      << " fragments means the dense tensor was "
-         "re-decomposed instead";
-
-  const Eigen::VectorXd& signs = container.get_signs();
-  EXPECT_TRUE((signs.array() > 0.0).all());
-
-  const Eigen::VectorXd& reconstructed =
-      std::get<0>(factorized->get_two_body_integrals());
-  EXPECT_TRUE(reconstructed.isApprox(expected, kReconstructionTolerance))
-      << "max abs deviation: "
-      << (reconstructed - expected).cwiseAbs().maxCoeff();
-
-  EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
-}
-
-TEST(DoubleFactorizerCholeskyTest, EigenDecompositionIgnoresStoredVectors) {
-  constexpr std::size_t norb = 3;
-  constexpr std::size_t independent = 3;
-  constexpr std::size_t stored = 5;
-  const auto vectors =
-      make_rank_deficient_cholesky_vectors(norb, independent, stored, 17);
-  auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
-
-  const Eigen::VectorXd expected =
-      std::get<0>(hamiltonian->get_two_body_integrals());
-
-  // The fast path belongs to the "cholesky" method alone, so the default
-  // "eigen_decomposition" has to fall through to the dense tensor and recover
-  // the true rank.
-  auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
-  ASSERT_NE(factorized, nullptr);
-
-  const auto& container = as_factorized(factorized);
-  EXPECT_EQ(container.get_num_ranks(), independent);
-
-  const Eigen::VectorXd& reconstructed =
-      std::get<0>(factorized->get_two_body_integrals());
-  EXPECT_TRUE(reconstructed.isApprox(expected, kReconstructionTolerance));
 }

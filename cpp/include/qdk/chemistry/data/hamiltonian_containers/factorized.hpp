@@ -150,8 +150,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * absolute value, and |sign| is 1.
    *
    * @throws std::runtime_error if the adjusted one-body matrix is not
-   *         symmetric, in which case its one-norm is not the sum of the
-   *         absolute eigenvalues and Λ is undefined.
+   *         symmetric.
    */
   double get_lambda() const;
 
@@ -161,10 +160,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *
    * @return The effective normalization, or 0.0 if any factor has a negative
    *         sign or E_gap is outside the open interval (0, 2Λ).
-   * @throws std::runtime_error propagated from get_lambda() when Λ is
-   *         undefined. The 0.0 sentinel is reserved for cases where Λ is
-   *         well defined but the λ_eff formula does not apply; it is not used
-   *         to mask an unusable normalization.
    */
   double get_lambda_eff() const;
 

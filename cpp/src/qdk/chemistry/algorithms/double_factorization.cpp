@@ -30,9 +30,6 @@ std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
   return std::make_unique<DoubleFactorizer>();
 }
 
-/// Map the `"method"` setting onto the enum. The setting's ListConstraint
-/// already rejects anything else, so an unknown value here means the
-/// constraint and this mapping have drifted apart.
 DoubleFactorizationMethod method_from_string(const std::string& method) {
   if (method == "cholesky") {
     return DoubleFactorizationMethod::Cholesky;
@@ -40,8 +37,7 @@ DoubleFactorizationMethod method_from_string(const std::string& method) {
   if (method == "eigen_decomposition") {
     return DoubleFactorizationMethod::Eigen;
   }
-  throw std::invalid_argument("double_factorizer: unknown method \"" + method +
-                              "\".");
+  throw std::invalid_argument("double_factorizer: unknown method " + method);
 }
 
 void validate_norb_and_threshold(std::size_t norb, double truncation_threshold,
@@ -59,9 +55,7 @@ void validate_norb_and_threshold(std::size_t norb, double truncation_threshold,
 }
 
 /// Reshape a length-norb^2 pair vector, indexed row-major as p*norb + q, into
-/// an norb x norb matrix and diagonalize it. Averaging enforces the p<->q
-/// generator, which is load-bearing rather than cosmetic: within a degenerate
-/// block the basis LAPACK returns is arbitrary and need not be symmetric.
+/// an norb x norb matrix and diagonalize it.
 void diagonalize_pair_vector(const double* pair_vector, std::size_t norb,
                              const std::string& context,
                              Eigen::MatrixXd& eigenvectors,
@@ -77,8 +71,7 @@ void diagonalize_pair_vector(const double* pair_vector, std::size_t norb,
       eigenvectors.data(), static_cast<int64_t>(norb), eigenvalues.data());
   if (info != 0) {
     throw std::runtime_error(context +
-                             ": LAPACK syev failed to diagonalize a "
-                             "fragment matrix (info=" +
+                             ": LAPACK syev failed to diagonalize (info=" +
                              std::to_string(info) + ").");
   }
 }

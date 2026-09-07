@@ -16,19 +16,6 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @file
- * @brief Double factorization of a Hamiltonian's two-electron integrals.
- *
- * @note Equation numbers here refer to :cite:`Low2025`.
- */
-
-/// First-step factorization of the two-electron supermatrix.
-enum class DoubleFactorizationMethod {
-  Cholesky,  ///< Pivoted Cholesky, O(naux * norb^4).
-  Eigen,     ///< Dense eigen-decomposition, O(norb^6).
-};
-
-/**
  * @class DoubleFactorizerSettings
  * @brief Settings container for DoubleFactorizer.
  *
@@ -41,11 +28,10 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
    */
   DoubleFactorizerSettings() {
     set_default("method", std::string("eigen_decomposition"),
-                "First-step factorization of the two-electron supermatrix. "
+                "First-step factorization of the supermatrix. "
                 "\"eigen_decomposition\" diagonalizes it in O(norb^6); "
                 "\"cholesky\" runs a pivoted Cholesky in O(naux * norb^4), "
-                "stops at the numerical rank, reuses stored three-center "
-                "integrals when the Hamiltonian carries them, and falls back "
+                "stops at the numerical rank, and falls back "
                 "to \"eigen_decomposition\" when the supermatrix is not "
                 "positive semi-definite.",
                 qdk::chemistry::data::ListConstraint<std::string>{
@@ -56,12 +42,17 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         "Drop fragments whose squared coefficient norm ||eps||^2 is below "
         "this threshold. For eigen_decomposition this equals the two-electron "
         "supermatrix eigenvalue magnitude. Must be non-negative; 0.0 keeps "
-        "every fragment the method produces, including the numerically null "
-        "ones, though cholesky still stops at the numerical rank.",
+        "every fragment the method produces.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
   ~DoubleFactorizerSettings() override = default;
+};
+
+/// First-step factorization of the two-electron supermatrix.
+enum class DoubleFactorizationMethod {
+  Cholesky,  ///< Pivoted Cholesky, O(naux * norb^4).
+  Eigen,     ///< Dense eigen-decomposition, O(norb^6).
 };
 
 /// A single low-rank ("perfect square") two-electron fragment:
@@ -82,22 +73,14 @@ struct TwoBodyFragment {
 ///
 /// Both methods reshape the tensor into the (pq),(rs) supermatrix, impose
 /// chemist permutation symmetry by averaging rather than verifying it, and
-/// threshold the same quantity, so a given `truncation_threshold` selects the
-/// same fragments from either one.
+/// threshold the same quantity.
 ///
 /// DoubleFactorizationMethod::Eigen diagonalizes the supermatrix with LAPACK
-/// in O(norb^6). It handles an indefinite supermatrix, which is the only way a
-/// fragment can carry sign -1.
-///
-/// DoubleFactorizationMethod::Cholesky runs a pivoted Cholesky
-/// :cite:`Beebe1977` :cite:`Koch2003`, costing O(naux * norb^4) and stopping at
+/// in O(norb^6). DoubleFactorizationMethod::Cholesky runs a pivoted Cholesky
+/// costing O(naux * norb^4) and stopping at
 /// the numerical rank instead of materializing all norb^2 eigenpairs. A
 /// Cholesky decomposition exists only for a positive semi-definite
-/// supermatrix. Exact two-electron integrals are positive semi-definite, but
-/// approximate or synthetic ones need not be, so a detected breakdown falls
-/// back to DoubleFactorizationMethod::Eigen rather than failing. That fallback
-/// is observable in the result: it is the only way this method can return a
-/// fragment with sign -1.
+/// supermatrix.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
 ///        Chemist permutation symmetry is imposed by averaging, not verified.
@@ -132,8 +115,8 @@ std::vector<TwoBodyFragment> double_factorize(
  *
  * The `"method"` setting selects the first factorization step: an
  * eigen-decomposition of the two-electron supermatrix, or a pivoted Cholesky
- * decomposition of it :cite:`Beebe1977` :cite:`Koch2003`. Both produce the
- * same container and threshold the same quantity, so a given
+ * decomposition of it. Both produce the same container and threshold the same
+ * quantity, so a given
  * `"truncation_threshold"` selects the same fragments from either.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and

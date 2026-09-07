@@ -251,17 +251,8 @@ TEST_F(FactorizedHamiltonianTest, TwoBodyLambdaIsSignInvariant) {
 }
 
 TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
-  // SelfAdjointEigenSolver reads a single triangle and reports Success either
-  // way, so without a guard lambda silently describes whichever triangle Eigen
-  // happened to read. The two mirrorings below are both legitimate symmetric
-  // containers and each shares a triangle with the non-symmetric input, so the
-  // gap between them is the size of the error that would have gone unreported.
   Eigen::MatrixXd asymmetric = one_body;
   asymmetric(0, 1) = 0.3;
-  // Large enough that mirroring the lower triangle makes h1' indefinite. That
-  // matters: for a definite matrix the sum of absolute eigenvalues collapses
-  // to |trace|, which does not depend on the off-diagonal at all, so a smaller
-  // value makes the two mirrorings agree exactly and the check below vacuous.
   asymmetric(1, 0) = -1.5;
 
   Eigen::MatrixXd from_lower = asymmetric;
@@ -285,11 +276,6 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
                                            inactive_fock, orbitals, signs,
                                            positive_gap);
   EXPECT_THROW(container.get_lambda(), std::runtime_error);
-
-  // get_lambda_eff() reserves its 0.0 sentinel for a well-defined lambda that
-  // the formula does not apply to, so it has to surface this rather than
-  // absorb it. The gap and the signs are positive precisely so that the call
-  // reaches get_lambda() instead of returning early.
   EXPECT_THROW(container.get_lambda_eff(), std::runtime_error);
 }
 
