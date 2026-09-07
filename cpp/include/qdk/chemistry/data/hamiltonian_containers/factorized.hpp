@@ -148,6 +148,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *
    * The per-rank signs do not appear: every two-body term enters through an
    * absolute value, and |sign| is 1.
+   *
+   * @throws std::runtime_error if the adjusted one-body matrix is not
+   *         symmetric, in which case its one-norm is not the sum of the
+   *         absolute eigenvalues and Λ is undefined.
    */
   double get_lambda() const;
 
@@ -157,6 +161,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *
    * @return The effective normalization, or 0.0 if any factor has a negative
    *         sign or E_gap is outside the open interval (0, 2Λ).
+   * @throws std::runtime_error propagated from get_lambda() when Λ is
+   *         undefined. The 0.0 sentinel is reserved for cases where Λ is
+   *         well defined but the λ_eff formula does not apply; it is not used
+   *         to mask an unusable normalization.
    */
   double get_lambda_eff() const;
 
@@ -199,7 +207,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
 
   Eigen::VectorXd _u;      ///< Flat U matrices [R*B*N]
   Eigen::VectorXd _w;      ///< Flat W matrices [R*B*C]
-  Eigen::MatrixXd _wb;     ///< Identity weights [R*C]
+  Eigen::MatrixXd _wb;     ///< Identity weights [R,C]
   Eigen::VectorXd _signs;  ///< Per-rank signs [R], each +1.0 or -1.0
 
   double _energy_gap;  ///< Energy-gap metadata

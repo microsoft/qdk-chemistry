@@ -10,7 +10,7 @@ internal package paths.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import (  # noqa: F401 - re-export
-    CholeskyDoubleFactorizer,
-    DoubleFactorizer,
+from qdk_chemistry._core._algorithms import (
+    CholeskyDoubleFactorizer,  # noqa: F401 - re-export
+    DoubleFactorizer,  # noqa: F401 - re-export
 )
