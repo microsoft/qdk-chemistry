@@ -333,44 +333,11 @@ std::vector<TwoBodyFragment> double_factorize(
                                         truncation_threshold);
 }
 
-std::vector<TwoBodyFragment> DoubleFactorizer::_compute_fragments(
-    const data::Hamiltonian& hamiltonian, std::size_t norb,
-    double truncation_threshold, DoubleFactorizationMethod method) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  using qdk::chemistry::data::CholeskyHamiltonianContainer;
-
-  // Stored three-center integrals already are the first factorization, so
-  // reusing them skips both expanding them into a dense norb^4 tensor and
-  // re-deriving a decomposition that is already on hand.
-  if (method == DoubleFactorizationMethod::Cholesky &&
-      hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
-    const Eigen::MatrixXd& three_center =
-        hamiltonian.get_container<CholeskyHamiltonianContainer>()
-            .get_three_center_integrals()
-            .first;
-
-    if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
-      return fragments_from_cholesky_vectors(three_center, norb,
-                                             truncation_threshold);
-    }
-
-    QDK_LOGGER().debug(
-        "double_factorizer: stored three-center integrals have {} rows "
-        "but num_orbitals={} implies {}, decomposing the dense tensor instead.",
-        three_center.rows(), norb, norb * norb);
-  }
-
-  const Eigen::VectorXd& g_aaaa =
-      std::get<0>(hamiltonian.get_two_body_integrals());
-
-  return double_factorize(g_aaaa, norb, truncation_threshold, method);
-}
-
 std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
   QDK_LOG_TRACE_ENTERING();
 
+  using qdk::chemistry::data::CholeskyHamiltonianContainer;
   using qdk::chemistry::data::FactorizedHamiltonianContainer;
 
   if (!hamiltonian) {
@@ -400,8 +367,35 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   // keeps implementations that never materialize a dense tensor viable.
   const std::size_t norb = static_cast<std::size_t>(h_alpha.rows());
 
+  // Stored three-center integrals already are the first factorization, so
+  // reusing them skips both expanding them into a dense norb^4 tensor and
+  // re-deriving a decomposition that is already on hand. The accessor hands
+  // back a pair of references into the container, so the bound reference stays
+  // valid after the pair expires.
+  const Eigen::MatrixXd* stored_vectors = nullptr;
+  if (method == DoubleFactorizationMethod::Cholesky &&
+      hamiltonian->has_container_type<CholeskyHamiltonianContainer>()) {
+    const Eigen::MatrixXd& three_center =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>()
+            .get_three_center_integrals()
+            .first;
+
+    if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
+      stored_vectors = &three_center;
+    } else {
+      QDK_LOGGER().debug(
+          "double_factorizer: stored three-center integrals have {} rows but "
+          "num_orbitals={} implies {}, decomposing the dense tensor instead.",
+          three_center.rows(), norb, norb * norb);
+    }
+  }
+
   auto fragments =
-      _compute_fragments(*hamiltonian, norb, truncation_threshold, method);
+      stored_vectors != nullptr
+          ? fragments_from_cholesky_vectors(*stored_vectors, norb,
+                                            truncation_threshold)
+          : double_factorize(std::get<0>(hamiltonian->get_two_body_integrals()),
+                             norb, truncation_threshold, method);
 
   QDK_LOGGER().debug(
       "{}: method={}, num_orbitals={}, truncation_threshold={}, "

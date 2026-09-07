@@ -192,26 +192,6 @@ class DoubleFactorizer
    */
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian) const override;
-
- private:
-  /**
-   * @brief Produce the low-rank fragments for a Hamiltonian.
-   *
-   * Only this step differs between methods; the container assembly, the
-   * carried-over one-body data and the validation are shared.
-   *
-   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param hamiltonian The validated, restricted input Hamiltonian.
-   * @param norb Number of active spatial orbitals.
-   * @param truncation_threshold Fragments whose squared coefficient norm
-   *        ||eps||^2 falls below this threshold are dropped.
-   * @param method First-step factorization to apply.
-   * \endcond
-   * @return The retained fragments.
-   */
-  std::vector<TwoBodyFragment> _compute_fragments(
-      const data::Hamiltonian& hamiltonian, std::size_t norb,
-      double truncation_threshold, DoubleFactorizationMethod method) const;
 };
 
 /**

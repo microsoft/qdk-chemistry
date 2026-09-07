@@ -47,16 +47,6 @@ void bind_double_factorization(py::module &m) {
   Both methods threshold the same quantity, so a given ``truncation_threshold``
   selects the same fragments from either.
 
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as alg
-
-    factorizer = alg.DoubleFactorizer()
-    factorizer.settings().set("method", "cholesky")
-    factorized = factorizer.run(hamiltonian)
-
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
 
