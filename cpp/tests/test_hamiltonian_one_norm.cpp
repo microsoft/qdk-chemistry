@@ -5,9 +5,11 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <cmath>
 #include <memory>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/utils/double_factorization.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 #include <tuple>
@@ -15,6 +17,7 @@
 #include "ut_common.hpp"
 
 using qdk::chemistry::utils::double_factorize;
+using qdk::chemistry::utils::double_factorize_three_center;
 using qdk::chemistry::utils::DoubleFactorizationMethod;
 using qdk::chemistry::utils::hamiltonian_one_norm;
 using qdk::chemistry::utils::TwoBodyFragment;
@@ -306,4 +309,101 @@ TEST_F(DoubleFactorizationCholeskyTest, HamiltonianOneNormAcceptsBothMethods) {
   EXPECT_NEAR(norm_default.two_body, norm_cholesky.two_body,
               testing::numerical_zero_tolerance);
   EXPECT_GT(norm_eigen.two_body, 0.0);
+}
+
+// ---------------------------------------------------------------------------
+// Three-center (Cholesky container) path: the same decomposition without ever
+// materializing the norb^4 tensor.
+// ---------------------------------------------------------------------------
+
+class ThreeCenterDoubleFactorizationTest : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    auto water = testing::create_water_structure();
+    auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+    auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+    ham_ = qdk::chemistry::algorithms::HamiltonianConstructorFactory::create(
+               "qdk_cholesky")
+               ->run(wfn_HF->get_orbitals());
+    ASSERT_TRUE(ham_->has_container_type<
+                qdk::chemistry::data::CholeskyHamiltonianContainer>());
+    l_alpha_ = ham_->get_container<
+                       qdk::chemistry::data::CholeskyHamiltonianContainer>()
+                   .get_three_center_integrals()
+                   .first;
+    std::tie(g_aaaa_, std::ignore, std::ignore) =
+        ham_->get_two_body_integrals();
+    norb_ =
+        static_cast<size_t>(ham_->get_orbitals()->get_num_molecular_orbitals());
+  }
+
+  std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham_;
+  Eigen::MatrixXd l_alpha_;
+  Eigen::VectorXd g_aaaa_;
+  size_t norb_ = 0;
+};
+
+TEST_F(ThreeCenterDoubleFactorizationTest, ReconstructsTensorExactly) {
+  const Eigen::MatrixXd half = l_alpha_ / std::sqrt(2.0);
+  const Eigen::VectorXd expected = 0.5 * g_aaaa_;
+
+  for (auto method : {DoubleFactorizationMethod::Cholesky,
+                      DoubleFactorizationMethod::Eigen}) {
+    auto fragments = double_factorize_three_center(half, norb_, 0.0, method);
+    ASSERT_FALSE(fragments.empty());
+    auto reconstructed = reconstruct(fragments, norb_);
+    EXPECT_LT((reconstructed - expected).cwiseAbs().maxCoeff(), 1e-9);
+  }
+}
+
+TEST_F(ThreeCenterDoubleFactorizationTest, FragmentsArePositiveAndOrdered) {
+  auto fragments =
+      double_factorize_three_center(l_alpha_ / std::sqrt(2.0), norb_, 0.0);
+  ASSERT_FALSE(fragments.empty());
+  for (size_t n = 0; n < fragments.size(); ++n) {
+    EXPECT_DOUBLE_EQ(fragments[n].sign, 1.0);
+    if (n > 0) {
+      EXPECT_LE(fragments[n].lambda_df, fragments[n - 1].lambda_df);
+    }
+  }
+}
+
+TEST_F(ThreeCenterDoubleFactorizationTest, EigenMethodRemovesRedundantColumns) {
+  const Eigen::MatrixXd half = l_alpha_ / std::sqrt(2.0);
+  auto eigen_fragments = double_factorize_three_center(
+      half, norb_, 0.0, DoubleFactorizationMethod::Eigen);
+  // The aux index is sized by the AO basis, so it can only ever exceed the
+  // symmetric-pair dimension of the (possibly smaller) orbital space.
+  EXPECT_LE(eigen_fragments.size(), norb_ * (norb_ + 1) / 2);
+  EXPECT_LE(eigen_fragments.size(), static_cast<size_t>(l_alpha_.cols()));
+}
+
+TEST_F(ThreeCenterDoubleFactorizationTest,
+       MeanFieldContractionsMatchDensePath) {
+  auto [coulomb_dense, exchange_dense] =
+      qdk::chemistry::utils::mean_field_contractions(g_aaaa_, norb_);
+  auto [coulomb_factored, exchange_factored] =
+      qdk::chemistry::utils::mean_field_contractions_three_center(l_alpha_,
+                                                                  norb_);
+  EXPECT_LT((coulomb_factored - coulomb_dense).cwiseAbs().maxCoeff(), 1e-9);
+  EXPECT_LT((exchange_factored - exchange_dense).cwiseAbs().maxCoeff(), 1e-9);
+}
+
+TEST_F(ThreeCenterDoubleFactorizationTest, OneNormUsesTheFactoredPath) {
+  auto norm = hamiltonian_one_norm(*ham_, 0.0);
+  EXPECT_GT(norm.one_body, 0.0);
+  EXPECT_GT(norm.two_body, 0.0);
+  EXPECT_NEAR(norm.total, norm.one_body + norm.two_body,
+              testing::numerical_zero_tolerance);
+
+  // The one-body term is a plain contraction of the same tensor, so it must
+  // agree with the dense container. lambda_2e is gauge dependent and is not
+  // expected to.
+  auto water = testing::create_water_structure();
+  auto scf_solver = qdk::chemistry::algorithms::ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+  auto dense =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create()->run(
+          wfn_HF->get_orbitals());
+  EXPECT_NEAR(norm.one_body, hamiltonian_one_norm(*dense, 0.0).one_body, 1e-6);
 }

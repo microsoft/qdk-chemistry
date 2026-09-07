@@ -251,3 +251,27 @@ TEST_F(SymmetryShiftTest, ComputeShiftThenRebuildMatchesRun) {
   EXPECT_NEAR(shifted_run->get_core_energy(), shifted_manual->get_core_energy(),
               1e-12);
 }
+
+/**
+ * @brief A Hamiltonian storing three-center integrals is shifted through the
+ * factored path, which never builds the norb^4 tensor. The shift is a
+ * symmetry, so the resulting Hamiltonian must be spectrally equivalent to the
+ * unshifted one in the target particle-number sector.
+ */
+TEST_F(SymmetryShiftTest, CholeskyContainerIsShiftedThroughTheFactoredPath) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto ham = HamiltonianConstructorFactory::create("qdk_cholesky")
+                 ->run(wfn_HF->get_orbitals());
+
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifted = shifter->run(ham, 5, 5);
+  ASSERT_NE(shifted, nullptr);
+
+  auto norm_before = qdk::chemistry::utils::hamiltonian_one_norm(*ham, 0.0);
+  auto norm_after = qdk::chemistry::utils::hamiltonian_one_norm(*shifted, 0.0);
+  EXPECT_GT(norm_before.total, 0.0);
+  EXPECT_LE(norm_after.total, norm_before.total);
+}

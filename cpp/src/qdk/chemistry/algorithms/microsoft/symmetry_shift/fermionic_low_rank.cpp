@@ -4,26 +4,22 @@
 
 #include "fermionic_low_rank.hpp"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <lapack.hh>
 #include <memory>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
 #include "../../symmetry_shift_detail.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
-
-namespace {
-
-inline std::size_t two_body_index(std::size_t i, std::size_t j, std::size_t k,
-                                  std::size_t l, std::size_t norb) {
-  return ((i * norb + j) * norb + k) * norb + l;
-}
-
-}  // namespace
 
 // ---------------------------------------------------------------------------
 // Step 2: per-fragment median shift, aggregated into a global (mu2, xi).
@@ -70,28 +66,11 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
 // ---------------------------------------------------------------------------
 
 OneElectronShiftResult solve_one_electron_shift(
-    const Eigen::MatrixXd& h, const Eigen::VectorXd& two_body_integrals,
+    const Eigen::MatrixXd& h, Eigen::MatrixXd coulomb, Eigen::MatrixXd exchange,
     double mu2, const Eigen::MatrixXd& xi, double num_electrons) {
   OneElectronShiftResult result;
 
   const std::size_t norb = static_cast<std::size_t>(h.rows());
-
-  // Mean-field contractions of the ORIGINAL two-electron tensor g[i,j,k,l]:
-  //   coul_ij = sum_k g[i,j,k,k],  exch_ij = sum_k g[i,k,k,j].
-  Eigen::MatrixXd coulomb = Eigen::MatrixXd::Zero(norb, norb);
-  Eigen::MatrixXd exchange = Eigen::MatrixXd::Zero(norb, norb);
-  for (std::size_t i = 0; i < norb; ++i) {
-    for (std::size_t j = 0; j < norb; ++j) {
-      double c = 0.0;
-      double e = 0.0;
-      for (std::size_t k = 0; k < norb; ++k) {
-        c += two_body_integrals[two_body_index(i, j, k, k, norb)];
-        e += two_body_integrals[two_body_index(i, k, k, j, norb)];
-      }
-      coulomb(i, j) = c;
-      exchange(i, j) = e;
-    }
-  }
 
   const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(norb, norb);
 
@@ -163,9 +142,6 @@ SymmetryShift compute_fermionic_low_rank_shift(
 
   auto [h_alpha, h_beta] = hamiltonian.get_one_body_integrals();
   (void)h_beta;
-  auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian.get_two_body_integrals();
-  (void)g_aabb;
-  (void)g_bbbb;
 
   const size_t norb = static_cast<size_t>(h_alpha.rows());
   QDK_LOGGER().debug(
@@ -173,9 +149,32 @@ SymmetryShift compute_fermionic_low_rank_shift(
       "df_truncation_threshold={}",
       norb, num_electrons, df_truncation_threshold);
 
-  const Eigen::VectorXd two_body_coefficient = 0.5 * g_aaaa;
-  auto fragments = qdk::chemistry::utils::double_factorize(
-      two_body_coefficient, norb, df_truncation_threshold, method);
+  std::vector<qdk::chemistry::utils::TwoBodyFragment> fragments;
+  Eigen::MatrixXd coulomb;
+  Eigen::MatrixXd exchange;
+  if (hamiltonian.has_container_type<
+          qdk::chemistry::data::CholeskyHamiltonianContainer>()) {
+    const auto& [l_alpha, l_beta] =
+        hamiltonian
+            .get_container<qdk::chemistry::data::CholeskyHamiltonianContainer>()
+            .get_three_center_integrals();
+    (void)l_beta;
+    const Eigen::MatrixXd half = l_alpha / std::sqrt(2.0);
+    fragments = qdk::chemistry::utils::double_factorize_three_center(
+        half, norb, df_truncation_threshold, method);
+    std::tie(coulomb, exchange) =
+        qdk::chemistry::utils::mean_field_contractions_three_center(l_alpha,
+                                                                    norb);
+  } else {
+    auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian.get_two_body_integrals();
+    (void)g_aabb;
+    (void)g_bbbb;
+    const Eigen::VectorXd two_body_coefficient = 0.5 * g_aaaa;
+    fragments = qdk::chemistry::utils::double_factorize(
+        two_body_coefficient, norb, df_truncation_threshold, method);
+    std::tie(coulomb, exchange) =
+        qdk::chemistry::utils::mean_field_contractions(g_aaaa, norb);
+  }
 
   if (fragments.empty()) {
     QDK_LOGGER().warn(
@@ -188,7 +187,8 @@ SymmetryShift compute_fermionic_low_rank_shift(
       accumulate_fragment_shifts(fragments, static_cast<Eigen::Index>(norb));
 
   auto one_electron = solve_one_electron_shift(
-      h_alpha, g_aaaa, global_shift.mu2, global_shift.xi, num_electrons);
+      h_alpha, std::move(coulomb), std::move(exchange), global_shift.mu2,
+      global_shift.xi, num_electrons);
 
   const double lambda_total_before =
       global_shift.lambda_df_baseline + one_electron.lambda_1e_baseline;

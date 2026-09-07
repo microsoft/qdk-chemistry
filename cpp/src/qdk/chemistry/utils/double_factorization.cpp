@@ -23,6 +23,17 @@ inline size_t two_body_index(size_t i, size_t j, size_t k, size_t l,
   return i * norb * norb * norb + j * norb * norb + k * norb + l;
 }
 
+/// Reshape one three-center column into its symmetric norb x norb matrix.
+Eigen::MatrixXd reshape_symmetric(const Eigen::VectorXd& column, size_t norb) {
+  Eigen::MatrixXd matrix(norb, norb);
+  for (size_t i = 0; i < norb; ++i) {
+    for (size_t j = 0; j < norb; ++j) {
+      matrix(i, j) = column[i * norb + j];
+    }
+  }
+  return 0.5 * (matrix + matrix.transpose());
+}
+
 /// Diagonalize a fragment's (symmetric) norb x norb matrix and package it as a
 /// TwoBodyFragment. `matrix` is consumed. `eps_scale` multiplies the resulting
 /// eigenvalues (used by the eigendecomposition path to fold in
@@ -273,6 +284,123 @@ std::vector<TwoBodyFragment> double_factorize(
 
   return factorize_by_eigendecomposition(supermatrix, norb,
                                          truncation_threshold);
+}
+
+std::vector<TwoBodyFragment> double_factorize_three_center(
+    const Eigen::MatrixXd& three_center, size_t norb,
+    double truncation_threshold, DoubleFactorizationMethod method) {
+  const size_t pair_dim = norb * norb;
+  if (static_cast<size_t>(three_center.rows()) != pair_dim) {
+    throw std::invalid_argument(
+        "double_factorize_three_center: expected " + std::to_string(pair_dim) +
+        " rows for norb=" + std::to_string(norb) + ", got " +
+        std::to_string(three_center.rows()) + ".");
+  }
+
+  const size_t naux = static_cast<size_t>(three_center.cols());
+  std::vector<TwoBodyFragment> fragments;
+  if (naux == 0 || norb == 0) {
+    return fragments;
+  }
+
+  if (method == DoubleFactorizationMethod::Cholesky) {
+    // The columns already factorize V; a column's weight is its squared norm.
+    const Eigen::VectorXd weights = three_center.colwise().squaredNorm();
+    const double stop_threshold =
+        std::max(truncation_threshold, std::numeric_limits<double>::epsilon() *
+                                           static_cast<double>(naux) *
+                                           weights.maxCoeff());
+
+    fragments.reserve(naux);
+    for (size_t q = 0; q < naux; ++q) {
+      if (weights[static_cast<Eigen::Index>(q)] <= stop_threshold) {
+        continue;
+      }
+      fragments.push_back(make_fragment(
+          reshape_symmetric(three_center.col(q), norb), 1.0, 1.0, norb));
+    }
+  } else {
+    // V = L L^T shares its nonzero eigenvalues with the Gram matrix L^T L,
+    // whose eigenvectors W lift to those of V as U = L W s^(-1/2).
+    Eigen::MatrixXd gram = three_center.transpose() * three_center;
+    Eigen::VectorXd gram_eigenvalues(naux);
+    const int64_t info = lapack::syev(
+        lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(naux),
+        gram.data(), static_cast<int64_t>(naux), gram_eigenvalues.data());
+    if (info != 0) {
+      throw std::runtime_error(
+          "double_factorize_three_center: LAPACK syev failed to diagonalize "
+          "the three-center Gram matrix (info=" +
+          std::to_string(info) + ").");
+    }
+
+    const double noise_floor = std::numeric_limits<double>::epsilon() *
+                               static_cast<double>(naux) *
+                               std::max(gram_eigenvalues.maxCoeff(), 0.0);
+    const double stop_threshold = std::max(truncation_threshold, noise_floor);
+
+    fragments.reserve(naux);
+    // syev returns ascending eigenvalues; walk backwards.
+    for (size_t n = naux; n-- > 0;) {
+      const double eigenvalue = gram_eigenvalues[static_cast<Eigen::Index>(n)];
+      if (eigenvalue <= stop_threshold) {
+        continue;
+      }
+      const Eigen::VectorXd lifted = three_center *
+                                     gram.col(static_cast<Eigen::Index>(n)) /
+                                     std::sqrt(eigenvalue);
+      fragments.push_back(make_fragment(reshape_symmetric(lifted, norb), 1.0,
+                                        std::sqrt(eigenvalue), norb));
+    }
+    return fragments;
+  }
+
+  std::sort(fragments.begin(), fragments.end(),
+            [](const TwoBodyFragment& a, const TwoBodyFragment& b) {
+              return a.lambda_df > b.lambda_df;
+            });
+  return fragments;
+}
+
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> mean_field_contractions(
+    const Eigen::VectorXd& two_body_integrals, size_t norb) {
+  Eigen::MatrixXd coulomb(norb, norb);
+  Eigen::MatrixXd exchange(norb, norb);
+  for (size_t i = 0; i < norb; ++i) {
+    for (size_t j = 0; j < norb; ++j) {
+      double c = 0.0;
+      double e = 0.0;
+      for (size_t k = 0; k < norb; ++k) {
+        c += two_body_integrals[two_body_index(i, j, k, k, norb)];
+        e += two_body_integrals[two_body_index(i, k, k, j, norb)];
+      }
+      coulomb(i, j) = c;
+      exchange(i, j) = e;
+    }
+  }
+  return {std::move(coulomb), std::move(exchange)};
+}
+
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
+mean_field_contractions_three_center(const Eigen::MatrixXd& three_center,
+                                     size_t norb) {
+  const size_t pair_dim = norb * norb;
+  if (static_cast<size_t>(three_center.rows()) != pair_dim) {
+    throw std::invalid_argument(
+        "mean_field_contractions_three_center: expected " +
+        std::to_string(pair_dim) + " rows for norb=" + std::to_string(norb) +
+        ", got " + std::to_string(three_center.rows()) + ".");
+  }
+
+  Eigen::MatrixXd coulomb = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::MatrixXd exchange = Eigen::MatrixXd::Zero(norb, norb);
+  // coulomb_ij = sum_Q L(ij,Q) * trace(L_Q); exchange_ij = sum_Q (L_Q L_Q)_ij.
+  for (Eigen::Index q = 0; q < three_center.cols(); ++q) {
+    const Eigen::MatrixXd matrix = reshape_symmetric(three_center.col(q), norb);
+    exchange.noalias() += matrix * matrix;
+    coulomb.noalias() += matrix.trace() * matrix;
+  }
+  return {std::move(coulomb), std::move(exchange)};
 }
 
 }  // namespace qdk::chemistry::utils

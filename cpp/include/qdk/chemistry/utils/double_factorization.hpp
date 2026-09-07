@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <cstddef>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::utils {
@@ -82,5 +83,37 @@ std::vector<TwoBodyFragment> double_factorize(
     const Eigen::VectorXd& two_body_integrals, size_t norb,
     double truncation_threshold = 0.0,
     DoubleFactorizationMethod method = DoubleFactorizationMethod::Cholesky);
+
+/// Double-factorize V_(ij),(kl) = sum_Q L_(ij),Q L_(kl),Q from its stored
+/// factor, as held by data::CholeskyHamiltonianContainer, without forming the
+/// norb^4 tensor. Cholesky reuses the columns as fragments directly; Eigen
+/// recovers the eigenpairs from the naux x naux Gram matrix L^T L.
+///
+/// @param three_center [norb^2, naux]; each column reshapes to a symmetric
+///        norb x norb matrix. The factorized supermatrix is L L^T, so pass
+///        L / sqrt(2) to factorize V = 1/2 g.
+/// @param truncation_threshold Compared against the squared column norm
+///        (Cholesky) or the eigenvalue (Eigen).
+/// @return Fragments sorted by decreasing contribution.
+///
+/// @note naux may exceed the rank of V, which is normal for an active space.
+///       Cholesky keeps the redundant columns; Eigen drops them.
+std::vector<TwoBodyFragment> double_factorize_three_center(
+    const Eigen::MatrixXd& three_center, size_t norb,
+    double truncation_threshold = 0.0,
+    DoubleFactorizationMethod method = DoubleFactorizationMethod::Cholesky);
+
+/// The two-electron contractions that fold into the effective one-electron
+/// operator: {coulomb_ij = sum_k g[i,j,k,k], exchange_ij = sum_k g[i,k,k,j]}.
+///
+/// This overload takes the dense tensor, laid out as for double_factorize().
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> mean_field_contractions(
+    const Eigen::VectorXd& two_body_integrals, size_t norb);
+
+/// As above, but contracting g = L L^T from its factor, laid out as for
+/// double_factorize_three_center().
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
+mean_field_contractions_three_center(const Eigen::MatrixXd& three_center,
+                                     size_t norb);
 
 }  // namespace qdk::chemistry::utils
