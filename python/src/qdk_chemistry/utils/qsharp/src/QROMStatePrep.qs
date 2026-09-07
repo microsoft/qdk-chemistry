@@ -250,6 +250,9 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     }
 
     /// Circuit entry point for QROM state preparation (allocates qubits).
+    ///
+    /// An exported circuit has no caller to hand it a phase gradient, so it reuses the
+    /// self-contained callable rather than repeating its allocate-prepare-uncompute body.
     operation MakeQROMStatePrepCircuit(
         amplitudes : Double[],
         rotationBitPrecision : Int,
@@ -261,11 +264,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
             numStateQubits = numStateQubits,
         };
         use state = Qubit[numStateQubits];
-        use phaseGradient = Qubit[rotationBitPrecision];
-        within {
-            PreparePhaseGradientState(phaseGradient);
-        } apply {
-            QROMStatePrepare(params, state, phaseGradient);
-        }
+        MakeQROMStatePrepOp(params)(state);
     }
 }

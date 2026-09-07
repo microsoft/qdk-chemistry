@@ -151,6 +151,7 @@ print(unitary.get_summary())
 
 ################################################################################
 # start-cell-lcu-prepare
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef
 
 # Load the PREPARE amplitudes with alias sampling instead of dense state preparation
