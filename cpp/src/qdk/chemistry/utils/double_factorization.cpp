@@ -11,6 +11,8 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace qdk::chemistry::utils {
 
@@ -112,10 +114,24 @@ std::vector<TwoBodyFragment> factorize_by_eigendecomposition(
   return fragments;
 }
 
-/// Pivoted Cholesky path, yielding supermatrix ~= sum_r L^r (L^r)^T. Because
-/// rows (ij) and (ji) of the supermatrix are identical (g_ijkl = g_jikl), each
-/// L^r reshapes to a symmetric norb x norb matrix, so the per-fragment
-/// diagonalization downstream is unchanged.
+/// Pivoted Cholesky path, yielding supermatrix ~= sum_r L^r (L^r)^T.
+///
+/// The factorization is carried out in the SYMMETRIC-PAIR basis (i <= j), not
+/// in the full (ij) basis, because g_ijkl = g_jikl makes rows (ij) and (ji) of
+/// the supermatrix *identical*. Those n(n-1)/2 duplicate directions are exact
+/// zero modes, and eliminating a pivot (ij) drives the residual diagonal of
+/// its mirror (ji) to a mathematical zero that is computed as the cancellation
+/// of two equal O(||M||) numbers. The result lands at +/- eps*||M|| with an
+/// arbitrary sign, which is fatal if the mirror is left in the problem: a
+/// positive value gets selected as the next pivot and its column is divided by
+/// sqrt(eps*||M||), amplifying pure roundoff into a spurious fragment, while a
+/// negative value is indistinguishable from genuine indefiniteness.
+///
+/// Restricting to representative pairs removes the degeneracy exactly rather
+/// than by tolerance: with M = S M_red S^T (S the (ij) -> (min,max) selection
+/// matrix), any M_red = L_red L_red^T gives M = (S L_red)(S L_red)^T, the rank
+/// is structurally bounded by n(n+1)/2, and every expanded vector reshapes to
+/// an exactly symmetric norb x norb matrix.
 ///
 /// Returns false if the supermatrix is detected to be indefinite, in which
 /// case the caller must fall back to the eigendecomposition. The supermatrix
@@ -126,24 +142,61 @@ std::vector<TwoBodyFragment> factorize_by_eigendecomposition(
 bool factorize_by_cholesky(const Eigen::MatrixXd& supermatrix, size_t norb,
                            double truncation_threshold,
                            std::vector<TwoBodyFragment>& fragments) {
-  const size_t pair_dim = norb * norb;
+  // Representative pairs (i <= j) and the map from a full (ij) index to its
+  // representative.
+  const size_t reduced_dim = norb * (norb + 1) / 2;
+  std::vector<std::pair<size_t, size_t>> pairs;
+  pairs.reserve(reduced_dim);
+  std::vector<size_t> reduced_index_of(norb * norb);
+  for (size_t i = 0; i < norb; ++i) {
+    for (size_t j = i; j < norb; ++j) {
+      reduced_index_of[i * norb + j] = pairs.size();
+      reduced_index_of[j * norb + i] = pairs.size();
+      pairs.emplace_back(i, j);
+    }
+  }
 
-  Eigen::VectorXd residual_diagonal = supermatrix.diagonal();
+  // M_red is the principal submatrix on the representative pairs. Average the
+  // mirror entries instead of picking one, which projects out any (i,j)
+  // asymmetry noise in the input tensor the same way the caller's transpose
+  // symmetrization does.
+  Eigen::MatrixXd reduced(reduced_dim, reduced_dim);
+  for (size_t p = 0; p < reduced_dim; ++p) {
+    const auto [i, j] = pairs[p];
+    for (size_t q = 0; q < reduced_dim; ++q) {
+      const auto [k, l] = pairs[q];
+      reduced(p, q) = 0.25 * (supermatrix(i * norb + j, k * norb + l) +
+                              supermatrix(j * norb + i, k * norb + l) +
+                              supermatrix(i * norb + j, l * norb + k) +
+                              supermatrix(j * norb + i, l * norb + k));
+    }
+  }
 
-  // A literal 0.0 threshold is never reached in floating point: past the true
-  // numerical rank the residual diagonal decays into roundoff. Floor the
-  // cutoff so that "lossless" stops at the true numerical rank instead.
-  const double epsilon = std::numeric_limits<double>::epsilon();
-  const double stop_threshold = std::max(truncation_threshold, epsilon);
-  const double indefinite_tolerance = epsilon;
+  Eigen::VectorXd residual_diagonal = reduced.diagonal();
+
+  // Nothing to factorize: an empty orbital space has no fragments, and the
+  // scale/pivot reductions below are undefined on an empty vector.
+  if (reduced_dim == 0) {
+    fragments.clear();
+    return true;
+  }
+
+  // A literal 0.0 threshold is never reached in floating point: once the
+  // numerical rank is exhausted the residual diagonal is a cancellation of
+  // O(||M||) terms and decays into roundoff, whose size is *relative* to the
+  // matrix scale. Floor the cutoff at that noise level -- an absolute floor
+  // such as machine epsilon is dimensionally wrong and would behave
+  // differently for the same problem expressed in different units.
+  const double diagonal_scale = std::max(residual_diagonal.maxCoeff(), 0.0);
+  const double noise_floor = std::numeric_limits<double>::epsilon() *
+                             static_cast<double>(reduced_dim) * diagonal_scale;
+  const double stop_threshold = std::max(truncation_threshold, noise_floor);
+  const double indefinite_tolerance = noise_floor;
 
   std::vector<Eigen::VectorXd> cholesky_vectors;
-  // The supermatrix is invariant under (ij) -> (ji), so every antisymmetric
-  // pair vector is in its null space and the rank cannot exceed the
-  // symmetric-pair dimension.
-  cholesky_vectors.reserve(norb * (norb + 1) / 2);
+  cholesky_vectors.reserve(reduced_dim);
 
-  for (size_t step = 0; step < pair_dim; ++step) {
+  for (size_t step = 0; step < reduced_dim; ++step) {
     Eigen::Index pivot = 0;
     Eigen::Index most_negative = 0;
     const double pivot_value = residual_diagonal.maxCoeff(&pivot);
@@ -167,7 +220,7 @@ bool factorize_by_cholesky(const Eigen::MatrixXd& supermatrix, size_t norb,
 
     // Residual column, formed on the fly so the supermatrix stays intact and
     // the fallback above costs nothing: r = M[:,q] - sum_s L^s L^s_q.
-    Eigen::VectorXd column = supermatrix.col(pivot);
+    Eigen::VectorXd column = reduced.col(pivot);
     for (const auto& vector : cholesky_vectors) {
       column -= vector * vector[pivot];
     }
@@ -180,15 +233,15 @@ bool factorize_by_cholesky(const Eigen::MatrixXd& supermatrix, size_t norb,
   fragments.clear();
   fragments.reserve(cholesky_vectors.size());
   for (const auto& vector : cholesky_vectors) {
-    // L^r is symmetric by construction; symmetrize defensively against
-    // accumulated roundoff, as the eigendecomposition path does.
+    // Expanding the reduced vector back over all (ij) pairs is exactly the
+    // S L product, and it is symmetric by construction: the mirror entries
+    // read the same reduced component.
     Eigen::MatrixXd fragment_matrix(norb, norb);
     for (size_t i = 0; i < norb; ++i) {
       for (size_t j = 0; j < norb; ++j) {
-        fragment_matrix(i, j) = vector[i * norb + j];
+        fragment_matrix(i, j) = vector[reduced_index_of[i * norb + j]];
       }
     }
-    fragment_matrix = 0.5 * (fragment_matrix + fragment_matrix.transpose());
 
     // Cholesky of a positive semi-definite matrix yields only positive
     // rank-one terms, so every fragment has sign = +1.

@@ -189,10 +189,35 @@ TEST_F(DoubleFactorizationCholeskyTest, IsTheDefaultMethod) {
 TEST_F(DoubleFactorizationCholeskyTest, RankIsBoundedBySymmetricPairDimension) {
   // The supermatrix M_(ij),(kl) satisfies M = M^T and is invariant under
   // (ij) -> (ji), so every antisymmetric pair vector lies in its null space
-  // and the rank cannot exceed the symmetric-pair dimension.
+  // and the rank cannot exceed the symmetric-pair dimension. The Cholesky
+  // path enforces this structurally by factorizing the symmetric-pair
+  // principal submatrix: leaving the mirrored rows in the problem lets their
+  // residual diagonal -- an exact zero computed as the cancellation of two
+  // equal O(||M||) numbers -- be selected as a pivot and amplified into a
+  // spurious roundoff fragment.
   auto fragments = double_factorize(g_aaaa_, norb_, 0.0,
                                     DoubleFactorizationMethod::Cholesky);
   EXPECT_LE(fragments.size(), norb_ * (norb_ + 1) / 2);
+}
+
+TEST_F(DoubleFactorizationCholeskyTest, RankIsInvariantUnderTensorScaling) {
+  // Scaling the tensor rescales the supermatrix but not its rank. The
+  // "lossless" cutoff must therefore be relative to the supermatrix scale;
+  // an absolute floor (e.g. machine epsilon) would silently return a
+  // different rank for the same operator expressed in different units.
+  auto reference = double_factorize(g_aaaa_, norb_, 0.0,
+                                    DoubleFactorizationMethod::Cholesky);
+  ASSERT_FALSE(reference.empty());
+
+  for (const double scale : {1.0e-6, 1.0e+6}) {
+    Eigen::VectorXd scaled = scale * g_aaaa_;
+    auto fragments = double_factorize(scaled, norb_, 0.0,
+                                      DoubleFactorizationMethod::Cholesky);
+    EXPECT_EQ(fragments.size(), reference.size()) << "scale = " << scale;
+    for (const auto& fragment : fragments) {
+      EXPECT_EQ(fragment.sign, 1) << "scale = " << scale;
+    }
+  }
 }
 
 TEST_F(DoubleFactorizationCholeskyTest,

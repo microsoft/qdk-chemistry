@@ -184,8 +184,7 @@ class SymmetryShifter
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,
-      unsigned int n_alpha_electrons,
-      unsigned int n_beta_electrons) const = 0;
+      unsigned int n_alpha_electrons, unsigned int n_beta_electrons) const = 0;
 };
 
 /**

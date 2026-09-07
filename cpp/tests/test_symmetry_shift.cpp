@@ -6,9 +6,9 @@
 
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 #include <string>
@@ -30,8 +30,7 @@ TEST_F(SymmetryShiftTest, FactoryHygiene) {
   EXPECT_EQ(shifter->name(), "fermionic_low_rank");
   EXPECT_EQ(shifter->type_name(), "symmetry_shifter");
 
-  auto shifter_named =
-      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifter_named = SymmetryShifterFactory::create("fermionic_low_rank");
   EXPECT_EQ(shifter_named->name(), "fermionic_low_rank");
 
   EXPECT_THROW(SymmetryShifterFactory::create("nonexistent"),
@@ -39,10 +38,9 @@ TEST_F(SymmetryShiftTest, FactoryHygiene) {
 }
 
 TEST_F(SymmetryShiftTest, DefaultTruncationThresholdIsZero) {
-  auto shifter =
-      SymmetryShifterFactory::create("fermionic_low_rank");
-  EXPECT_DOUBLE_EQ(
-      shifter->settings().get<double>("df_truncation_threshold"), 0.0);
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+  EXPECT_DOUBLE_EQ(shifter->settings().get<double>("df_truncation_threshold"),
+                   0.0);
 }
 
 /**
@@ -67,8 +65,9 @@ TEST_F(SymmetryShiftTest, NegativeTruncationThresholdIsRejected) {
  * there fails silently, leaving nested AlgorithmRefs without defaults.
  */
 TEST_F(SymmetryShiftTest, ResolvesAlgorithmDefaults) {
-  const auto settings = qdk::chemistry::algorithms::detail::
-      resolve_algorithm_defaults("symmetry_shifter", "fermionic_low_rank");
+  const auto settings =
+      qdk::chemistry::algorithms::detail::resolve_algorithm_defaults(
+          "symmetry_shifter", "fermionic_low_rank");
   ASSERT_NE(settings, nullptr)
       << "symmetry_shifter is missing from the REGISTER_FACTORY_SETTINGS_INIT "
          "block in algorithms/algorithm_defaults.cpp";
@@ -90,8 +89,7 @@ TEST_F(SymmetryShiftTest, ThrowsOnUnrestrictedHamiltonian) {
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
   ASSERT_FALSE(ham->is_restricted());
 
-  auto shifter =
-      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
   EXPECT_THROW(shifter->run(ham, 1, 0), std::invalid_argument);
 }
 
@@ -114,8 +112,7 @@ TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto [E_before, wfn_before] = mc->run(ham, 5, 5);
 
   for (const double threshold : {0.0, 1e-6}) {
-    auto shifter =
-        SymmetryShifterFactory::create("fermionic_low_rank");
+    auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
     shifter->settings().set("df_truncation_threshold", threshold);
     auto shifted_ham = shifter->run(ham, 5, 5);
     ASSERT_NE(shifted_ham, nullptr);
@@ -228,13 +225,11 @@ TEST_F(SymmetryShiftTest, ComputeShiftThenRebuildMatchesRun) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
-  auto shifter =
-      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
   auto shifted_run = shifter->run(ham, 5, 5);
   ASSERT_NE(shifted_run, nullptr);
 
-  auto shifter2 =
-      SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifter2 = SymmetryShifterFactory::create("fermionic_low_rank");
   auto shift = shifter2->compute_shift(*ham, 5, 5);
   auto shifted_manual = rebuild_shifted_hamiltonian(*ham, shift, 10u);
   ASSERT_NE(shifted_manual, nullptr);

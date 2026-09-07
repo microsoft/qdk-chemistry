@@ -226,6 +226,28 @@ Returns:
 
 )");
 
+  shifter.def("aliases", &SymmetryShifter::aliases, R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
+  shifter.def("hash", &SymmetryShifter::hash, py::arg("hamiltonian"),
+              py::arg("n_alpha_electrons"), py::arg("n_beta_electrons"), R"(
+Deterministic content hash for a run with these inputs.
+
+Args:
+    hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to shift
+    n_alpha_electrons (int): The target number of alpha electrons
+    n_beta_electrons (int): The target number of beta electrons
+
+Returns:
+    str: 16-character hex content hash
+
+)");
+
   // Factory class binding - creates SymmetryShifterFactory class with
   // static methods
   qdk::chemistry::python::bind_algorithm_factory<
