@@ -4,6 +4,49 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.2.0
+=============
+
+See :ref:`release-v2.2.0` for full details.
+
+- Model Context Protocol server (``qcmcp``) and command-line interface (``qc``) exposing the chemistry pipeline as structured tools, plus installable Copilot skills and MCP-configuration assets
+- Remote algorithm execution and result caching: ``run()`` accepts ``remote`` and ``cache`` for serializable arguments and results, backed by a file-based request format and pluggable remote and cache backends
+- Remote backend for Microsoft Discovery, installed with the new ``discovery`` extra
+- Unary-iteration phase estimation (``phase_estimation`` / ``qdk_unary``) over a qubitized walk; execution currently requires the sparse-state simulator
+- Binary encoding for sparse isometry state preparation, reducing the dense amplitude-loading width when :math:`\lceil \log_2 d \rceil` is smaller than the reduced support width, in exchange for lookup ancillas and CCZ operations
+- Controlled-SWAP circuit mapper (``controlled_circuit_mapper`` / ``cswap_pauli_sequence``) with a vacuum-annihilating term grouper and an additional system-sized vacuum register
+- Amplitude amplification (``amplitude_amplification`` / ``qdk_base``) with a registered QPE subspace-marking oracle
+- Gauge-fixing orbital localizer (``qdk_gauge_fixing``) that searches occupation-degenerate blocks for a lower mapped coefficient norm, and an active-space quantum-information orbital localizer (``qdk_active_space_qio``) that optimizes total single-orbital entropy
+- ``effective_hamiltonian_constructor`` interface for registering methods that downfold a Hamiltonian onto a target orbital space; no implementation ships in this release
+- Mulliken population analysis (``population_analyzer``) and ``Wavefunction.compute_s_squared()``
+- Native in-process cube generation for orbitals, with no third-party quantum chemistry package required
+- Native Windows wheels for x86-64 and Arm64, subject to the optional-dependency caveats in the release notes
+- New tutorial: ground-state molecular energies with quantum phase estimation
+
+Behavior changes:
+
+- The ``state_prep`` implementation ``"sparse_isometry_gf2x"`` is renamed ``"sparse_isometry"``; the old name remains as a deprecated alias
+- Orbital cube generation defaults to the native backend instead of PySCF, and default labels are zero-based (orbital ``0`` now writes ``orbital_0000.cube`` instead of ``orbital_0001.cube``)
+- :term:`ECP`-adjusted nuclear charges now determine SCF electron counts, nuclear repulsion energies, and Hamiltonian core energies, changing results for systems with effective core potentials; ECP assignments are keyed by atom rather than element, and pre-2.2 cached results for these systems must be cleared
+- When a stored one-particle :term:`RDM` does not match its determinant, orbital occupations are now its natural occupation numbers rather than integer mean-field occupations
+- Duplicate algorithm, data-class, remote-backend, and cache-backend registrations now raise ``DuplicateRegistrationError`` and preserve the existing registration
+- Custom ``DataClass`` subclasses must declare a static ``data_type_name()`` method instead of the former ``_data_type_name`` class attribute
+- Supported BLAS backends are temporarily restricted to one thread inside GauXC-backed SCF, gradient, and response operations because nested BLAS threading could cause oversubscription or wrong results
+
+Packaging and build changes:
+
+- The new ``mcp`` extra installs the MCP server dependencies; on Windows Arm64 it is omitted from the ``all`` and ``test`` extras because ``cryptography`` has no native wheel
+- The ``jupyter`` extra no longer installs the ``plugins`` extra; plugin backends require explicit opt-in
+- Source builds and CI now use Libint2 2.13.1 consistently
+- Fixed a BLIS/libFLAME symbol collision in Linux wheel builds
+
+Bug fixes:
+
+- Importing ``qdk_chemistry`` no longer emits the ``MP2NaturalOrbitalLocalizer`` deprecation message, while explicit use of ``qdk_mp2_natural_orbitals`` still warns
+- Derived orbitals survive JSON round trips: ``Orbitals.from_json`` returns the concrete type instead of a sliced base ``Orbitals``
+- Cache plugin discovery failures are logged instead of being swallowed
+- Corrected exponent rendering in the controlled-IQPE tutorial diagram
+
 Version 2.1.0
 =============
 

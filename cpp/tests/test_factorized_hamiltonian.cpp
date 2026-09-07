@@ -250,6 +250,49 @@ TEST_F(FactorizedHamiltonianTest, TwoBodyLambdaIsSignInvariant) {
               1e-12);
 }
 
+TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
+  // SelfAdjointEigenSolver reads a single triangle and reports Success either
+  // way, so without a guard lambda silently describes whichever triangle Eigen
+  // happened to read. The two mirrorings below are both legitimate symmetric
+  // containers and each shares a triangle with the non-symmetric input, so the
+  // gap between them is the size of the error that would have gone unreported.
+  Eigen::MatrixXd asymmetric = one_body;
+  asymmetric(0, 1) = 0.3;
+  // Large enough that mirroring the lower triangle makes h1' indefinite. That
+  // matters: for a definite matrix the sum of absolute eigenvalues collapses
+  // to |trace|, which does not depend on the off-diagonal at all, so a smaller
+  // value makes the two mirrorings agree exactly and the check below vacuous.
+  asymmetric(1, 0) = -1.5;
+
+  Eigen::MatrixXd from_lower = asymmetric;
+  from_lower(0, 1) = asymmetric(1, 0);
+  Eigen::MatrixXd from_upper = asymmetric;
+  from_upper(1, 0) = asymmetric(0, 1);
+
+  const double positive_gap = 0.1;
+  auto lambda_of = [&](const Eigen::MatrixXd& h1) {
+    return FactorizedHamiltonianContainer(core_energy, u, w, wb, h1,
+                                          inactive_fock, orbitals, signs,
+                                          positive_gap)
+        .get_lambda();
+  };
+
+  EXPECT_GT(std::abs(lambda_of(from_lower) - lambda_of(from_upper)), 1e-6)
+      << "the two triangles must disagree, otherwise this input cannot "
+         "demonstrate the ambiguity the guard exists to reject";
+
+  FactorizedHamiltonianContainer container(core_energy, u, w, wb, asymmetric,
+                                           inactive_fock, orbitals, signs,
+                                           positive_gap);
+  EXPECT_THROW(container.get_lambda(), std::runtime_error);
+
+  // get_lambda_eff() reserves its 0.0 sentinel for a well-defined lambda that
+  // the formula does not apply to, so it has to surface this rather than
+  // absorb it. The gap and the signs are positive precisely so that the call
+  // reaches get_lambda() instead of returning early.
+  EXPECT_THROW(container.get_lambda_eff(), std::runtime_error);
+}
+
 TEST_F(FactorizedHamiltonianTest, SignsDefaultToPositiveAndAreValidated) {
   FactorizedHamiltonianContainer defaulted(core_energy, u, w, wb, one_body,
                                            inactive_fock, orbitals,

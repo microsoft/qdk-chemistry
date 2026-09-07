@@ -96,4 +96,49 @@ Returns:
   });
 
   qdk::chemistry::python::bind_create_nested(double_factorizer);
+
+  py::class_<CholeskyDoubleFactorizer, DoubleFactorizer, py::smart_holder>(
+      m, "CholeskyDoubleFactorizer", R"(
+  Double-factorize a restricted Hamiltonian by pivoted Cholesky decomposition.
+
+  Produces the same
+  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` as
+  :class:`DoubleFactorizer` and thresholds the same quantity, but reaches it
+  without diagonalizing the two-electron supermatrix, and stops at the
+  numerical rank instead of forming all ``norb**2`` eigenpairs. Every fragment
+  carries sign ``+1``.
+
+  If the Hamiltonian is already backed by a
+  :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
+  three-center integrals are the first factorization and are reused directly,
+  so the dense ``norb**4`` tensor is never formed.
+
+  A Cholesky decomposition exists only for a positive semi-definite
+  supermatrix. Exact two-electron integrals are positive semi-definite, but
+  approximate or synthetic ones need not be, so a detected breakdown falls
+  back to the eigendecomposition rather than failing.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    factorizer = alg.CholeskyDoubleFactorizer()
+    factorized = factorizer.run(hamiltonian)
+
+See Also:
+    :class:`DoubleFactorizer`
+    :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
+
+References:
+    :cite:`Beebe1977`
+    :cite:`Koch2003`
+)")
+      .def(py::init<>(), R"(
+Create a Cholesky double factorizer with default settings.
+)")
+      .def("__repr__", [](const CholeskyDoubleFactorizer &) {
+        return "<qdk_chemistry.algorithms.CholeskyDoubleFactorizer>";
+      });
 }

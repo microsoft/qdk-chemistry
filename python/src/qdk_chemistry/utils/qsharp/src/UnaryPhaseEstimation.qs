@@ -145,7 +145,10 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             }
         } apply {
             statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
-            let blockEncoding = blockEncodingUsesShared ? (register) => applyBlockEncoding(register + sharedQubits) | applyBlockEncoding;
+            let blockEncoding =
+                blockEncodingUsesShared
+                ? (register) => applyBlockEncoding(register + sharedQubits)
+                | applyBlockEncoding;
             ApplySignedPowerSchedule(
                 blockEncoding,
                 applyReflection,
