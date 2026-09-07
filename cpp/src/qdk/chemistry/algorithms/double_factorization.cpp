@@ -363,15 +363,17 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   using qdk::chemistry::data::FactorizedHamiltonianContainer;
 
   if (!hamiltonian) {
-    throw std::invalid_argument("DoubleFactorizer: hamiltonian is null");
+    throw std::invalid_argument(name() + ": hamiltonian is null");
   }
   if (!hamiltonian->is_restricted()) {
     throw std::invalid_argument(
-        "DoubleFactorizer currently only supports restricted Hamiltonians.");
+        name() + " currently only supports restricted Hamiltonians.");
   }
   if (!hamiltonian->has_two_body_integrals()) {
     throw std::invalid_argument(
-        "The Hamiltonian carries no two-body integrals to factorize.");
+        name() +
+        ": the Hamiltonian carries no two-body integrals to "
+        "factorize.");
   }
 
   const double truncation_threshold =
