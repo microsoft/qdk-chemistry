@@ -39,11 +39,12 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
 
     set_default<double>(
         "truncation_threshold", 1e-12,
-        "Cutoff for first-step factorization candidates. "
-        "\"eigen_decomposition\" compares the two-electron supermatrix "
-        "eigenvalue magnitude; dense \"cholesky\" compares the largest "
-        "remaining residual diagonal, while reused three-center vectors are "
-        "compared by squared column norm. Must be non-negative; 0.0 keeps "
+        "Cutoff for first-step factorization candidates. Every method drops "
+        "fragments whose squared coefficient norm ||eps||^2 falls below it, so "
+        "a given value retains the same fragments from either; the dense "
+        "\"cholesky\" loop additionally uses it to stop pivoting once the "
+        "largest remaining residual diagonal drops to it. "
+        "Must be non-negative; 0.0 keeps "
         "every numerically resolvable fragment.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
@@ -74,8 +75,9 @@ struct TwoBodyFragment {
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
 /// Both methods reshape the tensor into the (pq),(rs) supermatrix, impose
-/// chemist permutation symmetry by averaging rather than verifying it, and use
-/// method-dependent cutoff and ordering metrics.
+/// chemist permutation symmetry by averaging rather than verifying it, and drop
+/// fragments on the same cutoff metric, but order the retained fragments by
+/// method-dependent metrics.
 ///
 /// DoubleFactorizationMethod::Eigen diagonalizes the supermatrix with LAPACK
 /// in O(norb^6). DoubleFactorizationMethod::Cholesky runs a pivoted Cholesky
@@ -88,9 +90,11 @@ struct TwoBodyFragment {
 ///        Chemist permutation symmetry is imposed by averaging, not verified.
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Cutoff below which first-step candidates are
-///        dropped. Eigen compares the supermatrix eigenvalue magnitude;
-///        Cholesky compares the largest remaining residual diagonal. The same
-///        value may therefore retain different ranks. 0.0 retains every
+///        dropped. Both methods compare the fragment's squared coefficient
+///        norm ||eps||^2 against it: the Cholesky column carries that norm
+///        directly, and for Eigen the reshaped eigenvector is unit-norm, so
+///        |eigenvalue| is exactly ||eps||^2. A given value therefore retains
+///        the same fragments from either method. 0.0 retains every
 ///        numerically resolvable fragment.
 /// @param method First-step factorization of the supermatrix.
 /// @return Retained fragments sorted by decreasing contribution: eigenvalue
@@ -118,11 +122,11 @@ std::vector<TwoBodyFragment> double_factorize(
  *
  * The `"method"` setting selects the first factorization step: an
  * eigen-decomposition of the two-electron supermatrix, or a pivoted Cholesky
- * decomposition of it. Both produce the same container, but their cutoff and
- * ordering metrics are method-dependent, so a given `"truncation_threshold"`
- * need not select the same rank from each. If the input already stores
- * three-center Cholesky vectors, those vectors are reused and compared by
- * squared column norm.
+ * decomposition of it. Both produce the same container and drop fragments on
+ * the same `||eps||^2` cutoff, so a given `"truncation_threshold"` selects the
+ * same fragments from each; only the ordering metric differs. If the input
+ * already stores three-center Cholesky vectors, those vectors are reused and
+ * compared by squared column norm.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.

@@ -24,7 +24,9 @@ void bind_double_factorization(py::module &m) {
   The result is backed by a
   :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` containing signed
   low-rank fragments. Chemist permutation symmetry is imposed by averaging.
-  Candidates below the method-dependent ``truncation_threshold`` are omitted.
+  Fragments whose squared coefficient norm ``||eps||**2`` falls below
+  ``truncation_threshold`` are omitted; both methods threshold that same
+  quantity, so a given threshold selects the same fragments from either.
   One-body data, core energy, orbitals, inactive Fock data, and Hamiltonian type
   are preserved.
 
