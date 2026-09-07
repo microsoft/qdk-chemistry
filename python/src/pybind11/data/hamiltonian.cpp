@@ -991,7 +991,7 @@ Args:
   py::class_<FactorizedHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
       factorized_container(data, "FactorizedHamiltonianContainer", R"(
-Restricted, spin-free, double factorized tensor hypercontraction hamiltonian.
+Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
 
 Check :meth:`get_signs` before treating the representation as a true sum of
 squares.

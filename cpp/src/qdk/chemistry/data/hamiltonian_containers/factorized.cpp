@@ -90,7 +90,7 @@ FactorizedHamiltonianContainer::get_two_body_integrals() const {
 }
 
 double FactorizedHamiltonianContainer::get_two_body_element(
-    unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
+    unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel) const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error(
