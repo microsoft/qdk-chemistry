@@ -1,6 +1,6 @@
 ---
 name: resource-estimation
-version: 'v2.1.0'
+version: 'v2.2.0'
 description: 'Explains QDK circuit resource-estimation parameters, result forms, and conceptual construction of custom QRE architecture and ISA studies. Use when estimating a stored circuit, choosing estimate_circuit parameters, interpreting estimates, or generating Python code for a custom qdk.qre analysis.'
 ---
 
