@@ -810,11 +810,11 @@ jobs:
     - name: Set memory-aware build parallelism
       shell: pwsh
       run: |
-        # Match the x86_64 job: cap concurrency by available RAM (~8 GB/job) so
+        # Match the x86_64 job: cap concurrency by available RAM (~10 GB/job) so
         # that memory-hungry translation units don't exhaust the heap.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 10)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
         Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
