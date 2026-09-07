@@ -283,20 +283,10 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
 double FactorizedHamiltonianContainer::get_lambda() const {
   Eigen::MatrixXd h1p = get_h1_prime();
 
-  // SelfAdjointEigenSolver reads one triangle and reports Success regardless,
-  // so a non-symmetric h1' would silently yield the one-norm of a different
-  // matrix rather than an error. Since lambda is the qubitization one-norm
-  // that resource estimates are built on, that has to be rejected rather than
-  // approximated. The check is on the matrix itself, not on the container's
-  // HamiltonianType: the two-body corrections in get_h1_prime() are symmetric
-  // by construction, so only the stored one-body term can break symmetry, and
-  // it can do so whichever way the container happens to be labelled.
   if (!h1p.isApprox(h1p.transpose())) {
     throw std::runtime_error(
-        "FactorizedHamiltonianContainer::get_lambda: the adjusted one-body "
-        "matrix is not symmetric, so its one-norm is not the sum of the "
-        "absolute eigenvalues and lambda is undefined. Supply symmetric "
-        "one-body integrals.");
+        "the adjusted one-body matrix is not symmetric, so its one-norm is "
+        "not the sum of the absolute eigenvalues and lambda is undefined.");
   }
 
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
