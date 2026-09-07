@@ -34,6 +34,7 @@ steps:
       -SrcDir "$(System.DefaultWorkingDirectory)" `
       -PythonVersion '${{ parameters.pythonVersion }}' `
       -PythonEnv $pythonEnv `
+      -Triplet '$(VCPKG_TRIPLET)' `
       -RunSlowTests '${{ parameters.runSlowTests }}'
   displayName: Test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}

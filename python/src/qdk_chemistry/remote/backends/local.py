@@ -177,6 +177,8 @@ class LocalBackend(RemoteBackend):
 
     """
 
+    mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
+
     def __init__(
         self,
         *,
@@ -271,6 +273,8 @@ class LocalBackend(RemoteBackend):
             algorithm_name=payload["algorithm_name"],
             settings=payload["settings"],
             run_hash=payload.get("run_hash"),
+            job_cache_key=payload.get("job_cache_key"),
+            owner=payload.get("owner"),
             input_hashes=payload.get("input_hashes"),
             force_rerun=payload.get("force_rerun", False),
             remote_cache=payload.get("remote_cache"),
