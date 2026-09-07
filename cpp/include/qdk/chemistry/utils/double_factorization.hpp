@@ -74,9 +74,7 @@ enum class DoubleFactorizationMethod {
 ///        the supermatrix eigenvalue magnitude, Cholesky against the largest
 ///        remaining residual diagonal. Defaults to 0.0, meaning "lossless" for
 ///        both. A literal 0.0 is unreachable in floating point for Cholesky,
-///        so that path floors the cutoff at the roundoff level of the
-///        supermatrix (eps * dim * max diagonal) to stop at the true numerical
-///        rank rather than emit roundoff fragments.
+///        so that path floors the cutoff at the supermatrix roundoff level.
 /// @param method Which decomposition to use. Defaults to Cholesky.
 /// @return The list of retained fragments, sorted by decreasing contribution
 ///         (eigenvalue magnitude for Eigen, sum_p |eps_p| for Cholesky).
