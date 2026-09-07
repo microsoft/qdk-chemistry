@@ -12,6 +12,7 @@
 #include <qdk/chemistry/algorithms/double_factorization.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <random>
 #include <stdexcept>
@@ -92,6 +93,29 @@ Eigen::MatrixXd make_cholesky_vectors(std::size_t norb, std::size_t naux,
   return vectors;
 }
 
+/// Pack `total` Cholesky vectors spanning only `independent` dimensions, by
+/// making the surplus columns fixed multiples of the independent ones. Reusing
+/// the stored vectors then yields `total` fragments while re-decomposing the
+/// dense tensor yields only `independent`, which is what makes the fast path
+/// observable rather than merely correct.
+Eigen::MatrixXd make_rank_deficient_cholesky_vectors(std::size_t norb,
+                                                     std::size_t independent,
+                                                     std::size_t total,
+                                                     unsigned seed) {
+  const Eigen::MatrixXd base = make_cholesky_vectors(norb, independent, seed);
+
+  Eigen::MatrixXd vectors(static_cast<Eigen::Index>(norb * norb),
+                          static_cast<Eigen::Index>(total));
+  vectors.leftCols(static_cast<Eigen::Index>(independent)) = base;
+  for (std::size_t k = independent; k < total; ++k) {
+    const double scale = 0.5 + 0.25 * static_cast<double>(k - independent);
+    vectors.col(static_cast<Eigen::Index>(k)) =
+        scale *
+        base.col(static_cast<Eigen::Index>((k - independent) % independent));
+  }
+  return vectors;
+}
+
 /// Rebuild the flattened two-body tensor from its fragments.
 Eigen::VectorXd reconstruct_two_body(
     const std::vector<TwoBodyFragment>& fragments, std::size_t norb) {
@@ -134,6 +158,17 @@ std::shared_ptr<Hamiltonian> make_hamiltonian(std::size_t norb,
   return std::make_shared<Hamiltonian>(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           make_one_body(norb, 7), two_body,
+          testing::create_test_orbitals(static_cast<int>(norb),
+                                        static_cast<int>(norb)),
+          core_energy, Eigen::MatrixXd::Zero(0, 0)));
+}
+
+std::shared_ptr<Hamiltonian> make_cholesky_hamiltonian(
+    std::size_t norb, const Eigen::MatrixXd& vectors,
+    double core_energy = -1.25) {
+  return std::make_shared<Hamiltonian>(
+      std::make_unique<CholeskyHamiltonianContainer>(
+          make_one_body(norb, 7), vectors,
           testing::create_test_orbitals(static_cast<int>(norb),
                                         static_cast<int>(norb)),
           core_energy, Eigen::MatrixXd::Zero(0, 0)));
@@ -496,4 +531,71 @@ TEST(CholeskyDoubleFactorizerTest, RunProducesEquivalentFactorizedContainer) {
 
   EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
   EXPECT_TRUE(factorized->is_restricted());
+}
+
+TEST(CholeskyDoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
+  constexpr std::size_t norb = 3;
+  constexpr std::size_t independent = 3;
+  constexpr std::size_t stored = 5;
+  constexpr double core_energy = 2.25;
+  const auto vectors =
+      make_rank_deficient_cholesky_vectors(norb, independent, stored, 17);
+  auto hamiltonian = make_cholesky_hamiltonian(norb, vectors, core_energy);
+
+  const Eigen::VectorXd expected =
+      std::get<0>(hamiltonian->get_two_body_integrals());
+
+  auto factorized =
+      DoubleFactorizerFactory::create("cholesky")->run(hamiltonian);
+  ASSERT_NE(factorized, nullptr);
+
+  const auto& container = as_factorized(factorized);
+
+  // The stored vectors are rank deficient, so consuming them yields one
+  // fragment per stored vector while decomposing the dense tensor would yield
+  // only `independent`. That difference is what detects the fast path silently
+  // ceasing to be taken: the fallback stays exact, so reconstruction alone
+  // could never notice.
+  EXPECT_EQ(container.get_num_ranks(), stored)
+      << "expected the stored three-center integrals to be reused directly; "
+         "getting "
+      << independent
+      << " fragments means the dense tensor was "
+         "re-decomposed instead";
+
+  const Eigen::VectorXd& signs = container.get_signs();
+  EXPECT_TRUE((signs.array() > 0.0).all());
+
+  const Eigen::VectorXd& reconstructed =
+      std::get<0>(factorized->get_two_body_integrals());
+  EXPECT_TRUE(reconstructed.isApprox(expected, kReconstructionTolerance))
+      << "max abs deviation: "
+      << (reconstructed - expected).cwiseAbs().maxCoeff();
+
+  EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
+}
+
+TEST(CholeskyDoubleFactorizerTest, EigenDecompositionIgnoresStoredVectors) {
+  constexpr std::size_t norb = 3;
+  constexpr std::size_t independent = 3;
+  constexpr std::size_t stored = 5;
+  const auto vectors =
+      make_rank_deficient_cholesky_vectors(norb, independent, stored, 17);
+  auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
+
+  const Eigen::VectorXd expected =
+      std::get<0>(hamiltonian->get_two_body_integrals());
+
+  // The fast path belongs to the Cholesky factorizer alone, so the eigen
+  // sibling has to fall through to the dense tensor and recover the true rank.
+  auto factorized =
+      DoubleFactorizerFactory::create("eigen_decomposition")->run(hamiltonian);
+  ASSERT_NE(factorized, nullptr);
+
+  const auto& container = as_factorized(factorized);
+  EXPECT_EQ(container.get_num_ranks(), independent);
+
+  const Eigen::VectorXd& reconstructed =
+      std::get<0>(factorized->get_two_body_integrals());
+  EXPECT_TRUE(reconstructed.isApprox(expected, kReconstructionTolerance));
 }
