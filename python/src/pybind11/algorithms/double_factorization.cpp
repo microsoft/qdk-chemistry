@@ -24,8 +24,9 @@ void bind_double_factorization(py::module &m) {
   The result is backed by a
   :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` containing signed
   low-rank fragments. Chemist permutation symmetry is imposed by averaging.
-  Modes below the absolute ``truncation_threshold`` are omitted. One-body data,
-  core energy, orbitals, inactive Fock data, and Hamiltonian type are preserved.
+  Candidates below the method-dependent ``truncation_threshold`` are omitted.
+  One-body data, core energy, orbitals, inactive Fock data, and Hamiltonian type
+  are preserved.
 
   The ``method`` setting selects the first factorization step:
 
@@ -44,8 +45,6 @@ void bind_double_factorization(py::module &m) {
       detected breakdown falls back to ``"eigen_decomposition"`` rather than
       failing.
 
-  Both methods threshold the same quantity, so a given ``truncation_threshold``
-  selects the same fragments from either.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`

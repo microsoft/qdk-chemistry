@@ -75,6 +75,25 @@ Eigen::VectorXd make_two_body(std::size_t norb,
   return two_body;
 }
 
+Eigen::VectorXd make_positive_two_body(
+    const std::vector<Eigen::MatrixXd>& factors) {
+  const std::size_t norb = static_cast<std::size_t>(factors.front().rows());
+  Eigen::VectorXd two_body = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (std::size_t p = 0; p < norb; ++p) {
+    for (std::size_t q = 0; q < norb; ++q) {
+      for (std::size_t r = 0; r < norb; ++r) {
+        for (std::size_t s = 0; s < norb; ++s) {
+          for (const auto& factor : factors) {
+            two_body[((p * norb + q) * norb + r) * norb + s] +=
+                factor(p, q) * factor(r, s);
+          }
+        }
+      }
+    }
+  }
+  return two_body;
+}
+
 /// Pack the same factors as norb^2 x naux Cholesky vectors, so that
 /// L L^T is the supermatrix of make_two_body with all-positive signs.
 Eigen::MatrixXd make_cholesky_vectors(std::size_t norb, std::size_t naux,
@@ -184,6 +203,10 @@ std::shared_ptr<Hamiltonian> make_unrestricted_hamiltonian(std::size_t norb) {
 const FactorizedHamiltonianContainer& as_factorized(
     const std::shared_ptr<Hamiltonian>& hamiltonian) {
   return hamiltonian->get_container<FactorizedHamiltonianContainer>();
+}
+
+double coefficient_one_norm(const TwoBodyFragment& fragment) {
+  return fragment.eps.cwiseAbs().sum();
 }
 
 std::unique_ptr<DoubleFactorizer> make_cholesky_factorizer() {
@@ -379,17 +402,34 @@ TEST(DoubleFactorizerCholeskyTest, AgreesWithEigenDecomposition) {
             kReconstructionTolerance);
 }
 
-TEST(DoubleFactorizerCholeskyTest, SortsFragmentsByDecreasingWeight) {
-  constexpr std::size_t norb = 4;
-  const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 23);
-  const auto fragments = double_factorize(two_body, norb, 1e-12,
-                                          DoubleFactorizationMethod::Cholesky);
-  ASSERT_GE(fragments.size(), 2u);
+TEST(DoubleFactorizerCholeskyTest,
+     SortsFragmentsByDecreasingOneNormContribution) {
+  constexpr std::size_t norb = 2;
+  Eigen::MatrixXd concentrated = Eigen::MatrixXd::Zero(norb, norb);
+  concentrated(0, 0) = 3.0;
+  Eigen::MatrixXd distributed = Eigen::MatrixXd::Zero(norb, norb);
+  distributed(0, 1) = 2.0;
+  distributed(1, 0) = 2.0;
 
-  for (std::size_t r = 1; r < fragments.size(); ++r) {
-    EXPECT_LE(fragments[r].eps.squaredNorm(),
-              fragments[r - 1].eps.squaredNorm() + 1e-12);
-  }
+  const auto fragments =
+      double_factorize(make_positive_two_body({concentrated, distributed}),
+                       norb, 0.0, DoubleFactorizationMethod::Cholesky);
+  ASSERT_EQ(fragments.size(), 2u);
+
+  EXPECT_GT(coefficient_one_norm(fragments[0]),
+            coefficient_one_norm(fragments[1]));
+  EXPECT_LT(fragments[0].eps.squaredNorm(), fragments[1].eps.squaredNorm());
+}
+
+TEST(DoubleFactorizerCholeskyTest, AppliesThresholdToResidualPivot) {
+  constexpr std::size_t norb = 2;
+  const Eigen::MatrixXd factor = Eigen::MatrixXd::Constant(norb, norb, 0.5);
+
+  const auto fragments =
+      double_factorize(make_positive_two_body({factor}), norb, 0.3,
+                       DoubleFactorizationMethod::Cholesky);
+
+  EXPECT_TRUE(fragments.empty());
 }
 
 TEST(DoubleFactorizerCholeskyTest, FallsBackForIndefiniteTensor) {

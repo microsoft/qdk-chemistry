@@ -39,10 +39,12 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
 
     set_default<double>(
         "truncation_threshold", 1e-12,
-        "Drop fragments whose squared coefficient norm ||eps||^2 is below "
-        "this threshold. For eigen_decomposition this equals the two-electron "
-        "supermatrix eigenvalue magnitude. Must be non-negative; 0.0 keeps "
-        "every fragment the method produces.",
+        "Cutoff for first-step factorization candidates. "
+        "\"eigen_decomposition\" compares the two-electron supermatrix "
+        "eigenvalue magnitude; dense \"cholesky\" compares the largest "
+        "remaining residual diagonal, while reused three-center vectors are "
+        "compared by squared column norm. Must be non-negative; 0.0 keeps "
+        "every numerically resolvable fragment.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
@@ -61,8 +63,8 @@ enum class DoubleFactorizationMethod {
 struct TwoBodyFragment {
   Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Column b is
                         ///< new-orbital vector b in the original basis.
-  Eigen::VectorXd eps;  ///< norb coefficients. The fragment's weight is
-                        ///< ||eps||^2, which for
+  Eigen::VectorXd eps;  ///< norb coefficients. Their squared norm ||eps||^2
+                        ///< for
                         ///< DoubleFactorizationMethod::Eigen equals the
                         ///< supermatrix eigenvalue magnitude.
   double sign = 1.0;    ///< +1.0 or -1.0.
@@ -72,8 +74,8 @@ struct TwoBodyFragment {
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
 /// Both methods reshape the tensor into the (pq),(rs) supermatrix, impose
-/// chemist permutation symmetry by averaging rather than verifying it, and
-/// threshold the same quantity.
+/// chemist permutation symmetry by averaging rather than verifying it, and use
+/// method-dependent cutoff and ordering metrics.
 ///
 /// DoubleFactorizationMethod::Eigen diagonalizes the supermatrix with LAPACK
 /// in O(norb^6). DoubleFactorizationMethod::Cholesky runs a pivoted Cholesky
@@ -85,13 +87,14 @@ struct TwoBodyFragment {
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
 ///        Chemist permutation symmetry is imposed by averaging, not verified.
 /// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose squared coefficient norm
-///        ||eps||^2 falls below this threshold are dropped. For
-///        DoubleFactorizationMethod::Eigen this equals the supermatrix
-///        eigenvalue magnitude. 0.0 retains every fragment the method
-///        produces, though Cholesky still stops at the numerical rank.
+/// @param truncation_threshold Cutoff below which first-step candidates are
+///        dropped. Eigen compares the supermatrix eigenvalue magnitude;
+///        Cholesky compares the largest remaining residual diagonal. The same
+///        value may therefore retain different ranks. 0.0 retains every
+///        numerically resolvable fragment.
 /// @param method First-step factorization of the supermatrix.
-/// @return The retained fragments, sorted by decreasing ||eps||^2.
+/// @return Retained fragments sorted by decreasing contribution: eigenvalue
+///         magnitude for Eigen and sum_b |eps_b| for Cholesky.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
 ///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
 ///         or contains a non-finite value.
@@ -115,9 +118,11 @@ std::vector<TwoBodyFragment> double_factorize(
  *
  * The `"method"` setting selects the first factorization step: an
  * eigen-decomposition of the two-electron supermatrix, or a pivoted Cholesky
- * decomposition of it. Both produce the same container and threshold the same
- * quantity, so a given
- * `"truncation_threshold"` selects the same fragments from either.
+ * decomposition of it. Both produce the same container, but their cutoff and
+ * ordering metrics are method-dependent, so a given `"truncation_threshold"`
+ * need not select the same rank from each. If the input already stores
+ * three-center Cholesky vectors, those vectors are reused and compared by
+ * squared column norm.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.
