@@ -233,7 +233,7 @@ if [[ "$MAC_BUILD" == "ON" ]]; then
 else
     tar xzf "$LIBINT_TARBALL" --warning=no-unknown-keyword
 fi
-# The tarball libint-2.9.0-mpqc4.tgz extracts to libint-2.9.0, not libint-2.9.0-mpqc4
+# The libint release tarball name may include a suffix (e.g., "-mpqc4"), but it typically extracts to a plain "libint-<version>" directory.
 # Find the actual extracted directory (excluding macOS metadata files starting with ._)
 LIBINT_DIR=$(ls -d libint-*/ 2>/dev/null | grep -v '^\._' | head -1 | tr -d '/')
 if [[ -z "$LIBINT_DIR" || ! -d "$LIBINT_DIR" ]]; then
