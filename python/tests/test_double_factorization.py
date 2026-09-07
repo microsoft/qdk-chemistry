@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import CholeskyDoubleFactorizer, DoubleFactorizer, create
+from qdk_chemistry.algorithms import DoubleFactorizer, create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     FactorizedHamiltonianContainer,
@@ -52,19 +52,22 @@ def create_positive_semidefinite_test_hamiltonian(num_orbitals=4, num_factors=3,
 
 @pytest.fixture
 def factorizer():
-    return create("double_factorizer", "eigen_decomposition")
+    return create("double_factorizer", "qdk")
 
 
 @pytest.fixture
 def cholesky_factorizer():
-    return create("double_factorizer", "cholesky")
+    factorizer = create("double_factorizer", "qdk")
+    factorizer.settings().set("method", "cholesky")
+    return factorizer
 
 
 class TestDoubleFactorizer:
     def test_metadata(self, factorizer):
         assert isinstance(factorizer, DoubleFactorizer)
         assert factorizer.type_name() == "double_factorizer"
-        assert factorizer.name() == "eigen_decomposition"
+        assert factorizer.name() == "qdk"
+        assert factorizer.settings().get("method") == "eigen_decomposition"
 
     def test_run_returns_an_exact_factorized_hamiltonian(self, factorizer):
         hamiltonian = create_nontrivial_test_hamiltonian(4)
@@ -87,7 +90,7 @@ class TestDoubleFactorizer:
         hamiltonian = create_nontrivial_test_hamiltonian(norb)
 
         def num_ranks(threshold):
-            truncated = create("double_factorizer", "eigen_decomposition")
+            truncated = create("double_factorizer", "qdk")
             truncated.settings().set("truncation_threshold", threshold)
             return truncated.run(hamiltonian).get_container().get_num_ranks()
 
@@ -125,13 +128,13 @@ class TestDoubleFactorizer:
         _assert_term_by_term_equivalent(mapper.run(hamiltonian, mapping), mapper.run(factorized, mapping))
 
 
-class TestCholeskyDoubleFactorizer:
+class TestDoubleFactorizerCholeskyMethod:
     def test_metadata(self, cholesky_factorizer):
-        assert isinstance(cholesky_factorizer, CholeskyDoubleFactorizer)
         assert isinstance(cholesky_factorizer, DoubleFactorizer)
         assert cholesky_factorizer.type_name() == "double_factorizer"
-        assert cholesky_factorizer.name() == "cholesky"
+        assert cholesky_factorizer.name() == "qdk"
         assert cholesky_factorizer.name() in cholesky_factorizer.aliases()
+        assert cholesky_factorizer.settings().get("method") == "cholesky"
 
     def test_run_returns_an_exact_factorized_hamiltonian(self, cholesky_factorizer):
         hamiltonian = create_positive_semidefinite_test_hamiltonian()

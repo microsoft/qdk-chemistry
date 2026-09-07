@@ -30,9 +30,18 @@ std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
   return std::make_unique<DoubleFactorizer>();
 }
 
-std::unique_ptr<DoubleFactorizer> make_cholesky_double_factorizer() {
-  QDK_LOG_TRACE_ENTERING();
-  return std::make_unique<CholeskyDoubleFactorizer>();
+/// Map the `"method"` setting onto the enum. The setting's ListConstraint
+/// already rejects anything else, so an unknown value here means the
+/// constraint and this mapping have drifted apart.
+DoubleFactorizationMethod method_from_string(const std::string& method) {
+  if (method == "cholesky") {
+    return DoubleFactorizationMethod::Cholesky;
+  }
+  if (method == "eigen_decomposition") {
+    return DoubleFactorizationMethod::Eigen;
+  }
+  throw std::invalid_argument("double_factorizer: unknown method \"" + method +
+                              "\".");
 }
 
 void validate_norb_and_threshold(std::size_t norb, double truncation_threshold,
@@ -124,7 +133,7 @@ std::vector<TwoBodyFragment> eigen_decompose_two_body(
   Eigen::VectorXd supermatrix_eigenvalues(pair_dim);
 
   // Dense diagonalization costs O(norb^6) and materializes all norb^2
-  // eigenpairs. CholeskyDoubleFactorizer avoids both for a positive
+  // eigenpairs. The "cholesky" method avoids both for a positive
   // semi-definite supermatrix.
   const int64_t supermatrix_info = lapack::syev(
       lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(pair_dim),
@@ -314,18 +323,7 @@ std::vector<TwoBodyFragment> cholesky_decompose_two_body(
 
 std::vector<TwoBodyFragment> DoubleFactorizer::_compute_fragments(
     const data::Hamiltonian& hamiltonian, std::size_t norb,
-    double truncation_threshold) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  const Eigen::VectorXd& g_aaaa =
-      std::get<0>(hamiltonian.get_two_body_integrals());
-
-  return eigen_decompose_two_body(g_aaaa, norb, truncation_threshold);
-}
-
-std::vector<TwoBodyFragment> CholeskyDoubleFactorizer::_compute_fragments(
-    const data::Hamiltonian& hamiltonian, std::size_t norb,
-    double truncation_threshold) const {
+    double truncation_threshold, DoubleFactorizationMethod method) const {
   QDK_LOG_TRACE_ENTERING();
 
   using qdk::chemistry::data::CholeskyHamiltonianContainer;
@@ -333,7 +331,8 @@ std::vector<TwoBodyFragment> CholeskyDoubleFactorizer::_compute_fragments(
   // Stored three-center integrals already are the first factorization, so
   // reusing them skips both expanding them into a dense norb^4 tensor and
   // re-deriving a decomposition that is already on hand.
-  if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
+  if (method == DoubleFactorizationMethod::Cholesky &&
+      hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
     const Eigen::MatrixXd& three_center =
         hamiltonian.get_container<CholeskyHamiltonianContainer>()
             .get_three_center_integrals()
@@ -345,7 +344,7 @@ std::vector<TwoBodyFragment> CholeskyDoubleFactorizer::_compute_fragments(
     }
 
     QDK_LOGGER().debug(
-        "CholeskyDoubleFactorizer: stored three-center integrals have {} rows "
+        "double_factorizer: stored three-center integrals have {} rows "
         "but num_orbitals={} implies {}, decomposing the dense tensor instead.",
         three_center.rows(), norb, norb * norb);
   }
@@ -353,7 +352,9 @@ std::vector<TwoBodyFragment> CholeskyDoubleFactorizer::_compute_fragments(
   const Eigen::VectorXd& g_aaaa =
       std::get<0>(hamiltonian.get_two_body_integrals());
 
-  return cholesky_decompose_two_body(g_aaaa, norb, truncation_threshold);
+  return method == DoubleFactorizationMethod::Cholesky
+             ? cholesky_decompose_two_body(g_aaaa, norb, truncation_threshold)
+             : eigen_decompose_two_body(g_aaaa, norb, truncation_threshold);
 }
 
 std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
@@ -376,6 +377,9 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
         "factorize.");
   }
 
+  const std::string method_name = _settings->get<std::string>("method");
+  const DoubleFactorizationMethod method = method_from_string(method_name);
+
   const double truncation_threshold =
       _settings->get<double>("truncation_threshold");
 
@@ -386,12 +390,14 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   // keeps implementations that never materialize a dense tensor viable.
   const std::size_t norb = static_cast<std::size_t>(h_alpha.rows());
 
-  auto fragments = _compute_fragments(*hamiltonian, norb, truncation_threshold);
+  auto fragments =
+      _compute_fragments(*hamiltonian, norb, truncation_threshold, method);
 
   QDK_LOGGER().debug(
-      "{}: num_orbitals={}, truncation_threshold={}, "
+      "{}: method={}, num_orbitals={}, truncation_threshold={}, "
       "retained {} of {} candidate fragments.",
-      name(), norb, truncation_threshold, fragments.size(), norb * norb);
+      name(), method_name, norb, truncation_threshold, fragments.size(),
+      norb * norb);
 
   if (fragments.empty()) {
     throw std::invalid_argument(
@@ -446,7 +452,6 @@ void DoubleFactorizerFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   DoubleFactorizerFactory::register_instance(&make_double_factorizer);
-  DoubleFactorizerFactory::register_instance(&make_cholesky_double_factorizer);
 }
 
 }  // namespace qdk::chemistry::algorithms

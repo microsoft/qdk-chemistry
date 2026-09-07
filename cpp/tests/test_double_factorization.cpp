@@ -16,6 +16,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <random>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -190,19 +191,27 @@ const FactorizedHamiltonianContainer& as_factorized(
   return hamiltonian->get_container<FactorizedHamiltonianContainer>();
 }
 
+std::unique_ptr<DoubleFactorizer> make_cholesky_factorizer() {
+  auto factorizer = DoubleFactorizerFactory::create("qdk");
+  factorizer->settings().set("method", "cholesky");
+  return factorizer;
+}
+
 }  // namespace
 
 TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
-  auto factorizer = DoubleFactorizerFactory::create("eigen_decomposition");
+  auto factorizer = DoubleFactorizerFactory::create("qdk");
   ASSERT_NE(factorizer, nullptr);
   EXPECT_EQ(factorizer->type_name(), "double_factorizer");
-  EXPECT_EQ(factorizer->name(), "eigen_decomposition");
+  EXPECT_EQ(factorizer->name(), "qdk");
   EXPECT_TRUE(factorizer->settings().has("truncation_threshold"));
+  EXPECT_TRUE(factorizer->settings().has("method"));
+  EXPECT_EQ(factorizer->settings().get<std::string>("method"),
+            "eigen_decomposition");
 
   const auto available = DoubleFactorizerFactory::available();
-  EXPECT_NE(
-      std::find(available.begin(), available.end(), "eigen_decomposition"),
-      available.end());
+  EXPECT_NE(std::find(available.begin(), available.end(), "qdk"),
+            available.end());
   EXPECT_THROW(DoubleFactorizerFactory::create("nonexistent_factorizer"),
                std::runtime_error);
 }
@@ -210,7 +219,7 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
 TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   constexpr std::size_t norb = 4;
   auto hamiltonian = make_hamiltonian(norb, make_two_body(norb, {1.0}, 31));
-  auto factorizer = DoubleFactorizerFactory::create("eigen_decomposition");
+  auto factorizer = DoubleFactorizerFactory::create("qdk");
 
   EXPECT_THROW(factorizer->settings().set("truncation_threshold", -1.0),
                std::exception);
@@ -236,7 +245,7 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(factorizer->run(nullptr), std::invalid_argument);
   EXPECT_THROW(factorizer->run(make_unrestricted_hamiltonian(norb)),
                std::invalid_argument);
-  auto truncating = DoubleFactorizerFactory::create("eigen_decomposition");
+  auto truncating = DoubleFactorizerFactory::create("qdk");
   truncating->settings().set("truncation_threshold", 1e6);
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
 }
@@ -270,8 +279,7 @@ TEST(DoubleFactorizerTest, RepresentsNegativeFragments) {
   const auto two_body = make_two_body(norb, {1.0, -1.0, 1.0}, 5);
   auto hamiltonian = make_hamiltonian(norb, two_body);
 
-  auto factorized =
-      DoubleFactorizerFactory::create("eigen_decomposition")->run(hamiltonian);
+  auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
   ASSERT_NE(factorized, nullptr);
   EXPECT_EQ(factorized->get_container_type(), "factorized");
   const auto& container = as_factorized(factorized);
@@ -294,8 +302,7 @@ TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
       make_hamiltonian(norb, make_two_body(norb, {1.0, 1.0}, 17), core_energy);
 
   auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
-  auto factorized =
-      DoubleFactorizerFactory::create("eigen_decomposition")->run(hamiltonian);
+  auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
 
   auto [factorized_h_alpha, factorized_h_beta] =
       factorized->get_one_body_integrals();
@@ -310,11 +317,11 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   const auto two_body = make_two_body(norb, {1.0, 1e-4, 1e-4}, 23);
   auto hamiltonian = make_hamiltonian(norb, two_body);
 
-  auto exact = DoubleFactorizerFactory::create("eigen_decomposition");
+  auto exact = DoubleFactorizerFactory::create("qdk");
   const auto num_ranks_exact =
       as_factorized(exact->run(hamiltonian)).get_num_ranks();
 
-  auto truncated = DoubleFactorizerFactory::create("eigen_decomposition");
+  auto truncated = DoubleFactorizerFactory::create("qdk");
   truncated->settings().set("truncation_threshold", 1e-2);
   auto truncated_hamiltonian = truncated->run(hamiltonian);
   const auto& truncated_container = as_factorized(truncated_hamiltonian);
@@ -328,19 +335,20 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   EXPECT_LT((g_aaaa - two_body).cwiseAbs().maxCoeff(), 1e-2);
 }
 
-TEST(CholeskyDoubleFactorizerTest, MetaDataAndFactoryRegistration) {
-  auto factorizer = DoubleFactorizerFactory::create("cholesky");
+TEST(DoubleFactorizerCholeskyTest, MetaDataAndFactoryRegistration) {
+  auto factorizer = make_cholesky_factorizer();
   ASSERT_NE(factorizer, nullptr);
   EXPECT_EQ(factorizer->type_name(), "double_factorizer");
-  EXPECT_EQ(factorizer->name(), "cholesky");
-  EXPECT_TRUE(factorizer->settings().has("truncation_threshold"));
+  EXPECT_EQ(factorizer->name(), "qdk");
+  EXPECT_EQ(factorizer->settings().get<std::string>("method"), "cholesky");
 
-  const auto available = DoubleFactorizerFactory::available();
-  EXPECT_NE(std::find(available.begin(), available.end(), "cholesky"),
-            available.end());
+  // The method is a constrained setting rather than a separate registered
+  // algorithm, so an unknown value has to be rejected at set() time.
+  EXPECT_THROW(factorizer->settings().set("method", "not_a_method"),
+               std::exception);
 }
 
-TEST(CholeskyDoubleFactorizerTest, FragmentsReconstructPositiveTensor) {
+TEST(DoubleFactorizerCholeskyTest, FragmentsReconstructPositiveTensor) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 17);
   const auto fragments = cholesky_decompose_two_body(two_body, norb);
@@ -357,7 +365,7 @@ TEST(CholeskyDoubleFactorizerTest, FragmentsReconstructPositiveTensor) {
   }
 }
 
-TEST(CholeskyDoubleFactorizerTest, AgreesWithEigenDecomposition) {
+TEST(DoubleFactorizerCholeskyTest, AgreesWithEigenDecomposition) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 29);
 
@@ -376,7 +384,7 @@ TEST(CholeskyDoubleFactorizerTest, AgreesWithEigenDecomposition) {
             kReconstructionTolerance);
 }
 
-TEST(CholeskyDoubleFactorizerTest, SortsFragmentsByDecreasingWeight) {
+TEST(DoubleFactorizerCholeskyTest, SortsFragmentsByDecreasingWeight) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 23);
   const auto fragments = cholesky_decompose_two_body(two_body, norb);
@@ -393,7 +401,7 @@ TEST(CholeskyDoubleFactorizerTest, SortsFragmentsByDecreasingWeight) {
 // roundoff in the residual diagonal outgrows it, which silently routes every
 // realistic input through the O(norb^6) fallback. Cover several orbital counts
 // so that regression is caught rather than hidden behind a correct answer.
-TEST(CholeskyDoubleFactorizerTest, DoesNotFallBackAsOrbitalCountGrows) {
+TEST(DoubleFactorizerCholeskyTest, DoesNotFallBackAsOrbitalCountGrows) {
   const std::vector<std::size_t> orbital_counts = {2, 3, 4, 6, 8};
   for (const std::size_t norb : orbital_counts) {
     const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 41);
@@ -414,7 +422,7 @@ TEST(CholeskyDoubleFactorizerTest, DoesNotFallBackAsOrbitalCountGrows) {
   }
 }
 
-TEST(CholeskyDoubleFactorizerTest, FallsBackForIndefiniteTensor) {
+TEST(DoubleFactorizerCholeskyTest, FallsBackForIndefiniteTensor) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, -1.0, 1.0}, 5);
   const auto fragments = cholesky_decompose_two_body(two_body, norb);
@@ -433,7 +441,7 @@ TEST(CholeskyDoubleFactorizerTest, FallsBackForIndefiniteTensor) {
             kReconstructionTolerance);
 }
 
-TEST(CholeskyDoubleFactorizerTest, TruncationDiscardsSmallFragments) {
+TEST(DoubleFactorizerCholeskyTest, TruncationDiscardsSmallFragments) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1e-4, 1e-4}, 23);
 
@@ -449,7 +457,7 @@ TEST(CholeskyDoubleFactorizerTest, TruncationDiscardsSmallFragments) {
             eigen_decompose_two_body(two_body, norb, 1e-2).size());
 }
 
-TEST(CholeskyDoubleFactorizerTest, RejectsInvalidInput) {
+TEST(DoubleFactorizerCholeskyTest, RejectsInvalidInput) {
   constexpr std::size_t norb = 4;
   const Eigen::VectorXd tensor = make_two_body(norb, {1.0, 1.0}, 31);
 
@@ -474,7 +482,7 @@ TEST(CholeskyDoubleFactorizerTest, RejectsInvalidInput) {
                std::invalid_argument);
 }
 
-TEST(CholeskyDoubleFactorizerTest, FragmentsFromStoredVectorsReconstruct) {
+TEST(DoubleFactorizerCholeskyTest, FragmentsFromStoredVectorsReconstruct) {
   constexpr std::size_t norb = 4;
   constexpr std::size_t naux = 3;
   const auto vectors = make_cholesky_vectors(norb, naux, 17);
@@ -491,7 +499,7 @@ TEST(CholeskyDoubleFactorizerTest, FragmentsFromStoredVectorsReconstruct) {
   }
 }
 
-TEST(CholeskyDoubleFactorizerTest, FragmentsFromStoredVectorsRejectInvalid) {
+TEST(DoubleFactorizerCholeskyTest, FragmentsFromStoredVectorsRejectInvalid) {
   constexpr std::size_t norb = 4;
   const auto vectors = make_cholesky_vectors(norb, 2, 17);
 
@@ -508,14 +516,13 @@ TEST(CholeskyDoubleFactorizerTest, FragmentsFromStoredVectorsRejectInvalid) {
                std::invalid_argument);
 }
 
-TEST(CholeskyDoubleFactorizerTest, RunProducesEquivalentFactorizedContainer) {
+TEST(DoubleFactorizerCholeskyTest, RunProducesEquivalentFactorizedContainer) {
   constexpr std::size_t norb = 4;
   constexpr double core_energy = -3.75;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 17);
   auto hamiltonian = make_hamiltonian(norb, two_body, core_energy);
 
-  auto factorized =
-      DoubleFactorizerFactory::create("cholesky")->run(hamiltonian);
+  auto factorized = make_cholesky_factorizer()->run(hamiltonian);
   ASSERT_NE(factorized, nullptr);
   EXPECT_EQ(factorized->get_container_type(), "factorized");
 
@@ -533,7 +540,7 @@ TEST(CholeskyDoubleFactorizerTest, RunProducesEquivalentFactorizedContainer) {
   EXPECT_TRUE(factorized->is_restricted());
 }
 
-TEST(CholeskyDoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
+TEST(DoubleFactorizerCholeskyTest, ReusesStoredThreeCenterIntegrals) {
   constexpr std::size_t norb = 3;
   constexpr std::size_t independent = 3;
   constexpr std::size_t stored = 5;
@@ -545,8 +552,7 @@ TEST(CholeskyDoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
   const Eigen::VectorXd expected =
       std::get<0>(hamiltonian->get_two_body_integrals());
 
-  auto factorized =
-      DoubleFactorizerFactory::create("cholesky")->run(hamiltonian);
+  auto factorized = make_cholesky_factorizer()->run(hamiltonian);
   ASSERT_NE(factorized, nullptr);
 
   const auto& container = as_factorized(factorized);
@@ -575,7 +581,7 @@ TEST(CholeskyDoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
   EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
 }
 
-TEST(CholeskyDoubleFactorizerTest, EigenDecompositionIgnoresStoredVectors) {
+TEST(DoubleFactorizerCholeskyTest, EigenDecompositionIgnoresStoredVectors) {
   constexpr std::size_t norb = 3;
   constexpr std::size_t independent = 3;
   constexpr std::size_t stored = 5;
@@ -586,10 +592,10 @@ TEST(CholeskyDoubleFactorizerTest, EigenDecompositionIgnoresStoredVectors) {
   const Eigen::VectorXd expected =
       std::get<0>(hamiltonian->get_two_body_integrals());
 
-  // The fast path belongs to the Cholesky factorizer alone, so the eigen
-  // sibling has to fall through to the dense tensor and recover the true rank.
-  auto factorized =
-      DoubleFactorizerFactory::create("eigen_decomposition")->run(hamiltonian);
+  // The fast path belongs to the "cholesky" method alone, so the default
+  // "eigen_decomposition" has to fall through to the dense tensor and recover
+  // the true rank.
+  auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
   ASSERT_NE(factorized, nullptr);
 
   const auto& container = as_factorized(factorized);

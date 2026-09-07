@@ -22,6 +22,12 @@ namespace qdk::chemistry::algorithms {
  * @note Equation numbers here refer to :cite:`Low2025`.
  */
 
+/// First-step factorization of the two-electron supermatrix.
+enum class DoubleFactorizationMethod {
+  Cholesky,  ///< Pivoted Cholesky, O(naux * norb^4).
+  Eigen,     ///< Dense eigen-decomposition, O(norb^6).
+};
+
 /**
  * @class DoubleFactorizerSettings
  * @brief Settings container for DoubleFactorizer.
@@ -34,6 +40,17 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
    * @brief Constructor that initializes the default settings.
    */
   DoubleFactorizerSettings() {
+    set_default("method", std::string("eigen_decomposition"),
+                "First-step factorization of the two-electron supermatrix. "
+                "\"eigen_decomposition\" diagonalizes it in O(norb^6); "
+                "\"cholesky\" runs a pivoted Cholesky in O(naux * norb^4), "
+                "stops at the numerical rank, reuses stored three-center "
+                "integrals when the Hamiltonian carries them, and falls back "
+                "to \"eigen_decomposition\" when the supermatrix is not "
+                "positive semi-definite.",
+                qdk::chemistry::data::ListConstraint<std::string>{
+                    {"eigen_decomposition", "cholesky"}});
+
     set_default<double>(
         "truncation_threshold", 1e-12,
         "Drop fragments whose squared coefficient norm ||eps||^2 is below "
@@ -131,7 +148,7 @@ std::vector<TwoBodyFragment> cholesky_decompose_two_body(
 
 /**
  * @class DoubleFactorizer
- * @brief Exact double factorization by nested eigen-decomposition
+ * @brief Exact double factorization of a Hamiltonian's two-electron integrals
  *        :cite:`vonBurg2021`.
  *
  * Maps a Hamiltonian carrying dense four-index two-electron integrals to an
@@ -140,6 +157,12 @@ std::vector<TwoBodyFragment> cholesky_decompose_two_body(
  * tensor is stored as a signed sum of low-rank fragments
  *   g_pqrs = sum_t s_t (sum_b eps^t_b U^t_bp U^t_bq)
  *                      (sum_b' eps^t_b' U^t_b'r U^t_b's).
+ *
+ * The `"method"` setting selects the first factorization step: an
+ * eigen-decomposition of the two-electron supermatrix, or a pivoted Cholesky
+ * decomposition of it :cite:`Beebe1977` :cite:`Koch2003`. Both produce the
+ * same container and threshold the same quantity, so a given
+ * `"truncation_threshold"` selects the same fragments from either.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.
@@ -176,9 +199,9 @@ class DoubleFactorizer
   /**
    * @brief Access the algorithm's name.
    *
-   * @return "eigen_decomposition".
+   * @return "qdk".
    */
-  std::string name() const override { return "eigen_decomposition"; }
+  std::string name() const override { return "qdk"; }
 
   /**
    * @brief Access the algorithm's type name.
@@ -198,12 +221,11 @@ class DoubleFactorizer
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian) const override;
 
+ private:
   /**
    * @brief Produce the low-rank fragments for a Hamiltonian.
    *
-   * Overridden by implementations that use a different factorization, or that
-   * can exploit a more compact input than the dense four-index tensor. Only
-   * this step differs between implementations; the container assembly, the
+   * Only this step differs between methods; the container assembly, the
    * carried-over one-body data and the validation are shared.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
@@ -211,59 +233,13 @@ class DoubleFactorizer
    * @param norb Number of active spatial orbitals.
    * @param truncation_threshold Fragments whose squared coefficient norm
    *        ||eps||^2 falls below this threshold are dropped.
+   * @param method First-step factorization to apply.
    * \endcond
    * @return The retained fragments.
    */
-  virtual std::vector<TwoBodyFragment> _compute_fragments(
-      const data::Hamiltonian& hamiltonian, std::size_t norb,
-      double truncation_threshold) const;
-};
-
-/**
- * @class CholeskyDoubleFactorizer
- * @brief Double factorization whose first step is a pivoted Cholesky
- *        decomposition :cite:`Beebe1977` :cite:`Koch2003` rather than an
- *        eigen-decomposition.
- *
- * Produces the same container as DoubleFactorizer and thresholds the same
- * quantity, but reaches it in O(naux * norb^4) instead of O(norb^6) and stops
- * at the numerical rank. Every fragment carries sign +1.
- *
- * When the input Hamiltonian is already backed by a
- * qdk::chemistry::data::CholeskyHamiltonianContainer, the stored three-center
- * integrals are the first factorization, so they are reused directly and the
- * dense norb^4 tensor is never formed.
- *
- * Falls back to the eigen-decomposition when the two-electron supermatrix is
- * not positive semi-definite, since no Cholesky decomposition exists then.
- */
-class CholeskyDoubleFactorizer : public DoubleFactorizer {
- public:
-  /**
-   * @brief Default constructor. Uses default DoubleFactorizerSettings.
-   */
-  CholeskyDoubleFactorizer() = default;
-
-  /**
-   * @brief Virtual destructor.
-   */
-  ~CholeskyDoubleFactorizer() override = default;
-
-  /**
-   * @brief Access the algorithm's name.
-   *
-   * @return "cholesky".
-   */
-  std::string name() const final { return "cholesky"; }
-
- protected:
-  /**
-   * @brief Factorize by pivoted Cholesky, reusing stored three-center
-   *        integrals when the Hamiltonian already carries them.
-   */
   std::vector<TwoBodyFragment> _compute_fragments(
       const data::Hamiltonian& hamiltonian, std::size_t norb,
-      double truncation_threshold) const override;
+      double truncation_threshold, DoubleFactorizationMethod method) const;
 };
 
 /**
@@ -275,7 +251,7 @@ struct DoubleFactorizerFactory
     : public AlgorithmFactory<DoubleFactorizer, DoubleFactorizerFactory> {
   static std::string algorithm_type_name() { return "double_factorizer"; }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return "eigen_decomposition"; }
+  static std::string default_algorithm_name() { return "qdk"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

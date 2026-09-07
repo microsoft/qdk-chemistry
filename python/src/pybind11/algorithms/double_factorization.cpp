@@ -19,7 +19,7 @@ using namespace qdk::chemistry::python;
 void bind_double_factorization(py::module &m) {
   py::class_<DoubleFactorizer, py::smart_holder> double_factorizer(
       m, "DoubleFactorizer", R"(
-  Double-factorize a restricted Hamiltonian by nested eigendecomposition.
+  Double-factorize a restricted Hamiltonian into low-rank two-electron fragments.
 
   The result is backed by a
   :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` containing signed
@@ -27,11 +27,43 @@ void bind_double_factorization(py::module &m) {
   Modes below the absolute ``truncation_threshold`` are omitted. One-body data,
   core energy, orbitals, inactive Fock data, and Hamiltonian type are preserved.
 
+  The ``method`` setting selects the first factorization step:
+
+  ``"eigen_decomposition"`` (default)
+      Diagonalize the two-electron supermatrix in ``O(norb**6)``, forming all
+      ``norb**2`` eigenpairs. Fragments may carry sign ``-1``.
+
+  ``"cholesky"``
+      Run a pivoted Cholesky decomposition of the supermatrix in
+      ``O(naux * norb**4)``, stopping at the numerical rank. Every fragment
+      carries sign ``+1``. If the Hamiltonian is already backed by a
+      :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
+      three-center integrals are the first factorization and are reused
+      directly, so the dense ``norb**4`` tensor is never formed. A Cholesky
+      decomposition exists only for a positive semi-definite supermatrix, so a
+      detected breakdown falls back to ``"eigen_decomposition"`` rather than
+      failing.
+
+  Both methods threshold the same quantity, so a given ``truncation_threshold``
+  selects the same fragments from either.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    factorizer = alg.DoubleFactorizer()
+    factorizer.settings().set("method", "cholesky")
+    factorized = factorizer.run(hamiltonian)
+
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
 
 References:
     :cite:`vonBurg2021`
+    :cite:`Beebe1977`
+    :cite:`Koch2003`
 )");
 
   double_factorizer.def(py::init<>(), R"(
@@ -68,7 +100,7 @@ Returns:
 Return the implementation name.
 
 Returns:
-  str: ``"eigen_decomposition"``.
+  str: ``"qdk"``.
 )");
 
   double_factorizer.def("aliases", &DoubleFactorizer::aliases, R"(
@@ -96,49 +128,4 @@ Returns:
   });
 
   qdk::chemistry::python::bind_create_nested(double_factorizer);
-
-  py::class_<CholeskyDoubleFactorizer, DoubleFactorizer, py::smart_holder>(
-      m, "CholeskyDoubleFactorizer", R"(
-  Double-factorize a restricted Hamiltonian by pivoted Cholesky decomposition.
-
-  Produces the same
-  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` as
-  :class:`DoubleFactorizer` and thresholds the same quantity, but reaches it
-  without diagonalizing the two-electron supermatrix, and stops at the
-  numerical rank instead of forming all ``norb**2`` eigenpairs. Every fragment
-  carries sign ``+1``.
-
-  If the Hamiltonian is already backed by a
-  :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
-  three-center integrals are the first factorization and are reused directly,
-  so the dense ``norb**4`` tensor is never formed.
-
-  A Cholesky decomposition exists only for a positive semi-definite
-  supermatrix. Exact two-electron integrals are positive semi-definite, but
-  approximate or synthetic ones need not be, so a detected breakdown falls
-  back to the eigendecomposition rather than failing.
-
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as alg
-
-    factorizer = alg.CholeskyDoubleFactorizer()
-    factorized = factorizer.run(hamiltonian)
-
-See Also:
-    :class:`DoubleFactorizer`
-    :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
-
-References:
-    :cite:`Beebe1977`
-    :cite:`Koch2003`
-)")
-      .def(py::init<>(), R"(
-Create a Cholesky double factorizer with default settings.
-)")
-      .def("__repr__", [](const CholeskyDoubleFactorizer &) {
-        return "<qdk_chemistry.algorithms.CholeskyDoubleFactorizer>";
-      });
 }
