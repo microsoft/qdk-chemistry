@@ -111,8 +111,6 @@ void validate_two_body_integrals(const Eigen::VectorXd& two_body_integrals,
   }
 }
 
-}  // namespace
-
 std::vector<TwoBodyFragment> eigen_decompose_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
     double truncation_threshold) {
@@ -321,6 +319,20 @@ std::vector<TwoBodyFragment> cholesky_decompose_two_body(
                                          norb, truncation_threshold);
 }
 
+}  // namespace
+
+std::vector<TwoBodyFragment> double_factorize(
+    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
+    double truncation_threshold, DoubleFactorizationMethod method) {
+  QDK_LOG_TRACE_ENTERING();
+
+  return method == DoubleFactorizationMethod::Cholesky
+             ? cholesky_decompose_two_body(two_body_integrals, norb,
+                                           truncation_threshold)
+             : eigen_decompose_two_body(two_body_integrals, norb,
+                                        truncation_threshold);
+}
+
 std::vector<TwoBodyFragment> DoubleFactorizer::_compute_fragments(
     const data::Hamiltonian& hamiltonian, std::size_t norb,
     double truncation_threshold, DoubleFactorizationMethod method) const {
@@ -352,9 +364,7 @@ std::vector<TwoBodyFragment> DoubleFactorizer::_compute_fragments(
   const Eigen::VectorXd& g_aaaa =
       std::get<0>(hamiltonian.get_two_body_integrals());
 
-  return method == DoubleFactorizationMethod::Cholesky
-             ? cholesky_decompose_two_body(g_aaaa, norb, truncation_threshold)
-             : eigen_decompose_two_body(g_aaaa, norb, truncation_threshold);
+  return double_factorize(g_aaaa, norb, truncation_threshold, method);
 }
 
 std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(

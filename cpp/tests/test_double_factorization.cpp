@@ -223,24 +223,34 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
 
   EXPECT_THROW(factorizer->settings().set("truncation_threshold", -1.0),
                std::exception);
-  EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd::Zero(10), norb),
+  EXPECT_THROW(double_factorize(Eigen::VectorXd::Zero(10), norb, 1e-12,
+                                DoubleFactorizationMethod::Eigen),
                std::invalid_argument);
 
-  EXPECT_THROW(eigen_decompose_two_body(Eigen::VectorXd(), 0),
+  EXPECT_THROW(double_factorize(Eigen::VectorXd(), 0, 1e-12,
+                                DoubleFactorizationMethod::Eigen),
                std::invalid_argument);
   const Eigen::VectorXd tensor = make_two_body(norb, {1.0}, 31);
-  EXPECT_THROW(eigen_decompose_two_body(tensor, norb, -1.0),
-               std::invalid_argument);
-  EXPECT_THROW(eigen_decompose_two_body(
-                   tensor, norb, std::numeric_limits<double>::quiet_NaN()),
-               std::invalid_argument);
-  EXPECT_FALSE(eigen_decompose_two_body(tensor, norb, 0.0).empty());
+  EXPECT_THROW(
+      double_factorize(tensor, norb, -1.0, DoubleFactorizationMethod::Eigen),
+      std::invalid_argument);
+  EXPECT_THROW(
+      double_factorize(tensor, norb, std::numeric_limits<double>::quiet_NaN(),
+                       DoubleFactorizationMethod::Eigen),
+      std::invalid_argument);
+  EXPECT_FALSE(
+      double_factorize(tensor, norb, 0.0, DoubleFactorizationMethod::Eigen)
+          .empty());
   Eigen::VectorXd with_nan = make_two_body(norb, {1.0}, 31);
   with_nan[0] = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(eigen_decompose_two_body(with_nan, norb), std::invalid_argument);
+  EXPECT_THROW(
+      double_factorize(with_nan, norb, 1e-12, DoubleFactorizationMethod::Eigen),
+      std::invalid_argument);
   Eigen::VectorXd with_inf = make_two_body(norb, {1.0}, 31);
   with_inf[0] = std::numeric_limits<double>::infinity();
-  EXPECT_THROW(eigen_decompose_two_body(with_inf, norb), std::invalid_argument);
+  EXPECT_THROW(
+      double_factorize(with_inf, norb, 1e-12, DoubleFactorizationMethod::Eigen),
+      std::invalid_argument);
 
   EXPECT_THROW(factorizer->run(nullptr), std::invalid_argument);
   EXPECT_THROW(factorizer->run(make_unrestricted_hamiltonian(norb)),
@@ -253,7 +263,8 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
 TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
   constexpr std::size_t norb = 3;
   const auto two_body = make_two_body(norb, {1.0, -1.0}, 17);
-  const auto fragments = eigen_decompose_two_body(two_body, norb);
+  const auto fragments =
+      double_factorize(two_body, norb, 1e-12, DoubleFactorizationMethod::Eigen);
   ASSERT_FALSE(fragments.empty());
 
   const Eigen::VectorXd reconstructed = reconstruct_two_body(fragments, norb);
@@ -265,7 +276,8 @@ TEST(DoubleFactorizerTest, EigenDecomposeFragmentsReconstructTensor) {
 TEST(DoubleFactorizerTest, EigenDecomposeSortsFragmentsByDecreasingWeight) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, -1.0, 1.0}, 23);
-  const auto fragments = eigen_decompose_two_body(two_body, norb);
+  const auto fragments =
+      double_factorize(two_body, norb, 1e-12, DoubleFactorizationMethod::Eigen);
   ASSERT_GE(fragments.size(), 2u);
 
   for (std::size_t r = 1; r < fragments.size(); ++r) {
@@ -351,7 +363,8 @@ TEST(DoubleFactorizerCholeskyTest, MetaDataAndFactoryRegistration) {
 TEST(DoubleFactorizerCholeskyTest, FragmentsReconstructPositiveTensor) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 17);
-  const auto fragments = cholesky_decompose_two_body(two_body, norb);
+  const auto fragments = double_factorize(two_body, norb, 1e-12,
+                                          DoubleFactorizationMethod::Cholesky);
   ASSERT_FALSE(fragments.empty());
 
   const Eigen::VectorXd reconstructed = reconstruct_two_body(fragments, norb);
@@ -369,8 +382,10 @@ TEST(DoubleFactorizerCholeskyTest, AgreesWithEigenDecomposition) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 29);
 
-  const auto eigen_fragments = eigen_decompose_two_body(two_body, norb);
-  const auto cholesky_fragments = cholesky_decompose_two_body(two_body, norb);
+  const auto eigen_fragments =
+      double_factorize(two_body, norb, 1e-12, DoubleFactorizationMethod::Eigen);
+  const auto cholesky_fragments = double_factorize(
+      two_body, norb, 1e-12, DoubleFactorizationMethod::Cholesky);
 
   // The threshold selects on ||eps||^2 in both methods, so a positive
   // semi-definite tensor has to yield the same number of fragments.
@@ -387,7 +402,8 @@ TEST(DoubleFactorizerCholeskyTest, AgreesWithEigenDecomposition) {
 TEST(DoubleFactorizerCholeskyTest, SortsFragmentsByDecreasingWeight) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 23);
-  const auto fragments = cholesky_decompose_two_body(two_body, norb);
+  const auto fragments = double_factorize(two_body, norb, 1e-12,
+                                          DoubleFactorizationMethod::Cholesky);
   ASSERT_GE(fragments.size(), 2u);
 
   for (std::size_t r = 1; r < fragments.size(); ++r) {
@@ -405,7 +421,8 @@ TEST(DoubleFactorizerCholeskyTest, DoesNotFallBackAsOrbitalCountGrows) {
   const std::vector<std::size_t> orbital_counts = {2, 3, 4, 6, 8};
   for (const std::size_t norb : orbital_counts) {
     const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 41);
-    const auto fragments = cholesky_decompose_two_body(two_body, norb);
+    const auto fragments = double_factorize(
+        two_body, norb, 1e-12, DoubleFactorizationMethod::Cholesky);
     ASSERT_FALSE(fragments.empty()) << "norb=" << norb;
 
     for (const auto& fragment : fragments) {
@@ -425,7 +442,8 @@ TEST(DoubleFactorizerCholeskyTest, DoesNotFallBackAsOrbitalCountGrows) {
 TEST(DoubleFactorizerCholeskyTest, FallsBackForIndefiniteTensor) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, -1.0, 1.0}, 5);
-  const auto fragments = cholesky_decompose_two_body(two_body, norb);
+  const auto fragments = double_factorize(two_body, norb, 1e-12,
+                                          DoubleFactorizationMethod::Cholesky);
   ASSERT_FALSE(fragments.empty());
 
   // No Cholesky decomposition exists here, so a negative fragment is proof
@@ -445,74 +463,49 @@ TEST(DoubleFactorizerCholeskyTest, TruncationDiscardsSmallFragments) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1e-4, 1e-4}, 23);
 
-  const auto exact = cholesky_decompose_two_body(two_body, norb);
-  const auto truncated = cholesky_decompose_two_body(two_body, norb, 1e-2);
+  const auto exact = double_factorize(two_body, norb, 1e-12,
+                                      DoubleFactorizationMethod::Cholesky);
+  const auto truncated = double_factorize(two_body, norb, 1e-2,
+                                          DoubleFactorizationMethod::Cholesky);
 
   EXPECT_LT(truncated.size(), exact.size());
   EXPECT_FALSE(truncated.empty());
 
   // The eigen path thresholds the same quantity, so it has to retain the same
   // number of fragments for the same threshold.
-  EXPECT_EQ(truncated.size(),
-            eigen_decompose_two_body(two_body, norb, 1e-2).size());
+  EXPECT_EQ(truncated.size(), double_factorize(two_body, norb, 1e-2,
+                                               DoubleFactorizationMethod::Eigen)
+                                  .size());
 }
 
 TEST(DoubleFactorizerCholeskyTest, RejectsInvalidInput) {
   constexpr std::size_t norb = 4;
   const Eigen::VectorXd tensor = make_two_body(norb, {1.0, 1.0}, 31);
 
-  EXPECT_THROW(cholesky_decompose_two_body(Eigen::VectorXd::Zero(10), norb),
+  EXPECT_THROW(double_factorize(Eigen::VectorXd::Zero(10), norb, 1e-12,
+                                DoubleFactorizationMethod::Cholesky),
                std::invalid_argument);
-  EXPECT_THROW(cholesky_decompose_two_body(Eigen::VectorXd(), 0),
+  EXPECT_THROW(double_factorize(Eigen::VectorXd(), 0, 1e-12,
+                                DoubleFactorizationMethod::Cholesky),
                std::invalid_argument);
-  EXPECT_THROW(cholesky_decompose_two_body(tensor, norb, -1.0),
-               std::invalid_argument);
-  EXPECT_THROW(cholesky_decompose_two_body(
-                   tensor, norb, std::numeric_limits<double>::quiet_NaN()),
-               std::invalid_argument);
+  EXPECT_THROW(
+      double_factorize(tensor, norb, -1.0, DoubleFactorizationMethod::Cholesky),
+      std::invalid_argument);
+  EXPECT_THROW(
+      double_factorize(tensor, norb, std::numeric_limits<double>::quiet_NaN(),
+                       DoubleFactorizationMethod::Cholesky),
+      std::invalid_argument);
 
   Eigen::VectorXd with_nan = tensor;
   with_nan[0] = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(cholesky_decompose_two_body(with_nan, norb),
+  EXPECT_THROW(double_factorize(with_nan, norb, 1e-12,
+                                DoubleFactorizationMethod::Cholesky),
                std::invalid_argument);
 
   Eigen::VectorXd with_inf = tensor;
   with_inf[0] = std::numeric_limits<double>::infinity();
-  EXPECT_THROW(cholesky_decompose_two_body(with_inf, norb),
-               std::invalid_argument);
-}
-
-TEST(DoubleFactorizerCholeskyTest, FragmentsFromStoredVectorsReconstruct) {
-  constexpr std::size_t norb = 4;
-  constexpr std::size_t naux = 3;
-  const auto vectors = make_cholesky_vectors(norb, naux, 17);
-  const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 17);
-
-  const auto fragments = fragments_from_cholesky_vectors(vectors, norb);
-  EXPECT_EQ(fragments.size(), naux);
-
-  // Reusing stored vectors has to give the same tensor as decomposing the
-  // dense one, since the vectors already are the first factorization.
-  const Eigen::VectorXd reconstructed = reconstruct_two_body(fragments, norb);
-  for (Eigen::Index i = 0; i < two_body.size(); ++i) {
-    EXPECT_NEAR(reconstructed[i], two_body[i], kReconstructionTolerance);
-  }
-}
-
-TEST(DoubleFactorizerCholeskyTest, FragmentsFromStoredVectorsRejectInvalid) {
-  constexpr std::size_t norb = 4;
-  const auto vectors = make_cholesky_vectors(norb, 2, 17);
-
-  EXPECT_THROW(fragments_from_cholesky_vectors(vectors, 0),
-               std::invalid_argument);
-  EXPECT_THROW(fragments_from_cholesky_vectors(vectors, norb + 1),
-               std::invalid_argument);
-  EXPECT_THROW(fragments_from_cholesky_vectors(vectors, norb, -1.0),
-               std::invalid_argument);
-
-  Eigen::MatrixXd with_nan = vectors;
-  with_nan(0, 0) = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(fragments_from_cholesky_vectors(with_nan, norb),
+  EXPECT_THROW(double_factorize(with_inf, norb, 1e-12,
+                                DoubleFactorizationMethod::Cholesky),
                std::invalid_argument);
 }
 

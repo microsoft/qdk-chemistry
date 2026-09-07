@@ -71,80 +71,52 @@ struct TwoBodyFragment {
   Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Column b is
                         ///< new-orbital vector b in the original basis.
   Eigen::VectorXd eps;  ///< norb coefficients. The fragment's weight is
-                        ///< ||eps||^2, which for eigen_decompose_two_body
-                        ///< equals the supermatrix eigenvalue magnitude.
+                        ///< ||eps||^2, which for
+                        ///< DoubleFactorizationMethod::Eigen equals the
+                        ///< supermatrix eigenvalue magnitude.
   double sign = 1.0;    ///< +1.0 or -1.0.
 };
 
-/// Eigen-decompose the spin-free two-electron tensor g_pqrs, flattened as
+/// Double-factorize the spin-free two-electron tensor g_pqrs, flattened as
 /// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
 ///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4.
-///        Chemist permutation symmetry is imposed by averaging, not verified.
-/// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose supermatrix eigenvalue
-///        magnitude falls below this threshold are dropped. 0.0 retains every
-///        fragment.
-/// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
-/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
-///         or contains a non-finite value.
-/// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> eigen_decompose_two_body(
-    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = 1e-12);
-
-/// Build low-rank fragments from Cholesky vectors of the two-electron
-/// supermatrix, i.e. from an L satisfying g_pqrs = sum_Q L_(pq),Q L_(rs),Q.
+/// Both methods reshape the tensor into the (pq),(rs) supermatrix, impose
+/// chemist permutation symmetry by averaging rather than verifying it, and
+/// threshold the same quantity, so a given `truncation_threshold` selects the
+/// same fragments from either one.
 ///
-/// Column Q is reshaped into the norb x norb matrix M^Q, whose eigenpairs give
-/// the fragment directly. Because L already carries the fragment magnitude,
-/// `eps` is used unscaled, and every fragment has sign +1: an L exists only
-/// when the supermatrix is positive semi-definite.
+/// DoubleFactorizationMethod::Eigen diagonalizes the supermatrix with LAPACK
+/// in O(norb^6). It handles an indefinite supermatrix, which is the only way a
+/// fragment can carry sign -1.
 ///
-/// @param cholesky_vectors norb^2 x naux matrix. Row index is the row-major
-///        pair p*norb + q, column index is the Cholesky (auxiliary) index.
-/// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose squared coefficient norm
-///        ||eps||^2 falls below this threshold are dropped.
-/// @return The retained fragments, sorted by decreasing ||eps||^2.
-/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `cholesky_vectors` does not have norb^2
-///         rows or contains a non-finite value.
-/// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> fragments_from_cholesky_vectors(
-    const Eigen::MatrixXd& cholesky_vectors, std::size_t norb,
-    double truncation_threshold = 1e-12);
-
-/// Decompose the spin-free two-electron tensor g_pqrs, flattened as
-/// p*norb^3 + q*norb^2 + r*norb + s, by pivoted Cholesky decomposition of the
-/// two-electron supermatrix :cite:`Beebe1977` :cite:`Koch2003`.
-///
-/// This costs O(naux * norb^4) rather than the O(norb^6) of a dense
-/// diagonalization, and stops at the numerical rank instead of materializing
-/// all norb^2 eigenpairs.
-///
-/// A Cholesky decomposition exists only for a positive semi-definite
+/// DoubleFactorizationMethod::Cholesky runs a pivoted Cholesky
+/// :cite:`Beebe1977` :cite:`Koch2003`, costing O(naux * norb^4) and stopping at
+/// the numerical rank instead of materializing all norb^2 eigenpairs. A
+/// Cholesky decomposition exists only for a positive semi-definite
 /// supermatrix. Exact two-electron integrals are positive semi-definite, but
 /// approximate or synthetic ones need not be, so a detected breakdown falls
-/// back to eigen_decompose_two_body() rather than failing. The fallback is
-/// observable in the result: it is the only way a fragment can carry sign -1.
+/// back to DoubleFactorizationMethod::Eigen rather than failing. That fallback
+/// is observable in the result: it is the only way this method can return a
+/// fragment with sign -1.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4.
 ///        Chemist permutation symmetry is imposed by averaging, not verified.
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Fragments whose squared coefficient norm
-///        ||eps||^2 falls below this threshold are dropped. This is the same
-///        quantity the eigen path thresholds, so a given value selects the
-///        same fragments from either method.
+///        ||eps||^2 falls below this threshold are dropped. For
+///        DoubleFactorizationMethod::Eigen this equals the supermatrix
+///        eigenvalue magnitude. 0.0 retains every fragment the method
+///        produces, though Cholesky still stops at the numerical rank.
+/// @param method First-step factorization of the supermatrix.
 /// @return The retained fragments, sorted by decreasing ||eps||^2.
 /// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
 ///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
 ///         or contains a non-finite value.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> cholesky_decompose_two_body(
+std::vector<TwoBodyFragment> double_factorize(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = 1e-12);
+    double truncation_threshold = 0.0,
+    DoubleFactorizationMethod method = DoubleFactorizationMethod::Cholesky);
 
 /**
  * @class DoubleFactorizer
