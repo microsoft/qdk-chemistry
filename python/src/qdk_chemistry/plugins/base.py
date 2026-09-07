@@ -75,6 +75,11 @@ class PluginRegistrar:
     def register_remote_backend(self, name: str, backend_type: Type[Any]) -> None:  # noqa: UP006
         """Register a remote execution backend.
 
+        Backends may expose selected constructor parameters to untrusted MCP
+        clients by declaring ``mcp_safe_config_options`` as a frozenset on the
+        concrete class. The declaration is validated during registration; an
+        omitted declaration exposes no parameters.
+
         Args:
             name: Registry name for the backend.
             backend_type: Backend class to register.

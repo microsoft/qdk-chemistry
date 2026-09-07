@@ -149,6 +149,15 @@ Returns:
 
 )");
 
+  mc_calculator.def("aliases", &MultiConfigurationCalculator::aliases,
+                    R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   mc_calculator.def("type_name", &MultiConfigurationCalculator::type_name,
                     R"(
 The algorithm's type name.

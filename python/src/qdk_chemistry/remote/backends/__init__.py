@@ -25,6 +25,7 @@ from qdk_chemistry.remote.backends.base import (
     available_backends,
     create_remote,
     get_backend,
+    get_mcp_safe_config_options,
     register_backend,
 )
 
@@ -37,6 +38,7 @@ __all__ = [
     "available_backends",
     "create_remote",
     "get_backend",
+    "get_mcp_safe_config_options",
     "register_backend",
 ]
 

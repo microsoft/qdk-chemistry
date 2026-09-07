@@ -58,6 +58,13 @@ class TestSCF : public ScfSolver {
   }
 };
 
+class MissingCanonicalAliasSCF : public TestSCF {
+ public:
+  std::string name() const override { return "missing_canonical_alias_scf"; }
+
+  std::vector<std::string> aliases() const override { return {"other_name"}; }
+};
+
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
   EXPECT_NE(
@@ -66,12 +73,15 @@ TEST_F(ScfTest, Factory) {
   EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
                       "qdk_stabilized"),
             available_solvers.end());
-  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+  EXPECT_EQ(std::find(available_solvers.begin(), available_solvers.end(),
                       "stabilized"),
             available_solvers.end());
-  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+  EXPECT_EQ(std::find(available_solvers.begin(), available_solvers.end(),
                       "stabilized_scf"),
             available_solvers.end());
+  EXPECT_EQ(ScfSolverFactory::create("stabilized")->name(), "qdk_stabilized");
+  EXPECT_EQ(ScfSolverFactory::create("stabilized_scf")->name(),
+            "qdk_stabilized");
   EXPECT_THROW(ScfSolverFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(ScfSolverFactory::register_instance(
@@ -83,6 +93,11 @@ TEST_F(ScfTest, Factory) {
                      return std::make_unique<TestSCF>();
                    }),
                qdk::chemistry::DuplicateRegistrationError);
+  EXPECT_THROW(ScfSolverFactory::register_instance(
+                   []() -> ScfSolverFactory::return_type {
+                     return std::make_unique<MissingCanonicalAliasSCF>();
+                   }),
+               std::invalid_argument);
   auto test_scf = ScfSolverFactory::create("test_scf");
 }
 

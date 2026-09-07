@@ -58,6 +58,10 @@ class SSHBackend(RemoteBackend):
     remain responsible for local job records and result directories.
     """
 
+    # MCP clients may tune polling behavior but cannot select the host,
+    # credentials, remote workspace, SSH arguments, or worker executable.
+    mcp_safe_config_options = frozenset({"poll_interval", "timeout"})
+
     def __init__(
         self,
         *,
