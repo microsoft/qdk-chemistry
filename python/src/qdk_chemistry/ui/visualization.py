@@ -276,7 +276,7 @@ function render(data){
     if(series.length>1||series[0]?.name){let legendY=top+12;for(const [index,item] of series.entries()){const color=colors[index%colors.length];add('rect',{x:left+width-140,y:legendY,width:10,height:10,fill:color,rx:2});add('text',{x:left+width-125,y:legendY+9,'font-size':11},item.name||`Series ${index+1}`);legendY+=18;}}
 }
 let requestId=1;
-window.addEventListener('message',event=>{if(event.source!==window.parent)return;const message=event.data;if(message?.jsonrpc!=='2.0')return;if(message.id===requestId){window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');}else if(message.method==='ui/notifications/tool-result'){const data=message.params?.structuredContent;if(data)render(data);}});
+window.addEventListener('message',event=>{if(event.source!==window.parent)return;const message=event.data;if(message?.jsonrpc!=='2.0')return;if(message.id!=null&&String(message.id)===String(requestId)){if(message.error){svg.replaceChildren();add('text',{x:350,y:225,'text-anchor':'middle'},`Initialize failed: ${message.error.message||'unknown error'}`);return;}window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');}else if(message.method==='ui/notifications/tool-result'){const result=message.params||{};let data=result.structuredContent;if(!data){const text=result.content?.find(item=>item.type==='text')?.text;if(text)try{data=JSON.parse(text);}catch{}}if(data)render(data);}});
 window.parent.postMessage({jsonrpc:'2.0',id:requestId,method:'ui/initialize',params:{appCapabilities:{},clientInfo:{name:'qdk-scatter-plot',version:'1.0.0'},protocolVersion:'2026-01-26'}},'*');
 </script>
 </body>
