@@ -48,16 +48,24 @@ class QuantumWalkContainer(UnitaryContainer):
     _serialization_version = "0.2.0"
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
-        """Recover an eigenvalue when the measured walk phase is unambiguous.
+        r"""Recover a Hamiltonian eigenvalue from a quantum-walk phase.
+
+        For a walk operator whose eigenvalues are
+        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE measures
+        :math:`\varphi = \arccos(E_k / \lambda) / (2\pi)`.  Inverting gives:
+
+        .. math::
+
+            E_k = \lambda \cos(2\pi\varphi)
 
         Args:
-            phase_fraction: Measured phase fraction in ``[0, 1)``.
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            float: The unique Hamiltonian eigenvalue.
+            float: The corresponding Hamiltonian eigenvalue.
 
         Raises:
-            ValueError: If multiple eigenvalues are consistent with the phase.
+            ValueError: If :math:`W^p` folds several eigenvalues onto the phase.
 
         """
         branches = self.eigenvalue_branches_from_phase(phase_fraction)

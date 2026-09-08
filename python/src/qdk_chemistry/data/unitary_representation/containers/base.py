@@ -106,16 +106,12 @@ class UnitaryContainer(DataClass):
 
     @abstractmethod
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
-        r"""Recover a Hamiltonian eigenvalue from a measured phase.
+        r"""Recover a Hamiltonian eigenvalue from the measured phase fraction.
 
         Each unitary encoding maps Hamiltonian eigenvalues to phases on the
         unit circle.  This method inverts that mapping so that a measured
         phase fraction :math:`\varphi \in [0, 1)` is converted back to the
         corresponding eigenvalue :math:`E`.
-
-        Powered quantum walks may fold several eigenvalues onto the same phase.
-        Scalar inversion raises in that case; use :meth:`eigenvalue_branches_from_phase`
-        to obtain all candidates and resolve the ambiguity explicitly.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
@@ -123,20 +119,17 @@ class UnitaryContainer(DataClass):
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
-        Raises:
-            ValueError: If the phase has multiple eigenvalue candidates.
-
         """
 
     def eigenvalue_branches_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
-        r"""Recover the candidate Hamiltonian eigenvalues for a measured phase.
+        r"""Recover every eigenvalue consistent with a measured phase.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            tuple[float, ...]: Candidate eigenvalues, sorted ascending. Containers
-                with scalar inversion return a one-element tuple.
+            tuple[float, ...]: Candidate eigenvalues, sorted ascending. Containers whose
+                phase inverts uniquely return a one-element tuple.
 
         """
         return (self.eigenvalue_from_phase(phase_fraction),)

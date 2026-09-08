@@ -101,15 +101,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         For :math:`U(t) = e^{-iHt}` an eigenstate with energy :math:`E` acquires
         phase :math:`e^{-iEt}`, so QPE measures :math:`\varphi = (-Et / 2\pi) \bmod 1`.
-        Inverting the wrapped angle gives the principal energy ``E = -angle / t``.
-        Periodic aliases differ by integer multiples of ``2*pi/abs(t)``; the inherited
-        ``eigenvalue_branches_from_phase`` returns only the principal representative.
+        Inverting gives ``E = -angle / t``.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            float: The corresponding Hamiltonian eigenvalue on the principal phase branch.
+            float: The corresponding Hamiltonian eigenvalue.
 
         """
         angle = (phase_fraction % 1.0) * (2 * np.pi)
