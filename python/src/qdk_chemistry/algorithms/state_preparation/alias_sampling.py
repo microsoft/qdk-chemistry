@@ -44,9 +44,7 @@ class AliasSamplingStatePreparation(StatePreparation):
         \sum_{\ell} \sqrt{\tilde{p}_\ell}\,|\ell\rangle\,|\text{garbage}_\ell\rangle,
         \qquad \tilde{p}_\ell \approx p_\ell = \frac{c_\ell^2}{\sum_k c_k^2},
 
-    where :math:`\tilde{p}` is :math:`p` discretized to :math:`\mu` bits. The index
-    amplitudes are therefore :math:`c_\ell / \lVert c \rVert_2`, matching
-    ``dense_pure_state``, so the same coefficient vector means the same thing to either.
+    where :math:`\tilde{p}` is :math:`p` discretized to :math:`\mu` bits.
 
     .. warning::
 
@@ -55,9 +53,6 @@ class AliasSamplingStatePreparation(StatePreparation):
         meaningful as the PREPARE subroutine of an LCU or qubitization circuit, where
         PREPARE\ :sup:`†` later uncomputes the garbage and projects onto the correct
         subspace.
-
-        Negative coefficients are not supported. Index :math:`\ell` is the determinant's
-        bit pattern, matching ``dense_pure_state``.
 
     The circuit proceeds:
 
@@ -73,8 +68,7 @@ class AliasSamplingStatePreparation(StatePreparation):
     implementations allocate further scratch ancilla on top of that.
 
     The Toffoli count is dominated by the :math:`O(L)` QROM lookup; the comparator adds a
-    further :math:`O(\mu)`, so the total grows slowly with :math:`\mu` rather than being
-    independent of it.
+    further :math:`O(\mu)`.
 
     """
 
@@ -84,8 +78,7 @@ class AliasSamplingStatePreparation(StatePreparation):
         Args:
             bits_precision: Number of bits μ for keep-coefficient precision.
                 Higher values give more accurate state preparation at the cost
-                of more ancilla qubits. Defaults to 10. Equivalent to setting the
-                ``bits_precision`` entry of ``settings()``.
+                of more ancilla qubits. Defaults to 10.
 
         """
         super().__init__()
@@ -101,7 +94,7 @@ class AliasSamplingStatePreparation(StatePreparation):
 
         Args:
             wavefunction: The target wavefunction. Its coefficients must be real and
-                non-negative; see the class docstring for why.
+                non-negative.
 
         Returns:
             Circuit: A Circuit wrapping the Q# alias sampling callable and factory.

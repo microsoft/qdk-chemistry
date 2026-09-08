@@ -85,9 +85,7 @@ class StatePreparation(Algorithm):
         """Scatter a wavefunction's coefficients onto their determinant-derived indices.
 
         A ``Wavefunction`` stores only occupied determinants, so the coefficient list is not
-        positionally aligned with the basis index. Each coefficient is placed at the index its
-        determinant's bits encode (little-endian), and the register width comes from the
-        configuration set rather than the coefficient count. Those bits are occupation numbers,
+        positionally aligned with the basis index. Those bits are occupation numbers,
         so qubit *i* holds mode *i* and the result is in the Jordan-Wigner basis.
 
         Args:

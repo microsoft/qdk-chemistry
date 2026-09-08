@@ -9,9 +9,7 @@
 /// and applied via phase gradient addition (RyViaPhaseGradient).
 ///
 /// References:
-///   - Low et al. (arXiv:2502.15882v1), Section C SBM decomposition
-///   - Low, Kliuchnikov, Schaeffer (arXiv:1812.00954): QROM
-///   - Sanders et al. (arXiv:2007.07391): Phase gradient rotation
+///   - Shende, Bullock, Markov, IEEE TCAD 25(6) 1000 (2006), doi:10.1109/TCAD.2005.855930
 namespace QDKChemistry.Utils.QROMStatePrep {
 
     import Std.Arrays.Any;
@@ -88,10 +86,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
                 let pLeft = tree[2 * node];
 
                 mutable angle = 0.0;
-                // Every node is the sum of its two non-negative children, so pLeft <= pTotal
-                // and the ratio is in [0, 1] whenever pTotal is non-zero. Testing against zero
-                // rather than a fixed epsilon keeps the guard independent of the overall scale
-                // of `amplitudes`, which the caller is not required to normalize.
                 if pTotal > 0.0 {
                     let cosVal = MinD(1.0, Sqrt(pLeft / pTotal));
                     set angle = ArcCos(cosVal);
@@ -121,8 +115,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     }
 
     /// Computes the sign correction table for real-valued state preparation.
-    ///
-    /// Returns Bool[2^n][1] where entry j is [true] if coefficients[j] < 0.
     internal function ComputeSignBits(
         coefficients : Double[],
         nQubits : Int,
@@ -142,17 +134,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     /// QROM state preparation using SBM decomposition.
     ///
     /// Prepares: |0⟩^n → Σ_j c_j |j⟩ using n layers of multiplexed Ry rotations.
-    operation QROMStatePrepare(
-        params : QROMStatePrepParams,
-        target : Qubit[],
-        phaseGradient : Qubit[],
-    ) : Unit is Adj + Ctl {
-        let bRot = params.rotationBitPrecision;
-        use angleReg = Qubit[bRot];
-        QROMStatePrepareCore(params, target, phaseGradient, angleReg);
-    }
-
-    /// Core QROM state preparation.
     ///
     /// Qubit ordering: `target` is little-endian, matching `Std.TableLookup.Select` and
     /// `ApplyControlledOnInt`, so the register can be handed straight to a SELECT oracle
@@ -166,16 +147,14 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     /// State register (n qubits), initialized to |0...0⟩.
     /// ## phaseGradient
     /// Phase gradient ancilla (bRot qubits), pre-initialized.
-    /// ## angleReg
-    /// Angle scratch register (bRot qubits), initialized to |0...0⟩.
-    internal operation QROMStatePrepareCore(
+    operation QROMStatePrepare(
         params : QROMStatePrepParams,
         target : Qubit[],
         phaseGradient : Qubit[],
-        angleReg : Qubit[],
     ) : Unit is Adj + Ctl {
         let n = params.numStateQubits;
         let bRot = params.rotationBitPrecision;
+        use angleReg = Qubit[bRot];
         let angleTree = ComputeSBMAngles(params.amplitudes, n, bRot);
 
         // SBM fixes the most significant bit first, so walk the LE register in reverse.
@@ -221,10 +200,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Factories and circuit entry points
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Create a self-contained QROM state preparation callable.
     function MakeQROMStatePrepOp(params : QROMStatePrepParams) : Qubit[] => Unit is Adj + Ctl {

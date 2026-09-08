@@ -28,7 +28,7 @@ namespace QDKChemistry.Utils.AliasSampling {
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
-        /// Coefficients of the quantum state to prepare, length L.
+        /// Sampling weights |c|^2 of the state to prepare, length L.
         coefficients : Double[],
         /// Number of bits μ for keep-coefficient precision.
         bitsPrecision : Int,
@@ -244,9 +244,6 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// Conditional alias sampling PREPARE (2D) — prepares
     /// |c⟩|0⟩ → |c⟩ Σ_ℓ √(p̃_{c,ℓ}) e^{iπ·sign_{c,ℓ}} |ℓ⟩|garbage⟩.
     ///
-    /// Uses SelectSwap2D to load per-condition alias tables in a single QROM pass.
-    /// Sign bits encode negative amplitudes via Z phase (Von Burg arXiv:2011.03494, Def. 1).
-    ///
     /// Register layout:
     ///   conditionalRegister — outer address (x_o)
     ///   indexRegister — output sampled index (b)
@@ -282,7 +279,6 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///
     /// "Free rider" = classical data that depends only on the conditional register
     /// (not on the sampled index), appended to every QROM row for that condition.
-    /// Use case: DFTHC inner PREP loads (G, r) bits alongside the b-sampling alias table.
     ///
     /// Circuit (arXiv:2502.15882v1, Table A):
     ///   1. PrepareUniformSuperposition on indexRegister
@@ -342,8 +338,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         let altIndexReg = qromOutput[bitsPrecision..bitsPrecision + nIndexBits - 1];
         let signOrigQubit = qromOutput[bitsPrecision + nIndexBits];
         let signAltQubit = qromOutput[bitsPrecision + nIndexBits + 1];
-        // Same σ < keep_ℓ convention as AliasSamplingPrepare: test keep_ℓ > σ to get
-        // the keep condition, then invert to get the swap condition σ ≥ keep_ℓ.
         ApplyIfGreaterLE(X, keepCoeffLoaded, uniformRegister, flagQubit);
         X(flagQubit);
 
@@ -351,14 +345,9 @@ namespace QDKChemistry.Utils.AliasSampling {
             Controlled SWAP([flagQubit], (indexRegister[i], altIndexReg[i]));
         }
 
-        // Sign encoding (Von Burg arXiv:2011.03494, Def. 1)
         Controlled SWAP([flagQubit], (signOrigQubit, signAltQubit));
         Z(signOrigQubit);
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Factories and circuit entry points
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Create an alias sampling state preparation callable.
     function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {

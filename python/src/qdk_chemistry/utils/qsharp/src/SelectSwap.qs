@@ -4,10 +4,6 @@
 
 /// SELECT-SWAP network for efficient QROM data loading (1D and 2D).
 ///
-/// Implements the SELECT-SWAP technique that trades ancilla qubits for
-/// reduced T-gate count when loading classical data into quantum registers.
-/// Uses measurement-based uncomputation for the adjoint.
-///
 /// 1D operations:
 ///   SelectSwap — loads data[address] into output.
 ///
@@ -46,10 +42,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Classical helpers
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Zero-pads a lookup table out to the full `2^nRequired` address space.
     internal function PadToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
@@ -100,11 +92,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// The post-butterfly target contents indexed by `select + swap * numSelectStates`.
-    ///
-    /// `numSelectStates` must be the full `2^Length(selectAddress)`, not `Length(flatData)`:
-    /// the address register puts the swap bits above the select bits, so a shorter stride
-    /// would misalign every row with a nonzero swap value. Rows past the end of `flatData` are
-    /// unreachable and carry no phase.
     internal function SwapPermutedTable(
         flatData : Bool[][],
         m : Int,
@@ -185,23 +172,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// Toffoli cost of one `SelectSwap2D` *and its uncompute*, for a given swap width.
-    ///
-    /// This mirrors the implementation term by term: a `Select` over the combined
-    /// `(innerSelect, outer)` address, the swap network once, and a measurement erasure. The
-    /// swap network is charged once rather than twice because both erasures measure their
-    /// target out instead of running the butterfly backwards, and an erasure addresses the
-    /// full `(outer, inner)` address whatever `lambda` is.
-    ///
-    /// The round trip pays that erasure twice at `lambda > 0` -- once inside the load to clear
-    /// the wide register the swap network wrote, once on the way back to clear the word -- but
-    /// only once at `lambda == 0`, where there is no wide register and the load is a bare
-    /// `Select`. That discount is the whole reason `lambda` selection cannot just drop the
-    /// term as a shared constant.
-    ///
-    /// `outerAddressAlwaysValid` must match what the caller passes to `SelectSwap2D`: it
-    /// decides whether the lookup covers `numOuterData` outer blocks or the full
-    /// `2^ceil(lg numOuterData)`, which is a factor of up to two on the `Select` term and can
-    /// move the optimum by a whole swap bit.
     internal function SelectSwapCost2D(
         lambda : Int,
         numOuterData : Int,
@@ -242,17 +212,6 @@ namespace QDKChemistry.Utils.SelectSwap {
 
     /// Concatenates the per-outer-index padded lookup tables into one row-major table, so a
     /// combined `(innerSelect, outer)` address indexes it directly.
-    ///
-    /// By default the table covers all `2^AddressQubits(Length(data))` outer address states,
-    /// not just the `Length(data)` valid ones, with each unused state routed to the same entry
-    /// `UnaryIteration` would have selected. That keeps the lookup identical to the
-    /// `numSwapBits == 0` path on every address state and makes the combined table a power of
-    /// two, so `Select` never applies aliasing of its own.
-    ///
-    /// `trimToValidOuter` drops the unused states, shrinking the `Select` by the ratio
-    /// `2^AddressQubits(Length(data)) / Length(data)`. It is only sound when the caller
-    /// guarantees the outer register never holds an out-of-range value, because the two paths
-    /// then disagree there -- `Select` aliases the trimmed states onto real entries.
     internal function FlattenPaddedData(
         data : Bool[][][],
         nRequired : Int,
@@ -268,10 +227,6 @@ namespace QDKChemistry.Utils.SelectSwap {
             )
         )
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Quantum operations
-    // ═══════════════════════════════════════════════════════════════════════════
 
     //  1D SELECT-SWAP
     operation SelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], output : Qubit[]) : Unit is Adj + Ctl {
@@ -297,11 +252,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     /// addressed word to the first chunk, copies it to `target`, and erases the scratch by
     /// measurement. Its custom adjoint erases `target` with a phase fixup over the combined
     /// `(outer, inner)` address, independent of the swap width used by the forward pass.
-    ///
-    /// The round trip is `select + swap + 2 erase` instead of `2(select + swap + erase)`. At
-    /// the SOSSA inner PREPARE (90 conditions x 16 slots, 21-bit words) that is 491 Toffolis
-    /// against 816 at the swap width both pick, and against 2,876 for the unary-iteration
-    /// load this replaced.
     operation SelectSwap2D(
         data : Bool[][][],
         outerAddress : Qubit[],
@@ -342,25 +292,11 @@ namespace QDKChemistry.Utils.SelectSwap {
             }
         }
         adjoint (...) {
-            // Erase against the flat (outer, inner) table: `target` holds `data[outer][inner]`
-            // however the forward pass got it there, so the fixup does not depend on the swap
-            // width the load used.
             EraseSwappedLoad(data, outerAddress, innerAddress, 0, outerAddressAlwaysValid, target);
         }
     }
 
     /// Erases a post-butterfly 2D load by measurement instead of running it backwards.
-    ///
-    /// Reversing the load costs `(2^lambda - 1) * m` Toffolis for the swap network plus the
-    /// unlookup, and the swap network is the larger of the two. The whole target is instead a
-    /// known function of the address -- the butterfly applies a known permutation to the
-    /// selected chunks -- so it can be measured out in the X basis and the kickback repaired
-    /// with one phase lookup. That lookup is over the combined
-    /// select-and-swap address, which is the full `(outer, inner)` address and therefore the
-    /// same width whatever `lambda` is, so the swap network is paid once rather than twice.
-    ///
-    /// This is the erasure of arXiv:2502.15882v1 Appendix B step 2: "(2^k-1)b qubits are
-    /// erased (via an X measurement and a later phase fixup)".
     internal operation EraseSwappedLoad(
         data : Bool[][][],
         outerAddress : Qubit[],
@@ -386,12 +322,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// Runs `action` on the data word addressed by `address`, then uncomputes the lookup.
-    ///
-    /// The adjoint is compiler-generated. Uncomputing a select-swap lookup by hand is
-    /// error-prone: it must undo the swap network as well as the lookup, and `Adjoint
-    /// Select` measures the target and repairs the phase kickback that leaves on the
-    /// address register. A wrong uncompute still loads the right values and corrupts only
-    /// the address-register phase, which for a state-preparation caller is the state.
     internal operation WithSelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], action : (Qubit[] => Unit is Adj + Ctl)) : Unit is Adj + Ctl {
         let nRequired = DimensionsForSelect(data, address);
         let addressFitted = address[...nRequired - 1];
@@ -439,10 +369,6 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers
-    // ═══════════════════════════════════════════════════════════════════════════
-
     /// 1D SelectSwap correctness: set address to |addr⟩, apply SelectSwap in within/apply,
     /// CNOT result to persistent copy register, then verify copy matches expected data.
     internal operation TestSelectSwap1DCorrectness(
@@ -481,20 +407,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// Cross-checks the select-swap path against the plain-select path as *phase* oracles.
-    ///
-    /// A lookup with a wrong uncompute still loads the right bits, so the correctness
-    /// wrappers above cannot see it: the damage lands on the phase of the address register.
-    /// Both `within { lookup } apply { Z }` blocks are diagonal ±1 oracles and therefore
-    /// self-inverse, so composing the swap path with the no-swap path is the identity
-    /// exactly when the two agree, and the address register returns to |0...0>.
-    ///
-    /// The verdict is a single measurement, so it is a *probabilistic* detector: when the two
-    /// paths disagree the address is left in a superposition that still collapses to |0...0>
-    /// a large fraction of the time (~35-50% for the shapes tested here). A `false` is
-    /// therefore conclusive but a `true` is not, and callers must repeat the trial -- see
-    /// `_assert_phase_agreement` in `python/tests/test_utils_select_swap.py`. A deterministic
-    /// `CheckAllZero` verdict is not available: it is rejected under the Adaptive_RIF profile
-    /// these tests run on.
     internal operation TestSelectSwap1DPhaseAgreement(data : Bool[][], numSwapBits : Int) : Bool {
         let m = Length(data[0]);
         let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
@@ -571,12 +483,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// Phase-oracle agreement between `SelectSwap2D` and unary iteration.
-    ///
-    /// `SelectSwap2D` is the one lookup here whose adjoint is not the reverse of its body:
-    /// the body may run a swap network, while the erasure ignores it and fixes up against the
-    /// flat `(outer, inner)` table. An erasure that got that wrong would still leave the right
-    /// bits in `target` and pass every value test, showing up only as a phase on the address
-    /// register -- which is the state, for the state-preparation caller.
     internal operation TestSelectSwap2DPhaseAgreement(
         data : Bool[][][],
         numSwapBits : Int,
@@ -621,9 +527,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     }
 
     /// Traces `SelectSwap2D` in one or both directions for a costing regression.
-    ///
-    /// The load and its erasure are selectable separately because the erasure is written by
-    /// hand rather than derived from the body, so the two costs move independently.
     internal operation TestSelectSwap2DResourceProbe(
         data : Bool[][][],
         numSwapBits : Int,

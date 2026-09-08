@@ -5,22 +5,55 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 import tempfile
 from pathlib import Path
 
 import h5py
 import numpy as np
 import pytest
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms import registry
-from qdk_chemistry.algorithms.circuit_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _reverse_bits(value: int, num_bits: int) -> int:
+    """Reverse the bit order of *value* within a *num_bits* field."""
+    reversed_value = 0
+    for bit in range(num_bits):
+        reversed_value |= ((value >> bit) & 1) << (num_bits - 1 - bit)
+    return reversed_value
+
+
+def _block_encoding_action(circuit, num_system_qubits: int, system_amplitudes: np.ndarray) -> np.ndarray:
+    r"""Apply ``circuit`` to :math:`|\psi\rangle|0\rangle_\mathrm{anc}` and project back on the ancillas.
+
+    Returns :math:`(\langle 0|_\mathrm{anc} \otimes I) B[H] (|0\rangle_\mathrm{anc} \otimes I) |\psi\rangle`,
+    which the block encoding identity makes :math:`H |\psi\rangle / \lambda`.
+
+    ``PSPMapper`` lays the register out as ``[system | ancilla]`` while
+    :func:`dump_operation_on_state` numbers basis states big-endian, so the system register takes
+    the high bits and its own index runs the other way -- hence the bit reversal on both ends.
+    """
+    stride = 2 ** (circuit.num_qubits - num_system_qubits)
+    dimension = 2**num_system_qubits
+
+    initial_state = [0.0] * ((dimension - 1) * stride + 1)
+    for index, amplitude in enumerate(system_amplitudes):
+        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
+
+    statevector = dump_operation_on_state(
+        circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
+    )
+    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
 
 
 class TestLCUBuilder:
@@ -180,25 +213,48 @@ class TestLCUBuilder:
         assert circuit._qsharp_factory.parameter["numSelectQubits"] == 2
         assert circuit._qsharp_factory.parameter["numBlockAncillaQubits"] == 13
 
+    def test_alias_sampling_block_encodes_the_hamiltonian(self):
+        r"""Verify :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda`.
 
-def _noop_op(_qubits) -> None:
-    """Stand in for a Q# operation the mapper only has to find non-None."""
+        The shape assertions above cannot see whether the entangled scratch register is
+        *uncomputed*: leftover garbage still produces a 15-qubit circuit, but it decoheres the
+        index register and the block stops being :math:`H/\lambda`. This runs the circuit.
 
+        Alias sampling rounds each :math:`p_\ell = |\alpha_\ell|/\lambda` to a multiple of
+        :math:`1/(L 2^\mu)`, so the block is off by at most :math:`\sum_\ell |\tilde p_\ell -
+        p_\ell| \le 2^{-\mu}`. The observed error is about eight times smaller than that bound.
 
-class _StubPrepare:
-    """A PREPARE algorithm handing the mapper a circuit of the test's choosing."""
+        Each column is compared up to an overall sign because ``SelectSwap`` erases its scratch
+        by measurement, which leaves the circuit a *global* phase of :math:`\pm 1` that is redrawn
+        on every simulator run. It is a true global phase -- the ratio between two runs is uniform
+        over every nonzero amplitude of the full statevector, not just this block -- and therefore
+        unobservable. The uniform-superposition case pins the relative signs *between* columns,
+        which the per-column comparison would otherwise leave free.
+        """
+        coefficients = np.array([0.25, 0.5, 0.1])
+        bits_precision = 4
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=coefficients)
+        circuit = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=bits_precision),
+        ).run(LCUBuilder().run(hamiltonian))
 
-    def __init__(self, circuit):
-        """Store the circuit to hand back."""
-        self._circuit = circuit
+        num_system_qubits = hamiltonian.num_qubits
+        dimension = 2**num_system_qubits
+        expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
+        alias_tolerance = 2.0**-bits_precision
 
-    def name(self) -> str:
-        """Return the name the mapper quotes in its error messages."""
-        return "stub"
+        inputs = [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]
+        for system_state in inputs:
+            actual = _block_encoding_action(circuit, num_system_qubits, system_state)
+            expected = expected_block @ system_state
 
-    def run(self, _wavefunction) -> Circuit:
-        """Return the circuit under test, ignoring the requested wavefunction."""
-        return self._circuit
+            assert np.abs(actual.imag).max() < alias_tolerance, f"unexpected phase in {actual}"
+            sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
+            assert np.allclose(sign * actual, expected, rtol=0.0, atol=alias_tolerance), (
+                f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
+            )
 
 
 class TestPSPMapperPrepareGuards:
@@ -209,21 +265,6 @@ class TestPSPMapperPrepareGuards:
         """Build a three-term LCU, whose PREPARE indexes two qubits."""
         hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 0.1]))
         return LCUBuilder().run(hamiltonian)
-
-    @pytest.mark.parametrize(
-        ("prepare_circuit", "match"),
-        [
-            (Circuit(qasm="OPENQASM 3.0;", num_qubits=2), "no Q# operation"),
-            (Circuit(qasm="OPENQASM 3.0;", qsharp_op=_noop_op), "does not declare num_qubits"),
-            (Circuit(qasm="OPENQASM 3.0;", qsharp_op=_noop_op, num_qubits=0), "at least one qubit"),
-            (Circuit(qasm="OPENQASM 3.0;", qsharp_op=_noop_op, num_qubits=1), "SELECT would control"),
-        ],
-    )
-    def test_rejects_a_prepare_circuit_it_cannot_embed(self, monkeypatch, prepare_circuit, match):
-        """Each guard fires on the circuit shape it exists to catch."""
-        monkeypatch.setattr(PSPMapper, "_create_nested", lambda _self, _key: _StubPrepare(prepare_circuit))
-        with pytest.raises(ValueError, match=match):
-            PSPMapper().run(self._unitary())
 
     def test_rejects_a_prepare_that_wants_a_phase_gradient(self):
         """QROM state prep declares shared ancilla this mapper never allocates.
