@@ -80,7 +80,7 @@ The :class:`~qdk_chemistry.data.QpeResult` stores the following information:
      - Alias-resolved phase angle in radians.
    * - ``raw_energy``
      - float
-    - Energy computed from ``canonical_phase_fraction`` via the scalar ``eigenvalue_from_phase`` method. The factory does not choose a lowest-energy candidate.
+     - Energy computed from ``canonical_phase_fraction`` via the scalar ``eigenvalue_from_phase`` method. The factory does not choose a lowest-energy candidate.
    * - ``branching``
      - tuple[float, ...]
      - Sorted energy candidates considered, including ``raw_energy``. A single-element tuple when the phase inverts uniquely and the algorithm performs no alias resolution.
@@ -115,8 +115,8 @@ Different energy values that differ by integer multiples of :math:`2\pi / t` all
 
    The current ``from_phase_fraction`` factory does not perform alias resolution automatically.
    Alias resolution is the responsibility of the calling algorithm when needed.
-  Supplied ``branching`` candidates are sorted and must contain ``raw_energy`` and, when provided,
-  ``resolved_energy``, allowing for floating-point roundoff.
+   Supplied ``branching`` candidates are sorted and must contain ``raw_energy`` and, when provided,
+   ``resolved_energy``, allowing for floating-point roundoff.
 
 
 Construction

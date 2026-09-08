@@ -388,6 +388,17 @@ def test_qpe_result_rejects_a_branching_without_the_recovered_energy():
         )
 
 
+def test_qpe_result_rejects_a_branching_within_default_isclose_tolerance():
+    """A chemically significant gap must not pass as round-off."""
+    with pytest.raises(ValueError, match="does not contain raw_energy"):
+        QpeResult.from_phase_fraction(
+            method="QPE",
+            phase_fraction=0.1,
+            eigenvalue_from_phase=lambda _: 1000.0,
+            branching=(1000.009,),
+        )
+
+
 @pytest.mark.parametrize("branching", [None, (-0.5, 1.5)])
 def test_qpe_result_rejects_resolved_energy_outside_branching(branching):
     """Resolved energy must be one of the considered candidates."""

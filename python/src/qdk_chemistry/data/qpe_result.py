@@ -155,17 +155,20 @@ class QpeResult(DataClass):
         canonical = normalized_phase if canonical_phase_fraction is None else float(canonical_phase_fraction % 1.0)
         canonical_angle = float(canonical * (2 * np.pi))
         raw_energy = float(eigenvalue_from_phase(canonical))
-        branches = (raw_energy,)
+        branches: tuple[float, ...] = (raw_energy,)
 
         if branching is not None:
             branches = tuple(sorted(float(energy) for energy in branching))
-            # The caller may have recomputed the candidate it passes in, so match with slack.
-            if not np.isclose(branches, raw_energy).any():
+            # Tolerances absorb recomputation round-off only, never a physically distinct energy.
+            if not np.isclose(branches, raw_energy, rtol=1e-12, atol=1e-12).any():
                 raise ValueError(
                     f"branching {branches} does not contain raw_energy {raw_energy} recovered from phase {canonical}."
                 )
 
-        if resolved_energy is not None and not np.isclose(branches, float(resolved_energy)).any():
+        if (
+            resolved_energy is not None
+            and not np.isclose(branches, float(resolved_energy), rtol=1e-12, atol=1e-12).any()
+        ):
             raise ValueError(f"resolved_energy {resolved_energy} is not contained in branching {branches}.")
 
         normalized_bits: tuple[int, ...] | None = None

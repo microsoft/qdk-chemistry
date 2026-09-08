@@ -90,9 +90,12 @@ class QuantumWalkContainer(UnitaryContainer):
             E_k = \lambda \cos\!\left(\frac{2\pi(\varphi + k)}{p}\right),
             \qquad k = 0, \ldots, p - 1
 
-        Branches whose walk angles coincide (up to a :math:`10^{-12}` phase
-        tolerance) are reported once, so :math:`p = 1` reduces to the single
-        eigenvalue :math:`E = \lambda \cos(2\pi\varphi)`.
+        Because :math:`\cos` is even, branches :math:`j` and :math:`k` coincide only when
+        :math:`j + k = p - 2\varphi` is an integer, which happens exactly at
+        :math:`\varphi = 0` (pairing :math:`k` with :math:`p - k`) and at
+        :math:`\varphi = 1/2` (pairing :math:`k` with :math:`p - 1 - k`). Enumerating the
+        distinct index range therefore needs no tolerance, and :math:`p = 1` reduces to the
+        single eigenvalue :math:`E = \lambda \cos(2\pi\varphi)`.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
@@ -103,16 +106,13 @@ class QuantumWalkContainer(UnitaryContainer):
         """
         phi = phase_fraction % 1.0
         power = self.power
-        if power == 1:
-            return (float(self.scale * np.cos(2 * np.pi * phi)),)
-        # cos is even, so two branches coincide exactly when their walk angles fold onto
-        # the same value in [0, 1/2]. Round only the dedup key, never the returned value.
-        folded_angles: dict[float, float] = {}
-        for k in range(power):
-            angle = (phi + k) / power
-            folded = min(angle, 1.0 - angle)
-            folded_angles.setdefault(round(folded, 12), folded)
-        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * a)) for a in folded_angles.values()))
+        if phi == 0.0:
+            num_distinct = power // 2 + 1
+        elif phi == 0.5:
+            num_distinct = (power - 1) // 2 + 1
+        else:
+            num_distinct = power
+        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * (phi + k) / power)) for k in range(num_distinct)))
 
     @property
     @abstractmethod

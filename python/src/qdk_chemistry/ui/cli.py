@@ -1171,12 +1171,14 @@ def cmd_utils_resolve_phase_energy(args):
     branching = tuple(sorted(container.eigenvalue_branches_from_phase(args.phase_fraction)))
     if not branching:
         raise ValueError("eigenvalue_branches_from_phase returned no candidate energies.")
-    raw_energy = branching[0]
+    principal_energy = branching[0]
+    # An ambiguous powered phase has no single inverse, so report none rather than an arbitrary branch.
+    raw_energy = principal_energy if len(branching) == 1 else None
     reference_energy = float(args.reference_energy)
     if container.type == "pauli_product_formula":
         period = 2.0 * math.pi / abs(float(container.scale))
-        alias_index = round((reference_energy - raw_energy) / period)
-        resolved_energy = raw_energy + alias_index * period
+        alias_index = round((reference_energy - principal_energy) / period)
+        resolved_energy = principal_energy + alias_index * period
     else:
         resolved_energy = min(branching, key=lambda energy: abs(energy - reference_energy))
 

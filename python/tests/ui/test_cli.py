@@ -308,11 +308,11 @@ def test_resolve_phase_energy_selects_serialized_walk_branch(
     assert result["container_type"] == "lcu_walk"
     assert result["phase_fraction"] == 0.1
     assert result["branching"] == pytest.approx(expected)
-    assert result["raw_energy"] == pytest.approx(expected[0])
+    assert result["raw_energy"] is None
     assert result["resolved_energy"] == pytest.approx(expected[-1] if reference_energy > 0 else expected[0])
 
 
-def test_resolve_phase_energy_walk_reference_overrides_negative_raw_energy(temp_project_dir, capsys, monkeypatch):
+def test_resolve_phase_energy_walk_reference_selects_positive_branch(temp_project_dir, capsys, monkeypatch):
     """A positive reference must not resolve to the negative sign branch of a powered walk."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
@@ -342,7 +342,7 @@ def test_resolve_phase_energy_walk_reference_overrides_negative_raw_energy(temp_
 
     result = json.loads(capsys.readouterr().out)
     assert result["branching"] == pytest.approx([-5.7063390977, 5.7063390977])
-    assert result["raw_energy"] == pytest.approx(-5.7063390977)
+    assert result["raw_energy"] is None
     assert result["resolved_energy"] == pytest.approx(5.7063390977)
 
 

@@ -411,6 +411,25 @@ class TestLCUContainer:
             atol=float_comparison_absolute_tolerance,
         )
 
+    @pytest.mark.parametrize(
+        ("power", "phase_fraction", "expected_count"),
+        [
+            # Degeneracy is exact, not approximate: only phi = 0 and phi = 1/2 pair branches up.
+            (4, 0.0, 3),
+            (4, 0.5, 2),
+            (4, 1.99e-12, 4),
+            (9243, 0.5, 4622),
+        ],
+    )
+    def test_walk_container_branch_count_is_exact(self, power, phase_fraction, expected_count):
+        """A phase a hair away from a degeneracy keeps every branch distinct."""
+        container = LCUWalkContainer(_lcu_container(), power=power, scale=6.0)
+
+        branches = container.eigenvalue_branches_from_phase(phase_fraction)
+
+        assert len(branches) == expected_count
+        assert len(set(branches)) == expected_count
+
     @pytest.mark.parametrize("power", [1, 2, 3, 4])
     @pytest.mark.parametrize("energy", [-5.5, -1.25, 0.0, 3.0, 6.0])
     def test_walk_container_branches_are_sound_and_complete(self, power, energy):
