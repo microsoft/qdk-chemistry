@@ -36,7 +36,6 @@ class FactorizedHamiltonianTest : public ::testing::Test {
     w << 0.5, -0.3;
     wb = Eigen::MatrixXd(R, C);
     wb(0, 0) = 0.2;
-    signs = Eigen::VectorXd::Ones(R);
 
     inactive_fock = Eigen::MatrixXd::Zero(0, 0);
     orbitals = std::make_shared<ModelOrbitals>(N);
@@ -49,8 +48,7 @@ class FactorizedHamiltonianTest : public ::testing::Test {
 
   std::unique_ptr<FactorizedHamiltonianContainer> make_container() const {
     return std::make_unique<FactorizedHamiltonianContainer>(
-        core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
-        energy_gap);
+        core_energy, u, w, wb, one_body, inactive_fock, orbitals, energy_gap);
   }
 
   size_t N, R, B, C;
@@ -58,26 +56,9 @@ class FactorizedHamiltonianTest : public ::testing::Test {
   Eigen::MatrixXd one_body;
   Eigen::VectorXd u, w;
   Eigen::MatrixXd wb;
-  Eigen::VectorXd signs;
   Eigen::MatrixXd inactive_fock;
   std::shared_ptr<Orbitals> orbitals;
 };
-
-TEST_F(FactorizedHamiltonianTest, SignCountMustMatchRankCount) {
-  // Omitting the signs is the documented shorthand for an all-positive
-  // factorization.
-  EXPECT_NO_THROW(std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, one_body, inactive_fock, orbitals,
-      Eigen::VectorXd(), energy_gap));
-
-  // Any other mismatch would misassign signs across fragments, so it is
-  // rejected rather than padded or truncated.
-  const Eigen::VectorXd too_many = Eigen::VectorXd::Ones(R + 1);
-  EXPECT_THROW(std::make_unique<FactorizedHamiltonianContainer>(
-                   core_energy, u, w, wb, one_body, inactive_fock, orbitals,
-                   too_many, energy_gap),
-               std::invalid_argument);
-}
 
 TEST_F(FactorizedHamiltonianTest, Properties) {
   auto container = make_container();
@@ -138,17 +119,13 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_DOUBLE_EQ(container->get_lambda_eff(), 0.0);
 
   FactorizedHamiltonianContainer gapped(core_energy, u, w, wb, one_body,
-                                        inactive_fock, orbitals, signs, 0.5);
+                                        inactive_fock, orbitals, 0.5);
   EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
 
   FactorizedHamiltonianContainer gap_at_upper_bound(
-      core_energy, u, w, wb, one_body, inactive_fock, orbitals, signs,
+      core_energy, u, w, wb, one_body, inactive_fock, orbitals,
       2.0 * container->get_lambda());
   EXPECT_DOUBLE_EQ(gap_at_upper_bound.get_lambda_eff(), 0.0);
-
-  FactorizedHamiltonianContainer signed_factorization(
-      core_energy, u, w, wb, one_body, inactive_fock, orbitals, -signs, 0.5);
-  EXPECT_DOUBLE_EQ(signed_factorization.get_lambda_eff(), 0.0);
 }
 
 TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
@@ -162,8 +139,7 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
     Eigen::MatrixXd wb_alt(R, C);
     wb_alt(0, 0) = wb_value;
     FactorizedHamiltonianContainer shifted(core_energy, u, w, wb_alt, one_body,
-                                           inactive_fock, orbitals, signs,
-                                           energy_gap);
+                                           inactive_fock, orbitals, energy_gap);
 
     const Eigen::VectorXd h2_alt = shifted.reconstruct_two_body_integrals();
     ASSERT_EQ(h2_alt.size(), h2_ref.size());
@@ -179,27 +155,7 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
   }
 }
 
-TEST_F(FactorizedHamiltonianTest, NegativeSignNegatesTwoBodyTensor) {
-  const Eigen::VectorXd h2_positive =
-      make_container()->reconstruct_two_body_integrals();
-
-  Eigen::VectorXd negative_signs(R);
-  negative_signs << -1.0;
-  FactorizedHamiltonianContainer negated(core_energy, u, w, wb, one_body,
-                                         inactive_fock, orbitals,
-                                         negative_signs, energy_gap);
-
-  const Eigen::VectorXd h2_negative = negated.reconstruct_two_body_integrals();
-  ASSERT_EQ(h2_negative.size(), h2_positive.size());
-  for (Eigen::Index i = 0; i < h2_positive.size(); ++i) {
-    EXPECT_NEAR(h2_negative(i), -h2_positive(i), 1e-12)
-        << "sign did not negate h2 element " << i;
-  }
-
-  EXPECT_GT(h2_positive.array().abs().maxCoeff(), 1e-6);
-}
-
-TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToH1Prime) {
+TEST_F(FactorizedHamiltonianTest, H1PrimeMatchesClosedForm) {
   Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
   for (size_t b = 0; b < B; ++b) {
     Eigen::VectorXd ub(N);
@@ -209,45 +165,25 @@ TEST_F(FactorizedHamiltonianTest, NegativeSignPropagatesToH1Prime) {
     m += w(static_cast<Eigen::Index>(b)) * ub * ub.transpose();
   }
 
-  const double sign_values[] = {1.0, -1.0};
+  // wB only enters through the -wB * M term, so varying it is what separates
+  // that term from the trace correction it sits next to.
   const double wb_values[] = {0.2, -3.5};
-  for (double sign_value : sign_values) {
-    for (double wb_value : wb_values) {
-      Eigen::MatrixXd wb_alt(R, C);
-      wb_alt(0, 0) = wb_value;
-      Eigen::VectorXd signs_alt(R);
-      signs_alt << sign_value;
+  for (double wb_value : wb_values) {
+    Eigen::MatrixXd wb_alt(R, C);
+    wb_alt(0, 0) = wb_value;
 
-      FactorizedHamiltonianContainer container(core_energy, u, w, wb_alt,
-                                               one_body, inactive_fock,
-                                               orbitals, signs_alt, energy_gap);
+    FactorizedHamiltonianContainer container(core_energy, u, w, wb_alt,
+                                             one_body, inactive_fock, orbitals,
+                                             energy_gap);
 
-      Eigen::MatrixXd expected = one_body;
-      expected -= 0.5 * sign_value * (m * m);
-      expected += sign_value * m.trace() * m;
-      expected -= sign_value * wb_value * m;
+    Eigen::MatrixXd expected = one_body;
+    expected -= 0.5 * (m * m);
+    expected += m.trace() * m;
+    expected -= wb_value * m;
 
-      EXPECT_TRUE(container.get_h1_prime().isApprox(expected, 1e-12))
-          << "sign=" << sign_value << ", wB=" << wb_value;
-    }
+    EXPECT_TRUE(container.get_h1_prime().isApprox(expected, 1e-12))
+        << "wB=" << wb_value;
   }
-}
-
-TEST_F(FactorizedHamiltonianTest, TwoBodyLambdaIsSignInvariant) {
-  auto two_body_lambda = [](const FactorizedHamiltonianContainer& container) {
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(
-        container.get_h1_prime());
-    return container.get_lambda() - solver.eigenvalues().array().abs().sum();
-  };
-
-  Eigen::VectorXd negative_signs(R);
-  negative_signs << -1.0;
-  FactorizedHamiltonianContainer negated(core_energy, u, w, wb, one_body,
-                                         inactive_fock, orbitals,
-                                         negative_signs, energy_gap);
-
-  EXPECT_NEAR(two_body_lambda(negated), two_body_lambda(*make_container()),
-              1e-12);
 }
 
 TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
@@ -263,8 +199,7 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
   const double positive_gap = 0.1;
   auto lambda_of = [&](const Eigen::MatrixXd& h1) {
     return FactorizedHamiltonianContainer(core_energy, u, w, wb, h1,
-                                          inactive_fock, orbitals, signs,
-                                          positive_gap)
+                                          inactive_fock, orbitals, positive_gap)
         .get_lambda();
   };
 
@@ -272,46 +207,10 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
       << "the two triangles must disagree, otherwise this input cannot "
          "demonstrate the ambiguity the guard exists to reject";
 
-  FactorizedHamiltonianContainer container(core_energy, u, w, wb, asymmetric,
-                                           inactive_fock, orbitals, signs,
-                                           positive_gap);
+  FactorizedHamiltonianContainer container(
+      core_energy, u, w, wb, asymmetric, inactive_fock, orbitals, positive_gap);
   EXPECT_THROW(container.get_lambda(), std::runtime_error);
   EXPECT_THROW(container.get_lambda_eff(), std::runtime_error);
-}
-
-TEST_F(FactorizedHamiltonianTest, SignsDefaultToPositiveAndAreValidated) {
-  FactorizedHamiltonianContainer defaulted(core_energy, u, w, wb, one_body,
-                                           inactive_fock, orbitals,
-                                           Eigen::VectorXd(), energy_gap);
-
-  ASSERT_EQ(defaulted.get_signs().size(), static_cast<Eigen::Index>(R));
-  EXPECT_TRUE(defaulted.get_signs().isApprox(Eigen::VectorXd::Ones(R)));
-  EXPECT_TRUE(defaulted.reconstruct_two_body_integrals().isApprox(
-      make_container()->reconstruct_two_body_integrals(), 1e-12));
-
-  const double invalid_values[] = {0.0, 0.5, -2.0};
-  for (double invalid : invalid_values) {
-    Eigen::VectorXd bad_signs(R);
-    bad_signs << invalid;
-    EXPECT_THROW(FactorizedHamiltonianContainer(core_energy, u, w, wb, one_body,
-                                                inactive_fock, orbitals,
-                                                bad_signs, energy_gap),
-                 std::invalid_argument)
-        << "accepted a sign of " << invalid;
-  }
-
-  Eigen::VectorXd too_many_signs(R + 1);
-  too_many_signs << 1.0, 1.0;
-  EXPECT_THROW(FactorizedHamiltonianContainer(core_energy, u, w, wb, one_body,
-                                              inactive_fock, orbitals,
-                                              too_many_signs, energy_gap),
-               std::invalid_argument);
-
-  // Serialized payloads always include signs, so a missing field is malformed.
-  nlohmann::json without_signs = make_container()->to_json();
-  without_signs.erase("signs");
-  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(without_signs),
-               nlohmann::json::out_of_range);
 }
 
 TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
@@ -323,8 +222,9 @@ TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
   EXPECT_TRUE(h2->has_container_type<FactorizedHamiltonianContainer>());
   EXPECT_EQ(h2->get_core_energy(), core_energy);
   EXPECT_TRUE(
-      h2->get_container<FactorizedHamiltonianContainer>().get_signs().isApprox(
-          signs));
+      h2->get_container<FactorizedHamiltonianContainer>()
+          .reconstruct_two_body_integrals()
+          .isApprox(make_container()->reconstruct_two_body_integrals()));
 
   auto [h1a, h1b] = h.get_one_body_integrals();
   auto [h2_h1a, h2_h1b] = h2->get_one_body_integrals();

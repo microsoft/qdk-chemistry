@@ -22,36 +22,29 @@ void bind_double_factorization(py::module &m) {
   Double-factorize a restricted Hamiltonian into low-rank two-electron fragments.
 
   The result is backed by a
-  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` containing signed
-  low-rank fragments. Chemist permutation symmetry is imposed by averaging.
-  Fragments whose squared coefficient norm ``||eps||**2`` falls below
-  ``truncation_threshold`` are omitted; both methods threshold that same
-  quantity, so a given threshold selects the same fragments from either.
-  One-body data, core energy, orbitals, inactive Fock data, and Hamiltonian type
-  are preserved.
+  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` holding a sum of
+  low-rank squares. One-body data, core energy, orbitals, inactive Fock data,
+  and Hamiltonian type are preserved.
 
-  The ``method`` setting selects the first factorization step:
+  The factorization has two steps. The first produces Cholesky vectors ``L``
+  with ``g = L L^T``; the second diagonalizes each vector into its fragment.
+  Only the first step depends on how the input stores its integrals:
 
-  ``"eigen_decomposition"`` (default)
-      Diagonalize the two-electron supermatrix in ``O(norb**6)``, forming all
-      ``norb**2`` eigenpairs. Fragments may carry sign ``-1``.
+  - Dense four-index integrals are reshaped into the supermatrix, given
+    chemist permutation symmetry by averaging, and reduced by a pivoted
+    Cholesky decomposition in ``O(naux * norb**4)`` that stops at the
+    numerical rank. Pivoting stops once the largest remaining residual
+    diagonal drops to ``truncation_threshold``.
+  - A :class:`qdk_chemistry.data.CholeskyHamiltonianContainer` already stores
+    such vectors, so they are consumed directly and the dense ``norb**4``
+    tensor is never formed. ``truncation_threshold`` is ignored in that case,
+    because the stored vectors are the first factorization and were already
+    truncated when they were built.
 
-  ``"cholesky"``
-      Run a pivoted Cholesky decomposition of the supermatrix in
-      ``O(naux * norb**4)``, stopping at the numerical rank. Every fragment
-      carries sign ``+1``. A Cholesky decomposition exists only for a positive
-      semi-definite supermatrix, so a detected breakdown falls back to
-      ``"eigen_decomposition"`` rather than failing.
-
-If the Hamiltonian is already backed by a
-:class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
-three-center integrals are themselves the first factorization, so they are
-consumed directly and the dense ``norb**4`` tensor is never formed. Either
-method can do this: ``"cholesky"`` reuses the stored vectors as fragments,
-while ``"eigen_decomposition"`` recovers the eigenpairs from their
-``naux x naux`` Gram matrix. The two therefore differ on a redundant input,
-because only the eigen path collapses linearly dependent vectors.
-
+  A Cholesky decomposition exists only for a positive semi-definite
+  supermatrix. Exact two-electron integrals are positive semi-definite, but
+  approximate or synthetic ones need not be, and such an input raises
+  ``ValueError`` rather than being silently truncated.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`

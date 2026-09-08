@@ -3,15 +3,12 @@
 // license information.
 
 #pragma once
-#include <Eigen/Dense>
-#include <cstddef>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
-#include <vector>
 
 namespace qdk::chemistry::algorithms {
 
@@ -27,86 +24,20 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
    * @brief Constructor that initializes the default settings.
    */
   DoubleFactorizerSettings() {
-    set_default("method", std::string("eigen_decomposition"),
-                "First-step factorization of the supermatrix. "
-                "\"eigen_decomposition\" diagonalizes it in O(norb^6); "
-                "\"cholesky\" runs a pivoted Cholesky in O(naux * norb^4), "
-                "stops at the numerical rank, and falls back "
-                "to \"eigen_decomposition\" when the supermatrix is not "
-                "positive semi-definite.",
-                qdk::chemistry::data::ListConstraint<std::string>{
-                    {"eigen_decomposition", "cholesky"}});
-
     set_default<double>(
         "truncation_threshold", 1e-12,
-        "Cutoff for first-step factorization candidates. Every method drops "
-        "fragments whose squared coefficient norm ||eps||^2 falls below it, so "
-        "a given value retains the same fragments from either; the dense "
-        "\"cholesky\" loop additionally uses it to stop pivoting once the "
-        "largest remaining residual diagonal drops to it. "
-        "Must be non-negative; 0.0 keeps "
-        "every numerically resolvable fragment.",
+        "Cutoff for the pivoted Cholesky decomposition of the two-electron "
+        "supermatrix: pivoting stops once the largest remaining residual "
+        "diagonal drops to it. Must be non-negative; 0.0 keeps every "
+        "numerically resolvable fragment. Ignored when the input Hamiltonian "
+        "is backed by a CholeskyHamiltonianContainer, because its stored "
+        "vectors are already the first factorization and were truncated when "
+        "they were built.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
   ~DoubleFactorizerSettings() override = default;
 };
-
-/// First-step factorization of the two-electron supermatrix.
-enum class DoubleFactorizationMethod {
-  Cholesky,  ///< Pivoted Cholesky, O(naux * norb^4).
-  Eigen,     ///< Dense eigen-decomposition, O(norb^6).
-};
-
-/// A single low-rank ("perfect square") two-electron fragment:
-///
-/// g^(f)_pqrs = sign * (sum_b eps_b U_pb U_qb) (sum_b' eps_b' U_rb' U_sb')
-struct TwoBodyFragment {
-  Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Column b is
-                        ///< new-orbital vector b in the original basis.
-  Eigen::VectorXd eps;  ///< norb coefficients. Their squared norm ||eps||^2
-                        ///< for
-                        ///< DoubleFactorizationMethod::Eigen equals the
-                        ///< supermatrix eigenvalue magnitude.
-  double sign = 1.0;    ///< +1.0 or -1.0.
-};
-
-/// Double-factorize the spin-free two-electron tensor g_pqrs, flattened as
-/// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
-///
-/// Both methods reshape the tensor into the (pq),(rs) supermatrix, impose
-/// chemist permutation symmetry by averaging rather than verifying it, and drop
-/// fragments on the same cutoff metric, but order the retained fragments by
-/// method-dependent metrics.
-///
-/// DoubleFactorizationMethod::Eigen diagonalizes the supermatrix with LAPACK
-/// in O(norb^6). DoubleFactorizationMethod::Cholesky runs a pivoted Cholesky
-/// costing O(naux * norb^4) and stopping at
-/// the numerical rank instead of materializing all norb^2 eigenpairs. A
-/// Cholesky decomposition exists only for a positive semi-definite
-/// supermatrix.
-///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4.
-///        Chemist permutation symmetry is imposed by averaging, not verified.
-/// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Cutoff below which first-step candidates are
-///        dropped. Both methods compare the fragment's squared coefficient
-///        norm ||eps||^2 against it: the Cholesky column carries that norm
-///        directly, and for Eigen the reshaped eigenvector is unit-norm, so
-///        |eigenvalue| is exactly ||eps||^2. A given value therefore retains
-///        the same fragments from either method. 0.0 retains every
-///        numerically resolvable fragment.
-/// @param method First-step factorization of the supermatrix.
-/// @return Retained fragments sorted by decreasing contribution: eigenvalue
-///         magnitude for Eigen and sum_b |eps_b| for Cholesky.
-/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
-///         or contains a non-finite value.
-/// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> double_factorize(
-    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = 0.0,
-    DoubleFactorizationMethod method = DoubleFactorizationMethod::Cholesky);
 
 /**
  * @class DoubleFactorizer
@@ -116,22 +47,29 @@ std::vector<TwoBodyFragment> double_factorize(
  * Maps a Hamiltonian carrying dense four-index two-electron integrals to an
  * equivalent Hamiltonian backed by a
  * qdk::chemistry::data::FactorizedHamiltonianContainer, whose two-electron
- * tensor is stored as a signed sum of low-rank fragments
- *   g_pqrs = sum_t s_t (sum_b eps^t_b U^t_bp U^t_bq)
- *                      (sum_b' eps^t_b' U^t_b'r U^t_b's).
+ * tensor is stored as a sum of low-rank squares
+ *   g_pqrs = sum_t (sum_b eps^t_b U^t_bp U^t_bq)
+ *                  (sum_b' eps^t_b' U^t_b'r U^t_b's).
  *
- * The `"method"` setting selects the first factorization step: an
- * eigen-decomposition of the two-electron supermatrix, or a pivoted Cholesky
- * decomposition of it. Both produce the same container and drop fragments on
- * the same `||eps||^2` cutoff, so a given `"truncation_threshold"` selects the
- * same fragments from each; only the ordering metric differs. If the input
- * already stores three-center Cholesky vectors, those vectors are consumed
- * directly rather than expanded into a dense norb^4 tensor: `"cholesky"`
- * reuses them as fragments, and `"eigen_decomposition"` recovers the
- * eigenpairs from their naux x naux Gram matrix. Only the latter collapses
- * linearly dependent vectors, so the two disagree on the fragment count of a
- * redundant input, and it stops at the numerical rank rather than returning
- * norb^2 fragments the way a dense diagonalization does.
+ * The factorization has two steps. The first produces Cholesky vectors L with
+ * g = L L^T; the second diagonalizes each vector into its (U, eps) fragment.
+ * Only the first step depends on how the input stores its integrals:
+ *
+ * - Dense four-index integrals are reshaped into the (pq),(rs) supermatrix,
+ *   given chemist permutation symmetry by averaging rather than by
+ *   verification, and reduced by a pivoted Cholesky decomposition costing
+ *   O(naux * norb^4), which stops at the numerical rank rather than
+ *   materializing all norb^2 eigenpairs :cite:`Beebe1977` :cite:`Koch2003`.
+ * - A qdk::chemistry::data::CholeskyHamiltonianContainer already stores such
+ *   vectors, so they are consumed directly and the dense norb^4 tensor is
+ *   never formed. `"truncation_threshold"` is ignored in that case: the
+ *   stored vectors are the first factorization, already truncated when they
+ *   were built.
+ *
+ * A Cholesky decomposition exists only for a positive semi-definite
+ * supermatrix. Exact two-electron integrals are positive semi-definite, but
+ * approximate or synthetic ones need not be, and such an input is rejected
+ * rather than silently truncated.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.

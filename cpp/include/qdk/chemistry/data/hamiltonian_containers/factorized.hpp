@@ -20,8 +20,8 @@ namespace qdk::chemistry::data {
  * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC)
  *        Hamiltonian container :cite:`Low2025`.
  *
- * @note Consumers that genuinely require a sum of squares must check
- * get_signs().
+ * @note The two-body tensor is stored as a plain sum of squares, so it is
+ * positive semi-definite by construction.
  */
 class FactorizedHamiltonianContainer : public HamiltonianContainer {
  public:
@@ -35,20 +35,16 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param one_body_integrals One-body integrals [N,N].
    * @param inactive_fock_matrix Inactive Fock matrix.
    * @param orbitals Orbitals with an active space.
-   * @param signs Per-rank signs, length R, each exactly +1.0 or -1.0. Pass an
-   *        empty vector (the default) for an all-positive factorization.
    * @param energy_gap Energy-gap metadata.
    * @param type Hamiltonian type.
-   * @throws std::invalid_argument if dimensions or required data are invalid,
-   *         or if any entry of `signs` is neither +1.0 nor -1.0.
+   * @throws std::invalid_argument if dimensions or required data are invalid.
    */
   FactorizedHamiltonianContainer(
       double core_energy, const Eigen::VectorXd& u_matrices,
       const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& inactive_fock_matrix,
-      std::shared_ptr<Orbitals> orbitals,
-      const Eigen::VectorXd& signs = Eigen::VectorXd(), double energy_gap = 0.0,
+      std::shared_ptr<Orbitals> orbitals, double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /** @brief Destructor. */
@@ -124,9 +120,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Identity weights w_B with shape [R,C]. */
   const Eigen::MatrixXd& get_wb_matrix() const;
 
-  /** @return Per-rank signs, length R, each +1.0 or -1.0. */
-  const Eigen::VectorXd& get_signs() const;
-
   /** @return Number N of active spatial orbitals. */
   size_t get_num_orbitals() const;
 
@@ -146,9 +139,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @brief Compute the factorization normalization (Eq. 33).
    * Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    *
-   * The per-rank signs do not appear: every two-body term enters through an
-   * absolute value, and |sign| is 1.
-   *
    * @throws std::runtime_error if the adjusted one-body matrix is not
    *         symmetric.
    */
@@ -158,8 +148,8 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @brief Compute the effective normalization (Eq. 11).
    * λ_eff = √(E_gap · (2Λ - E_gap))
    *
-   * @return The effective normalization, or 0.0 if any factor has a negative
-   *         sign or E_gap is outside the open interval (0, 2Λ).
+   * @return The effective normalization, or 0.0 if E_gap is outside the open
+   *         interval (0, 2Λ).
    */
   double get_lambda_eff() const;
 
@@ -168,10 +158,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *
    * Writing the rank-r copy-c leaf as
    *   M^{rc}_{pq} = Σ_{b∈[B]} W^{rc}_b U^r_{bp} U^r_{bq},
-   * this accumulates three corrections, each scaled by that rank's sign:
-   *   h'(1)_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}
-   *                        + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}
-   *                        - Σ_{rc} s_r WB^{rc} M^{rc}_{pq}
+   * this accumulates three corrections:
+   *   h'(1)_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}
+   *                        + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}
+   *                        - Σ_{rc} WB^{rc} M^{rc}_{pq}
    *
    * @return The [N,N] matrix, contracted directly from the factors.
    */
@@ -181,10 +171,10 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @brief Reconstruct the approximate two-body integrals.
    *
    * With t the rank index (r and s here are orbital indices):
-   * h2_{pqrs} = Σ_{t,c} s_t (Σ_b U^t_{bp} U^t_{bq} W^t_{bc})
-   *                          (Σ_{b'} U^t_{b'r} U^t_{b's} W^t_{b'c})
+   * h2_{pqrs} = Σ_{t,c} (Σ_b U^t_{bp} U^t_{bq} W^t_{bc})
+   *                      (Σ_{b'} U^t_{b'r} U^t_{b's} W^t_{b'c})
    *
-   * Note this is built purely from (U, W) and the per-rank signs.
+   * Note this is built purely from (U, W).
    *
    * @return A flat N^4 vector in [p,q,r,s] order.
    */
@@ -195,15 +185,13 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /**
-   * @throws std::invalid_argument if U, W, WB or sign dimensions are invalid,
-   *         or if a sign is neither +1.0 nor -1.0.
+   * @throws std::invalid_argument if U, W or WB dimensions are invalid.
    */
   void validate_integral_dimensions() const override final;
 
-  Eigen::VectorXd _u;      ///< Flat U matrices [R*B*N]
-  Eigen::VectorXd _w;      ///< Flat W matrices [R*B*C]
-  Eigen::MatrixXd _wb;     ///< Identity weights [R,C]
-  Eigen::VectorXd _signs;  ///< Per-rank signs [R], each +1.0 or -1.0
+  Eigen::VectorXd _u;   ///< Flat U matrices [R*B*N]
+  Eigen::VectorXd _w;   ///< Flat W matrices [R*B*C]
+  Eigen::MatrixXd _wb;  ///< Identity weights [R,C]
 
   double _energy_gap;  ///< Energy-gap metadata
 

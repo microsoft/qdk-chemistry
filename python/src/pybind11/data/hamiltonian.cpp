@@ -993,8 +993,8 @@ Args:
       factorized_container(data, "FactorizedHamiltonianContainer", R"(
 Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
 
-Check :meth:`get_signs` before treating the representation as a true sum of
-squares.
+The two-body tensor is stored as a plain sum of squares, so it is positive
+semi-definite by construction.
 
 References:
     :cite:`Low2025`
@@ -1003,8 +1003,8 @@ References:
   factorized_container.def(
       py::init<double, const Eigen::VectorXd&, const Eigen::VectorXd&,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>,
-               const Eigen::VectorXd&, double, HamiltonianType>(),
+               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>, double,
+               HamiltonianType>(),
       R"(
 Constructor for a factorized Hamiltonian.
 
@@ -1016,17 +1016,16 @@ Args:
     one_body_integrals (numpy.ndarray): One-body integrals with shape [N,N].
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix with shape [N,N], or an empty array.
     orbitals (Orbitals): Restricted orbitals with N active spatial orbitals.
-    signs (numpy.ndarray, optional): Rank signs of length R; entries must be +1 or -1. Empty means all positive.
     energy_gap (float, optional): Energy gap for SOS block encoding; defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type; defaults to Hermitian.
 
 Raises:
-    ValueError: If required data, dimensions, restrictedness, or signs are inconsistent.
+    ValueError: If required data, dimensions, or restrictedness are inconsistent.
 )",
       py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
       py::arg("wb_matrix"), py::arg("one_body_integrals"),
       py::arg("inactive_fock_matrix"), py::arg("orbitals"),
-      py::arg("signs") = Eigen::VectorXd(), py::arg("energy_gap") = 0.0,
+      py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 
   factorized_container.def("get_u_matrices",
@@ -1089,15 +1088,6 @@ Returns:
     int: Number of copies per rank.
 )");
 
-  factorized_container.def("get_signs",
-                           &FactorizedHamiltonianContainer::get_signs,
-                           py::return_value_policy::reference_internal, R"(
-Return the sign of each factorized rank.
-
-Returns:
-    numpy.ndarray: Length-R array containing only +1.0 or -1.0.
-)");
-
   factorized_container.def("get_energy_gap",
                            &FactorizedHamiltonianContainer::get_energy_gap, R"(
 E_gap for SOS block encoding.
@@ -1122,7 +1112,7 @@ Raises:
 Compute the effective SOS normalization.
 
 Returns:
-    float: ``sqrt(E_gap * (2 * Lambda - E_gap))``, or 0.0 if any rank carries a negative sign or the gap is outside ``(0, 2 * Lambda)``.
+    float: ``sqrt(E_gap * (2 * Lambda - E_gap))``, or 0.0 if the gap is outside ``(0, 2 * Lambda)``.
 
 Raises:
     RuntimeError: If the adjusted one-body matrix cannot be diagonalized.
@@ -1139,7 +1129,7 @@ Returns:
   factorized_container.def(
       "reconstruct_two_body_integrals",
       &FactorizedHamiltonianContainer::reconstruct_two_body_integrals, R"(
-Reconstruct the two-body integrals from U, W, and the rank signs.
+Reconstruct the two-body integrals from U and W.
 
 Returns:
     numpy.ndarray: New flat N**4 array in [p,q,r,s] order.

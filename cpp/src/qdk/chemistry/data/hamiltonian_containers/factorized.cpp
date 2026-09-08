@@ -22,24 +22,14 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
     const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::MatrixXd& inactive_fock_matrix,
-    std::shared_ptr<Orbitals> orbitals, const Eigen::VectorXd& signs,
-    double energy_gap, HamiltonianType type)
+    std::shared_ptr<Orbitals> orbitals, double energy_gap, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _u(u_matrices),
       _w(w_matrices),
       _wb(wb_matrix),
-      _signs(signs.size() > 0 ? signs
-                              : Eigen::VectorXd::Ones(wb_matrix.rows())),
       _energy_gap(energy_gap) {
   QDK_LOG_TRACE_ENTERING();
-
-  if (_signs.size() != _wb.rows()) {
-    throw std::invalid_argument(
-        "Factorized Hamiltonian expects one sign per rank, but got " +
-        std::to_string(_signs.size()) + " signs for " +
-        std::to_string(_wb.rows()) + " ranks.");
-  }
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
@@ -63,8 +53,8 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     fock_alpha = fa;
   }
   return std::make_unique<FactorizedHamiltonianContainer>(
-      _core_energy, _u, _w, _wb, h1_alpha, fock_alpha, _orbitals, _signs,
-      _energy_gap, _type);
+      _core_energy, _u, _w, _wb, h1_alpha, fock_alpha, _orbitals, _energy_gap,
+      _type);
 }
 
 std::string FactorizedHamiltonianContainer::get_container_type() const {
@@ -171,7 +161,7 @@ Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
     }
 
     Eigen::MatrixXd M = Wr.transpose() * pair_products;
-    h2_matrix.noalias() += _signs(r) * (M.transpose() * M);
+    h2_matrix.noalias() += M.transpose() * M;
   }
 
   return h2;
@@ -195,10 +185,6 @@ const Eigen::VectorXd& FactorizedHamiltonianContainer::get_w_matrices() const {
 
 const Eigen::MatrixXd& FactorizedHamiltonianContainer::get_wb_matrix() const {
   return _wb;
-}
-
-const Eigen::VectorXd& FactorizedHamiltonianContainer::get_signs() const {
-  return _signs;
 }
 
 size_t FactorizedHamiltonianContainer::get_num_orbitals() const {
@@ -225,7 +211,7 @@ double FactorizedHamiltonianContainer::get_energy_gap() const {
 
 double FactorizedHamiltonianContainer::get_lambda_eff() const {
   // :cite:`Low2025` (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
-  if ((_signs.array() < 0.0).any() || !(_energy_gap > 0.0)) return 0.0;
+  if (!(_energy_gap > 0.0)) return 0.0;
 
   const double lambda = get_lambda();
   if (!(_energy_gap < 2.0 * lambda)) return 0.0;
@@ -238,16 +224,16 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
   // Writing the rank-r copy-c leaf as
   //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
   // the three accumulated corrections are
-  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}  (a) normal-order
-  //                      + Σ_{rc} s_r tr(M^{rc}) M^{rc}_{pq}  (b)
-  //                      - Σ_{rc} s_r wB^{rc} M^{rc}_{pq}     (c)
+  //   h1'_{pq} = h1_{pq} - ½ Σ_{rc} (M^{rc} M^{rc})_{pq}  (a) normal-order
+  //                      + Σ_{rc} tr(M^{rc}) M^{rc}_{pq}  (b)
+  //                      - Σ_{rc} wB^{rc} M^{rc}_{pq}     (c)
   //
   // Term (a) has no counterpart in Eq. 36 as printed, because the paper writes
   // the two-body term as a plain product of E operators while this container
   // stores h2 = (pq|rs) normal-ordered, i.e.
   //   H = E_core + Σ h1_{pq} E_pq + ½ Σ h2_{pqrs} (E_pq E_rs - δ_qr E_ps).
   // Unpacking that -½ δ_qr E_ps piece leaves the one-body remainder
-  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} s_r (M^{rc} M^{rc})_{pq}.
+  // -½ Σ_s h2_{pssq} = -½ Σ_{rc} (M^{rc} M^{rc})_{pq}.
   size_t norb = get_num_orbitals();
   size_t R = get_num_ranks();
   size_t B = get_num_bases();
@@ -261,8 +247,6 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
                                    Eigen::RowMajor>>
         Ur(_u.data() + r * B * norb, B, norb);
 
-    const double sign = _signs(r);
-
     for (size_t c = 0; c < C; ++c) {
       Eigen::MatrixXd scaled(B, norb);
       for (size_t b = 0; b < B; ++b) {
@@ -271,9 +255,9 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
       }
 
       Eigen::MatrixXd Mrc = Ur.transpose() * scaled;
-      h1.noalias() -= 0.5 * sign * (Mrc * Mrc);
-      h1 += sign * Mrc.trace() * Mrc;
-      h1 -= sign * _wb(r, c) * Mrc;
+      h1.noalias() -= 0.5 * (Mrc * Mrc);
+      h1 += Mrc.trace() * Mrc;
+      h1 -= _wb(r, c) * Mrc;
     }
   }
 
@@ -332,7 +316,6 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   j["u_matrices"] = vector_to_json(_u);
   j["w_matrices"] = vector_to_json(_w);
   j["wb_matrix"] = matrix_to_json(_wb);
-  j["signs"] = vector_to_json(_signs);
   j["num_ranks"] = get_num_ranks();
   j["num_bases"] = get_num_bases();
   j["num_copies"] = get_num_copies();
@@ -362,7 +345,6 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   auto u = json_to_vector(j.at("u_matrices"));
   auto w = json_to_vector(j.at("w_matrices"));
   auto wb = json_to_matrix(j.at("wb_matrix"));
-  auto signs = json_to_vector(j.at("signs"));
   double core_energy = j.at("core_energy");
   double energy_gap = j.at("energy_gap");
   const std::size_t num_ranks = j.at("num_ranks").get<std::size_t>();
@@ -383,7 +365,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap, type);
+      core_energy, u, w, wb, h1, fock, orbitals, energy_gap, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
@@ -454,7 +436,6 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   save_vector_to_group(group, "u_matrices", _u);
   save_vector_to_group(group, "w_matrices", _w);
   save_matrix_to_group(group, "wb_matrix", _wb);
-  save_vector_to_group(group, "signs", _signs);
 
   if (has_inactive_fock_matrix()) {
     auto [fock_a, fock_b] = get_inactive_fock_matrix();
@@ -506,7 +487,6 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   auto u = load_vector_from_group(group, "u_matrices");
   auto w = load_vector_from_group(group, "w_matrices");
   auto wb = load_matrix_from_group(group, "wb_matrix");
-  auto signs = load_vector_from_group(group, "signs");
 
   H5::Group orb_group = group.openGroup("orbitals");
   std::shared_ptr<Orbitals> orbitals = Orbitals::from_hdf5(orb_group);
@@ -517,7 +497,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, signs, energy_gap, type);
+      core_energy, u, w, wb, h1, fock, orbitals, energy_gap, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
@@ -567,18 +547,6 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
         ", B=" + std::to_string(B) + ", C=" + std::to_string(C) + "), got " +
         std::to_string(_w.size()) + ".");
   }
-  if (static_cast<size_t>(_signs.size()) != R) {
-    throw std::invalid_argument(
-        "Sign vector size mismatch: expected one sign per rank R = " +
-        std::to_string(R) + ", got " + std::to_string(_signs.size()) + ".");
-  }
-  for (Eigen::Index r = 0; r < _signs.size(); ++r) {
-    if (_signs(r) != 1.0 && _signs(r) != -1.0) {
-      throw std::invalid_argument("Sign for rank " + std::to_string(r) +
-                                  " must be exactly +1.0 or -1.0, got " +
-                                  std::to_string(_signs(r)) + ".");
-    }
-  }
 }
 
 // === Hashing ===
@@ -594,7 +562,6 @@ void FactorizedHamiltonianContainer::hash_update(
   hash_value(ctx, _u);
   hash_value(ctx, _w);
   hash_value(ctx, _wb);
-  hash_value(ctx, _signs);
 }
 
 }  // namespace qdk::chemistry::data
