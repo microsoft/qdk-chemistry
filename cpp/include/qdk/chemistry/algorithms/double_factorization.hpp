@@ -128,7 +128,10 @@ std::vector<TwoBodyFragment> double_factorize(
  * already stores three-center Cholesky vectors, those vectors are consumed
  * directly rather than expanded into a dense norb^4 tensor: `"cholesky"`
  * reuses them as fragments, and `"eigen_decomposition"` recovers the
- * eigenpairs from their naux x naux Gram matrix.
+ * eigenpairs from their naux x naux Gram matrix. Only the latter collapses
+ * linearly dependent vectors, so the two disagree on the fragment count of a
+ * redundant input, and it stops at the numerical rank rather than returning
+ * norb^2 fragments the way a dense diagonalization does.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.
