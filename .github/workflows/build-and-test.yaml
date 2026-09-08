@@ -471,7 +471,7 @@ jobs:
           echo "" >> "$report"
           echo '```' >> "$report"
           # coverage.py has no native markdown writer; strip backticks
-          tail -50 coverage-reports/python_coverage.txt | tr -d '`' >> "$report"
+          tr -d '`' < coverage-reports/python_coverage.txt >> "$report"
           echo '```' >> "$report"
           echo "</details>" >> "$report"
           echo "" >> "$report"
