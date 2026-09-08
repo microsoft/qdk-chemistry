@@ -205,6 +205,20 @@ def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
     }
 
 
+def _validate_commands(plugin_name: str, commands: object, state_root: Path) -> dict[str, str]:
+    if not isinstance(commands, dict):
+        raise PluginInstallError(f"invalid command binding for {plugin_name!r} beneath {state_root}")
+    for server_name in _PLUGIN_SERVER_SCRIPTS[plugin_name]:
+        command = commands.get(server_name)
+        if not isinstance(command, str):
+            raise PluginInstallError(
+                f"command binding for required MCP server {server_name!r} is missing; rebind from the intended venv"
+            )
+        if not Path(command).is_file():
+            raise PluginInstallError(f"bound MCP command no longer exists: {command}; rebind from the intended venv")
+    return commands
+
+
 def _mcp_config_path(plugin_dir: Path) -> Path:
     manifest = _load_object(_manifest_path(plugin_dir))
     configured = manifest.get("mcpServers", ".mcp.json")
@@ -562,23 +576,19 @@ def update_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
     record = state["plugins"].get(plugin_name)
     if not isinstance(record, dict):
         raise PluginInstallError(f"{plugin_name!r} has no QDK Chemistry binding beneath {state_root}")
-    commands = record.get("commands")
-    if not isinstance(commands, dict) or any(not isinstance(value, str) for value in commands.values()):
-        raise PluginInstallError(f"invalid command binding for {plugin_name!r} beneath {state_root}")
-    for command in commands.values():
-        if not Path(command).is_file():
-            raise PluginInstallError(f"bound MCP command no longer exists: {command}; rebind from the intended venv")
+    commands = _validate_commands(plugin_name, record.get("commands"), state_root)
     _run_copilot(["plugin", "update", str(record.get("update_spec") or plugin_name)], home=home)
     live_plugin_dir = _live_plugin_dir(record, state_root)
     plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
+    is_live = live_plugin_dir is not None and plugin_dir == live_plugin_dir
     workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
     plugin_config = (
         _mcp_config_path(plugin_dir)
-        if live_plugin_dir is not None and workspace is not None
+        if is_live and workspace is not None
         else _bind_mcp_commands(plugin_dir, plugin_name, commands)
     )
     deployment = _deploy_workspace(plugin_dir, plugin_name, workspace, commands) if workspace is not None else {}
-    record.update({"plugin_dir": str(plugin_dir), **deployment})
+    record.update({"plugin_dir": str(plugin_dir), "live_plugin": is_live, **deployment})
     _write_binding(state_root, plugin_name, record)
     result = {
         "status": "updated",
@@ -642,11 +652,12 @@ def rebind_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
     previous = _load_bindings(state_root)["plugins"].get(plugin_name)
     live_plugin_dir = _live_plugin_dir(previous if isinstance(previous, dict) else None, state_root)
     plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
+    is_live = live_plugin_dir is not None and plugin_dir == live_plugin_dir
     commands = _commands_for_current_environment(plugin_name)
     workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
     plugin_config = (
         _mcp_config_path(plugin_dir)
-        if live_plugin_dir is not None and workspace is not None
+        if is_live and workspace is not None
         else _bind_mcp_commands(plugin_dir, plugin_name, commands)
     )
     deployment = _deploy_workspace(plugin_dir, plugin_name, workspace, commands) if workspace is not None else {}
@@ -665,7 +676,7 @@ def rebind_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
             "plugin_dir": str(plugin_dir),
             "source": source,
             "update_spec": update_spec,
-            "live_plugin": live_plugin_dir is not None,
+            "live_plugin": is_live,
             **deployment,
         },
     )

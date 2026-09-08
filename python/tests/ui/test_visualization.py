@@ -44,6 +44,9 @@ def test_visualization_tools_use_static_apps_resources(monkeypatch):
         assert "ui/initialize" in resource.text
         assert "ui/notifications/tool-result" in resource.text
         assert "event.source" in resource.text
+    widget_html = resources["ui://qdk-chem-mcp/circuit-viewer"].text
+    assert "pending.set(String(id)" in widget_html
+    assert "String(message.id)" in widget_html
     for binding in tools.values():
         assert binding.meta is not None
         assert binding.meta["ui"]["resourceUri"] in resources
@@ -72,3 +75,6 @@ def test_scatter_app_does_not_embed_tool_controlled_strings(monkeypatch):
     assert "function ticks(" in html
     assert "Series ${index+1}" in html
     assert "item.mode?.includes('lines')" in html
+    assert "message.error" in html
+    assert "String(message.id)===String(requestId)" in html
+    assert "result.content?.find" in html

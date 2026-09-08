@@ -319,6 +319,86 @@ def test_update_reapplies_recorded_command(
     assert config["servers"]["qdk_chemistry"]["command"] == str(command)
 
 
+def test_update_switches_live_binding_to_installed_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    live_plugin_dir = _write_plugin(tmp_path / "live")
+    command = tmp_path / ".venv" / "bin" / "qcmcp"
+    command.parent.mkdir(parents=True)
+    command.touch()
+    plugin_installer._write_binding(
+        tmp_path / ".qdk_chem",
+        "qdk-chemistry",
+        {
+            "commands": {"qdk_chemistry": str(command)},
+            "plugin_dir": str(live_plugin_dir),
+            "live_plugin": True,
+        },
+    )
+
+    installed_plugin_dir: Path | None = None
+
+    def fake_update(_arguments: list[str], *, home: Path) -> None:
+        nonlocal installed_plugin_dir
+        installed_plugin_dir = _write_plugin(home)
+
+    monkeypatch.setattr(plugin_installer, "_run_copilot", fake_update)
+
+    result = plugin_installer.update_plugin("qdk-chemistry", target_dir=tmp_path)
+
+    assert installed_plugin_dir is not None
+    assert result["plugin_dir"] == str(installed_plugin_dir)
+    installed_config = json.loads((installed_plugin_dir / ".mcp.json").read_text(encoding="utf-8"))
+    assert installed_config["mcpServers"]["qdk_chemistry"]["command"] == str(command)
+    state = json.loads((tmp_path / ".qdk_chem" / "qdk-chemistry-plugin-bindings.json").read_text())
+    assert state["plugins"]["qdk-chemistry"]["live_plugin"] is False
+
+
+def test_update_requires_every_server_command(tmp_path: Path) -> None:
+    plugin_installer._write_binding(
+        tmp_path / ".qdk_chem",
+        "qdk-chemistry",
+        {"commands": {}, "plugin_dir": str(tmp_path / "plugin")},
+    )
+
+    with pytest.raises(plugin_installer.PluginInstallError, match="required MCP server"):
+        plugin_installer.update_plugin("qdk-chemistry", target_dir=tmp_path)
+
+
+def test_rebind_switches_live_binding_to_installed_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed_plugin_dir = _write_plugin(tmp_path / ".qdk_chem" / "copilot")
+    live_plugin_dir = _write_plugin(tmp_path / "live")
+    command = tmp_path / ".venv" / "bin" / "qcmcp"
+    command.parent.mkdir(parents=True)
+    command.touch()
+    plugin_installer._write_binding(
+        tmp_path / ".qdk_chem",
+        "qdk-chemistry",
+        {
+            "commands": {"qdk_chemistry": str(command)},
+            "plugin_dir": str(live_plugin_dir),
+            "live_plugin": True,
+        },
+    )
+    monkeypatch.setattr(
+        plugin_installer,
+        "_commands_for_current_environment",
+        lambda _name: {"qdk_chemistry": str(command)},
+    )
+
+    result = plugin_installer.rebind_plugin("qdk-chemistry", target_dir=tmp_path)
+
+    assert result["plugin_dir"] == str(installed_plugin_dir)
+    installed_config = json.loads((installed_plugin_dir / ".mcp.json").read_text(encoding="utf-8"))
+    assert installed_config["mcpServers"]["qdk_chemistry"]["command"] == str(command)
+    state = json.loads((tmp_path / ".qdk_chem" / "qdk-chemistry-plugin-bindings.json").read_text())
+    assert state["plugins"]["qdk-chemistry"]["live_plugin"] is False
+
+
 def test_current_environment_must_be_a_venv(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(plugin_installer.sys, "prefix", "/usr")
     monkeypatch.setattr(plugin_installer.sys, "base_prefix", "/usr")
