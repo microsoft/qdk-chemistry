@@ -11,6 +11,7 @@ param(
     [string]$SrcDir        = (Resolve-Path "$PSScriptRoot\..\.." -ErrorAction Stop),
     [string]$PythonVersion = '3.11',
     [string]$RunSlowTests  = 'true',
+    [string]$Triplet       = $env:VCPKG_TRIPLET,
     [ValidateSet('conda', 'venv')]
     [string]$PythonEnv     = 'conda'
 )
@@ -48,6 +49,10 @@ Write-Host "Installing: $wheel"
 if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed ($LASTEXITCODE)" }
 & $runExe @runArgs -m pip install "$wheel[test]"
 if ($LASTEXITCODE -ne 0) { throw "pip install wheel[test] failed ($LASTEXITCODE)" }
+if ($Triplet -ne 'arm64-windows-static-md') {
+    & $runExe @runArgs -c "import mcp; from qdk_chemistry.ui._mcp import MCP_AVAILABLE; assert MCP_AVAILABLE"
+    if ($LASTEXITCODE -ne 0) { throw "MCP installation smoke test failed ($LASTEXITCODE)" }
+}
 
 # ─── 3. Component Governance PipReport (non-fatal) ───────────────────────────
 Write-Host "=== Generate Component Governance PipReport ==="

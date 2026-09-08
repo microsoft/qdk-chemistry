@@ -120,7 +120,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     ``vacuum`` register (:math:`|0\ldots0\rangle`) is conditionally swapped with the system,
     the *uncontrolled* evolution runs on the vacuum (``step_reps`` times), and the swap is
     uncomputed.  The eigenphase accumulates on the :math:`|1\rangle` control branch, as with
-    a directly controlled evolution, for the cost of one layer of controlled-:math:`\mathrm{SWAP}`.
+    a directly controlled evolution, using an additional system-sized register and two layers
+    of system-wide controlled-:math:`\mathrm{SWAP}` gates.
 
     **Vacuum phase.** The :math:`|0\rangle` branch acquires
     :math:`U|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle` with :math:`\varphi_0 = -E_0 t`

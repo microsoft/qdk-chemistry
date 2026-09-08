@@ -106,7 +106,8 @@ This mapper avoids controlling every gate. It allocates an internal *vacuum* reg
 **uncontrolled** evolution to the vacuum register, and uncomputes the swap.
 When the control is :math:`|0\rangle` the evolution hits the vacuum and the system is untouched;
 when it is :math:`|1\rangle` the system is parked in the vacuum register and evolved.
-A single layer of controlled-:math:`\mathrm{SWAP}` gates thus replaces a fully controlled circuit.
+For an :math:`n`-qubit system, an additional :math:`n`-qubit vacuum register and two layers of
+:math:`n` controlled-:math:`\mathrm{SWAP}` gates replace a fully controlled evolution circuit.
 This mapper applies to **particle-conserving** Hamiltonians only. It relies on
 :math:`|0\ldots0\rangle` staying in its own particle-number sector.
 
