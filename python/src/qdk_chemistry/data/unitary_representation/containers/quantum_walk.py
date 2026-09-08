@@ -47,7 +47,28 @@ class QuantumWalkContainer(UnitaryContainer):
     # Serialization version for this class
     _serialization_version = "0.2.0"
 
-    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
+        """Recover an eigenvalue when the measured walk phase is unambiguous.
+
+        Args:
+            phase_fraction: Measured phase fraction in ``[0, 1)``.
+
+        Returns:
+            float: The unique Hamiltonian eigenvalue.
+
+        Raises:
+            ValueError: If multiple eigenvalues are consistent with the phase.
+
+        """
+        branches = self.eigenvalue_branches_from_phase(phase_fraction)
+        if len(branches) != 1:
+            raise ValueError(
+                f"Phase {phase_fraction} is ambiguous for a quantum walk with power {self.power}; "
+                "use eigenvalue_branches_from_phase() to obtain all candidate energies."
+            )
+        return branches[0]
+
+    def eigenvalue_branches_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
         r"""Recover every eigenvalue consistent with a quantum-walk phase.
 
         For a walk operator whose eigenvalues are

@@ -29,6 +29,7 @@ from qdk_chemistry.ui.cli import (
     _deep_merge,
     _parse_set_overrides,
     cmd_data_convert,
+    cmd_utils_resolve_phase_energy,
     create_parser,
     format_output,
     main,
@@ -195,7 +196,7 @@ def test_create_parser():
 
 
 def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, capsys, monkeypatch):
-    """Resolve aliases using the sign and scale stored by a product-formula unitary."""
+    """Report the principal branch and resolve its periodic alias in the CLI."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
     unitary = data.UnitaryRepresentation(
@@ -230,6 +231,7 @@ def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, cap
 
     result = json.loads(capsys.readouterr().out)
     assert result["container_type"] == "pauli_product_formula"
+    assert result["branching"] == pytest.approx([-np.pi / 4.0])
     assert result["raw_energy"] == pytest.approx(-np.pi / 4.0)
     assert result["resolved_energy"] == pytest.approx(3.0 * np.pi / 4.0)
 
@@ -262,8 +264,104 @@ def test_resolve_phase_energy_uses_quantum_walk_mapping(temp_project_dir, capsys
 
     result = json.loads(capsys.readouterr().out)
     assert result["container_type"] == "lcu_walk"
+    assert result["branching"] == pytest.approx([0.0], abs=1e-12)
     assert result["raw_energy"] == pytest.approx(0.0, abs=1e-12)
     assert result["resolved_energy"] == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize("power", [2, 3])
+@pytest.mark.parametrize("reference_energy", [-5.8, 5.8])
+@pytest.mark.parametrize("file_format", ["json", "hdf5"])
+def test_resolve_phase_energy_selects_serialized_walk_branch(
+    temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format
+):
+    """The CLI reports every saved walk branch and resolves the one nearest the reference."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    builder = algorithms.create("hamiltonian_unitary_builder", "lcu", quantum_walk=True, power=power)
+    unitary = builder.run(data.QubitOperator(pauli_strings=["Z"], coefficients=[6.0]))
+    filename = f"walk.unitary_representation.{file_format}"
+    unitary.to_file(str(project_path / filename), file_format)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            filename,
+            "--phase-fraction",
+            "0.1",
+            "--reference-energy",
+            str(reference_energy),
+        ],
+    )
+
+    main()
+
+    result = json.loads(capsys.readouterr().out)
+    expected = sorted(6.0 * np.cos(2 * np.pi * (0.1 + branch) / power) for branch in range(power))
+    assert result["success"] is True
+    assert result["container_type"] == "lcu_walk"
+    assert result["phase_fraction"] == 0.1
+    assert result["branching"] == pytest.approx(expected)
+    assert result["raw_energy"] == pytest.approx(expected[0])
+    assert result["resolved_energy"] == pytest.approx(expected[-1] if reference_energy > 0 else expected[0])
+
+
+def test_resolve_phase_energy_walk_reference_overrides_negative_raw_energy(temp_project_dir, capsys, monkeypatch):
+    """A positive reference must not resolve to the negative sign branch of a powered walk."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    builder = algorithms.create("hamiltonian_unitary_builder", "lcu", quantum_walk=True, power=2)
+    unitary = builder.run(data.QubitOperator(pauli_strings=["Z"], coefficients=[6.0]))
+    filename = "walk.unitary_representation.json"
+    unitary.to_file(str(project_path / filename), "json")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            filename,
+            "--phase-fraction",
+            "0.1",
+            "--reference-energy",
+            "5.8",
+        ],
+    )
+
+    main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["branching"] == pytest.approx([-5.7063390977, 5.7063390977])
+    assert result["raw_energy"] == pytest.approx(-5.7063390977)
+    assert result["resolved_energy"] == pytest.approx(5.7063390977)
+
+
+def test_resolve_phase_energy_rejects_empty_candidates(temp_project_dir, monkeypatch):
+    """An invalid empty inverse gets a clear error rather than an indexing failure."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None))
+    monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
+    monkeypatch.setattr(LCUWalkContainer, "eigenvalue_branches_from_phase", lambda *_args: ())
+    args = argparse.Namespace(
+        unitary_representation_filename="walk.unitary_representation.json",
+        project_name="test_project",
+        phase_fraction=0.1,
+        reference_energy=5.8,
+    )
+
+    with pytest.raises(ValueError, match="returned no candidate energies"):
+        cmd_utils_resolve_phase_energy(args)
 
 
 def test_resolve_phase_energy_rejects_raw_block_encoding(temp_project_dir, capsys, monkeypatch):

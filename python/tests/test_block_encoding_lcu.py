@@ -389,20 +389,23 @@ class TestLCUContainer:
         # φ=0 → E=λ
         assert np.allclose(
             container.eigenvalue_from_phase(0.0),
-            (lam,),
+            lam,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
         # φ=0.25 → E=0
-        assert np.allclose(container.eigenvalue_from_phase(0.25), (0.0,), atol=float_comparison_absolute_tolerance)
+        assert isinstance(container.eigenvalue_from_phase(0.25), float)
+        assert np.isclose(container.eigenvalue_from_phase(0.25), 0.0, atol=float_comparison_absolute_tolerance)
 
     def test_walk_container_squared_folds_the_energy_sign(self):
         """Squaring the walk sends θ and π-θ to the same eigenphases, so both signs are reported."""
         container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
         energy = 6.0 * np.cos(np.pi * 0.1)
 
+        with pytest.raises(ValueError, match=r"ambiguous.*power 2"):
+            container.eigenvalue_from_phase(0.1)
         assert np.allclose(
-            container.eigenvalue_from_phase(0.1),
+            container.eigenvalue_branches_from_phase(0.1),
             (-energy, energy),
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
@@ -416,7 +419,7 @@ class TestLCUContainer:
         container = LCUWalkContainer(_lcu_container(), power=power, scale=lam)
         phase_fraction = (power * np.arccos(energy / lam) / (2 * np.pi)) % 1.0
 
-        branches = np.array(container.eigenvalue_from_phase(phase_fraction))
+        branches = np.array(container.eigenvalue_branches_from_phase(phase_fraction))
 
         assert len(branches) <= power
         assert np.all(np.diff(branches) > 0.0)
@@ -440,7 +443,16 @@ class TestLCUContainer:
         restored = LCUWalkContainer.from_json(container.to_json())
 
         assert restored.power == 3
-        assert restored.eigenvalue_from_phase(0.1) == container.eigenvalue_from_phase(0.1)
+        assert restored.eigenvalue_branches_from_phase(0.1) == container.eigenvalue_branches_from_phase(0.1)
+        with pytest.raises(ValueError, match="ambiguous"):
+            restored.eigenvalue_from_phase(0.1)
+
+    def test_walk_container_powered_scalar_inversion_when_branches_coincide(self):
+        """A powered walk can still have a unique energy at a special phase."""
+        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
+
+        assert len(container.eigenvalue_branches_from_phase(0.5)) == 1
+        assert container.eigenvalue_from_phase(0.5) == pytest.approx(0.0, abs=1e-12)
 
     def test_walk_container_rejects_a_non_positive_power(self):
         """A walk operator applied fewer than once represents nothing."""

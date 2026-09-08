@@ -96,25 +96,26 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self.scale = scale
         super().__init__()
 
-    def eigenvalue_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+    def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
 
         For :math:`U(t) = e^{-iHt}` an eigenstate with energy :math:`E` acquires
         phase :math:`e^{-iEt}`, so QPE measures :math:`\varphi = (-Et / 2\pi) \bmod 1`.
-        Inverting gives ``E = -angle / t``.  The phase depends linearly on the
-        energy, so the inverse is always a single branch.
+        Inverting the wrapped angle gives the principal energy ``E = -angle / t``.
+        Periodic aliases differ by integer multiples of ``2*pi/abs(t)``; the inherited
+        ``eigenvalue_branches_from_phase`` returns only the principal representative.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
-            tuple[float, ...]: The corresponding Hamiltonian eigenvalue, as a one-element tuple.
+            float: The corresponding Hamiltonian eigenvalue on the principal phase branch.
 
         """
         angle = (phase_fraction % 1.0) * (2 * np.pi)
         if angle > np.pi:
             angle -= 2 * np.pi
-        return (float(-angle / self.scale),)
+        return float(-angle / self.scale)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -181,6 +182,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=reordered_step_terms,
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
+            scale=self.scale,
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":

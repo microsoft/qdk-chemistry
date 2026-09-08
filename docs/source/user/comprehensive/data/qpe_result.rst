@@ -38,8 +38,14 @@ where :math:`\lambda = \sum_j |\alpha_j|` is the 1-norm of the Hamiltonian coeff
 
 A container representing :math:`W^p` with :math:`p > 1` generally folds several energies onto the same phase,
 :math:`E_k = \lambda \cos(2\pi(\varphi + k)/p)` for :math:`k = 0, \ldots, p - 1`.
-``eigenvalue_from_phase`` reports every one of them, so the resulting :class:`~qdk_chemistry.data.QpeResult`
-carries all candidates in ``branching`` and the caller can resolve the branch with outside information.
+``eigenvalue_from_phase`` returns a scalar when the phase has a unique energy and raises ``ValueError``
+when it is ambiguous. Use ``eigenvalue_branches_from_phase`` to obtain the sorted tuple of distinct candidates
+and resolve the branch with outside information. Single-valued containers also provide this method,
+returning a one-element tuple.
+
+A saved representation of :math:`U^p` or :math:`W^p` must invert the phase of that powered operator.
+Standard and iterative QPE instead invert the base unitary (``power=1``), because their controlled powers
+are part of the query schedule, not a change to the operator whose phase is estimated.
 
 :class:`~qdk_chemistry.data.QpeResult` is the output of the :doc:`PhaseEstimation <../algorithms/phase_estimation>` algorithm and supports full :doc:`serialization <serialization>` to JSON and HDF5 formats.
 For details on how different :term:`QPE` implementations (:ref:`IQPE <iqpe-algorithm>`, :ref:`standard QFT-based <standard-qpe-algorithm>`) populate this result, see the :doc:`PhaseEstimation algorithm documentation <../algorithms/phase_estimation>`.
@@ -74,7 +80,7 @@ The :class:`~qdk_chemistry.data.QpeResult` stores the following information:
      - Alias-resolved phase angle in radians.
    * - ``raw_energy``
      - float
-     - Energy computed from ``canonical_phase_fraction`` via the container's ``eigenvalue_from_phase`` method, the lowest candidate when the container reports several.
+    - Energy computed from ``canonical_phase_fraction`` via the scalar ``eigenvalue_from_phase`` method. The factory does not choose a lowest-energy candidate.
    * - ``branching``
      - tuple[float, ...]
      - Sorted energy candidates considered, including ``raw_energy``. A single-element tuple when the phase inverts uniquely and the algorithm performs no alias resolution.
@@ -98,8 +104,9 @@ Alias resolution
 ----------------
 
 Alias resolution is relevant for **time-evolution-based QPE** (Trotter) where the phase is periodic.
-For qubitization the cosine mapping is injective over the measurable range of a single walk step, but a walk raised to a power :math:`p > 1`
-folds several energies onto one phase; ``from_phase_fraction`` then records all of them in ``branching``.
+For qubitization a single walk phase determines one energy, but a walk raised to a power :math:`p > 1`
+can fold several energies onto one phase. Obtain those candidates with ``eigenvalue_branches_from_phase``
+and resolve the ambiguity explicitly before using ``from_phase_fraction`` with a scalar converter.
 
 Phase estimation measures a phase :math:`\varphi \in [0, 1)`, but the underlying energy eigenvalue can be negative, positive, or arbitrarily large.
 Different energy values that differ by integer multiples of :math:`2\pi / t` all map to the same phase.
@@ -108,6 +115,8 @@ Different energy values that differ by integer multiples of :math:`2\pi / t` all
 
    The current ``from_phase_fraction`` factory does not perform alias resolution automatically.
    Alias resolution is the responsibility of the calling algorithm when needed.
+  Supplied ``branching`` candidates are sorted and must contain ``raw_energy`` and, when provided,
+  ``resolved_energy``, allowing for floating-point roundoff.
 
 
 Construction

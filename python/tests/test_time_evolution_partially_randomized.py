@@ -399,4 +399,22 @@ class TestPartiallyRandomizedScale:
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
         builder = PartiallyRandomized(time=t)
         container = builder.run(hamiltonian).get_container()
-        assert np.isclose(container.eigenvalue_from_phase(phi)[0], energy, rtol=1e-10, atol=1e-12)
+        assert np.isclose(container.eigenvalue_from_phase(phi), energy, rtol=1e-10, atol=1e-12)
+
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    @pytest.mark.parametrize("energy", [-0.5, 0.5])
+    def test_powered_phase_inversion_survives_serialization(self, power_strategy, energy):
+        """Powered partially randomized evolution preserves its phase mapping in JSON."""
+        time = 0.7
+        power = 3
+        phase = (-energy * time * power / (2 * np.pi)) % 1.0
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = PartiallyRandomized(time=time, power=power, power_strategy=power_strategy, seed=42)
+        container = builder.run(hamiltonian).get_container()
+        restored = PauliProductFormulaContainer.from_json(container.to_json())
+
+        for candidate in (container, restored):
+            assert candidate.scale == pytest.approx(time * power)
+            assert isinstance(candidate.eigenvalue_from_phase(phase), float)
+            assert candidate.eigenvalue_from_phase(phase) == pytest.approx(energy)
+            assert candidate.eigenvalue_branches_from_phase(phase) == pytest.approx((energy,))

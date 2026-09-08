@@ -53,7 +53,7 @@ def _dump_op(op, num_qubits: int) -> np.ndarray:
 def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
     """Run the decoder against a walk whose block encoding has ``lambda = 1``."""
     return _post_process_phase_estimation(
-        counts, num_bits, "qdk_unary", resolve_positive_branch, lambda phase: (float(np.cos(2 * np.pi * phase)),)
+        counts, num_bits, "qdk_unary", resolve_positive_branch, lambda phase: float(np.cos(2 * np.pi * phase))
     )
 
 
@@ -216,8 +216,10 @@ class TestPhaseDecoding:
 
     def test_a_unitary_that_folds_several_energies_onto_a_phase_is_rejected(self):
         """The sign flag names one energy per branch, so an ambiguous inverse has nothing to name."""
-        with pytest.raises(ValueError, match="one eigenvalue per sign branch"):
-            _post_process_phase_estimation({"01": 1}, 2, "qdk_unary", True, lambda _: (-1.0, 1.0))
+        base = LCUBuilder(quantum_walk=True).run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0])).get_container()
+        container = LCUWalkContainer(base.block_encoding, power=2)
+        with pytest.raises(ValueError, match="ambiguous"):
+            _post_process_phase_estimation({"01": 1}, 2, "qdk_unary", True, container.eigenvalue_from_phase)
 
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     def test_tied_counts_decode_independently_of_shot_order(self, resolve_positive_branch):

@@ -1159,23 +1159,26 @@ def cmd_utils_compute_valence_params(args):
 
 
 def cmd_utils_resolve_phase_energy(args):
-    """Resolve QPE phase to energy using the unitary's phase mapping."""
+    """Report phase-inversion branches and resolve energy using an external reference."""
     filename = _strip(args.unitary_representation_filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     unitary = load_data_object(filename, qdk_data.UnitaryRepresentation)
     container = unitary.get_container()
-    branching = tuple(sorted(container.eigenvalue_from_phase(args.phase_fraction)))
+    if container.type == "pauli_product_formula" and container.scale == 0:
+        raise ValueError("The unitary representation has a zero evolution-time scale")
+    branching = tuple(sorted(container.eigenvalue_branches_from_phase(args.phase_fraction)))
+    if not branching:
+        raise ValueError("eigenvalue_branches_from_phase returned no candidate energies.")
     raw_energy = branching[0]
-    resolved_energy = raw_energy
-
+    reference_energy = float(args.reference_energy)
     if container.type == "pauli_product_formula":
-        if container.scale == 0:
-            raise ValueError("The unitary representation has a zero evolution-time scale")
         period = 2.0 * math.pi / abs(float(container.scale))
-        alias_index = round((float(args.reference_energy) - raw_energy) / period)
+        alias_index = round((reference_energy - raw_energy) / period)
         resolved_energy = raw_energy + alias_index * period
+    else:
+        resolved_energy = min(branching, key=lambda energy: abs(energy - reference_energy))
 
     print(
         json.dumps(
@@ -1825,8 +1828,8 @@ def _create_utils_parsers(subparsers):
     # resolve-phase-energy
     p = subparsers.add_parser(
         "resolve-phase-energy",
-        help="Resolve QPE phase to energy using a unitary representation",
-        description="Use a unitary container's canonical phase inversion and representation-specific alias handling.",
+        help="List phase-inversion branches and resolve energy using a reference",
+        description="Report container branches and select the nearest walk candidate or periodic time-evolution alias.",
     )
     p.add_argument("--project-name", required=True, help="Project name")
     p.add_argument(

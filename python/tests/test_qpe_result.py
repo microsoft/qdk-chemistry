@@ -335,30 +335,30 @@ def test_qpe_result_from_phase_fraction_qubitization():
     assert result.metadata is None
 
 
-def test_qpe_result_branching_collects_candidates_and_sorts_a_supplied_set():
-    """Several candidates fill ``branching`` with ``raw_energy`` lowest; an explicit set replaces them, sorted."""
+def test_qpe_result_branching_preserves_scalar_energy_and_sorts_a_supplied_set():
+    """Explicit candidates are sorted without changing the scalar raw energy."""
     default = QpeResult.from_phase_fraction(
         method="qubitization_qpe",
         phase_fraction=0.1,
-        eigenvalue_from_phase=lambda _: (1.5, -0.5, 0.25),
+        eigenvalue_from_phase=lambda _: 1.5,
     )
     supplied = QpeResult.from_phase_fraction(
         method="qubitization_qpe",
         phase_fraction=0.1,
-        eigenvalue_from_phase=lambda _: (1.5, -0.5),
+        eigenvalue_from_phase=lambda _: 1.5,
         branching=(2.5, -0.5, 1.5),
         resolved_energy=1.5,
     )
 
     assert np.allclose(
         default.branching,
-        (-0.5, 0.25, 1.5),
+        (1.5,),
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
     )
     assert np.isclose(
         default.raw_energy,
-        -0.5,
+        1.5,
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
     )
@@ -368,6 +368,7 @@ def test_qpe_result_branching_collects_candidates_and_sorts_a_supplied_set():
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
     )
+    assert supplied.raw_energy == 1.5
     assert np.isclose(
         supplied.resolved_energy,
         1.5,
@@ -382,9 +383,34 @@ def test_qpe_result_rejects_a_branching_without_the_recovered_energy():
         QpeResult.from_phase_fraction(
             method="qubitization_qpe",
             phase_fraction=0.1,
-            eigenvalue_from_phase=lambda _: (1.5, -0.5),
+            eigenvalue_from_phase=lambda _: -0.5,
             branching=(1.5, 2.5),
         )
+
+
+@pytest.mark.parametrize("branching", [None, (-0.5, 1.5)])
+def test_qpe_result_rejects_resolved_energy_outside_branching(branching):
+    """Resolved energy must be one of the considered candidates."""
+    with pytest.raises(ValueError, match=r"resolved_energy.*not contained in branching"):
+        QpeResult.from_phase_fraction(
+            method="QPE",
+            phase_fraction=0.1,
+            eigenvalue_from_phase=lambda _: -0.5,
+            branching=branching,
+            resolved_energy=2.5,
+        )
+
+
+def test_qpe_result_accepts_resolved_energy_with_roundoff():
+    """Recomputed candidate energies may differ by floating-point roundoff."""
+    result = QpeResult.from_phase_fraction(
+        method="QPE",
+        phase_fraction=0.1,
+        eigenvalue_from_phase=lambda _: -0.5,
+        resolved_energy=-0.5 + 1e-12,
+    )
+
+    assert result.resolved_energy == pytest.approx(result.raw_energy)
 
 
 @pytest.mark.parametrize(

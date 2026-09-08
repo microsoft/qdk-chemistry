@@ -115,9 +115,7 @@ class QPESubspaceMarking(Algorithm):
                 if isinstance(container, QuantumWalkContainer)
                 else phase_bin
             )
-            # A powered walk folds several energies onto one bin; the bin is marked
-            # when any of them reaches the bound.
-            if max(container.eigenvalue_from_phase(canonical_bin / phase_bin_count)) < energy_lower_bound:
+            if container.eigenvalue_from_phase(canonical_bin / phase_bin_count) < energy_lower_bound:
                 continue
             if ranges and ranges[-1][1] == phase_bin:
                 ranges[-1] = (ranges[-1][0], phase_bin + 1)
