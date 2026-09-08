@@ -32,7 +32,6 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: read
   checks: write
   statuses: write
   code-quality: write
@@ -307,7 +306,6 @@ jobs:
             --exclude '.*gtest.*' \
             --exclude '.*gmock.*' \
             --exclude '.*/external/.*' \
-            --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
             --cobertura ${{ github.workspace }}/coverage-reports/cpp_coverage.cobertura.xml \
             --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
             --markdown ${{ github.workspace }}/coverage-reports/cpp_coverage.md \
@@ -380,7 +378,6 @@ jobs:
           COV_ARGS=(
             --cov=qdk_chemistry
             --cov-report=xml:../coverage-reports/python_coverage.xml
-            --cov-report=html:../coverage-reports/python_coverage_html
             --cov-report=term
           )
         fi
@@ -435,7 +432,6 @@ jobs:
           --markdown "../coverage-reports/pybind11_coverage.md" \
           --markdown-heading-level 5 \
           --markdown-title 'Pybind11 Coverage Report' \
-          --html-details "../coverage-reports/pybind11_coverage.html" \
           2> >(grep -v 'Can not fix case of path' >&2 || true)
 
         echo "Pybind11 Coverage Summary:"
@@ -495,22 +491,10 @@ jobs:
           echo "</details>" >> "$report"
         fi
 
-        cp "$report" pr-comment.md
-
-    # Forked pull_request runs only get a read-only GITHUB_TOKEN, so the comment is
-    # posted by the separate "Coverage PR Comment" workflow_run workflow instead.
-    - name: Upload coverage comment artifact
-      if: github.event_name == 'pull_request' && matrix.enable-coverage
-      uses: actions/upload-artifact@v7
-      with:
-        name: coverage-comment
-        path: pr-comment.md
-        retention-days: 1
-
     # Fork PRs are skipped by the action itself (no write access), not by this condition.
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
       with:
         file: coverage-reports/cpp_coverage.cobertura.xml
         language: C++
@@ -519,7 +503,7 @@ jobs:
 
     - name: Upload Pybind11 code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
       with:
         file: coverage-reports/pybind11_coverage.cobertura.xml
         language: C++
@@ -528,23 +512,12 @@ jobs:
 
     - name: Upload Python code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@v1
+      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
       with:
         file: coverage-reports/python_coverage.xml
         language: Python
         label: code-coverage/python
         fail-on-error: false
-
-    - name: Upload coverage HTML reports
-      if: matrix.enable-coverage
-      uses: actions/upload-artifact@v7
-      with:
-        name: coverage-html-reports
-        path: |
-          coverage-reports/cpp_coverage*.html
-          coverage-reports/pybind11_coverage*.html
-          coverage-reports/python_coverage_html/
-        retention-days: 14
 
     - name: Add coverage to job summary
       if: matrix.enable-coverage
