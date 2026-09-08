@@ -1,9 +1,4 @@
-"""Public entry point for the double factorization algorithm.
-
-This module re-exports the core double factorizer so that consumers can
-import it directly from ``qdk_chemistry.algorithms`` without depending on
-internal package paths.
-"""
+"""Public entry point for the double factorization algorithm."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

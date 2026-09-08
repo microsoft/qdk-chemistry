@@ -59,7 +59,7 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
  *   given chemist permutation symmetry by averaging rather than by
  *   verification, and reduced by a pivoted Cholesky decomposition costing
  *   O(naux * norb^4), which stops at the numerical rank rather than
- *   materializing all norb^2 eigenpairs :cite:`Beebe1977` :cite:`Koch2003`.
+ *   materializing all norb^2 eigenpairs.
  * - A qdk::chemistry::data::CholeskyHamiltonianContainer already stores such
  *   vectors, so they are consumed directly and the dense norb^4 tensor is
  *   never formed. `"truncation_threshold"` is ignored in that case: the

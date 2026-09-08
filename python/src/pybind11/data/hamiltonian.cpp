@@ -992,12 +992,6 @@ Args:
              py::smart_holder>
       factorized_container(data, "FactorizedHamiltonianContainer", R"(
 Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
-
-The two-body tensor is stored as a plain sum of squares, so it is positive
-semi-definite by construction.
-
-References:
-    :cite:`Low2025`
 )");
 
   factorized_container.def(

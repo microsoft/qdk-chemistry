@@ -35,7 +35,7 @@ std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
 }
 
 /// First factorization: pivoted Cholesky decomposition of the two-electron
-/// supermatrix :cite:`Beebe1977` :cite:`Koch2003`.
+/// supermatrix.
 ///
 /// Pivoting runs in the symmetric-pair basis of dimension norb(norb+1)/2
 /// rather than the full norb^2, since the supermatrix is symmetric under
@@ -53,29 +53,28 @@ std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
 /// @param norb Number of (spatial) orbitals.
 /// @param truncation_threshold Pivoting stops once the largest remaining
 ///        residual diagonal falls to or below this value.
-/// @param context Caller name, used in exception messages.
 /// @return norb^2 x naux matrix L with g_pqrs = sum_Q L_(pq),Q L_(rs),Q.
 /// @throws std::invalid_argument if `two_body_integrals` is not norb^4 long,
 ///         contains a non-finite value, or is not positive semi-definite,
 ///         since no Cholesky decomposition exists in that last case.
 Eigen::MatrixXd cholesky_vectors_from_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold, const std::string& context) {
+    double truncation_threshold) {
   QDK_LOG_TRACE_ENTERING();
 
   const std::size_t pair_dim = norb * norb;
   const std::size_t expected = pair_dim * pair_dim;
   if (static_cast<std::size_t>(two_body_integrals.size()) != expected) {
     throw std::invalid_argument(
-        context + ": expected norb^4 = " + std::to_string(expected) +
+        "double_factorizer: expected norb^4 = " + std::to_string(expected) +
         " elements for norb = " + std::to_string(norb) + ", got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
 
   if (!two_body_integrals.allFinite()) {
-    throw std::invalid_argument(context +
-                                ": two_body_integrals contains a non-finite "
-                                "value (NaN or infinity).");
+    throw std::invalid_argument(
+        "double_factorizer: two_body_integrals contains a non-finite "
+        "value (NaN or infinity).");
   }
 
   const Eigen::Map<const RowMajorMatrix> raw(
@@ -125,10 +124,9 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
     // is reported rather than truncated away.
     if (most_negative < -noise_floor) {
       throw std::invalid_argument(
-          context +
-          ": the two-electron supermatrix is not positive semi-definite, so "
-          "it has no Cholesky decomposition. Its most negative residual "
-          "diagonal is " +
+          "double_factorizer: the two-electron supermatrix is not positive "
+          "semi-definite, so it has no Cholesky decomposition. Its most "
+          "negative residual diagonal is " +
           std::to_string(most_negative) + ".");
     }
 
@@ -175,7 +173,6 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 /// @param cholesky_vectors norb^2 x naux matrix. Row index is the row-major
 ///        pair p*norb + q, column index is the Cholesky (auxiliary) index.
 /// @param norb Number of (spatial) orbitals.
-/// @param context Caller name, used in exception messages.
 /// @param u_matrices Resized to naux * norb * norb and filled rank by rank.
 /// @param w_matrices Resized to naux * norb and filled rank by rank.
 /// @return The number of ranks written, one per Cholesky vector, ordered by
@@ -185,22 +182,21 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
 std::size_t fragments_from_cholesky_vectors(
     const Eigen::MatrixXd& cholesky_vectors, std::size_t norb,
-    const std::string& context, Eigen::VectorXd& u_matrices,
-    Eigen::VectorXd& w_matrices) {
+    Eigen::VectorXd& u_matrices, Eigen::VectorXd& w_matrices) {
   QDK_LOG_TRACE_ENTERING();
 
   const std::size_t pair_dim = norb * norb;
   if (static_cast<std::size_t>(cholesky_vectors.rows()) != pair_dim) {
     throw std::invalid_argument(
-        context + ": expected norb^2 = " + std::to_string(pair_dim) +
+        "double_factorizer: expected norb^2 = " + std::to_string(pair_dim) +
         " rows for norb = " + std::to_string(norb) + ", got " +
         std::to_string(cholesky_vectors.rows()) + ".");
   }
 
   if (!cholesky_vectors.allFinite()) {
     throw std::invalid_argument(
-        context +
-        ": cholesky_vectors contains a non-finite value (NaN or infinity).");
+        "double_factorizer: cholesky_vectors contains a non-finite value (NaN "
+        "or infinity).");
   }
 
   const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
@@ -222,9 +218,9 @@ std::size_t fragments_from_cholesky_vectors(
                      static_cast<int64_t>(norb), rotation.data(),
                      static_cast<int64_t>(norb), coefficients.col(q).data());
     if (info != 0) {
-      throw std::runtime_error(context +
-                               ": LAPACK syev failed to diagonalize (info=" +
-                               std::to_string(info) + ").");
+      throw std::runtime_error(
+          "double_factorizer: LAPACK syev failed to diagonalize (info=" +
+          std::to_string(info) + ").");
     }
   }
 
@@ -263,15 +259,15 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   using qdk::chemistry::data::FactorizedHamiltonianContainer;
 
   if (!hamiltonian) {
-    throw std::invalid_argument(name() + ": hamiltonian is null");
+    throw std::invalid_argument(type_name() + ": hamiltonian is null");
   }
   if (!hamiltonian->is_restricted()) {
     throw std::invalid_argument(
-        name() + " currently only supports restricted Hamiltonians.");
+        type_name() + " currently only supports restricted Hamiltonians.");
   }
   if (!hamiltonian->has_two_body_integrals()) {
     throw std::invalid_argument(
-        name() +
+        type_name() +
         ": the Hamiltonian carries no two-body integrals to factorize.");
   }
 
@@ -282,13 +278,13 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
       std::get<0>(hamiltonian->get_one_body_integrals());
 
   const std::size_t norb = static_cast<std::size_t>(h_alpha.rows());
-  const std::string context = name();
 
   if (norb == 0) {
-    throw std::invalid_argument(context + ": norb must be greater than zero.");
+    throw std::invalid_argument(type_name() +
+                                ": norb must be greater than zero.");
   }
   if (truncation_threshold < 0.0 || std::isnan(truncation_threshold)) {
-    throw std::invalid_argument(context +
+    throw std::invalid_argument(type_name() +
                                 ": truncation_threshold must be "
                                 "non-negative, got " +
                                 std::to_string(truncation_threshold) + ".");
@@ -308,9 +304,9 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
       cholesky_vectors = &three_center;
     } else {
       QDK_LOGGER().debug(
-          "{}: stored three-center integrals have {} rows but "
+          "double_factorizer: stored three-center integrals have {} rows but "
           "num_orbitals={} implies {}, decomposing the dense tensor instead.",
-          context, three_center.rows(), norb, norb * norb);
+          three_center.rows(), norb, norb * norb);
     }
   }
 
@@ -318,8 +314,8 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   if (cholesky_vectors == nullptr) {
     const Eigen::VectorXd& two_body =
         std::get<0>(hamiltonian->get_two_body_integrals());
-    computed_vectors = cholesky_vectors_from_two_body(
-        two_body, norb, truncation_threshold, context);
+    computed_vectors =
+        cholesky_vectors_from_two_body(two_body, norb, truncation_threshold);
     cholesky_vectors = &computed_vectors;
   }
 
@@ -328,15 +324,16 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   Eigen::VectorXd u_matrices;
   Eigen::VectorXd w_matrices;
   const std::size_t num_ranks = fragments_from_cholesky_vectors(
-      *cholesky_vectors, norb, context, u_matrices, w_matrices);
+      *cholesky_vectors, norb, u_matrices, w_matrices);
 
   QDK_LOGGER().debug(
-      "{}: num_orbitals={}, truncation_threshold={}, retained {} fragments.",
-      context, norb, truncation_threshold, num_ranks);
+      "double_factorizer: num_orbitals={}, truncation_threshold={}, retained "
+      "{} fragments.",
+      norb, truncation_threshold, num_ranks);
 
   if (num_ranks == 0) {
     throw std::invalid_argument(
-        name() +
+        type_name() +
         ": truncation_threshold=" + std::to_string(truncation_threshold) +
         " leaves the factorized Hamiltonian with no two-body term at all.");
   }

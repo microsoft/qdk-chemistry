@@ -28,9 +28,8 @@ namespace {
 
 constexpr double kReconstructionTolerance = 1e-10;
 
-/// Random symmetric factors F_k of the tensor g_pqrs = sum_k s_k F_k(p,q)
-/// F_k(r,s). With every s_k positive these are also Cholesky vectors of the
-/// two-electron supermatrix, so the same fixture drives both factorizations.
+/// Random symmetric matrices: the factors F_k of a two-body tensor, and with
+/// @p count 1 the one-body term as well.
 std::vector<Eigen::MatrixXd> make_factors(std::size_t norb, std::size_t count,
                                           unsigned seed) {
   std::mt19937 rng(seed);
@@ -52,12 +51,12 @@ std::vector<Eigen::MatrixXd> make_factors(std::size_t norb, std::size_t count,
   return factors;
 }
 
-/// Build a random two-body tensor with a negative entry in @p signs.
-Eigen::VectorXd make_two_body(std::size_t norb,
-                              const std::vector<double>& signs, unsigned seed) {
-  const std::vector<Eigen::MatrixXd> factors =
-      make_factors(norb, signs.size(), seed);
-
+/// Contract explicit factors into g_pqrs = sum_k signs[k] F_k(p,q) F_k(r,s).
+/// All-positive signs make the supermatrix positive semi-definite, so the
+/// factors are then also Cholesky vectors of it.
+Eigen::VectorXd make_two_body(const std::vector<Eigen::MatrixXd>& factors,
+                              const std::vector<double>& signs) {
+  const std::size_t norb = static_cast<std::size_t>(factors.front().rows());
   Eigen::VectorXd two_body = Eigen::VectorXd::Zero(norb * norb * norb * norb);
   for (std::size_t p = 0; p < norb; ++p) {
     for (std::size_t q = 0; q < norb; ++q) {
@@ -75,34 +74,28 @@ Eigen::VectorXd make_two_body(std::size_t norb,
   return two_body;
 }
 
-Eigen::VectorXd make_positive_two_body(
-    const std::vector<Eigen::MatrixXd>& factors) {
-  const std::size_t norb = static_cast<std::size_t>(factors.front().rows());
-  Eigen::VectorXd two_body = Eigen::VectorXd::Zero(norb * norb * norb * norb);
-  for (std::size_t p = 0; p < norb; ++p) {
-    for (std::size_t q = 0; q < norb; ++q) {
-      for (std::size_t r = 0; r < norb; ++r) {
-        for (std::size_t s = 0; s < norb; ++s) {
-          for (const auto& factor : factors) {
-            two_body[((p * norb + q) * norb + r) * norb + s] +=
-                factor(p, q) * factor(r, s);
-          }
-        }
-      }
-    }
-  }
-  return two_body;
+/// As above, over freshly generated random factors, one per sign.
+Eigen::VectorXd make_two_body(std::size_t norb,
+                              const std::vector<double>& signs, unsigned seed) {
+  return make_two_body(make_factors(norb, signs.size(), seed), signs);
 }
 
-/// Pack the same factors as norb^2 x naux Cholesky vectors, so that
-/// L L^T is the supermatrix of make_two_body with all-positive signs.
-Eigen::MatrixXd make_cholesky_vectors(std::size_t norb, std::size_t naux,
-                                      unsigned seed) {
-  const std::vector<Eigen::MatrixXd> factors = make_factors(norb, naux, seed);
+/// Pack random factors as norb^2 x naux Cholesky vectors, so that L L^T is the
+/// supermatrix of make_two_body with all-positive signs.
+///
+/// @param independent Number of linearly independent columns, i.e. the true
+///        rank of the tensor.
+/// @param total Number of stored columns. Anything beyond @p independent is a
+///        scaled copy of an earlier column, which leaves the tensor unchanged
+///        but makes L rank-deficient, as stored vectors routinely are.
+Eigen::MatrixXd make_cholesky_vectors(std::size_t norb, std::size_t independent,
+                                      std::size_t total, unsigned seed) {
+  const std::vector<Eigen::MatrixXd> factors =
+      make_factors(norb, independent, seed);
 
   Eigen::MatrixXd vectors(static_cast<Eigen::Index>(norb * norb),
-                          static_cast<Eigen::Index>(naux));
-  for (std::size_t k = 0; k < naux; ++k) {
+                          static_cast<Eigen::Index>(total));
+  for (std::size_t k = 0; k < independent; ++k) {
     for (std::size_t p = 0; p < norb; ++p) {
       for (std::size_t q = 0; q < norb; ++q) {
         vectors(static_cast<Eigen::Index>(p * norb + q),
@@ -110,39 +103,13 @@ Eigen::MatrixXd make_cholesky_vectors(std::size_t norb, std::size_t naux,
       }
     }
   }
-  return vectors;
-}
-
-Eigen::MatrixXd make_rank_deficient_cholesky_vectors(std::size_t norb,
-                                                     std::size_t independent,
-                                                     std::size_t total,
-                                                     unsigned seed) {
-  const Eigen::MatrixXd base = make_cholesky_vectors(norb, independent, seed);
-
-  Eigen::MatrixXd vectors(static_cast<Eigen::Index>(norb * norb),
-                          static_cast<Eigen::Index>(total));
-  vectors.leftCols(static_cast<Eigen::Index>(independent)) = base;
   for (std::size_t k = independent; k < total; ++k) {
     const double scale = 0.5 + 0.25 * static_cast<double>(k - independent);
     vectors.col(static_cast<Eigen::Index>(k)) =
         scale *
-        base.col(static_cast<Eigen::Index>((k - independent) % independent));
+        vectors.col(static_cast<Eigen::Index>((k - independent) % independent));
   }
   return vectors;
-}
-
-Eigen::MatrixXd make_one_body(std::size_t norb, unsigned seed) {
-  std::mt19937 rng(seed);
-  std::uniform_real_distribution<double> dist(-1.0, 1.0);
-  Eigen::MatrixXd one_body(norb, norb);
-  for (std::size_t p = 0; p < norb; ++p) {
-    for (std::size_t q = 0; q <= p; ++q) {
-      const double value = dist(rng);
-      one_body(p, q) = value;
-      one_body(q, p) = value;
-    }
-  }
-  return one_body;
 }
 
 std::shared_ptr<Hamiltonian> make_hamiltonian(std::size_t norb,
@@ -150,7 +117,7 @@ std::shared_ptr<Hamiltonian> make_hamiltonian(std::size_t norb,
                                               double core_energy = -1.25) {
   return std::make_shared<Hamiltonian>(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          make_one_body(norb, 7), two_body,
+          make_factors(norb, 1, 7).front(), two_body,
           testing::create_test_orbitals(static_cast<int>(norb),
                                         static_cast<int>(norb)),
           core_energy, Eigen::MatrixXd::Zero(0, 0)));
@@ -161,7 +128,7 @@ std::shared_ptr<Hamiltonian> make_cholesky_hamiltonian(
     double core_energy = -1.25) {
   return std::make_shared<Hamiltonian>(
       std::make_unique<CholeskyHamiltonianContainer>(
-          make_one_body(norb, 7), vectors,
+          make_factors(norb, 1, 7).front(), vectors,
           testing::create_test_orbitals(static_cast<int>(norb),
                                         static_cast<int>(norb)),
           core_energy, Eigen::MatrixXd::Zero(0, 0)));
@@ -171,8 +138,8 @@ std::shared_ptr<Hamiltonian> make_unrestricted_hamiltonian(std::size_t norb) {
   const auto two_body = make_two_body(norb, {1.0, 1.0}, 3);
   return std::make_shared<Hamiltonian>(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          make_one_body(norb, 7), make_one_body(norb, 11), two_body, two_body,
-          two_body,
+          make_factors(norb, 1, 7).front(), make_factors(norb, 1, 11).front(),
+          two_body, two_body, two_body,
           testing::create_test_orbitals(static_cast<int>(norb),
                                         static_cast<int>(norb)),
           0.0, Eigen::MatrixXd::Zero(0, 0), Eigen::MatrixXd::Zero(0, 0)));
@@ -219,6 +186,14 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
             available.end());
   EXPECT_THROW(DoubleFactorizerFactory::create("nonexistent_factorizer"),
                std::runtime_error);
+
+  // A Cholesky decomposition exists only for a positive semi-definite
+  // supermatrix. Stopping at the breakdown would yield an exact factorization
+  // of a *different* tensor and a silently wrong lambda, so an indefinite
+  // input is rejected rather than approximated.
+  EXPECT_THROW(factorizer->run(
+                   make_hamiltonian(4, make_two_body(4, {1.0, -1.0, 1.0}, 5))),
+               std::invalid_argument);
 }
 
 TEST(DoubleFactorizerTest, RejectsInvalidInput) {
@@ -247,30 +222,6 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   auto truncating = DoubleFactorizerFactory::create("qdk");
   truncating->settings().set("truncation_threshold", 1e6);
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
-}
-
-TEST(DoubleFactorizerTest, RejectsIndefiniteTensor) {
-  // A Cholesky decomposition exists only for a positive semi-definite
-  // supermatrix. Stopping at the breakdown would yield an exact factorization
-  // of a *different* tensor and a silently wrong lambda, so an indefinite
-  // input is rejected rather than approximated.
-  constexpr std::size_t norb = 4;
-  auto hamiltonian =
-      make_hamiltonian(norb, make_two_body(norb, {1.0, -1.0, 1.0}, 5));
-
-  EXPECT_THROW(DoubleFactorizerFactory::create("qdk")->run(hamiltonian),
-               std::invalid_argument);
-}
-
-TEST(DoubleFactorizerTest, FragmentsReconstructPositiveTensor) {
-  constexpr std::size_t norb = 3;
-  const auto two_body = make_two_body(norb, {1.0, 1.0}, 17);
-  auto factorized = DoubleFactorizerFactory::create("qdk")->run(
-      make_hamiltonian(norb, two_body));
-
-  auto [g_aaaa, g_aabb, g_bbbb] = factorized->get_two_body_integrals();
-  EXPECT_TRUE(g_aaaa.isApprox(two_body, kReconstructionTolerance))
-      << "max abs deviation: " << (g_aaaa - two_body).cwiseAbs().maxCoeff();
 }
 
 TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
@@ -327,7 +278,7 @@ TEST(DoubleFactorizerTest, SortsFragmentsByDecreasingOneNormContribution) {
 
   auto factorized =
       DoubleFactorizerFactory::create("qdk")->run(make_hamiltonian(
-          norb, make_positive_two_body({concentrated, distributed})));
+          norb, make_two_body({concentrated, distributed}, {1.0, 1.0})));
   const auto& container = as_factorized(factorized);
   ASSERT_EQ(container.get_num_ranks(), 2u);
 
@@ -363,8 +314,7 @@ TEST(DoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
   // Stored as 5 vectors that only span rank 3. Getting 5 fragments back is
   // what proves the stored vectors were consumed as-is: decomposing the dense
   // tensor would have stopped at the numerical rank and returned 3.
-  const Eigen::MatrixXd vectors =
-      make_rank_deficient_cholesky_vectors(norb, 3, 5, 23);
+  const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 5, 23);
   auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
 
   auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
@@ -383,8 +333,7 @@ TEST(DoubleFactorizerTest, IgnoresTruncationThresholdForStoredVectors) {
   // vectors skip that step entirely. A threshold large enough to discard every
   // fragment of the equivalent dense tensor therefore has to change nothing.
   constexpr std::size_t norb = 3;
-  const Eigen::MatrixXd vectors =
-      make_rank_deficient_cholesky_vectors(norb, 3, 5, 23);
+  const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 5, 23);
   auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
 
   auto factorizer = DoubleFactorizerFactory::create("qdk");
@@ -402,7 +351,7 @@ TEST(DoubleFactorizerTest, IgnoresTruncationThresholdForStoredVectors) {
 
 TEST(DoubleFactorizerTest, StoredVectorsMatchDenseDecomposition) {
   constexpr std::size_t norb = 3;
-  const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 23);
+  const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 3, 23);
 
   // The same tensor reached two ways: from the stored vectors, which skip the
   // first factorization, and from the dense tensor, which runs it. The

@@ -69,9 +69,6 @@ Returns:
 Raises:
   ValueError: If the input or its two-electron integrals are invalid, or no fragment survives truncation.
   RuntimeError: If an eigendecomposition fails.
-
-Note:
-  Calling this method locks the settings.
 )",
                         py::arg("hamiltonian"));
 
