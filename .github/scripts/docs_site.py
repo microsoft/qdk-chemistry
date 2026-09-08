@@ -24,6 +24,7 @@ import argparse
 import json
 import re
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -118,6 +119,8 @@ def _write_build_info(
     package_version: str,
     commit: str,
     ref: str,
+    docs_commit: str = "",
+    docs_ref: str = "",
     source_run_id: str = "",
 ) -> None:
     """Record what a published directory was built from.
@@ -126,8 +129,10 @@ def _write_build_info(
         directory: Published version directory.
         version: Version label of the build.
         package_version: Exact package version used to build release docs.
-        commit: Commit SHA the documentation sources came from.
-        ref: Git ref the documentation sources came from.
+        commit: Commit SHA the release sources came from.
+        ref: Git ref the release sources came from.
+        docs_commit: Commit SHA the documentation sources came from.
+        docs_ref: Git ref the documentation sources came from.
         source_run_id: GitHub Actions run that produced development documentation.
     """
     info = {
@@ -136,6 +141,8 @@ def _write_build_info(
         "commit": commit,
         "ref": ref,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "docs_commit": docs_commit or commit,
+        "docs_ref": docs_ref or ref,
     }
     if source_run_id:
         info["source_run_id"] = source_run_id
@@ -184,6 +191,77 @@ def _read_build_info(directory: Path) -> dict[str, str]:
             f"build metadata in {info_file} is missing: {', '.join(sorted(missing_keys))}"
         )
     return info
+
+
+def _run_git(repository: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+    """Run Git in a repository and capture its result."""
+    try:
+        return subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as error:
+        _fail(f"could not run Git in {repository}: {error}")
+
+
+def _check_docs_revision(
+    repository: Path,
+    previous_info: dict[str, str],
+    package_version: str,
+    docs_commit: str,
+) -> None:
+    """Require same-package documentation updates to move forward in history."""
+    previous_package_version = previous_info.get("package_version", "")
+    previous_docs_commit = previous_info.get("docs_commit") or previous_info.get(
+        "commit", ""
+    )
+    if (
+        previous_package_version != package_version
+        or not previous_docs_commit
+        or previous_docs_commit == docs_commit
+    ):
+        return
+    if not docs_commit:
+        _fail(
+            f"documentation commit is required when replacing release {package_version}"
+        )
+
+    previous_exists = _run_git(
+        repository, "cat-file", "-e", f"{previous_docs_commit}^{{commit}}"
+    )
+    if previous_exists.returncode != 0:
+        fetch = _run_git(
+            repository, "fetch", "--no-tags", "origin", previous_docs_commit
+        )
+        if fetch.returncode != 0:
+            detail = fetch.stderr.strip()
+            suffix = f": {detail}" if detail else ""
+            _fail(
+                "could not fetch currently published documentation commit "
+                f"{previous_docs_commit} for release {package_version}{suffix}"
+            )
+
+    ancestry = _run_git(
+        repository,
+        "merge-base",
+        "--is-ancestor",
+        previous_docs_commit,
+        docs_commit,
+    )
+    if ancestry.returncode == 0:
+        return
+    if ancestry.returncode == 1:
+        _fail(
+            f"documentation commit {docs_commit} does not descend from currently "
+            f"published commit {previous_docs_commit} for release {package_version}"
+        )
+    detail = ancestry.stderr.strip()
+    suffix = f": {detail}" if detail else ""
+    _fail(
+        f"could not verify documentation history for release {package_version}{suffix}"
+    )
 
 
 def _discover_versions(site: Path) -> list[str]:
@@ -473,9 +551,8 @@ def install(args: argparse.Namespace) -> None:
                 f"release {args.package_version} must publish with version and target "
                 f"{expected_target!r}"
             )
-        previous_version = _read_build_info(site / target_name).get(
-            "package_version", ""
-        )
+        previous_info = _read_build_info(site / target_name)
+        previous_version = previous_info.get("package_version", "")
         if previous_version and _release_sort_key(
             args.package_version
         ) < _release_sort_key(previous_version):
@@ -483,6 +560,12 @@ def install(args: argparse.Namespace) -> None:
                 f"refusing to replace {target_name}/ built from newer release "
                 f"{previous_version} with {args.package_version}"
             )
+        _check_docs_revision(
+            Path(args.repository),
+            previous_info,
+            args.package_version,
+            args.docs_commit or args.commit,
+        )
 
     target = site / target_name
     _replace_tree(html, target)
@@ -492,7 +575,9 @@ def install(args: argparse.Namespace) -> None:
         args.package_version,
         args.commit,
         args.ref,
-        source_run_id,
+        docs_commit=args.docs_commit,
+        docs_ref=args.docs_ref,
+        source_run_id=source_run_id,
     )
     print(f"installed {args.version} ({args.commit[:8]}) into {target.name}/")
 
@@ -538,10 +623,21 @@ def main() -> None:
         help="exact X.Y.Z package version used for release documentation",
     )
     install_parser.add_argument(
-        "--commit", default="", help="commit the sources came from"
+        "--commit", default="", help="commit the release sources came from"
     )
     install_parser.add_argument(
-        "--ref", default="", help="git ref the sources came from"
+        "--ref", default="", help="git ref the release sources came from"
+    )
+    install_parser.add_argument(
+        "--docs-commit", default="", help="commit the documentation came from"
+    )
+    install_parser.add_argument(
+        "--docs-ref", default="", help="git ref the documentation came from"
+    )
+    install_parser.add_argument(
+        "--repository",
+        default=".",
+        help="Git repository used to verify documentation ancestry",
     )
     install_parser.add_argument(
         "--source-run-id",

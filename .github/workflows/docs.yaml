@@ -1,20 +1,26 @@
 name: Docs
 
 on:
-  # Build and Test already builds dev from main, so reuse that trusted artifact.
-  # Branch filters cannot take expressions, so this one name is hardcoded; the
-  # job conditions below compare against the repository's default branch.
+  # Automatic trigger: publish /dev/ from a successful "Build and Test" artifact for main.
   workflow_run:
     workflows: [Build and Test]
     types: [completed]
     branches: [main]
+  # Automatic trigger: publish versioned and stable docs for a newly published final release.
   release:
     types: [published]
+  # Manual trigger: build docs for an existing release tag, optionally using the docs/ from docs_ref.
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Immutable release tag to build (vX.Y.Z)
+        description: Release tag to build (vX.Y.Z); matching package must be on PyPI
         required: true
+        type: string
+      docs_ref:
+        description: >-
+          Branch, tag, or commit providing docs/; generated API docs remain at release_tag.
+          Leave blank to use release_tag.
+        required: false
         type: string
       publish:
         description: Push the result to the gh-pages branch
@@ -43,6 +49,8 @@ jobs:
     timeout-minutes: 10
     outputs:
       base_url: ${{ steps.resolve.outputs.base_url }}
+      docs_ref: ${{ steps.resolve.outputs.docs_ref }}
+      docs_sha: ${{ steps.resolve.outputs.docs_sha }}
       package_version: ${{ steps.resolve.outputs.package_version }}
       publish: ${{ steps.resolve.outputs.publish }}
       ref: ${{ steps.resolve.outputs.ref }}
@@ -56,6 +64,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
+        fetch-depth: 0
         ref: ${{ github.event_name == 'workflow_run' && github.event.repository.default_branch || format('refs/tags/{0}', inputs.release_tag || github.event.release.tag_name) }}
 
     - name: Resolve inputs
@@ -63,6 +72,7 @@ jobs:
       env:
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         EVENT: ${{ github.event_name }}
+        INPUT_DOCS_REF: ${{ inputs.docs_ref }}
         INPUT_PUBLISH: ${{ inputs.publish }}
         INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
         RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -78,6 +88,8 @@ jobs:
           SOURCE_RUN_ID="$RUN_ID"
           TARGET=dev
           VERSION=dev
+          DOCS_REF="$REF"
+          DOCS_SHA="$SHA"
         else
           if [[ "$EVENT" == "release" ]]; then
             PUBLISH=true
@@ -105,6 +117,43 @@ jobs:
             echo "::error::Selected release tag ${EXPECTED_REF} resolves to ${EXPECTED_SHA}, but the checkout is ${SHA}."
             exit 1
           fi
+
+          DOCS_REF="$REF"
+          DOCS_SHA="$SHA"
+          if [[ "$EVENT" == "workflow_dispatch" && -n "$INPUT_DOCS_REF" ]]; then
+            DOCS_REF="$INPUT_DOCS_REF"
+            if [[ "$DOCS_REF" =~ [[:space:]] ]]; then
+              echo "::error::Documentation ref must not contain whitespace."
+              exit 1
+            fi
+
+            CANDIDATES=("$DOCS_REF")
+            if [[ "$DOCS_REF" == refs/heads/* ]]; then
+              CANDIDATES+=("refs/remotes/origin/${DOCS_REF#refs/heads/}")
+            elif [[ "$DOCS_REF" != refs/* && "$DOCS_REF" != origin/* ]]; then
+              CANDIDATES+=("refs/tags/$DOCS_REF" "refs/remotes/origin/$DOCS_REF")
+            fi
+
+            DOCS_SHA=""
+            for CANDIDATE in "${CANDIDATES[@]}"; do
+              CANDIDATE_SHA="$(git rev-parse --verify "${CANDIDATE}^{commit}" 2>/dev/null || true)"
+              if [[ -n "$CANDIDATE_SHA" ]]; then
+                if [[ -n "$DOCS_SHA" && "$CANDIDATE_SHA" != "$DOCS_SHA" ]]; then
+                  echo "::error::Documentation ref '$DOCS_REF' is ambiguous; use a fully qualified ref."
+                  exit 1
+                fi
+                DOCS_SHA="$CANDIDATE_SHA"
+              fi
+            done
+            if [[ -z "$DOCS_SHA" ]]; then
+              echo "::error::Could not resolve documentation ref '$DOCS_REF' to a commit in this repository."
+              exit 1
+            fi
+            if ! git merge-base --is-ancestor "$SHA" "$DOCS_SHA"; then
+              echo "::error::Documentation ref '$DOCS_REF' (${DOCS_SHA}) does not descend from release tag ${EXPECTED_REF} (${SHA})."
+              exit 1
+            fi
+          fi
           SOURCE=build
           SOURCE_RUN_ID=""
         fi
@@ -113,6 +162,8 @@ jobs:
         NAME="$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')"
         {
           echo "base_url=https://${OWNER}.github.io/${NAME}/"
+          echo "docs_ref=$DOCS_REF"
+          echo "docs_sha=$DOCS_SHA"
           echo "package_version=$PACKAGE_VERSION"
           echo "publish=$PUBLISH"
           echo "ref=$REF"
@@ -131,10 +182,24 @@ jobs:
     timeout-minutes: 60
 
     steps:
-    - name: Checkout documentation sources
+    - name: Checkout release sources
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         ref: ${{ needs.config.outputs.sha }}
+
+    - name: Checkout documentation revision
+      if: needs.config.outputs.docs_sha != needs.config.outputs.sha
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        path: docs-source
+        ref: ${{ needs.config.outputs.docs_sha }}
+        sparse-checkout: docs
+
+    - name: Overlay documentation revision
+      if: needs.config.outputs.docs_sha != needs.config.outputs.sha
+      run: |
+        rm -rf docs
+        cp -a docs-source/docs docs
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -164,6 +229,7 @@ jobs:
         # so search results follow the current documentation instead of pinning
         # to whichever version happened to be newest when they were indexed.
         QDK_CHEMISTRY_DOCS_BASE_URL: ${{ needs.config.outputs.base_url }}stable/
+        QDK_CHEMISTRY_DOCS_COMMIT: ${{ needs.config.outputs.docs_sha }}
         QDK_CHEMISTRY_DOCS_VERSION: ${{ needs.config.outputs.package_version }}
       run: make clean all
 
@@ -209,6 +275,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
+        fetch-depth: 0
         ref: ${{ github.event.repository.default_branch }}
 
     - name: Check for a gh-pages branch
@@ -259,6 +326,8 @@ jobs:
     - name: Update, commit, and push
       env:
         BASE_URL: ${{ needs.config.outputs.base_url }}
+        DOCS_REF: ${{ needs.config.outputs.docs_ref }}
+        DOCS_SHA: ${{ needs.config.outputs.docs_sha }}
         PACKAGE_VERSION: ${{ needs.config.outputs.package_version }}
         REF: ${{ needs.config.outputs.ref }}
         SHA: ${{ needs.config.outputs.sha }}
@@ -287,6 +356,8 @@ jobs:
           python3 .github/scripts/docs_site.py --site "$SITE" --base-url "$BASE_URL" \
             install --html docs-html --target "$TARGET" --version "$VERSION" \
             --package-version "$PACKAGE_VERSION" --commit "$SHA" --ref "$REF" \
+            --docs-commit "$DOCS_SHA" --docs-ref "$DOCS_REF" \
+            --repository . \
             --source-run-id "${{ needs.config.outputs.source_run_id }}" \
             "${STABLE_ARG[@]}"
           git -C gh-pages add --all --force docs
@@ -297,7 +368,7 @@ jobs:
           fi
 
           LABEL="${PACKAGE_VERSION:-dev}"
-          git -C gh-pages commit -m "Update ${TARGET} docs to ${LABEL} (${SHA:0:8})"
+          git -C gh-pages commit -m "Update ${TARGET} docs to ${LABEL} (${DOCS_SHA:0:8})"
           if git -C gh-pages push origin HEAD:gh-pages; then
             exit 0
           fi

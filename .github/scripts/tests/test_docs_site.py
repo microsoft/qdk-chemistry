@@ -8,6 +8,7 @@
 import argparse
 import importlib.util
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -48,11 +49,15 @@ class DocsSiteTest(unittest.TestCase):
         version: str,
         package_version: str = "",
         *,
+        commit: str = "abcdef123456",
         stable: bool = False,
+        docs_commit: str = "",
+        docs_ref: str = "",
+        repository: Path | None = None,
         source_run_id: str = "",
     ) -> None:
         """Install a minimal documentation build into the test site."""
-        marker = source_run_id or package_version or version
+        marker = source_run_id or docs_commit or package_version or version
         docs_site.install(
             argparse.Namespace(
                 html=str(self._html(marker)),
@@ -60,13 +65,45 @@ class DocsSiteTest(unittest.TestCase):
                 target=target,
                 version=version,
                 package_version=package_version,
-                commit="abcdef123456",
+                commit=commit,
                 ref="main" if target == "dev" else f"v{package_version}",
+                docs_commit=docs_commit,
+                docs_ref=docs_ref,
+                repository=str(repository or self.root),
                 stable=stable,
                 base_url="https://example.test/docs/",
                 source_run_id=source_run_id,
             )
         )
+
+    def _git(self, repository: Path, *arguments: str) -> str:
+        """Run Git in a test repository and return standard output."""
+        result = subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def _linear_history(self) -> tuple[Path, str, str]:
+        """Create a two-commit Git history for documentation revisions."""
+        repository = self.root / "repository"
+        repository.mkdir()
+        self._git(repository, "init", "--quiet")
+        self._git(repository, "config", "user.name", "Docs Test")
+        self._git(repository, "config", "user.email", "docs@example.test")
+
+        tracked_file = repository / "docs.txt"
+        tracked_file.write_text("first\n")
+        self._git(repository, "add", "docs.txt")
+        self._git(repository, "commit", "--quiet", "-m", "First revision")
+        first_commit = self._git(repository, "rev-parse", "HEAD")
+
+        tracked_file.write_text("second\n")
+        self._git(repository, "commit", "--quiet", "-am", "Second revision")
+        second_commit = self._git(repository, "rev-parse", "HEAD")
+        return repository, first_commit, second_commit
 
     def _package_version(self, directory: str) -> str:
         """Read the exact package version recorded for a directory."""
@@ -92,6 +129,120 @@ class DocsSiteTest(unittest.TestCase):
 
         self.assertEqual(self._package_version("2.1"), "2.1.1")
         self.assertEqual(self._package_version("stable"), "2.1.1")
+
+    def test_release_metadata_records_documentation_revision(self) -> None:
+        """Record release and documentation provenance independently."""
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            docs_commit="fedcba654321",
+            docs_ref="stable/2.1",
+        )
+
+        info = docs_site._read_build_info(self.site / "2.1")
+        self.assertEqual(info["commit"], "abcdef123456")
+        self.assertEqual(info["ref"], "v2.1.3")
+        self.assertEqual(info["docs_commit"], "fedcba654321")
+        self.assertEqual(info["docs_ref"], "stable/2.1")
+
+    def test_same_package_documentation_revision_moves_forward(self) -> None:
+        """Allow a documentation revision descending from the published one."""
+        repository, first_commit, second_commit = self._linear_history()
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            docs_commit=first_commit,
+            repository=repository,
+        )
+
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            docs_commit=second_commit,
+            repository=repository,
+        )
+
+        info = docs_site._read_build_info(self.site / "2.1")
+        self.assertEqual(info["docs_commit"], second_commit)
+
+    def test_same_package_documentation_revision_cannot_move_backward(self) -> None:
+        """Reject a documentation revision older than the published one."""
+        repository, first_commit, second_commit = self._linear_history()
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            docs_commit=second_commit,
+            repository=repository,
+        )
+
+        with self.assertRaises(SystemExit):
+            self._install(
+                "2.1",
+                "2.1",
+                "2.1.3",
+                docs_commit=first_commit,
+                repository=repository,
+            )
+
+        info = docs_site._read_build_info(self.site / "2.1")
+        self.assertEqual(info["docs_commit"], second_commit)
+
+    def test_legacy_metadata_uses_release_commit_for_history(self) -> None:
+        """Use the release commit when older metadata has no docs commit."""
+        repository, first_commit, second_commit = self._linear_history()
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            commit=first_commit,
+            docs_commit=first_commit,
+            repository=repository,
+        )
+        info_file = self.site / "2.1" / docs_site.BUILD_INFO_NAME
+        info = json.loads(info_file.read_text())
+        del info["docs_commit"]
+        del info["docs_ref"]
+        info_file.write_text(json.dumps(info))
+
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            commit=first_commit,
+            docs_commit=second_commit,
+            repository=repository,
+        )
+
+        info = docs_site._read_build_info(self.site / "2.1")
+        self.assertEqual(info["docs_commit"], second_commit)
+
+    def test_unavailable_published_documentation_revision_fails_closed(self) -> None:
+        """Reject an update when the published revision cannot be verified."""
+        repository, _, second_commit = self._linear_history()
+        unavailable_commit = "f" * 40
+        self._install(
+            "2.1",
+            "2.1",
+            "2.1.3",
+            docs_commit=unavailable_commit,
+            repository=repository,
+        )
+
+        with self.assertRaises(SystemExit):
+            self._install(
+                "2.1",
+                "2.1",
+                "2.1.3",
+                docs_commit=second_commit,
+                repository=repository,
+            )
+
+        info = docs_site._read_build_info(self.site / "2.1")
+        self.assertEqual(info["docs_commit"], unavailable_commit)
 
     def test_older_maintenance_release_does_not_downgrade_stable(self) -> None:
         """Keep stable on the newest release across maintenance lines."""

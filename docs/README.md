@@ -134,12 +134,14 @@ The [`Docs`](../.github/workflows/docs.yaml) workflow maintains it, and [`.githu
 
 `dev/` is republished automatically after every successful `Build and Test` run on `main`. If publication fails, rerun the downstream `Docs` workflow while the artifact is available. To rebuild an expired or missing artifact, run `Build and Test` manually on `main`.
 
-Final releases are rebuilt from their tag against the exact package version from PyPI. Publishing `2.1.3` replaces `2.1/` if it is newer than the version already there; its sidebar shows `Documentation 2.1.3`, while the version switcher and URL use `2.1`. Patch-version directories are not retained. The newest published release also replaces `stable/`, while a release on an older minor line updates only its own minor directory. Older releases cannot overwrite newer documentation, and prereleases are not published.
+Releases are rebuilt from their tag against the exact package version from PyPI. Publishing `2.1.3` replaces `2.1/` if it is newer than the version already there. Patch-version directories are not retained. The newest published release also replaces `stable/`, while a release on an older minor line updates only its own minor directory.
 
-Historical tags can be selected in a manual run. Releases that predate the current theme retain their old theme and have no version switcher, so a reader who lands in one of those directories has no in-page way back to `stable/`. If that becomes a problem for a maintained line, update its documentation configuration and publish a patch release.
+Historical tags can be selected in a manual run. Releases that predate the current theme retain their old theme and have no version switcher, so a reader who lands in one of those directories has no in-page way back to `stable/`. Compatible documentation corrections can be backported to a maintained release line and published manually without creating a package release.
 
 Python wheels are published by a separate, approval-gated pipeline. If the exact package version is not on PyPI when the GitHub release is published, the release-triggered `Docs` workflow fails with a direct error. Rerun that same workflow after the wheel is available; GitHub preserves the original release tag for the rerun.
 
-Manual runs (`workflow_dispatch`) accept one immutable final-release tag for validating or backfilling a release. The exact PyPI package version and minor-version target are derived from that tag's root [`VERSION`](../VERSION) file, and the workflow verifies that the checkout resolves to the matching tag.
+Manual runs (`workflow_dispatch`) require an immutable final `release_tag`, which determines the package version and minor-version target. An optional same-repository `docs_ref` (branch, tag, or commit) can supply a corrected `docs/` tree and defaults to the release tag. It must descend from the release tag; generated API docs still use the release sources. Published metadata records both revisions.
+
+Use `stable/X.Y` as `docs_ref` for ongoing corrections. Updates for the same package must move forward in history, and fixes must remain in the next patch release. A new patch tag replaces `/X.Y/`; use that tag with the same maintenance branch afterward.
 
 Published minor versions are retained. A build is currently about 50 MB and GitHub Pages limits a published site to 1 GB. The site assembler warns at 800 MB and rejects publication above 1 GB.

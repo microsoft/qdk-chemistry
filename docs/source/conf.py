@@ -177,12 +177,19 @@ breathe_default_members = (
 # overflows the header into the search box.
 html_title = f"QDK/Chemistry {release}"
 html_theme = "pydata_sphinx_theme"
+_repository_url = "https://github.com/microsoft/qdk-chemistry"
+_docs_commit = os.environ.get("QDK_CHEMISTRY_DOCS_COMMIT", "")
+html_context = {
+    "docs_commit": _docs_commit,
+    "repository_url": _repository_url,
+}
 html_theme_options = {
-    "github_url": "https://github.com/microsoft/qdk-chemistry",
+    "github_url": _repository_url,
     # The version sits next to the name, in the switcher, rather than in the brand text.
     "logo": {"text": "QDK/Chemistry"},
     "navbar_start": ["navbar-logo", "version-switcher"],
     "navbar_end": ["theme-switcher", "navbar-icon-links"],
+    "footer_end": ["build-provenance", "theme-version"],
     # Keep the whole table of contents in the left sidebar, as the previous theme did.
     "navbar_center": [],
     "show_nav_level": 1,

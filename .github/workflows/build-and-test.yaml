@@ -529,6 +529,8 @@ jobs:
     - name: Build documentation
       if: matrix.python-version == '3.13'
       working-directory: docs
+      env:
+        QDK_CHEMISTRY_DOCS_COMMIT: ${{ github.sha }}
       run: |
         if [[ ("$GITHUB_EVENT_NAME" == "push" || "$GITHUB_EVENT_NAME" == "workflow_dispatch") &&
               "$GITHUB_REF_NAME" == "${{ github.event.repository.default_branch }}" ]]; then
