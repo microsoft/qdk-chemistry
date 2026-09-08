@@ -72,7 +72,7 @@ qubit_ham = qubit_mapper.run(
 )
 
 # 6. State preparation
-state_prep = create("state_prep", "sparse_isometry_gf2x")
+state_prep = create("state_prep", "sparse_isometry")
 circuit = state_prep.run(wfn_cas)
 
 # 7. Create and run IQPE circuit builder with nested algorithm settings

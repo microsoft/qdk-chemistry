@@ -13,6 +13,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.remote.backends
    qdk_chemistry.remote.cache
 
 Submodules
@@ -22,3 +23,6 @@ Submodules
    :maxdepth: 4
 
    qdk_chemistry.remote.job
+   qdk_chemistry.remote.proxy
+   qdk_chemistry.remote.serialization
+   qdk_chemistry.remote.worker

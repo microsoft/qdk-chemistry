@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>What’s New in Version 2.0 &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>What’s New in Version 2.0 &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../_static/documentation_options.js?v=b21de401"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -68,6 +69,7 @@
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="v2.2.0.html">What’s New in Version 2.2</a></li>
 <li class="toctree-l2"><a class="reference internal" href="v2.1.0.html">What’s New in Version 2.1</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 2.0</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
@@ -214,17 +216,17 @@ Two variants are available: an analytic <code class="docutils literal notranslat
 <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> gradients, and a <code class="docutils literal notranslate"><span class="pre">qdk_finite_difference</span></code> path that evaluates
 central differences and can additionally assemble a Hessian.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Analytic gradients</span>
-<span class="n">grad_calc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;nuclear_derivative_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">grad_calc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"nuclear_derivative_calculator"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">)</span>
 <span class="n">energy</span><span class="p">,</span> <span class="n">gradients</span><span class="p">,</span> <span class="n">_hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">grad_calc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed_or_basis</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed_or_basis</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 
 <span class="c1"># Numeric Hessian (central finite differences)</span>
 <span class="n">hess_calc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;nuclear_derivative_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_finite_difference&quot;</span><span class="p">,</span> <span class="n">compute_hessian</span><span class="o">=</span><span class="kc">True</span>
+    <span class="s2">"nuclear_derivative_calculator"</span><span class="p">,</span> <span class="s2">"qdk_finite_difference"</span><span class="p">,</span> <span class="n">compute_hessian</span><span class="o">=</span><span class="kc">True</span>
 <span class="p">)</span>
 <span class="n">energy</span><span class="p">,</span> <span class="n">gradients</span><span class="p">,</span> <span class="n">hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">hess_calc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed_or_basis</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed_or_basis</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -237,8 +239,8 @@ the converged wavefunction.</p>
 after convergence it tests the wavefunction for internal and external
 instabilities, rotates the orbitals along any instability direction, and re-runs
 until the reference is stable or an iteration limit is reached.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_stabilized&quot;</span><span class="p">)</span>
-<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"qdk_stabilized"</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"sto-3g"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Its behavior is controlled through settings (which stability checks to run, the
@@ -255,7 +257,7 @@ builders.</p>
 produces a PREPARE-SELECT block encoding of a Hermitian
 <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a>, and can wrap it as a qubitization walk
 operator for phase estimation:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;lcu&quot;</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"lcu"</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">walk</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_operator</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -266,7 +268,7 @@ circuit and returns the measurement data for an overlap or expectation value.</p
 operator with higher-order commutator corrections; the step count is set with
 <code class="docutils literal notranslate"><span class="pre">num_divisions</span></code> or selected from a <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;zassenhaus&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span>
+    <span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"zassenhaus"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span>
 <span class="p">)</span>
 <span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_operator</span><span class="p">)</span>
 </pre></div>
@@ -287,7 +289,7 @@ and <a class="reference external" href="https://github.com/microsoft/qdk-chemist
 operators map to Pauli strings, and is passed to the qubit mapper at <code class="docutils literal notranslate"><span class="pre">run()</span></code>
 time instead of selecting an encoding by string:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
-<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qubit_mapper"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">)</span>
 <span class="n">qubit_operator</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -309,7 +311,7 @@ implicit step inside the estimator. A grouper attaches a
 <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.FlatPartition" title="qdk_chemistry.data.FlatPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">FlatPartition</span></code></a> or
 <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.LayeredPartition" title="qdk_chemistry.data.LayeredPartition"><code class="xref py py-class docutils literal notranslate"><span class="pre">LayeredPartition</span></code></a>) to a
 <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitOperator" title="qdk_chemistry.data.QubitOperator"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitOperator</span></code></a> for downstream consumers:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grouper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;term_grouper&quot;</span><span class="p">,</span> <span class="s2">&quot;qubit_wise_commuting&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">grouper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"term_grouper"</span><span class="p">,</span> <span class="s2">"qubit_wise_commuting"</span><span class="p">)</span>
 <span class="n">grouped</span> <span class="o">=</span> <span class="n">grouper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_operator</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -328,7 +330,7 @@ Quantum Resource Estimator. A <a class="reference internal" href="../api/api_aut
 <code class="docutils literal notranslate"><span class="pre">get_qre_application()</span></code>, which wraps the circuit as a <code class="docutils literal notranslate"><span class="pre">qdk.qre</span></code> application
 (Q#, OpenQASM, or QIR) for use with <code class="docutils literal notranslate"><span class="pre">qdk.qre.estimate()</span></code> and custom hardware and
 factory models. Resource estimation is enabled by the optional <code class="docutils literal notranslate"><span class="pre">qre</span></code> extra:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[qre]&#39;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[qre]'</span>
 </pre></div>
 </div>
 <p>Circuits from any of the circuit builders can be estimated this way. See
@@ -430,10 +432,10 @@ new order. Update any positional unpacking:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Configuration</span>
 
 <span class="c1"># v1</span>
-<span class="c1"># config = Configuration(&quot;2020&quot;)</span>
+<span class="c1"># config = Configuration("2020")</span>
 
 <span class="c1"># v2</span>
-<span class="n">config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;2020&quot;</span><span class="p">)</span>
+<span class="n">config</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"2020"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The Python factories are
@@ -445,12 +447,12 @@ new order. Update any positional unpacking:</p>
 <p>The qubit mapper no longer takes an <code class="docutils literal notranslate"><span class="pre">encoding</span></code> string. Build a
 <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.MajoranaMapping" title="qdk_chemistry.data.MajoranaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">MajoranaMapping</span></code></a> and pass it to <code class="docutils literal notranslate"><span class="pre">run()</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># v1</span>
-<span class="c1"># mapper = create(&quot;qubit_mapper&quot;, &quot;qdk&quot;)  # configured via encoding=&quot;jordan-wigner&quot;</span>
+<span class="c1"># mapper = create("qubit_mapper", "qdk")  # configured via encoding="jordan-wigner"</span>
 <span class="c1"># qubit_operator = mapper.run(hamiltonian)</span>
 
 <span class="c1"># v2</span>
 <span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="p">)</span>
-<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"qubit_mapper"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">)</span>
 <span class="n">qubit_operator</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
 </pre></div>
 </div>

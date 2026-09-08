@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.unitary_representation.containers.base &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.data.unitary_representation.containers.base &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.data.unitary_representation.containers.base</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry unitary container base module.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""QDK/Chemistry unitary container base module."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -109,31 +110,41 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
 
-<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;UnitaryContainer&quot;</span><span class="p">]</span>
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"UnitaryContainer"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="UnitaryContainer">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">UnitaryContainer</span><span class="p">(</span><span class="n">DataClass</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract class for a unitary container.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract class for a unitary container."""</span>
 
-    <span class="c1"># Class attribute for filename validation</span>
-    <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;unitary_container&quot;</span>
+<div class="viewcode-block" id="UnitaryContainer.data_type_name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.data_type_name">[docs]</a>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">data_type_name</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the wire-format identifier for unitary containers.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ``"unitary_container"``.</span>
+
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="s2">"unitary_container"</span></div>
+
 
     <span class="c1"># Serialization version for this class</span>
-    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">"0.1.0"</span>
 
 <div class="viewcode-block" id="UnitaryContainer.type">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.type">[docs]</a>
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">type</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the type of the unitary container.</span>
+<span class="w">        </span><span class="sd">"""Get the type of the unitary container.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The type of the unitary container.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.num_qubits">
@@ -141,44 +152,44 @@
     <span class="nd">@property</span>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">num_qubits</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the number of qubits the unitary acts on.</span>
+<span class="w">        </span><span class="sd">"""Get the number of qubits the unitary acts on.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The number of qubits.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.to_json">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.to_json">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the UnitaryContainer to a dictionary for JSON serialization.</span>
+<span class="w">        </span><span class="sd">"""Convert the UnitaryContainer to a dictionary for JSON serialization.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            dict: Dictionary representation of the UnitaryContainer</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.to_hdf5">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.to_hdf5">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the UnitaryContainer to an HDF5 group.</span>
+<span class="w">        </span><span class="sd">"""Save the UnitaryContainer to an HDF5 group.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            group: HDF5 group or file to write data to</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.from_json">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.from_json">[docs]</a>
     <span class="nd">@classmethod</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">&quot;UnitaryContainer&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create UnitaryContainer from a JSON dictionary.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="s2">"UnitaryContainer"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Create UnitaryContainer from a JSON dictionary.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            json_data: Dictionary containing the serialized data</span>
@@ -186,15 +197,15 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            UnitaryContainer</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.from_hdf5">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.from_hdf5">[docs]</a>
     <span class="nd">@classmethod</span>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;UnitaryContainer&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load an instance from an HDF5 group.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"UnitaryContainer"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Load an instance from an HDF5 group.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            group: HDF5 group or file to read data from</span>
@@ -202,26 +213,26 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            UnitaryContainer</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.get_summary">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.get_summary">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get summary of unitary container.</span>
+<span class="w">        </span><span class="sd">"""Get summary of unitary container.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            str: Summary string describing the UnitaryContainer&#39;s contents and properties</span>
+<span class="sd">            str: Summary string describing the UnitaryContainer's contents and properties</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.eigenvalue_from_phase">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">eigenvalue_from_phase</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">phase_fraction</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Recover a Hamiltonian eigenvalue from the measured phase fraction.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Recover a Hamiltonian eigenvalue from the measured phase fraction.</span>
 
 <span class="sd">        Each unitary encoding maps Hamiltonian eigenvalues to phases on the</span>
 <span class="sd">        unit circle.  This method inverts that mapping so that a measured</span>
@@ -234,14 +245,14 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            float: The corresponding Hamiltonian eigenvalue.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="UnitaryContainer.combine">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.data.unitary_representation.containers.base.html#qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.combine">[docs]</a>
     <span class="nd">@abstractmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">combine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;UnitaryContainer&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;UnitaryContainer&quot;</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Combine this container with another to represent sequential application.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">combine</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">"UnitaryContainer"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">"UnitaryContainer"</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Combine this container with another to represent sequential application.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            other: The container to append after this one.</span>
@@ -249,7 +260,7 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            A new container representing the combined evolution.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 </div>
 
 </pre></div>

@@ -1,0 +1,1408 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.state_preparation.sparse_isometry &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.state_preparation.sparse_isometry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.state_preparation.sparse_isometry</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Sparse isometry module for quantum state preparation.</span>
+
+<span class="sd">This module implements sparse isometry algorithms for efficient quantum circuit</span>
+<span class="sd">generation from electronic structure wavefunctions. Sparse isometry methods</span>
+<span class="sd">leverage the sparsity of quantum states to create optimized circuits that</span>
+<span class="sd">prepare only the non-zero amplitude components, significantly reducing circuit</span>
+<span class="sd">depth and gate count compared to dense state preparation methods.</span>
+
+<span class="sd">**SparseIsometryStatePrep**: Enhanced sparse isometry method.</span>
+<span class="sd">This method performs duplicate row removal, all-ones row removal, and diagonal</span>
+<span class="sd">matrix rank reduction besides standard GF2 Gaussian elimination. It tracks both</span>
+<span class="sd">CNOT and X operations for optimal circuit reconstruction and can be more</span>
+<span class="sd">efficient than standard GF2 for matrices with specific structural patterns.</span>
+
+<span class="sd">The sparse isometry algorithms are particularly well-suited for quantum chemistry</span>
+<span class="sd">applications where electronic structure wavefunctions often have a small number of</span>
+<span class="sd">dominant determinants.</span>
+
+<span class="sd">The implementations prepare the same quantum state with much more efficient</span>
+<span class="sd">circuits, featuring significantly reduced gate counts and circuit depths</span>
+<span class="sd">compared to traditional isometry methods.</span>
+
+<span class="sd">Algorithm Details:</span>
+
+<span class="sd">* SparseIsometry: Applies enhanced preprocessing, GF2 Gaussian elimination,</span>
+<span class="sd">  and postprocessing, performs dense state preparation on the reduced space,</span>
+<span class="sd">  then applies recorded operations (CX and X) in reverse to expand back to</span>
+<span class="sd">  the full space.</span>
+<span class="sd">"""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.state_preparation.state_preparation</span><span class="w"> </span><span class="kn">import</span> <span class="n">StatePreparation</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AlgorithmRef</span><span class="p">,</span>
+    <span class="n">BasisSet</span><span class="p">,</span>
+    <span class="n">Circuit</span><span class="p">,</span>
+    <span class="n">Configuration</span><span class="p">,</span>
+    <span class="n">Orbitals</span><span class="p">,</span>
+    <span class="n">OrbitalType</span><span class="p">,</span>
+    <span class="n">Settings</span><span class="p">,</span>
+    <span class="n">Shell</span><span class="p">,</span>
+    <span class="n">StateVectorContainer</span><span class="p">,</span>
+    <span class="n">Wavefunction</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span><span class="p">,</span> <span class="n">get_qsharp_context</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">._binary_encoding_utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">MatrixCompressionOp</span><span class="p">,</span> <span class="n">MatrixCompressionType</span><span class="p">,</span> <span class="n">RefTableau</span><span class="p">,</span> <span class="n">_BinaryEncodingSynthesizer</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"SparseIsometryStatePreparationSettings"</span><span class="p">]</span>
+
+
+<span class="c1"># Pre-rename settings, kept working via translation onto the nested dense preparation algorithm.</span>
+<span class="n">_DEPRECATED_DENSE_METHODS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"qdk"</span><span class="p">:</span> <span class="s2">"dense_pure_state"</span><span class="p">,</span> <span class="s2">"qiskit"</span><span class="p">:</span> <span class="s2">"qiskit_regular_isometry"</span><span class="p">}</span>
+<span class="n">_DEPRECATED_TRANSPILE_KEYS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"basis_gates"</span><span class="p">,</span> <span class="s2">"transpile"</span><span class="p">,</span> <span class="s2">"transpile_optimization_level"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_qsharp_dense_factory</span><span class="p">(</span><span class="n">factory</span><span class="p">:</span> <span class="n">QsharpFactoryData</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return whether a factory uses the built-in Q# dense state preparation."""</span>
+    <span class="k">return</span> <span class="n">factory</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">factory</span><span class="o">.</span><span class="n">program</span> <span class="ow">is</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeStatePreparationCircuit</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_require_composable_dense_circuit</span><span class="p">(</span><span class="n">dense_circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">dense_algo</span><span class="p">:</span> <span class="s2">"StatePreparation"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Reject a nested dense circuit that neither composition path can consume.</span>
+
+<span class="sd">    Composition needs either the built-in Q# state preparation factory (composed in Q#) or a</span>
+<span class="sd">    QASM/QIR representation (composed in Qiskit). A circuit carrying only a pre-built Q# object</span>
+<span class="sd">    satisfies neither, so fail here rather than deep inside the Qiskit conversion.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        dense_circuit: Circuit returned by the nested dense state preparation algorithm.</span>
+<span class="sd">        dense_algo: The nested algorithm instance, named in the error message.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the circuit has no QASM or QIR representation to compose against.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">dense_circuit</span><span class="o">.</span><span class="n">qasm</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">dense_circuit</span><span class="o">.</span><span class="n">_has_qir</span><span class="p">():</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"dense_state_prep=</span><span class="si">{</span><span class="n">dense_algo</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">!r}</span><span class="s2"> returned a circuit that sparse isometry cannot compose. "</span>
+            <span class="s2">"The nested dense algorithm must return either the built-in Q# state preparation factory "</span>
+            <span class="s2">"(as 'dense_pure_state' does) or a circuit with a QASM or QIR representation "</span>
+            <span class="s2">"(as 'qiskit_regular_isometry' does)."</span>
+        <span class="p">)</span>
+
+
+<div class="viewcode-block" id="SparseIsometryStatePreparationSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryStatePreparationSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseIsometryStatePreparationSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Settings for SparseIsometryStatePreparation."""</span>
+
+<div class="viewcode-block" id="SparseIsometryStatePreparationSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryStatePreparationSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">"""Initialize the SparseIsometryStatePreparationSettings."""</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"dense_state_prep"</span><span class="p">,</span>
+            <span class="s2">"algorithm_ref"</span><span class="p">,</span>
+            <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"dense_pure_state"</span><span class="p">),</span>
+            <span class="s2">"State preparation algorithm used for the dense subspace."</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"binary_encoding"</span><span class="p">,</span>
+            <span class="s2">"bool"</span><span class="p">,</span>
+            <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">"Use binary encoding instead of dense state preparation for the reduced subspace. "</span>
+            <span class="s2">"Best effort: it is applied only when it actually shrinks the dense register, i.e. when "</span>
+            <span class="s2">"ceil(log2(n_determinants)) is smaller than the number of rows left after GF(2) elimination. "</span>
+            <span class="s2">"Otherwise the standard sparse isometry is used instead."</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"include_negative_controls"</span><span class="p">,</span>
+            <span class="s2">"bool"</span><span class="p">,</span>
+            <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">"Include both positive and negative fixed controls in PUI construction."</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">"measurement_based_uncompute"</span><span class="p">,</span>
+            <span class="s2">"bool"</span><span class="p">,</span>
+            <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">"Use measurement-based AND uncomputation in PUI blocks."</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SparseIsometryStatePreparationSettings.update">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryStatePreparationSettings.update">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Apply setting overrides, translating the deprecated pre-rename keys.</span>
+
+<span class="sd">        ``dense_preparation_method`` and the transpilation keys used to live on this algorithm.</span>
+<span class="sd">        They now belong to the nested algorithm selected by ``dense_state_prep``, so they are</span>
+<span class="sd">        folded into that reference instead of being rejected as unknown settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            values (dict): Setting overrides, possibly containing deprecated keys.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``dense_preparation_method`` is not one of the supported values.</span>
+
+<span class="sd">        """</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+        <span class="n">method</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s2">"dense_preparation_method"</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">transpile_overrides</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">values</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_DEPRECATED_TRANSPILE_KEYS</span> <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">values</span><span class="p">}</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">transpile_overrides</span><span class="p">:</span>
+            <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">values</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="n">deprecated</span> <span class="o">=</span> <span class="p">([</span><span class="sa">f</span><span class="s2">"dense_preparation_method=</span><span class="si">{</span><span class="n">method</span><span class="si">!r}</span><span class="s2">"</span><span class="p">]</span> <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="p">[])</span> <span class="o">+</span> <span class="nb">sorted</span><span class="p">(</span>
+            <span class="n">transpile_overrides</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">method</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">algorithm_name</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dense_state_prep"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"dense_state_prep"</span><span class="p">))</span><span class="o">.</span><span class="n">algorithm_name</span>
+        <span class="k">elif</span> <span class="n">method</span> <span class="ow">in</span> <span class="n">_DEPRECATED_DENSE_METHODS</span><span class="p">:</span>
+            <span class="n">algorithm_name</span> <span class="o">=</span> <span class="n">_DEPRECATED_DENSE_METHODS</span><span class="p">[</span><span class="n">method</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Unknown dense_preparation_method </span><span class="si">{</span><span class="n">method</span><span class="si">!r}</span><span class="s2">; expected one of </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">_DEPRECATED_DENSE_METHODS</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span>
+            <span class="p">)</span>
+
+        <span class="c1"># The transpilation keys were already inert on the Q# dense path before the rename.</span>
+        <span class="n">forwarded</span> <span class="o">=</span> <span class="n">transpile_overrides</span> <span class="k">if</span> <span class="n">algorithm_name</span> <span class="o">==</span> <span class="s2">"qiskit_regular_isometry"</span> <span class="k">else</span> <span class="p">{}</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">deprecated</span><span class="p">)</span><span class="si">}</span><span class="s2"> is deprecated and will be removed in a future release; "</span>
+            <span class="sa">f</span><span class="s2">"configure the nested algorithm instead, e.g. "</span>
+            <span class="sa">f</span><span class="s2">"dense_state_prep=AlgorithmRef('state_prep', '</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2">', ...)."</span><span class="p">,</span>
+            <span class="ne">DeprecationWarning</span><span class="p">,</span>
+            <span class="n">stacklevel</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">values</span><span class="p">[</span><span class="s2">"dense_state_prep"</span><span class="p">]</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">,</span> <span class="o">**</span><span class="n">forwarded</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">values</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="SparseIsometryStatePreparationSettings.set">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.state_preparation.sparse_isometry.html#qdk_chemistry.algorithms.state_preparation.sparse_isometry.SparseIsometryStatePreparationSettings.set">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Apply a single setting override, translating the deprecated pre-rename keys.</span>
+
+<span class="sd">        ``set`` is the single-key counterpart of :meth:`update`, so it has to perform the same</span>
+<span class="sd">        translation; otherwise a deprecated key set this way would be rejected as unknown.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            key (str): Setting name, possibly one of the deprecated keys.</span>
+<span class="sd">            value: Value to assign to ``key``.</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">"dense_preparation_method"</span> <span class="ow">or</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">_DEPRECATED_TRANSPILE_KEYS</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="n">key</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span>
+            <span class="k">return</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span></div>
+</div>
+
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SparseIsometryStatePreparation</span><span class="p">(</span><span class="n">StatePreparation</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""State preparation using sparse isometry with enhanced GF2 Gaussian elimination.</span>
+
+<span class="sd">    This class implements sparse isometry state preparation for electronic structure problems.</span>
+<span class="sd">    The preprocessing includes:</span>
+
+<span class="sd">        1. Removing duplicate rows using CX operations</span>
+<span class="sd">        2. Removing all-ones rows using X operations</span>
+<span class="sd">        3. Then performing standard GF2 Gaussian elimination</span>
+<span class="sd">        4. Apply the additional rank reduction if the reduced row-echelon matrix is diagonal</span>
+
+<span class="sd">    This enhanced approach can be more efficient than standard GF2 Gaussian elimination,</span>
+<span class="sd">    particularly for matrices with duplicate rows or all-ones rows. The algorithm</span>
+<span class="sd">    tracks both CX and X operations for proper circuit reconstruction.</span>
+
+<span class="sd">    Key References:</span>
+
+<span class="sd">        * Sparse isometry: Malvetti, Iten, and Colbeck (arXiv:2006.00016) :cite:`Malvetti2021`</span>
+<span class="sd">        * GF(2) affine compression and binary encoding: Chen et al. (arXiv:2608.20593) :cite:`Chen2026`</span>
+
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Initialize the SparseIsometryStatePreparation."""</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">SparseIsometryStatePreparationSettings</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The target wavefunction to prepare.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit object containing the quantum circuit that prepares the desired state.</span>
+
+<span class="sd">        """</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_circuit</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span> <span class="n">dense_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_dense</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Build only the dense-loading stage of the sparse isometry circuit.</span>
+
+<span class="sd">        This is a helper function for resource estimation. It returns a Circuit that prepares</span>
+<span class="sd">        the dense subspace of the wavefunction. This allows users to estimate the resource cost</span>
+<span class="sd">        of the dense-loading stage separately from the isometry expansion.</span>
+
+<span class="sd">        A sparse isometry circuit loads the amplitudes densely on a reduced qubit subset and</span>
+<span class="sd">        then applies the isometry gates (binary encoding and/or GF(2) expansion) that map the</span>
+<span class="sd">        reduced state back onto the full register. This method returns the dense stage alone,</span>
+<span class="sd">        embedded in the same full-width register that `StatePreparation.run` uses, so the</span>
+<span class="sd">        isometry cost can be obtained by subtracting the two resource estimates.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The target wavefunction to prepare.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit containing only the dense-loading stage, acting on the full register.</span>
+
+<span class="sd">        Examples:</span>
+<span class="sd">            &gt;&gt;&gt; prep = create("state_prep", "sparse_isometry")</span>
+<span class="sd">            &gt;&gt;&gt; full = prep.run(wavefunction).estimate()["logicalCounts"]</span>
+<span class="sd">            &gt;&gt;&gt; dense = prep.create_dense(wavefunction).estimate()["logicalCounts"]</span>
+<span class="sd">            &gt;&gt;&gt; isometry_t_count = full["tCount"] - dense["tCount"]</span>
+
+<span class="sd">        """</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_circuit</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">,</span> <span class="n">dense_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_circuit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span> <span class="n">dense_only</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Build the sparse isometry circuit, optionally stopping after the dense-loading stage.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: The target wavefunction to prepare.</span>
+<span class="sd">            dense_only: If True, omit the isometry operations that expand back to the full space.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit object acting on the full qubit register.</span>
+
+<span class="sd">        """</span>
+        <span class="n">dets</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_determinants</span><span class="p">()</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_coefficients</span><span class="p">())</span>
+        <span class="c1"># The Q# dense preparation takes Double[] amplitudes, so complex coefficients are only</span>
+        <span class="c1"># usable when their imaginary part vanishes.</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">iscomplexobj</span><span class="p">(</span><span class="n">coeffs</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">allclose</span><span class="p">(</span><span class="n">coeffs</span><span class="o">.</span><span class="n">imag</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Sparse isometry requires real coefficients (imaginary part must be zero)."</span><span class="p">)</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">coeffs</span><span class="o">.</span><span class="n">real</span>
+        <span class="n">config_set</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_configuration_set</span><span class="p">()</span>
+        <span class="n">n_bits</span> <span class="o">=</span> <span class="n">config_set</span><span class="o">.</span><span class="n">num_modes</span><span class="p">()</span> <span class="o">*</span> <span class="n">dets</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">bits_per_mode</span><span class="p">()</span>
+        <span class="n">state_vector</span> <span class="o">=</span> <span class="p">[</span><span class="n">det</span><span class="o">.</span><span class="n">to_bits</span><span class="p">(</span><span class="n">n_bits</span><span class="p">)</span> <span class="k">for</span> <span class="n">det</span> <span class="ow">in</span> <span class="n">dets</span><span class="p">]</span>
+        <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">state_vector</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="c1"># Check for single determinant case after filtering</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">state_vector</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"After filtering, only 1 determinant remains, using single reference state preparation"</span><span class="p">)</span>
+            <span class="c1"># A single reference is pure expansion, so its dense stage is the empty full-width circuit.</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_prepare_single_reference_state</span><span class="p">([</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_qubits</span> <span class="k">if</span> <span class="n">dense_only</span> <span class="k">else</span> <span class="n">state_vector</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">state_vector</span><span class="p">)</span><span class="si">}</span><span class="s2"> determinants for state preparation"</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"binary_encoding"</span><span class="p">):</span>
+            <span class="n">circuit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_binary_encoding</span><span class="p">(</span><span class="n">state_vector</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="n">dense_only</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">circuit</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">circuit</span>
+
+        <span class="c1"># Perform GF2 Gaussian elimination with tracking</span>
+        <span class="n">gf2x_operation_results</span><span class="p">,</span> <span class="n">statevector_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_perform_gf2x</span><span class="p">(</span><span class="n">state_vector</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"gf2x_operation_results dense qubit: </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">row_map</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"gf2x_operation_results state vector: </span><span class="si">{</span><span class="n">statevector_data</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="c1"># Build reduced wavefunction and delegate dense preparation to nested algorithm</span>
+        <span class="n">reduced_wf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_reduced_wavefunction</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">,</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="p">)</span>
+        <span class="n">dense_algo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">"dense_state_prep"</span><span class="p">)</span>
+        <span class="n">dense_circuit</span> <span class="o">=</span> <span class="n">dense_algo</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">reduced_wf</span><span class="p">)</span>
+
+        <span class="c1"># Build expansion ops and compose with dense circuit</span>
+        <span class="n">expansion_ops</span> <span class="o">=</span> <span class="p">[]</span> <span class="k">if</span> <span class="n">dense_only</span> <span class="k">else</span> <span class="bp">self</span><span class="o">.</span><span class="n">_build_expansion_ops</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_with_expansion</span><span class="p">(</span>
+            <span class="n">dense_circuit</span><span class="p">,</span> <span class="n">expansion_ops</span><span class="p">,</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">row_map</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="n">dense_algo</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_binary_encoding</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state_vector</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span> <span class="n">coeffs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">dense_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Prepare a quantum circuit using binary encoding.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_vector: List of bit vectors (determinants), each a list of 0/1 ints.</span>
+<span class="sd">            coeffs: Wavefunction coefficients aligned with the determinants.</span>
+<span class="sd">            n_qubits: Total number of qubits in the system.</span>
+<span class="sd">            dense_only: If True, omit the binary-encoding and expansion operations.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit if binary encoding is applicable, or None to fall back to the standard path.</span>
+
+<span class="sd">        """</span>
+        <span class="n">bitstring_matrix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bitstrings_to_binary_matrix</span><span class="p">(</span><span class="n">state_vector</span><span class="p">)</span>
+        <span class="n">gf2x_result</span> <span class="o">=</span> <span class="n">gf2x_with_tracking</span><span class="p">(</span><span class="n">bitstring_matrix</span><span class="p">,</span> <span class="n">skip_diagonal_reduction</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">forward_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">num_rows</span><span class="p">,</span> <span class="n">num_cols</span> <span class="o">=</span> <span class="n">gf2x_result</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">dense_register_width</span> <span class="o">=</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">num_cols</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="k">else</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">num_cols</span><span class="p">))</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dense_register_width</span> <span class="o">&lt;</span> <span class="n">num_rows</span><span class="p">:</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">"Binary encoding is not applicable for this wavefunction; falling back to standard sparse isometry."</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+        <span class="n">synthesis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_synthesize_binary_encoding</span><span class="p">(</span><span class="n">gf2x_result</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">state_vector</span><span class="p">))</span>
+
+        <span class="c1"># Build reduced wavefunction and delegate dense prep to nested algorithm</span>
+        <span class="n">reduced_wf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_reduced_wavefunction</span><span class="p">(</span><span class="n">synthesis</span><span class="p">[</span><span class="s2">"compressed_sv"</span><span class="p">],</span> <span class="n">synthesis</span><span class="p">[</span><span class="s2">"dense_size"</span><span class="p">])</span>
+        <span class="n">dense_algo</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_nested</span><span class="p">(</span><span class="s2">"dense_state_prep"</span><span class="p">)</span>
+        <span class="n">dense_circuit</span> <span class="o">=</span> <span class="n">dense_algo</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">reduced_wf</span><span class="p">)</span>
+
+        <span class="c1"># Compose with binary encoding + Gaussian elimination expansion.</span>
+        <span class="c1"># Reverse dense_row_map because DensePureStatePreparation internally reverses</span>
+        <span class="c1"># its rowMap; the reversed embedding cancels out that reversal so the net effect</span>
+        <span class="c1"># matches the original ApplyDensePreparation(dense_row_map, sv, qs) behavior.</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_binary_encoding</span><span class="p">(</span>
+            <span class="n">dense_circuit</span><span class="p">,</span>
+            <span class="nb">list</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">synthesis</span><span class="p">[</span><span class="s2">"dense_row_map"</span><span class="p">])),</span>
+            <span class="p">[]</span> <span class="k">if</span> <span class="n">dense_only</span> <span class="k">else</span> <span class="n">synthesis</span><span class="p">[</span><span class="s2">"binary_encoding_ops"</span><span class="p">],</span>
+            <span class="p">[]</span> <span class="k">if</span> <span class="n">dense_only</span> <span class="k">else</span> <span class="n">synthesis</span><span class="p">[</span><span class="s2">"gaussian_elimination_ops"</span><span class="p">],</span>
+            <span class="n">synthesis</span><span class="p">[</span><span class="s2">"ancilla_pool"</span><span class="p">],</span>
+            <span class="n">n_qubits</span><span class="p">,</span>
+            <span class="n">dense_algo</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_synthesize_binary_encoding</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">gf2x_result</span><span class="p">:</span> <span class="s2">"GF2XEliminationResult"</span><span class="p">,</span>
+        <span class="n">coeffs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+        <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">n_dets</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Build binary-encoding state preparation parameters from an already-computed REF result.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            gf2x_result: Forward-only REF result from GF2 Gaussian elimination.</span>
+<span class="sd">            coeffs: Wavefunction coefficients aligned with matrix columns.</span>
+<span class="sd">            n_qubits: Total number of qubits in the original space.</span>
+<span class="sd">            n_dets: Number of determinants (used for logging only).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A dict with synthesis results for composing the binary-encoding circuit.</span>
+
+<span class="sd">        """</span>
+        <span class="n">include_negative_controls</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"include_negative_controls"</span><span class="p">)</span>
+        <span class="n">measurement_based_uncompute</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"measurement_based_uncompute"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">measurement_based_uncompute</span><span class="p">:</span>
+            <span class="n">profile</span> <span class="o">=</span> <span class="n">get_qsharp_context</span><span class="p">()</span><span class="o">.</span><span class="n">get_target_profile</span><span class="p">()</span>
+            <span class="k">if</span> <span class="s2">"adaptive"</span> <span class="ow">in</span> <span class="nb">str</span><span class="p">(</span><span class="n">profile</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"measurement_based_uncompute is active on target profile </span><span class="si">{</span><span class="n">profile</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"measurement_based_uncompute was requested but the target profile is </span><span class="si">{</span><span class="n">profile</span><span class="si">}</span><span class="s2">, "</span>
+                    <span class="s2">"which has no mid-circuit measurement; Std.Intrinsic.AND will uncompute unitarily "</span>
+                    <span class="s2">"and the circuit will contain no measurements.</span><span class="se">\n</span><span class="s2">"</span>
+                    <span class="s2">"To use measurement-based uncomputation, set the target profile by  "</span>
+                    <span class="s2">"adaptive_context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RIF)</span><span class="se">\n</span><span class="s2">"</span>
+                    <span class="s2">"set_qsharp_context(adaptive_context)"</span>
+                <span class="p">)</span>
+        <span class="n">encoded_ops</span><span class="p">,</span> <span class="n">bijection</span><span class="p">,</span> <span class="n">dense_size</span> <span class="o">=</span> <span class="n">_BinaryEncodingSynthesizer</span><span class="p">(</span>
+            <span class="n">RefTableau</span><span class="p">(</span><span class="n">gf2x_result</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="p">),</span>
+            <span class="n">include_negative_controls</span><span class="o">=</span><span class="n">include_negative_controls</span><span class="p">,</span>
+            <span class="n">measurement_based_uncompute</span><span class="o">=</span><span class="n">measurement_based_uncompute</span><span class="p">,</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">synthesize</span><span class="p">(</span><span class="n">active_qubit_indices</span><span class="o">=</span><span class="n">gf2x_result</span><span class="o">.</span><span class="n">row_map</span><span class="p">)</span>
+
+        <span class="n">compressed_sv</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">dense_size</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">dense_val</span><span class="p">,</span> <span class="n">orig_col</span> <span class="ow">in</span> <span class="n">bijection</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">orig_col</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">coeffs</span><span class="p">):</span>
+                <span class="n">compressed_sv</span><span class="p">[</span><span class="n">dense_val</span><span class="p">]</span> <span class="o">=</span> <span class="n">coeffs</span><span class="p">[</span><span class="n">orig_col</span><span class="p">]</span>
+        <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">compressed_sv</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">norm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">compressed_sv</span> <span class="o">/=</span> <span class="n">norm</span>
+
+        <span class="n">dense_row_map</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">gf2x_result</span><span class="o">.</span><span class="n">row_map</span><span class="p">[:</span><span class="n">dense_size</span><span class="p">])</span>
+
+        <span class="n">gaussian_elimination_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">operation</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">gf2x_result</span><span class="o">.</span><span class="n">operations</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">operation</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"cx"</span><span class="p">,</span> <span class="s2">"cnot"</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">):</span>
+                    <span class="n">target</span><span class="p">,</span> <span class="n">control</span> <span class="o">=</span> <span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">gaussian_elimination_ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">control</span><span class="p">,</span> <span class="n">target</span><span class="p">]))</span>
+            <span class="k">elif</span> <span class="n">operation</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"x"</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">gaussian_elimination_ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"X"</span><span class="p">),</span> <span class="p">[</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">]]))</span>
+
+        <span class="n">active_qubits_set</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">q</span><span class="p">)</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">gf2x_result</span><span class="o">.</span><span class="n">row_map</span><span class="p">}</span>
+        <span class="n">ancilla_pool</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">))</span> <span class="o">-</span> <span class="n">active_qubits_set</span><span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Binary encoding produced </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">encoded_ops</span><span class="p">)</span><span class="si">}</span><span class="s2"> operations "</span>
+            <span class="sa">f</span><span class="s2">"for </span><span class="si">{</span><span class="n">n_qubits</span><span class="si">}</span><span class="s2">-qubit system with </span><span class="si">{</span><span class="n">n_dets</span><span class="si">}</span><span class="s2"> determinants "</span>
+            <span class="sa">f</span><span class="s2">"using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">ancilla_pool</span><span class="p">)</span><span class="si">}</span><span class="s2"> pre-existing qubits as ancilla pool"</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">"compressed_sv"</span><span class="p">:</span> <span class="n">compressed_sv</span><span class="p">,</span>
+            <span class="s2">"dense_size"</span><span class="p">:</span> <span class="n">dense_size</span><span class="p">,</span>
+            <span class="s2">"dense_row_map"</span><span class="p">:</span> <span class="n">dense_row_map</span><span class="p">,</span>
+            <span class="s2">"binary_encoding_ops"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">encoded_ops</span><span class="p">),</span>
+            <span class="s2">"gaussian_elimination_ops"</span><span class="p">:</span> <span class="n">gaussian_elimination_ops</span><span class="p">,</span>
+            <span class="s2">"ancilla_pool"</span><span class="p">:</span> <span class="n">ancilla_pool</span><span class="p">,</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_reduced_wavefunction</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">statevector_data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Wavefunction</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Construct a reduced Wavefunction from the statevector.</span>
+
+<span class="sd">        Creates a synthetic Wavefunction using 1-bit-per-mode configurations</span>
+<span class="sd">        that represents the dense subspace after GF2 Gaussian elimination.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            statevector_data: Amplitude vector of length 2^rank (normalized).</span>
+<span class="sd">            rank: Number of qubits in the reduced space.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Wavefunction suitable for passing to a dense state preparation algorithm.</span>
+
+<span class="sd">        """</span>
+        <span class="n">configs</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">coeffs_list</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">statevector_data</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span> <span class="o">!=</span> <span class="mf">0.0</span><span class="p">:</span>
+                <span class="n">bits_str</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">((</span><span class="n">idx</span> <span class="o">&gt;&gt;</span> <span class="n">i</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">))</span>
+                <span class="n">configs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Configuration</span><span class="o">.</span><span class="n">from_bitstring</span><span class="p">(</span><span class="n">bits_str</span><span class="p">))</span>
+                <span class="n">coeffs_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+
+        <span class="n">coeffs_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">coeffs_list</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="n">shells</span> <span class="o">=</span> <span class="p">[</span><span class="n">Shell</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">OrbitalType</span><span class="o">.</span><span class="n">S</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]),</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">]))</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span><span class="p">)]</span>
+        <span class="n">basis_set</span> <span class="o">=</span> <span class="n">BasisSet</span><span class="p">(</span><span class="s2">"reduced"</span><span class="p">,</span> <span class="n">shells</span><span class="p">)</span>
+        <span class="n">orbitals</span> <span class="o">=</span> <span class="n">Orbitals</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">rank</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">basis_set</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">coeffs_arr</span><span class="p">,</span> <span class="n">configs</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_expansion_ops</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gf2x_operation_results</span><span class="p">:</span> <span class="s2">"GF2XEliminationResult"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Build expansion operations from GF2 Gaussian elimination results.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            gf2x_operation_results: The result of GF2 Gaussian elimination.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List of MatrixCompressionOp representing the expansion gates.</span>
+
+<span class="sd">        """</span>
+        <span class="n">expansion_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">operation</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">operation</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"cx"</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">tuple</span><span class="p">):</span>
+                    <span class="n">target</span><span class="p">,</span> <span class="n">control</span> <span class="o">=</span> <span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">expansion_ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"CX"</span><span class="p">),</span> <span class="p">[</span><span class="n">control</span><span class="p">,</span> <span class="n">target</span><span class="p">]))</span>
+            <span class="k">elif</span> <span class="n">operation</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"x"</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                <span class="n">expansion_ops</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">MatrixCompressionOp</span><span class="p">(</span><span class="n">MatrixCompressionType</span><span class="p">(</span><span class="s2">"X"</span><span class="p">),</span> <span class="p">[</span><span class="n">operation</span><span class="p">[</span><span class="mi">1</span><span class="p">]]))</span>
+        <span class="k">return</span> <span class="n">expansion_ops</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compose_with_expansion</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dense_circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">expansion_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">],</span>
+        <span class="n">embedding_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dense_algo</span><span class="p">:</span> <span class="s2">"StatePreparation"</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Compose a dense preparation circuit with expansion operations.</span>
+
+<span class="sd">        Embeds the dense circuit (operating on the reduced qubit subset) into</span>
+<span class="sd">        the full register, then applies GF2 Gaussian elimination expansion operations.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dense_circuit: Circuit from the nested dense state prep algorithm.</span>
+<span class="sd">            expansion_ops: GF2 Gaussian elimination expansion operations for the full register.</span>
+<span class="sd">            embedding_map: Maps reduced qubit indices to full register positions.</span>
+<span class="sd">            n_qubits: Total number of qubits in the full register.</span>
+<span class="sd">            dense_algo: The nested dense state prep algorithm instance (for transpile settings).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Composed Circuit operating on the full qubit register.</span>
+
+<span class="sd">        """</span>
+        <span class="n">factory</span> <span class="o">=</span> <span class="n">dense_circuit</span><span class="o">.</span><span class="n">_qsharp_factory</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">if</span> <span class="n">_is_qsharp_dense_factory</span><span class="p">(</span><span class="n">factory</span><span class="p">):</span>
+            <span class="c1"># Compose with the dense preparation parameters rather than its callable: a callable capturing</span>
+            <span class="c1"># another callable cannot be resolved statically by the adaptive-profile code generator.</span>
+            <span class="n">dense_params</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">StatePreparationParams</span><span class="p">(</span><span class="o">**</span><span class="n">factory</span><span class="o">.</span><span class="n">parameter</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_qsharp</span><span class="p">(</span><span class="n">dense_params</span><span class="p">,</span> <span class="n">expansion_ops</span><span class="p">,</span> <span class="n">embedding_map</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span>
+        <span class="n">_require_composable_dense_circuit</span><span class="p">(</span><span class="n">dense_circuit</span><span class="p">,</span> <span class="n">dense_algo</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compose_qiskit</span><span class="p">(</span><span class="n">dense_circuit</span><span class="p">,</span> <span class="n">expansion_ops</span><span class="p">,</span> <span class="n">embedding_map</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">,</span> <span class="n">dense_algo</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compose_qsharp</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dense_params</span><span class="p">,</span>
+        <span class="n">expansion_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">],</span>
+        <span class="n">embedding_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Compose via Q# — embed the dense preparation on a subregister, then apply expansion."""</span>
+        <span class="n">serialized_ops</span> <span class="o">=</span> <span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">expansion_ops</span><span class="p">]</span>
+        <span class="n">qsharp_op</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeComposeSparseIsometryOp</span><span class="p">(</span>
+            <span class="n">dense_params</span><span class="p">,</span>
+            <span class="n">embedding_map</span><span class="p">,</span>
+            <span class="n">serialized_ops</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+            <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeComposeSparseIsometryCircuit</span><span class="p">,</span>
+            <span class="n">parameter</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">"denseParams"</span><span class="p">:</span> <span class="n">dense_params</span><span class="p">,</span>
+                <span class="s2">"embeddingMap"</span><span class="p">:</span> <span class="n">embedding_map</span><span class="p">,</span>
+                <span class="s2">"expansionOps"</span><span class="p">:</span> <span class="n">serialized_ops</span><span class="p">,</span>
+                <span class="s2">"numQubits"</span><span class="p">:</span> <span class="n">n_qubits</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">,</span> <span class="n">qsharp_op</span><span class="o">=</span><span class="n">qsharp_op</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"jordan-wigner"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compose_qiskit</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dense_circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">expansion_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">],</span>
+        <span class="n">embedding_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dense_algo</span><span class="p">:</span> <span class="s2">"StatePreparation"</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Compose via Qiskit — embed dense circuit on subregister, then apply expansion gates."""</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span><span class="p">,</span> <span class="n">qasm3</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.compiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">transpile</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">apply_matrix_compression_ops</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">dense_qc</span> <span class="o">=</span> <span class="n">dense_circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span>
+        <span class="n">full_qc</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">)</span>
+        <span class="n">full_qc</span><span class="o">.</span><span class="n">compose</span><span class="p">(</span><span class="n">dense_qc</span><span class="p">,</span> <span class="n">qubits</span><span class="o">=</span><span class="n">embedding_map</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">apply_matrix_compression_ops</span><span class="p">(</span><span class="n">full_qc</span><span class="p">,</span> <span class="n">expansion_ops</span><span class="p">)</span>
+
+        <span class="c1"># Transpilation is configured on the nested dense prep, which need not declare these settings.</span>
+        <span class="n">dense_settings</span> <span class="o">=</span> <span class="n">dense_algo</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">"transpile"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transpile"</span><span class="p">):</span>
+            <span class="n">basis_gates</span> <span class="o">=</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"basis_gates"</span><span class="p">)</span>
+            <span class="n">opt_level</span> <span class="o">=</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transpile_optimization_level"</span><span class="p">)</span>
+            <span class="n">full_qc</span> <span class="o">=</span> <span class="n">transpile</span><span class="p">(</span><span class="n">full_qc</span><span class="p">,</span> <span class="n">basis_gates</span><span class="o">=</span><span class="n">basis_gates</span><span class="p">,</span> <span class="n">optimization_level</span><span class="o">=</span><span class="n">opt_level</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qasm</span><span class="o">=</span><span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">full_qc</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"jordan-wigner"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compose_binary_encoding</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">dense_circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">dense_row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">binary_encoding_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">],</span>
+        <span class="n">gaussian_elimination_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">MatrixCompressionOp</span><span class="p">],</span>
+        <span class="n">ancilla_pool</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">dense_algo</span><span class="p">:</span> <span class="s2">"StatePreparation"</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Compose a dense circuit with binary-encoding and GF2 Gaussian elimination expansion operations.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            dense_circuit: Circuit from the nested dense state prep algorithm.</span>
+<span class="sd">            dense_row_map: Maps reduced qubit indices to full register positions.</span>
+<span class="sd">            binary_encoding_ops: Binary-encoding gate sequence.</span>
+<span class="sd">            gaussian_elimination_ops: GF2 Gaussian elimination expansion operations.</span>
+<span class="sd">            ancilla_pool: Idle qubit indices available as ancillas.</span>
+<span class="sd">            n_qubits: Total number of qubits in the full register.</span>
+<span class="sd">            dense_algo: The nested dense state prep algorithm instance (for transpile settings).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Composed Circuit operating on the full qubit register.</span>
+
+<span class="sd">        """</span>
+        <span class="n">factory</span> <span class="o">=</span> <span class="n">dense_circuit</span><span class="o">.</span><span class="n">_qsharp_factory</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="k">if</span> <span class="n">_is_qsharp_dense_factory</span><span class="p">(</span><span class="n">factory</span><span class="p">):</span>
+            <span class="c1"># Compose with the dense preparation parameters rather than its callable: a callable capturing</span>
+            <span class="c1"># another callable cannot be resolved statically by the adaptive-profile code generator.</span>
+            <span class="n">dense_params</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">StatePreparationParams</span><span class="p">(</span><span class="o">**</span><span class="n">factory</span><span class="o">.</span><span class="n">parameter</span><span class="p">)</span>
+            <span class="n">serialized_be</span> <span class="o">=</span> <span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">to_qsharp_parameter</span><span class="p">()</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">binary_encoding_ops</span><span class="p">]</span>
+            <span class="n">serialized_ge</span> <span class="o">=</span> <span class="p">[</span><span class="n">op</span><span class="o">.</span><span class="n">to_qsharp_parameter</span><span class="p">()</span> <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">gaussian_elimination_ops</span><span class="p">]</span>
+            <span class="n">qsharp_op</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">BinaryEncoding</span><span class="o">.</span><span class="n">MakeComposeBinaryEncodingOp</span><span class="p">(</span>
+                <span class="n">dense_params</span><span class="p">,</span>
+                <span class="n">dense_row_map</span><span class="p">,</span>
+                <span class="n">serialized_be</span><span class="p">,</span>
+                <span class="n">serialized_ge</span><span class="p">,</span>
+                <span class="n">ancilla_pool</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+                <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">BinaryEncoding</span><span class="o">.</span><span class="n">MakeComposeBinaryEncodingCircuit</span><span class="p">,</span>
+                <span class="n">parameter</span><span class="o">=</span><span class="p">{</span>
+                    <span class="s2">"denseParams"</span><span class="p">:</span> <span class="n">dense_params</span><span class="p">,</span>
+                    <span class="s2">"embeddingMap"</span><span class="p">:</span> <span class="n">dense_row_map</span><span class="p">,</span>
+                    <span class="s2">"binaryEncodingOps"</span><span class="p">:</span> <span class="n">serialized_be</span><span class="p">,</span>
+                    <span class="s2">"gaussianEliminationOps"</span><span class="p">:</span> <span class="n">serialized_ge</span><span class="p">,</span>
+                    <span class="s2">"numQubits"</span><span class="p">:</span> <span class="n">n_qubits</span><span class="p">,</span>
+                    <span class="s2">"ancillaPool"</span><span class="p">:</span> <span class="n">ancilla_pool</span><span class="p">,</span>
+                <span class="p">},</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">,</span> <span class="n">qsharp_op</span><span class="o">=</span><span class="n">qsharp_op</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"jordan-wigner"</span><span class="p">)</span>
+
+        <span class="c1"># Qiskit path</span>
+        <span class="n">_require_composable_dense_circuit</span><span class="p">(</span><span class="n">dense_circuit</span><span class="p">,</span> <span class="n">dense_algo</span><span class="p">)</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span><span class="p">,</span> <span class="n">qasm3</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.compiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">transpile</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">apply_matrix_compression_ops</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">dense_qc</span> <span class="o">=</span> <span class="n">dense_circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span>
+        <span class="n">full_qc</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">n_qubits</span><span class="p">)</span>
+        <span class="n">full_qc</span><span class="o">.</span><span class="n">compose</span><span class="p">(</span><span class="n">dense_qc</span><span class="p">,</span> <span class="n">qubits</span><span class="o">=</span><span class="n">dense_row_map</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">apply_matrix_compression_ops</span><span class="p">(</span><span class="n">full_qc</span><span class="p">,</span> <span class="n">binary_encoding_ops</span><span class="p">)</span>
+        <span class="n">apply_matrix_compression_ops</span><span class="p">(</span><span class="n">full_qc</span><span class="p">,</span> <span class="n">gaussian_elimination_ops</span><span class="p">)</span>
+
+        <span class="c1"># Transpilation is configured on the nested dense prep, which need not declare these settings.</span>
+        <span class="c1"># Needed to decompose multi-controlled gates (e.g. MCX) whose QASM3 export has a Qiskit bug.</span>
+        <span class="n">dense_settings</span> <span class="o">=</span> <span class="n">dense_algo</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">"transpile"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transpile"</span><span class="p">):</span>
+            <span class="n">basis_gates</span> <span class="o">=</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"basis_gates"</span><span class="p">)</span>
+            <span class="n">opt_level</span> <span class="o">=</span> <span class="n">dense_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"transpile_optimization_level"</span><span class="p">)</span>
+            <span class="n">full_qc</span> <span class="o">=</span> <span class="n">transpile</span><span class="p">(</span><span class="n">full_qc</span><span class="p">,</span> <span class="n">basis_gates</span><span class="o">=</span><span class="n">basis_gates</span><span class="p">,</span> <span class="n">optimization_level</span><span class="o">=</span><span class="n">opt_level</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qasm</span><span class="o">=</span><span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">full_qc</span><span class="p">),</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"jordan-wigner"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_perform_gf2x</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">bitstrings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]],</span> <span class="n">coeffs</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="s2">"GF2XEliminationResult"</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Perform Gaussian elimination over GF(2^x) on the given bitstrings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            bitstrings: The list of bit vectors (0/1 ints) representing the wavefunction.</span>
+<span class="sd">            coeffs: The coefficients corresponding to each determinant.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A tuple containing the GF2X elimination result and the statevector.</span>
+
+<span class="sd">        """</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Using </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span><span class="si">}</span><span class="s2"> determinants for state preparation"</span><span class="p">)</span>
+
+        <span class="c1"># Step 1: Convert bitstrings to binary matrix</span>
+        <span class="n">bitstring_matrix</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bitstrings_to_binary_matrix</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span>
+
+        <span class="c1"># Step 2: Apply enhanced GF2 Gaussian elimination with tracking of operations</span>
+        <span class="c1"># (includes duplicate removal, all-ones removal, and GF2)</span>
+        <span class="n">gf2x_operation_results</span> <span class="o">=</span> <span class="n">gf2x_with_tracking</span><span class="p">(</span><span class="n">bitstring_matrix</span><span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Original matrix shape: </span><span class="si">{</span><span class="n">bitstring_matrix</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Reduced matrix shape: </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Matrix rank: </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total operations: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="c1"># Log operations by type</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"CX operations: </span><span class="si">{</span><span class="p">[</span><span class="n">op</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">op</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">op</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'cx'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"X operations: </span><span class="si">{</span><span class="p">[</span><span class="n">op</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">op</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">operations</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">op</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="s1">'x'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="c1"># Step 3: Create statevector for the reduced matrix</span>
+        <span class="k">if</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Create statevector correctly preserving coefficient-determinant correspondence.</span>
+            <span class="c1"># Each coefficient corresponds to a specific determinant (column in reduced matrix).</span>
+            <span class="c1"># We need to map each coefficient to the correct basis state in the reduced space.</span>
+
+            <span class="n">statevector_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+            <span class="c1"># For each determinant (column in reduced matrix), map it to the correct statevector index</span>
+            <span class="k">for</span> <span class="n">det_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="c1"># Get the reduced column for this determinant</span>
+                <span class="n">reduced_column</span> <span class="o">=</span> <span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">reduced_matrix</span><span class="p">[:,</span> <span class="n">det_idx</span><span class="p">]</span>
+
+                <span class="c1"># Convert reduced column to binary string (reverse for little-endian)</span>
+                <span class="n">bitstring</span> <span class="o">=</span> <span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">bit</span><span class="p">)</span> <span class="k">for</span> <span class="n">bit</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">reduced_column</span><span class="p">))</span>
+
+                <span class="c1"># Calculate the statevector index for this bitstring</span>
+                <span class="n">statevector_index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bitstring</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+
+                <span class="c1"># Assign the coefficient to the correct statevector index</span>
+                <span class="n">statevector_data</span><span class="p">[</span><span class="n">statevector_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">coeffs</span><span class="p">[</span><span class="n">det_idx</span><span class="p">]</span>
+
+                <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Determinant </span><span class="si">{</span><span class="n">det_idx</span><span class="si">}</span><span class="s2">: coeff=</span><span class="si">{</span><span class="n">coeffs</span><span class="p">[</span><span class="n">det_idx</span><span class="p">]</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">, "</span>
+                    <span class="sa">f</span><span class="s2">"reduced_column=</span><span class="si">{</span><span class="n">reduced_column</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span><span class="si">}</span><span class="s2">, "</span>
+                    <span class="sa">f</span><span class="s2">"bitstring='</span><span class="si">{</span><span class="n">bitstring</span><span class="si">}</span><span class="s2">', sv_index=</span><span class="si">{</span><span class="n">statevector_index</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
+
+            <span class="c1"># Normalize the statevector</span>
+            <span class="n">norm</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">norm</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">norm</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">statevector_data</span> <span class="o">/=</span> <span class="n">norm</span>
+
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Statevector created for reduced matrix with rank </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Statevector shape: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Non-zero elements in statevector:"</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">amp</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">statevector_data</span><span class="p">):</span>
+                <span class="n">bitstring_repr</span> <span class="o">=</span> <span class="nb">format</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"0</span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">b"</span><span class="p">)</span>
+                <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  |</span><span class="si">{</span><span class="n">bitstring_repr</span><span class="si">}</span><span class="s2">⟩: </span><span class="si">{</span><span class="n">amp</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Target indices are </span><span class="si">{</span><span class="n">gf2x_operation_results</span><span class="o">.</span><span class="n">row_map</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># If reduced matrix has zero rank, all determinants are identical</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Cannot perform sparse isometry on identical determinants. All determinants must be distinct. "</span>
+                <span class="s2">"Please check your wavefunction data - you may have duplicate determinants or "</span>
+                <span class="s2">"need to use a single-determinant state preparation method."</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">gf2x_operation_results</span><span class="p">,</span> <span class="n">statevector_data</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bitstrings_to_binary_matrix</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bitstrings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Convert a list of bit vectors to a binary matrix.</span>
+
+<span class="sd">        This function converts a list of bit vectors (determinants) into a binary matrix</span>
+<span class="sd">        where each column represents a determinant and each row represents a qubit.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            bitstrings (list[list[int]]): List of bit vectors, each a list of 0/1 ints</span>
+<span class="sd">                in qubit order q[0]...q[N-1] (as returned by Configuration.to_bits()).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Binary matrix M of shape (N, k) where</span>
+
+<span class="sd">                * N is the number of qubits (rows)</span>
+<span class="sd">                * k is the number of determinants (columns)</span>
+
+<span class="sd">            The matrix follows top-down convention with row ordering "q[0]...q[N-1]"</span>
+<span class="sd">            (qubit 0 at the top).</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">            &gt;&gt;&gt; bitstrings = [[1, 0, 1], [0, 1, 0]]</span>
+<span class="sd">            &gt;&gt;&gt; matrix = _bitstrings_to_binary_matrix(bitstrings)</span>
+<span class="sd">            &gt;&gt;&gt; print(matrix)</span>
+<span class="sd">            [[1 0]  # q[0]</span>
+<span class="sd">            [0 1]  # q[1]</span>
+<span class="sd">            [1 0]] # q[2]</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">bitstrings</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Bitstrings list cannot be empty"</span><span class="p">)</span>
+
+        <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">n_dets</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">)</span>
+
+        <span class="c1"># Validate all bit vectors have the same length</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bitstring</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span> <span class="o">!=</span> <span class="n">n_qubits</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"All bit vectors must have the same length. "</span>
+                    <span class="sa">f</span><span class="s2">"Bit vector </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> has length </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">n_qubits</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
+
+        <span class="c1"># Create binary matrix: each bit vector is already in q[0]...q[N-1] order</span>
+        <span class="n">bitstring_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n_qubits</span><span class="p">,</span> <span class="n">n_dets</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">bitstring</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">bitstrings</span><span class="p">):</span>
+            <span class="n">bitstring_matrix</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">bitstring</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int8</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">bitstring_matrix</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_prepare_single_reference_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">bitstring</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Prepare a single reference state on a quantum circuit based on a bitstring.</span>
+
+<span class="sd">        The input bitstring is in big-endian order: ``bitstring[0]`` corresponds to</span>
+<span class="sd">        the highest-indexed qubit (MSB) and ``bitstring[N-1]`` corresponds to qubit 0</span>
+<span class="sd">        (LSB). The function reverses the bitstring internally so that in the circuit,</span>
+<span class="sd">        ``bitstring[i]`` maps to qubit ``N-1-i``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            bitstring: List of 0/1 ints in big-endian order (MSB first).</span>
+<span class="sd">                1 means apply X gate, 0 means leave in |0⟩ state.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">                A Circuit object with the prepared single reference state</span>
+
+<span class="sd">        Example:</span>
+<span class="sd">                bitstring = [1, 0, 1, 0] produces X gates on qubit 0 and qubit 2:</span>
+
+<span class="sd">                * qubit 0 ← bitstring[0] = 1 → X → :math:`\left| 1 \right\rangle`</span>
+<span class="sd">                * qubit 1 ← bitstring[1] = 0 → :math:`\left| 0 \right\rangle`</span>
+<span class="sd">                * qubit 2 ← bitstring[2] = 1 → X → :math:`\left| 1 \right\rangle`</span>
+<span class="sd">                * qubit 3 ← bitstring[3] = 0 → :math:`\left| 0 \right\rangle`</span>
+
+<span class="sd">        """</span>
+        <span class="c1"># Input validation</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">bitstring</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Bitstring cannot be empty"</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="n">bit</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">bit</span> <span class="ow">in</span> <span class="n">bitstring</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Bitstring must contain only 0 and 1 values"</span><span class="p">)</span>
+
+        <span class="n">num_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">SingleReferenceParams</span><span class="p">(</span><span class="n">bitStrings</span><span class="o">=</span><span class="n">bitstring</span><span class="p">,</span> <span class="n">numQubits</span><span class="o">=</span><span class="n">num_qubits</span><span class="p">)</span>
+        <span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+            <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeSingleReferenceStateCircuit</span><span class="p">,</span> <span class="n">parameter</span><span class="o">=</span><span class="nb">vars</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">qsharp_op</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakePrepareSingleReferenceStateOp</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">,</span>
+            <span class="n">qsharp_op</span><span class="o">=</span><span class="n">qsharp_op</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="s2">"jordan-wigner"</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the name of the state preparation method."""</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">return</span> <span class="s2">"sparse_isometry"</span>
+
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">GF2XEliminationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Data class to hold the results of GF2+X elimination."""</span>
+
+    <span class="n">reduced_matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span>
+<span class="w">    </span><span class="sd">"""Reduced row-echelon binary matrix with zero rows removed."""</span>
+
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">"""Map of reduced matrix row i to original row index."""</span>
+
+    <span class="n">col_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+<span class="w">    </span><span class="sd">"""Map of reduced matrix col j to original column index."""</span>
+
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span>
+<span class="w">    </span><span class="sd">"""List of operations in the form:</span>
+
+<span class="sd">        * ('cx', (target_row, control_row)) for CX operations</span>
+<span class="sd">        * ('x', row_index) for X operations on entire rows</span>
+
+<span class="sd">    All indices refer to original matrix positions.</span>
+<span class="sd">    """</span>
+
+    <span class="n">rank</span><span class="p">:</span> <span class="nb">int</span>
+<span class="w">    </span><span class="sd">"""Rank of the reduced matrix (number of non-zero rows)."""</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">gf2x_with_tracking</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">skip_diagonal_reduction</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">forward_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GF2XEliminationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Perform enhanced GF2+X Gaussian elimination with smart preprocessing and X operations.</span>
+
+<span class="sd">    This function implements a smarter approach to GF2 Gaussian elimination by:</span>
+
+<span class="sd">        1. First removing duplicate rows using CX operations</span>
+<span class="sd">        2. Removing all-ones rows using X operations</span>
+<span class="sd">        3. Then performing standard Gaussian elimination</span>
+<span class="sd">        4. Performing further reduction if the resulting matrix is diagonal</span>
+
+<span class="sd">    This approach can be more efficient than standard Gaussian elimination alone,</span>
+<span class="sd">    especially for certain types of matrices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: shape (m, n), binary (0/1) matrix</span>
+<span class="sd">        skip_diagonal_reduction: If True, skip the optional diagonal-to-upper-</span>
+<span class="sd">            staircase rank reduction (step 4).  Binary encoding handles the</span>
+<span class="sd">            identity pivot block natively, so the extra CX + X expansion ops</span>
+<span class="sd">            produced by the diagonal reduction are redundant Cliffords.</span>
+<span class="sd">        forward_only: If True, perform forward-only GF2 elimination into row echelon form (REF),</span>
+<span class="sd">            skipping back-substitution entirely.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A dataclass containing GF2+X elimination results.</span>
+
+<span class="sd">    """</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">row_map</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">))</span>
+    <span class="n">col_map</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_cols</span><span class="p">))</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Handle empty matrix case early</span>
+    <span class="k">if</span> <span class="n">n_rows</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Input matrix has no rows (no qubits). Please check your input data."</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n_cols</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Input matrix has no columns (no determinants). Please check your input data."</span><span class="p">)</span>
+
+    <span class="c1"># Log the original matrix rank</span>
+    <span class="n">original_rank</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">matrix_rank</span><span class="p">(</span><span class="n">matrix</span><span class="p">)</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Original matrix rank: </span><span class="si">{</span><span class="n">original_rank</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="c1"># Check for zero rank matrix (all zero rows)</span>
+    <span class="k">if</span> <span class="n">original_rank</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">"Input matrix has rank 0 (all rows are zero). This indicates no valid quantum states. "</span>
+            <span class="s2">"Please check your wavefunction data - you may have invalid determinants or coefficients."</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Work on a copy to avoid modifying the input</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="c1"># Step 1: Remove duplicate rows using CX operations</span>
+    <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span> <span class="o">=</span> <span class="n">_remove_duplicate_rows_with_cnot</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span><span class="p">)</span>
+
+    <span class="c1"># Step 2: Remove all-ones rows using X operations</span>
+    <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span> <span class="o">=</span> <span class="n">_remove_all_ones_rows_with_x</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="n">operations</span><span class="p">)</span>
+
+    <span class="c1"># Step 3: Perform standard Gaussian elimination on the remaining matrix</span>
+    <span class="k">if</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Only if there are rows left</span>
+        <span class="n">matrix_processed</span><span class="p">,</span> <span class="n">updated_row_map</span><span class="p">,</span> <span class="n">new_cnot_ops</span> <span class="o">=</span> <span class="n">_perform_gaussian_elimination</span><span class="p">(</span>
+            <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map</span><span class="p">,</span> <span class="p">[],</span> <span class="n">forward_only</span><span class="o">=</span><span class="n">forward_only</span>
+        <span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">control</span> <span class="ow">in</span> <span class="n">new_cnot_ops</span><span class="p">:</span>
+            <span class="n">operations</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"cx"</span><span class="p">,</span> <span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">control</span><span class="p">)))</span>
+
+        <span class="c1"># Remove zero rows and update row_map accordingly</span>
+        <span class="n">matrix_reduced</span><span class="p">,</span> <span class="n">reduced_row_map</span><span class="p">,</span> <span class="n">rank</span> <span class="o">=</span> <span class="n">_remove_zero_rows</span><span class="p">(</span><span class="n">matrix_processed</span><span class="p">,</span> <span class="n">updated_row_map</span><span class="p">)</span>
+
+        <span class="n">gf2x_results</span> <span class="o">=</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+            <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">matrix_reduced</span><span class="p">,</span>
+            <span class="n">row_map</span><span class="o">=</span><span class="n">reduced_row_map</span><span class="p">,</span>
+            <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span>
+            <span class="n">operations</span><span class="o">=</span><span class="n">operations</span><span class="p">,</span>
+            <span class="n">rank</span><span class="o">=</span><span class="n">rank</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Step 4: Check for diagonal matrix and apply further reduction if possible</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">forward_only</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">skip_diagonal_reduction</span> <span class="ow">and</span> <span class="n">rank</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">_is_diagonal_matrix</span><span class="p">(</span><span class="n">matrix_reduced</span><span class="p">):</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Detected diagonal matrix with rank </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">, applying further reduction"</span><span class="p">)</span>
+            <span class="n">gf2x_results</span> <span class="o">=</span> <span class="n">_reduce_diagonal_matrix</span><span class="p">(</span><span class="n">matrix_reduced</span><span class="p">,</span> <span class="n">reduced_row_map</span><span class="p">,</span> <span class="n">col_map</span><span class="p">,</span> <span class="n">operations</span><span class="p">)</span>
+
+        <span class="c1"># Log the final reduced matrix rank</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Final reduced matrix rank: </span><span class="si">{</span><span class="n">gf2x_results</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">gf2x_results</span>
+
+    <span class="c1"># If no rows left after preprocessing, return empty matrix</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">"Final reduced matrix rank: 0"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+        <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_cols</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">matrix</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
+        <span class="n">row_map</span><span class="o">=</span><span class="n">row_map</span><span class="p">,</span>
+        <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span>
+        <span class="n">operations</span><span class="o">=</span><span class="n">operations</span><span class="p">,</span>
+        <span class="n">rank</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remove_duplicate_rows_with_cnot</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]]:</span>
+<span class="w">    </span><span class="sd">"""Remove duplicate rows using CNOT operations.</span>
+
+<span class="sd">    This function identifies duplicate rows and eliminates them by applying CNOT operations.</span>
+<span class="sd">    When two rows are identical, a CNOT operation from one to the other will make the target row all zeros.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to process</span>
+<span class="sd">        row_map: Current row mapping to original indices</span>
+<span class="sd">        operations: List to append operations to</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing ``(updated_matrix, updated_row_map, updated_operations)``.</span>
+
+<span class="sd">    """</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">operations_work</span> <span class="o">=</span> <span class="n">operations</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">rows_to_eliminate</span><span class="p">:</span> <span class="nb">set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+    <span class="c1"># Find duplicate rows and XOR them to zero immediately</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]):</span>
+            <span class="k">continue</span>
+
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n_rows</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">j</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+                <span class="k">continue</span>
+
+            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">j</span><span class="p">]):</span>
+                <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"cx"</span><span class="p">,</span> <span class="p">(</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">])))</span>
+                <span class="n">matrix_work</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">^=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+                <span class="n">rows_to_eliminate</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+
+                <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Found duplicate row </span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s2"> identical to row </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">, adding CX(</span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">, </span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">}</span><span class="s2">)"</span>
+                <span class="p">)</span>
+
+    <span class="c1"># Remove eliminated rows (now all zeros)</span>
+    <span class="k">if</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Eliminating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rows_to_eliminate</span><span class="p">)</span><span class="si">}</span><span class="s2"> duplicate rows: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">rows_to_eliminate</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="n">rows_to_keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">]</span>
+        <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">rows_to_keep</span><span class="p">]</span>
+        <span class="n">row_map_work</span> <span class="o">=</span> <span class="p">[</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_keep</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">operations_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remove_all_ones_rows_with_x</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]]:</span>
+<span class="w">    </span><span class="sd">"""Remove all-ones rows using X operations.</span>
+
+<span class="sd">    This function identifies rows that contain all ones and eliminates them</span>
+<span class="sd">    by applying X operations to flip all bits in those rows to zeros.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to process</span>
+<span class="sd">        row_map: Current row mapping to original indices</span>
+<span class="sd">        operations: List to append operations to</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing ``(updated_matrix, updated_row_map, updated_operations)``</span>
+
+<span class="sd">    """</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">operations_work</span> <span class="o">=</span> <span class="n">operations</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+    <span class="n">n_rows</span><span class="p">,</span> <span class="n">n_cols</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">rows_to_eliminate</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Find all-ones rows</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+            <span class="c1"># Apply X operation to flip all bits to zero</span>
+            <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]))</span>
+            <span class="n">rows_to_eliminate</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Found all-ones row </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">, adding X operation on row </span><span class="si">{</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="c1"># Apply X operations to eliminate all-ones rows</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+        <span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_cols</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">matrix_work</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+    <span class="c1"># Remove eliminated rows (which are now all zeros)</span>
+    <span class="k">if</span> <span class="n">rows_to_eliminate</span><span class="p">:</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Eliminating </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">rows_to_eliminate</span><span class="p">)</span><span class="si">}</span><span class="s2"> all-ones rows: </span><span class="si">{</span><span class="n">rows_to_eliminate</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="c1"># Create mask for rows to keep</span>
+        <span class="n">rows_to_keep</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_rows</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rows_to_eliminate</span><span class="p">]</span>
+
+        <span class="c1"># Update matrix and row mapping</span>
+        <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">rows_to_keep</span><span class="p">]</span>
+        <span class="n">row_map_work</span> <span class="o">=</span> <span class="p">[</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">rows_to_keep</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">operations_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_perform_gaussian_elimination</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">cnot_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">forward_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">"""Perform GF2 Gaussian elimination.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to reduce (copied internally).</span>
+<span class="sd">        row_map: Current-to-original row index mapping (copied internally).</span>
+<span class="sd">        cnot_ops: Existing CNOT operation list (copied internally).</span>
+<span class="sd">        forward_only: If True, perform forward-only elimination into</span>
+<span class="sd">            row echelon form (REF), skipping back-substitution.  If</span>
+<span class="sd">            False (default), perform full elimination into RREF.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``(reduced_matrix, updated_row_map, updated_cnot_ops)``</span>
+
+<span class="sd">    """</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">cnot_ops_work</span> <span class="o">=</span> <span class="n">cnot_ops</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">num_rows</span><span class="p">,</span> <span class="n">num_cols</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="n">pivot_row</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_cols</span><span class="p">):</span>
+        <span class="n">sel</span> <span class="o">=</span> <span class="n">_find_pivot_row</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">pivot_row</span><span class="p">,</span> <span class="n">col</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="k">if</span> <span class="n">sel</span> <span class="o">!=</span> <span class="n">pivot_row</span><span class="p">:</span>
+            <span class="n">matrix_work</span><span class="p">[[</span><span class="n">pivot_row</span><span class="p">,</span> <span class="n">sel</span><span class="p">]]</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="p">[[</span><span class="n">sel</span><span class="p">,</span> <span class="n">pivot_row</span><span class="p">]]</span>
+            <span class="n">row_map_work</span><span class="p">[</span><span class="n">pivot_row</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">sel</span><span class="p">]</span> <span class="o">=</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">sel</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">pivot_row</span><span class="p">]</span>
+
+        <span class="n">_eliminate_column</span><span class="p">(</span><span class="n">matrix_work</span><span class="p">,</span> <span class="n">pivot_row</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">cnot_ops_work</span><span class="p">,</span> <span class="n">forward_only</span><span class="o">=</span><span class="n">forward_only</span><span class="p">)</span>
+
+        <span class="n">pivot_row</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">pivot_row</span> <span class="o">==</span> <span class="n">num_rows</span><span class="p">:</span>
+            <span class="k">break</span>
+
+    <span class="k">return</span> <span class="n">matrix_work</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">,</span> <span class="n">cnot_ops_work</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_find_pivot_row</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">start_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Find the first row at or below ``start_row`` with a 1 in ``col``.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix (read-only).</span>
+<span class="sd">        start_row: First row index to consider (inclusive).</span>
+<span class="sd">        col: Column to search.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Row index of the first 1-entry, or ``None`` if the column is</span>
+<span class="sd">        all-zero from ``start_row`` downward.</span>
+
+<span class="sd">    """</span>
+    <span class="n">candidates</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">matrix</span><span class="p">[</span><span class="n">start_row</span><span class="p">:,</span> <span class="n">col</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">start_row</span> <span class="o">+</span> <span class="nb">int</span><span class="p">(</span><span class="n">candidates</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="n">candidates</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_eliminate_column</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">pivot_row</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">col</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">cnot_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">forward_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Eliminate rows in ``col`` using XOR with the pivot row.</span>
+
+<span class="sd">    Modifies ``matrix`` and ``cnot_ops`` **in place**.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix (modified in place).</span>
+<span class="sd">        pivot_row: Index of the pivot row (unchanged).</span>
+<span class="sd">        col: Column to eliminate.</span>
+<span class="sd">        row_map: Current-to-original row index mapping (read-only).</span>
+<span class="sd">        cnot_ops: Destination list for recorded CNOT operations.</span>
+<span class="sd">        forward_only: If True, only eliminate rows below the pivot</span>
+<span class="sd">            (forward elimination / REF).  If False, eliminate all</span>
+<span class="sd">            other rows (full back-substitution / RREF).</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">forward_only</span><span class="p">:</span>
+        <span class="n">targets</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">matrix</span><span class="p">[</span><span class="n">pivot_row</span> <span class="o">+</span> <span class="mi">1</span> <span class="p">:,</span> <span class="n">col</span><span class="p">])</span> <span class="o">+</span> <span class="n">pivot_row</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">targets</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">matrix</span><span class="p">[:,</span> <span class="n">col</span><span class="p">])</span>
+        <span class="n">targets</span> <span class="o">=</span> <span class="n">targets</span><span class="p">[</span><span class="n">targets</span> <span class="o">!=</span> <span class="n">pivot_row</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">targets</span><span class="p">:</span>
+        <span class="n">matrix</span><span class="p">[</span><span class="n">r</span><span class="p">]</span> <span class="o">^=</span> <span class="n">matrix</span><span class="p">[</span><span class="n">pivot_row</span><span class="p">]</span>
+        <span class="n">cnot_ops</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">row_map</span><span class="p">[</span><span class="n">r</span><span class="p">],</span> <span class="n">row_map</span><span class="p">[</span><span class="n">pivot_row</span><span class="p">]))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_remove_zero_rows</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Remove all-zero rows from the matrix and update the row mapping.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix (read-only).</span>
+<span class="sd">        row_map: Current-to-original row index mapping (read-only).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``(matrix_reduced, reduced_row_map, rank)`` where ``rank`` is the</span>
+<span class="sd">        number of retained (non-zero) rows.</span>
+
+<span class="sd">    """</span>
+    <span class="n">non_zero_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">matrix</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">matrix</span><span class="p">[</span><span class="n">non_zero_indices</span><span class="p">],</span>
+        <span class="p">[</span><span class="n">row_map</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">non_zero_indices</span><span class="p">],</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">non_zero_indices</span><span class="o">.</span><span class="n">size</span><span class="p">),</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_reduce_diagonal_matrix</span><span class="p">(</span>
+    <span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+    <span class="n">row_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">col_map</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">operations</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">GF2XEliminationResult</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Reduce a diagonal (identity) matrix by one rank via CX cascade + X.</span>
+
+<span class="sd">    Applies CX(i, i+1) for i = 0…rank-2, making the last row all-ones,</span>
+<span class="sd">    then X on the last row to zero it, and finally removes that row.</span>
+
+<span class="sd">    The caller is responsible for verifying ``_is_diagonal_matrix`` first.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Diagonal binary matrix to reduce.</span>
+<span class="sd">        row_map: Current row mapping to original indices.</span>
+<span class="sd">        col_map: Column mapping (passed through unchanged).</span>
+<span class="sd">        operations: Operations list to extend.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        GF2XEliminationResult with rank decremented by 1.</span>
+
+<span class="sd">    """</span>
+    <span class="n">matrix_work</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">row_map_work</span> <span class="o">=</span> <span class="n">row_map</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">operations_work</span> <span class="o">=</span> <span class="n">operations</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+    <span class="n">rank</span> <span class="o">=</span> <span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Applying diagonal matrix reduction on </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2">x</span><span class="si">{</span><span class="n">matrix_work</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2"> matrix"</span><span class="p">)</span>
+
+    <span class="c1"># Sequential CX(i, i+1) accumulates all 1s into the last row</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"cx"</span><span class="p">,</span> <span class="p">(</span><span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">],</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">i</span><span class="p">])))</span>
+        <span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span> <span class="o">^=</span> <span class="n">matrix_work</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+    <span class="c1"># X on the all-ones last row zeroes it</span>
+    <span class="n">operations_work</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="s2">"x"</span><span class="p">,</span> <span class="n">row_map_work</span><span class="p">[</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]))</span>
+
+    <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Diagonal reduction complete: rank reduced from </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">rank</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">GF2XEliminationResult</span><span class="p">(</span>
+        <span class="n">reduced_matrix</span><span class="o">=</span><span class="n">matrix_work</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">row_map</span><span class="o">=</span><span class="n">row_map_work</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span>
+        <span class="n">col_map</span><span class="o">=</span><span class="n">col_map</span><span class="p">,</span>
+        <span class="n">operations</span><span class="o">=</span><span class="n">operations_work</span><span class="p">,</span>
+        <span class="n">rank</span><span class="o">=</span><span class="n">rank</span> <span class="o">-</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_is_diagonal_matrix</span><span class="p">(</span><span class="n">matrix</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Check if a binary matrix is diagonal and safe for rank reduction.</span>
+
+<span class="sd">    Two accepted shapes:</span>
+
+<span class="sd">    1. **Square identity**: ``matrix == np.eye(r)``.</span>
+<span class="sd">    2. **Pseudo-diagonal** (more columns than rows, odd row count):</span>
+<span class="sd">       the leading ``r x r`` block is identity and every extra column</span>
+<span class="sd">       is all-ones.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        matrix: Binary matrix to check.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``True`` if the matrix matches one of the accepted shapes.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">matrix</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="n">num_rows</span><span class="p">,</span> <span class="n">num_cols</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">identity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">num_rows</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">matrix</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">num_rows</span> <span class="o">==</span> <span class="n">num_cols</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">matrix</span><span class="p">,</span> <span class="n">identity</span><span class="p">))</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="n">num_cols</span> <span class="o">&gt;</span> <span class="n">num_rows</span>
+        <span class="ow">and</span> <span class="n">num_rows</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span>
+        <span class="ow">and</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array_equal</span><span class="p">(</span><span class="n">matrix</span><span class="p">[:,</span> <span class="p">:</span><span class="n">num_rows</span><span class="p">],</span> <span class="n">identity</span><span class="p">))</span>
+        <span class="ow">and</span> <span class="nb">bool</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">matrix</span><span class="p">[:,</span> <span class="n">num_rows</span><span class="p">:]</span> <span class="o">==</span> <span class="mi">1</span><span class="p">))</span>
+    <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

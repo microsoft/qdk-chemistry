@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Amplitude amplification &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Amplitude amplification &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -77,13 +78,15 @@
 <li class="toctree-l3"><a class="reference internal" href="qpe_circuit_builder.html">Phase estimation circuit builder</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Amplitude amplification</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#using-amplitude-amplification">Using amplitude amplification</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#amplitude-amplified-qpe">Amplitude amplified QPE</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qpe-subspace-marking-oracle">QPE subspace marking oracle</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#settings">Settings</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further Reading</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -143,16 +146,17 @@
              
   <section id="amplitude-amplification">
 <h1>Amplitude amplification<a class="headerlink" href="#amplitude-amplification" title="Link to this heading"></a></h1>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification" title="qdk_chemistry.algorithms.amplitude_amplification.AmplitudeAmplification"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeAmplification</span></code></a>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.AmplitudeAmplification" title="qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification.AmplitudeAmplification"><code class="xref py py-class docutils literal notranslate"><span class="pre">AmplitudeAmplification</span></code></a>
 algorithm increases the probability of measuring a state in a chosen subspace.
 It takes two <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> objects:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">state_prep_oracle</span></code> prepares the initial state.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">good_state_oracle</span></code> flips a flag qubit for the good subspace.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">state_prep_oracle</span></code> prepares the initial state from <span class="math notranslate nohighlight">\(|0\rangle\)</span>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">good_state_oracle</span></code> marks the good subspace: applied to <code class="docutils literal notranslate"><span class="pre">(register,</span> <span class="pre">flag)</span></code> it flips the
+flag qubit when the register holds a good state, and leaves the register itself untouched.</p></li>
 </ul>
 <p>The circuit first prepares the initial state. Each round then flags the
-good subspace and reflects about the prepared state. If the initial probability
-of the marked subspace is <span class="math notranslate nohighlight">\(a\)</span>, the probability after <span class="math notranslate nohighlight">\(k\)</span> rounds is</p>
+good subspace and reflects. If the initial probability of the marked
+subspace is <span class="math notranslate nohighlight">\(a\)</span>, the probability after <span class="math notranslate nohighlight">\(k\)</span> rounds is</p>
 <div class="math notranslate nohighlight">
 \[p_k = \sin^2\!\big((2k+1)\arcsin\sqrt{a}\big).\]</div>
 <p>This gives the <span class="math notranslate nohighlight">\(O(1/\sqrt{a})\)</span> query scaling. More rounds are not
@@ -171,113 +175,109 @@ probability. Choose <code class="docutils literal notranslate"><span class="pre"
 
 <span class="c1"># Number of Grover iterates. Choose it from an estimate of the overlap a,</span>
 <span class="c1"># the success probability after k rounds is sin^2((2k+1) arcsin(sqrt(a))).</span>
-<span class="n">amplitude_amplification</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;amplitude_amplification&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_base&quot;</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">amplitude_amplification</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"amplitude_amplification"</span><span class="p">,</span> <span class="s2">"qdk_base"</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
 </pre></div>
 </div>
 </div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">run</span></code> takes the two oracles and reads the register width from a resource estimate of
-the state preparation. The returned circuit measures the whole register. It also carries
-the same amplification without measurement as a Q# callable, so a caller can append its
-own measurement instead. See below for an example of amplifying a measurement-free QPE circuit.</p>
+<p><code class="docutils literal notranslate"><span class="pre">run</span></code> takes the two oracles as <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a>. See below for an
+example of amplifying an eigenstate found by QPE.</p>
 </section>
-<section id="amplitude-amplified-qpe">
-<h2>Amplitude amplified QPE<a class="headerlink" href="#amplitude-amplified-qpe" title="Link to this heading"></a></h2>
-<p>Build a measurement-free QPE circuit, mark the target phase bin, and amplify.
-<a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.html#qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle" title="qdk_chemistry.algorithms.amplitude_amplification.phase_marking_oracle"><code class="xref py py-func docutils literal notranslate"><span class="pre">phase_marking_oracle()</span></code></a> reads the
-register layout from the QPE circuit, so only the target bins have to be given:</p>
+<section id="qpe-subspace-marking-oracle">
+<h2>QPE subspace marking oracle<a class="headerlink" href="#qpe-subspace-marking-oracle" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.html#qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking" title="qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace.QPESubspaceMarking"><code class="xref py py-class docutils literal notranslate"><span class="pre">QPESubspaceMarking</span></code></a>
+algorithm (<code class="docutils literal notranslate"><span class="pre">amplitude_amplification_oracle</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_qpe_subspace</span></code>) builds a
+<code class="docutils literal notranslate"><span class="pre">good_state_oracle</span></code> for an eigenspace. It runs the nested phase estimation on the register
+it is handed, flips the flag when the phase lands in a bin whose energy is at least
+<code class="docutils literal notranslate"><span class="pre">energy_lower_bound</span></code>, then undoes the estimation so the register comes back as it was
+found. <code class="docutils literal notranslate"><span class="pre">run</span></code> takes only the <code class="docutils literal notranslate"><span class="pre">qubit_hamiltonian</span></code>: the register already holds the state
+under test, so no state preparation is needed.</p>
+<p>The oracle reflects about the marked eigenspaces only when the estimation is exact, that is
+when every eigenphase of the state under test is a multiple of <span class="math notranslate nohighlight">\(2^{-n}\)</span> for
+<code class="docutils literal notranslate"><span class="pre">num_bits</span></code> <span class="math notranslate nohighlight">\(n\)</span>. Off a bin the phase register comes back spread rather than to
+<span class="math notranslate nohighlight">\(|0\rangle\)</span>, so the ancillas the oracle releases carry away part of the state.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span><span class="p">,</span> <span class="n">phase_marking_oracle</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span><span class="p">,</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QubitOperator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">AlgorithmRef</span><span class="p">,</span>
+    <span class="n">Configuration</span><span class="p">,</span>
+    <span class="n">ModelOrbitals</span><span class="p">,</span>
+    <span class="n">QubitOperator</span><span class="p">,</span>
+    <span class="n">StateVectorContainer</span><span class="p">,</span>
+    <span class="n">Wavefunction</span><span class="p">,</span>
+<span class="p">)</span>
 
-<span class="c1"># 1. A two-qubit Hamiltonian</span>
+<span class="c1"># 1. A two-qubit Hamiltonian. Its spectrum is {+lambda, 0, 0, -lambda}, with |11&gt; on top.</span>
 <span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
-    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ZI&quot;</span><span class="p">,</span> <span class="s2">&quot;IZ&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">4.0</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">4.0</span><span class="p">])</span>
+    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">"ZI"</span><span class="p">,</span> <span class="s2">"IZ"</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">4.0</span><span class="p">,</span> <span class="o">-</span><span class="n">math</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="mf">4.0</span><span class="p">])</span>
 <span class="p">)</span>
 
-<span class="c1"># 2. A guiding state with 0.3 amplitude on the target eigenvector |11&gt;</span>
-<span class="n">state_vector</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">]</span>
-<span class="n">state_vector</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.3</span>
-<span class="n">state_vector</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="mf">0.3</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
-<span class="n">prep_parameters</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;rowMap&quot;</span><span class="p">:</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">],</span>
-    <span class="s2">&quot;stateVector&quot;</span><span class="p">:</span> <span class="n">state_vector</span><span class="p">,</span>
-    <span class="s2">&quot;expansionOps&quot;</span><span class="p">:</span> <span class="p">[],</span>
-    <span class="s2">&quot;numQubits&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-<span class="p">}</span>
-<span class="n">state_preparation</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
-    <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span>
-        <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeStatePreparationCircuit</span><span class="p">,</span>
-        <span class="n">parameter</span><span class="o">=</span><span class="n">prep_parameters</span><span class="p">,</span>
+<span class="c1"># 2. A guiding state with 0.3 amplitude on the target eigenvector |11&gt;.</span>
+<span class="n">amplitude</span> <span class="o">=</span> <span class="mf">0.3</span>
+<span class="n">guiding_state</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span>
+    <span class="n">StateVectorContainer</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">math</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">amplitude</span><span class="o">**</span><span class="mi">2</span><span class="p">),</span> <span class="n">amplitude</span><span class="p">]),</span>
+        <span class="p">[</span><span class="n">Configuration</span><span class="o">.</span><span class="n">from_bitstring</span><span class="p">(</span><span class="s2">"00"</span><span class="p">),</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_bitstring</span><span class="p">(</span><span class="s2">"11"</span><span class="p">)],</span>
+        <span class="n">ModelOrbitals</span><span class="p">(</span><span class="mi">2</span><span class="p">),</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">state_preparation</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"dense_pure_state"</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">guiding_state</span><span class="p">)</span>
+
+<span class="c1"># 3. To mark the target state, a QPE is run on the prepared register, and a flag</span>
+<span class="c1"># is flipped when the QPE phase lands in the desired range. The bound is halfway</span>
+<span class="c1"># up the band, so |11&gt; at +lambda is marked and the rest of the spectrum is not.</span>
+<span class="n">good_state_oracle</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">"amplitude_amplification_oracle"</span><span class="p">,</span>
+    <span class="s2">"qdk_qpe_subspace"</span><span class="p">,</span>
+    <span class="n">energy_lower_bound</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">schatten_norm</span> <span class="o">/</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">qpe_circuit_builder</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+        <span class="s2">"qpe_circuit_builder"</span><span class="p">,</span>
+        <span class="s2">"qdk_standard"</span><span class="p">,</span>
+        <span class="n">num_bits</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span>
+        <span class="n">unitary_builder</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+            <span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"lcu"</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">),</span>
+        <span class="n">controlled_circuit_mapper</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+            <span class="s2">"controlled_circuit_mapper"</span><span class="p">,</span> <span class="s2">"prepare_select_prepare"</span>
+        <span class="p">),</span>
     <span class="p">),</span>
-    <span class="n">qsharp_op</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeStatePreparationOp</span><span class="p">(</span><span class="n">prep_parameters</span><span class="p">),</span>
-<span class="p">)</span>
+<span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">)</span>
 
-<span class="c1"># 3. Build a measurement-free QPE circuit. This whole circuit is the preparation that</span>
-<span class="c1"># gets amplified, so the phase register and its ancillas stay inside the amplified</span>
-<span class="c1"># register and every round reflects about the full prepared state.</span>
-<span class="n">num_bits</span> <span class="o">=</span> <span class="mi">4</span>
-<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;qpe_circuit_builder&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;qdk_standard&quot;</span><span class="p">,</span>
-    <span class="n">num_bits</span><span class="o">=</span><span class="n">num_bits</span><span class="p">,</span>
-    <span class="n">controlled_circuit_mapper</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
-        <span class="s2">&quot;controlled_circuit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;prepare_select_prepare&quot;</span>
-    <span class="p">),</span>
-    <span class="n">unitary_builder</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
-        <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;lcu&quot;</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span>
-    <span class="p">),</span>
-    <span class="n">measure_phase</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="n">state_prep_oracle</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">state_preparation</span><span class="o">=</span><span class="n">state_preparation</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span>
-<span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+<span class="c1"># 4. Amplify the initial state against the qpe subspace marking oracle.</span>
+<span class="n">amplitude_amplification</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"amplitude_amplification"</span><span class="p">,</span> <span class="s2">"qdk_base"</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">amplitude_amplification</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">state_preparation</span><span class="p">,</span> <span class="n">good_state_oracle</span><span class="p">)</span>
 
-<span class="c1"># 4. Mark the phase bins holding the target eigenvalue. QPE writes the phase phi of</span>
-<span class="c1"># the eigenvalue exp(2 pi i phi) into bin round(phi * 2**num_bits), so the half-open</span>
-<span class="c1"># window (8, 9) accepts bin 8 alone, that is phi = 0.5.</span>
-<span class="n">target_phase_bins</span> <span class="o">=</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">9</span><span class="p">)</span>
-<span class="n">good_state_oracle</span> <span class="o">=</span> <span class="n">phase_marking_oracle</span><span class="p">(</span><span class="n">state_prep_oracle</span><span class="p">,</span> <span class="n">target_phase_bins</span><span class="p">)</span>
-
-<span class="c1"># The same window can be named by energy instead. The walk maps E to</span>
-<span class="c1"># phi = arccos(E / lambda) / 2 pi, with lambda the L1 norm of the Hamiltonian, and</span>
-<span class="c1"># marks both signs of that phase. Here it selects bin 8 again.</span>
-<span class="n">good_state_oracle</span> <span class="o">=</span> <span class="n">phase_marking_oracle</span><span class="p">(</span>
-    <span class="n">state_prep_oracle</span><span class="p">,</span>
-    <span class="n">target_energy_range</span><span class="o">=</span><span class="p">(</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.99</span> <span class="o">*</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">schatten_norm</span><span class="p">),</span>
-    <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
-<span class="p">)</span>
-
-<span class="c1"># 5. Amplify, then execute</span>
-<span class="n">amplitude_amplification</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;amplitude_amplification&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_base&quot;</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-<span class="n">circuit</span> <span class="o">=</span> <span class="n">amplitude_amplification</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">state_prep_oracle</span><span class="p">,</span> <span class="n">good_state_oracle</span><span class="p">)</span>
-
-<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_sparse_state_simulator&quot;</span><span class="p">)</span>
+<span class="c1"># 5. Run the circuit and measure. Rounds 0 and 2 side by side show what the</span>
+<span class="c1"># amplification bought: |11&gt; starts at the 9% the guiding state gives it and ends</span>
+<span class="c1"># up dominating the shots, matching sin^2((2k+1) arcsin(0.3)).</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_sparse_state_simulator"</span><span class="p">)</span>
 <span class="n">shots</span> <span class="o">=</span> <span class="mi">400</span>
 <span class="n">counts</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">)</span><span class="o">.</span><span class="n">bitstring_counts</span>
+
+<span class="n">unamplified</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"amplitude_amplification"</span><span class="p">,</span> <span class="s2">"qdk_base"</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">state_preparation</span><span class="p">,</span> <span class="n">good_state_oracle</span>
+<span class="p">)</span>
+<span class="n">before</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">unamplified</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">)</span><span class="o">.</span><span class="n">bitstring_counts</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rounds=0: |11&gt; in </span><span class="si">{</span><span class="n">before</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'11'</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">shots</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2"> of shots, </span><span class="si">{</span><span class="n">before</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rounds=2: |11&gt; in </span><span class="si">{</span><span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'11'</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">shots</span><span class="si">:</span><span class="s2">.0%</span><span class="si">}</span><span class="s2"> of shots, </span><span class="si">{</span><span class="n">counts</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 </pre></div>
 </div>
 </div>
 </div>
-<p>The target can also be named as an energy window.
-This only applies to a QPE circuit built on a qubitization walk, whose eigenvalues are
-<span class="math notranslate nohighlight">\(e^{\pm i\arccos(E/\lambda)}\)</span> for <span class="math notranslate nohighlight">\(\lambda\)</span> the L1 norm of the Hamiltonian.</p>
-<p>Alternatively, the marked phase window can be replaced by a reflection onto the target
-eigenspace built with quantum signal processing on a block encoding of the Hamiltonian,
-amplifying an initial state preparation directly. See Lin and Tong,
+<p>Alternatively, the qpe subspace marking oracle can be replaced by a quantum signal processing oracle
+on a block encoding of the Hamiltonian. See Lin and Tong,
 <a class="reference external" href="https://arxiv.org/abs/2002.12508">arXiv:2002.12508</a>, and its use in
 <a class="reference external" href="https://arxiv.org/abs/2510.07273">arXiv:2510.07273</a>, Section 2.</p>
 </section>
 <section id="settings">
 <h2>Settings<a class="headerlink" href="#settings" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">amplitude_amplification</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_base</span></code>:</p>
 <table class="docutils align-default">
 <colgroup>
 <col style="width: 25.0%" />
@@ -297,12 +297,34 @@ amplifying an initial state preparation directly. See Lin and Tong,
 </tr>
 </tbody>
 </table>
+<p><code class="docutils literal notranslate"><span class="pre">amplitude_amplification_oracle</span></code> / <code class="docutils literal notranslate"><span class="pre">qdk_qpe_subspace</span></code>:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Setting</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">energy_lower_bound</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">float</span></code></p></td>
+<td><p>Lowest energy the marked subspace may hold. Must be finite. Default: <code class="docutils literal notranslate"><span class="pre">nan</span></code> (invalid; user must set).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qpe_circuit_builder</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></p></td>
+<td><p>The phase estimation to mark. Default: <code class="docutils literal notranslate"><span class="pre">AlgorithmRef(&quot;qpe_circuit_builder&quot;,</span> <span class="pre">&quot;qdk_standard&quot;)</span></code>.</p></td>
+</tr>
+</tbody>
+</table>
 </section>
 <section id="further-reading">
 <h2>Further Reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
-<li><p><a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a>: the un-amplified algorithm.</p></li>
-<li><p><a class="reference internal" href="qpe_circuit_builder.html"><span class="doc">QpeCircuitBuilder</span></a>: builds the coherent preparation this algorithm amplifies.</p></li>
 <li><p>Lin, L. <em>Lecture Notes on Quantum Algorithms for Scientific Computation</em>, <a class="reference external" href="https://arxiv.org/abs/2201.08309">arXiv:2201.08309</a>, Chapter 2.</p></li>
 <li><p>Brassard, G., Høyer, P., Mosca, M., and Tapp, A. <em>Quantum Amplitude Amplification and Estimation</em>, <a class="reference external" href="https://arxiv.org/abs/quant-ph/0005055">arXiv:quant-ph/0005055</a>.</p></li>
 <li><p>Lin, L. and Tong, Y. <em>Near-optimal ground state preparation</em>, <a class="reference external" href="https://arxiv.org/abs/2002.12508">arXiv:2002.12508</a>: the signal-processing eigenspace reflection.</p></li>

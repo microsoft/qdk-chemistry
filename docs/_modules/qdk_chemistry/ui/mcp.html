@@ -1,0 +1,387 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.ui.mcp &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.ui.mcp</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.ui.mcp</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""MCP server entry point for the QDK/Chemistry Toolkit.</span>
+
+<span class="sd">Launch the MCP server with::</span>
+
+<span class="sd">    qcmcp                          # stdio (default)</span>
+<span class="sd">    qcmcp --transport sse          # Server-Sent Events</span>
+<span class="sd">    qcmcp --transport streamable-http --port 8081</span>
+<span class="sd">    qcmcp --transport streamable-http --stateless-http --json-response</span>
+<span class="sd">        # sessionless JSON-RPC-over-HTTP (no Mcp-Session-Id required)</span>
+<span class="sd">"""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">argparse</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">._mcp</span><span class="w"> </span><span class="kn">import</span> <span class="n">MCP_AVAILABLE</span><span class="p">,</span> <span class="n">MCP_INSTALL_MESSAGE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">app</span>
+
+<span class="n">_TRANSPORTS</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"stdio"</span><span class="p">,</span> <span class="s2">"streamable-http"</span><span class="p">,</span> <span class="s2">"sse"</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_compact_tool_description</span><span class="p">(</span><span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the summary paragraph from one MCP tool description."""</span>
+    <span class="k">if</span> <span class="n">description</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="sa">r</span><span class="s2">"\n\s*\n"</span><span class="p">,</span> <span class="n">description</span><span class="o">.</span><span class="n">strip</span><span class="p">(),</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">return</span> <span class="s2">" "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">summary</span><span class="o">.</span><span class="n">split</span><span class="p">())</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_install_tool_description_compactor</span><span class="p">(</span><span class="n">server</span><span class="o">=</span><span class="n">app</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Expose concise tool summaries while retaining full Python docstrings."""</span>
+    <span class="n">list_tools</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">list_tools</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_compacted</span><span class="p">():</span>
+        <span class="n">tools</span> <span class="o">=</span> <span class="k">await</span> <span class="n">list_tools</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">tool</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">"description"</span><span class="p">:</span> <span class="n">_compact_tool_description</span><span class="p">(</span><span class="n">tool</span><span class="o">.</span><span class="n">description</span><span class="p">)})</span> <span class="k">for</span> <span class="n">tool</span> <span class="ow">in</span> <span class="n">tools</span><span class="p">]</span>
+
+    <span class="n">server</span><span class="o">.</span><span class="n">list_tools</span> <span class="o">=</span> <span class="n">_compacted</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_install_output_schema_stripper</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Wrap tool listing to drop ``outputSchema`` and ``_meta``.</span>
+
+<span class="sd">    Some MCP hosts pinned to the 2025-03-26 spec reject tools that include</span>
+<span class="sd">    ``outputSchema`` (added in 2025-06-18). The ``_meta`` field (used here for</span>
+<span class="sd">    MCP-Apps UI widget hints) is spec-compliant but unknown to such hosts and</span>
+<span class="sd">    can also cause silent indexing failures. Enabling this stripper removes</span>
+<span class="sd">    both fields so the ``tools/list`` payload is maximally portable.</span>
+<span class="sd">    """</span>
+    <span class="n">list_tools</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">list_tools</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_stripped</span><span class="p">():</span>
+        <span class="n">tools</span> <span class="o">=</span> <span class="k">await</span> <span class="n">list_tools</span><span class="p">()</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">tool</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">"output_schema"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"meta"</span><span class="p">:</span> <span class="kc">None</span><span class="p">})</span> <span class="k">for</span> <span class="n">tool</span> <span class="ow">in</span> <span class="n">tools</span><span class="p">]</span>
+
+    <span class="n">app</span><span class="o">.</span><span class="n">list_tools</span> <span class="o">=</span> <span class="n">_stripped</span>  <span class="c1"># type: ignore[method-assign]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">argparse</span><span class="o">.</span><span class="n">Namespace</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Parse MCP server flags (--transport, --host, --port, --verbose)."""</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="s2">"qcmcp"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"QDK/Chemistry MCP server"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--transport"</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="n">_TRANSPORTS</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"stdio"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"MCP transport (default: stdio)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--host"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"127.0.0.1"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Bind address for HTTP transports (default: 127.0.0.1)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--port"</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="mi">8081</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Port for HTTP transports (default: 8081)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--endpoint"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="s2">"/mcp"</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"HTTP POST endpoint path for streamable-http transport (default: /mcp)"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"-v"</span><span class="p">,</span>
+        <span class="s2">"--verbose"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">"Enable verbose (DEBUG) logging"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--strip-output-schema"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"QDK_CHEM_MCP_STRIP_OUTPUT_SCHEMA"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"1"</span><span class="p">,</span> <span class="s2">"true"</span><span class="p">,</span> <span class="s2">"yes"</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Omit 'outputSchema' and '_meta' from tools/list responses for "</span>
+            <span class="s2">"hosts pinned to MCP spec 2025-03-26 (also via "</span>
+            <span class="s2">"QDK_CHEM_MCP_STRIP_OUTPUT_SCHEMA=1)"</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--stateless-http"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"QDK_CHEM_MCP_STATELESS_HTTP"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"1"</span><span class="p">,</span> <span class="s2">"true"</span><span class="p">,</span> <span class="s2">"yes"</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Run streamable-http transport in sessionless mode: each request "</span>
+            <span class="s2">"is independent and no Mcp-Session-Id header is required (also via "</span>
+            <span class="s2">"QDK_CHEM_MCP_STATELESS_HTTP=1). Ignored for stdio/sse transports."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--json-response"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"QDK_CHEM_MCP_JSON_RESPONSE"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"1"</span><span class="p">,</span> <span class="s2">"true"</span><span class="p">,</span> <span class="s2">"yes"</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Return plain application/json responses instead of SSE-framed "</span>
+            <span class="s2">"text/event-stream for streamable-http (also via "</span>
+            <span class="s2">"QDK_CHEM_MCP_JSON_RESPONSE=1). Useful with --stateless-http for "</span>
+            <span class="s2">"simple JSON-RPC-over-HTTP clients. Ignored for stdio/sse transports."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">p</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">"--relax-accept-header"</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">"store_true"</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"QDK_CHEM_MCP_RELAX_ACCEPT"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"1"</span><span class="p">,</span> <span class="s2">"true"</span><span class="p">,</span> <span class="s2">"yes"</span><span class="p">),</span>
+        <span class="n">help</span><span class="o">=</span><span class="p">(</span>
+            <span class="s2">"Inject 'Accept: application/json, text/event-stream' on incoming "</span>
+            <span class="s2">"streamable-http requests that don't already advertise both media "</span>
+            <span class="s2">"types. Lets hosts that only send 'Accept: application/json' work "</span>
+            <span class="s2">"with the MCP spec (also via QDK_CHEM_MCP_RELAX_ACCEPT=1). "</span>
+            <span class="s2">"Ignored for stdio/sse transports."</span>
+        <span class="p">),</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">argv</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_accept_relaxer_middleware</span><span class="p">(</span><span class="n">inner_app</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Return an ASGI app that ensures Accept advertises both required types.</span>
+
+<span class="sd">    The MCP streamable-http server returns 406 unless the request's Accept</span>
+<span class="sd">    header lists both ``application/json`` and ``text/event-stream``. Some</span>
+<span class="sd">    hosts only send ``application/json`` (or ``*/*``). This middleware</span>
+<span class="sd">    rewrites the Accept header on HTTP requests so the inner MCP app</span>
+<span class="sd">    accepts them.</span>
+<span class="sd">    """</span>
+    <span class="n">required</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"application/json, text/event-stream"</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">app_with_relaxed_accept</span><span class="p">(</span><span class="n">scope</span><span class="p">,</span> <span class="n">receive</span><span class="p">,</span> <span class="n">send</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">scope</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">"http"</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">inner_app</span><span class="p">(</span><span class="n">scope</span><span class="p">,</span> <span class="n">receive</span><span class="p">,</span> <span class="n">send</span><span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">headers</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">scope</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"headers"</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="n">accept_val</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">""</span>
+        <span class="n">accept_idx</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">v</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">headers</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="sa">b</span><span class="s2">"accept"</span><span class="p">:</span>
+                <span class="n">accept_val</span> <span class="o">=</span> <span class="n">v</span>
+                <span class="n">accept_idx</span> <span class="o">=</span> <span class="n">i</span>
+                <span class="k">break</span>
+        <span class="n">lower</span> <span class="o">=</span> <span class="n">accept_val</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+        <span class="n">has_json</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"application/json"</span> <span class="ow">in</span> <span class="n">lower</span> <span class="ow">or</span> <span class="sa">b</span><span class="s2">"*/*"</span> <span class="ow">in</span> <span class="n">lower</span>
+        <span class="n">has_sse</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"text/event-stream"</span> <span class="ow">in</span> <span class="n">lower</span> <span class="ow">or</span> <span class="sa">b</span><span class="s2">"*/*"</span> <span class="ow">in</span> <span class="n">lower</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">has_json</span> <span class="ow">and</span> <span class="n">has_sse</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">accept_idx</span> <span class="o">&gt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">headers</span><span class="p">[</span><span class="n">accept_idx</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="sa">b</span><span class="s2">"accept"</span><span class="p">,</span> <span class="n">required</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">headers</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="sa">b</span><span class="s2">"accept"</span><span class="p">,</span> <span class="n">required</span><span class="p">))</span>
+            <span class="n">scope</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">scope</span><span class="p">)</span>
+            <span class="n">scope</span><span class="p">[</span><span class="s2">"headers"</span><span class="p">]</span> <span class="o">=</span> <span class="n">headers</span>
+        <span class="k">await</span> <span class="n">inner_app</span><span class="p">(</span><span class="n">scope</span><span class="p">,</span> <span class="n">receive</span><span class="p">,</span> <span class="n">send</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">app_with_relaxed_accept</span>
+
+
+<div class="viewcode-block" id="main">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.mcp.html#qdk_chemistry.ui.mcp.main">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Run the QDK/Chemistry MCP server."""</span>
+    <span class="n">args</span> <span class="o">=</span> <span class="n">_parse_args</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">MCP_AVAILABLE</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">SystemExit</span><span class="p">(</span><span class="n">MCP_INSTALL_MESSAGE</span><span class="p">)</span>
+
+    <span class="c1"># Suppress noisy INFO/DEBUG logs unless --verbose is given.</span>
+    <span class="n">level</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span> <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">verbose</span> <span class="k">else</span> <span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span><span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">"</span><span class="si">%(levelname)s</span><span class="s2">: </span><span class="si">%(message)s</span><span class="s2">"</span><span class="p">,</span> <span class="n">force</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"qdk_chemistry"</span><span class="p">,</span> <span class="s2">"qsharp"</span><span class="p">,</span> <span class="s2">"pyscf"</span><span class="p">,</span> <span class="s2">"mcp"</span><span class="p">,</span> <span class="s2">"mcp.server"</span><span class="p">):</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">level</span><span class="p">)</span>
+
+    <span class="n">_install_tool_description_compactor</span><span class="p">()</span>
+    <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"qdk_chemistry"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="s2">"tools/list: descriptions contain summary paragraphs only"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">strip_output_schema</span><span class="p">:</span>
+        <span class="n">_install_output_schema_stripper</span><span class="p">()</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"qdk_chemistry"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="s2">"tools/list: outputSchema and _meta will be stripped from responses"</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">transport</span> <span class="o">==</span> <span class="s2">"stdio"</span><span class="p">:</span>
+        <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">transport</span><span class="o">=</span><span class="s2">"stdio"</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">transport</span> <span class="o">==</span> <span class="s2">"streamable-http"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">relax_accept_header</span><span class="p">:</span>
+            <span class="kn">import</span><span class="w"> </span><span class="nn">uvicorn</span>  <span class="c1"># noqa: PLC0415</span>
+
+            <span class="n">inner</span> <span class="o">=</span> <span class="n">app</span><span class="o">.</span><span class="n">streamable_http_app</span><span class="p">(</span>
+                <span class="n">host</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                <span class="n">streamable_http_path</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">endpoint</span><span class="p">,</span>
+                <span class="n">stateless_http</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">stateless_http</span><span class="p">,</span>
+                <span class="n">json_response</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">json_response</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">wrapped</span> <span class="o">=</span> <span class="n">_accept_relaxer_middleware</span><span class="p">(</span><span class="n">inner</span><span class="p">)</span>
+            <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"qdk_chemistry"</span><span class="p">)</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="s2">"streamable-http: Accept header will be relaxed to 'application/json, text/event-stream' when missing"</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">uvicorn</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">wrapped</span><span class="p">,</span>
+                <span class="n">host</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+                <span class="n">port</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+                <span class="n">log_level</span><span class="o">=</span><span class="n">app</span><span class="o">.</span><span class="n">settings</span><span class="o">.</span><span class="n">log_level</span><span class="o">.</span><span class="n">lower</span><span class="p">(),</span>
+            <span class="p">)</span>
+            <span class="k">return</span>
+        <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">transport</span><span class="o">=</span><span class="s2">"streamable-http"</span><span class="p">,</span>
+            <span class="n">host</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">host</span><span class="p">,</span>
+            <span class="n">port</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">port</span><span class="p">,</span>
+            <span class="n">streamable_http_path</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">endpoint</span><span class="p">,</span>
+            <span class="n">stateless_http</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">stateless_http</span><span class="p">,</span>
+            <span class="n">json_response</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">json_response</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">stateless_http</span> <span class="ow">or</span> <span class="n">args</span><span class="o">.</span><span class="n">json_response</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"qdk_chemistry"</span><span class="p">)</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"--stateless-http / --json-response only apply to --transport streamable-http; ignoring for </span><span class="si">%s</span><span class="s2">."</span><span class="p">,</span>
+            <span class="n">args</span><span class="o">.</span><span class="n">transport</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">relax_accept_header</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">"qdk_chemistry"</span><span class="p">)</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">"--relax-accept-header only applies to --transport streamable-http; ignoring for sse."</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">transport</span><span class="o">=</span><span class="s2">"sse"</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">host</span><span class="p">,</span> <span class="n">port</span><span class="o">=</span><span class="n">args</span><span class="o">.</span><span class="n">port</span><span class="p">)</span></div>
+
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s2">"__main__"</span><span class="p">:</span>
+    <span class="n">main</span><span class="p">()</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

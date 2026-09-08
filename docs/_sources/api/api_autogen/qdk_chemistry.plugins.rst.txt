@@ -13,8 +13,17 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.plugins.discovery
    qdk_chemistry.plugins.geometric
    qdk_chemistry.plugins.networkx
    qdk_chemistry.plugins.openfermion
    qdk_chemistry.plugins.pyscf
    qdk_chemistry.plugins.qiskit
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.base

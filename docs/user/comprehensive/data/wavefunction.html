@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Wavefunction &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Wavefunction &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
@@ -71,6 +72,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#container-types">Container types</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#accessing-wavefunction-data">Accessing wavefunction data</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#total-spin">Total spin</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#accessing-cluster-amplitudes">Accessing cluster amplitudes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
@@ -167,7 +169,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 
 <span class="c1"># Create a simple Slater determinant wavefunction for H2 ground state</span>
 <span class="c1"># 2 electrons in bonding sigma orbital</span>
-<span class="n">det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+<span class="n">det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"20"</span><span class="p">)</span>
 
 <span class="c1"># Constructor takes single determinant and orbitals as input</span>
 <span class="n">sd_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
@@ -180,7 +182,7 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Orbitals</span><span class="o">&gt;</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
 <span class="w">  </span><span class="c1">// Create a simple Slater determinant wavefunction for H2 ground state</span>
 <span class="w">  </span><span class="c1">// 2 electrons in bonding sigma orbital</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">det</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">det</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">"20"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Constructor takes single determinant and orbitals as input</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">);</span>
@@ -199,10 +201,10 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <span class="c1"># SCI selects only the most important configurations/determinants from the full space</span>
 <span class="n">sci_dets</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-        <span class="s2">&quot;20&quot;</span>
+        <span class="s2">"20"</span>
     <span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
-    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
-    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"du"</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"ud"</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
 <span class="p">]</span>
 
 <span class="c1"># Coefficients for selected determinants</span>
@@ -220,9 +222,9 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <span class="w">  </span><span class="c1">// SCI selects only the most important configurations/determinants from the</span>
 <span class="w">  </span><span class="c1">// full space</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">sci_dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Mixed state</span>
-<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;du&quot;</span><span class="p">)</span><span class="w">   </span><span class="c1">// Mixed state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">"20"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">"ud"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Mixed state</span>
+<span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">"du"</span><span class="p">)</span><span class="w">   </span><span class="c1">// Mixed state</span>
 <span class="w">  </span><span class="p">};</span>
 
 <span class="w">  </span><span class="c1">// Coefficients for selected determinants</span>
@@ -249,11 +251,11 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <span class="c1"># All possible configurations:</span>
 <span class="n">cas_dets</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-        <span class="s2">&quot;20&quot;</span>
+        <span class="s2">"20"</span>
     <span class="p">),</span>  <span class="c1"># both electrons in bonding MO (ground state)</span>
-    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;ud&quot;</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
-    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;du&quot;</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
-    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;02&quot;</span><span class="p">),</span>  <span class="c1"># both electrons in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"ud"</span><span class="p">),</span>  <span class="c1"># alpha in bonding, beta in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"du"</span><span class="p">),</span>  <span class="c1"># beta in bonding, alpha in antibonding</span>
+    <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"02"</span><span class="p">),</span>  <span class="c1"># both electrons in antibonding</span>
 <span class="p">]</span>
 
 <span class="c1"># Coefficients (normalized later by container)</span>
@@ -272,13 +274,13 @@ In QDK/Chemistry, the <a class="reference internal" href="../../../api/api_autog
 <span class="w">  </span><span class="c1">// All possible configurations:</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">cas_dets</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
 <span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-<span class="w">          </span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Both electrons in bonding (ground state)</span>
+<span class="w">          </span><span class="s">"20"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Both electrons in bonding (ground state)</span>
 <span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-<span class="w">          </span><span class="s">&quot;ud&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Alpha in bonding, beta in antibonding</span>
+<span class="w">          </span><span class="s">"ud"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Alpha in bonding, beta in antibonding</span>
 <span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-<span class="w">          </span><span class="s">&quot;du&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Beta in bonding, alpha in antibonding</span>
+<span class="w">          </span><span class="s">"du"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Beta in bonding, alpha in antibonding</span>
 <span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-<span class="w">          </span><span class="s">&quot;02&quot;</span><span class="p">)</span><span class="w">  </span><span class="c1">// Both electrons in antibonding</span>
+<span class="w">          </span><span class="s">"02"</span><span class="p">)</span><span class="w">  </span><span class="c1">// Both electrons in antibonding</span>
 <span class="w">  </span><span class="p">};</span>
 
 <span class="w">  </span><span class="c1">// Coefficients</span>
@@ -309,7 +311,7 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 
 <span class="c1"># Use the Slater determinant as reference</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
-<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"20"</span><span class="p">)</span>
 <span class="n">sd_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
 <span class="n">ref_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
 
@@ -330,7 +332,7 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 
 <span class="w">  </span><span class="c1">// Use the Slater determinant as reference</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_mp2</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_det</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_det</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">"20"</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container_mp2</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals_mp2</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_wavefunction</span><span class="w"> </span><span class="o">=</span>
@@ -357,7 +359,7 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 
 <span class="c1"># Use the Slater determinant as reference</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">make_minimal_orbitals</span><span class="p">()</span>
-<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">&quot;20&quot;</span><span class="p">)</span>
+<span class="n">ref_det</span> <span class="o">=</span> <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s2">"20"</span><span class="p">)</span>
 <span class="n">sd_container</span> <span class="o">=</span> <span class="n">StateVectorContainer</span><span class="p">(</span><span class="n">ref_det</span><span class="p">,</span> <span class="n">orbitals</span><span class="p">)</span>
 <span class="n">ref_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">sd_container</span><span class="p">)</span>
 
@@ -387,7 +389,7 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 
 <span class="w">  </span><span class="c1">// Use the Slater determinant as reference</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">orbitals_cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">make_minimal_orbitals</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_det_cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">&quot;20&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_det_cc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span><span class="s">"20"</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">sd_container_cc</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">StateVectorContainer</span><span class="o">&gt;</span><span class="p">(</span><span class="n">ref_det_cc</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals_cc</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ref_wavefunction_cc</span><span class="w"> </span><span class="o">=</span>
@@ -582,11 +584,37 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 </div>
 </div>
 </section>
+<section id="total-spin">
+<h2>Total spin<a class="headerlink" href="#total-spin" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction.compute_s_squared" title="qdk_chemistry.data.Wavefunction.compute_s_squared"><code class="xref py py-meth docutils literal notranslate"><span class="pre">compute_s_squared()</span></code></a> method evaluates
+the total-spin expectation value <span class="math notranslate nohighlight">\(\langle S^2\rangle\)</span> from the real,
+spin-resolved active-space one- and two-particle <a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a> blocks. For a pure
+spin eigenstate with spin quantum number <span class="math notranslate nohighlight">\(S\)</span>, the result is
+<span class="math notranslate nohighlight">\(S(S+1)\)</span>.</p>
+<p>The calculation requires alpha and beta molecular orbitals to share a common
+spatial basis. Restricted closed-shell and restricted open-shell wavefunctions
+meet this requirement; unrestricted orbitals are rejected because their
+spin-flip contractions additionally require the alpha–beta molecular-orbital
+overlap. The method also raises if the required RDM blocks are unavailable,
+their symmetry-blocked extents are inconsistent, or they are complex-valued.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">s_squared</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">compute_s_squared</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">C++ API</label><div class="tab-content docutils container">
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="kt">double</span><span class="w"> </span><span class="n">s_squared</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wavefunction</span><span class="o">-&gt;</span><span class="n">compute_s_squared</span><span class="p">();</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
 <section id="accessing-cluster-amplitudes">
 <h2>Accessing cluster amplitudes<a class="headerlink" href="#accessing-cluster-amplitudes" title="Link to this heading"></a></h2>
 <p>For <a class="reference internal" href="../../../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> and coupled cluster wavefunctions, one can access T1 and T2 cluster amplitudes.</p>
 <div class="tab-set docutils container">
-<input checked="True" class="tab-input" id="tab-set--6-input--1" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--1">Python API</label><div class="tab-content docutils container">
+<input checked="True" class="tab-input" id="tab-set--7-input--1" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access T1 and T2 amplitudes from MP2 and CC containers</span>
 
 <span class="c1"># For MP2 - amplitudes computed on demand</span>
@@ -600,7 +628,7 @@ It is pure storage: the amplitudes are supplied by the producing algorithm and a
 </pre></div>
 </div>
 </div>
-<input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">C++ API</label><div class="tab-content docutils container">
+<input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Access T1 and T2 amplitudes from MP2 and CC containers</span>
 
 <span class="w">  </span><span class="c1">// MP2</span>

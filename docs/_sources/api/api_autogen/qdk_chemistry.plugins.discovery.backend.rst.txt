@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.discovery.backend module
+===============================================
+
+.. automodule:: qdk_chemistry.plugins.discovery.backend
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

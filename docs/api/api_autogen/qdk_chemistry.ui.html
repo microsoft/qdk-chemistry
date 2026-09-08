@@ -1,0 +1,414 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.ui package &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.ui package</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.ui.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.ui">
+<span id="qdk-chemistry-ui-package"></span><h1>qdk_chemistry.ui package<a class="headerlink" href="#module-qdk_chemistry.ui" title="Link to this heading"></a></h1>
+<p>MCP Server and CLI for the QDK/Chemistry Toolkit.</p>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui._mcp.html">qdk_chemistry.ui._mcp module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui._mcp.html#qdk_chemistry.ui._mcp.require_mcp"><code class="docutils literal notranslate"><span class="pre">require_mcp()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.cli.html">qdk_chemistry.ui.cli module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.load_data_object"><code class="docutils literal notranslate"><span class="pre">load_data_object()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.save_data_object"><code class="docutils literal notranslate"><span class="pre">save_data_object()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.create_majorana_mapping"><code class="docutils literal notranslate"><span class="pre">create_majorana_mapping()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.create_model_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_model_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.create_spin_model_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_spin_model_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.create_structure"><code class="docutils literal notranslate"><span class="pre">create_structure()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.describe_backend"><code class="docutils literal notranslate"><span class="pre">describe_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.get_active_space_indices"><code class="docutils literal notranslate"><span class="pre">get_active_space_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.get_algorithm_default_settings"><code class="docutils literal notranslate"><span class="pre">get_algorithm_default_settings()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.get_algorithm_default_type"><code class="docutils literal notranslate"><span class="pre">get_algorithm_default_type()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.get_ansatz"><code class="docutils literal notranslate"><span class="pre">get_ansatz()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.get_orbitals_from_input"><code class="docutils literal notranslate"><span class="pre">get_orbitals_from_input()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.get_top_configurations"><code class="docutils literal notranslate"><span class="pre">get_top_configurations()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.list_cache_backends"><code class="docutils literal notranslate"><span class="pre">list_cache_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.list_remote_backends"><code class="docutils literal notranslate"><span class="pre">list_remote_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_active_space_selector"><code class="docutils literal notranslate"><span class="pre">run_active_space_selector()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_circuit_executor"><code class="docutils literal notranslate"><span class="pre">run_circuit_executor()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_controlled_evolution_circuit_mapper"><code class="docutils literal notranslate"><span class="pre">run_controlled_evolution_circuit_mapper()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_dynamical_correlation_calculator"><code class="docutils literal notranslate"><span class="pre">run_dynamical_correlation_calculator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_energy_estimator"><code class="docutils literal notranslate"><span class="pre">run_energy_estimator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_hamiltonian_constructor"><code class="docutils literal notranslate"><span class="pre">run_hamiltonian_constructor()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_multi_configuration_calculation"><code class="docutils literal notranslate"><span class="pre">run_multi_configuration_calculation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_multi_configuration_scf"><code class="docutils literal notranslate"><span class="pre">run_multi_configuration_scf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_orbital_localization"><code class="docutils literal notranslate"><span class="pre">run_orbital_localization()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_phase_estimation"><code class="docutils literal notranslate"><span class="pre">run_phase_estimation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_projected_multi_configuration_calculation"><code class="docutils literal notranslate"><span class="pre">run_projected_multi_configuration_calculation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_qubit_hamiltonian_solver"><code class="docutils literal notranslate"><span class="pre">run_qubit_hamiltonian_solver()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_qubit_mapper"><code class="docutils literal notranslate"><span class="pre">run_qubit_mapper()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_scf"><code class="docutils literal notranslate"><span class="pre">run_scf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_stability_checker"><code class="docutils literal notranslate"><span class="pre">run_stability_checker()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_state_preparation"><code class="docutils literal notranslate"><span class="pre">run_state_preparation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.run_time_evolution_builder"><code class="docutils literal notranslate"><span class="pre">run_time_evolution_builder()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.resolve_project_path"><code class="docutils literal notranslate"><span class="pre">resolve_project_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.parse_json_arg"><code class="docutils literal notranslate"><span class="pre">parse_json_arg()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.format_output"><code class="docutils literal notranslate"><span class="pre">format_output()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_plugin"><code class="docutils literal notranslate"><span class="pre">cmd_plugin()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_scf"><code class="docutils literal notranslate"><span class="pre">cmd_scf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_active_space"><code class="docutils literal notranslate"><span class="pre">cmd_active_space()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_localize"><code class="docutils literal notranslate"><span class="pre">cmd_localize()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_correlate"><code class="docutils literal notranslate"><span class="pre">cmd_correlate()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_stability"><code class="docutils literal notranslate"><span class="pre">cmd_stability()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_hamiltonian"><code class="docutils literal notranslate"><span class="pre">cmd_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_model_hamiltonian"><code class="docutils literal notranslate"><span class="pre">cmd_model_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_spin_model"><code class="docutils literal notranslate"><span class="pre">cmd_spin_model()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_majorana_mapping"><code class="docutils literal notranslate"><span class="pre">cmd_majorana_mapping()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_casci"><code class="docutils literal notranslate"><span class="pre">cmd_casci()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_mcscf"><code class="docutils literal notranslate"><span class="pre">cmd_mcscf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_sparse_ci"><code class="docutils literal notranslate"><span class="pre">cmd_sparse_ci()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_qubit_map"><code class="docutils literal notranslate"><span class="pre">cmd_qubit_map()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_state_prep"><code class="docutils literal notranslate"><span class="pre">cmd_state_prep()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_qubit_solve"><code class="docutils literal notranslate"><span class="pre">cmd_qubit_solve()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_energy"><code class="docutils literal notranslate"><span class="pre">cmd_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_qpe_build_evolution"><code class="docutils literal notranslate"><span class="pre">cmd_qpe_build_evolution()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_qpe_map_circuit"><code class="docutils literal notranslate"><span class="pre">cmd_qpe_map_circuit()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_qpe_execute"><code class="docutils literal notranslate"><span class="pre">cmd_qpe_execute()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_qpe"><code class="docutils literal notranslate"><span class="pre">cmd_qpe()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_defaults"><code class="docutils literal notranslate"><span class="pre">cmd_defaults()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_list_algorithms"><code class="docutils literal notranslate"><span class="pre">cmd_list_algorithms()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_list_cache_backends"><code class="docutils literal notranslate"><span class="pre">cmd_list_cache_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_list_remote_backends"><code class="docutils literal notranslate"><span class="pre">cmd_list_remote_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_describe_backend"><code class="docutils literal notranslate"><span class="pre">cmd_describe_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_summary"><code class="docutils literal notranslate"><span class="pre">cmd_data_summary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_convert"><code class="docutils literal notranslate"><span class="pre">cmd_data_convert()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_orbitals"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_orbitals()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_active_space_indices"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_active_space_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_ansatz"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_ansatz()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_top_configurations"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_top_configurations()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_create_structure"><code class="docutils literal notranslate"><span class="pre">cmd_data_create_structure()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_energy"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_structure_xyz"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_structure_xyz()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_circuit_qasm"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_circuit_qasm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_circuit_stats"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_circuit_stats()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_qubit_hamiltonian_info"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_qubit_hamiltonian_info()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_stability_result"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_stability_result()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_data_get_qpe_result"><code class="docutils literal notranslate"><span class="pre">cmd_data_get_qpe_result()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_list_projects"><code class="docutils literal notranslate"><span class="pre">cmd_utils_list_projects()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_create_project"><code class="docutils literal notranslate"><span class="pre">cmd_utils_create_project()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_list_files"><code class="docutils literal notranslate"><span class="pre">cmd_utils_list_files()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_convert_coordinates"><code class="docutils literal notranslate"><span class="pre">cmd_utils_convert_coordinates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_convert_energy"><code class="docutils literal notranslate"><span class="pre">cmd_utils_convert_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_compute_valence_params"><code class="docutils literal notranslate"><span class="pre">cmd_utils_compute_valence_params()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_utils_resolve_phase_energy"><code class="docutils literal notranslate"><span class="pre">cmd_utils_resolve_phase_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_workflow"><code class="docutils literal notranslate"><span class="pre">cmd_workflow()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_describe"><code class="docutils literal notranslate"><span class="pre">cmd_describe()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_list_commands"><code class="docutils literal notranslate"><span class="pre">cmd_list_commands()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.cmd_remote_run"><code class="docutils literal notranslate"><span class="pre">cmd_remote_run()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.create_parser"><code class="docutils literal notranslate"><span class="pre">create_parser()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.cli.html#qdk_chemistry.ui.cli.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.config.html">qdk_chemistry.ui.config module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.config.html#qdk_chemistry.ui.config.QDKMCPConfig"><code class="docutils literal notranslate"><span class="pre">QDKMCPConfig</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.config.html#qdk_chemistry.ui.config.QDKMCPConfig.__init__"><code class="docutils literal notranslate"><span class="pre">QDKMCPConfig.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.config.html#qdk_chemistry.ui.config.QDKMCPConfig.set_workspace_root"><code class="docutils literal notranslate"><span class="pre">QDKMCPConfig.set_workspace_root()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.io.html">qdk_chemistry.ui.io module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.io.html#qdk_chemistry.ui.io.current_project_dir"><code class="docutils literal notranslate"><span class="pre">current_project_dir()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.io.html#qdk_chemistry.ui.io.resolve_project_file"><code class="docutils literal notranslate"><span class="pre">resolve_project_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.io.html#qdk_chemistry.ui.io.check_output_path_exists"><code class="docutils literal notranslate"><span class="pre">check_output_path_exists()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.io.html#qdk_chemistry.ui.io.check_output_exists"><code class="docutils literal notranslate"><span class="pre">check_output_exists()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.io.html#qdk_chemistry.ui.io.load_data_object"><code class="docutils literal notranslate"><span class="pre">load_data_object()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.io.html#qdk_chemistry.ui.io.save_data_object"><code class="docutils literal notranslate"><span class="pre">save_data_object()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.mcp.html">qdk_chemistry.ui.mcp module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.mcp.html#qdk_chemistry.ui.mcp.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html">qdk_chemistry.ui.plugin_installer module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.require_mcp"><code class="docutils literal notranslate"><span class="pre">require_mcp()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.PluginInstallError"><code class="docutils literal notranslate"><span class="pre">PluginInstallError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.plugin_names"><code class="docutils literal notranslate"><span class="pre">plugin_names()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.install_plugin"><code class="docutils literal notranslate"><span class="pre">install_plugin()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.update_plugin"><code class="docutils literal notranslate"><span class="pre">update_plugin()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.update_all_plugins"><code class="docutils literal notranslate"><span class="pre">update_all_plugins()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.plugin_installer.html#qdk_chemistry.ui.plugin_installer.rebind_plugin"><code class="docutils literal notranslate"><span class="pre">rebind_plugin()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.tools.html">qdk_chemistry.ui.tools module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.available_backends"><code class="docutils literal notranslate"><span class="pre">available_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_mcp_safe_config_options"><code class="docutils literal notranslate"><span class="pre">get_mcp_safe_config_options()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.available_caches"><code class="docutils literal notranslate"><span class="pre">available_caches()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.resolve_cache"><code class="docutils literal notranslate"><span class="pre">resolve_cache()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache"><code class="docutils literal notranslate"><span class="pre">FolderCache</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.name"><code class="docutils literal notranslate"><span class="pre">FolderCache.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.__init__"><code class="docutils literal notranslate"><span class="pre">FolderCache.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.get_job"><code class="docutils literal notranslate"><span class="pre">FolderCache.get_job()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.put_job"><code class="docutils literal notranslate"><span class="pre">FolderCache.put_job()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.get_data"><code class="docutils literal notranslate"><span class="pre">FolderCache.get_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.put_data"><code class="docutils literal notranslate"><span class="pre">FolderCache.put_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.has_data"><code class="docutils literal notranslate"><span class="pre">FolderCache.has_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.to_config"><code class="docutils literal notranslate"><span class="pre">FolderCache.to_config()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.delete_job"><code class="docutils literal notranslate"><span class="pre">FolderCache.delete_job()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.delete_data"><code class="docutils literal notranslate"><span class="pre">FolderCache.delete_data()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FolderCache.clear"><code class="docutils literal notranslate"><span class="pre">FolderCache.clear()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job"><code class="docutils literal notranslate"><span class="pre">Job</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.job_id"><code class="docutils literal notranslate"><span class="pre">Job.job_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.backend"><code class="docutils literal notranslate"><span class="pre">Job.backend</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.backend_config"><code class="docutils literal notranslate"><span class="pre">Job.backend_config</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.backend_state"><code class="docutils literal notranslate"><span class="pre">Job.backend_state</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.algorithm_info"><code class="docutils literal notranslate"><span class="pre">Job.algorithm_info</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.status"><code class="docutils literal notranslate"><span class="pre">Job.status</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.submitted_at"><code class="docutils literal notranslate"><span class="pre">Job.submitted_at</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.file_path"><code class="docutils literal notranslate"><span class="pre">Job.file_path</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.run_hash"><code class="docutils literal notranslate"><span class="pre">Job.run_hash</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.input_hashes"><code class="docutils literal notranslate"><span class="pre">Job.input_hashes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.output_hashes"><code class="docutils literal notranslate"><span class="pre">Job.output_hashes</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.output_is_tuple"><code class="docutils literal notranslate"><span class="pre">Job.output_is_tuple</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.owner"><code class="docutils literal notranslate"><span class="pre">Job.owner</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.__init__"><code class="docutils literal notranslate"><span class="pre">Job.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.to_dict"><code class="docutils literal notranslate"><span class="pre">Job.to_dict()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.save"><code class="docutils literal notranslate"><span class="pre">Job.save()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.load"><code class="docutils literal notranslate"><span class="pre">Job.load()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.discover"><code class="docutils literal notranslate"><span class="pre">Job.discover()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.attach_backend"><code class="docutils literal notranslate"><span class="pre">Job.attach_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.detach_backend"><code class="docutils literal notranslate"><span class="pre">Job.detach_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.check"><code class="docutils literal notranslate"><span class="pre">Job.check()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.cancel"><code class="docutils literal notranslate"><span class="pre">Job.cancel()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.fetch"><code class="docutils literal notranslate"><span class="pre">Job.fetch()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.cleanup"><code class="docutils literal notranslate"><span class="pre">Job.cleanup()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.wait"><code class="docutils literal notranslate"><span class="pre">Job.wait()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.is_terminal"><code class="docutils literal notranslate"><span class="pre">Job.is_terminal</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.Job.is_successful"><code class="docutils literal notranslate"><span class="pre">Job.is_successful</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.check_output_exists"><code class="docutils literal notranslate"><span class="pre">check_output_exists()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.check_output_path_exists"><code class="docutils literal notranslate"><span class="pre">check_output_path_exists()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.load_data_object"><code class="docutils literal notranslate"><span class="pre">load_data_object()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.save_data_object"><code class="docutils literal notranslate"><span class="pre">save_data_object()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.FilenameFormatError"><code class="docutils literal notranslate"><span class="pre">FilenameFormatError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.current_project_name"><code class="docutils literal notranslate"><span class="pre">current_project_name()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.ensure_filename_format"><code class="docutils literal notranslate"><span class="pre">ensure_filename_format()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.resolve_project_file"><code class="docutils literal notranslate"><span class="pre">resolve_project_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.resolve_project_path"><code class="docutils literal notranslate"><span class="pre">resolve_project_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.strip_filename_path"><code class="docutils literal notranslate"><span class="pre">strip_filename_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.validate_project"><code class="docutils literal notranslate"><span class="pre">validate_project()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.current_workspace_root"><code class="docutils literal notranslate"><span class="pre">current_workspace_root()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.workspace_binding_middleware"><code class="docutils literal notranslate"><span class="pre">workspace_binding_middleware()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.register_visualization_tools"><code class="docutils literal notranslate"><span class="pre">register_visualization_tools()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.bind_workspace"><code class="docutils literal notranslate"><span class="pre">bind_workspace()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_algorithms"><code class="docutils literal notranslate"><span class="pre">list_algorithms()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.describe_algorithm"><code class="docutils literal notranslate"><span class="pre">describe_algorithm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_cache_backends"><code class="docutils literal notranslate"><span class="pre">list_cache_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_remote_backends"><code class="docutils literal notranslate"><span class="pre">list_remote_backends()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_projects"><code class="docutils literal notranslate"><span class="pre">list_projects()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.create_project"><code class="docutils literal notranslate"><span class="pre">create_project()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_project_files"><code class="docutils literal notranslate"><span class="pre">list_project_files()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_summary"><code class="docutils literal notranslate"><span class="pre">get_summary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_tools"><code class="docutils literal notranslate"><span class="pre">list_tools()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.convert_coordinates"><code class="docutils literal notranslate"><span class="pre">convert_coordinates()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.convert_energy"><code class="docutils literal notranslate"><span class="pre">convert_energy()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.describe_backend"><code class="docutils literal notranslate"><span class="pre">describe_backend()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.create_structure"><code class="docutils literal notranslate"><span class="pre">create_structure()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_algorithm_default_type"><code class="docutils literal notranslate"><span class="pre">get_algorithm_default_type()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_algorithm_default_settings"><code class="docutils literal notranslate"><span class="pre">get_algorithm_default_settings()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_orbitals_from_input"><code class="docutils literal notranslate"><span class="pre">get_orbitals_from_input()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_active_space_indices"><code class="docutils literal notranslate"><span class="pre">get_active_space_indices()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_ansatz"><code class="docutils literal notranslate"><span class="pre">get_ansatz()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_active_space_selector"><code class="docutils literal notranslate"><span class="pre">run_active_space_selector()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_dynamical_correlation_calculator"><code class="docutils literal notranslate"><span class="pre">run_dynamical_correlation_calculator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_hamiltonian_constructor"><code class="docutils literal notranslate"><span class="pre">run_hamiltonian_constructor()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.create_model_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_model_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.create_spin_model_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_spin_model_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_orbital_localization"><code class="docutils literal notranslate"><span class="pre">run_orbital_localization()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_stability_checker"><code class="docutils literal notranslate"><span class="pre">run_stability_checker()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_term_grouper"><code class="docutils literal notranslate"><span class="pre">run_term_grouper()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_amplitude_amplification"><code class="docutils literal notranslate"><span class="pre">run_amplitude_amplification()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_hadamard_test"><code class="docutils literal notranslate"><span class="pre">run_hadamard_test()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_evolution_circuit_builder"><code class="docutils literal notranslate"><span class="pre">run_evolution_circuit_builder()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_hamiltonian_simulation"><code class="docutils literal notranslate"><span class="pre">run_hamiltonian_simulation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_qubit_hamiltonian_solver"><code class="docutils literal notranslate"><span class="pre">run_qubit_hamiltonian_solver()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_energy_estimator"><code class="docutils literal notranslate"><span class="pre">run_energy_estimator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.create_majorana_mapping"><code class="docutils literal notranslate"><span class="pre">create_majorana_mapping()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_qubit_mapper"><code class="docutils literal notranslate"><span class="pre">run_qubit_mapper()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_state_preparation"><code class="docutils literal notranslate"><span class="pre">run_state_preparation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.estimate_circuit"><code class="docutils literal notranslate"><span class="pre">estimate_circuit()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_time_evolution_builder"><code class="docutils literal notranslate"><span class="pre">run_time_evolution_builder()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_controlled_evolution_circuit_mapper"><code class="docutils literal notranslate"><span class="pre">run_controlled_evolution_circuit_mapper()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_circuit_executor"><code class="docutils literal notranslate"><span class="pre">run_circuit_executor()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_phase_estimation"><code class="docutils literal notranslate"><span class="pre">run_phase_estimation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_scf"><code class="docutils literal notranslate"><span class="pre">run_scf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_population_analysis"><code class="docutils literal notranslate"><span class="pre">run_population_analysis()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_nuclear_derivative_calculator"><code class="docutils literal notranslate"><span class="pre">run_nuclear_derivative_calculator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_geometry_optimization"><code class="docutils literal notranslate"><span class="pre">run_geometry_optimization()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_multi_configuration_calculation"><code class="docutils literal notranslate"><span class="pre">run_multi_configuration_calculation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_multi_configuration_scf"><code class="docutils literal notranslate"><span class="pre">run_multi_configuration_scf()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.run_projected_multi_configuration_calculation"><code class="docutils literal notranslate"><span class="pre">run_projected_multi_configuration_calculation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_top_determinants"><code class="docutils literal notranslate"><span class="pre">get_top_determinants()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_top_configurations"><code class="docutils literal notranslate"><span class="pre">get_top_configurations()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.get_circuit_stats"><code class="docutils literal notranslate"><span class="pre">get_circuit_stats()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.check_remote_job"><code class="docutils literal notranslate"><span class="pre">check_remote_job()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.retrieve_remote_results"><code class="docutils literal notranslate"><span class="pre">retrieve_remote_results()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.list_remote_jobs"><code class="docutils literal notranslate"><span class="pre">list_remote_jobs()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.tools.html#qdk_chemistry.ui.tools.cancel_remote_job"><code class="docutils literal notranslate"><span class="pre">cancel_remote_job()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.validation.html">qdk_chemistry.ui.validation module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.class_data_type_name"><code class="docutils literal notranslate"><span class="pre">class_data_type_name()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.current_project_name"><code class="docutils literal notranslate"><span class="pre">current_project_name()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.current_project_dir"><code class="docutils literal notranslate"><span class="pre">current_project_dir()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.strip_filename_path"><code class="docutils literal notranslate"><span class="pre">strip_filename_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.resolve_project_file"><code class="docutils literal notranslate"><span class="pre">resolve_project_file()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.FilenameFormatError"><code class="docutils literal notranslate"><span class="pre">FilenameFormatError</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.resolve_project_path"><code class="docutils literal notranslate"><span class="pre">resolve_project_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.ensure_filename_format"><code class="docutils literal notranslate"><span class="pre">ensure_filename_format()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.validate_project"><code class="docutils literal notranslate"><span class="pre">validate_project()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.is_project_valid"><code class="docutils literal notranslate"><span class="pre">is_project_valid()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.visualization.html">qdk_chemistry.ui.visualization module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.visualization.html#qdk_chemistry.ui.visualization.load_data_object"><code class="docutils literal notranslate"><span class="pre">load_data_object()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.visualization.html#qdk_chemistry.ui.visualization.strip_filename_path"><code class="docutils literal notranslate"><span class="pre">strip_filename_path()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.visualization.html#qdk_chemistry.ui.visualization.validate_project"><code class="docutils literal notranslate"><span class="pre">validate_project()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.visualization.html#qdk_chemistry.ui.visualization.register_visualization_tools"><code class="docutils literal notranslate"><span class="pre">register_visualization_tools()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.ui.workspace.html">qdk_chemistry.ui.workspace module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.workspace.html#qdk_chemistry.ui.workspace.current_workspace_root"><code class="docutils literal notranslate"><span class="pre">current_workspace_root()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.workspace.html#qdk_chemistry.ui.workspace.configure_workspace"><code class="docutils literal notranslate"><span class="pre">configure_workspace()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.workspace.html#qdk_chemistry.ui.workspace.bind_workspace"><code class="docutils literal notranslate"><span class="pre">bind_workspace()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.ui.workspace.html#qdk_chemistry.ui.workspace.workspace_binding_middleware"><code class="docutils literal notranslate"><span class="pre">workspace_binding_middleware()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

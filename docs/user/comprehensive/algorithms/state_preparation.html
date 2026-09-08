@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>State preparation &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>State preparation &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,12 +17,13 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
@@ -53,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -84,6 +86,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -144,11 +148,11 @@
   <section id="state-preparation">
 <h1>State preparation<a class="headerlink" href="#state-preparation" title="Link to this heading"></a></h1>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> algorithm in QDK/Chemistry constructs quantum circuits that load classical representations of target wavefunctions onto qubits.
-Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> instance as input and produces an OpenQASM circuit as output.
+Following QDK/Chemistry’s <a class="reference internal" href="../design/index.html"><span class="doc">algorithm design principles</span></a>, it takes a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> instance as input and produces a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> as output.
 The output circuit, when executed, prepares the qubit register in a state that encodes the input wavefunction.</p>
 <section id="overview">
 <h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
-<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> module provides tools for constructing quantum circuits that load classical representations of wavefunctions(e.g., a Slater determinant or a linear combination thereof, represented by the <cite>Wavefunction</cite> class)  onto qubits. It supports multiple approaches for state preparation, allowing users to choose the method best suited to their problem. Each approach is designed to efficiently encode quantum states for chemistry applications.</p>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> module provides tools for constructing quantum circuits that load classical representations of wavefunctions (e.g., a Slater determinant or a linear combination thereof, represented by the <cite>Wavefunction</cite> class)  onto qubits. It supports multiple approaches for state preparation, allowing users to choose the method best suited to their problem. Each approach is designed to efficiently encode quantum states for chemistry applications.</p>
 <p>For details on individual methods and their technical implementations, see the <a class="reference internal" href="#available-implementations">Available implementations</a> section below.</p>
 </section>
 <section id="using-the-statepreparation">
@@ -158,7 +162,7 @@ The output circuit, when executed, prepares the qubit register in a state that e
 <p>This algorithm is currently available only in the Python API.</p>
 </div>
 <p>This section demonstrates how to create, configure, and run a state preparation.
-The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns an OpenQASM circuit string that, when executed, loads the input wavefunction onto a qubit register.</p>
+The <code class="docutils literal notranslate"><span class="pre">run</span></code> method returns a circuit object that, when executed, loads the input wavefunction onto a qubit register.</p>
 <section id="input-requirements">
 <h3>Input requirements<a class="headerlink" href="#input-requirements" title="Link to this heading"></a></h3>
 <p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation" title="qdk_chemistry.algorithms.StatePreparation"><code class="xref py py-class docutils literal notranslate"><span class="pre">StatePreparation</span></code></a> requires the following input:</p>
@@ -170,10 +174,12 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmRef</span>
 
 <span class="c1"># Create a StatePreparation instance</span>
-<span class="n">sparse_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
-<span class="n">regular_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;qiskit_regular_isometry&quot;</span><span class="p">)</span>
+<span class="n">sparse_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"sparse_isometry"</span><span class="p">)</span>
+<span class="n">dense_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"dense_pure_state"</span><span class="p">)</span>
+<span class="n">regular_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"qiskit_regular_isometry"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -183,10 +189,23 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
 See <a class="reference internal" href="#available-implementations">Available implementations</a> below for implementation-specific options.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure transpilation settings</span>
-<span class="n">sparse_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;transpile&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-<span class="n">sparse_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;basis_gates&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;cz&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">,</span> <span class="s2">&quot;h&quot;</span><span class="p">])</span>
-<span class="n">sparse_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;transpile_optimization_level&quot;</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Transpilation is configured on the algorithm that emits the Qiskit circuit.</span>
+<span class="n">regular_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"transpile"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">regular_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"basis_gates"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"cz"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">,</span> <span class="s2">"h"</span><span class="p">])</span>
+<span class="n">regular_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"transpile_optimization_level"</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Select other dense preparation method for sparse isometry</span>
+<span class="n">sparse_isometry_with_qiskit_dense_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">"state_prep"</span><span class="p">,</span>
+    <span class="s2">"sparse_isometry"</span><span class="p">,</span>
+    <span class="n">dense_state_prep</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+        <span class="s2">"state_prep"</span><span class="p">,</span>
+        <span class="s2">"qiskit_regular_isometry"</span><span class="p">,</span>
+        <span class="n">transpile</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">basis_gates</span><span class="o">=</span><span class="p">[</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"cz"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">,</span> <span class="s2">"h"</span><span class="p">],</span>
+        <span class="n">transpile_optimization_level</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -200,28 +219,30 @@ See <a class="reference internal" href="#available-implementations">Available im
 
 <span class="c1"># Specify a structure</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">]</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="n">symbols</span><span class="p">)</span>
 
 <span class="c1"># Run scf</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn_scf</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 
 <span class="c1"># Compute the Hamiltonian</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_scf</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 
 <span class="c1"># Compute CAS wavefunction</span>
-<span class="n">cas_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_cas&quot;</span><span class="p">)</span>
+<span class="n">cas_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"multi_configuration_calculator"</span><span class="p">,</span> <span class="s2">"macis_cas"</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">cas_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
 
 <span class="c1"># Construct the circuit</span>
 <span class="n">regular_circuit</span> <span class="o">=</span> <span class="n">regular_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">)</span>
 <span class="n">sparse_circuit</span> <span class="o">=</span> <span class="n">sparse_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Regular isometry circuit:</span><span class="se">\n</span><span class="si">{</span><span class="n">regular_circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sparse isometry circuit:</span><span class="se">\n</span><span class="si">{</span><span class="n">sparse_circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">dense_circuit</span> <span class="o">=</span> <span class="n">dense_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Regular isometry circuit:</span><span class="se">\n</span><span class="si">{</span><span class="n">regular_circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Sparse isometry circuit:</span><span class="se">\n</span><span class="si">{</span><span class="n">sparse_circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Dense pure state circuit:</span><span class="se">\n</span><span class="si">{</span><span class="n">dense_circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -236,16 +257,57 @@ You can discover available implementations programmatically:</p>
 <input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">))</span>
-<span class="c1"># [&#39;sparse_isometry_gf2x&#39;, &#39;qiskit_regular_isometry&#39;]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">))</span>
+<span class="c1"># ['sparse_isometry', 'dense_pure_state', 'qiskit_regular_isometry']</span>
 </pre></div>
 </div>
 </div>
 </div>
-<section id="sparse-isometry-gf2-x">
-<span id="sparse-isometry-gf2x"></span><h3>Sparse Isometry GF2+X<a class="headerlink" href="#sparse-isometry-gf2-x" title="Link to this heading"></a></h3>
-<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry_gf2x&quot;</span></code></p>
-<p>This method is an optimized approach that leverages sparsity in the target wavefunction. The GF2+X method, a modification of the original sparse isometry work in <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../../references.html#id13" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>, applies GF(2) Gaussian elimination to the binary matrix representation of the state to determine a reduced space representation of the sparse state. This reduced state is then densely encoded via regular isometry <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id22" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span> on a smaller number of qubits, and finally scattered to the full qubit space using X and <a class="reference internal" href="../../../glossary.html#term-CNOT"><span class="xref std std-term">CNOT</span></a> gates. These reductions correspond to efficient gate sequences that simplify the preparation basis. By focusing only on non-zero amplitudes, this approach substantially reduces circuit depth and gate count compared with dense isometry methods. This method is native to QDK/Chemistry and is especially efficient for wavefunctions with sparse amplitude structure.</p>
+<section id="sparse-isometry-gf2x">
+<span id="sparse-isometry"></span><span id="id1"></span><h3>Sparse Isometry<a class="headerlink" href="#sparse-isometry-gf2x" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;sparse_isometry&quot;</span></code></p>
+<p>This method is an optimized approach that leverages sparsity in the target wavefunction. It is a modification of the original sparse isometry work in <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../../references.html#id14" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>, and is native to QDK/Chemistry, described in <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id15" title="Yingrong Chen, Nathan A. Baker, Rushi Gong, Conrad S. N. Johnston, Brad Lackey, Hongbin Liu, Sasha Schmidt, Yuan Su, David B. Williams-Young, and Yinuo Yang. Clifford-efficient sparse state preparation for molecular wavefunctions. arXiv, 2026. URL: https://arxiv.org/abs/2608.20593, doi:10.48550/arXiv.2608.20593.">CBG+26</a>]</span>. By working only with the non-zero amplitudes, it substantially reduces circuit depth and gate count compared with dense methods, and is especially efficient for wavefunctions with sparse amplitude structure.</p>
+<p class="rubric">How it works</p>
+<p>A wavefunction built from <span class="math notranslate nohighlight">\(d\)</span> determinants is written as</p>
+<div class="math notranslate nohighlight">
+\[\left| \psi \right\rangle = \sum_{j=1}^{d} c_j \left| b_j \right\rangle ,
+\qquad b_j \in \{0,1\}^{n} ,\]</div>
+<p>where each <span class="math notranslate nohighlight">\(b_j\)</span> is the occupation bitstring of one determinant on <span class="math notranslate nohighlight">\(n\)</span> qubits. For chemically relevant states <span class="math notranslate nohighlight">\(d \ll 2^{n}\)</span>, so all but a vanishing fraction of the <span class="math notranslate nohighlight">\(2^{n}\)</span> amplitudes are zero. Dense methods still pay for every one of them; the sparse isometry pays only for the <span class="math notranslate nohighlight">\(d\)</span> that matter.</p>
+<p>The support is collected into a binary matrix <span class="math notranslate nohighlight">\(M \in \mathrm{GF}(2)^{n \times d}\)</span> whose columns are the determinant bitstrings. The algorithm then proceeds in four steps:</p>
+<ol class="arabic simple">
+<li><p><strong>Reduce.</strong> Gaussian elimination over <span class="math notranslate nohighlight">\(\mathrm{GF}(2)\)</span> brings <span class="math notranslate nohighlight">\(M\)</span> to row echelon form of rank <span class="math notranslate nohighlight">\(r \le n\)</span>. Elimination is preceded by two simplifications: duplicate rows are cancelled against each other, and all-ones rows are cleared. When the reduced matrix is diagonal, an additional cascade removes one further row, so the final reduced width may be smaller than <span class="math notranslate nohighlight">\(r\)</span>.</p></li>
+<li><p><strong>Record.</strong> Every row operation used in the reduction is tracked. A row addition over <span class="math notranslate nohighlight">\(\mathrm{GF}(2)\)</span> is exactly a <a class="reference internal" href="../../../glossary.html#term-CNOT"><span class="xref std std-term">CNOT</span></a> on the qubit register and a row negation is exactly an <code class="docutils literal notranslate"><span class="pre">X</span></code> gate, so the elimination sequence is itself a Clifford circuit <span class="math notranslate nohighlight">\(E\)</span> satisfying <span class="math notranslate nohighlight">\(E \cdot M = M_{\mathrm{ref}}\)</span>.</p></li>
+<li><p><strong>Prepare.</strong> The amplitudes <span class="math notranslate nohighlight">\(c_j\)</span> are loaded onto the remaining reduced rows by a nested state-preparation algorithm selected with the <code class="docutils literal notranslate"><span class="pre">dense_state_prep</span></code> setting.</p></li>
+<li><p><strong>Recovery.</strong> Replaying the recorded operations in reverse applies <span class="math notranslate nohighlight">\(E^{-1}\)</span>, mapping the reduced basis states back onto the original determinant bitstrings <span class="math notranslate nohighlight">\(b_j\)</span>.</p></li>
+</ol>
+<p>The cost is therefore governed by <span class="math notranslate nohighlight">\(d\)</span> and the reduced width rather than by <span class="math notranslate nohighlight">\(2^{n}\)</span>, and step 3 is the only part that is exponential in that smaller register.</p>
+<p class="rubric">Binary encoding</p>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">binary_encoding</span></code> to <code class="docutils literal notranslate"><span class="pre">True</span></code> replaces step 3 when <span class="math notranslate nohighlight">\(m = \lceil \log_2 d \rceil\)</span> is smaller than the number of rows left after reduction. It constructs a one-to-one map from the <span class="math notranslate nohighlight">\(d\)</span> determinants into the <span class="math notranslate nohighlight">\(2^m\)</span> basis states of an <span class="math notranslate nohighlight">\(m\)</span>-qubit dense register, so the nested preparation runs on that smaller amplitude vector.</p>
+<p>The compression circuit is synthesized in two stages:</p>
+<ul class="simple">
+<li><p><strong>Diagonal encoding.</strong> The pivot block of the reduced matrix is an identity, i.e. a <em>unary</em> encoding that spends one qubit per determinant. A staircase of <a class="reference internal" href="../../../glossary.html#term-CNOT"><span class="xref std std-term">CNOT</span></a> gates normalizes it, and a divide-and-conquer cascade of <a class="reference internal" href="../../../glossary.html#term-CNOT"><span class="xref std std-term">CNOT</span></a> and Toffoli gates then folds the unary pattern into a binary counter, collapsing the pivot columns onto the <span class="math notranslate nohighlight">\(m\)</span> dense rows.</p></li>
+<li><p><strong>Non-pivot processing.</strong> The remaining columns carry no pivot and are handled in power-of-two batches. Each batch emits an address-controlled lookup block that writes the correct binary label into the dense register conditioned on the sparse indicator rows, and then clears those rows. The synthesizer costs a single lookup against a split into smaller chunks and keeps whichever needs fewer Toffoli gates.</p></li>
+</ul>
+<p>Once both stages complete, every sparse row is guaranteed to hold <span class="math notranslate nohighlight">\(\left| 0 \right\rangle\)</span>, so the state lives entirely in the dense register. The amplitudes are prepared there, and the whole compression circuit is inverted to scatter back to the full register.</p>
+<p>Lookup blocks add CCZ operations and need helper qubits. Rather than allocating fresh ancillas, the synthesizer first borrows idle system qubits — those absent from the reduced support — and allocates additional qubits only when that pool is exhausted. The smaller amplitude-loading register therefore does not imply fewer qubits or non-Clifford gates for the complete circuit.</p>
+<p>Binary encoding applies only when <span class="math notranslate nohighlight">\(m &lt; n_{\mathrm{rows}}\)</span>, where <span class="math notranslate nohighlight">\(n_{\mathrm{rows}}\)</span> is the width left after reduction. Otherwise the algorithm transparently falls back to the standard path described above.</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compress the reduced subspace with binary encoding</span>
+<span class="n">binary_encoded_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"sparse_isometry"</span><span class="p">,</span> <span class="n">binary_encoding</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Select the algorithm that prepares the compressed dense register</span>
+<span class="n">binary_encoded_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span>
+    <span class="s2">"dense_state_prep"</span><span class="p">,</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"dense_pure_state"</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Setting <code class="docutils literal notranslate"><span class="pre">measurement_based_uncompute</span></code> to <code class="docutils literal notranslate"><span class="pre">True</span></code> uncomputes the helper qubits of each lookup block by measurement and a classically controlled correction rather than by Toffoli gates. This trades Toffoli count for mid-circuit measurement and feedforward, so the resulting circuit requires a target profile that supports adaptive execution.</p>
+</div>
 <p class="rubric">Settings</p>
 <table class="docutils align-default">
 <colgroup>
@@ -260,25 +322,61 @@ You can discover available implementations programmatically:</p>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">basis_gates</span></code></p></td>
-<td><p>list[str]</p></td>
-<td><p>Basis gates for transpilation. Default is [“x”, “y”, “z”, “cx”, “cz”, “id”, “h”, “s”, “sdg”, “rz”].</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">transpile</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">binary_encoding</span></code></p></td>
 <td><p>bool</p></td>
-<td><p>Whether to transpile the circuit. Default is True.</p></td>
+<td><p>Compress the reduced subspace with binary encoding instead of preparing it directly. Best effort: <code class="docutils literal notranslate"><span class="pre">True</span></code> requests the encoding rather than guaranteeing it, since it is skipped when <span class="math notranslate nohighlight">\(m \ge n_{\mathrm{rows}}\)</span> and the standard path is used instead. Default is False.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">transpile_optimization_level</span></code></p></td>
-<td><p>int</p></td>
-<td><p>Optimization level for transpilation (0-3). Default is 1.</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dense_state_prep</span></code></p></td>
+<td><p>AlgorithmRef</p></td>
+<td><p>State preparation algorithm used for the dense subspace. Default is <code class="docutils literal notranslate"><span class="pre">dense_pure_state</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">include_negative_controls</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Allow anti-controls as well as controls in the lookup blocks. Default is True.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">measurement_based_uncompute</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Uncompute lookup helper qubits by measurement instead of Toffoli gates. Default is False.</p></td>
 </tr>
 </tbody>
 </table>
+<p>This algorithm declares no transpilation settings of its own. Transpilation applies only when
+the nested <code class="docutils literal notranslate"><span class="pre">dense_state_prep</span></code> algorithm emits a Qiskit circuit, and is configured on that
+algorithm:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Transpilation is configured on the algorithm that emits the Qiskit circuit.</span>
+<span class="n">regular_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"transpile"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">regular_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"basis_gates"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"cz"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">,</span> <span class="s2">"h"</span><span class="p">])</span>
+<span class="n">regular_prep</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"transpile_optimization_level"</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Select other dense preparation method for sparse isometry</span>
+<span class="n">sparse_isometry_with_qiskit_dense_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+    <span class="s2">"state_prep"</span><span class="p">,</span>
+    <span class="s2">"sparse_isometry"</span><span class="p">,</span>
+    <span class="n">dense_state_prep</span><span class="o">=</span><span class="n">AlgorithmRef</span><span class="p">(</span>
+        <span class="s2">"state_prep"</span><span class="p">,</span>
+        <span class="s2">"qiskit_regular_isometry"</span><span class="p">,</span>
+        <span class="n">transpile</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">basis_gates</span><span class="o">=</span><span class="p">[</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"cz"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">,</span> <span class="s2">"h"</span><span class="p">],</span>
+        <span class="n">transpile_optimization_level</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="dense-pure-state">
+<h3>Dense Pure State<a class="headerlink" href="#dense-pure-state" title="Link to this heading"></a></h3>
+<p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;dense_pure_state&quot;</span></code></p>
+<p>This method expands the wavefunction into its full amplitude vector and synthesizes that vector exactly. Synthesis is delegated to <a class="reference external" href="https://github.com/microsoft/qdk/blob/main/library/std/src/Std/StatePreparation.qs">PreparePureStateD</a> from the Q# standard library, which follows the construction of Shende, Bullock, and Markov <span class="bibtex-citation" id="id4">[<a class="reference internal" href="../../../references.html#id25" title="Vivek V. Shende, Stephen S. Bullock, and Igor L. Markov. Synthesis of quantum-logic circuits. IEEE Transactions on Computer-Aided Design of Integrated Circuits and Systems, 25(6):1000–1010, 2006. doi:10.1109/TCAD.2005.855930.">SBM06</a>]</span>.
+Each determinant’s coefficient is placed at the index given by its occupation bitstring, giving a dense vector of <span class="math notranslate nohighlight">\(2^{n}\)</span> real amplitudes that is handed to <code class="docutils literal notranslate"><span class="pre">PreparePureStateD</span></code>.</p>
+<p class="rubric">Requirements</p>
+<p>The coefficients must be real; a wavefunction with a non-zero imaginary part is rejected. The register is limited to 32 qubits, which bounds the size of the dense amplitude vector.</p>
+<p class="rubric">Settings</p>
+<p>This implementation exposes no settings.</p>
 </section>
 <section id="regular-isometry">
 <h3>Regular Isometry<a class="headerlink" href="#regular-isometry" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qiskit_regular_isometry&quot;</span></code></p>
-<p>This method uses regular isometry synthesis via <a class="reference external" href="https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation">Qiskit</a>, implementing the isometry-based approach proposed by Matthias Christandl <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id22" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred.</p>
+<p>This method uses regular isometry synthesis via <a class="reference external" href="https://quantum.cloud.ibm.com/docs/en/api/qiskit/qiskit.circuit.library.StatePreparation">Qiskit</a>, implementing the isometry-based approach proposed by Matthias Christandl <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id24" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>. It provides a general solution for state preparation, and is suitable for cases where a dense representation is required or preferred. Like <a class="reference internal" href="#dense-pure-state">Dense Pure State</a> it synthesizes the full amplitude vector, but it is provided through the <a class="reference internal" href="../plugins.html#plugin-system"><span class="std std-ref">plugin system</span></a> and returns an OpenQASM circuit, which makes it the natural choice for Qiskit-based workflows.</p>
 <p class="rubric">Settings</p>
 <table class="docutils align-default">
 <colgroup>
@@ -303,7 +401,7 @@ You can discover available implementations programmatically:</p>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">transpile_optimization_level</span></code></p></td>
 <td><p>int</p></td>
-<td><p>Optimization level for transpilation (0-3). Default is 1.</p></td>
+<td><p>Optimization level for transpilation (0-3). Default is 0.</p></td>
 </tr>
 </tbody>
 </table>
@@ -314,6 +412,7 @@ You can discover available implementations programmatically:</p>
 <h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>: Input wavefunction for circuit construction</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a>: Output circuit that prepares the wavefunction on qubits</p></li>
 </ul>
 </section>
 <section id="further-reading">

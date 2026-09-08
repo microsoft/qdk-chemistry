@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit._interop.transpiler &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit._interop.transpiler &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -101,12 +102,12 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
-<span class="sa">r</span><span class="sd">&quot;&quot;&quot;Utilities for transpiling qiskit quantum circuits.</span>
+<span class="sa">r</span><span class="sd">"""Utilities for transpiling qiskit quantum circuits.</span>
 
 <span class="sd">This module provides various custom transformation passes for optimizing circuits, including merging Z-basis</span>
 <span class="sd">rotations, substituting Clifford Rz gates, and removing Z-basis operations on qubits in the :math:`\lvert 0 \rangle`</span>
 <span class="sd">state. It also includes functions to create custom pass managers based on preset configurations and custom passes.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">ParameterExpression</span>
@@ -135,17 +136,17 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;MergeZBasisRotations&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;RemoveZBasisOnZeroState&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SubstituteCliffordRz&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;SubstitutePauliRotation&quot;</span><span class="p">,</span>
+    <span class="s2">"MergeZBasisRotations"</span><span class="p">,</span>
+    <span class="s2">"RemoveZBasisOnZeroState"</span><span class="p">,</span>
+    <span class="s2">"SubstituteCliffordRz"</span><span class="p">,</span>
+    <span class="s2">"SubstitutePauliRotation"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
 <div class="viewcode-block" id="MergeZBasisRotations">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MergeZBasisRotations</span><span class="p">(</span><span class="n">TransformationPass</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Transformation pass to merge consecutive Z-basis rotations into a single Rz gate and remove identity gates.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Transformation pass to merge consecutive Z-basis rotations into a single Rz gate and remove identity gates.</span>
 
 <span class="sd">    This pass identifies sequences of single-qubit gates in the Z-basis,</span>
 <span class="sd">    specifically Rz(θ), Z, S, and Sdg, and combines them into a single Rz(θ_new)</span>
@@ -176,21 +177,21 @@
 <span class="sd">        * Useful for simplifying circuits before basis gate decomposition.</span>
 <span class="sd">        * Reduces gate count and improves optimization opportunities downstream.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="MergeZBasisRotations.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_optimize1q_decomposition</span> <span class="o">=</span> <span class="n">Optimize1qGatesDecomposition</span><span class="p">(</span><span class="n">basis</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;rx&quot;</span><span class="p">])</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_optimize1q_decomposition</span> <span class="o">=</span> <span class="n">Optimize1qGatesDecomposition</span><span class="p">(</span><span class="n">basis</span><span class="o">=</span><span class="p">[</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"rx"</span><span class="p">])</span></div>
 
 
 <div class="viewcode-block" id="MergeZBasisRotations.run">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.MergeZBasisRotations.run">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dag</span><span class="p">:</span> <span class="n">DAGCircuit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DAGCircuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the pass on the given ``DAGCircuit``.</span>
+<span class="w">        </span><span class="sd">"""Run the pass on the given ``DAGCircuit``.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dag: The input ``DAGCircuit`` to transform.</span>
@@ -198,9 +199,9 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The transformed ``DAGCircuit`` with merged Z-basis rotations.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running MergeZBasisRotations pass.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Running MergeZBasisRotations pass."</span><span class="p">)</span>
         <span class="n">new_dag</span> <span class="o">=</span> <span class="n">DAGCircuit</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">qreg</span> <span class="ow">in</span> <span class="n">dag</span><span class="o">.</span><span class="n">qregs</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
             <span class="n">new_dag</span><span class="o">.</span><span class="n">add_qreg</span><span class="p">(</span><span class="n">qreg</span><span class="p">)</span>
@@ -216,8 +217,8 @@
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">dag</span><span class="o">.</span><span class="n">topological_op_nodes</span><span class="p">():</span>
             <span class="n">name</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">name</span>
 
-            <span class="n">is_z_basis_gate</span> <span class="o">=</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">}</span>
-            <span class="n">is_id_gate</span> <span class="o">=</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;id&quot;</span>
+            <span class="n">is_z_basis_gate</span> <span class="o">=</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">,</span> <span class="s2">"s"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">}</span>
+            <span class="n">is_id_gate</span> <span class="o">=</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">"id"</span>
 
             <span class="k">if</span> <span class="n">is_id_gate</span><span class="p">:</span>
                 <span class="c1"># Remove Id gates (no effect on state)</span>
@@ -252,47 +253,47 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">SubstituteCliffordRzSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for SubstituteCliffordRz.</span>
+<span class="w">    </span><span class="sd">"""Settings configuration for SubstituteCliffordRz.</span>
 
 <span class="sd">    SubstituteCliffordRz-specific settings:</span>
-<span class="sd">        equivalent_gate_set (vector&lt;string&gt;, default=[&quot;id&quot;, &quot;t&quot;, &quot;s&quot;, &quot;sdg&quot;, &quot;tdg&quot;, &quot;z&quot;]): Equivalent gate set to use.</span>
+<span class="sd">        equivalent_gate_set (vector&lt;string&gt;, default=["id", "t", "s", "sdg", "tdg", "z"]): Equivalent gate set to use.</span>
 <span class="sd">        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SubstituteCliffordRzSettings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize SubstituteCliffordRzSettings."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">,</span> <span class="s2">&quot;vector&lt;string&gt;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">,</span> <span class="s2">&quot;tdg&quot;</span><span class="p">])</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"equivalent_gate_set"</span><span class="p">,</span> <span class="s2">"vector&lt;string&gt;"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"t"</span><span class="p">,</span> <span class="s2">"s"</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">,</span> <span class="s2">"tdg"</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"tolerance"</span><span class="p">,</span> <span class="s2">"double"</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Override set to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
+<span class="w">        </span><span class="sd">"""Override set to ensure 'id' is always in equivalent_gate_set and duplicates are removed.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            key (str): Setting key to set.</span>
 <span class="sd">            value: Value to set.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Ensure &#39;id&#39; is present in equivalent_gate_set and remove duplicates</span>
-        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;equivalent_gate_set&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-            <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">})</span>
+<span class="sd">        """</span>
+        <span class="c1"># Ensure 'id' is present in equivalent_gate_set and remove duplicates</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">"equivalent_gate_set"</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">value</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">})</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Override update to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
+<span class="w">        </span><span class="sd">"""Override update to ensure 'id' is always in equivalent_gate_set and duplicates are removed.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            settings_dict (dict): Dictionary of settings to update.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Ensure &#39;id&#39; is present in equivalent_gate_set and remove duplicates</span>
-        <span class="k">if</span> <span class="s2">&quot;equivalent_gate_set&quot;</span> <span class="ow">in</span> <span class="n">settings_dict</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">],</span> <span class="nb">list</span><span class="p">):</span>
+<span class="sd">        """</span>
+        <span class="c1"># Ensure 'id' is present in equivalent_gate_set and remove duplicates</span>
+        <span class="k">if</span> <span class="s2">"equivalent_gate_set"</span> <span class="ow">in</span> <span class="n">settings_dict</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">"equivalent_gate_set"</span><span class="p">],</span> <span class="nb">list</span><span class="p">):</span>
             <span class="n">settings_dict</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="o">**</span><span class="n">settings_dict</span><span class="p">,</span>
-                <span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">],</span> <span class="s2">&quot;id&quot;</span><span class="p">}),</span>
+                <span class="s2">"equivalent_gate_set"</span><span class="p">:</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">"equivalent_gate_set"</span><span class="p">],</span> <span class="s2">"id"</span><span class="p">}),</span>
             <span class="p">}</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
@@ -301,7 +302,7 @@
 <div class="viewcode-block" id="SubstituteCliffordRz">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SubstituteCliffordRz</span><span class="p">(</span><span class="n">TransformationPass</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Transformation pass to substitute Rz(θ) gates with equivalent Clifford+T gates for special angles.</span>
+<span class="w">    </span><span class="sd">"""Transformation pass to substitute Rz(θ) gates with equivalent Clifford+T gates for special angles.</span>
 
 <span class="sd">    This pass replaces Rz(θ) gates with one of the following gates:</span>
 
@@ -336,7 +337,7 @@
 <span class="sd">        * Leaves parameterized Rz gates untouched to preserve symbolic expressions.</span>
 <span class="sd">        * Ignores gates not in the user-specified ``equivalent_gate_set``</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="SubstituteCliffordRz.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.__init__">[docs]</a>
@@ -345,37 +346,37 @@
         <span class="n">equivalent_gate_set</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">),</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the SubstituteCliffordRz transformation pass.</span>
+<span class="w">        </span><span class="sd">"""Initialize the SubstituteCliffordRz transformation pass.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            equivalent_gate_set (list[str] | None): List of gates to substitute rz with special</span>
-<span class="sd">                angles. Default is None, which means [&#39;id&#39;, &#39;t&#39;, &#39;s&#39;, &#39;z&#39;, &#39;sdg&#39;, &#39;tdg&#39;].</span>
+<span class="sd">                angles. Default is None, which means ['id', 't', 's', 'z', 'sdg', 'tdg'].</span>
 <span class="sd">            tolerance (float): Angle comparison tolerance. Default is np.finfo(np.float64).eps.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">SubstituteCliffordRzSettings</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">equivalent_gate_set</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">equivalent_gate_set</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set must be a list of gate names or None&quot;</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">,</span> <span class="n">equivalent_gate_set</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"equivalent_gate_set must be a list of gate names or None"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"equivalent_gate_set"</span><span class="p">,</span> <span class="n">equivalent_gate_set</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"tolerance"</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_factor_to_gate</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">type</span><span class="p">],</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="n">IGate</span><span class="p">),</span>
-            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="n">TGate</span><span class="p">),</span>
-            <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="n">SGate</span><span class="p">),</span>
-            <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="n">ZGate</span><span class="p">),</span>
-            <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">,</span> <span class="n">SdgGate</span><span class="p">),</span>
-            <span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="s2">&quot;tdg&quot;</span><span class="p">,</span> <span class="n">TdgGate</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">,</span> <span class="n">IGate</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"t"</span><span class="p">,</span> <span class="n">TGate</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="s2">"s"</span><span class="p">,</span> <span class="n">SGate</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">,</span> <span class="n">ZGate</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">,</span> <span class="n">SdgGate</span><span class="p">),</span>
+            <span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="s2">"tdg"</span><span class="p">,</span> <span class="n">TdgGate</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_build_lookup</span><span class="p">()</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_build_lookup</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Precompute the mod-8 lookup table from current settings.&quot;&quot;&quot;</span>
-        <span class="n">gate_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">))</span>
-        <span class="n">tolerance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+<span class="w">        </span><span class="sd">"""Precompute the mod-8 lookup table from current settings."""</span>
+        <span class="n">gate_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"equivalent_gate_set"</span><span class="p">))</span>
+        <span class="n">tolerance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tolerance"</span><span class="p">)</span>
         <span class="c1"># Precompute (mod8_target, gate_instance) pairs for enabled gates</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_lookup</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">object</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">mod8_val</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="bp">cls</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_factor_to_gate</span><span class="p">:</span>
@@ -387,7 +388,7 @@
 <div class="viewcode-block" id="SubstituteCliffordRz.run">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.run">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dag</span><span class="p">:</span> <span class="n">DAGCircuit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DAGCircuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the pass on the given ``DAGCircuit``.</span>
+<span class="w">        </span><span class="sd">"""Run the pass on the given ``DAGCircuit``.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dag: The input ``DAGCircuit`` to transform.</span>
@@ -395,14 +396,14 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The transformed ``DAGCircuit`` with Rz substitutions.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="n">tolerance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_tolerance</span>
         <span class="n">lookup</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lookup</span>
         <span class="n">inv_quarter_pi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_inv_quarter_pi</span>
 
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">dag</span><span class="o">.</span><span class="n">op_nodes</span><span class="p">():</span>
-            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">&quot;rz&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="o">!=</span> <span class="s2">"rz"</span><span class="p">:</span>
                 <span class="k">continue</span>
 
             <span class="n">angle</span> <span class="o">=</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -425,12 +426,12 @@
 <div class="viewcode-block" id="SubstituteCliffordRz.settings">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstituteCliffordRz.settings">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Settings</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the settings for SubstituteCliffordRz.</span>
+<span class="w">        </span><span class="sd">"""Get the settings for SubstituteCliffordRz.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The settings object associated with SubstituteCliffordRz.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span></div>
 </div>
@@ -438,45 +439,45 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">SubstitutePauliRotationSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for SubstitutePauliRotation.</span>
+<span class="w">    </span><span class="sd">"""Settings configuration for SubstitutePauliRotation.</span>
 
 <span class="sd">    SubstitutePauliRotation-specific settings:</span>
-<span class="sd">        equivalent_gate_set (vector&lt;string&gt;, default=[&quot;id&quot;, &quot;x&quot;, &quot;y&quot;, &quot;z&quot;]): Equivalent gate set to use.</span>
+<span class="sd">        equivalent_gate_set (vector&lt;string&gt;, default=["id", "x", "y", "z"]): Equivalent gate set to use.</span>
 <span class="sd">        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SubstitutePauliRotationSettings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize SubstitutePauliRotationSettings."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">,</span> <span class="s2">&quot;vector&lt;string&gt;&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">])</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"equivalent_gate_set"</span><span class="p">,</span> <span class="s2">"vector&lt;string&gt;"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"x"</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"tolerance"</span><span class="p">,</span> <span class="s2">"double"</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">))</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">set</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Override set to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
+<span class="w">        </span><span class="sd">"""Override set to ensure 'id' is always in equivalent_gate_set and duplicates are removed.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            key (str): Setting key to set.</span>
 <span class="sd">            value: Value to set.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">&quot;equivalent_gate_set&quot;</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-            <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">})</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="o">==</span> <span class="s2">"equivalent_gate_set"</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">value</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">})</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">settings_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Override update to ensure &#39;id&#39; is always in equivalent_gate_set and duplicates are removed.</span>
+<span class="w">        </span><span class="sd">"""Override update to ensure 'id' is always in equivalent_gate_set and duplicates are removed.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            settings_dict (dict): Dictionary of settings to update.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="s2">&quot;equivalent_gate_set&quot;</span> <span class="ow">in</span> <span class="n">settings_dict</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">],</span> <span class="nb">list</span><span class="p">):</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="s2">"equivalent_gate_set"</span> <span class="ow">in</span> <span class="n">settings_dict</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">"equivalent_gate_set"</span><span class="p">],</span> <span class="nb">list</span><span class="p">):</span>
             <span class="n">settings_dict</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="o">**</span><span class="n">settings_dict</span><span class="p">,</span>
-                <span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">:</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">],</span> <span class="s2">&quot;id&quot;</span><span class="p">}),</span>
+                <span class="s2">"equivalent_gate_set"</span><span class="p">:</span> <span class="nb">list</span><span class="p">({</span><span class="o">*</span><span class="n">settings_dict</span><span class="p">[</span><span class="s2">"equivalent_gate_set"</span><span class="p">],</span> <span class="s2">"id"</span><span class="p">}),</span>
             <span class="p">}</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
@@ -485,7 +486,7 @@
 <div class="viewcode-block" id="SubstitutePauliRotation">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstitutePauliRotation">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">SubstitutePauliRotation</span><span class="p">(</span><span class="n">TransformationPass</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Substitute Pauli rotation gates at integer multiples of π.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Substitute Pauli rotation gates at integer multiples of π.</span>
 
 <span class="sd">    Handles both 1-qubit (Rx, Ry, Rz) and 2-qubit (Rxx, Ryy, Rzz) rotations:</span>
 
@@ -493,7 +494,7 @@
 <span class="sd">    * :math:`R_P(k\pi)` where *k* is odd  → the corresponding Pauli gate(s).</span>
 
 <span class="sd">    For 2-qubit rotations the Pauli is applied independently to each qubit.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="SubstitutePauliRotation.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstitutePauliRotation.__init__">[docs]</a>
@@ -502,30 +503,30 @@
         <span class="n">equivalent_gate_set</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
         <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">),</span>
     <span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize SubstitutePauliRotation.</span>
+<span class="w">        </span><span class="sd">"""Initialize SubstitutePauliRotation.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            equivalent_gate_set: List of gates to allow substitution with, or None for</span>
-<span class="sd">                defaults (``[&quot;id&quot;, &quot;x&quot;, &quot;y&quot;, &quot;z&quot;]``).</span>
+<span class="sd">                defaults (``["id", "x", "y", "z"]``).</span>
 <span class="sd">            tolerance: Angle comparison tolerance.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rotation_gates</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;rx&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">XGate</span><span class="p">,</span> <span class="n">RXGate</span><span class="p">),</span>
-            <span class="s2">&quot;ry&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">YGate</span><span class="p">,</span> <span class="n">RYGate</span><span class="p">),</span>
-            <span class="s2">&quot;rz&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">ZGate</span><span class="p">,</span> <span class="n">RZGate</span><span class="p">),</span>
-            <span class="s2">&quot;rxx&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">XGate</span><span class="p">,</span> <span class="n">RXXGate</span><span class="p">),</span>
-            <span class="s2">&quot;ryy&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">YGate</span><span class="p">,</span> <span class="n">RYYGate</span><span class="p">),</span>
-            <span class="s2">&quot;rzz&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">ZGate</span><span class="p">,</span> <span class="n">RZZGate</span><span class="p">),</span>
+            <span class="s2">"rx"</span><span class="p">:</span> <span class="p">(</span><span class="n">XGate</span><span class="p">,</span> <span class="n">RXGate</span><span class="p">),</span>
+            <span class="s2">"ry"</span><span class="p">:</span> <span class="p">(</span><span class="n">YGate</span><span class="p">,</span> <span class="n">RYGate</span><span class="p">),</span>
+            <span class="s2">"rz"</span><span class="p">:</span> <span class="p">(</span><span class="n">ZGate</span><span class="p">,</span> <span class="n">RZGate</span><span class="p">),</span>
+            <span class="s2">"rxx"</span><span class="p">:</span> <span class="p">(</span><span class="n">XGate</span><span class="p">,</span> <span class="n">RXXGate</span><span class="p">),</span>
+            <span class="s2">"ryy"</span><span class="p">:</span> <span class="p">(</span><span class="n">YGate</span><span class="p">,</span> <span class="n">RYYGate</span><span class="p">),</span>
+            <span class="s2">"rzz"</span><span class="p">:</span> <span class="p">(</span><span class="n">ZGate</span><span class="p">,</span> <span class="n">RZZGate</span><span class="p">),</span>
         <span class="p">}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">SubstitutePauliRotationSettings</span><span class="p">()</span>
         <span class="k">if</span> <span class="n">equivalent_gate_set</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">equivalent_gate_set</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
-                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set must be a list of gate names or None&quot;</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">,</span> <span class="n">equivalent_gate_set</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">)</span></div>
+                <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="s2">"equivalent_gate_set must be a list of gate names or None"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"equivalent_gate_set"</span><span class="p">,</span> <span class="n">equivalent_gate_set</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"tolerance"</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="SubstitutePauliRotation.substitute_pauli_rotations">
@@ -537,7 +538,7 @@
         <span class="n">equivalent_gate_set</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
         <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DAGCircuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Replace rotation gates at integer multiples of π with Pauli gates or identity.</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">"""Replace rotation gates at integer multiples of π with Pauli gates or identity.</span>
 
 <span class="sd">        For a rotation gate :math:`R_P(\theta)`:</span>
 
@@ -555,11 +556,11 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The transformed ``DAGCircuit`` with Pauli substitutions.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="s2">&quot;id&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Gate &#39;id&#39; is missing in equivalent_gate_set.&quot;</span><span class="p">)</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="s2">"id"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Gate 'id' is missing in equivalent_gate_set."</span><span class="p">)</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">equivalent_gate_set</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">equivalent_gate_set</span><span class="p">)):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gates in equivalent_gate_set (</span><span class="si">{</span><span class="n">equivalent_gate_set</span><span class="si">}</span><span class="s2">) are not unique.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Gates in equivalent_gate_set (</span><span class="si">{</span><span class="n">equivalent_gate_set</span><span class="si">}</span><span class="s2">) are not unique."</span><span class="p">)</span>
 
         <span class="k">for</span> <span class="n">node</span> <span class="ow">in</span> <span class="n">dag</span><span class="o">.</span><span class="n">op_nodes</span><span class="p">():</span>
             <span class="k">if</span> <span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">rotation_gates</span><span class="p">:</span>
@@ -570,13 +571,13 @@
                 <span class="k">continue</span>
 
             <span class="n">pauli_cls</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">rotation_gates</span><span class="p">[</span><span class="n">node</span><span class="o">.</span><span class="n">op</span><span class="o">.</span><span class="n">name</span><span class="p">]</span>
-            <span class="n">pauli_name</span> <span class="o">=</span> <span class="n">pauli_cls</span><span class="p">()</span><span class="o">.</span><span class="n">name</span>  <span class="c1"># e.g. &quot;x&quot;, &quot;y&quot;, &quot;z&quot;</span>
+            <span class="n">pauli_name</span> <span class="o">=</span> <span class="n">pauli_cls</span><span class="p">()</span><span class="o">.</span><span class="n">name</span>  <span class="c1"># e.g. "x", "y", "z"</span>
 
             <span class="n">k</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span>
             <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">angle</span><span class="p">)</span> <span class="o">-</span> <span class="n">k</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">tolerance</span><span class="p">:</span>
                 <span class="k">continue</span>
 
-            <span class="k">if</span> <span class="n">k</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="s2">&quot;id&quot;</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">k</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="s2">"id"</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
                 <span class="c1"># Even multiple of π → identity; remove the gate</span>
                 <span class="n">dag</span><span class="o">.</span><span class="n">remove_op_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">k</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">!=</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">pauli_name</span> <span class="ow">in</span> <span class="n">equivalent_gate_set</span><span class="p">:</span>
@@ -596,7 +597,7 @@
 <div class="viewcode-block" id="SubstitutePauliRotation.run">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstitutePauliRotation.run">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dag</span><span class="p">:</span> <span class="n">DAGCircuit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DAGCircuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the pass on the given ``DAGCircuit``.</span>
+<span class="w">        </span><span class="sd">"""Run the pass on the given ``DAGCircuit``.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dag: The input ``DAGCircuit`` to transform.</span>
@@ -604,26 +605,26 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The transformed ``DAGCircuit`` with Pauli substitutions.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running SubstitutePauliRotation pass.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Running SubstitutePauliRotation pass."</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">substitute_pauli_rotations</span><span class="p">(</span>
             <span class="n">dag</span><span class="p">,</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_rotation_gates</span><span class="p">,</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;equivalent_gate_set&quot;</span><span class="p">),</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"equivalent_gate_set"</span><span class="p">),</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"tolerance"</span><span class="p">),</span>
         <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="SubstitutePauliRotation.settings">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.SubstitutePauliRotation.settings">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Settings</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the settings for this pass.</span>
+<span class="w">        </span><span class="sd">"""Get the settings for this pass.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            The settings object associated with this pass.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span></div>
 </div>
@@ -633,7 +634,7 @@
 <div class="viewcode-block" id="RemoveZBasisOnZeroState">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">RemoveZBasisOnZeroState</span><span class="p">(</span><span class="n">TransformationPass</span><span class="p">):</span>
-<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Transformation pass to remove Z-basis operations on qubits that are in the :math:`\lvert 0 \rangle` state.</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">"""Transformation pass to remove Z-basis operations on qubits that are in the :math:`\lvert 0 \rangle` state.</span>
 
 <span class="sd">    This optimization eliminates gates that apply only a global phase to the qubit,</span>
 <span class="sd">    which has no effect on observable outcomes (measurement probabilities) or</span>
@@ -649,21 +650,21 @@
 
 <span class="sd">    This transformation must not be applied to qubits in superposition or entangled</span>
 <span class="sd">    states, since Z-basis rotations there modify relative phases between basis states.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="RemoveZBasisOnZeroState.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the ``RemoveZBasisOnZeroState`` transformation pass.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the ``RemoveZBasisOnZeroState`` transformation pass."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_z_basis_gates</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rz&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;s&quot;</span><span class="p">,</span> <span class="s2">&quot;sdg&quot;</span><span class="p">}</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_z_basis_gates</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"rz"</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">,</span> <span class="s2">"s"</span><span class="p">,</span> <span class="s2">"sdg"</span><span class="p">}</span></div>
 
 
 <div class="viewcode-block" id="RemoveZBasisOnZeroState.run">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.plugins.qiskit._interop.transpiler.html#qdk_chemistry.plugins.qiskit._interop.transpiler.RemoveZBasisOnZeroState.run">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dag</span><span class="p">:</span> <span class="n">DAGCircuit</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DAGCircuit</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the pass on the given ``DAGCircuit``.</span>
+<span class="w">        </span><span class="sd">"""Run the pass on the given ``DAGCircuit``.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            dag: The input ``DAGCircuit`` to transform.</span>
@@ -671,9 +672,9 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            The transformed ``DAGCircuit`` with Z-basis gates removed.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running RemoveZBasisOnZeroState pass.&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">"Running RemoveZBasisOnZeroState pass."</span><span class="p">)</span>
 
         <span class="c1"># Track qubits still in |0⟩ (True means untouched)</span>
         <span class="n">zero_state_qubits</span> <span class="o">=</span> <span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">(</span><span class="n">dag</span><span class="o">.</span><span class="n">qubits</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
@@ -687,7 +688,7 @@
             <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z_basis_gates</span><span class="p">:</span>
                 <span class="n">remove_gate</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span><span class="n">zero_state_qubits</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">qubits</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">remove_gate</span><span class="p">:</span>
-                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Removing </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> on qubit </span><span class="si">{</span><span class="n">qubits</span><span class="si">}</span><span class="s2"> (still |0⟩)&quot;</span><span class="p">)</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Removing </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> on qubit </span><span class="si">{</span><span class="n">qubits</span><span class="si">}</span><span class="s2"> (still |0⟩)"</span><span class="p">)</span>
                     <span class="n">dag</span><span class="o">.</span><span class="n">remove_op_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
                     <span class="k">continue</span>  <span class="c1"># Skip to next node</span>
 
@@ -700,7 +701,7 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_is_diagonal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">gate_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Determine if a gate is diagonal in computational basis.</span>
+<span class="w">        </span><span class="sd">"""Determine if a gate is diagonal in computational basis.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            gate_name: Name of the gate.</span>
@@ -711,7 +712,7 @@
 <span class="sd">        Note:</span>
 <span class="sd">            The gate classification logic depends on the ``DIAGONAL_Z_1Q_GATES`` defined in ``definitions.py``.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">gate_name</span> <span class="ow">in</span> <span class="n">DIAGONAL_Z_1Q_GATES</span></div>
 

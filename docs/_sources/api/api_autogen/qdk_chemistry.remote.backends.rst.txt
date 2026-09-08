@@ -1,0 +1,17 @@
+qdk\_chemistry.remote.backends package
+======================================
+
+.. automodule:: qdk_chemistry.remote.backends
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.remote.backends.base
+   qdk_chemistry.remote.backends.local

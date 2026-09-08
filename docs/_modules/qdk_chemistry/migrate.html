@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.migrate &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.migrate &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,11 +96,11 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.migrate</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Migrate serialized data files across serialization-schema versions.</span>
+<span></span><span class="sd">"""Migrate serialized data files across serialization-schema versions.</span>
 
 <span class="sd">Each qdk-chemistry data class versions its serialization schema independently, and</span>
 <span class="sd">its deserializer accepts only the version the installed library was built against.</span>
-<span class="sd">Loading a file written against an older version of that class&#39;s schema raises an</span>
+<span class="sd">Loading a file written against an older version of that class's schema raises an</span>
 <span class="sd">error; use this module to upgrade such a file to the version the library accepts.</span>
 
 <span class="sd">Command line::</span>
@@ -109,25 +110,25 @@
 <span class="sd">Python::</span>
 
 <span class="sd">    from qdk_chemistry import migrate</span>
-<span class="sd">    migrate.convert_file(&quot;old.hamiltonian.json&quot;, &quot;new.hamiltonian.h5&quot;)</span>
+<span class="sd">    migrate.convert_file("old.hamiltonian.json", "new.hamiltonian.h5")</span>
 
 <span class="sd">The data type is taken from the ``name.type.ext`` filename convention</span>
 <span class="sd">(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the</span>
 <span class="sd">serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).</span>
 <span class="sd">Input and output formats may differ.</span>
 
-<span class="sd">Migration is keyed point-by-point on each data class&#39;s serialization version, not</span>
+<span class="sd">Migration is keyed point-by-point on each data class's serialization version, not</span>
 <span class="sd">on a library release: every migratable type exposes a ``STEPS`` table mapping a</span>
 <span class="sd">source version to a ``(next_version, transform)`` pair, and the chain is followed</span>
 <span class="sd">until it reaches the version the installed library accepts. To support a future</span>
-<span class="sd">serialization-version bump for a data class, register the next step in that type&#39;s</span>
+<span class="sd">serialization-version bump for a data class, register the next step in that type's</span>
 <span class="sd">``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``);</span>
 <span class="sd">the migrated document is validated against the live deserializer, so a missing step</span>
 <span class="sd">fails loudly.</span>
 
 <span class="sd">This module lives outside the data classes so that no legacy-schema knowledge</span>
 <span class="sd">leaks into the core serialization.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -145,7 +146,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_ansatz</span><span class="p">,</span> <span class="n">_hamiltonian</span><span class="p">,</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_orbitals</span><span class="p">,</span> <span class="n">_qpe_result</span><span class="p">,</span> <span class="n">_wavefunction</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;MigrationError&quot;</span><span class="p">,</span> <span class="s2">&quot;convert_file&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"MigrationError"</span><span class="p">,</span> <span class="s2">"convert_file"</span><span class="p">]</span>
 
 <span class="n">_PathLike</span> <span class="o">=</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span>
 
@@ -153,12 +154,12 @@
 <div class="viewcode-block" id="MigrationError">
 <a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.migrate.html#qdk_chemistry.migrate.MigrationError">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">MigrationError</span><span class="p">(</span><span class="ne">RuntimeError</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Raised when a file cannot be migrated to the current serialization version.&quot;&quot;&quot;</span></div>
+<span class="w">    </span><span class="sd">"""Raised when a file cannot be migrated to the current serialization version."""</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_resolves_to_same_file</span><span class="p">(</span><span class="n">src</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">dst</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if ``src`` and ``dst`` point at the same file on disk.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Return True if ``src`` and ``dst`` point at the same file on disk."""</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">src</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dst</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
             <span class="k">return</span> <span class="n">src</span><span class="o">.</span><span class="n">samefile</span><span class="p">(</span><span class="n">dst</span><span class="p">)</span>
@@ -171,26 +172,26 @@
 
 
 <span class="n">_MODULES</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals</span><span class="p">,</span>
-    <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">_hamiltonian</span><span class="p">,</span>
-    <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">_wavefunction</span><span class="p">,</span>
-    <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span> <span class="n">_ansatz</span><span class="p">,</span>
-    <span class="s2">&quot;qpe_result&quot;</span><span class="p">:</span> <span class="n">_qpe_result</span><span class="p">,</span>
+    <span class="s2">"orbitals"</span><span class="p">:</span> <span class="n">_orbitals</span><span class="p">,</span>
+    <span class="s2">"hamiltonian"</span><span class="p">:</span> <span class="n">_hamiltonian</span><span class="p">,</span>
+    <span class="s2">"wavefunction"</span><span class="p">:</span> <span class="n">_wavefunction</span><span class="p">,</span>
+    <span class="s2">"ansatz"</span><span class="p">:</span> <span class="n">_ansatz</span><span class="p">,</span>
+    <span class="s2">"qpe_result"</span><span class="p">:</span> <span class="n">_qpe_result</span><span class="p">,</span>
 <span class="p">}</span>
 
 <span class="n">_CLASSES</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">Orbitals</span><span class="p">,</span>
-    <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
-    <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span>
-    <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span> <span class="n">Ansatz</span><span class="p">,</span>
-    <span class="s2">&quot;qpe_result&quot;</span><span class="p">:</span> <span class="n">QpeResult</span><span class="p">,</span>
+    <span class="s2">"orbitals"</span><span class="p">:</span> <span class="n">Orbitals</span><span class="p">,</span>
+    <span class="s2">"hamiltonian"</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
+    <span class="s2">"wavefunction"</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">,</span>
+    <span class="s2">"ansatz"</span><span class="p">:</span> <span class="n">Ansatz</span><span class="p">,</span>
+    <span class="s2">"qpe_result"</span><span class="p">:</span> <span class="n">QpeResult</span><span class="p">,</span>
 <span class="p">}</span>
 
 
 <div class="viewcode-block" id="convert_file">
 <a class="viewcode-back" href="../../api/api_autogen/qdk_chemistry.migrate.html#qdk_chemistry.migrate.convert_file">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">convert_file</span><span class="p">(</span><span class="n">src</span><span class="p">:</span> <span class="n">_PathLike</span><span class="p">,</span> <span class="n">dst</span><span class="p">:</span> <span class="n">_PathLike</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Migrate a single data file to the serialization version the library accepts.</span>
+<span class="w">    </span><span class="sd">"""Migrate a single data file to the serialization version the library accepts.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        src: Path to the file to read (format inferred from its extension).</span>
@@ -204,13 +205,13 @@
 <span class="sd">            destination are the same file, the file is already at the current</span>
 <span class="sd">            serialization version, or the migration fails.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">src_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
     <span class="n">dst_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">dst</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">_resolves_to_same_file</span><span class="p">(</span><span class="n">src_path</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">):</span>
         <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Refusing to migrate &#39;</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">&#39; in place: the source and destination resolve to &quot;</span>
-            <span class="s2">&quot;the same file. Choose a different output path so the original is not overwritten.&quot;</span>
+            <span class="sa">f</span><span class="s2">"Refusing to migrate '</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">' in place: the source and destination resolve to "</span>
+            <span class="s2">"the same file. Choose a different output path so the original is not overwritten."</span>
         <span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">data_type</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">detect_type</span><span class="p">(</span><span class="n">src_path</span><span class="p">)</span>
@@ -222,42 +223,42 @@
     <span class="n">module</span> <span class="o">=</span> <span class="n">_MODULES</span><span class="p">[</span><span class="n">data_type</span><span class="p">]</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="n">old_doc</span> <span class="o">=</span> <span class="n">_read_old</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">data_type</span><span class="p">,</span> <span class="n">src_path</span><span class="p">,</span> <span class="n">src_format</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;ansatz&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">"ansatz"</span><span class="p">:</span>
             <span class="c1"># An Ansatz has no version step of its own; it delegates to each</span>
-            <span class="c1"># embedded payload&#39;s serialization-version chain.</span>
+            <span class="c1"># embedded payload's serialization-version chain.</span>
             <span class="n">new_json</span> <span class="o">=</span> <span class="n">module</span><span class="o">.</span><span class="n">to_new_json</span><span class="p">(</span><span class="n">old_doc</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">new_json</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">migrate_doc</span><span class="p">(</span><span class="n">module</span><span class="o">.</span><span class="n">STEPS</span><span class="p">,</span> <span class="n">old_doc</span><span class="p">,</span> <span class="n">data_type</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">NotImplementedError</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">error</span><span class="p">))</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to migrate &#39;</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to migrate '</span><span class="si">{</span><span class="n">src_path</span><span class="si">}</span><span class="s2">': </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
 
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">json_input</span> <span class="o">=</span> <span class="n">new_json</span> <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;qpe_result&quot;</span> <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_json</span><span class="p">)</span>
+        <span class="n">json_input</span> <span class="o">=</span> <span class="n">new_json</span> <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">"qpe_result"</span> <span class="k">else</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_json</span><span class="p">)</span>
         <span class="n">obj</span> <span class="o">=</span> <span class="n">_CLASSES</span><span class="p">[</span><span class="n">data_type</span><span class="p">]</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_input</span><span class="p">)</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">KeyError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;The installed qdk-chemistry rejected the migrated </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">). If the &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> serialization schema changed, register the next step in </span><span class="si">{</span><span class="n">module</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.STEPS.&quot;</span>
+            <span class="sa">f</span><span class="s2">"The installed qdk-chemistry rejected the migrated </span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">). If the "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2"> serialization schema changed, register the next step in </span><span class="si">{</span><span class="n">module</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">.STEPS."</span>
         <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
 
     <span class="k">try</span><span class="p">:</span>
         <span class="n">_io</span><span class="o">.</span><span class="n">write_object</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">dst_path</span><span class="p">,</span> <span class="n">dst_format</span><span class="p">)</span>
     <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to write &#39;</span><span class="si">{</span><span class="n">dst_path</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+        <span class="k">raise</span> <span class="n">MigrationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to write '</span><span class="si">{</span><span class="n">dst_path</span><span class="si">}</span><span class="s2">': </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
     <span class="k">return</span> <span class="n">dst_path</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_read_old</span><span class="p">(</span><span class="n">module</span><span class="p">,</span> <span class="n">data_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">src</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span> <span class="n">src_format</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a legacy file into a normalized old-doc for ``data_type``.&quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">src_format</span> <span class="o">==</span> <span class="s2">&quot;json&quot;</span><span class="p">:</span>
-        <span class="n">doc</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+<span class="w">    </span><span class="sd">"""Read a legacy file into a normalized old-doc for ``data_type``."""</span>
+    <span class="k">if</span> <span class="n">src_format</span> <span class="o">==</span> <span class="s2">"json"</span><span class="p">:</span>
+        <span class="n">doc</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">src</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">doc</span><span class="p">)</span>
 
-    <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span>
-        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+    <span class="k">if</span> <span class="n">data_type</span> <span class="o">==</span> <span class="s2">"orbitals"</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">src</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">module</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">src</span><span class="p">)</span>
 </pre></div>

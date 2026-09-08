@@ -1,0 +1,8 @@
+qdk\_chemistry.ui.config module
+===============================
+
+.. automodule:: qdk_chemistry.ui.config
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

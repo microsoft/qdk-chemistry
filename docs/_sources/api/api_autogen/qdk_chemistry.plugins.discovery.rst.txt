@@ -1,0 +1,17 @@
+qdk\_chemistry.plugins.discovery package
+========================================
+
+.. automodule:: qdk_chemistry.plugins.discovery
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.discovery._sdk
+   qdk_chemistry.plugins.discovery.backend

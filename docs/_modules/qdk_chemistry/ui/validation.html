@@ -1,0 +1,464 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.ui.validation &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.ui.validation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.ui.validation</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Input validation and project management for QDK Chemistry."""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">contextvars</span><span class="w"> </span><span class="kn">import</span> <span class="n">ContextVar</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span><span class="p">,</span> <span class="n">PurePosixPath</span><span class="p">,</span> <span class="n">PureWindowsPath</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">TypeVar</span><span class="p">,</span> <span class="n">cast</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">data</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._type_name</span><span class="w"> </span><span class="kn">import</span> <span class="n">class_data_type_name</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">config</span>
+
+<span class="n">F</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">"F"</span><span class="p">,</span> <span class="n">bound</span><span class="o">=</span><span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span>
+<span class="n">T</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">"T"</span><span class="p">)</span>
+
+<span class="n">_CURRENT_PROJECT_NAME</span><span class="p">:</span> <span class="n">ContextVar</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">"qdk_current_project_name"</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+<span class="n">_CURRENT_PROJECT_DIR</span><span class="p">:</span> <span class="n">ContextVar</span><span class="p">[</span><span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">ContextVar</span><span class="p">(</span><span class="s2">"qdk_current_project_dir"</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="current_project_name">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.current_project_name">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">current_project_name</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the project currently validated for this execution context."""</span>
+    <span class="k">return</span> <span class="n">_CURRENT_PROJECT_NAME</span><span class="o">.</span><span class="n">get</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="current_project_dir">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.current_project_dir">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">current_project_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the absolute project directory validated for this execution context."""</span>
+    <span class="k">return</span> <span class="n">_CURRENT_PROJECT_DIR</span><span class="o">.</span><span class="n">get</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="strip_filename_path">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.strip_filename_path">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">strip_filename_path</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return only the filename, accepting both POSIX and Windows separators."""</span>
+    <span class="k">return</span> <span class="n">PureWindowsPath</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span><span class="o">.</span><span class="n">name</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_project_file">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.resolve_project_file">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_project_file</span><span class="p">(</span>
+    <span class="n">filename</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">allow_nested</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">allow_absolute</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Resolve a client-provided filename inside the current project sandbox.</span>
+
+<span class="sd">    Absolute paths, traversal components, Windows drive or UNC paths, and</span>
+<span class="sd">    symlinks that resolve outside the project are rejected.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        filename: Project-relative filename to resolve.</span>
+<span class="sd">        allow_nested: Whether ordinary nested path components are accepted.</span>
+<span class="sd">        allow_absolute: Whether an internal absolute path may be revalidated.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        An absolute path contained by the current project directory.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If called outside a validated project context.</span>
+<span class="sd">        ValueError: If the filename is invalid or escapes the project.</span>
+
+<span class="sd">    """</span>
+    <span class="n">project_dir</span> <span class="o">=</span> <span class="n">current_project_dir</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">project_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Project file access requires a validated project context"</span><span class="p">)</span>
+
+    <span class="n">value</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">value</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="ow">or</span> <span class="s2">"</span><span class="se">\x00</span><span class="s2">"</span> <span class="ow">in</span> <span class="n">value</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Project filename must be a non-empty string"</span><span class="p">)</span>
+
+    <span class="n">native_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">native_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">candidate</span> <span class="o">=</span> <span class="n">native_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot resolve project filename </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">candidate</span><span class="o">.</span><span class="n">is_relative_to</span><span class="p">(</span><span class="n">project_dir</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename resolves outside project directory: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_absolute</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename must be relative: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">candidate</span>
+
+    <span class="n">path_flavors</span> <span class="o">=</span> <span class="p">(</span><span class="n">PurePosixPath</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="n">PureWindowsPath</span><span class="p">(</span><span class="n">value</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="ow">or</span> <span class="n">path</span><span class="o">.</span><span class="n">anchor</span> <span class="ow">or</span> <span class="n">path</span><span class="o">.</span><span class="n">drive</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">path_flavors</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename resolves outside project directory: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="s2">".."</span> <span class="ow">in</span> <span class="n">path</span><span class="o">.</span><span class="n">parts</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">path_flavors</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename resolves outside project directory: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">part</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">""</span><span class="p">,</span> <span class="s2">"."</span><span class="p">,</span> <span class="s2">".."</span><span class="p">}</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">path_flavors</span> <span class="k">for</span> <span class="n">part</span> <span class="ow">in</span> <span class="n">path</span><span class="o">.</span><span class="n">parts</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename contains an invalid path component: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">allow_nested</span> <span class="ow">and</span> <span class="nb">any</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">parts</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">path_flavors</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename must be a single path component: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">candidate</span> <span class="o">=</span> <span class="p">(</span><span class="n">project_dir</span> <span class="o">/</span> <span class="n">value</span><span class="p">)</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">error</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Cannot resolve project filename </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">error</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">candidate</span><span class="o">.</span><span class="n">is_relative_to</span><span class="p">(</span><span class="n">project_dir</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Project filename resolves outside project directory: </span><span class="si">{</span><span class="n">value</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">candidate</span></div>
+
+
+
+<div class="viewcode-block" id="FilenameFormatError">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.FilenameFormatError">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">FilenameFormatError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Raised when a filename has an invalid format for the expected data type."""</span></div>
+
+
+
+<div class="viewcode-block" id="resolve_project_path">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.resolve_project_path">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_project_path</span><span class="p">(</span><span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">projects_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>  <span class="c1"># noqa: PLR0911</span>
+<span class="w">    </span><span class="sd">"""Resolve a single-component project name beneath the projects directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        project_name: Name of the project directory.</span>
+<span class="sd">        projects_dir: Root directory containing projects.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The resolved project path and an empty error message, or ``None`` and</span>
+<span class="sd">        an explanation when the path is invalid.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">projects_dir</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">projects_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">projects_dir</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">projects_dir</span><span class="p">,</span> <span class="n">Path</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Projects dir should be a Path or string but it's </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">projects_dir</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">project_name</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">project_name</span><span class="o">.</span><span class="n">strip</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"Project name must be a non-empty string"</span>
+
+    <span class="n">path_flavors</span> <span class="o">=</span> <span class="p">(</span><span class="n">PurePosixPath</span><span class="p">(</span><span class="n">project_name</span><span class="p">),</span> <span class="n">PureWindowsPath</span><span class="p">(</span><span class="n">project_name</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">()</span> <span class="ow">or</span> <span class="n">path</span><span class="o">.</span><span class="n">parts</span> <span class="o">!=</span> <span class="p">(</span><span class="n">project_name</span><span class="p">,)</span> <span class="ow">or</span> <span class="n">project_name</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"."</span><span class="p">,</span> <span class="s2">".."</span><span class="p">}</span> <span class="k">for</span> <span class="n">path</span> <span class="ow">in</span> <span class="n">path_flavors</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"Project name must be a single path component"</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">projects_root</span> <span class="o">=</span> <span class="n">projects_dir</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="n">unresolved_project_path</span> <span class="o">=</span> <span class="n">projects_root</span> <span class="o">/</span> <span class="n">project_name</span>
+        <span class="k">if</span> <span class="n">unresolved_project_path</span><span class="o">.</span><span class="n">is_symlink</span><span class="p">():</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Project path </span><span class="si">{</span><span class="n">unresolved_project_path</span><span class="si">}</span><span class="s2"> must not be a symbolic link"</span>
+        <span class="n">project_path</span> <span class="o">=</span> <span class="n">unresolved_project_path</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">OSError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Cannot resolve project directory: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">project_path</span><span class="o">.</span><span class="n">is_relative_to</span><span class="p">(</span><span class="n">projects_root</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Project path </span><span class="si">{</span><span class="n">project_path</span><span class="si">}</span><span class="s2"> is outside projects directory </span><span class="si">{</span><span class="n">projects_root</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">return</span> <span class="n">project_path</span><span class="p">,</span> <span class="s2">""</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_data_type_markers</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Build the data type to filename marker mapping from qdk_chemistry.data classes.</span>
+
+<span class="sd">    This function discovers public names for registered data classes and builds a</span>
+<span class="sd">    mapping from class name to the filename marker (e.g., ".structure.").</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        dict[str, str]: Mapping from class name to filename marker</span>
+
+<span class="sd">    """</span>
+    <span class="n">registered_classes</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">available_dataclasses</span><span class="p">()</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">markers</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">data</span><span class="o">.</span><span class="n">__all__</span><span class="p">:</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="ow">or</span> <span class="n">obj</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">registered_classes</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">type_name</span> <span class="o">=</span> <span class="n">class_data_type_name</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+        <span class="n">markers</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">".</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">."</span>
+
+    <span class="k">return</span> <span class="n">markers</span>
+
+
+<span class="c1"># Data type to filename marker mapping (auto-discovered from qdk_chemistry.data)</span>
+<span class="n">_DATA_TYPE_MARKERS</span> <span class="o">=</span> <span class="n">_build_data_type_markers</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="ensure_filename_format">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.ensure_filename_format">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">ensure_filename_format</span><span class="p">(</span><span class="n">filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">data_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Ensure filename contains the correct type marker for the given data type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        filename: The filename to check/correct</span>
+<span class="sd">        data_type: The data type name (e.g., "Wavefunction", "QubitHamiltonian")</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The corrected filename with proper type marker</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        FilenameFormatError: If the data type is unrecognized or the file extension is invalid</span>
+
+<span class="sd">    """</span>
+    <span class="n">marker</span> <span class="o">=</span> <span class="n">_DATA_TYPE_MARKERS</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">data_type</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">marker</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">FilenameFormatError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Unrecognized data type '</span><span class="si">{</span><span class="n">data_type</span><span class="si">}</span><span class="s2">' for filename '</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">'. "</span>
+            <span class="sa">f</span><span class="s2">"Valid types are: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">_DATA_TYPE_MARKERS</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Check if marker is already present</span>
+    <span class="k">if</span> <span class="n">marker</span> <span class="ow">in</span> <span class="n">filename</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">filename</span>
+
+    <span class="c1"># Find the extension and insert the marker before it</span>
+    <span class="k">for</span> <span class="n">ext</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">".json"</span><span class="p">,</span> <span class="s2">".hdf5"</span><span class="p">,</span> <span class="s2">".h5"</span><span class="p">]:</span>
+        <span class="k">if</span> <span class="n">filename</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="n">ext</span><span class="p">):</span>
+            <span class="n">base</span> <span class="o">=</span> <span class="n">filename</span><span class="p">[:</span> <span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">ext</span><span class="p">)]</span>
+            <span class="c1"># Remove trailing dot if present (e.g., "file." -&gt; "file")</span>
+            <span class="n">base</span> <span class="o">=</span> <span class="n">base</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">base</span><span class="si">}{</span><span class="n">marker</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}{</span><span class="n">ext</span><span class="si">}</span><span class="s2">"</span>  <span class="c1"># marker already has dots, remove trailing</span>
+
+    <span class="c1"># No recognized extension - raise error</span>
+    <span class="k">raise</span> <span class="n">FilenameFormatError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unrecognized file extension for '</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">'. Must end with .json, .hdf5, or .h5"</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="validate_project">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.validate_project">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_project</span><span class="p">(</span><span class="n">func</span><span class="p">:</span> <span class="n">F</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">F</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Decorator to validate project before executing the function.</span>
+
+<span class="sd">    Validates that a project exists and exposes its absolute directory through</span>
+<span class="sd">    the current execution context. The process working directory is unchanged.</span>
+
+<span class="sd">    It expects the decorated function to have ``project_name`` as its</span>
+<span class="sd">    first parameter after ``self`` (if applicable).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        func: The function to decorate. Must have ``project_name: str`` as a parameter.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        F: The decorated function with project validation logic,</span>
+<span class="sd">        or str: a JSON string with error information.</span>
+
+<span class="sd">    Example::</span>
+
+<span class="sd">        @validate_project</span>
+<span class="sd">        @app.tool()</span>
+<span class="sd">        def my_function(project_name: str, other_param: int) -&gt; str:</span>
+<span class="sd">            # This function will only execute if project_name is valid</span>
+<span class="sd">            return "success"</span>
+
+<span class="sd">    """</span>
+
+    <span class="nd">@wraps</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Wrap function with project validation logic.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            project_name: Project name inside default project directory</span>
+<span class="sd">            *args: Additional positional arguments passed to the decorated function</span>
+<span class="sd">            **kwargs: Additional keyword arguments passed to the decorated function</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            String with error information if validation fails, otherwise</span>
+<span class="sd">            returns the result of the decorated function</span>
+
+<span class="sd">        """</span>
+        <span class="n">is_valid</span><span class="p">,</span> <span class="n">message</span> <span class="o">=</span> <span class="n">is_project_valid</span><span class="p">(</span><span class="n">project_name</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">projects_dir</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">is_valid</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Project validation failed: </span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2"> for project_name: </span><span class="si">{</span><span class="n">project_name</span><span class="si">}</span><span class="s2">"</span>
+
+        <span class="n">project_dir</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="n">resolve_project_path</span><span class="p">(</span><span class="n">project_name</span><span class="p">,</span> <span class="n">config</span><span class="o">.</span><span class="n">projects_dir</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">project_dir</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Project validation failed: </span><span class="si">{</span><span class="n">error</span><span class="si">}</span><span class="s2"> for project_name: </span><span class="si">{</span><span class="n">project_name</span><span class="si">}</span><span class="s2">"</span>
+
+        <span class="n">name_token</span> <span class="o">=</span> <span class="n">_CURRENT_PROJECT_NAME</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">project_name</span><span class="p">)</span>
+        <span class="n">dir_token</span> <span class="o">=</span> <span class="n">_CURRENT_PROJECT_DIR</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">project_dir</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">func</span><span class="p">(</span><span class="n">project_name</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">_CURRENT_PROJECT_DIR</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">dir_token</span><span class="p">)</span>
+            <span class="n">_CURRENT_PROJECT_NAME</span><span class="o">.</span><span class="n">reset</span><span class="p">(</span><span class="n">name_token</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">cast</span><span class="p">(</span><span class="s2">"F"</span><span class="p">,</span> <span class="n">wrapper</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="is_project_valid">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.validation.html#qdk_chemistry.ui.validation.is_project_valid">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">is_project_valid</span><span class="p">(</span>  <span class="c1"># noqa: PLR0911</span>
+    <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">projects_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">bool</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Checks validity of base project dir/name combination.</span>
+
+<span class="sd">    Tries to make the directory if it doesn't exist yet. This function does</span>
+<span class="sd">    not change the process working directory.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        project_name: Name of specific project</span>
+<span class="sd">        projects_dir: Path to all projects directories (can be string or Path)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Tuple[bool, str] that states whether the project is valid, and if not, an explanation</span>
+
+<span class="sd">    """</span>
+    <span class="n">project_path</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="n">resolve_project_path</span><span class="p">(</span><span class="n">project_name</span><span class="p">,</span> <span class="n">projects_dir</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">project_path</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="n">error</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">project_exists</span> <span class="o">=</span> <span class="n">project_path</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No read permissions to access </span><span class="si">{</span><span class="n">project_path</span><span class="o">.</span><span class="n">parent</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Cannot access project directory </span><span class="si">{</span><span class="n">project_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">project_exists</span><span class="p">:</span>
+        <span class="c1"># try to create project</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">project_path</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"No write permissions to </span><span class="si">{</span><span class="n">project_path</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Cannot create project directory </span><span class="si">{</span><span class="n">project_path</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">project_path</span><span class="o">.</span><span class="n">is_dir</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">False</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Project path </span><span class="si">{</span><span class="n">project_path</span><span class="si">}</span><span class="s2"> is not a directory"</span>
+
+    <span class="k">return</span> <span class="kc">True</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"Project with path </span><span class="si">{</span><span class="n">project_path</span><span class="si">}</span><span class="s2"> exists"</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>What’s New in Version 2.1 &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>What’s New in Version 2.1 &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../_static/documentation_options.js?v=b21de401"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -28,7 +28,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="What’s New in Version 2.0" href="v2.0.0.html" />
-    <link rel="prev" title="Release Notes" href="index.html" /> 
+    <link rel="prev" title="What’s New in Version 2.2" href="v2.2.0.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -69,6 +70,7 @@
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="v2.2.0.html">What’s New in Version 2.2</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 2.1</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#geometry-optimization">Geometry Optimization</a></li>
@@ -153,21 +155,21 @@ that drives a nuclear derivative calculator to a stationary point.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Structure coordinates are in Bohr</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]],</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
 
-<span class="n">optimizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;geometric&quot;</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">optimizer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"geometry_optimizer"</span><span class="p">,</span> <span class="s2">"geometric"</span><span class="p">,</span> <span class="n">max_iterations</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The energy and gradient engine is itself an algorithm reference, so any registered
 nuclear derivative calculator can drive the optimization:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">derivative_ref</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;nuclear_derivative_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_finite_difference&quot;</span><span class="p">)</span>
-<span class="n">derivative_ref</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;finite_difference_step&quot;</span><span class="p">,</span> <span class="mf">1.0e-2</span><span class="p">)</span>
-<span class="n">optimizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;derivative_calculator&quot;</span><span class="p">,</span> <span class="n">derivative_ref</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">derivative_ref</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"nuclear_derivative_calculator"</span><span class="p">,</span> <span class="s2">"qdk_finite_difference"</span><span class="p">)</span>
+<span class="n">derivative_ref</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"finite_difference_step"</span><span class="p">,</span> <span class="mf">1.0e-2</span><span class="p">)</span>
+<span class="n">optimizer</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"derivative_calculator"</span><span class="p">,</span> <span class="n">derivative_ref</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Shared settings on <code class="docutils literal notranslate"><span class="pre">GeometryOptimizerSettings</span></code> are <code class="docutils literal notranslate"><span class="pre">derivative_calculator</span></code>,
 <code class="docutils literal notranslate"><span class="pre">max_iterations</span></code> (default 300), and <code class="docutils literal notranslate"><span class="pre">compute_hessian</span></code> (default <code class="docutils literal notranslate"><span class="pre">False</span></code>; when
 <code class="docutils literal notranslate"><span class="pre">True</span></code>, a Hessian is evaluated at the converged geometry and returned).</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">energy</span><span class="p">,</span> <span class="n">optimized_structure</span><span class="p">,</span> <span class="n">hessian</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">optimizer</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="nb">input</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -182,7 +184,7 @@ doubly occupied orbitals from the active space used by the derivative calculator
 <p>The bundled <code class="docutils literal notranslate"><span class="pre">&quot;geometric&quot;</span></code> implementation wraps
 <a class="reference external" href="https://github.com/leeping/geomeTRIC">geomeTRIC</a> and is enabled automatically when the
 package is installed:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[plugins]&#39;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[plugins]'</span>
 </pre></div>
 </div>
 <p>It adds transition-state search (<code class="docutils literal notranslate"><span class="pre">transition_state</span></code>), a choice of coordinate system
@@ -253,7 +255,7 @@ time-evolution <a class="reference internal" href="../glossary.html#term-QPE"><s
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="index.html" class="btn btn-neutral float-left" title="Release Notes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="v2.2.0.html" class="btn btn-neutral float-left" title="What’s New in Version 2.2" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="v2.0.0.html" class="btn btn-neutral float-right" title="What’s New in Version 2.0" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

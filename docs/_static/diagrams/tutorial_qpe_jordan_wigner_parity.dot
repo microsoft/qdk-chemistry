@@ -6,7 +6,7 @@ digraph TutorialQpeJordanWignerParity {
     overlap=false;
     splines=ortho;
     pad=0.2;
-    bgcolor="#FAFAFA";
+    bgcolor="#FFFFFF";
 
     node [shape=box, style="rounded,filled", fontname="Arial", margin="0.22,0.18"];
     edge [penwidth=2.5, arrowsize=0.9, fontname="Arial"];
@@ -14,28 +14,28 @@ digraph TutorialQpeJordanWignerParity {
     Ordering [shape=plain, label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="10" COLOR="#5C6BC0">
         <TR><TD COLSPAN="4" BGCOLOR="#E8EAF6"><FONT COLOR="#3949AB"><B>Chosen order of active spin orbitals (fermionic modes)</B></FONT></TD></TR>
         <TR>
-            <TD BGCOLOR="#E0F2F1"><FONT COLOR="#00796B"><B>mode 0</B><BR/>qubit ℓ<SUB>0</SUB></FONT></TD>
-            <TD BGCOLOR="#E0F2F1"><FONT COLOR="#00796B"><B>mode 1</B><BR/>qubit ℓ<SUB>1</SUB></FONT></TD>
-            <TD BGCOLOR="#E0F2F1"><FONT COLOR="#00796B"><B>mode 2</B><BR/>qubit ℓ<SUB>2</SUB></FONT></TD>
-            <TD BGCOLOR="#F3E5F5"><FONT COLOR="#7B1FA2"><B>target spin orbital p = 3</B><BR/>fermionic mode 3 → qubit ℓ<SUB>3</SUB></FONT></TD>
+            <TD BGCOLOR="#E0F2F1"><FONT COLOR="#00796B"><B>mode 0</B><BR/>qubit ℓ₀</FONT></TD>
+            <TD BGCOLOR="#E0F2F1"><FONT COLOR="#00796B"><B>mode 1</B><BR/>qubit ℓ₁</FONT></TD>
+            <TD BGCOLOR="#E0F2F1"><FONT COLOR="#00796B"><B>mode 2</B><BR/>qubit ℓ₂</FONT></TD>
+            <TD BGCOLOR="#F3E5F5"><FONT COLOR="#7B1FA2"><B>target spin orbital p = 3</B><BR/>fermionic mode 3 → qubit ℓ₃</FONT></TD>
         </TR>
         <TR>
-            <TD BGCOLOR="#00796B"><FONT COLOR="#FFFFFF"><B>Z<SUB>ℓ0</SUB></B></FONT></TD>
-            <TD BGCOLOR="#00796B"><FONT COLOR="#FFFFFF"><B>Z<SUB>ℓ1</SUB></B></FONT></TD>
-            <TD BGCOLOR="#00796B"><FONT COLOR="#FFFFFF"><B>Z<SUB>ℓ2</SUB></B></FONT></TD>
-            <TD BGCOLOR="#7B1FA2"><FONT COLOR="#FFFFFF"><B>(X<SUB>ℓ3</SUB> ∓ iY<SUB>ℓ3</SUB>)/2</B></FONT></TD>
+            <TD BGCOLOR="#00796B"><FONT COLOR="#FFFFFF"><B>Z[ℓ₀]</B></FONT></TD>
+            <TD BGCOLOR="#00796B"><FONT COLOR="#FFFFFF"><B>Z[ℓ₁]</B></FONT></TD>
+            <TD BGCOLOR="#00796B"><FONT COLOR="#FFFFFF"><B>Z[ℓ₂]</B></FONT></TD>
+            <TD BGCOLOR="#7B1FA2"><FONT COLOR="#FFFFFF"><B>(X[ℓ₃] ∓ iY[ℓ₃])/2</B></FONT></TD>
         </TR>
     </TABLE>>];
 
     subgraph factors {
         rank=same;
 
-        Parity [label=<<B>Lower-mode parity string</B><BR/><BR/>Z<SUB>ℓ0</SUB> Z<SUB>ℓ1</SUB> Z<SUB>ℓ2</SUB><BR/><BR/><FONT POINT-SIZE="11">Eigenvalue: odd occupancy gives −1</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", width=3.2, height=1.3];
+        Parity [label=<<B>Lower-mode parity string</B><BR/><BR/>Z[ℓ₀] Z[ℓ₁] Z[ℓ₂]<BR/><BR/><FONT POINT-SIZE="11">Eigenvalue: odd occupancy gives −1</FONT>>, fillcolor="#E0F2F1", color="#00796B", penwidth=2.5, fontcolor="#004D40", width=3.2, height=1.3];
 
-        Target [label=<<B>Target-qubit action</B><BR/><BR/>(X<SUB>ℓ3</SUB> ∓ iY<SUB>ℓ3</SUB>)/2<BR/><BR/><FONT POINT-SIZE="11">Creates or annihilates in spin orbital p = 3</FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=3.2, height=1.3];
+        Target [label=<<B>Target-qubit action</B><BR/><BR/>(X[ℓ₃] ∓ iY[ℓ₃])/2<BR/><BR/><FONT POINT-SIZE="11">Creates or annihilates in spin orbital p = 3</FONT>>, fillcolor="#F3E5F5", color="#7B1FA2", penwidth=2.5, fontcolor="#4A148C", width=3.2, height=1.3];
     }
 
-    Combined [label=<<B>Mapped operator for spin orbital p = 3</B><BR/><BR/>creation: ½ Z<SUB>ℓ0</SUB> Z<SUB>ℓ1</SUB> Z<SUB>ℓ2</SUB> (X<SUB>ℓ3</SUB> − iY<SUB>ℓ3</SUB>)<BR/><BR/>annihilation: ½ Z<SUB>ℓ0</SUB> Z<SUB>ℓ1</SUB> Z<SUB>ℓ2</SUB> (X<SUB>ℓ3</SUB> + iY<SUB>ℓ3</SUB>)<BR/><BR/><FONT POINT-SIZE="11">The Z-string contributes the fermionic ordering sign</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", width=7.0, height=1.8];
+    Combined [label=<<B>Mapped operator for spin orbital p = 3</B><BR/><BR/>creation: ½ Z[ℓ₀] Z[ℓ₁] Z[ℓ₂] (X[ℓ₃] − iY[ℓ₃])<BR/><BR/>annihilation: ½ Z[ℓ₀] Z[ℓ₁] Z[ℓ₂] (X[ℓ₃] + iY[ℓ₃])<BR/><BR/><FONT POINT-SIZE="11">The Z-string contributes the fermionic ordering sign</FONT>>, fillcolor="#FFFFFF", color="#5C6BC0", penwidth=2.5, fontcolor="#283593", width=7.0, height=1.8];
 
     Ordering -> Parity [color="#00796B"];
     Ordering -> Target [color="#7B1FA2"];

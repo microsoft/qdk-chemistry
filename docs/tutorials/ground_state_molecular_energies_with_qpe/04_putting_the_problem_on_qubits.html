@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Mapping the problem to qubits &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Mapping the problem to qubits &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -144,10 +145,10 @@ Calculate the number of qubits needed to encode the selected active-space fermio
 Record the core energy separately and identify every quantity excluded from this qubit count.</p>
 </div>
 </section>
-<section id="example-download">
-<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
-<p>Download <a class="reference download internal" download="" href="../../_downloads/106a739e0f553cfc05fb84c9f1e2e7bc/tutorial_map_n2_to_qubits.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_map_n2_to_qubits.py</span></code></a> and save it in the tutorial working directory that contains <code class="docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code> from <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>.
-Open all three files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
+<section id="example-files">
+<h2>Example files<a class="headerlink" href="#example-files" title="Link to this heading"></a></h2>
+<p>Add <a class="reference download internal" download="" href="../../_downloads/106a739e0f553cfc05fb84c9f1e2e7bc/tutorial_map_n2_to_qubits.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_map_n2_to_qubits.py</span></code></a> to your tutorial working folder.
+Open the new file in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
 The script imports the tested <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a> workflow so that both lessons use the same selected active space.</p>
 </section>
 <section id="the-active-space-hamiltonian">
@@ -171,7 +172,7 @@ The coefficients <span class="math notranslate nohighlight">\(g_{pqrs}\)</span> 
 Together, these operators connect the <a class="reference external" href="https://en.wikipedia.org/wiki/Slater_determinant">Slater determinants</a> introduced in <a class="reference internal" href="index.html#tutorial-orbitals-and-determinants"><span class="std std-ref">Orbitals and determinants</span></a> that can contribute to the active-space wavefunction.</p>
 <p>The mapping script reconstructs this selected active-space Hamiltonian from the orbitals produced by <a class="reference internal" href="03_choosing_the_active_space.html"><span class="doc">Choosing the active space</span></a>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">selected_orbitals</span> <span class="o">=</span> <span class="n">active_space_result</span><span class="o">.</span><span class="n">refined_orbitals</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">)</span>
 <span class="n">active_hamiltonian</span> <span class="o">=</span> <span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">selected_orbitals</span><span class="p">)</span>
 
 <span class="c1"># Nuclear repulsion and frozen inactive-orbital contributions stay outside</span>
@@ -206,7 +207,7 @@ You will not need to manipulate these relations by hand; the Jordan–Wigner tra
 </section>
 <section id="the-jordan-wigner-transformation">
 <h2>The Jordan–Wigner transformation<a class="headerlink" href="#the-jordan-wigner-transformation" title="Link to this heading"></a></h2>
-<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Jordan%E2%80%93Wigner_transformation">Jordan–Wigner transformation</a> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id16" title="P. Jordan and E. Wigner. Über das Paulische Äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span> assigns each fermionic mode to one qubit.
+<p>The <a class="reference external" href="https://en.wikipedia.org/wiki/Jordan%E2%80%93Wigner_transformation">Jordan–Wigner transformation</a> <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../../references.html#id18" title="P. Jordan and E. Wigner. Über das Paulische Äquivalenzverbot. Zeitschrift für Physik, 47:631-651, 1928. doi:10.1007/BF01331938.">JW28</a>]</span> assigns each fermionic mode to one qubit.
 In this molecular problem, each fermionic mode is one active spin orbital.
 To keep the two kinds of labels distinct, let <span class="math notranslate nohighlight">\(\ell_p\)</span> denote the qubit assigned to fermionic mode <span class="math notranslate nohighlight">\(p\)</span>; its numerical qubit index is <span class="math notranslate nohighlight">\(p\)</span>.</p>
 <div class="math notranslate nohighlight">
@@ -231,7 +232,7 @@ Each occupied lower-indexed mode contributes an eigenvalue of <span class="math 
 Acting on mode <span class="math notranslate nohighlight">\(p\)</span> crosses the occupied lower-indexed modes in the chosen fermionic ordering, with each crossing contributing a minus sign.
 The parity string supplies their combined sign, so the mapped operators satisfy the fermionic anticommutation relations.</p>
 <figure class="align-center" id="id2">
-<div class="graphviz"><img src="../../_images/graphviz-2bc1512c26e48434e5f02e1ebae4a3be7f9907bd.png" alt="Worked Jordan--Wigner mapping for target active spin orbital p equals 3, also called fermionic mode 3. Modes 0, 1, and 2 map to qubits ell 0, ell 1, and ell 2 and contribute the parity string Z ell 0 times Z ell 1 times Z ell 2. Its eigenvalue is negative when an odd number of those lower modes is occupied. Target qubit ell 3 carries the X minus iY creation action or X plus iY annihilation action. Multiplying target action by parity string preserves the fermionic ordering sign." class="graphviz" /></div>
+<img alt="Worked Jordan--Wigner mapping for target active spin orbital p equals 3, also called fermionic mode 3. Modes 0, 1, and 2 map to qubits ell 0, ell 1, and ell 2 and contribute the parity string Z ell 0 times Z ell 1 times Z ell 2. Its eigenvalue is negative when an odd number of those lower modes is occupied. Target qubit ell 3 carries the X minus iY creation action or X plus iY annihilation action. Multiplying target action by parity string preserves the fermionic ordering sign." src="../../_images/tutorial_qpe_jordan_wigner_parity.svg" />
 <figcaption>
 <p><span class="caption-text">A fermionic mode is one active spin orbital. For target spin orbital <span class="math notranslate nohighlight">\(p=3\)</span>, the qubits assigned to preceding spin orbitals supply the parity string <span class="math notranslate nohighlight">\(Z_{\ell_0}Z_{\ell_1}Z_{\ell_2}\)</span>, while qubit <span class="math notranslate nohighlight">\(\ell_3\)</span> changes the target occupation. The same pattern extends to any target <span class="math notranslate nohighlight">\(p\)</span>.</span><a class="headerlink" href="#id2" title="Link to this image"></a></p>
 </figcaption>
@@ -291,8 +292,8 @@ The exact count also depends on the mapper’s numerical thresholds because term
 <p>The script creates a Jordan–Wigner mapping for the active spin orbitals and passes it to the native <a class="reference internal" href="../../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a>/Chemistry mapper:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">num_active_spin_orbitals</span><span class="p">)</span>
 <span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;qdk&quot;</span><span class="p">,</span>
+    <span class="s2">"qubit_mapper"</span><span class="p">,</span>
+    <span class="s2">"qdk"</span><span class="p">,</span>
     <span class="n">threshold</span><span class="o">=</span><span class="mf">1e-10</span><span class="p">,</span>
     <span class="n">integral_threshold</span><span class="o">=</span><span class="mf">1e-14</span><span class="p">,</span>
 <span class="p">)</span>
@@ -348,7 +349,7 @@ The lowest eigenvalue in this subspace is obtained directly from the mapped qubi
     <span class="n">active_space_result</span><span class="o">.</span><span class="n">refined_wavefunction</span><span class="o">.</span><span class="n">get_active_num_electrons</span><span class="p">()</span>
 <span class="p">)</span>
 
-<span class="c1"># QDK/Chemistry&#39;s blocked fermion ordering stores alpha occupations in the</span>
+<span class="c1"># QDK/Chemistry's blocked fermion ordering stores alpha occupations in the</span>
 <span class="c1"># low bits and beta occupations in the high bits. Shifting 1 left and</span>
 <span class="c1"># subtracting 1 creates a mask with one low bit per alpha spin orbital.</span>
 <span class="n">alpha_mask</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">num_active_spatial_orbitals</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>

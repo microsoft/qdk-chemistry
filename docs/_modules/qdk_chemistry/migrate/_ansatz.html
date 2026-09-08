@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.migrate._ansatz &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.migrate._ansatz &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -96,14 +97,14 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.migrate._ansatz</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Migrate the ``Ansatz`` serialization schema to the current version.</span>
+<span></span><span class="sd">"""Migrate the ``Ansatz`` serialization schema to the current version.</span>
 
 <span class="sd">An ``Ansatz`` is an envelope around a :class:`~qdk_chemistry.data.Hamiltonian`</span>
 <span class="sd">and a :class:`~qdk_chemistry.data.Wavefunction`. The envelope itself</span>
 <span class="sd">(``{type, version, hamiltonian, wavefunction}``) is schema-stable, so this</span>
 <span class="sd">converter has no version step of its own; it migrates each embedded payload</span>
-<span class="sd">through that payload&#39;s own serialization-version chain.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">through that payload's own serialization-version chain.</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -116,18 +117,18 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_hamiltonian</span><span class="p">,</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_wavefunction</span>
 
-<span class="n">ANSATZ_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+<span class="n">ANSATZ_VERSION</span> <span class="o">=</span> <span class="s2">"0.1.0"</span>
 
 
 <div class="viewcode-block" id="from_json_doc">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._ansatz.html#qdk_chemistry.migrate._ansatz.from_json_doc">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_json_doc</span><span class="p">(</span><span class="n">doc</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a parsed legacy Ansatz JSON object into an old-doc.&quot;&quot;&quot;</span>
-    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;hamiltonian&quot;</span><span class="p">)</span>
-    <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Normalize a parsed legacy Ansatz JSON object into an old-doc."""</span>
+    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"hamiltonian"</span><span class="p">)</span>
+    <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"wavefunction"</span><span class="p">)</span>
     <span class="k">return</span> <span class="p">{</span>
-        <span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">hamiltonian</span> <span class="k">else</span> <span class="n">_hamiltonian</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">),</span>
-        <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">wavefunction</span> <span class="k">else</span> <span class="n">_wavefunction</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">),</span>
+        <span class="s2">"hamiltonian"</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">hamiltonian</span> <span class="k">else</span> <span class="n">_hamiltonian</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">),</span>
+        <span class="s2">"wavefunction"</span><span class="p">:</span> <span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">wavefunction</span> <span class="k">else</span> <span class="n">_wavefunction</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">),</span>
     <span class="p">}</span></div>
 
 
@@ -135,27 +136,27 @@
 <div class="viewcode-block" id="from_hdf5_file">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._ansatz.html#qdk_chemistry.migrate._ansatz.from_hdf5_file">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a legacy Ansatz HDF5 file into an old-doc.&quot;&quot;&quot;</span>
-    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
-        <span class="n">group</span> <span class="o">=</span> <span class="n">handle</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ansatz&quot;</span><span class="p">,</span> <span class="n">handle</span><span class="p">)</span>
-        <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">_hamiltonian</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;hamiltonian&quot;</span><span class="p">])</span> <span class="k">if</span> <span class="s2">&quot;hamiltonian&quot;</span> <span class="ow">in</span> <span class="n">group</span> <span class="k">else</span> <span class="kc">None</span>
-        <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">_wavefunction</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">])</span> <span class="k">if</span> <span class="s2">&quot;wavefunction&quot;</span> <span class="ow">in</span> <span class="n">group</span> <span class="k">else</span> <span class="kc">None</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;hamiltonian&quot;</span><span class="p">:</span> <span class="n">hamiltonian</span><span class="p">,</span> <span class="s2">&quot;wavefunction&quot;</span><span class="p">:</span> <span class="n">wavefunction</span><span class="p">}</span></div>
+<span class="w">    </span><span class="sd">"""Read a legacy Ansatz HDF5 file into an old-doc."""</span>
+    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">handle</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"ansatz"</span><span class="p">,</span> <span class="n">handle</span><span class="p">)</span>
+        <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">_hamiltonian</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">"hamiltonian"</span><span class="p">])</span> <span class="k">if</span> <span class="s2">"hamiltonian"</span> <span class="ow">in</span> <span class="n">group</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">_wavefunction</span><span class="o">.</span><span class="n">from_hdf5_group</span><span class="p">(</span><span class="n">group</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">])</span> <span class="k">if</span> <span class="s2">"wavefunction"</span> <span class="ow">in</span> <span class="n">group</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"hamiltonian"</span><span class="p">:</span> <span class="n">hamiltonian</span><span class="p">,</span> <span class="s2">"wavefunction"</span><span class="p">:</span> <span class="n">wavefunction</span><span class="p">}</span></div>
 
 
 
 <div class="viewcode-block" id="to_new_json">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._ansatz.html#qdk_chemistry.migrate._ansatz.to_new_json">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the migrated Ansatz JSON object by migrating each embedded payload&#39;s chain.&quot;&quot;&quot;</span>
-    <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">ANSATZ_VERSION</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;Ansatz&quot;</span><span class="p">}</span>
-    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;hamiltonian&quot;</span><span class="p">]</span>
-    <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">]</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;hamiltonian&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="kc">None</span> <span class="k">if</span> <span class="n">hamiltonian</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_io</span><span class="o">.</span><span class="n">migrate_doc</span><span class="p">(</span><span class="n">_hamiltonian</span><span class="o">.</span><span class="n">STEPS</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">,</span> <span class="s2">&quot;embedded Hamiltonian&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Build the migrated Ansatz JSON object by migrating each embedded payload's chain."""</span>
+    <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"version"</span><span class="p">:</span> <span class="n">ANSATZ_VERSION</span><span class="p">,</span> <span class="s2">"type"</span><span class="p">:</span> <span class="s2">"Ansatz"</span><span class="p">}</span>
+    <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">"hamiltonian"</span><span class="p">]</span>
+    <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">old</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">]</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"hamiltonian"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="kc">None</span> <span class="k">if</span> <span class="n">hamiltonian</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_io</span><span class="o">.</span><span class="n">migrate_doc</span><span class="p">(</span><span class="n">_hamiltonian</span><span class="o">.</span><span class="n">STEPS</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">,</span> <span class="s2">"embedded Hamiltonian"</span><span class="p">)</span>
     <span class="p">)</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="kc">None</span> <span class="k">if</span> <span class="n">wavefunction</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_io</span><span class="o">.</span><span class="n">migrate_doc</span><span class="p">(</span><span class="n">_wavefunction</span><span class="o">.</span><span class="n">STEPS</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">,</span> <span class="s2">&quot;embedded Wavefunction&quot;</span><span class="p">)</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="kc">None</span> <span class="k">if</span> <span class="n">wavefunction</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_io</span><span class="o">.</span><span class="n">migrate_doc</span><span class="p">(</span><span class="n">_wavefunction</span><span class="o">.</span><span class="n">STEPS</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">,</span> <span class="s2">"embedded Wavefunction"</span><span class="p">)</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">new</span></div>
 

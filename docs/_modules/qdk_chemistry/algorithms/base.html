@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.base &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.base &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,11 +96,11 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.base</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK Chemistry Algorithms Base Class.</span>
+<span></span><span class="sd">"""QDK Chemistry Algorithms Base Class.</span>
 
 <span class="sd">This module defines the base class for custom algorithms that can be</span>
 <span class="sd">integrated into the QDK/Chemistry framework.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -111,6 +112,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core</span><span class="w"> </span><span class="kn">import</span> <span class="n">DuplicateRegistrationError</span> <span class="k">as</span> <span class="n">_DuplicateRegistrationError</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
@@ -120,7 +122,7 @@
 <div class="viewcode-block" id="Algorithm">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Algorithm</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for custom algorithms in QDK/Chemistry.</span>
+<span class="w">    </span><span class="sd">"""Base class for custom algorithms in QDK/Chemistry.</span>
 
 <span class="sd">    In derived classes, ensure to call super().__init__() to properly</span>
 <span class="sd">    initialize the base class and override the _settings attribute if</span>
@@ -138,23 +140,23 @@
 <span class="sd">        ...         super().__init__()</span>
 <span class="sd">        ...         # Replace with specialized settings</span>
 <span class="sd">        ...         self._settings = ElectronicStructureSettings()</span>
-<span class="sd">        ...         self._settings.set(&quot;max_iterations&quot;, 50)</span>
-<span class="sd">        ...         self._settings.set(&quot;convergence_threshold&quot;, 1e-6)</span>
+<span class="sd">        ...         self._settings.set("max_iterations", 50)</span>
+<span class="sd">        ...         self._settings.set("convergence_threshold", 1e-6)</span>
 <span class="sd">        ...</span>
 <span class="sd">        ...     def name(self) -&gt; str:</span>
-<span class="sd">        ...         return &quot;my_custom_scf&quot;</span>
+<span class="sd">        ...         return "my_custom_scf"</span>
 <span class="sd">        ...</span>
 <span class="sd">        ...     def type_name(self) -&gt; str:</span>
-<span class="sd">        ...         return &quot;scf_solver&quot;</span>
+<span class="sd">        ...         return "scf_solver"</span>
 <span class="sd">        ...</span>
 <span class="sd">        ...     def aliases(self) -&gt; list[str]:</span>
-<span class="sd">        ...         return [&quot;my_custom_scf&quot;, &quot;custom_scf&quot;]</span>
+<span class="sd">        ...         return ["my_custom_scf", "custom_scf"]</span>
 <span class="sd">        ...</span>
 <span class="sd">        ...     def _run_impl(self, structure: Structure, charge: int,</span>
 <span class="sd">        ...                   spin_multiplicity: int) -&gt; tuple[float, Wavefunction]:</span>
 <span class="sd">        ...         # Custom SCF implementation</span>
-<span class="sd">        ...         max_iter = self.settings().get(&quot;max_iterations&quot;)</span>
-<span class="sd">        ...         threshold = self.settings().get(&quot;convergence_threshold&quot;)</span>
+<span class="sd">        ...         max_iter = self.settings().get("max_iterations")</span>
+<span class="sd">        ...         threshold = self.settings().get("convergence_threshold")</span>
 <span class="sd">        ...</span>
 <span class="sd">        ...         # ... perform SCF calculation ...</span>
 <span class="sd">        ...         energy = -1.0  # placeholder</span>
@@ -166,27 +168,27 @@
 <span class="sd">        &gt;&gt;&gt; registry.register(lambda: MyCustomScfSolver())</span>
 <span class="sd">        &gt;&gt;&gt;</span>
 <span class="sd">        &gt;&gt;&gt; # Use it like any built-in algorithm</span>
-<span class="sd">        &gt;&gt;&gt; scf = registry.create(&quot;scf_solver&quot;, &quot;my_custom_scf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; scf = registry.create("scf_solver", "my_custom_scf")</span>
 <span class="sd">        &gt;&gt;&gt; # Or using the alias</span>
-<span class="sd">        &gt;&gt;&gt; scf = registry.create(&quot;scf_solver&quot;, &quot;custom_scf&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; scf = registry.create("scf_solver", "custom_scf")</span>
 <span class="sd">        &gt;&gt;&gt;</span>
 <span class="sd">        &gt;&gt;&gt; # Configure and run</span>
-<span class="sd">        &gt;&gt;&gt; scf.settings().set(&quot;max_iterations&quot;, 100)</span>
+<span class="sd">        &gt;&gt;&gt; scf.settings().set("max_iterations", 100)</span>
 <span class="sd">        &gt;&gt;&gt; energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1)</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="Algorithm.__init__">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the base algorithm.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize the base algorithm."""</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">Settings</span><span class="p">()</span></div>
 
 
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The implementation of the algorithm.</span>
+<span class="w">        </span><span class="sd">"""The implementation of the algorithm.</span>
 
 <span class="sd">        Derived classes must implement this method.</span>
 
@@ -197,12 +199,12 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            Any: The results of the algorithm</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
 
 <div class="viewcode-block" id="Algorithm.run">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.run">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the algorithm with the provided arguments.</span>
+<span class="w">        </span><span class="sd">"""Run the algorithm with the provided arguments.</span>
 
 <span class="sd">        This method wraps the internal _run_impl method to provide a</span>
 <span class="sd">        consistent interface for executing the algorithm.</span>
@@ -214,7 +216,7 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            Any: The results of the algorithm</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">lock</span><span class="p">()</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_impl</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
 
@@ -222,7 +224,7 @@
 <div class="viewcode-block" id="Algorithm.hash">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.hash">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">hash</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute a deterministic content hash for a run with these inputs.</span>
+<span class="w">        </span><span class="sd">"""Compute a deterministic content hash for a run with these inputs.</span>
 
 <span class="sd">        Same signature as ``run()`` but returns a hex hash string instead</span>
 <span class="sd">        of executing. Identical inputs produce identical hashes.</span>
@@ -234,7 +236,7 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            str: 16-character hex content hash.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">run_content_hash</span>  <span class="c1"># noqa: PLC0415</span>
 
         <span class="k">return</span> <span class="n">run_content_hash</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></div>
@@ -243,17 +245,17 @@
 <div class="viewcode-block" id="Algorithm.settings">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.settings">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">settings</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Settings</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the settings for this algorithm.</span>
+<span class="w">        </span><span class="sd">"""Get the settings for this algorithm.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Settings:The settings object associated with this algorithm.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_create_nested</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">setting_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Instantiate a nested algorithm from an AlgorithmRef in settings.</span>
+<span class="w">        </span><span class="sd">"""Instantiate a nested algorithm from an AlgorithmRef in settings.</span>
 
 <span class="sd">        Reads the ``AlgorithmRef`` stored at *setting_key*, creates the</span>
 <span class="sd">        corresponding algorithm via the registry, and applies any nested</span>
@@ -268,57 +270,57 @@
 <span class="sd">        Raises:</span>
 <span class="sd">            KeyError: If the algorithm type or name cannot be found.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="n">create_from_ref</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="p">,</span> <span class="n">setting_key</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Algorithm.type_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.type_name">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the algorithm type.</span>
+<span class="w">        </span><span class="sd">"""Return the name of the algorithm type.</span>
 
 <span class="sd">        Derived classes must implement this method.</span>
 
-<span class="sd">        An example of an algorithm type is &quot;scf_solver&quot;.</span>
-<span class="sd">        An example of an algorithm name is &quot;pyscf&quot; indicating</span>
+<span class="sd">        An example of an algorithm type is "scf_solver".</span>
+<span class="sd">        An example of an algorithm name is "pyscf" indicating</span>
 <span class="sd">        the origin of the specific implementation of the algorithm type.</span>
 <span class="sd">        Or in the case of an active space selector,</span>
-<span class="sd">        an example of an algorithm type is &quot;active_space_selector&quot;.</span>
-<span class="sd">        and an example of an algorithm name is &quot;qdk_valence&quot;,</span>
+<span class="sd">        an example of an algorithm type is "active_space_selector".</span>
+<span class="sd">        and an example of an algorithm name is "qdk_valence",</span>
 <span class="sd">        indicating the specific algorithm name and origin.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            str: The main name of the algorithm type.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="Algorithm.name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.name">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the main name of the algorithm.</span>
+<span class="w">        </span><span class="sd">"""Return the main name of the algorithm.</span>
 
 <span class="sd">        Derived classes must implement this method.</span>
 
-<span class="sd">        An example of an algorithm type is &quot;scf_solver&quot;.</span>
-<span class="sd">        An example of an algorithm name is &quot;pyscf&quot; indicating</span>
+<span class="sd">        An example of an algorithm type is "scf_solver".</span>
+<span class="sd">        An example of an algorithm name is "pyscf" indicating</span>
 <span class="sd">        the origin of the specific implementation of the algorithm type.</span>
 <span class="sd">        Or in the case of an active space selector,</span>
-<span class="sd">        an example of an algorithm type is &quot;active_space_selector&quot;.</span>
-<span class="sd">        and an example of an algorithm name is &quot;qdk_valence&quot;,</span>
+<span class="sd">        an example of an algorithm type is "active_space_selector".</span>
+<span class="sd">        and an example of an algorithm name is "qdk_valence",</span>
 <span class="sd">        indicating the specific algorithm name and origin.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            str: The main name of the algorithm</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="Algorithm.aliases">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.Algorithm.aliases">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">aliases</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return all aliases of the algorithm&#39;s name.</span>
+<span class="w">        </span><span class="sd">"""Return all aliases of the algorithm's name.</span>
 
 <span class="sd">        Derived classes can override this method.</span>
 <span class="sd">        The aliases must include the main name returned by name().</span>
@@ -326,9 +328,9 @@
 <span class="sd">        By default, this method returns a list containing only the main name.</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            list[str]: All aliases of the algorithm&#39;s name including the main name.</span>
+<span class="sd">            list[str]: All aliases of the algorithm's name including the main name.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">()]</span></div>
 </div>
 
@@ -337,11 +339,11 @@
 <div class="viewcode-block" id="create_from_ref">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.create_from_ref">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">create_from_ref</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="n">setting_key</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Instantiate a nested algorithm from an AlgorithmRef stored in a Settings object.</span>
+<span class="w">    </span><span class="sd">"""Instantiate a nested algorithm from an AlgorithmRef stored in a Settings object.</span>
 
 <span class="sd">    This is a standalone helper usable by both pure-Python algorithms</span>
 <span class="sd">    (via ``Algorithm._create_nested``) and C++-backed algorithms that</span>
-<span class="sd">    don&#39;t inherit the Python ``Algorithm`` base class.</span>
+<span class="sd">    don't inherit the Python ``Algorithm`` base class.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        settings: A ``Settings`` object containing the ``AlgorithmRef``.</span>
@@ -353,7 +355,7 @@
 <span class="sd">    Raises:</span>
 <span class="sd">        KeyError: If the algorithm type or name cannot be found.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: PLC0415</span>
 
     <span class="n">ref</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">setting_key</span><span class="p">)</span>
@@ -367,7 +369,7 @@
 <div class="viewcode-block" id="AlgorithmFactory">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">AlgorithmFactory</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Base class for algorithm factories in QDK/Chemistry.</span>
+<span class="w">    </span><span class="sd">"""Base class for algorithm factories in QDK/Chemistry.</span>
 
 <span class="sd">    Algorithm factories are responsible for creating and managing algorithm instances</span>
 <span class="sd">    of a specific type. Each factory maintains a registry of algorithm implementations</span>
@@ -392,20 +394,20 @@
 <span class="sd">        &gt;&gt;&gt; # Example custom algorithm type</span>
 <span class="sd">        &gt;&gt;&gt; class GeometryOptimizer(Algorithm):</span>
 <span class="sd">        ...     def type_name(self) -&gt; str:</span>
-<span class="sd">        ...         return &quot;geometry_optimizer&quot;</span>
+<span class="sd">        ...         return "geometry_optimizer"</span>
 <span class="sd">        &gt;&gt;&gt;</span>
 <span class="sd">        &gt;&gt;&gt; # Example factory for this algorithm type</span>
 <span class="sd">        &gt;&gt;&gt; class GeometryOptimizerFactory(AlgorithmFactory):</span>
 <span class="sd">        ...     def algorithm_type_name(self) -&gt; str:</span>
-<span class="sd">        ...         return &quot;geometry_optimizer&quot;</span>
+<span class="sd">        ...         return "geometry_optimizer"</span>
 <span class="sd">        ...</span>
 <span class="sd">        ...     def default_algorithm_name(self) -&gt; str:</span>
-<span class="sd">        ...         return &quot;bfgs&quot;  # Default algorithm</span>
+<span class="sd">        ...         return "bfgs"  # Default algorithm</span>
 <span class="sd">        &gt;&gt;&gt;</span>
 <span class="sd">        &gt;&gt;&gt; # Register a custom implementation</span>
 <span class="sd">        &gt;&gt;&gt; class BfgsOptimizer(GeometryOptimizer):</span>
 <span class="sd">        ...     def name(self) -&gt; str:</span>
-<span class="sd">        ...         return &quot;bfgs&quot;</span>
+<span class="sd">        ...         return "bfgs"</span>
 <span class="sd">        ...     def _run_impl(self, structure: Structure):</span>
 <span class="sd">        ...         # Implementation here</span>
 <span class="sd">        ...         pass</span>
@@ -418,45 +420,46 @@
 <span class="sd">        &gt;&gt;&gt; algorithms.register(lambda: BfgsOptimizer())</span>
 <span class="sd">        &gt;&gt;&gt;</span>
 <span class="sd">        &gt;&gt;&gt; # Now use via the top-level API</span>
-<span class="sd">        &gt;&gt;&gt; optimizer = algorithms.create(&quot;geometry_optimizer&quot;, &quot;bfgs&quot;)</span>
-<span class="sd">        &gt;&gt;&gt; available_opts = algorithms.available(&quot;geometry_optimizer&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; optimizer = algorithms.create("geometry_optimizer", "bfgs")</span>
+<span class="sd">        &gt;&gt;&gt; available_opts = algorithms.available("geometry_optimizer")</span>
 <span class="sd">        &gt;&gt;&gt; print(available_opts)</span>
-<span class="sd">        {&#39;geometry_optimizer&#39;: [&#39;bfgs&#39;]}</span>
+<span class="sd">        {'geometry_optimizer': ['bfgs']}</span>
 
 <span class="sd">    See Also:</span>
 <span class="sd">        qdk_chemistry.algorithms.registry:</span>
 
 <span class="sd">            Higher-level registry functions for creating and managing algorithms across all types.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="AlgorithmFactory.__init__">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the algorithm factory with an empty registry.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">Algorithm</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span></div>
+<span class="w">        </span><span class="sd">"""Initialize the algorithm factory with an empty registry."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">Algorithm</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.algorithm_type_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.algorithm_type_name">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the type name of algorithms this factory creates.</span>
+<span class="w">        </span><span class="sd">"""Return the type name of algorithms this factory creates.</span>
 
 <span class="sd">        Derived classes must implement this method to specify the algorithm</span>
-<span class="sd">        type they manage (e.g., &quot;scf_solver&quot;, &quot;active_space_selector&quot;).</span>
+<span class="sd">        type they manage (e.g., "scf_solver", "active_space_selector").</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            str: The algorithm type name.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.default_algorithm_name">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.default_algorithm_name">[docs]</a>
     <span class="nd">@abstractmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the default algorithm for this type.</span>
+<span class="w">        </span><span class="sd">"""Return the name of the default algorithm for this type.</span>
 
 <span class="sd">        Derived classes must implement this method to specify which algorithm</span>
 <span class="sd">        should be created when no specific name is provided to `create()`.</span>
@@ -464,13 +467,13 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            str: The name of the default algorithm implementation.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span></div>
+<span class="sd">        """</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.create">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.create">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Algorithm</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create an algorithm instance by name.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">suppress_warnings</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Algorithm</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Create an algorithm instance by name.</span>
 
 <span class="sd">        Creates and returns a new instance of the requested algorithm. If no name</span>
 <span class="sd">        is provided, creates an instance of the default algorithm for this type.</span>
@@ -479,6 +482,8 @@
 <span class="sd">            name (Optional[str]): The name of the algorithm to create.</span>
 
 <span class="sd">                If None or empty, creates the default algorithm.</span>
+
+<span class="sd">            suppress_warnings (bool): Whether to suppress creation-time warnings.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Algorithm: A new instance of the requested algorithm.</span>
@@ -491,45 +496,77 @@
 <span class="sd">            &gt;&gt;&gt; # Create default SCF solver</span>
 <span class="sd">            &gt;&gt;&gt; default_scf = factory.create()</span>
 <span class="sd">            &gt;&gt;&gt; # Create specific implementation</span>
-<span class="sd">            &gt;&gt;&gt; pyscf_solver = factory.create(&quot;pyscf&quot;)</span>
+<span class="sd">            &gt;&gt;&gt; pyscf_solver = factory.create("pyscf")</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;&quot;</span><span class="p">:</span>
+<span class="sd">        """</span>
+        <span class="k">del</span> <span class="n">suppress_warnings</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">""</span><span class="p">:</span>
             <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_algorithm_name</span><span class="p">()</span>
-        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Algorithm &#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; of type &#39;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&#39; is not registered. &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;Available algorithms: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
-            <span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">[</span><span class="n">name</span><span class="p">]()</span></div>
+        <span class="n">generator</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+        <span class="k">if</span> <span class="n">generator</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">generator</span><span class="p">()</span>
+
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"Algorithm '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' of type '</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">' is not registered. "</span>
+            <span class="sa">f</span><span class="s2">"Available algorithms: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.register_instance">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.register_instance">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">register_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">generator</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">Algorithm</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a new algorithm implementation in this factory.</span>
+<span class="w">        </span><span class="sd">"""Register a new algorithm implementation in this factory.</span>
 
-<span class="sd">        Adds a new algorithm to the factory&#39;s registry. The generator function</span>
+<span class="sd">        Adds a new algorithm to the factory's registry. The generator function</span>
 <span class="sd">        will be called each time an instance of this algorithm is requested.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            generator (Callable[[], Algorithm]): A callable that returns a new instance of the algorithm.</span>
 
-<span class="sd">                Must return an Algorithm whose name()</span>
-<span class="sd">                will be used as the registration key.</span>
+<span class="sd">                Must return an Algorithm with unique names and aliases.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            DuplicateRegistrationError: If an algorithm name or alias is already registered in this factory.</span>
 
 <span class="sd">        Examples:</span>
 <span class="sd">            &gt;&gt;&gt; factory = ScfSolverFactory()</span>
 <span class="sd">            &gt;&gt;&gt; factory.register_instance(lambda: MyCustomScf())</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">[</span><span class="n">generator</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">()]</span> <span class="o">=</span> <span class="n">generator</span></div>
+<span class="sd">        """</span>
+        <span class="n">instance</span> <span class="o">=</span> <span class="n">generator</span><span class="p">()</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">name</span><span class="p">()</span>
+        <span class="n">aliases</span> <span class="o">=</span> <span class="n">instance</span><span class="o">.</span><span class="n">aliases</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">aliases</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Algorithm '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' aliases must be returned as a list"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">name</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Algorithm name must not be empty"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">aliases</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Algorithm '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' must include its canonical name in aliases"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">alias</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">alias</span> <span class="k">for</span> <span class="n">alias</span> <span class="ow">in</span> <span class="n">aliases</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Algorithm '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' aliases must be non-empty strings"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">aliases</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">aliases</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Algorithm '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' aliases must be unique"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span> <span class="ow">or</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">_DuplicateRegistrationError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Algorithm factory for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">: "</span>
+                <span class="sa">f</span><span class="s2">"algorithm with name/alias '</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">' already exists in registry"</span>
+            <span class="p">)</span>
+        <span class="k">for</span> <span class="n">alias</span> <span class="ow">in</span> <span class="n">aliases</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">alias</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span> <span class="ow">or</span> <span class="n">alias</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">_DuplicateRegistrationError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Algorithm factory for </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">algorithm_type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">: "</span>
+                    <span class="sa">f</span><span class="s2">"algorithm with name/alias '</span><span class="si">{</span><span class="n">alias</span><span class="si">}</span><span class="s2">' already exists in registry"</span>
+                <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">generator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">((</span><span class="n">alias</span> <span class="k">for</span> <span class="n">alias</span> <span class="ow">in</span> <span class="n">aliases</span> <span class="k">if</span> <span class="n">alias</span> <span class="o">!=</span> <span class="n">name</span><span class="p">),</span> <span class="n">name</span><span class="p">))</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.unregister_instance">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.unregister_instance">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">unregister_instance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove an algorithm implementation from this factory.</span>
+<span class="w">        </span><span class="sd">"""Remove an algorithm implementation from this factory.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            name (str): The name of the algorithm to unregister.</span>
@@ -539,16 +576,19 @@
 
 <span class="sd">        Examples:</span>
 <span class="sd">            &gt;&gt;&gt; factory = ScfSolverFactory()</span>
-<span class="sd">            &gt;&gt;&gt; success = factory.unregister_instance(&quot;my_custom_scf&quot;)</span>
+<span class="sd">            &gt;&gt;&gt; success = factory.unregister_instance("my_custom_scf")</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span></div>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span> <span class="o">=</span> <span class="p">{</span><span class="n">alias</span><span class="p">:</span> <span class="n">owner</span> <span class="k">for</span> <span class="n">alias</span><span class="p">,</span> <span class="n">owner</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">owner</span> <span class="o">!=</span> <span class="n">name</span><span class="p">}</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.available">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.available">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">available</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a list of all available algorithm names in this factory.</span>
+<span class="w">        </span><span class="sd">"""Get a list of all available algorithm names in this factory.</span>
 
 <span class="sd">        Returns:</span>
 <span class="sd">            list[str]: Names of all registered algorithms.</span>
@@ -557,16 +597,16 @@
 <span class="sd">            &gt;&gt;&gt; factory = ScfSolverFactory()</span>
 <span class="sd">            &gt;&gt;&gt; algos = factory.available()</span>
 <span class="sd">            &gt;&gt;&gt; print(algos)</span>
-<span class="sd">            [&#39;pyscf&#39;, &#39;qdk&#39;, &#39;my_custom_scf&#39;]</span>
+<span class="sd">            ['pyscf', 'qdk', 'my_custom_scf']</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.has">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.has">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">has</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check if an algorithm is registered in this factory.</span>
+<span class="w">        </span><span class="sd">"""Check if an algorithm is registered in this factory.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            key (str): The algorithm name to check.</span>
@@ -576,17 +616,17 @@
 
 <span class="sd">        Examples:</span>
 <span class="sd">            &gt;&gt;&gt; factory = ScfSolverFactory()</span>
-<span class="sd">            &gt;&gt;&gt; if factory.has(&quot;pyscf&quot;):</span>
-<span class="sd">            ...     scf = factory.create(&quot;pyscf&quot;)</span>
+<span class="sd">            &gt;&gt;&gt; if factory.has("pyscf"):</span>
+<span class="sd">            ...     scf = factory.create("pyscf")</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span></div>
+<span class="sd">        """</span>
+        <span class="k">return</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span> <span class="ow">or</span> <span class="n">key</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span></div>
 
 
 <div class="viewcode-block" id="AlgorithmFactory.clear">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory.clear">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">clear</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Remove all registered algorithms from this factory.</span>
+<span class="w">        </span><span class="sd">"""Remove all registered algorithms from this factory.</span>
 
 <span class="sd">        This method clears the entire registry. Use with caution as it will</span>
 <span class="sd">        remove all algorithm implementations, including built-in ones.</span>
@@ -595,8 +635,9 @@
 <span class="sd">            This is typically used internally for cleanup during Python</span>
 <span class="sd">            interpreter shutdown. Users rarely need to call this directly.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
+<span class="sd">        """</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_registry</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_aliases</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span></div>
 </div>
 
 </pre></div>

@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data._spin_channels &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.data._spin_channels &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -99,7 +100,7 @@
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
-<span class="sd">&quot;&quot;&quot;Internal per-spin-channel helpers over symmetry-blocked data.</span>
+<span class="sd">"""Internal per-spin-channel helpers over symmetry-blocked data.</span>
 
 <span class="sd">These helpers are **not** part of the public API. User code should read</span>
 <span class="sd">symmetry-blocked tensors and index sets through their primitive accessors</span>
@@ -111,7 +112,7 @@
 <span class="sd">encapsulate the trivial (spin-free) vs spin-resolved label selection so the</span>
 <span class="sd">same call works for restricted, unrestricted, and model (symmetry-free)</span>
 <span class="sd">orbitals.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry._core.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">AxisName</span><span class="p">,</span>
@@ -123,16 +124,16 @@
 <span class="p">)</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;spin_channel_indices&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;spin_channel_matrix&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;spin_channel_vector&quot;</span><span class="p">,</span>
+    <span class="s2">"spin_channel_indices"</span><span class="p">,</span>
+    <span class="s2">"spin_channel_matrix"</span><span class="p">,</span>
+    <span class="s2">"spin_channel_vector"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
 <div class="viewcode-block" id="spin_channel_matrix">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data._spin_channels.html#qdk_chemistry.data._spin_channels.spin_channel_matrix">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">spin_channel_matrix</span><span class="p">(</span><span class="n">coefficients</span><span class="p">:</span> <span class="n">SymmetryBlockedTensorRank2</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="n">SpinValue</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Per-spin dense block of a rank-2 (coefficient-like) SymmetryBlockedTensor.</span>
+<span class="w">    </span><span class="sd">"""Per-spin dense block of a rank-2 (coefficient-like) SymmetryBlockedTensor.</span>
 
 <span class="sd">    Returns the block for ``channel``; for a restricted (spin-equivalent) tensor the</span>
 <span class="sd">    alpha and beta blocks share storage, so either channel selection succeeds.</span>
@@ -142,9 +143,9 @@
 <span class="sd">        channel: The spin channel to select, e.g. ``axes.alpha()`` or ``axes.beta()``.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        The requested spin channel&#39;s dense block as a NumPy array.</span>
+<span class="sd">        The requested spin channel's dense block as a NumPy array.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">slots</span> <span class="o">=</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">symmetries</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_slot_label</span><span class="p">(</span><span class="n">index</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SymmetryLabel</span><span class="p">:</span>
@@ -158,7 +159,7 @@
 <div class="viewcode-block" id="spin_channel_vector">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data._spin_channels.html#qdk_chemistry.data._spin_channels.spin_channel_vector">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">spin_channel_vector</span><span class="p">(</span><span class="n">energies</span><span class="p">:</span> <span class="n">SymmetryBlockedTensorRank1</span><span class="p">,</span> <span class="n">channel</span><span class="p">:</span> <span class="n">SpinValue</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Per-spin dense block of a rank-1 (energy-like) SymmetryBlockedTensor.</span>
+<span class="w">    </span><span class="sd">"""Per-spin dense block of a rank-1 (energy-like) SymmetryBlockedTensor.</span>
 
 <span class="sd">    Returns the block for ``channel``; for a restricted (spin-equivalent) tensor the</span>
 <span class="sd">    alpha and beta blocks share storage, so either channel selection succeeds.</span>
@@ -168,9 +169,9 @@
 <span class="sd">        channel: The spin channel to select, e.g. ``axes.alpha()`` or ``axes.beta()``.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        The requested spin channel&#39;s dense block as a NumPy array.</span>
+<span class="sd">        The requested spin channel's dense block as a NumPy array.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">label</span> <span class="o">=</span> <span class="n">SymmetryLabel</span><span class="p">([</span><span class="n">channel</span><span class="p">])</span>
     <span class="n">slots</span> <span class="o">=</span> <span class="n">energies</span><span class="o">.</span><span class="n">symmetries</span><span class="p">()</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">slots</span> <span class="ow">and</span> <span class="n">slots</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">AxisName</span><span class="o">.</span><span class="n">Spin</span><span class="p">)):</span>

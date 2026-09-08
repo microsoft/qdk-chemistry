@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hamiltonian construction &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Hamiltonian construction &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -84,6 +85,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -170,11 +173,11 @@ The <code class="docutils literal notranslate"><span class="pre">HamiltonianCons
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># List available Hamiltonian constructor implementations</span>
-<span class="n">available_constructors</span> <span class="o">=</span> <span class="n">available</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available Hamiltonian constructors: </span><span class="si">{</span><span class="n">available_constructors</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">available_constructors</span> <span class="o">=</span> <span class="n">available</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Available Hamiltonian constructors: </span><span class="si">{</span><span class="n">available_constructors</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Create the default HamiltonianConstructor instance</span>
-<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -195,10 +198,10 @@ See <a class="reference internal" href="#available-implementations">Available im
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure settings (check available options)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Available settings: </span><span class="si">{</span><span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Available settings: </span><span class="si">{</span><span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Set ERI method if needed</span>
-<span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;eri_method&quot;</span><span class="p">,</span> <span class="s2">&quot;direct&quot;</span><span class="p">)</span>
+<span class="n">hamiltonian_constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"eri_method"</span><span class="p">,</span> <span class="s2">"direct"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -207,7 +210,7 @@ See <a class="reference internal" href="#available-implementations">Available im
 <span class="c1">// Note: Available settings can be inspected at runtime</span>
 
 <span class="c1">// Set ERI method if needed</span>
-<span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;eri_method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;direct&quot;</span><span class="p">);</span>
+<span class="n">hamiltonian_constructor</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"eri_method"</span><span class="p">,</span><span class="w"> </span><span class="s">"direct"</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -216,17 +219,17 @@ See <a class="reference internal" href="#available-implementations">Available im
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load a structure from inline XYZ file</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">"""</span><span class="se">\</span>
 <span class="s2">2</span>
 <span class="s2">H2 molecule</span>
 <span class="s2">H    0.000000    0.000000    0.000000</span>
 <span class="s2">H    0.000000    0.000000    0.740848</span>
-<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="s2">"""</span><span class="p">)</span>
 
 <span class="c1"># Run a SCF to get orbitals</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
@@ -238,24 +241,24 @@ See <a class="reference internal" href="#available-implementations">Available im
 <span class="n">h2_aaaa</span><span class="p">,</span> <span class="n">h2_aabb</span><span class="p">,</span> <span class="n">h2_bbbb</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
 <span class="n">core_energy</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;One-body integrals shape: </span><span class="si">{</span><span class="n">h1_a</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Two-body integrals shape: </span><span class="si">{</span><span class="n">h2_aaaa</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Core energy: </span><span class="si">{</span><span class="n">core_energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"One-body integrals shape: </span><span class="si">{</span><span class="n">h1_a</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Two-body integrals shape: </span><span class="si">{</span><span class="n">h2_aaaa</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Core energy: </span><span class="si">{</span><span class="n">core_energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Load structure from inline XYZ file</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz</span><span class="p">(</span><span class="sa">R</span><span class="s">&quot;</span><span class="dl">(</span><span class="s">2</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">2</span>
 <span class="s">H2 molecule</span>
 <span class="s">H    0.000000    0.000000    0.000000</span>
 <span class="s">H    0.000000    0.000000    0.740848</span>
-<span class="dl">)</span><span class="s">&quot;</span><span class="p">));</span>
+<span class="dl">)</span><span class="s">"</span><span class="p">));</span>
 
 <span class="c1">// Run a SCF to get orbitals</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sto-3g&quot;</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">"sto-3g"</span><span class="p">);</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
 
 <span class="c1">// Construct the Hamiltonian from orbitals</span>
@@ -266,13 +269,13 @@ See <a class="reference internal" href="#available-implementations">Available im
 <span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">h2_aaaa</span><span class="p">,</span><span class="w"> </span><span class="n">h2_aabb</span><span class="p">,</span><span class="w"> </span><span class="n">h2_bbbb</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="o">-&gt;</span><span class="n">get_two_body_integrals</span><span class="p">();</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">core_energy</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hamiltonian</span><span class="o">-&gt;</span><span class="n">get_core_energy</span><span class="p">();</span>
 
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;One-body integrals shape: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h1_a</span><span class="p">.</span><span class="n">rows</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h1_a</span><span class="p">.</span><span class="n">cols</span><span class="p">()</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"One-body integrals shape: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h1_a</span><span class="p">.</span><span class="n">rows</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"x"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h1_a</span><span class="p">.</span><span class="n">cols</span><span class="p">()</span>
 <span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Two-body integrals shape: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x&quot;</span>
-<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;x&quot;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Two-body integrals shape: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"x"</span>
+<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"x"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"x"</span>
 <span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">h2_aaaa</span><span class="p">.</span><span class="n">dimension</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Core energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
-<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">core_energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Core energy: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">fixed</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">setprecision</span><span class="p">(</span><span class="mi">10</span><span class="p">)</span>
+<span class="w">          </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">core_energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">" Hartree"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">hamiltonian</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
@@ -288,8 +291,8 @@ You can discover available implementations programmatically:</p>
 <input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">))</span>
-<span class="c1"># [&#39;qdk&#39;]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">))</span>
+<span class="c1"># ['qdk']</span>
 </pre></div>
 </div>
 </div>

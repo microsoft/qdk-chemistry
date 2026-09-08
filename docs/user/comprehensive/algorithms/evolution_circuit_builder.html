@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Evolution circuit builder &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Evolution circuit builder &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -86,6 +87,8 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -208,7 +211,7 @@ Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.a
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dt</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Time step for evolution discretization. Each step is passed to the propagator. Default: <code class="docutils literal notranslate"><span class="pre">0.0</span></code> (invalid; user must set).</p></td>
+<td><p>Time step for evolution discretization. Must be nonzero, match the sign of <code class="docutils literal notranslate"><span class="pre">total_time</span></code>, and not exceed it in magnitude. Default: <code class="docutils literal notranslate"><span class="pre">0.0</span></code> (invalid; user must set).</p></td>
 </tr>
 </tbody>
 </table>
@@ -232,13 +235,13 @@ Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.a
 
 <span class="c1"># 2. Configure the builder</span>
 <span class="n">evolution_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
-    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">2</span>
+    <span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">2</span>
 <span class="p">)</span>
-<span class="n">propagator</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;propagator&quot;</span><span class="p">,</span> <span class="s2">&quot;magnus&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">propagator</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"propagator"</span><span class="p">,</span> <span class="s2">"magnus"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
 <span class="n">circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;euler&quot;</span><span class="p">,</span>
+    <span class="s2">"evolution_circuit_builder"</span><span class="p">,</span>
+    <span class="s2">"euler"</span><span class="p">,</span>
     <span class="n">evolution_builder</span><span class="o">=</span><span class="n">evolution_builder</span><span class="p">,</span>
     <span class="n">propagator</span><span class="o">=</span><span class="n">propagator</span><span class="p">,</span>
     <span class="n">total_time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
@@ -249,11 +252,11 @@ Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.a
 <span class="n">state_prep</span> <span class="o">=</span> <span class="n">identity_state_prep</span><span class="p">(</span><span class="n">num_qubits</span><span class="o">=</span><span class="n">td_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">)</span>
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">circuit_builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">td_hamiltonian</span><span class="p">,</span> <span class="n">state_prep</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Circuit has QIR: </span><span class="si">{</span><span class="n">circuit</span><span class="o">.</span><span class="n">get_qir</span><span class="p">()</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Circuit has QIR: </span><span class="si">{</span><span class="n">circuit</span><span class="o">.</span><span class="n">get_qir</span><span class="p">()</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># 4. Use for quantum resource estimation</span>
 <span class="n">app</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qre_application</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;QRE application created: </span><span class="si">{</span><span class="n">app</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"QRE application created: </span><span class="si">{</span><span class="n">app</span><span class="w"> </span><span class="ow">is</span><span class="w"> </span><span class="ow">not</span><span class="w"> </span><span class="kc">None</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -277,13 +280,13 @@ Use <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.a
 <span class="c1"># and the evolution builder constructs the unitary with `num_divisions`</span>
 <span class="c1"># subdivisions within that interval.</span>
 <span class="n">evolution_builder</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span>
-    <span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">2</span>
+    <span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">num_divisions</span><span class="o">=</span><span class="mi">2</span>
 <span class="p">)</span>
-<span class="n">propagator</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">&quot;propagator&quot;</span><span class="p">,</span> <span class="s2">&quot;magnus&quot;</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">propagator</span> <span class="o">=</span> <span class="n">AlgorithmRef</span><span class="p">(</span><span class="s2">"propagator"</span><span class="p">,</span> <span class="s2">"magnus"</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 
 <span class="n">circuit_builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;evolution_circuit_builder&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;euler&quot;</span><span class="p">,</span>
+    <span class="s2">"evolution_circuit_builder"</span><span class="p">,</span>
+    <span class="s2">"euler"</span><span class="p">,</span>
     <span class="n">evolution_builder</span><span class="o">=</span><span class="n">evolution_builder</span><span class="p">,</span>
     <span class="n">propagator</span><span class="o">=</span><span class="n">propagator</span><span class="p">,</span>
     <span class="n">total_time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>

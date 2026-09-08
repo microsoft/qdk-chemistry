@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins package &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins package &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -26,7 +26,7 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="qdk_chemistry.plugins.geometric package" href="qdk_chemistry.plugins.geometric.html" />
+    <link rel="next" title="qdk_chemistry.plugins.discovery package" href="qdk_chemistry.plugins.discovery.html" />
     <link rel="prev" title="qdk_chemistry.algorithms.stability_checker module" href="qdk_chemistry.algorithms.stability_checker.html" /> 
 </head>
 
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -67,10 +68,14 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#plugins">Plugins</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">qdk_chemistry.plugins package</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#purpose-and-benefits">Purpose and Benefits</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#available-plugins">Available Plugins</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#using-plugins">Using Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#external-plugins">External plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#bundled-integrations">Bundled integrations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.plugins.ChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">ChemistryPlugin</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.plugins.DuplicateRegistrationError"><code class="docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.plugins.PluginRegistrar"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.plugins.QdkChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
 </ul>
 </li>
 </ul>
@@ -116,82 +121,225 @@
              
   <section id="module-qdk_chemistry.plugins">
 <span id="qdk-chemistry-plugins-package"></span><h1>qdk_chemistry.plugins package<a class="headerlink" href="#module-qdk_chemistry.plugins" title="Link to this heading"></a></h1>
-<p>QDK/Chemistry plugins for external quantum chemistry software integration.</p>
-<p>Plugins are bridge modules that connect QDK/Chemistry with external quantum chemistry
-software packages. They implement QDK/Chemistry’s algorithm interfaces (such as
-<a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ScfSolver" title="qdk_chemistry.algorithms.ScfSolver"><code class="xref py py-class docutils literal notranslate"><span class="pre">ScfSolver</span></code></a>, etc.) while internally using the external library
-to perform the actual calculations. This allows users to leverage specialized capabilities
-from established quantum chemistry packages while maintaining a consistent QDK/Chemistry API.</p>
-<section id="purpose-and-benefits">
-<h2>Purpose and Benefits<a class="headerlink" href="#purpose-and-benefits" title="Link to this heading"></a></h2>
-<p>Plugins serve several key purposes:</p>
-<ol class="arabic simple">
-<li><p><strong>Extended Functionality</strong>: Leverage specialized capabilities from established quantum
-chemistry packages (e.g., PySCF’s diverse DFT functionals, orbital localization methods).</p></li>
-<li><p><strong>Automatic Format Conversion</strong>: Handle conversion between QDK/Chemistry data structures
-(e.g., <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a>, <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><code class="xref py py-class docutils literal notranslate"><span class="pre">Orbitals</span></code></a>,
-<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a>) and external library formats automatically.</p></li>
-<li><p><strong>Registry Integration</strong>: Plugin implementations are automatically registered with
-QDK/Chemistry’s algorithm registry system, making them available through the
-<a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create" title="qdk_chemistry.algorithms.create"><code class="xref py py-func docutils literal notranslate"><span class="pre">create()</span></code></a> factory function.</p></li>
-<li><p><strong>Consistent Interface</strong>: Provide a uniform API for different backend implementations,
-allowing users to easily switch between different computational engines without
-changing their workflow code.</p></li>
-</ol>
-</section>
-<section id="available-plugins">
-<h2>Available Plugins<a class="headerlink" href="#available-plugins" title="Link to this heading"></a></h2>
-<p>Currently available plugin packages:</p>
+<p>Plugin registration and discovery for QDK/Chemistry extensions.</p>
+<p>Plugins connect QDK/Chemistry to optional chemistry packages, quantum software,
+and execution services while preserving the library’s common interfaces. An
+extension can contribute:</p>
 <ul class="simple">
-<li><p><a class="reference internal" href="qdk_chemistry.plugins.pyscf.html#module-qdk_chemistry.plugins.pyscf" title="qdk_chemistry.plugins.pyscf"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.pyscf</span></code></a>: PySCF integration providing SCF solvers, coupled
-cluster calculators, orbital localization, active space selection (AVAS), and
-stability analysis.</p></li>
-<li><p><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#module-qdk_chemistry.plugins.qiskit" title="qdk_chemistry.plugins.qiskit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.qiskit</span></code></a>: Qiskit integration providing qubit mapping,
-circuit execution, expectation-value estimation, and state preparation.</p></li>
-<li><p><a class="reference internal" href="qdk_chemistry.plugins.openfermion.html#module-qdk_chemistry.plugins.openfermion" title="qdk_chemistry.plugins.openfermion"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.openfermion</span></code></a>: OpenFermion integration providing qubit mapping,
-operator conversion, and quantum circuit interoperability.</p></li>
+<li><p>implementations of existing algorithm types or entirely new algorithm types;</p></li>
+<li><p>data classes used by algorithm inputs and outputs;</p></li>
+<li><p>remote execution backends; and</p></li>
+<li><p>cache backends.</p></li>
 </ul>
-</section>
-<section id="using-plugins">
-<h2>Using Plugins<a class="headerlink" href="#using-plugins" title="Link to this heading"></a></h2>
-<p>Plugins are used by importing the plugin module (which auto-registers implementations)
-and then creating instances through the registry or directly:</p>
-<p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Import the plugin to register its implementations</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a PySCF SCF solver through the registry</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Configure and use like any other algorithm</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()[</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">50</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">orbitals</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<section id="external-plugins">
+<h2>External plugins<a class="headerlink" href="#external-plugins" title="Link to this heading"></a></h2>
+<p>An installed package exposes a <a class="reference internal" href="#qdk_chemistry.plugins.QdkChemistryPlugin" title="qdk_chemistry.plugins.QdkChemistryPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a> subclass through the
+<code class="docutils literal notranslate"><span class="pre">qdk_chemistry.plugins</span></code> entry-point group:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[project.entry-points.</span><span class="s2">"qdk_chemistry.plugins"</span><span class="k">]</span>
+<span class="n">custom</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"custom_package.plugin:CustomPlugin"</span>
 </pre></div>
 </div>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># Import the OpenFermion plugin to register its implementations</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion</span>  <span class="c1"># noqa: F401</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create an OpenFermion qubit mapper through the registry</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">MajoranaMapping</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;openfermion&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">mapping</span> <span class="o">=</span> <span class="n">MajoranaMapping</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">(</span><span class="n">num_modes</span><span class="o">=</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">mapping</span><span class="p">)</span>
+<p>Importing <a class="reference internal" href="qdk_chemistry.html#module-qdk_chemistry" title="qdk_chemistry"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry</span></code></a> discovers each entry point and calls its
+<a class="reference internal" href="#qdk_chemistry.plugins.QdkChemistryPlugin.register" title="qdk_chemistry.plugins.QdkChemistryPlugin.register"><code class="xref py py-meth docutils literal notranslate"><span class="pre">QdkChemistryPlugin.register()</span></code></a> method with a <a class="reference internal" href="#qdk_chemistry.plugins.PluginRegistrar" title="qdk_chemistry.plugins.PluginRegistrar"><code class="xref py py-class docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a>. The
+registrar provides access to the standard QDK/Chemistry registries without
+requiring application code to import the plugin package directly.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">PluginRegistrar</span><span class="p">,</span> <span class="n">QdkChemistryPlugin</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">CustomPlugin</span><span class="p">(</span><span class="n">QdkChemistryPlugin</span><span class="p">):</span>
+     <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registrar</span><span class="p">:</span> <span class="n">PluginRegistrar</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+          <span class="n">registrar</span><span class="o">.</span><span class="n">register_algorithm</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">CustomAlgorithm</span><span class="p">())</span>
+          <span class="n">registrar</span><span class="o">.</span><span class="n">register_remote_backend</span><span class="p">(</span><span class="s2">"custom"</span><span class="p">,</span> <span class="n">CustomRemoteBackend</span><span class="p">)</span>
 </pre></div>
 </div>
-<p class="rubric">Notes</p>
-<p>Plugin modules may have additional dependencies beyond core QDK/Chemistry.
-For example, the PySCF plugin requires the <cite>pyscf</cite> package to be installed
-separately.</p>
-<div class="admonition seealso">
-<p class="admonition-title">See also</p>
-<p><a class="reference internal" href="qdk_chemistry.algorithms.html#module-qdk_chemistry.algorithms" title="qdk_chemistry.algorithms"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.algorithms</span></code></a>: Algorithm base classes and registry system
-<a class="reference internal" href="qdk_chemistry.plugins.pyscf.html#module-qdk_chemistry.plugins.pyscf" title="qdk_chemistry.plugins.pyscf"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.pyscf</span></code></a>: PySCF integration plugin
-<a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#module-qdk_chemistry.plugins.qiskit" title="qdk_chemistry.plugins.qiskit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.qiskit</span></code></a>: Qiskit integration plugin
-<a class="reference internal" href="qdk_chemistry.plugins.openfermion.html#module-qdk_chemistry.plugins.openfermion" title="qdk_chemistry.plugins.openfermion"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.openfermion</span></code></a>: OpenFermion integration plugin</p>
-</div>
 </section>
+<section id="bundled-integrations">
+<h2>Bundled integrations<a class="headerlink" href="#bundled-integrations" title="Link to this heading"></a></h2>
+<p>QDK/Chemistry also includes integrations for:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="qdk_chemistry.plugins.pyscf.html#module-qdk_chemistry.plugins.pyscf" title="qdk_chemistry.plugins.pyscf"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.pyscf</span></code></a> for electronic-structure algorithms;</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.plugins.qiskit.html#module-qdk_chemistry.plugins.qiskit" title="qdk_chemistry.plugins.qiskit"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.qiskit</span></code></a> for circuit construction, mapping, and execution;</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.plugins.openfermion.html#module-qdk_chemistry.plugins.openfermion" title="qdk_chemistry.plugins.openfermion"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.openfermion</span></code></a> for operator conversion and qubit mapping;</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.plugins.networkx.html#module-qdk_chemistry.plugins.networkx" title="qdk_chemistry.plugins.networkx"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.networkx</span></code></a> for graph-coloring term grouping; and</p></li>
+<li><p><a class="reference internal" href="qdk_chemistry.plugins.geometric.html#module-qdk_chemistry.plugins.geometric" title="qdk_chemistry.plugins.geometric"><code class="xref py py-mod docutils literal notranslate"><span class="pre">qdk_chemistry.plugins.geometric</span></code></a> for molecular geometry optimization.</p></li>
+</ul>
+<p>Bundled integrations are loaded automatically when their optional dependencies
+are available. Their implementations can then be created through the standard
+algorithm registry, for example <code class="docutils literal notranslate"><span class="pre">create(&quot;scf_solver&quot;,</span> <span class="pre">&quot;pyscf&quot;)</span></code>.</p>
+</section>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.ChemistryPlugin">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.</span></span><span class="sig-name descname"><span class="pre">ChemistryPlugin</span></span><a class="headerlink" href="#qdk_chemistry.plugins.ChemistryPlugin" title="Link to this definition"></a></dt>
+<dd><p>alias of <a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.QdkChemistryPlugin" title="qdk_chemistry.plugins.base.QdkChemistryPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a></p>
+</dd></dl>
+
+<dl class="py exception">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.DuplicateRegistrationError">
+<span class="property"><span class="k"><span class="pre">exception</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.</span></span><span class="sig-name descname"><span class="pre">DuplicateRegistrationError</span></span><a class="headerlink" href="#qdk_chemistry.plugins.DuplicateRegistrationError" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code></a></p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.PluginRegistrar">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.</span></span><span class="sig-name descname"><span class="pre">PluginRegistrar</span></span><a class="headerlink" href="#qdk_chemistry.plugins.PluginRegistrar" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/functions.html#object" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></a></p>
+<p>Register plugin capabilities through the existing public registries.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.PluginRegistrar.register_algorithm_factory">
+<span class="sig-name descname"><span class="pre">register_algorithm_factory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">factory</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.PluginRegistrar.register_algorithm_factory" title="Link to this definition"></a></dt>
+<dd><p>Register a factory that introduces an algorithm type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>factory</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></span>) – Factory that defines and creates the algorithm type.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><strong>DuplicateRegistrationError</strong></a> – If the algorithm type is already registered.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.PluginRegistrar.register_algorithm">
+<span class="sig-name descname"><span class="pre">register_algorithm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">factory</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">data_classes</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.PluginRegistrar.register_algorithm" title="Link to this definition"></a></dt>
+<dd><p>Register an algorithm factory and its DataClass input or output types.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>factory</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code></a>[[], <a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span>) – Factory that creates the algorithm implementation.</p></li>
+<li><p><strong>data_classes</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Iterable" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Iterable</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]]</span>) – DataClass loaders used by the algorithm’s inputs or outputs.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><strong>DuplicateRegistrationError</strong></a> – If the algorithm name or a DataClass wire type is already registered.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#TypeError" title="(in Python v3.14)"><strong>TypeError</strong></a> – If a DataClass loader is invalid.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.PluginRegistrar.register_dataclass">
+<span class="sig-name descname"><span class="pre">register_dataclass</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataclass_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.PluginRegistrar.register_dataclass" title="Link to this definition"></a></dt>
+<dd><p>Register a DataClass loader used in algorithm inputs or outputs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>dataclass_type</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span>) – Canonical DataClass loader to register.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><strong>DuplicateRegistrationError</strong></a> – If the DataClass wire type is already registered.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.PluginRegistrar.register_remote_backend">
+<span class="sig-name descname"><span class="pre">register_remote_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.PluginRegistrar.register_remote_backend" title="Link to this definition"></a></dt>
+<dd><p>Register a remote execution backend.</p>
+<p>Backends may expose selected constructor parameters to untrusted MCP
+clients by declaring <code class="docutils literal notranslate"><span class="pre">mcp_safe_config_options</span></code> as a frozenset on the
+concrete class. The declaration is validated during registration; an
+omitted declaration exposes no parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – Registry name for the backend.</p></li>
+<li><p><strong>backend_type</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span>) – Backend class to register.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><strong>DuplicateRegistrationError</strong></a> – If the backend name or class is already registered.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.PluginRegistrar.register_cache_backend">
+<span class="sig-name descname"><span class="pre">register_cache_backend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">backend_type</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.PluginRegistrar.register_cache_backend" title="Link to this definition"></a></dt>
+<dd><p>Register a cache backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – Registry name for the cache backend.</p></li>
+<li><p><strong>backend_type</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Type" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Type</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Any" title="(in Python v3.14)"><code class="xref py py-data docutils literal notranslate"><span class="pre">Any</span></code></a>]</span>) – Cache backend class to register.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><strong>DuplicateRegistrationError</strong></a> – If the cache name or class is already registered.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.QdkChemistryPlugin">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.</span></span><span class="sig-name descname"><span class="pre">QdkChemistryPlugin</span></span><a class="headerlink" href="#qdk_chemistry.plugins.QdkChemistryPlugin" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference external" href="https://docs.python.org/3/library/abc.html#abc.ABC" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ABC</span></code></a></p>
+<p>Base class for plugins discovered through <code class="docutils literal notranslate"><span class="pre">qdk_chemistry.plugins</span></code>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.QdkChemistryPlugin.api_version">
+<span class="sig-name descname"><span class="pre">api_version</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1</span></span><a class="headerlink" href="#qdk_chemistry.plugins.QdkChemistryPlugin.api_version" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.QdkChemistryPlugin.register">
+<span class="property"><span class="k"><span class="pre">abstractmethod</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">register</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">registrar</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.plugins.QdkChemistryPlugin.register" title="Link to this definition"></a></dt>
+<dd><p>Register the capabilities provided by this plugin.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>registrar</strong> (<a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar" title="qdk_chemistry.plugins.base.PluginRegistrar"><em>PluginRegistrar</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 <section id="subpackages">
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.discovery.html">qdk_chemistry.plugins.discovery package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.discovery.html#submodules">Submodules</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.discovery._sdk.html">qdk_chemistry.plugins.discovery._sdk module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery._sdk.html#qdk_chemistry.plugins.discovery._sdk.create_credential"><code class="docutils literal notranslate"><span class="pre">create_credential()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery._sdk.html#qdk_chemistry.plugins.discovery._sdk.create_workspace_client"><code class="docutils literal notranslate"><span class="pre">create_workspace_client()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery._sdk.html#qdk_chemistry.plugins.discovery._sdk.response_mapping"><code class="docutils literal notranslate"><span class="pre">response_mapping()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html">qdk_chemistry.plugins.discovery.backend module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.create_credential"><code class="docutils literal notranslate"><span class="pre">create_credential()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.create_workspace_client"><code class="docutils literal notranslate"><span class="pre">create_workspace_client()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.response_mapping"><code class="docutils literal notranslate"><span class="pre">response_mapping()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.JobStatus"><code class="docutils literal notranslate"><span class="pre">JobStatus</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.RemoteBackend"><code class="docutils literal notranslate"><span class="pre">RemoteBackend</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.deserialize_outputs"><code class="docutils literal notranslate"><span class="pre">deserialize_outputs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.get_serialized_file_names"><code class="docutils literal notranslate"><span class="pre">get_serialized_file_names()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.serialize_inputs"><code class="docutils literal notranslate"><span class="pre">serialize_inputs()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.discovery.backend.html#qdk_chemistry.plugins.discovery.backend.DiscoveryBackend"><code class="docutils literal notranslate"><span class="pre">DiscoveryBackend</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.geometric.html">qdk_chemistry.plugins.geometric package</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.geometric.html#qdk_chemistry.plugins.geometric.load"><code class="docutils literal notranslate"><span class="pre">load()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.geometric.html#submodules">Submodules</a><ul>
@@ -266,6 +414,11 @@ separately.</p>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.mcscf.html#qdk_chemistry.plugins.pyscf.mcscf.PyscfMcscfSettings"><code class="docutils literal notranslate"><span class="pre">PyscfMcscfSettings</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.population_analysis.html">qdk_chemistry.plugins.pyscf.population_analysis module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.population_analysis.html#qdk_chemistry.plugins.pyscf.population_analysis.PyscfPopulationAnalysisSettings"><code class="docutils literal notranslate"><span class="pre">PyscfPopulationAnalysisSettings</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.population_analysis.html#qdk_chemistry.plugins.pyscf.population_analysis.PyscfPopulationAnalyzer"><code class="docutils literal notranslate"><span class="pre">PyscfPopulationAnalyzer</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html">qdk_chemistry.plugins.pyscf.scf_solver module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSettings"><code class="docutils literal notranslate"><span class="pre">PyscfScfSettings</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.pyscf.scf_solver.html#qdk_chemistry.plugins.pyscf.scf_solver.PyscfScfSolver"><code class="docutils literal notranslate"><span class="pre">PyscfScfSolver</span></code></a></li>
@@ -302,6 +455,7 @@ separately.</p>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.conversion.html">qdk_chemistry.plugins.qiskit.conversion module</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.conversion.html#qdk_chemistry.plugins.qiskit.conversion.apply_matrix_compression_ops"><code class="docutils literal notranslate"><span class="pre">apply_matrix_compression_ops()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.conversion.html#qdk_chemistry.plugins.qiskit.conversion.create_statevector_from_wavefunction"><code class="docutils literal notranslate"><span class="pre">create_statevector_from_wavefunction()</span></code></a></li>
 </ul>
 </li>
@@ -317,8 +471,33 @@ separately.</p>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html">qdk_chemistry.plugins.qiskit.regular_isometry module</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparation"><code class="docutils literal notranslate"><span class="pre">RegularIsometryStatePreparation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.qiskit.regular_isometry.html#qdk_chemistry.plugins.qiskit.regular_isometry.RegularIsometryStatePreparationSettings"><code class="docutils literal notranslate"><span class="pre">RegularIsometryStatePreparationSettings</span></code></a></li>
 </ul>
 </li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.plugins.base.html">qdk_chemistry.plugins.base module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.ChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">ChemistryPlugin</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm_factory"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar.register_algorithm_factory()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar.register_algorithm()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar.register_dataclass()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_remote_backend"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar.register_remote_backend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_cache_backend"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar.register_cache_backend()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.QdkChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.QdkChemistryPlugin.api_version"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin.api_version</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.QdkChemistryPlugin.register"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin.register()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -333,7 +512,7 @@ separately.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="qdk_chemistry.algorithms.stability_checker.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.stability_checker module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="qdk_chemistry.plugins.geometric.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins.geometric package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="qdk_chemistry.plugins.discovery.html" class="btn btn-neutral float-right" title="qdk_chemistry.plugins.discovery package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

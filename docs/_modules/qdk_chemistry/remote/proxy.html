@@ -1,0 +1,520 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.remote.proxy &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.remote.proxy</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.remote.proxy</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Remote execution and caching for QDK/Chemistry algorithms."""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">hashlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>
+
+<span class="n">_CACHE_MISS</span> <span class="o">=</span> <span class="nb">object</span><span class="p">()</span>
+
+
+<span class="c1"># ─────────────────────────────────────────────────────────────────────────────</span>
+<span class="c1"># Standalone run — works with any algorithm (Python or C++)</span>
+<span class="c1"># ─────────────────────────────────────────────────────────────────────────────</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_payload_for</span><span class="p">(</span><span class="n">algorithm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Build an execution payload from any algorithm-like object.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm: Algorithm-like object providing execution metadata.</span>
+<span class="sd">        args: Positional arguments for the algorithm.</span>
+<span class="sd">        kwargs: Keyword arguments for the algorithm.</span>
+
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">_item_content_hash</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
+        <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+        <span class="s2">"settings"</span><span class="p">:</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">to_dict</span><span class="p">(),</span>
+        <span class="s2">"args"</span><span class="p">:</span> <span class="n">args</span><span class="p">,</span>
+        <span class="s2">"kwargs"</span><span class="p">:</span> <span class="n">kwargs</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+        <span class="n">payload</span><span class="p">[</span><span class="s2">"run_hash"</span><span class="p">]</span> <span class="o">=</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">hash</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">input_hashes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">arg</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">input_hashes</span><span class="p">[</span><span class="sa">f</span><span class="s2">"args.arg_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">input_hashes</span><span class="p">[</span><span class="sa">f</span><span class="s2">"kwargs.</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_item_content_hash</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">input_hashes</span><span class="p">:</span>
+        <span class="n">payload</span><span class="p">[</span><span class="s2">"input_hashes"</span><span class="p">]</span> <span class="o">=</span> <span class="n">input_hashes</span>
+
+    <span class="k">return</span> <span class="n">payload</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_store_result</span><span class="p">(</span><span class="n">cache</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Hash result items, persist DataClass blobs, update job in cache.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cache: Cache backend receiving result data and job metadata.</span>
+<span class="sd">        run_hash: Deterministic cache key for the execution.</span>
+<span class="sd">        job: Job record to update with output hashes.</span>
+<span class="sd">        result: Algorithm result to persist.</span>
+
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._hashing</span><span class="w"> </span><span class="kn">import</span> <span class="n">collect_content_hashes</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span> <span class="o">=</span> <span class="n">collect_content_hashes</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+    <span class="n">job</span><span class="o">.</span><span class="n">output_is_tuple</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span>
+    <span class="n">job</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">"retrieved"</span>
+
+    <span class="n">items</span> <span class="o">=</span> <span class="n">result</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="n">result</span><span class="p">,)</span>
+    <span class="k">for</span> <span class="n">entry</span><span class="p">,</span> <span class="n">item</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="s2">"value"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+            <span class="n">cache</span><span class="o">.</span><span class="n">put_data</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"hash"</span><span class="p">],</span> <span class="n">item</span><span class="p">)</span>
+
+    <span class="n">cache</span><span class="o">.</span><span class="n">put_job</span><span class="p">(</span><span class="n">run_hash</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_job_cache_key</span><span class="p">(</span><span class="n">run_hash</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">owner</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the cache key for a job record without changing run identity."""</span>
+    <span class="k">if</span> <span class="n">owner</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">run_hash</span>
+
+    <span class="n">owner_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">owner</span><span class="p">,</span> <span class="n">sort_keys</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">separators</span><span class="o">=</span><span class="p">(</span><span class="s2">","</span><span class="p">,</span> <span class="s2">":"</span><span class="p">))</span>
+    <span class="n">owner_digest</span> <span class="o">=</span> <span class="n">hashlib</span><span class="o">.</span><span class="n">sha256</span><span class="p">(</span><span class="n">owner_json</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">()[:</span><span class="mi">16</span><span class="p">]</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">owner_digest</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">run_hash</span><span class="si">}</span><span class="s2">"</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_reconstruct_from_cache</span><span class="p">(</span><span class="n">cache</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">job</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Reconstruct the full result from cached data, or return the cache-miss sentinel.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        cache: Cache backend containing result data.</span>
+<span class="sd">        job: Job record containing output-hash descriptors.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">job</span><span class="o">.</span><span class="n">output_is_tuple</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_CACHE_MISS</span>
+
+    <span class="n">items</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">"value"</span> <span class="ow">in</span> <span class="n">entry</span><span class="p">:</span>
+            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">cache</span><span class="o">.</span><span class="n">get_data</span><span class="p">(</span><span class="n">entry</span><span class="p">[</span><span class="s2">"hash"</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">_CACHE_MISS</span>
+            <span class="n">items</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">job</span><span class="o">.</span><span class="n">output_is_tuple</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">items</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">items</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">_CACHE_MISS</span>
+
+
+<div class="viewcode-block" id="submit">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.submit">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">(</span>
+    <span class="n">algorithm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">remote</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">job_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Job</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Submit an algorithm for remote execution without blocking.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm: Algorithm-like object to execute remotely.</span>
+<span class="sd">        *args: Positional arguments for the algorithm.</span>
+<span class="sd">        remote: Remote backend name or connected backend instance.</span>
+<span class="sd">        job_dir: Optional directory where the job record is saved.</span>
+<span class="sd">        **kwargs: Keyword arguments for the algorithm.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A job handle that can be checked, canceled, fetched, or waited on.</span>
+
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_backend</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">owns_backend</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="n">get_backend</span><span class="p">(</span><span class="n">remote</span><span class="p">)</span>
+        <span class="n">backend</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="n">remote</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">job</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">_build_payload_for</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">),</span> <span class="n">job_dir</span><span class="o">=</span><span class="n">job_dir</span><span class="p">)</span>
+        <span class="n">job</span><span class="o">.</span><span class="n">attach_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+            <span class="n">job</span><span class="o">.</span><span class="n">detach_backend</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">job</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+            <span class="n">backend</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_run_uncached</span><span class="p">(</span><span class="n">algorithm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">remote</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Execute without caching, locally or through a remote job.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm: Algorithm-like object to execute.</span>
+<span class="sd">        remote: Remote backend name or instance, or ``None`` for local execution.</span>
+<span class="sd">        args: Positional arguments for the algorithm.</span>
+<span class="sd">        kwargs: Keyword arguments for the algorithm.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">remote</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_backend</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">owns_backend</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="n">get_backend</span><span class="p">(</span><span class="n">remote</span><span class="p">)</span>
+        <span class="n">backend</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">backend</span> <span class="o">=</span> <span class="n">remote</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">job</span> <span class="o">=</span> <span class="n">submit</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="n">final_status</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">job</span><span class="o">.</span><span class="n">is_successful</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Remote job </span><span class="si">{</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="si">}</span><span class="s2"> ended with status: </span><span class="si">{</span><span class="n">final_status</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+                <span class="sa">f</span><span class="s2">"Error: </span><span class="si">{</span><span class="n">final_status</span><span class="o">.</span><span class="n">error</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">'unknown'</span><span class="si">}</span><span class="se">\n</span><span class="s2">Logs:</span><span class="se">\n</span><span class="si">{</span><span class="n">final_status</span><span class="o">.</span><span class="n">logs</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">job</span><span class="o">.</span><span class="n">fetch</span><span class="p">()</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+            <span class="n">backend</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="run">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.remote.proxy.html#qdk_chemistry.remote.proxy.run">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
+    <span class="n">algorithm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">cache</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">remote</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">force_rerun</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">_on_job_submitted</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Job</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">_owner</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Execute any algorithm with optional caching and remote backend.</span>
+
+<span class="sd">    Works with both Python and C++ algorithm implementations — anything</span>
+<span class="sd">    with ``run()``, ``hash()``, ``type_name()``, ``name()``, and</span>
+<span class="sd">    ``settings()`` methods.</span>
+
+<span class="sd">    On a cache hit the result is returned immediately.  On a miss the</span>
+<span class="sd">    algorithm is executed (locally or via *remote*) and the result is</span>
+<span class="sd">    stored.  If a previous remote submission is still in-flight, polling</span>
+<span class="sd">    resumes automatically — no duplicate submission.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm: Any algorithm instance (from ``create(...)``).</span>
+<span class="sd">        *args: Positional arguments for ``algorithm.run()``.</span>
+<span class="sd">        cache: Cache backend — a ``CacheBackend``, a path (``str`` /</span>
+<span class="sd">            ``Path`` → ``FolderCache``), or ``None``. For remote execution,</span>
+<span class="sd">            complete caller-side records are cache hits whether or not the</span>
+<span class="sd">            backend is shared. Shared backends are also used by the compute</span>
+<span class="sd">            node as transport. A ``TieredCache`` can combine local and shared</span>
+<span class="sd">            backends.</span>
+<span class="sd">        remote: Remote backend name or instance, or ``None`` for local.</span>
+<span class="sd">        force_rerun: If ``True``, skip the cache lookup and re-execute,</span>
+<span class="sd">            overwriting any previously cached result.</span>
+<span class="sd">        _on_job_submitted: Internal callback invoked after a remote job handle</span>
+<span class="sd">            is persisted to the local cache.</span>
+<span class="sd">        _owner: Internal workspace and project ownership for MCP-managed jobs.</span>
+<span class="sd">        **kwargs: Keyword arguments for ``algorithm.run()``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The algorithm result (e.g. ``(energy, wavefunction)``).</span>
+
+<span class="sd">    Examples::</span>
+
+<span class="sd">        # "scheduler" is provided by an installed plugin</span>
+<span class="sd">        # Shared cache — both sides use the same backend</span>
+<span class="sd">        shared = FolderCache("/mnt/shared/cache", is_shared=True)</span>
+<span class="sd">        energy, wfn = run(scf, mol, 0, 1, "cc-pvdz",</span>
+<span class="sd">                  cache=shared, remote="scheduler")</span>
+
+<span class="sd">        # Local cache backed by a shared cache for remote execution</span>
+<span class="sd">        cache = TieredCache([FolderCache("./cache"), shared])</span>
+<span class="sd">        energy, wfn = run(scf, mol, 0, 1, "cc-pvdz",</span>
+<span class="sd">                  cache=cache, remote="scheduler")</span>
+
+<span class="sd">    """</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_cache</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">resolved_cache</span> <span class="o">=</span> <span class="n">resolve_cache</span><span class="p">(</span><span class="n">cache</span><span class="p">)</span>
+    <span class="n">resolved_remote_cache</span> <span class="o">=</span> <span class="n">resolved_cache</span><span class="o">.</span><span class="n">for_remote</span><span class="p">()</span> <span class="k">if</span> <span class="n">remote</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">resolved_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="c1"># No cache — just run</span>
+    <span class="k">if</span> <span class="n">resolved_cache</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_uncached</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">remote</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">_build_payload_for</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">_owner</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">payload</span><span class="p">[</span><span class="s2">"owner"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_owner</span>
+    <span class="n">run_hash</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"run_hash"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">run_hash</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_run_uncached</span><span class="p">(</span><span class="n">algorithm</span><span class="p">,</span> <span class="n">remote</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">kwargs</span><span class="p">)</span>
+    <span class="n">job_cache_key</span> <span class="o">=</span> <span class="n">_job_cache_key</span><span class="p">(</span><span class="n">run_hash</span><span class="p">,</span> <span class="n">_owner</span><span class="p">)</span>
+    <span class="n">payload</span><span class="p">[</span><span class="s2">"job_cache_key"</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_cache_key</span>
+
+    <span class="c1"># 1) Check the cache (skip on force_rerun)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">force_rerun</span><span class="p">:</span>
+        <span class="n">job</span> <span class="o">=</span> <span class="n">resolved_cache</span><span class="o">.</span><span class="n">get_job</span><span class="p">(</span><span class="n">job_cache_key</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">job</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">owner_matches</span> <span class="o">=</span> <span class="n">_owner</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">job</span><span class="o">.</span><span class="n">owner</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">job</span><span class="o">.</span><span class="n">owner</span> <span class="o">==</span> <span class="n">_owner</span>
+            <span class="k">if</span> <span class="n">owner_matches</span> <span class="ow">and</span> <span class="n">remote</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                <span class="n">job</span><span class="o">.</span><span class="n">attach_backend</span><span class="p">(</span><span class="n">remote</span><span class="p">)</span>
+
+            <span class="c1"># 1a) Completed with outputs → reconstruct</span>
+            <span class="k">if</span> <span class="n">owner_matches</span> <span class="ow">and</span> <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">_reconstruct_from_cache</span><span class="p">(</span><span class="n">resolved_cache</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">_CACHE_MISS</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">result</span>
+
+            <span class="c1"># 1b) Still in-flight → resume polling</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">job</span><span class="o">.</span><span class="n">is_terminal</span> <span class="ow">and</span> <span class="n">owner_matches</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">_on_job_submitted</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">_on_job_submitted</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+                <span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+
+            <span class="c1"># 1c) Execution finished but cached outputs are unavailable → fetch again</span>
+            <span class="k">if</span> <span class="n">job</span><span class="o">.</span><span class="n">is_successful</span> <span class="ow">and</span> <span class="n">owner_matches</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">fetch</span><span class="p">()</span>
+                <span class="n">_store_result</span><span class="p">(</span><span class="n">resolved_cache</span><span class="p">,</span> <span class="n">job_cache_key</span><span class="p">,</span> <span class="n">job</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">result</span>
+
+            <span class="c1"># 1d) Failed → fall through and re-submit</span>
+
+    <span class="c1"># 2) Cache miss — execute</span>
+    <span class="k">if</span> <span class="n">remote</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.backends</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_backend</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">owns_backend</span> <span class="o">=</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">remote</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">backend</span> <span class="o">=</span> <span class="n">get_backend</span><span class="p">(</span><span class="n">remote</span><span class="p">)</span>
+            <span class="n">backend</span><span class="o">.</span><span class="n">connect</span><span class="p">()</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">backend</span> <span class="o">=</span> <span class="n">remote</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># If the caller provided a remote-reachable cache, serialize its</span>
+            <span class="c1"># coordinates into the payload so the remote script can use it.</span>
+            <span class="k">if</span> <span class="n">resolved_remote_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">payload</span><span class="p">[</span><span class="s2">"remote_cache"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                    <span class="s2">"name"</span><span class="p">:</span> <span class="n">resolved_remote_cache</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">resolved_remote_cache</span><span class="o">.</span><span class="n">to_config</span><span class="p">(),</span>
+                <span class="p">}</span>
+                <span class="c1"># When the cache is shared (both sides see the same data),</span>
+                <span class="c1"># pass the backend object so serialize_inputs can skip files</span>
+                <span class="c1"># that already exist in the cache.</span>
+                <span class="k">if</span> <span class="n">resolved_remote_cache</span><span class="o">.</span><span class="n">is_shared</span><span class="p">:</span>
+                    <span class="n">payload</span><span class="p">[</span><span class="s2">"remote_cache_backend"</span><span class="p">]</span> <span class="o">=</span> <span class="n">resolved_remote_cache</span>
+
+            <span class="k">if</span> <span class="n">force_rerun</span><span class="p">:</span>
+                <span class="n">payload</span><span class="p">[</span><span class="s2">"force_rerun"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+            <span class="n">job</span> <span class="o">=</span> <span class="n">backend</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+            <span class="n">job</span><span class="o">.</span><span class="n">owner</span> <span class="o">=</span> <span class="n">_owner</span>
+            <span class="n">job</span><span class="o">.</span><span class="n">attach_backend</span><span class="p">(</span><span class="n">backend</span><span class="p">)</span>
+            <span class="n">job</span><span class="o">.</span><span class="n">run_hash</span> <span class="o">=</span> <span class="n">run_hash</span>
+            <span class="n">resolved_cache</span><span class="o">.</span><span class="n">put_job</span><span class="p">(</span><span class="n">job_cache_key</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">_on_job_submitted</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">_on_job_submitted</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+
+            <span class="n">final_status</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">wait</span><span class="p">()</span>
+
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">job</span><span class="o">.</span><span class="n">is_successful</span><span class="p">:</span>
+                <span class="n">resolved_cache</span><span class="o">.</span><span class="n">put_job</span><span class="p">(</span><span class="n">job_cache_key</span><span class="p">,</span> <span class="n">job</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Remote job </span><span class="si">{</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="si">}</span><span class="s2"> ended with status: </span><span class="si">{</span><span class="n">final_status</span><span class="o">.</span><span class="n">status</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
+                    <span class="sa">f</span><span class="s2">"Error: </span><span class="si">{</span><span class="n">final_status</span><span class="o">.</span><span class="n">error</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">'unknown'</span><span class="si">}</span><span class="se">\n</span><span class="s2">Logs:</span><span class="se">\n</span><span class="si">{</span><span class="n">final_status</span><span class="o">.</span><span class="n">logs</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
+
+            <span class="c1"># If the remote wrote results to a shared cache, reconstruct</span>
+            <span class="c1"># from there directly — avoiding an expensive fetch/download.</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">_CACHE_MISS</span>
+            <span class="k">if</span> <span class="n">resolved_remote_cache</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">resolved_remote_cache</span><span class="o">.</span><span class="n">is_shared</span><span class="p">:</span>
+                <span class="n">remote_job</span> <span class="o">=</span> <span class="n">resolved_remote_cache</span><span class="o">.</span><span class="n">get_job</span><span class="p">(</span><span class="n">job_cache_key</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">remote_job</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">remote_job</span><span class="o">.</span><span class="n">output_hashes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="n">_reconstruct_from_cache</span><span class="p">(</span><span class="n">resolved_remote_cache</span><span class="p">,</span> <span class="n">remote_job</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">_CACHE_MISS</span><span class="p">:</span>
+                        <span class="n">job</span><span class="o">.</span><span class="n">output_hashes</span> <span class="o">=</span> <span class="n">remote_job</span><span class="o">.</span><span class="n">output_hashes</span>
+                        <span class="n">job</span><span class="o">.</span><span class="n">output_is_tuple</span> <span class="o">=</span> <span class="n">remote_job</span><span class="o">.</span><span class="n">output_is_tuple</span>
+                        <span class="n">job</span><span class="o">.</span><span class="n">status</span> <span class="o">=</span> <span class="s2">"retrieved"</span>
+
+            <span class="k">if</span> <span class="n">result</span> <span class="ow">is</span> <span class="n">_CACHE_MISS</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">job</span><span class="o">.</span><span class="n">fetch</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+                <span class="n">job</span><span class="o">.</span><span class="n">detach_backend</span><span class="p">()</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">owns_backend</span><span class="p">:</span>
+                <span class="n">backend</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.job</span><span class="w"> </span><span class="kn">import</span> <span class="n">Job</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">job</span> <span class="o">=</span> <span class="n">Job</span><span class="p">(</span>
+            <span class="n">job_id</span><span class="o">=</span><span class="n">run_hash</span><span class="p">[:</span><span class="mi">12</span><span class="p">],</span>
+            <span class="n">backend</span><span class="o">=</span><span class="s2">"local"</span><span class="p">,</span>
+            <span class="n">backend_config</span><span class="o">=</span><span class="p">{},</span>
+            <span class="n">backend_state</span><span class="o">=</span><span class="p">{},</span>
+            <span class="n">algorithm_info</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">"type"</span><span class="p">:</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"algorithm_type"</span><span class="p">),</span>
+                <span class="s2">"name"</span><span class="p">:</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"algorithm_name"</span><span class="p">),</span>
+                <span class="s2">"settings"</span><span class="p">:</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"settings"</span><span class="p">),</span>
+            <span class="p">},</span>
+            <span class="n">status</span><span class="o">=</span><span class="s2">"retrieved"</span><span class="p">,</span>
+            <span class="n">run_hash</span><span class="o">=</span><span class="n">run_hash</span><span class="p">,</span>
+            <span class="n">input_hashes</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_hashes"</span><span class="p">),</span>
+            <span class="n">owner</span><span class="o">=</span><span class="n">_owner</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="n">_store_result</span><span class="p">(</span><span class="n">resolved_cache</span><span class="p">,</span> <span class="n">job_cache_key</span><span class="p">,</span> <span class="n">job</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">result</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

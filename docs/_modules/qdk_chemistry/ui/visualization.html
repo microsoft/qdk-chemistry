@@ -1,0 +1,914 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.ui.visualization &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.ui.visualization</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.ui.visualization</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""MCP Apps visualisation tools for qdk-chemistry.</span>
+
+<span class="sd">This module conditionally registers ``ui://`` resources backed by</span>
+<span class="sd">the JavaScript components shipped with ``qsharp_widgets`` and</span>
+<span class="sd">exposes interactive MCP tools:</span>
+
+<span class="sd">* ``visualize_circuit``  - interactive quantum-circuit diagram</span>
+<span class="sd">* ``visualize_orbital_entanglement`` - orbital-entanglement chord diagram</span>
+<span class="sd">* ``visualize_molecule`` - interactive 3D molecule viewer</span>
+<span class="sd">* ``visualize_orbitals`` - 3D molecule viewer with orbital isosurfaces</span>
+
+<span class="sd">These tools are only registered when ``qsharp_widgets`` is installed.</span>
+<span class="sd">The tools follow the same conventions as the rest of ``tools.py``:</span>
+<span class="sd">they accept a ``project_name`` / filename pair, load a qdk/chemistry</span>
+<span class="sd">data object, and return either an error string or a list of</span>
+<span class="sd">``TextContent`` items with JSON data for the MCP Apps host.</span>
+<span class="sd">"""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="c1"># ruff: noqa: ARG001, E501</span>
+<span class="c1"># MCP tool functions accept ``project_name`` consumed by the</span>
+<span class="c1"># ``@validate_project`` decorator.</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">secrets</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">mcp.types</span><span class="w"> </span><span class="kn">import</span> <span class="n">CallToolResult</span><span class="p">,</span> <span class="n">TextContent</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry</span><span class="w"> </span><span class="kn">import</span> <span class="n">data</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.io</span><span class="w"> </span><span class="kn">import</span> <span class="n">load_data_object</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.validation</span><span class="w"> </span><span class="kn">import</span> <span class="n">strip_filename_path</span><span class="p">,</span> <span class="n">validate_project</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Check for qsharp_widgets availability</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">qsharp_widgets</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_qsharp_widgets</span>
+
+    <span class="n">_WIDGETS_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">_WIDGETS_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Locate the JavaScript / CSS bundle shipped with qsharp_widgets</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+<span class="n">_WIDGETS_CACHE</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_widgets_static_dir</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the ``qsharp_widgets/static`` directory, raising if missing."""</span>
+    <span class="k">if</span> <span class="s2">"static"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_WIDGETS_CACHE</span><span class="p">:</span>
+        <span class="n">_WIDGETS_CACHE</span><span class="p">[</span><span class="s2">"static"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">_qsharp_widgets</span><span class="o">.</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"static"</span>
+    <span class="k">return</span> <span class="n">_WIDGETS_CACHE</span><span class="p">[</span><span class="s2">"static"</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_json_script</span><span class="p">(</span><span class="n">identifier</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return *value* as an inert, HTML-safe JSON script element."""</span>
+    <span class="n">serialized</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">ensure_ascii</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"&lt;"</span><span class="p">,</span> <span class="sa">r</span><span class="s2">"\u003c"</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"&gt;"</span><span class="p">,</span> <span class="sa">r</span><span class="s2">"\u003e"</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"&amp;"</span><span class="p">,</span> <span class="sa">r</span><span class="s2">"\u0026"</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s1">'&lt;script id="</span><span class="si">{</span><span class="n">identifier</span><span class="si">}</span><span class="s1">" type="application/json"&gt;</span><span class="si">{</span><span class="n">serialized</span><span class="si">}</span><span class="s1">&lt;/script&gt;'</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># HTML builder (uses MCP Apps SDK + patched widget bundle)</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_html</span><span class="p">(</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">component_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">app_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">embedded_data</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">min_height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Build a self-contained HTML page for a qsharp-widgets component."""</span>
+    <span class="n">static</span> <span class="o">=</span> <span class="n">_widgets_static_dir</span><span class="p">()</span>
+    <span class="n">js_text</span> <span class="o">=</span> <span class="p">(</span><span class="n">static</span> <span class="o">/</span> <span class="s2">"index.js"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+    <span class="n">css_text</span> <span class="o">=</span> <span class="p">(</span><span class="n">static</span> <span class="o">/</span> <span class="s2">"index.css"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span>
+
+    <span class="n">m</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">"export\{(\w+) as default,(\w+) as mdRenderer\}"</span><span class="p">,</span> <span class="n">js_text</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">m</span><span class="p">:</span>
+        <span class="n">default_var</span><span class="p">,</span> <span class="n">md_var</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">js_patched</span> <span class="o">=</span> <span class="n">js_text</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+            <span class="n">m</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span>
+            <span class="sa">f</span><span class="s2">"window.__qdk_widget=</span><span class="se">{{</span><span class="s2">default:</span><span class="si">{</span><span class="n">default_var</span><span class="si">}</span><span class="s2">,mdRenderer:</span><span class="si">{</span><span class="n">md_var</span><span class="si">}</span><span class="se">}}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">js_patched</span> <span class="o">=</span> <span class="n">js_text</span>
+
+    <span class="k">return</span> <span class="p">(</span>
+        <span class="s2">"&lt;!DOCTYPE html&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'&lt;html lang="en"&gt;</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"&lt;head&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'&lt;meta charset="utf-8" /&gt;</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'&lt;meta name="viewport" content="width=device-width, initial-scale=1" /&gt;</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"&lt;title&gt;&lt;/title&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"&lt;style&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  :root { color-scheme: light dark; }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  html, body {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    margin: 0; padding: 0;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    font-family: system-ui, -apple-system, sans-serif;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  #widget-root {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    width: 100%;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  #loading { text-align: center; padding: 2em; opacity: 0.6; }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  .widget-error { padding: 16px; background: #3a1a1a; color: #f88;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    border: 1px solid #f44; border-radius: 8px; font-family: monospace;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    font-size: 13px; white-space: pre-wrap; word-break: break-word; }</span><span class="se">\n</span><span class="s2">"</span> <span class="o">+</span> <span class="n">css_text</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">&lt;/style&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"&lt;/head&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"&lt;body&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'  &lt;div id="widget-root"&gt;&lt;div id="loading"&gt;Loading widget</span><span class="se">\u2026</span><span class="s1">&lt;/div&gt;&lt;/div&gt;</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'  &lt;script type="module"&gt;</span><span class="se">\n</span><span class="s1">'</span> <span class="o">+</span> <span class="n">js_patched</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">  &lt;/script&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'  &lt;script type="module"&gt;</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"    try {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'    const config = JSON.parse(document.getElementById("widget-config").textContent);</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"    document.title = config.title;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    async function waitForWidget(ms = 5000) {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      const t0 = Date.now();</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      while (!window.__qdk_widget &amp;&amp; Date.now() - t0 &lt; ms)</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        await new Promise(r =&gt; setTimeout(r, 50));</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      return window.__qdk_widget;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    const widgetModule = await waitForWidget();</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    if (!widgetModule) {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'      document.getElementById("loading").textContent = "Failed to load widget JS";</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'      throw new Error("widget bundle did not load");</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"    }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    function renderToolData(data) {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      const widgetType = data.__widget_type || config.componentName;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      let stateKeys;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'      if (widgetType === "MoleculeViewer") {</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"        stateKeys = {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'          comp: "MoleculeViewer",</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"          molecule_data: data.molecule_data,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"          cube_data: data.cube_data ?? </span><span class="si">{}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"          isoval: data.isoval ?? 0.02,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        };</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'      } else if (widgetType === "Circuit") {</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"        stateKeys = {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'          comp: "Circuit",</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"          ...data,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        };</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      } else {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        stateKeys = {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"          comp: widgetType,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"          ...data,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        };</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      const model = {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        get(key) { return stateKeys[key]; },</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        set(key, val) { stateKeys[key] = val; },</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        save_changes() </span><span class="si">{}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        on() </span><span class="si">{}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"        send() </span><span class="si">{}</span><span class="s2">,</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      };</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'      const el = document.getElementById("widget-root");</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'      el.innerHTML = "";</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'      if (widgetType === "MoleculeViewer") {</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'        el.style.minHeight = "400px";</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"      }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      widgetModule.default.render({ model, el });</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="o">+</span> <span class="p">(</span>
+            <span class="s2">"    renderToolData(config.embeddedData);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="k">if</span> <span class="n">embedded_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="k">else</span> <span class="s1">'    document.getElementById("loading")?.remove();</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="p">)</span>
+        <span class="o">+</span> <span class="s2">"    } catch(e) {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'      const el = document.getElementById("loading") || document.getElementById("widget-root");</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"      if (el) {</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s1">'        const error = document.createElement("div");</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'        error.className = "widget-error";</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s1">'        error.textContent = "Error: " + e.message + "</span><span class="se">\\</span><span class="s1">n</span><span class="se">\\</span><span class="s1">n" + e.stack;</span><span class="se">\n</span><span class="s1">'</span>
+        <span class="s2">"        el.replaceChildren(error);</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"      }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"    }</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"  &lt;/script&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"&lt;/body&gt;</span><span class="se">\n</span><span class="s2">"</span>
+        <span class="s2">"&lt;/html&gt;"</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
+            <span class="s2">"&lt;/body&gt;"</span><span class="p">,</span>
+            <span class="n">_json_script</span><span class="p">(</span>
+                <span class="s2">"widget-config"</span><span class="p">,</span> <span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">,</span> <span class="s2">"componentName"</span><span class="p">:</span> <span class="n">component_name</span><span class="p">,</span> <span class="s2">"embeddedData"</span><span class="p">:</span> <span class="n">embedded_data</span><span class="p">}</span>
+            <span class="p">)</span>
+            <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">&lt;/body&gt;"</span><span class="p">,</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Widget data bridge: sync tool data → resource HTML</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">_WidgetBridge</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Store tool payloads for unique, single-use ``ui://`` resources.</span>
+
+<span class="sd">    Each call to :meth:`send` receives an unguessable resource URI. The</span>
+<span class="sd">    matching resource handler removes the payload before rendering it, so</span>
+<span class="sd">    concurrent clients cannot overwrite or retrieve each other's data.</span>
+<span class="sd">    """</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">resource_uri</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">component_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">app_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">min_height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">500</span><span class="p">,</span>
+        <span class="n">payload_ttl</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">300</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">resource_uri_template</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">resource_uri</span><span class="si">}</span><span class="s2">/</span><span class="se">{{</span><span class="s2">token</span><span class="se">}}</span><span class="s2">"</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_resource_uri</span> <span class="o">=</span> <span class="n">resource_uri</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_component_name</span> <span class="o">=</span> <span class="n">component_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_app_name</span> <span class="o">=</span> <span class="n">app_name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_title</span> <span class="o">=</span> <span class="n">title</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_min_height</span> <span class="o">=</span> <span class="n">min_height</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_payload_ttl</span> <span class="o">=</span> <span class="n">payload_ttl</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_payloads</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_discard_expired</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">now</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">expired</span> <span class="o">=</span> <span class="p">[</span><span class="n">token</span> <span class="k">for</span> <span class="n">token</span><span class="p">,</span> <span class="p">(</span><span class="n">created</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_payloads</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">now</span> <span class="o">-</span> <span class="n">created</span> <span class="o">&gt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_payload_ttl</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">token</span> <span class="ow">in</span> <span class="n">expired</span><span class="p">:</span>
+            <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_payloads</span><span class="p">[</span><span class="n">token</span><span class="p">]</span>
+
+    <span class="c1"># Called by the tool</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CallToolResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Store *payload* and return its unique resource URI."""</span>
+        <span class="n">token</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_urlsafe</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_discard_expired</span><span class="p">(</span><span class="n">now</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_payloads</span><span class="p">[</span><span class="n">token</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">now</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">payload</span><span class="p">))</span>
+        <span class="n">resource_uri</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_resource_uri</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">return</span> <span class="n">CallToolResult</span><span class="p">(</span>
+            <span class="n">content</span><span class="o">=</span><span class="p">[</span><span class="n">TextContent</span><span class="p">(</span><span class="nb">type</span><span class="o">=</span><span class="s2">"text"</span><span class="p">,</span> <span class="n">text</span><span class="o">=</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">payload</span><span class="p">))],</span>
+            <span class="n">structuredContent</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
+            <span class="n">meta</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">"ui"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"resourceUri"</span><span class="p">:</span> <span class="n">resource_uri</span><span class="p">},</span>
+                <span class="s2">"ui/resourceUri"</span><span class="p">:</span> <span class="n">resource_uri</span><span class="p">,</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">receive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Remove and return the payload for *token*, if it is still valid."""</span>
+        <span class="n">now</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_discard_expired</span><span class="p">(</span><span class="n">now</span><span class="p">)</span>
+            <span class="n">entry</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_payloads</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">token</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">entry</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">entry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="c1"># Called by the resource handler</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">receive_html</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Consume *token* and return self-contained HTML for its payload."""</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">receive</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">payload</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">_expired_visualization_html</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">_build_html</span><span class="p">(</span>
+            <span class="n">title</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_title</span><span class="p">,</span>
+            <span class="n">component_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_component_name</span><span class="p">,</span>
+            <span class="n">app_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_app_name</span><span class="p">,</span>
+            <span class="n">embedded_data</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span>
+            <span class="n">min_height</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_min_height</span><span class="p">,</span>
+        <span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_expired_visualization_html</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return a non-sensitive response for an expired or consumed URI."""</span>
+    <span class="k">return</span> <span class="s2">"&lt;html&gt;&lt;body&gt;&lt;p&gt;This visualization has expired or was already opened.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;"</span>
+
+
+<span class="c1"># ---------------------------------------------------------------------------</span>
+<span class="c1"># Public API: register resources and tools on the MCPServer app</span>
+<span class="c1"># ---------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="register_visualization_tools">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.ui.visualization.html#qdk_chemistry.ui.visualization.register_visualization_tools">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">register_visualization_tools</span><span class="p">(</span><span class="n">app</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Register interactive widget-based visualization tools on an MCP server.</span>
+
+<span class="sd">    Tools are registered only when ``qsharp_widgets`` is installed. Otherwise,</span>
+<span class="sd">    this function is a no-op.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        app: MCP server application that receives the widget resources and</span>
+<span class="sd">            tools.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_WIDGETS_AVAILABLE</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="c1"># ── Circuit viewer ────────────────────────────────────────────</span>
+    <span class="n">_circuit_bridge</span> <span class="o">=</span> <span class="n">_WidgetBridge</span><span class="p">(</span>
+        <span class="n">resource_uri</span><span class="o">=</span><span class="s2">"ui://qdk-chem-mcp/circuit-viewer"</span><span class="p">,</span>
+        <span class="n">component_name</span><span class="o">=</span><span class="s2">"Circuit"</span><span class="p">,</span>
+        <span class="n">app_name</span><span class="o">=</span><span class="s2">"qdk-circuit-viewer"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Circuit Viewer"</span><span class="p">,</span>
+        <span class="n">min_height</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">resource</span><span class="p">(</span>
+        <span class="n">_circuit_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">"circuit_viewer"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Interactive quantum-circuit diagram (qsharp-widgets Circuit component)"</span><span class="p">,</span>
+        <span class="n">mime_type</span><span class="o">=</span><span class="s2">"text/html;profile=mcp-app"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">circuit_viewer_resource</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_circuit_bridge</span><span class="o">.</span><span class="n">receive_html</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Render a saved Circuit in VS Code MCP Apps."</span><span class="p">,</span>
+        <span class="n">meta</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">"ui"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"resourceUri"</span><span class="p">:</span> <span class="n">_circuit_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">},</span>
+            <span class="s2">"ui/resourceUri"</span><span class="p">:</span> <span class="n">_circuit_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">structured_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nd">@validate_project</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_circuit</span><span class="p">(</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">circuit_filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Render a saved Circuit in VS Code MCP Apps."""</span>
+        <span class="n">circuit_filename</span> <span class="o">=</span> <span class="n">strip_filename_path</span><span class="p">(</span><span class="n">circuit_filename</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">circuit_obj</span> <span class="o">=</span> <span class="n">load_data_object</span><span class="p">(</span><span class="n">circuit_filename</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">Circuit</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Failed to load circuit from </span><span class="si">{</span><span class="n">circuit_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">"</span>
+
+        <span class="c1"># Convert the qdk-chemistry Circuit to the widget-compatible format:</span>
+        <span class="c1">#   1. Extract QASM via circuit_obj.get_qasm()</span>
+        <span class="c1">#   2. Convert to a qsharp Circuit via qdk.openqasm.circuit()</span>
+        <span class="c1">#   3. Serialise with .json() → widget-compatible JSON string</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk.openqasm</span><span class="w"> </span><span class="kn">import</span> <span class="n">circuit</span> <span class="k">as</span> <span class="n">openqasm_circuit</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">qasm_str</span> <span class="o">=</span> <span class="n">circuit_obj</span><span class="o">.</span><span class="n">get_qasm</span><span class="p">()</span>
+            <span class="n">qsharp_circuit</span> <span class="o">=</span> <span class="n">openqasm_circuit</span><span class="p">(</span><span class="n">qasm_str</span><span class="p">)</span>
+            <span class="n">circuit_json_str</span> <span class="o">=</span> <span class="n">qsharp_circuit</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Cannot build circuit visualisation from </span><span class="si">{</span><span class="n">circuit_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Make sure the file contains a valid qdk/chemistry Circuit object."</span>
+            <span class="p">)</span>
+
+        <span class="n">circuit_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"circuit_json"</span><span class="p">:</span> <span class="n">circuit_json_str</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">_circuit_bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">circuit_data</span><span class="p">)</span>
+
+    <span class="c1"># ── Orbital-entanglement chord diagram ────────────────────────</span>
+    <span class="n">_entanglement_bridge</span> <span class="o">=</span> <span class="n">_WidgetBridge</span><span class="p">(</span>
+        <span class="n">resource_uri</span><span class="o">=</span><span class="s2">"ui://qdk-chem-mcp/orbital-entanglement"</span><span class="p">,</span>
+        <span class="n">component_name</span><span class="o">=</span><span class="s2">"Entanglement"</span><span class="p">,</span>
+        <span class="n">app_name</span><span class="o">=</span><span class="s2">"qdk-orbital-entanglement"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Orbital Entanglement"</span><span class="p">,</span>
+        <span class="n">min_height</span><span class="o">=</span><span class="mi">700</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">resource</span><span class="p">(</span>
+        <span class="n">_entanglement_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">"orbital_entanglement"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Interactive orbital-entanglement chord diagram (qsharp-widgets Entanglement component)"</span><span class="p">,</span>
+        <span class="n">mime_type</span><span class="o">=</span><span class="s2">"text/html;profile=mcp-app"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">orbital_entanglement_resource</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_entanglement_bridge</span><span class="o">.</span><span class="n">receive_html</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps."</span><span class="p">,</span>
+        <span class="n">meta</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">"ui"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"resourceUri"</span><span class="p">:</span> <span class="n">_entanglement_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">},</span>
+            <span class="s2">"ui/resourceUri"</span><span class="p">:</span> <span class="n">_entanglement_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">structured_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nd">@validate_project</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_orbital_entanglement</span><span class="p">(</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">wavefunction_filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">selected_indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">group_selected</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">mi_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps."""</span>
+        <span class="n">wavefunction_filename</span> <span class="o">=</span> <span class="n">strip_filename_path</span><span class="p">(</span><span class="n">wavefunction_filename</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">load_data_object</span><span class="p">(</span><span class="n">wavefunction_filename</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Failed to load wavefunction from </span><span class="si">{</span><span class="n">wavefunction_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">"</span>
+
+        <span class="c1"># ── Convert absolute orbital indices to diagram-relative positions ──</span>
+        <span class="c1"># The widget labels arcs with absolute orbital indices (e.g., 6..11)</span>
+        <span class="c1"># but its selected_indices parameter expects 0-based positions into</span>
+        <span class="c1"># the diagram (0 = first arc, 1 = second arc, ...).</span>
+        <span class="c1">#</span>
+        <span class="c1"># We build the label list first, then map the caller's absolute</span>
+        <span class="c1"># indices to their positions in that list.</span>
+        <span class="n">diagram_selected</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">selected_indices</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_np</span>  <span class="c1"># noqa: PLC0415</span>
+
+                <span class="n">n_entropies</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">_np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">wavefunction</span><span class="o">.</span><span class="n">get_single_orbital_entropies</span><span class="p">()))</span>
+                <span class="c1"># Build the same label list the widget would generate</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">has_active_space</span><span class="p">():</span>
+                        <span class="n">active_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_active_space_indices</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">active_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_entropies</span><span class="p">))</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+                    <span class="n">active_indices</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n_entropies</span><span class="p">))</span>
+
+                <span class="c1"># Map absolute indices → diagram positions</span>
+                <span class="n">abs_to_pos</span> <span class="o">=</span> <span class="p">{</span><span class="n">abs_idx</span><span class="p">:</span> <span class="n">pos</span> <span class="k">for</span> <span class="n">pos</span><span class="p">,</span> <span class="n">abs_idx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">active_indices</span><span class="p">)}</span>
+                <span class="n">diagram_selected</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="n">bad_indices</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">selected_indices</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">abs_to_pos</span><span class="p">:</span>
+                        <span class="n">diagram_selected</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">abs_to_pos</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+                    <span class="k">else</span><span class="p">:</span>
+                        <span class="n">bad_indices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idx</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="n">bad_indices</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"selected_indices </span><span class="si">{</span><span class="n">bad_indices</span><span class="si">}</span><span class="s2"> are not valid absolute orbital indices "</span>
+                        <span class="sa">f</span><span class="s2">"for this wavefunction.  Valid absolute indices are: </span><span class="si">{</span><span class="n">active_indices</span><span class="si">}</span><span class="s2">"</span>
+                    <span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">):</span>
+                <span class="c1"># Fall back to treating them as-is (diagram-relative)</span>
+                <span class="n">diagram_selected</span> <span class="o">=</span> <span class="n">selected_indices</span>
+
+        <span class="c1"># Use the Entanglement widget to extract all data from the</span>
+        <span class="c1"># wavefunction.  The widget is a Python-side convenience that maps</span>
+        <span class="c1"># wavefunction data onto ChordDiagram traitlets — it handles</span>
+        <span class="c1"># entropy/MI extraction, orbital labels, and default options.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qsharp_widgets</span><span class="w"> </span><span class="kn">import</span> <span class="n">Entanglement</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">opts</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">if</span> <span class="n">group_selected</span><span class="p">:</span>
+            <span class="n">opts</span><span class="p">[</span><span class="s2">"group_selected"</span><span class="p">]</span> <span class="o">=</span> <span class="n">group_selected</span>
+        <span class="k">if</span> <span class="n">mi_threshold</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">opts</span><span class="p">[</span><span class="s2">"mi_threshold"</span><span class="p">]</span> <span class="o">=</span> <span class="n">mi_threshold</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">widget</span> <span class="o">=</span> <span class="n">Entanglement</span><span class="p">(</span>
+                <span class="n">wavefunction</span><span class="o">=</span><span class="n">wavefunction</span><span class="p">,</span>
+                <span class="n">selected_indices</span><span class="o">=</span><span class="n">diagram_selected</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">opts</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"Cannot build orbital-entanglement diagram from </span><span class="si">{</span><span class="n">wavefunction_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">. "</span>
+                <span class="sa">f</span><span class="s2">"Make sure the wavefunction was produced by a multi-configurational calculation "</span>
+                <span class="sa">f</span><span class="s2">"with calculate_one_rdm=True, calculate_two_rdm=True, and "</span>
+                <span class="sa">f</span><span class="s2">"calculate_mutual_information=True."</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Read the traitlet values the widget computed</span>
+        <span class="n">s1_entropies</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">widget</span><span class="o">.</span><span class="n">s1_entropies</span><span class="p">)</span>
+        <span class="n">mutual_info</span> <span class="o">=</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">row</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">widget</span><span class="o">.</span><span class="n">mutual_information</span><span class="p">]</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">widget</span><span class="o">.</span><span class="n">labels</span><span class="p">)</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">widget</span><span class="o">.</span><span class="n">options</span><span class="p">)</span>
+
+        <span class="n">entanglement_data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"s1_entropies"</span><span class="p">:</span> <span class="n">s1_entropies</span><span class="p">,</span>
+            <span class="s2">"mutual_information"</span><span class="p">:</span> <span class="n">mutual_info</span><span class="p">,</span>
+            <span class="s2">"labels"</span><span class="p">:</span> <span class="n">labels</span><span class="p">,</span>
+            <span class="s2">"selected_indices"</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">widget</span><span class="o">.</span><span class="n">selected_indices</span><span class="p">)</span> <span class="k">if</span> <span class="n">widget</span><span class="o">.</span><span class="n">selected_indices</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"options"</span><span class="p">:</span> <span class="n">options</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">_entanglement_bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">entanglement_data</span><span class="p">)</span>
+
+    <span class="c1"># ── Molecule viewer ───────────────────────────────────────────</span>
+    <span class="n">molecule_viewer_uri</span> <span class="o">=</span> <span class="s2">"ui://qdk-chem-mcp/molecule-viewer"</span>
+    <span class="n">_molecule_bridge</span> <span class="o">=</span> <span class="n">_WidgetBridge</span><span class="p">(</span>
+        <span class="n">resource_uri</span><span class="o">=</span><span class="n">molecule_viewer_uri</span><span class="p">,</span>
+        <span class="n">component_name</span><span class="o">=</span><span class="s2">"MoleculeViewer"</span><span class="p">,</span>
+        <span class="n">app_name</span><span class="o">=</span><span class="s2">"qdk-molecule-viewer"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Molecule Viewer"</span><span class="p">,</span>
+        <span class="n">min_height</span><span class="o">=</span><span class="mi">550</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">resource</span><span class="p">(</span>
+        <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">"molecule_viewer"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Interactive 3D molecule viewer (qsharp-widgets MoleculeViewer component)"</span><span class="p">,</span>
+        <span class="n">mime_type</span><span class="o">=</span><span class="s2">"text/html;profile=mcp-app"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">molecule_viewer_resource</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">receive_html</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Render a saved Structure in VS Code MCP Apps."</span><span class="p">,</span>
+        <span class="n">meta</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">"ui"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"resourceUri"</span><span class="p">:</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">},</span>
+            <span class="s2">"ui/resourceUri"</span><span class="p">:</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">structured_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nd">@validate_project</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_molecule</span><span class="p">(</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">structure_filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Render a saved Structure in VS Code MCP Apps."""</span>
+        <span class="n">structure_filename</span> <span class="o">=</span> <span class="n">strip_filename_path</span><span class="p">(</span><span class="n">structure_filename</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">structure</span> <span class="o">=</span> <span class="n">load_data_object</span><span class="p">(</span><span class="n">structure_filename</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">Structure</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Failed to load structure from </span><span class="si">{</span><span class="n">structure_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">"</span>
+
+        <span class="n">xyz_str</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_xyz</span><span class="p">()</span>
+
+        <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"__widget_type"</span><span class="p">:</span> <span class="s2">"MoleculeViewer"</span><span class="p">,</span>
+            <span class="s2">"molecule_data"</span><span class="p">:</span> <span class="n">xyz_str</span><span class="p">,</span>
+            <span class="s2">"cube_data"</span><span class="p">:</span> <span class="p">{},</span>
+            <span class="s2">"isoval"</span><span class="p">:</span> <span class="mf">0.02</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+    <span class="c1"># ── Orbital viewer (molecule + orbital isosurfaces) ───────────</span>
+    <span class="nd">@app</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Render saved Wavefunction orbitals in VS Code MCP Apps."</span><span class="p">,</span>
+        <span class="n">meta</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">"ui"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"resourceUri"</span><span class="p">:</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">},</span>
+            <span class="s2">"ui/resourceUri"</span><span class="p">:</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">structured_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="nd">@validate_project</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_orbitals</span><span class="p">(</span>
+        <span class="n">project_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">wavefunction_filename</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">orbital_indices</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">isoval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.02</span><span class="p">,</span>
+        <span class="n">grid_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">40</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">list</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Render saved Wavefunction orbitals in VS Code MCP Apps."""</span>
+        <span class="n">wavefunction_filename</span> <span class="o">=</span> <span class="n">strip_filename_path</span><span class="p">(</span><span class="n">wavefunction_filename</span><span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">load_data_object</span><span class="p">(</span><span class="n">wavefunction_filename</span><span class="p">,</span> <span class="n">data</span><span class="o">.</span><span class="n">Wavefunction</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Failed to load wavefunction from </span><span class="si">{</span><span class="n">wavefunction_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">"</span>
+
+        <span class="c1"># Extract orbitals and structure from the wavefunction</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
+            <span class="n">structure</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span><span class="o">.</span><span class="n">get_structure</span><span class="p">()</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">AttributeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Cannot extract structure/orbitals from </span><span class="si">{</span><span class="n">wavefunction_filename</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">"</span>
+
+        <span class="c1"># Generate XYZ string for the molecule</span>
+        <span class="n">xyz_str</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">to_xyz</span><span class="p">()</span>
+
+        <span class="c1"># Generate cube data for the requested orbitals</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.cubegen</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_cubefiles_from_orbitals</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">cube_data</span> <span class="o">=</span> <span class="n">generate_cubefiles_from_orbitals</span><span class="p">(</span>
+                <span class="n">orbitals</span><span class="p">,</span>
+                <span class="n">output_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># return dict[label, cube_content]</span>
+                <span class="n">indices</span><span class="o">=</span><span class="n">orbital_indices</span><span class="p">,</span>
+                <span class="n">grid_size</span><span class="o">=</span><span class="p">(</span><span class="n">grid_size</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">,</span> <span class="n">grid_size</span><span class="p">),</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"Failed to generate cube data: </span><span class="si">{</span><span class="n">e</span><span class="si">!s}</span><span class="s2">"</span>
+
+        <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"__widget_type"</span><span class="p">:</span> <span class="s2">"MoleculeViewer"</span><span class="p">,</span>
+            <span class="s2">"molecule_data"</span><span class="p">:</span> <span class="n">xyz_str</span><span class="p">,</span>
+            <span class="s2">"cube_data"</span><span class="p">:</span> <span class="n">cube_data</span><span class="p">,</span>
+            <span class="s2">"isoval"</span><span class="p">:</span> <span class="n">isoval</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="n">_molecule_bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span>
+
+    <span class="c1"># ── Scatter plot (inline SVG) ─────────────────────────────────</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_build_plotly_html</span><span class="p">(</span><span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Build a self-contained HTML page with an inline SVG scatter plot.</span>
+
+<span class="sd">        Uses pure SVG + vanilla JS (no CDN) so it works in VS Code</span>
+<span class="sd">        webview sandboxed iframes.</span>
+<span class="sd">        """</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">math</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">title</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"Scatter Plot"</span><span class="p">)</span>
+        <span class="n">x_label</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"x_label"</span><span class="p">,</span> <span class="s2">"X"</span><span class="p">)</span>
+        <span class="n">y_label</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"y_label"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">)</span>
+        <span class="n">log_x</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"log_x"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">log_y</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"log_y"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="n">series_list</span> <span class="o">=</span> <span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"series"</span><span class="p">,</span> <span class="p">[])</span>
+
+        <span class="c1"># Collect all x/y values to compute axis ranges</span>
+        <span class="n">all_x</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">all_y</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">series_list</span><span class="p">:</span>
+            <span class="n">all_x</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"x"</span><span class="p">,</span> <span class="p">[]))</span>
+            <span class="n">all_y</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"y"</span><span class="p">,</span> <span class="p">[]))</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">all_x</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">all_y</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">"&lt;html&gt;&lt;body&gt;&lt;p&gt;No data to plot.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;"</span>
+
+        <span class="k">if</span> <span class="n">log_x</span><span class="p">:</span>
+            <span class="n">all_x</span> <span class="o">=</span> <span class="p">[</span><span class="n">math</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">if</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">all_x</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">log_y</span><span class="p">:</span>
+            <span class="n">all_y</span> <span class="o">=</span> <span class="p">[</span><span class="n">math</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">if</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">all_y</span><span class="p">]</span>
+
+        <span class="n">x_min</span><span class="p">,</span> <span class="n">x_max</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">all_x</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">all_x</span><span class="p">)</span>
+        <span class="n">y_min</span><span class="p">,</span> <span class="n">y_max</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">all_y</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">all_y</span><span class="p">)</span>
+        <span class="n">x_pad</span> <span class="o">=</span> <span class="p">(</span><span class="n">x_max</span> <span class="o">-</span> <span class="n">x_min</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.08</span> <span class="ow">or</span> <span class="mi">1</span>
+        <span class="n">y_pad</span> <span class="o">=</span> <span class="p">(</span><span class="n">y_max</span> <span class="o">-</span> <span class="n">y_min</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.08</span> <span class="ow">or</span> <span class="mi">1</span>
+        <span class="n">x_min</span> <span class="o">-=</span> <span class="n">x_pad</span>
+        <span class="n">x_max</span> <span class="o">+=</span> <span class="n">x_pad</span>
+        <span class="n">y_min</span> <span class="o">-=</span> <span class="n">y_pad</span>
+        <span class="n">y_max</span> <span class="o">+=</span> <span class="n">y_pad</span>
+
+        <span class="c1"># SVG layout</span>
+        <span class="n">w</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="mi">700</span><span class="p">,</span> <span class="mi">450</span>
+        <span class="n">ml</span><span class="p">,</span> <span class="n">mr</span><span class="p">,</span> <span class="n">mt</span><span class="p">,</span> <span class="n">mb</span> <span class="o">=</span> <span class="mi">80</span><span class="p">,</span> <span class="mi">30</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">60</span>  <span class="c1"># margins</span>
+        <span class="n">pw</span> <span class="o">=</span> <span class="n">w</span> <span class="o">-</span> <span class="n">ml</span> <span class="o">-</span> <span class="n">mr</span>
+        <span class="n">ph</span> <span class="o">=</span> <span class="n">h</span> <span class="o">-</span> <span class="n">mt</span> <span class="o">-</span> <span class="n">mb</span>
+
+        <span class="n">colors</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"#89b4fa"</span><span class="p">,</span> <span class="s2">"#f38ba8"</span><span class="p">,</span> <span class="s2">"#a6e3a1"</span><span class="p">,</span> <span class="s2">"#fab387"</span><span class="p">,</span> <span class="s2">"#cba6f7"</span><span class="p">,</span> <span class="s2">"#94e2d5"</span><span class="p">,</span> <span class="s2">"#f9e2af"</span><span class="p">,</span> <span class="s2">"#74c7ec"</span><span class="p">]</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_nice_ticks</span><span class="p">(</span><span class="n">lo</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">hi</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]:</span>
+            <span class="n">rng</span> <span class="o">=</span> <span class="n">hi</span> <span class="o">-</span> <span class="n">lo</span>
+            <span class="k">if</span> <span class="n">rng</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="n">lo</span><span class="p">]</span>
+            <span class="n">raw</span> <span class="o">=</span> <span class="n">rng</span> <span class="o">/</span> <span class="n">n</span>
+            <span class="n">mag</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">**</span> <span class="n">math</span><span class="o">.</span><span class="n">floor</span><span class="p">(</span><span class="n">math</span><span class="o">.</span><span class="n">log10</span><span class="p">(</span><span class="n">raw</span><span class="p">))</span>
+            <span class="k">for</span> <span class="n">step</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">10</span><span class="p">):</span>
+                <span class="n">s</span> <span class="o">=</span> <span class="n">step</span> <span class="o">*</span> <span class="n">mag</span>
+                <span class="k">if</span> <span class="n">rng</span> <span class="o">/</span> <span class="n">s</span> <span class="o">&lt;=</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+                    <span class="k">break</span>
+            <span class="n">start</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">lo</span> <span class="o">/</span> <span class="n">s</span><span class="p">)</span> <span class="o">*</span> <span class="n">s</span>
+            <span class="n">ticks</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">start</span>
+            <span class="k">while</span> <span class="n">v</span> <span class="o">&lt;=</span> <span class="n">hi</span> <span class="o">+</span> <span class="n">s</span> <span class="o">*</span> <span class="mf">0.01</span><span class="p">:</span>
+                <span class="n">ticks</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">round</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="mi">10</span><span class="p">))</span>
+                <span class="n">v</span> <span class="o">+=</span> <span class="n">s</span>
+            <span class="k">return</span> <span class="n">ticks</span>
+
+        <span class="n">x_ticks</span> <span class="o">=</span> <span class="n">_nice_ticks</span><span class="p">(</span><span class="n">x_min</span><span class="p">,</span> <span class="n">x_max</span><span class="p">)</span>
+        <span class="n">y_ticks</span> <span class="o">=</span> <span class="n">_nice_ticks</span><span class="p">(</span><span class="n">y_min</span><span class="p">,</span> <span class="n">y_max</span><span class="p">)</span>
+
+        <span class="n">chart</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">,</span>
+            <span class="s2">"xLabel"</span><span class="p">:</span> <span class="n">x_label</span><span class="p">,</span>
+            <span class="s2">"yLabel"</span><span class="p">:</span> <span class="n">y_label</span><span class="p">,</span>
+            <span class="s2">"logX"</span><span class="p">:</span> <span class="n">log_x</span><span class="p">,</span>
+            <span class="s2">"logY"</span><span class="p">:</span> <span class="n">log_y</span><span class="p">,</span>
+            <span class="s2">"series"</span><span class="p">:</span> <span class="n">series_list</span><span class="p">,</span>
+            <span class="s2">"layout"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"width"</span><span class="p">:</span> <span class="n">w</span><span class="p">,</span> <span class="s2">"height"</span><span class="p">:</span> <span class="n">h</span><span class="p">,</span> <span class="s2">"marginLeft"</span><span class="p">:</span> <span class="n">ml</span><span class="p">,</span> <span class="s2">"marginTop"</span><span class="p">:</span> <span class="n">mt</span><span class="p">,</span> <span class="s2">"plotWidth"</span><span class="p">:</span> <span class="n">pw</span><span class="p">,</span> <span class="s2">"plotHeight"</span><span class="p">:</span> <span class="n">ph</span><span class="p">},</span>
+            <span class="s2">"xRange"</span><span class="p">:</span> <span class="p">[</span><span class="n">x_min</span><span class="p">,</span> <span class="n">x_max</span><span class="p">],</span>
+            <span class="s2">"yRange"</span><span class="p">:</span> <span class="p">[</span><span class="n">y_min</span><span class="p">,</span> <span class="n">y_max</span><span class="p">],</span>
+            <span class="s2">"xTicks"</span><span class="p">:</span> <span class="n">x_ticks</span><span class="p">,</span>
+            <span class="s2">"yTicks"</span><span class="p">:</span> <span class="n">y_ticks</span><span class="p">,</span>
+            <span class="s2">"colors"</span><span class="p">:</span> <span class="n">colors</span><span class="p">,</span>
+        <span class="p">}</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="s2">"&lt;!DOCTYPE html&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s1">'&lt;html lang="en"&gt;</span><span class="se">\n</span><span class="s1">'</span>
+            <span class="s2">"&lt;head&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s1">'&lt;meta charset="utf-8"/&gt;</span><span class="se">\n</span><span class="s1">'</span>
+            <span class="s1">'&lt;meta name="viewport" content="width=device-width,initial-scale=1"/&gt;</span><span class="se">\n</span><span class="s1">'</span>
+            <span class="s2">"&lt;title&gt;&lt;/title&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;style&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"  html, body { margin:0; padding:0; background:#1e1e2e;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"    width:100%; height:100%; overflow:hidden; }</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"  svg { display:block; width:100%; height:100%; }</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"  #tooltip { position:fixed; pointer-events:none; display:none;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"    background:#313244; color:#cdd6f4; padding:8px 12px;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"    border-radius:6px; font-size:12px; font-family:system-ui,sans-serif;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"    box-shadow:0 2px 8px rgba(0,0,0,0.4); z-index:100;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"    max-width:260px; line-height:1.5; }</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;/style&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;/head&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;body&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s1">'&lt;div id="tooltip"&gt;&lt;/div&gt;</span><span class="se">\n</span><span class="s1">'</span> <span class="o">+</span> <span class="n">_json_script</span><span class="p">(</span><span class="s2">"scatter-plot-data"</span><span class="p">,</span> <span class="n">chart</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">&lt;script&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"const chart=JSON.parse(document.getElementById('scatter-plot-data').textContent);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"document.title=chart.title;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"const svgNs='http://www.w3.org/2000/svg', svg=document.createElementNS(svgNs,'svg');</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"const tip=document.getElementById('tooltip');</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"const {width:w,height:h,marginLeft:ml,marginTop:mt,plotWidth:pw,plotHeight:ph}=chart.layout;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"const [xMin,xMax]=chart.xRange,[yMin,yMax]=chart.yRange;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"svg.setAttribute('viewBox',`0 0 $</span><span class="si">{w}</span><span class="s2"> $</span><span class="si">{h}</span><span class="s2">`); svg.setAttribute('preserveAspectRatio','xMidYMid meet');</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"function node(name,attrs=</span><span class="si">{}</span><span class="s2">,text){const el=document.createElementNS(svgNs,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));if(text!==undefined)el.textContent=text;svg.append(el);return el;}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"function tx(value){return ml+(value-xMin)/(xMax-xMin)*pw;} function ty(value){return mt+ph-(value-yMin)/(yMax-yMin)*ph;}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"function xText(value){return chart.logX ? (10**value).toFixed(0) : String(value);} function yText(value){return chart.logY ? (10**value).toExponential(1) : String(value);}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"node('rect',{width:w,height:h,fill:'#1e1e2e'}); node('rect',{x:ml,y:mt,width:pw,height:ph,fill:'#181825',stroke:'#45475a','stroke-width':1});</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"for(const value of chart.xTicks){const x=tx(value);if(x&gt;=ml&amp;&amp;x&lt;=ml+pw){node('line',{x1:x,y1:mt,x2:x,y2:mt+ph,stroke:'#313244','stroke-width':.5});node('text',{x,y:mt+ph+16,'text-anchor':'middle',fill:'#a6adc8','font-size':11},xText(value));}}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"for(const value of chart.yTicks){const y=ty(value);if(y&gt;=mt&amp;&amp;y&lt;=mt+ph){node('line',{x1:ml,y1:y,x2:ml+pw,y2:y,stroke:'#313244','stroke-width':.5});node('text',{x:ml-8,y:y+4,'text-anchor':'end',fill:'#a6adc8','font-size':11},yText(value));}}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"node('text',{x:w/2,y:28,'text-anchor':'middle',fill:'#cdd6f4','font-size':15,'font-weight':600},chart.title);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"node('text',{x:ml+pw/2,y:h-8,'text-anchor':'middle',fill:'#a6adc8','font-size':12},chart.xLabel);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"node('text',{x:16,y:mt+ph/2,'text-anchor':'middle',fill:'#a6adc8','font-size':12,transform:`rotate(-90,16,${mt+ph/2})`},chart.yLabel);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"let activePt; const xH=node('line',{x1:ml,y1:0,x2:ml+pw,y2:0,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'}),xV=node('line',{x1:0,y1:mt,x2:0,y2:mt+ph,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'});</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"function tooltip(point){tip.replaceChildren();const label=document.createElement('b');label.textContent=point.label;tip.append(label,document.createElement('br'),document.createTextNode(`$</span><span class="si">{chart.xLabel}</span><span class="s2">: $</span><span class="si">{point.x}</span><span class="s2">`),document.createElement('br'),document.createTextNode(`$</span><span class="si">{chart.yLabel}</span><span class="s2">: $</span><span class="si">{point.y}</span><span class="s2">`));}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"for(const [index,series] of chart.series.entries()){const color=chart.colors[index</span><span class="si">%c</span><span class="s2">hart.colors.length],points=[];for(let i=0;i&lt;Math.min(series.x.length,series.y.length);i++){const x=series.x[i],y=series.y[i],px=tx(chart.logX&amp;&amp;x&gt;0?Math.log10(x):x),py=ty(chart.logY&amp;&amp;y&gt;0?Math.log10(y):y);points.push({x,y,px,py,label:series.text?.[i]||`$</span><span class="si">{x}</span><span class="s2">, $</span><span class="si">{y}</span><span class="s2">`});}if(series.mode?.includes('lines')&amp;&amp;points.length&gt;1)node('path',{d:points.map((point,i)=&gt;`${i?'L':'M'}${point.px.toFixed(1)},${point.py.toFixed(1)}`).join(' '),fill:'none',stroke:color,'stroke-width':2,opacity:.7});if(series.mode?.includes('markers')??true)for(const point of points){const circle=node('circle',{cx:point.px.toFixed(1),cy:point.py.toFixed(1),r:(series.marker_size??8)/2,fill:color,opacity:.9});circle.style.cursor='pointer';circle.addEventListener('mouseenter',()=&gt;{if(activePt)activePt.setAttribute('r',activePt.dataset.origR);activePt=circle;circle.dataset.origR=circle.getAttribute('r');circle.setAttribute('r',String(Number(circle.dataset.origR)*1.8));circle.setAttribute('opacity','1');tooltip(point);tip.style.display='block';xH.setAttribute('y1',String(point.py));xH.setAttribute('y2',String(point.py));xH.setAttribute('visibility','visible');xV.setAttribute('x1',String(point.px));xV.setAttribute('x2',String(point.px));xV.setAttribute('visibility','visible');});circle.addEventListener('mousemove',event=&gt;{tip.style.left=`${event.clientX+16}px`;tip.style.top=`${event.clientY-12}px`;});circle.addEventListener('mouseleave',()=&gt;{circle.setAttribute('r',circle.dataset.origR);circle.setAttribute('opacity','.9');tip.style.display='none';xH.setAttribute('visibility','hidden');xV.setAttribute('visibility','hidden');activePt=null;});}}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"if(chart.series.length&gt;1||chart.series[0]?.name){let y=mt+12;for(const [index,series] of chart.series.entries()){const color=chart.colors[index</span><span class="si">%c</span><span class="s2">hart.colors.length];node('rect',{x:ml+pw-140,y,width:10,height:10,fill:color,rx:2});node('text',{x:ml+pw-125,y:y+9,fill:'#cdd6f4','font-size':11},series.name||`Series ${index+1}`);y+=18;}}</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"document.body.prepend(svg);</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;/script&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;/body&gt;</span><span class="se">\n</span><span class="s2">"</span>
+            <span class="s2">"&lt;/html&gt;"</span>
+        <span class="p">)</span>
+
+    <span class="n">_scatter_bridge</span> <span class="o">=</span> <span class="n">_WidgetBridge</span><span class="p">(</span>
+        <span class="n">resource_uri</span><span class="o">=</span><span class="s2">"ui://qdk-chem-mcp/scatter-plot"</span><span class="p">,</span>
+        <span class="n">component_name</span><span class="o">=</span><span class="s2">"ScatterPlot"</span><span class="p">,</span>
+        <span class="n">app_name</span><span class="o">=</span><span class="s2">"qdk-scatter-plot"</span><span class="p">,</span>
+        <span class="n">title</span><span class="o">=</span><span class="s2">"Scatter Plot"</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">resource</span><span class="p">(</span>
+        <span class="n">_scatter_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="s2">"scatter_plot"</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Interactive Plotly scatter plot with optional log axes and multiple series"</span><span class="p">,</span>
+        <span class="n">mime_type</span><span class="o">=</span><span class="s2">"text/html;profile=mcp-app"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">scatter_plot_resource</span><span class="p">(</span><span class="n">token</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="n">_scatter_bridge</span><span class="o">.</span><span class="n">receive</span><span class="p">(</span><span class="n">token</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">_build_plotly_html</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span> <span class="k">if</span> <span class="n">payload</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_expired_visualization_html</span><span class="p">()</span>
+
+    <span class="nd">@app</span><span class="o">.</span><span class="n">tool</span><span class="p">(</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">"Render numeric series as an SVG scatter plot in VS Code MCP Apps."</span><span class="p">,</span>
+        <span class="n">meta</span><span class="o">=</span><span class="p">{</span>
+            <span class="s2">"ui"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"resourceUri"</span><span class="p">:</span> <span class="n">_scatter_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">},</span>
+            <span class="s2">"ui/resourceUri"</span><span class="p">:</span> <span class="n">_scatter_bridge</span><span class="o">.</span><span class="n">resource_uri_template</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="n">structured_output</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">visualize_scatter_plot</span><span class="p">(</span>
+        <span class="n">series</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+        <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"Scatter Plot"</span><span class="p">,</span>
+        <span class="n">x_label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"X"</span><span class="p">,</span>
+        <span class="n">y_label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"Y"</span><span class="p">,</span>
+        <span class="n">log_x</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">log_y</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CallToolResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Render numeric series as an SVG scatter plot in VS Code MCP Apps."""</span>
+        <span class="n">payload</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">,</span>
+            <span class="s2">"x_label"</span><span class="p">:</span> <span class="n">x_label</span><span class="p">,</span>
+            <span class="s2">"y_label"</span><span class="p">:</span> <span class="n">y_label</span><span class="p">,</span>
+            <span class="s2">"log_x"</span><span class="p">:</span> <span class="n">log_x</span><span class="p">,</span>
+            <span class="s2">"log_y"</span><span class="p">:</span> <span class="n">log_y</span><span class="p">,</span>
+            <span class="s2">"series"</span><span class="p">:</span> <span class="n">series</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">_scatter_bridge</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">payload</span><span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

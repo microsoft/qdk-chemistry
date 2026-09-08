@@ -1,0 +1,8 @@
+qdk\_chemistry.ui.\_mcp module
+==============================
+
+.. automodule:: qdk_chemistry.ui._mcp
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

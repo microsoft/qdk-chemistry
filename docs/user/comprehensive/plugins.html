@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plugins &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Plugins &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="data/index.html">Data classes</a></li>
@@ -67,6 +68,9 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#creating-plugins">Creating plugins</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#automatic-discovery">Automatic discovery</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#remote-backend-mcp-configuration">Remote backend MCP configuration</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#implementing-a-remote-backend">Implementing a remote backend</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#implementing-a-new-algorithm-backend">Implementing a new algorithm backend</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#defining-a-new-algorithm-type">Defining a new algorithm type</a></li>
 </ul>
@@ -165,26 +169,26 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="c1"># Load H2 molecule from inline XYZ file</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">"""</span><span class="se">\</span>
 <span class="s2">2</span>
 <span class="s2">H2 molecule</span>
 <span class="s2">H    0.000000    0.000000    0.000000</span>
 <span class="s2">H    0.000000    0.000000    0.740848</span>
-<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="s2">"""</span><span class="p">)</span>
 
 <span class="c1"># Create a SCF solver using the factory</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"pyscf"</span><span class="p">)</span>
 
 <span class="c1"># Configure it using the standard settings interface</span>
-<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"hf"</span><span class="p">)</span>
 
 <span class="c1"># Run calculation - returns (energy, wavefunction)</span>
 <span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"cc-pvdz"</span>
 <span class="p">)</span>
 <span class="n">orbitals</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SCF Energy: </span><span class="si">{</span><span class="n">energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -195,7 +199,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <span class="k">auto</span><span class="w"> </span><span class="n">scf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 
 <span class="c1">// Configure it using the standard settings interface</span>
-<span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;hf&quot;</span><span class="p">);</span>
+<span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"method"</span><span class="p">,</span><span class="w"> </span><span class="s">"hf"</span><span class="p">);</span>
 
 <span class="c1">// Run calculation with the same API as native implementations</span>
 <span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
@@ -209,13 +213,13 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># List available implementations for each algorithm type</span>
 <span class="k">for</span> <span class="n">algorithm_name</span> <span class="ow">in</span> <span class="n">available</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2"> has methods:&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">algorithm_name</span><span class="si">}</span><span class="s2"> has methods:"</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">method_name</span> <span class="ow">in</span> <span class="n">available</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">):</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">method_name</span><span class="si">}</span><span class="s2"> has settings:&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">method_name</span><span class="si">}</span><span class="s2"> has settings:"</span><span class="p">)</span>
         <span class="n">method</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="n">algorithm_name</span><span class="p">,</span> <span class="n">method_name</span><span class="p">)</span>
         <span class="n">settings</span> <span class="o">=</span> <span class="n">method</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -230,7 +234,7 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <span class="p">}</span>
 
 <span class="c1">// Get documentation for a specific implementation</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">get_docstring</span><span class="p">(</span><span class="s">&quot;default&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">get_docstring</span><span class="p">(</span><span class="s">"default"</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
@@ -247,8 +251,24 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <li><p><a class="reference external" href="https://github.com/leeping/geomeTRIC">geomeTRIC</a> — Molecular geometry optimization</p></li>
 </ul>
 <p>These plugins are enabled automatically when the corresponding package is installed.</p>
+<section id="pyscf-plugin-details">
+<span id="id3"></span><h4>PySCF plugin details<a class="headerlink" href="#pyscf-plugin-details" title="Link to this heading"></a></h4>
+<p>The PySCF plugin is installed via the <code class="docutils literal notranslate"><span class="pre">plugins</span></code> extra:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[plugins]'</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>PySCF publishes no Windows wheels, so the <code class="docutils literal notranslate"><span class="pre">plugins</span></code> extra installs geomeTRIC but omits PySCF
+on native Windows. The <code class="docutils literal notranslate"><span class="pre">test</span></code> and <code class="docutils literal notranslate"><span class="pre">all</span></code> extras include <code class="docutils literal notranslate"><span class="pre">plugins</span></code> and likewise install
+without PySCF there. The <code class="docutils literal notranslate"><span class="pre">jupyter</span></code> extra does not include <code class="docutils literal notranslate"><span class="pre">plugins</span></code>.</p>
+<p>The native QDK/Chemistry implementations are unaffected and remain available on Windows.
+To use the PySCF plugin on a Windows machine, work inside
+<a class="reference external" href="https://learn.microsoft.com/windows/wsl/install">WSL</a>.</p>
+</div>
+</section>
 <section id="qiskit-plugin-details">
-<span id="id3"></span><h4>Qiskit plugin details<a class="headerlink" href="#qiskit-plugin-details" title="Link to this heading"></a></h4>
+<span id="id4"></span><h4>Qiskit plugin details<a class="headerlink" href="#qiskit-plugin-details" title="Link to this heading"></a></h4>
 <p>The Qiskit plugin uses <strong>opportunistic loading</strong> to maximize compatibility across different installation configurations.
 When Qiskit is installed, the plugin will load and register the available algorithms. The optional ecosystem packages (Qiskit Aer and Qiskit Nature) are loaded based on their availability in your environment.</p>
 <p><strong>Loading behavior:</strong></p>
@@ -259,7 +279,7 @@ When Qiskit is installed, the plugin will load and register the available algori
 </ul>
 <p><strong>Installing optional Qiskit packages:</strong></p>
 <p>To install the optional Qiskit ecosystem packages, use the <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> extra when installing QDK/Chemistry:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[qiskit-extras]&#39;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[qiskit-extras]'</span>
 </pre></div>
 </div>
 <p>Alternatively, you can install them directly:</p>
@@ -280,9 +300,9 @@ platform. All other platforms install the full set.</p>
     <span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit core available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit Nature available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit Aer available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Qiskit core available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Qiskit Nature available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Qiskit Aer available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>These boolean variables are set at module load time and reflect the actual availability of each package in your Python environment.</p>
@@ -294,7 +314,7 @@ to see which implementations are currently available.</p>
 </div>
 </section>
 <section id="openfermion-plugin-details">
-<span id="id4"></span><h4>OpenFermion plugin details<a class="headerlink" href="#openfermion-plugin-details" title="Link to this heading"></a></h4>
+<span id="id5"></span><h4>OpenFermion plugin details<a class="headerlink" href="#openfermion-plugin-details" title="Link to this heading"></a></h4>
 <p>The OpenFermion plugin integrates QDK/Chemistry with <a class="reference external" href="https://quantumai.google/openfermion">OpenFermion</a>.
 Like the Qiskit plugin, it uses <strong>opportunistic loading</strong>: the plugin loads when OpenFermion is installed.</p>
 <p><strong>Loading behavior:</strong></p>
@@ -303,7 +323,7 @@ Like the Qiskit plugin, it uses <strong>opportunistic loading</strong>: the plug
 </ul>
 <p><strong>Installing OpenFermion packages:</strong></p>
 <p>To install OpenFermion, use the <code class="docutils literal notranslate"><span class="pre">openfermion-extras</span></code> extra when installing QDK/Chemistry:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[openfermion-extras]&#39;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[openfermion-extras]'</span>
 </pre></div>
 </div>
 <p><strong>Checking what is loaded:</strong></p>
@@ -312,7 +332,7 @@ Like the Qiskit plugin, it uses <strong>opportunistic loading</strong>: the plug
     <span class="n">QDK_CHEMISTRY_HAS_OPENFERMION</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OpenFermion available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_OPENFERMION</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"OpenFermion available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_OPENFERMION</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This boolean variable is set at module load time and reflects the actual availability of each package in your Python environment.</p>
@@ -328,12 +348,569 @@ to see which implementations are currently available.</p>
 </section>
 <section id="creating-plugins">
 <span id="adding-plugins"></span><h2>Creating plugins<a class="headerlink" href="#creating-plugins" title="Link to this heading"></a></h2>
-<p>QDK/Chemistry supports two extension mechanisms:</p>
-<ol class="arabic simple">
-<li><p>Implementing a new backend for an existing algorithm type (e.g., integrating an external quantum chemistry package)</p></li>
-<li><p>Defining an entirely new algorithm type with its own factory and implementations</p></li>
-</ol>
-<p>The following sections provide comprehensive examples of each approach.</p>
+<p>An installed Python package can contribute any combination of:</p>
+<ul class="simple">
+<li><p>Implementations of existing algorithm types</p></li>
+<li><p>New algorithm types and their implementations</p></li>
+<li><p><a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.DataClass" title="qdk_chemistry.data.DataClass"><code class="xref py py-class docutils literal notranslate"><span class="pre">DataClass</span></code></a> types used in algorithm inputs or outputs</p></li>
+<li><p>Remote execution backends</p></li>
+<li><p>Cache backends</p></li>
+</ul>
+<p>The following sections provide complete remote backend and algorithm examples. The same plugin object can register multiple capabilities through <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.html#qdk_chemistry.plugins.PluginRegistrar" title="qdk_chemistry.plugins.PluginRegistrar"><code class="xref py py-class docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a>.</p>
+<p>Registration names must be unique within their registry. Registering a second algorithm, algorithm type, data class, remote backend, or cache backend under an existing name raises <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><code class="xref py py-class docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a>, a <a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ValueError</span></code></a> subclass. The rejected registration does not replace the existing implementation.</p>
+<section id="automatic-discovery">
+<h3>Automatic discovery<a class="headerlink" href="#automatic-discovery" title="Link to this heading"></a></h3>
+<p>The plugin contract is a <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.QdkChemistryPlugin" title="qdk_chemistry.plugins.base.QdkChemistryPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a> subclass exposed through the <code class="docutils literal notranslate"><span class="pre">qdk_chemistry.plugins</span></code> entry-point group. A plugin package declares this in its <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[project.entry-points.</span><span class="s2">"qdk_chemistry.plugins"</span><span class="k">]</span>
+<span class="n">custom</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"custom_package.plugin:CustomScfPlugin"</span>
+</pre></div>
+</div>
+<p>Importing <code class="docutils literal notranslate"><span class="pre">qdk_chemistry</span></code> discovers the installed package and calls its <code class="docutils literal notranslate"><span class="pre">register</span></code> method; users do not need to import the plugin module themselves. A plugin registers its capabilities through the supplied registrar:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">PluginRegistrar</span><span class="p">,</span> <span class="n">QdkChemistryPlugin</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">CustomPlugin</span><span class="p">(</span><span class="n">QdkChemistryPlugin</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registrar</span><span class="p">:</span> <span class="n">PluginRegistrar</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_algorithm</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">CustomAlgorithm</span><span class="p">())</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_dataclass</span><span class="p">(</span><span class="n">CustomResult</span><span class="p">)</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_remote_backend</span><span class="p">(</span><span class="s2">"custom"</span><span class="p">,</span> <span class="n">CustomRemoteBackend</span><span class="p">)</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_cache_backend</span><span class="p">(</span><span class="s2">"custom"</span><span class="p">,</span> <span class="n">CustomCacheBackend</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Each plugin-defined <code class="docutils literal notranslate"><span class="pre">DataClass</span></code> used in algorithm inputs or outputs must declare a non-empty wire-format identifier in its own class body:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">CustomResult</span><span class="p">(</span><span class="n">DataClass</span><span class="p">):</span>
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">data_type_name</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"custom_result"</span>
+    <span class="o">...</span>
+</pre></div>
+</div>
+<p>The value returned by <code class="docutils literal notranslate"><span class="pre">data_type_name()</span></code> identifies the serialized format during remote and cache deserialization. A canonical loader must declare this static method directly and return a non-empty string. A subclass must declare a unique identifier and register as its own loader. Registration raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code> when the declaration is missing or empty, and <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><code class="xref py py-class docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a> when another loader already owns the identifier.</p>
+<p>Register these classes with <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass" title="qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass"><code class="xref py py-meth docutils literal notranslate"><span class="pre">register_dataclass()</span></code></a> or pass them through the <code class="docutils literal notranslate"><span class="pre">data_classes</span></code> argument of <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm" title="qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm"><code class="xref py py-meth docutils literal notranslate"><span class="pre">register_algorithm()</span></code></a>. Python return annotations are not used for discovery.</p>
+</section>
+<section id="remote-backend-mcp-configuration">
+<h3>Remote backend MCP configuration<a class="headerlink" href="#remote-backend-mcp-configuration" title="Link to this heading"></a></h3>
+<p>Remote backends expose no constructor options to MCP clients by default. To allow a client-controlled option, declare <code class="docutils literal notranslate"><span class="pre">mcp_safe_config_options</span></code> directly on the concrete backend class. Registration validates that it is a <code class="docutils literal notranslate"><span class="pre">frozenset</span></code> of non-empty constructor parameter names.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">CustomRemoteBackend</span><span class="p">(</span><span class="n">RemoteBackend</span><span class="p">):</span>
+   <span class="n">mcp_safe_config_options</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"poll_interval"</span><span class="p">,</span> <span class="s2">"timeout"</span><span class="p">})</span>
+
+   <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">endpoint</span><span class="p">,</span> <span class="n">poll_interval</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mf">3600.0</span><span class="p">):</span>
+      <span class="o">...</span>
+</pre></div>
+</div>
+<p>Do not declare executable paths, credentials, endpoint selection, storage locations, or other options that can redirect execution or access. These remain backend- or server-owned.</p>
+<p class="rubric">Naming and call order</p>
+<p>An algorithm implementation name must be unique within its algorithm type; remote backend and cache backend names must be unique within their respective registries. Third-party plugins should use package- or organization-prefixed names to avoid collisions with built-in implementations and other plugins.</p>
+<p>Registration is first come, first served and does not override an existing name. Core built-ins are registered before external registrations reach each registry. Unified plugin entry points are called in the order returned by Python’s entry-point discovery, followed by bundled optional integrations. If a plugin reuses an existing name, registration raises <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><code class="xref py py-class docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a> and keeps the earlier implementation unchanged. During entry-point discovery, QDK/Chemistry catches that exception, emits a <code class="docutils literal notranslate"><span class="pre">UserWarning</span></code> identifying the plugin that failed to register, and continues loading other plugins. Because entry-point order can vary between environments, plugins must not rely on discovery order to override another implementation.</p>
+</section>
+<section id="implementing-a-remote-backend">
+<span id="adding-remote-backends"></span><h3>Implementing a remote backend<a class="headerlink" href="#implementing-a-remote-backend" title="Link to this heading"></a></h3>
+<p>A remote backend implements the transport and job lifecycle required to execute a serialized QDK/Chemistry request outside the calling process. The following example uses the system <code class="docutils literal notranslate"><span class="pre">ssh</span></code> and <code class="docutils literal notranslate"><span class="pre">scp</span></code> commands to transfer files and launch a background process.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This example targets a directly SSH-accessible machine with <code class="docutils literal notranslate"><span class="pre">python3</span></code> and QDK/Chemistry available in its default environment. It does not submit through a queue scheduler such as SLURM or PBS. Queue-managed systems should provide a backend designed for their scheduler and site policy.</p>
+<p>The example retains each remote job directory, including its inputs, outputs,
+PID file, and logs, after the job reaches a terminal state. Applications are
+responsible for removing these artifacts through job cleanup. That cleanup
+does not remove caller-owned local job records or result directories.</p>
+</div>
+<p class="rubric">Backend implementation</p>
+<p>Implement <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.RemoteBackend" title="qdk_chemistry.remote.backends.base.RemoteBackend"><code class="xref py py-class docutils literal notranslate"><span class="pre">RemoteBackend</span></code></a> for the target transport and execution environment:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">shlex</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span><span class="p">,</span> <span class="n">PurePosixPath</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.backends</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">DEFAULT_POLL_INTERVAL</span><span class="p">,</span>
+    <span class="n">DEFAULT_TIMEOUT</span><span class="p">,</span>
+    <span class="n">JobState</span><span class="p">,</span>
+    <span class="n">JobStatus</span><span class="p">,</span>
+    <span class="n">RemoteBackend</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parse_remote_pid</span><span class="p">(</span><span class="n">output</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return a normalized positive PID from remote command output.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        output: Standard output containing the remote process identifier.</span>
+
+<span class="sd">    """</span>
+    <span class="n">pid</span> <span class="o">=</span> <span class="n">output</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pid</span><span class="o">.</span><span class="n">isascii</span><span class="p">()</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">pid</span><span class="o">.</span><span class="n">isdecimal</span><span class="p">():</span>
+        <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">pid</span><span class="o">.</span><span class="n">lstrip</span><span class="p">(</span><span class="s2">"0"</span><span class="p">)</span> <span class="ow">or</span> <span class="kc">None</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SSHBackend</span><span class="p">(</span><span class="n">RemoteBackend</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Run QDK/Chemistry jobs on a directly SSH-accessible machine.</span>
+
+<span class="sd">    Only ``connect``, ``disconnect``, ``upload``, and ``download`` are abstract</span>
+<span class="sd">    in ``RemoteBackend``. The asynchronous job hooks ``_submit``, ``check``,</span>
+<span class="sd">    ``cancel``, and ``fetch`` have default implementations that raise</span>
+<span class="sd">    ``NotImplementedError``, so a backend can leave unsupported hooks unchanged.</span>
+<span class="sd">    This example overrides all five, including ``cleanup_job``, to support the</span>
+<span class="sd">    complete asynchronous job lifecycle.</span>
+
+<span class="sd">    Job directories under ``remote_workdir`` are retained after they reach a</span>
+<span class="sd">    terminal state. Job cleanup removes only these remote directories; callers</span>
+<span class="sd">    remain responsible for local job records and result directories.</span>
+<span class="sd">    """</span>
+
+    <span class="c1"># MCP clients may tune polling behavior but cannot select the host,</span>
+    <span class="c1"># credentials, remote workspace, SSH arguments, or worker executable.</span>
+    <span class="n">mcp_safe_config_options</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"poll_interval"</span><span class="p">,</span> <span class="s2">"timeout"</span><span class="p">})</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">host</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">poll_interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_POLL_INTERVAL</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_TIMEOUT</span><span class="p">,</span>
+        <span class="n">remote_workdir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"/tmp/qdk_remote"</span><span class="p">,</span>
+        <span class="n">identity_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">ssh_options</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">python_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"python3"</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Initialize the backend with a required SSH host.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            host: SSH destination, such as ``"user@hostname"``.</span>
+<span class="sd">            poll_interval: Seconds between job status checks.</span>
+<span class="sd">            timeout: Maximum duration for one SSH or SCP operation.</span>
+<span class="sd">            remote_workdir: Remote directory containing job artifacts.</span>
+<span class="sd">            identity_file: Optional private-key path passed to SSH and SCP.</span>
+<span class="sd">            ssh_options: Additional SSH and SCP command-line options.</span>
+<span class="sd">            python_path: Remote Python executable used to start the worker.</span>
+
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">host</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"SSHBackend requires a host (e.g., 'user@hostname')"</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">host</span><span class="o">=</span><span class="n">host</span><span class="p">,</span>
+            <span class="n">poll_interval</span><span class="o">=</span><span class="n">poll_interval</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+            <span class="n">remote_workdir</span><span class="o">=</span><span class="n">remote_workdir</span><span class="p">,</span>
+            <span class="n">identity_file</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">identity_file</span><span class="p">)</span> <span class="k">if</span> <span class="n">identity_file</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="n">ssh_options</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">ssh_options</span> <span class="ow">or</span> <span class="p">[]),</span>
+            <span class="n">python_path</span><span class="o">=</span><span class="n">python_path</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">host</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span> <span class="o">=</span> <span class="n">timeout</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span> <span class="o">=</span> <span class="n">remote_workdir</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">identity_file</span> <span class="o">=</span> <span class="n">identity_file</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">ssh_options</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">ssh_options</span> <span class="ow">or</span> <span class="p">[])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python_path</span> <span class="o">=</span> <span class="n">python_path</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Implement the abstract connection hook by testing SSH and creating a workdir."""</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ssh_cmd</span><span class="p">([</span><span class="s2">"echo"</span><span class="p">,</span> <span class="s2">"connected"</span><span class="p">]),</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ConnectionError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SSH connection failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_ssh_cmd</span><span class="p">([</span><span class="s2">"mkdir"</span><span class="p">,</span> <span class="s2">"-p"</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span><span class="p">]),</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Implement the abstract disconnection hook as a no-op for one-shot commands."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">upload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Implement the abstract upload hook with SCP.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            local_path: Source file on the local machine.</span>
+<span class="sd">            remote_path: Destination file path on the remote machine.</span>
+
+<span class="sd">        """</span>
+        <span class="n">local_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+        <span class="n">command</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">"scp"</span><span class="p">,</span>
+            <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_ssh_options</span><span class="p">(),</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">local_path</span><span class="p">),</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_ssh_target</span><span class="p">()</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">remote_path</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+        <span class="p">]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">command</span><span class="p">,</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SCP upload failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">download</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">local_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Implement the abstract download hook with SCP.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            remote_path: Source file path on the remote machine.</span>
+<span class="sd">            local_path: Destination file on the local machine.</span>
+
+<span class="sd">        """</span>
+        <span class="n">local_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+        <span class="n">local_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">command</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="s2">"scp"</span><span class="p">,</span>
+            <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_ssh_options</span><span class="p">(),</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_ssh_target</span><span class="p">()</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">remote_path</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+            <span class="nb">str</span><span class="p">(</span><span class="n">local_path</span><span class="p">),</span>
+        <span class="p">]</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">command</span><span class="p">,</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SCP download failed: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ssh_target</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Return the configured SSH target."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">host</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ssh_options</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Build the common SSH and SCP options."""</span>
+        <span class="n">options</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">identity_file</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">options</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="s2">"-i"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">identity_file</span><span class="p">)</span><span class="o">.</span><span class="n">expanduser</span><span class="p">())])</span>
+        <span class="n">options</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">ssh_options</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">options</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ssh_cmd</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">remote_command</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Build an SSH command.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            remote_command: Command and arguments to execute on the remote machine.</span>
+
+<span class="sd">        """</span>
+        <span class="n">command</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"ssh"</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_ssh_options</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ssh_target</span><span class="p">()]</span>
+        <span class="n">command</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">shlex</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">remote_command</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">command</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_remote</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">command</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">CompletedProcess</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Run a shell command on the remote machine.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            command: Shell command to execute remotely.</span>
+<span class="sd">            timeout: Optional command timeout in seconds.</span>
+
+<span class="sd">        """</span>
+        <span class="n">ssh_command</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"ssh"</span><span class="p">,</span> <span class="o">*</span><span class="bp">self</span><span class="o">.</span><span class="n">_ssh_options</span><span class="p">(),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_ssh_target</span><span class="p">(),</span> <span class="n">command</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+            <span class="n">ssh_command</span><span class="p">,</span>
+            <span class="n">check</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+            <span class="n">capture_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">text</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">timeout</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Override the optional async submission hook to launch an SSH worker.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            payload: Serialized algorithm execution request.</span>
+
+<span class="sd">        """</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialize_inputs</span>
+
+        <span class="n">job_id</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span><span class="p">[:</span><span class="mi">12</span><span class="p">]</span>
+        <span class="n">remote_job_dir</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span><span class="si">}</span><span class="s2">/job_</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">remote_input_dir</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s2">/input"</span>
+        <span class="n">remote_output_dir</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s2">/output"</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"mkdir -p </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">remote_input_dir</span><span class="p">)</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">remote_output_dir</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">local_input_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"qdk_ssh_input_"</span><span class="p">))</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">input_files</span> <span class="o">=</span> <span class="n">serialize_inputs</span><span class="p">(</span>
+                <span class="n">local_input_dir</span><span class="p">,</span>
+                <span class="n">args</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"args"</span><span class="p">],</span>
+                <span class="n">kwargs</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"kwargs"</span><span class="p">],</span>
+                <span class="n">algorithm_type</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"algorithm_type"</span><span class="p">],</span>
+                <span class="n">algorithm_name</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"algorithm_name"</span><span class="p">],</span>
+                <span class="n">settings</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">],</span>
+                <span class="n">run_hash</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"run_hash"</span><span class="p">),</span>
+                <span class="n">input_hashes</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_hashes"</span><span class="p">),</span>
+                <span class="n">force_rerun</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"force_rerun"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+                <span class="n">remote_cache</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"remote_cache"</span><span class="p">),</span>
+                <span class="n">remote_cache_backend</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"remote_cache_backend"</span><span class="p">),</span>
+            <span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">local_file</span> <span class="ow">in</span> <span class="n">input_files</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">upload</span><span class="p">(</span><span class="n">local_file</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_input_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">local_file</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">local_input_dir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="c1"># A detached worker and PID file are choices made by this direct-SSH</span>
+        <span class="c1"># transport. A scheduler backend would submit through its scheduler and</span>
+        <span class="c1"># record the resulting scheduler job ID instead.</span>
+        <span class="n">background_command</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"cd </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">remote_job_dir</span><span class="p">)</span><span class="si">}</span><span class="s2"> &amp;&amp; "</span>
+            <span class="sa">f</span><span class="s2">"nohup </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">python_path</span><span class="p">)</span><span class="si">}</span><span class="s2"> -m qdk_chemistry.remote.worker "</span>
+            <span class="sa">f</span><span class="s2">"--input-dir </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">remote_input_dir</span><span class="p">)</span><span class="si">}</span><span class="s2"> --output-dir </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">remote_output_dir</span><span class="p">)</span><span class="si">}</span><span class="s2"> "</span>
+            <span class="sa">f</span><span class="s2">"&gt; </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s1">/stdout.log'</span><span class="p">)</span><span class="si">}</span><span class="s2"> "</span>
+            <span class="sa">f</span><span class="s2">"2&gt; </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s1">/stderr.log'</span><span class="p">)</span><span class="si">}</span><span class="s2"> &amp; "</span>
+            <span class="sa">f</span><span class="s2">"echo $! &gt; </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s1">'</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s1">/pid'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+        <span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span><span class="n">background_command</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to launch remote job: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="c1"># Job persists this opaque state in JSON and passes it back to check,</span>
+        <span class="c1"># cancel, and fetch, so every value must be JSON-serializable.</span>
+        <span class="n">backend_state</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"job_id"</span><span class="p">:</span> <span class="n">job_id</span><span class="p">,</span>
+            <span class="s2">"remote_job_dir"</span><span class="p">:</span> <span class="n">remote_job_dir</span><span class="p">,</span>
+            <span class="s2">"remote_output_dir"</span><span class="p">:</span> <span class="n">remote_output_dir</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">backend_state</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JobStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Override the optional async status hook to inspect the SSH worker.</span>
+
+<span class="sd">        ``JobState`` defines the canonical case-insensitive lifecycle states.</span>
+<span class="sd">        Backend-specific status strings are also supported and remain</span>
+<span class="sd">        nonterminal until mapped to a terminal state.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the submitted remote job.</span>
+
+<span class="sd">        """</span>
+        <span class="n">remote_job_dir</span> <span class="o">=</span> <span class="n">backend_state</span><span class="p">[</span><span class="s2">"remote_job_dir"</span><span class="p">]</span>
+
+        <span class="n">pid_path</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s2">/pid"</span><span class="p">)</span>
+        <span class="n">pid_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cat </span><span class="si">{</span><span class="n">pid_path</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pid_result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JobStatus</span><span class="p">(</span>
+                <span class="n">job_id</span><span class="o">=</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"job_id"</span><span class="p">],</span>
+                <span class="n">status</span><span class="o">=</span><span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span><span class="p">,</span>
+                <span class="n">error</span><span class="o">=</span><span class="s2">"Could not read PID file"</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">pid</span> <span class="o">=</span> <span class="n">_parse_remote_pid</span><span class="p">(</span><span class="n">pid_result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pid</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">JobStatus</span><span class="p">(</span>
+                <span class="n">job_id</span><span class="o">=</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"job_id"</span><span class="p">],</span>
+                <span class="n">status</span><span class="o">=</span><span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span><span class="p">,</span>
+                <span class="n">error</span><span class="o">=</span><span class="s2">"Invalid PID file"</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="c1"># ``kill -0`` is this transport's process-liveness probe. A scheduler</span>
+        <span class="c1"># backend would query scheduler state using its persisted job ID.</span>
+        <span class="n">alive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"kill -0 </span><span class="si">{</span><span class="n">pid</span><span class="si">}</span><span class="s2"> 2&gt;/dev/null &amp;&amp; echo alive || echo done"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="s2">"alive"</span> <span class="ow">in</span> <span class="n">alive</span><span class="o">.</span><span class="n">stdout</span><span class="p">:</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">manifest_path</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s2">/output/manifest.json"</span><span class="p">)</span>
+            <span class="n">manifest_check</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"test -f </span><span class="si">{</span><span class="n">manifest_path</span><span class="si">}</span><span class="s2"> &amp;&amp; echo ok || echo missing"</span><span class="p">,</span>
+                <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">JobState</span><span class="o">.</span><span class="n">SUCCEEDED</span> <span class="k">if</span> <span class="s2">"ok"</span> <span class="ow">in</span> <span class="n">manifest_check</span><span class="o">.</span><span class="n">stdout</span> <span class="k">else</span> <span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span>
+            <span class="p">)</span>
+
+        <span class="n">stderr_path</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s2">/stderr.log"</span><span class="p">)</span>
+        <span class="n">logs_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"tail -50 </span><span class="si">{</span><span class="n">stderr_path</span><span class="si">}</span><span class="s2"> 2&gt;/dev/null"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span>
+        <span class="p">)</span>
+        <span class="n">logs</span> <span class="o">=</span> <span class="n">logs_result</span><span class="o">.</span><span class="n">stdout</span> <span class="k">if</span> <span class="n">logs_result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span> <span class="k">else</span> <span class="s2">""</span>
+
+        <span class="k">return</span> <span class="n">JobStatus</span><span class="p">(</span>
+            <span class="n">job_id</span><span class="o">=</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"job_id"</span><span class="p">],</span>
+            <span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">,</span>
+            <span class="n">logs</span><span class="o">=</span><span class="n">logs</span><span class="p">,</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">"pid"</span><span class="p">:</span> <span class="n">pid</span><span class="p">,</span> <span class="s2">"remote_job_dir"</span><span class="p">:</span> <span class="n">remote_job_dir</span><span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Override the optional async cancellation hook by signaling the worker PID.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the submitted remote job.</span>
+
+<span class="sd">        """</span>
+        <span class="n">remote_job_dir</span> <span class="o">=</span> <span class="n">backend_state</span><span class="p">[</span><span class="s2">"remote_job_dir"</span><span class="p">]</span>
+        <span class="n">pid_path</span> <span class="o">=</span> <span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_job_dir</span><span class="si">}</span><span class="s2">/pid"</span><span class="p">)</span>
+        <span class="n">pid_result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cat </span><span class="si">{</span><span class="n">pid_path</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">pid_result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">pid</span> <span class="o">=</span> <span class="n">_parse_remote_pid</span><span class="p">(</span><span class="n">pid_result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">pid</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span><span class="sa">f</span><span class="s2">"kill </span><span class="si">{</span><span class="n">pid</span><span class="si">}</span><span class="s2"> 2&gt;/dev/null"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+        <span class="n">local_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Override the optional async fetch hook to download and deserialize results.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the completed remote job.</span>
+<span class="sd">            local_dir: Optional directory for downloaded result files.</span>
+
+<span class="sd">        """</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+            <span class="n">deserialize_outputs</span><span class="p">,</span>
+            <span class="n">get_serialized_file_names</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">remote_output_dir</span> <span class="o">=</span> <span class="n">backend_state</span><span class="p">[</span><span class="s2">"remote_output_dir"</span><span class="p">]</span>
+
+        <span class="n">own_temporary_directory</span> <span class="o">=</span> <span class="n">local_dir</span> <span class="ow">is</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">own_temporary_directory</span><span class="p">:</span>
+            <span class="n">resolved_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"qdk_ssh_fetch_"</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="n">local_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+            <span class="n">resolved_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_dir</span><span class="p">)</span>
+            <span class="n">resolved_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">local_dir</span> <span class="o">=</span> <span class="n">resolved_dir</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">manifest_local</span> <span class="o">=</span> <span class="n">local_dir</span> <span class="o">/</span> <span class="s2">"manifest.json"</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_output_dir</span><span class="si">}</span><span class="s2">/manifest.json"</span><span class="p">,</span> <span class="n">manifest_local</span><span class="p">)</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">manifest_local</span><span class="p">)</span> <span class="k">as</span> <span class="n">manifest_file</span><span class="p">:</span>
+                <span class="n">manifest</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">manifest_file</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">manifest</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"results"</span><span class="p">,</span> <span class="p">[]):</span>
+                <span class="k">for</span> <span class="n">filename</span> <span class="ow">in</span> <span class="n">get_serialized_file_names</span><span class="p">(</span><span class="n">entry</span><span class="p">):</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">download</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">remote_output_dir</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">filename</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">local_dir</span> <span class="o">/</span> <span class="n">filename</span>
+                    <span class="p">)</span>
+
+            <span class="k">return</span> <span class="n">deserialize_outputs</span><span class="p">(</span><span class="n">local_dir</span><span class="p">)</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">own_temporary_directory</span><span class="p">:</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">local_dir</span><span class="p">,</span> <span class="n">ignore_errors</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Remove artifacts owned by one completed SSH job.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the terminal remote job.</span>
+
+<span class="sd">        """</span>
+        <span class="n">remote_workdir</span> <span class="o">=</span> <span class="n">PurePosixPath</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span><span class="p">)</span>
+        <span class="n">remote_job_dir</span> <span class="o">=</span> <span class="n">PurePosixPath</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"remote_job_dir"</span><span class="p">])</span>
+        <span class="n">remote_output_dir</span> <span class="o">=</span> <span class="n">PurePosixPath</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"remote_output_dir"</span><span class="p">])</span>
+        <span class="k">if</span> <span class="p">(</span>
+            <span class="n">remote_job_dir</span><span class="o">.</span><span class="n">parent</span> <span class="o">!=</span> <span class="n">remote_workdir</span>
+            <span class="ow">or</span> <span class="n">remote_output_dir</span><span class="o">.</span><span class="n">parent</span> <span class="o">!=</span> <span class="n">remote_job_dir</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">"Remote job paths are inconsistent with the configured work directory"</span>
+            <span class="p">)</span>
+
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_remote</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">"rm -rf -- </span><span class="si">{</span><span class="n">shlex</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">remote_job_dir</span><span class="p">))</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">30</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">returncode</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Failed to clean up remote job: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">stderr</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+
+</pre></div>
+</div>
+<p class="rubric">Registration and discovery</p>
+<p>Register the backend through <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.PluginRegistrar" title="qdk_chemistry.plugins.base.PluginRegistrar"><code class="xref py py-class docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a> from a <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.plugins.base.html#qdk_chemistry.plugins.base.QdkChemistryPlugin" title="qdk_chemistry.plugins.base.QdkChemistryPlugin"><code class="xref py py-class docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">PluginRegistrar</span><span class="p">,</span> <span class="n">QdkChemistryPlugin</span>
+
+
+<span class="k">class</span><span class="w"> </span><span class="nc">SSHRemoteBackendPlugin</span><span class="p">(</span><span class="n">QdkChemistryPlugin</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Register the illustrative SSH remote backend."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registrar</span><span class="p">:</span> <span class="n">PluginRegistrar</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Register the backend with QDK/Chemistry.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            registrar: Plugin registrar receiving the SSH backend.</span>
+
+<span class="sd">        """</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_remote_backend</span><span class="p">(</span><span class="s2">"ssh"</span><span class="p">,</span> <span class="n">SSHBackend</span><span class="p">)</span>
+
+
+</pre></div>
+</div>
+<p>Expose that plugin class through the unified entry-point group in the plugin package’s <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>:</p>
+<div class="highlight-toml notranslate"><div class="highlight"><pre><span></span><span class="k">[project.entry-points.</span><span class="s2">"qdk_chemistry.plugins"</span><span class="k">]</span>
+<span class="n">ssh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"custom_package.ssh_backend:SSHRemoteBackendPlugin"</span>
+</pre></div>
+</div>
+<p>After the package is installed, importing <code class="docutils literal notranslate"><span class="pre">qdk_chemistry</span></code> discovers the entry point and registers the backend. Application code does not import the plugin module explicitly.</p>
+<p class="rubric">Usage</p>
+<p>The discovered backend is available through the standard remote backend registry:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">create_ssh_backend</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">"""Create the automatically discovered SSH backend."""</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote</span><span class="w"> </span><span class="kn">import</span> <span class="n">available_backends</span><span class="p">,</span> <span class="n">create_remote</span>
+
+    <span class="k">assert</span> <span class="s2">"ssh"</span> <span class="ow">in</span> <span class="n">available_backends</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">create_remote</span><span class="p">(</span><span class="s2">"ssh"</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">"user@compute.example.com"</span><span class="p">)</span>
+
+
+</pre></div>
+</div>
+<p>Algorithms created through <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create" title="qdk_chemistry.algorithms.create"><code class="xref py py-func docutils literal notranslate"><span class="pre">qdk_chemistry.algorithms.create()</span></code></a> accept <code class="docutils literal notranslate"><span class="pre">remote</span></code> and <code class="docutils literal notranslate"><span class="pre">cache</span></code> keyword arguments on <code class="docutils literal notranslate"><span class="pre">run</span></code>. <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.remote.backends.base.html#qdk_chemistry.remote.backends.base.create_remote" title="qdk_chemistry.remote.backends.base.create_remote"><code class="xref py py-func docutils literal notranslate"><span class="pre">create_remote()</span></code></a> returns a connected backend, which the caller disconnects when it is no longer needed:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_remote</span>
+
+<span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
+<span class="n">remote</span> <span class="o">=</span> <span class="n">create_remote</span><span class="p">(</span><span class="s2">"ssh"</span><span class="p">,</span> <span class="n">host</span><span class="o">=</span><span class="s2">"user@compute.example.com"</span><span class="p">)</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+        <span class="n">structure</span><span class="p">,</span>
+        <span class="mi">0</span><span class="p">,</span>
+        <span class="mi">1</span><span class="p">,</span>
+        <span class="s2">"cc-pvdz"</span><span class="p">,</span>
+        <span class="n">remote</span><span class="o">=</span><span class="n">remote</span><span class="p">,</span>
+        <span class="n">cache</span><span class="o">=</span><span class="s2">"./cache"</span><span class="p">,</span>
+    <span class="p">)</span>
+<span class="k">finally</span><span class="p">:</span>
+    <span class="n">remote</span><span class="o">.</span><span class="n">disconnect</span><span class="p">()</span>
+
+</pre></div>
+</div>
+<p>Remote argument and result values support QDK Chemistry data classes, NumPy arrays with non-object and non-structured data types, <code class="docutils literal notranslate"><span class="pre">None</span></code>, booleans, integers, floats, strings, NumPy scalar equivalents, and lists or tuples recursively containing supported values. <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.AlgorithmRef" title="qdk_chemistry.data.AlgorithmRef"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmRef</span></code></a> values are also supported in arguments and settings, including nested algorithm-reference settings. Generic dictionaries are not supported as argument or result values. Keyword arguments and algorithm settings remain mappings because the protocol serializes their entries separately; use a QDK Chemistry data class for other structured values.</p>
+<p>Disconnecting closes connection-scoped resources but does not remove artifacts belonging to submitted jobs. For an asynchronous <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job" title="qdk_chemistry.remote.job.Job"><code class="xref py py-class docutils literal notranslate"><span class="pre">Job</span></code></a>, pass <code class="docutils literal notranslate"><span class="pre">cleanup=True</span></code> to <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.fetch" title="qdk_chemistry.remote.job.Job.fetch"><code class="xref py py-meth docutils literal notranslate"><span class="pre">fetch()</span></code></a> to remove backend artifacts after the result is successfully retrieved and persisted. Call <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.remote.job.html#qdk_chemistry.remote.job.Job.cleanup" title="qdk_chemistry.remote.job.Job.cleanup"><code class="xref py py-meth docutils literal notranslate"><span class="pre">cleanup()</span></code></a> to remove artifacts separately for any terminal job. Cleanup is idempotent; failed retrieval leaves artifacts available for inspection or retry.</p>
+<p>Passing a path as <code class="docutils literal notranslate"><span class="pre">cache</span></code> creates a local <a class="reference internal" href="../../api/api_autogen/qdk_chemistry.remote.cache.folder.html#qdk_chemistry.remote.cache.folder.FolderCache" title="qdk_chemistry.remote.cache.folder.FolderCache"><code class="xref py py-class docutils literal notranslate"><span class="pre">FolderCache</span></code></a>. On a completed cache hit, <code class="docutils literal notranslate"><span class="pre">run</span></code> reconstructs and returns the result without submitting another remote job. If the cache contains an in-flight job for the same algorithm, settings, and inputs, polling resumes instead of creating a duplicate. Pass <code class="docutils literal notranslate"><span class="pre">force_rerun=True</span></code> to bypass the lookup and execute again.</p>
+<p>By default, a cache is local to the calling machine. Set <code class="docutils literal notranslate"><span class="pre">is_shared=True</span></code> only when the same backing store is reachable from both the calling machine and remote compute node, such as a network-mounted directory:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.cache</span><span class="w"> </span><span class="kn">import</span> <span class="n">FolderCache</span>
+
+<span class="n">cache</span> <span class="o">=</span> <span class="n">FolderCache</span><span class="p">(</span><span class="s2">"/mnt/shared/qdk-cache"</span><span class="p">,</span> <span class="n">is_shared</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">algorithm</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">remote</span><span class="o">=</span><span class="n">remote</span><span class="p">,</span> <span class="n">cache</span><span class="o">=</span><span class="n">cache</span><span class="p">)</span>
+
+</pre></div>
+</div>
+<p>A shared cache lets the remote worker reuse content-addressed inputs already present there and publish results without transferring those files through the backend. Do not mark a caller-local directory as shared; the remote worker must be able to recreate and access the configured cache.</p>
+</section>
 <section id="implementing-a-new-algorithm-backend">
 <span id="adding-implementations"></span><h3>Implementing a new algorithm backend<a class="headerlink" href="#implementing-a-new-algorithm-backend" title="Link to this heading"></a></h3>
 <p>This section demonstrates how to integrate an external <a class="reference internal" href="../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> solver as a QDK/Chemistry plugin, enabling access through the standard API.</p>
@@ -352,16 +929,16 @@ to see which implementations are currently available.</p>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">CustomScfSettings</span><span class="p">(</span><span class="n">ElectronicStructureSettings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the custom SCF solver.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Settings for the custom SCF solver."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="c1"># Define additional settings beyond the inherited defaults</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;custom_option&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;default_value&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;Description of the custom option&quot;</span><span class="p">,</span>
+            <span class="s2">"custom_option"</span><span class="p">,</span>
+            <span class="s2">"string"</span><span class="p">,</span>
+            <span class="s2">"default_value"</span><span class="p">,</span>
+            <span class="s2">"Description of the custom option"</span><span class="p">,</span>
         <span class="p">)</span>
 
 
@@ -374,7 +951,7 @@ to see which implementations are currently available.</p>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">CustomScfSettings</span><span class="p">()</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">ElectronicStructureSettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Define additional settings beyond the inherited defaults</span>
-<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;custom_option&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;default_value&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">"custom_option"</span><span class="p">,</span><span class="w"> </span><span class="s">"default_value"</span><span class="p">);</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
@@ -401,14 +978,14 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">CustomScfSolver</span><span class="p">(</span><span class="n">ScfSolver</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Custom SCF solver wrapping an external chemistry package.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Custom SCF solver wrapping an external chemistry package."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">CustomScfSettings</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;custom&quot;</span>
+        <span class="k">return</span> <span class="s2">"custom"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
@@ -417,7 +994,7 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
         <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
         <span class="n">basis_or_guess</span><span class="p">:</span> <span class="n">Orbitals</span> <span class="o">|</span> <span class="n">BasisSet</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Wavefunction</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform a self-consistent field (SCF) calculation using a custom backend.</span>
+<span class="w">        </span><span class="sd">"""Perform a self-consistent field (SCF) calculation using a custom backend.</span>
 
 <span class="sd">        This method should convert the input structure to the external format, run the SCF calculation</span>
 <span class="sd">        using the specified method and basis set, and return the electronic energy and wavefunction</span>
@@ -435,7 +1012,7 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 
 <span class="sd">        Returns:</span>
 <span class="sd">            Tuple of (energy, wavefunction)</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="c1"># Convert to external format</span>
 
         <span class="c1"># Execute external calculation</span>
@@ -454,13 +1031,13 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;qdk/chemistry/algorithms/scf.hpp&gt;</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;external_chemistry_package.hpp&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">"external_chemistry_package.hpp"</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">CustomScfSolver</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolver</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">CustomScfSolver</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">_settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">CustomScfSettings</span><span class="o">&gt;</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
 
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;custom&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">"custom"</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
 
 <span class="w"> </span><span class="k">protected</span><span class="o">:</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">pair</span><span class="o">&lt;</span><span class="kt">double</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Wavefunction</span><span class="o">&gt;&gt;</span>
@@ -472,7 +1049,7 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">external_mol</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">convert_to_external_format</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
 
 <span class="w">    </span><span class="c1">// Execute external calculation</span>
-<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">basis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="n">basis</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"basis_set"</span><span class="p">);</span>
 <span class="w">    </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">external_orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
 <span class="w">        </span><span class="n">external_package</span><span class="o">::</span><span class="n">run_scf</span><span class="p">(</span><span class="n">external_mol</span><span class="p">,</span><span class="w"> </span><span class="n">basis</span><span class="p">);</span>
 
@@ -488,13 +1065,22 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 </div>
 <p class="rubric">Registration</p>
 <p>Implementations are registered with the algorithm factory to enable discovery and instantiation by name.
-Registration is typically performed during module initialization:</p>
+The plugin registrar delegates to that existing factory registry:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--4-input--1" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">PluginRegistrar</span><span class="p">,</span> <span class="n">QdkChemistryPlugin</span>
 
-<span class="c1"># Registration during module import</span>
-<span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">CustomScfSolver</span><span class="p">())</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">CustomScfPlugin</span><span class="p">(</span><span class="n">QdkChemistryPlugin</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Register the capabilities provided by the custom SCF package."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registrar</span><span class="p">:</span> <span class="n">PluginRegistrar</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_algorithm</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">CustomScfSolver</span><span class="p">())</span>
+
+
+<span class="c1"># Installed plugins are registered automatically through their entry point.</span>
+<span class="c1"># This call only makes the standalone documentation example executable.</span>
+<span class="n">CustomScfPlugin</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">PluginRegistrar</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
@@ -515,16 +1101,16 @@ Registration is typically performed during module initialization:</p>
 
 <span class="c1"># Define a molecular structure (e.g., H2 molecule)</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="p">[[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]]</span>
-<span class="n">molecule</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+<span class="n">molecule</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">])</span>
 
 <span class="c1"># Instantiate the custom solver</span>
-<span class="n">solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;custom&quot;</span><span class="p">)</span>
+<span class="n">solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"custom"</span><span class="p">)</span>
 <span class="c1"># energy, wavefunction = solver.run(</span>
-<span class="c1">#     molecule, charge=0, spin_multiplicity=1, basis_or_guess=&quot;sto-3g&quot;</span>
+<span class="c1">#     molecule, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"</span>
 <span class="c1"># )</span>
 
 <span class="c1"># Verify registration</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">))</span>  <span class="c1"># [..., &#39;custom&#39;]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">))</span>  <span class="c1"># [..., 'custom']</span>
 </pre></div>
 </div>
 </section>
@@ -550,11 +1136,11 @@ This section demonstrates the complete process using a molecular descriptor calc
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for molecular descriptor algorithms.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Settings for molecular descriptor algorithms."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;Normalize the descriptor&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"normalize"</span><span class="p">,</span> <span class="s2">"bool"</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="s2">"Normalize the descriptor"</span><span class="p">)</span>
 
 
 </pre></div>
@@ -564,7 +1150,7 @@ This section demonstrates the complete process using a molecular descriptor calc
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorSettings</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="w"> </span><span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">MolecularDescriptorSettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">set_default</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;normalize&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Normalize the descriptor&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">set_default</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"normalize"</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="p">,</span><span class="w"> </span><span class="s">"Normalize the descriptor"</span><span class="p">);</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
@@ -579,10 +1165,10 @@ This section demonstrates the complete process using a molecular descriptor calc
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorCalculator</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for molecular descriptor algorithms.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Abstract base class for molecular descriptor algorithms."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;molecular_descriptor_calculator&quot;</span>
+        <span class="k">return</span> <span class="s2">"molecular_descriptor_calculator"</span>
 
 
 </pre></div>
@@ -597,7 +1183,7 @@ This section demonstrates the complete process using a molecular descriptor calc
 <span class="p">{</span>
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">type_name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">final</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;molecular_descriptor_calculator&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s">"molecular_descriptor_calculator"</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
@@ -612,13 +1198,13 @@ This section demonstrates the complete process using a molecular descriptor calc
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorCalculatorFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Factory for creating molecular descriptor calculators.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Factory for creating molecular descriptor calculators."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;molecular_descriptor_calculator&quot;</span>
+        <span class="k">return</span> <span class="s2">"molecular_descriptor_calculator"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;nuclear_charge&quot;</span>
+        <span class="k">return</span> <span class="s2">"nuclear_charge"</span>
 
 
 </pre></div>
@@ -629,10 +1215,10 @@ This section demonstrates the complete process using a molecular descriptor calc
 <span class="w">    </span><span class="o">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">AlgorithmFactory</span><span class="o">&lt;</span>
 <span class="w">          </span><span class="n">MolecularDescriptorCalculator</span><span class="p">,</span><span class="w"> </span><span class="n">MolecularDescriptorCalculatorFactory</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;molecular_descriptor_calculator&quot;</span><span class="p">;</span>
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="s">"molecular_descriptor_calculator"</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>
 
-<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;nuclear_charge&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="k">static</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">"nuclear_charge"</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
 </div>
@@ -646,18 +1232,18 @@ This section demonstrates the complete process using a molecular descriptor calc
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">NuclearChargeDescriptor</span><span class="p">(</span><span class="n">MolecularDescriptorCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for a nuclear-charge molecular descriptor.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Calculator for a nuclear-charge molecular descriptor."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">MolecularDescriptorSettings</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;nuclear_charge&quot;</span>
+        <span class="k">return</span> <span class="s2">"nuclear_charge"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="n">descriptor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">get_nuclear_charges</span><span class="p">()))</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"normalize"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">descriptor</span> <span class="o">/=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">descriptor</span>
 
@@ -672,7 +1258,7 @@ This section demonstrates the complete process using a molecular descriptor calc
 <span class="w">    </span><span class="n">_settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">MolecularDescriptorSettings</span><span class="o">&gt;</span><span class="p">();</span>
 <span class="w">  </span><span class="p">}</span>
 
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">&quot;nuclear_charge&quot;</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">name</span><span class="p">()</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">override</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="s">"nuclear_charge"</span><span class="p">;</span><span class="w"> </span><span class="p">}</span>
 
 <span class="w"> </span><span class="k">protected</span><span class="o">:</span>
 <span class="w">  </span><span class="kt">double</span><span class="w"> </span><span class="n">_run_impl</span><span class="p">(</span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">data</span><span class="o">::</span><span class="n">Structure</span><span class="o">&gt;</span><span class="w"> </span><span class="n">structure</span><span class="p">)</span>
@@ -680,7 +1266,7 @@ This section demonstrates the complete process using a molecular descriptor calc
 <span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">charges</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_nuclear_charges</span><span class="p">();</span>
 <span class="w">    </span><span class="kt">double</span><span class="w"> </span><span class="n">descriptor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.0</span><span class="p">;</span>
 <span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">double</span><span class="w"> </span><span class="n">charge</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">charges</span><span class="p">)</span><span class="w"> </span><span class="n">descriptor</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">charge</span><span class="p">;</span>
-<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;normalize&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">_settings</span><span class="o">-&gt;</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">bool</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"normalize"</span><span class="p">)</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">      </span><span class="n">descriptor</span><span class="w"> </span><span class="o">/=</span><span class="w"> </span><span class="k">static_cast</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="n">structure</span><span class="o">-&gt;</span><span class="n">get_num_atoms</span><span class="p">());</span>
 <span class="w">    </span><span class="p">}</span>
 <span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">descriptor</span><span class="p">;</span>
@@ -692,18 +1278,18 @@ This section demonstrates the complete process using a molecular descriptor calc
 </div>
 <p>Additional implementations follow the same pattern:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">MassDescriptor</span><span class="p">(</span><span class="n">MolecularDescriptorCalculator</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculator for a molecular-mass descriptor.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Calculator for a molecular-mass descriptor."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">MolecularDescriptorSettings</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;mass&quot;</span>
+        <span class="k">return</span> <span class="s2">"mass"</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
         <span class="n">descriptor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">structure</span><span class="o">.</span><span class="n">get_masses</span><span class="p">()))</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"normalize"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="n">descriptor</span> <span class="o">/=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_num_atoms</span><span class="p">()</span>
         <span class="k">return</span> <span class="n">descriptor</span>
 
@@ -714,14 +1300,20 @@ This section demonstrates the complete process using a molecular descriptor calc
 <p>Register the factory and all implementations:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--9-input--1" name="tab-set--9" type="radio" /><label class="tab-label" for="tab-set--9-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">algorithms</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins</span><span class="w"> </span><span class="kn">import</span> <span class="n">PluginRegistrar</span><span class="p">,</span> <span class="n">QdkChemistryPlugin</span>
 
-<span class="c1"># Register the factory</span>
-<span class="n">algorithms</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">register_factory</span><span class="p">(</span><span class="n">MolecularDescriptorCalculatorFactory</span><span class="p">())</span>
 
-<span class="c1"># Register implementations</span>
-<span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">NuclearChargeDescriptor</span><span class="p">())</span>
-<span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">MassDescriptor</span><span class="p">())</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">MolecularDescriptorPlugin</span><span class="p">(</span><span class="n">QdkChemistryPlugin</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Register a custom algorithm type and its implementations."""</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">register</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">registrar</span><span class="p">:</span> <span class="n">PluginRegistrar</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_algorithm_factory</span><span class="p">(</span><span class="n">MolecularDescriptorCalculatorFactory</span><span class="p">())</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_algorithm</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">NuclearChargeDescriptor</span><span class="p">())</span>
+        <span class="n">registrar</span><span class="o">.</span><span class="n">register_algorithm</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">MassDescriptor</span><span class="p">())</span>
+
+
+<span class="c1"># Installed plugins are registered automatically through their entry point.</span>
+<span class="n">MolecularDescriptorPlugin</span><span class="p">()</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">PluginRegistrar</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
@@ -740,11 +1332,11 @@ This section demonstrates the complete process using a molecular descriptor calc
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 
 <span class="c1"># List available implementations</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;molecular_descriptor_calculator&quot;</span><span class="p">))</span>  <span class="c1"># [&#39;mass&#39;, &#39;nuclear_charge&#39;]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">"molecular_descriptor_calculator"</span><span class="p">))</span>  <span class="c1"># ['mass', 'nuclear_charge']</span>
 
 <span class="c1"># Instantiate and configure</span>
-<span class="n">calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;molecular_descriptor_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;nuclear_charge&quot;</span><span class="p">)</span>
-<span class="n">calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;normalize&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"molecular_descriptor_calculator"</span><span class="p">,</span> <span class="s2">"nuclear_charge"</span><span class="p">)</span>
+<span class="n">calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"normalize"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 
 <span class="c1"># Execute</span>
 <span class="c1"># descriptor = calculator.run(molecule)</span>
@@ -758,6 +1350,7 @@ This section demonstrates the complete process using a molecular descriptor calc
 <h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
 <ul class="simple">
 <li><p>Custom plugin examples: <a class="reference external" href="../../_static/examples/cpp/custom_plugin.cpp">C++ source</a> | <a class="reference external" href="../../_static/examples/python/custom_plugin.py">Python source</a></p></li>
+<li><p><a class="reference external" href="../../_static/examples/python/custom_remote_backend.py">SSH remote backend plugin example</a></p></li>
 <li><p>Plugin usage examples: <a class="reference external" href="../../_static/examples/cpp/interfaces.cpp">C++ example</a> | <a class="reference external" href="../../_static/examples/python/interfaces.py">Python example</a></p></li>
 <li><p><a class="reference internal" href="algorithms/factory_pattern.html"><span class="doc">Factory pattern</span></a></p></li>
 <li><p><a class="reference internal" href="algorithms/settings.html"><span class="doc">Settings</span></a></p></li>

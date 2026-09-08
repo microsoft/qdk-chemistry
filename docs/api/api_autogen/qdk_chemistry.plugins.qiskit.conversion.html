@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit.conversion module &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit.conversion module &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -67,10 +68,14 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#plugins">Plugins</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#purpose-and-benefits">Purpose and Benefits</a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#available-plugins">Available Plugins</a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#using-plugins">Using Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#external-plugins">External plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#bundled-integrations">Bundled integrations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.ChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">ChemistryPlugin</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError"><code class="docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.PluginRegistrar"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.QdkChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.plugins.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#submodules">Submodules</a></li>
 </ul>
 </li>
 </ul>
@@ -122,40 +127,58 @@
 <p>This module provides functions to convert QDK Chemistry objects into Qiskit-compatible
 representations, particularly for quantum circuit simulation and state preparation.</p>
 <dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.conversion.apply_matrix_compression_ops">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.conversion.</span></span><span class="sig-name descname"><span class="pre">apply_matrix_compression_ops</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">circuit</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ops</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/conversion.html#apply_matrix_compression_ops"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.conversion.apply_matrix_compression_ops" title="Link to this definition"></a></dt>
+<dd><p>Apply matrix compression operations to a Qiskit QuantumCircuit.</p>
+<p>Supports all <a class="reference internal" href="qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.html#qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionType" title="qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionType"><code class="xref py py-class docutils literal notranslate"><span class="pre">MatrixCompressionType</span></code></a>
+operations: X, CX, SWAP, CCX, SELECT, and SELECT_AND.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>circuit</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://quantum.cloud.ibm.com/docs/api/qiskit/qiskit.circuit.QuantumCircuit" title="(in Qiskit v2.5)"><code class="xref py py-class docutils literal notranslate"><span class="pre">QuantumCircuit</span></code></a></span>) – Qiskit QuantumCircuit to append gates to (modified in place).</p></li>
+<li><p><strong>ops</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference internal" href="qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.html#qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionOp" title="qdk_chemistry.algorithms.state_preparation._binary_encoding_utils.MatrixCompressionOp"><code class="xref py py-class docutils literal notranslate"><span class="pre">MatrixCompressionOp</span></code></a>]</span>) – List of MatrixCompressionOp to apply.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.plugins.qiskit.conversion.create_statevector_from_wavefunction">
 <span class="sig-prename descclassname"><span class="pre">qdk_chemistry.plugins.qiskit.conversion.</span></span><span class="sig-name descname"><span class="pre">create_statevector_from_wavefunction</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavefunction</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normalize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/plugins/qiskit/conversion.html#create_statevector_from_wavefunction"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.plugins.qiskit.conversion.create_statevector_from_wavefunction" title="Link to this definition"></a></dt>
 <dd><p>Create a Qiskit-compatible statevector from a QDK Chemistry wavefunction.</p>
 <p>This function converts a QDK Chemistry wavefunction into a dense statevector
 representation suitable for use with Qiskit quantum circuit simulators.</p>
-<p>The encoding uses a little-endian qubit ordering convention where each spatial
-orbital is mapped to two qubits (one for alpha spin, one for beta spin):
-- Lower qubits (0 to num_orbitals-1): alpha spin orbitals
-- Upper qubits (num_orbitals to 2*num_orbitals-1): beta spin orbitals</p>
-<p>Each determinant in the wavefunction is mapped to its corresponding basis state
-index, and the wavefunction coefficient is placed at that index in the statevector.</p>
+<p>The register uses <code class="docutils literal notranslate"><span class="pre">num_modes</span> <span class="pre">*</span> <span class="pre">bits_per_mode</span></code> qubits with little-endian
+ordering. A standard spin-half wavefunction (<code class="docutils literal notranslate"><span class="pre">bits_per_mode</span> <span class="pre">==</span> <span class="pre">2</span></code>) maps each
+spatial orbital to two qubits — alpha on the lower half, beta on the upper half —
+for <code class="docutils literal notranslate"><span class="pre">2</span> <span class="pre">*</span> <span class="pre">num_active_orbitals</span></code> qubits; a spinless subspace (<code class="docutils literal notranslate"><span class="pre">bits_per_mode</span> <span class="pre">==</span> <span class="pre">1</span></code>)
+uses one qubit per mode. Each determinant’s coefficient is placed at its basis-state index.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>wavefunction</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><em>Wavefunction</em></a>) – The wavefunction to convert to statevector representation.
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wavefunction</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a></span>) – The wavefunction to convert to statevector representation.
 Must have a defined active space with the same number of alpha and
 beta orbitals.</p></li>
-<li><p><strong>normalize</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to normalize the resulting statevector to unit norm.
+<li><p><strong>normalize</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – Whether to normalize the resulting statevector to unit norm.
 Default is True.</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt>Dense complex statevector of size 2^(2*num_active_orbitals).</dt><dd><p>The dtype is always complex128, even if the wavefunction has real
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Dense complex statevector of size 2^(num_modes * bits_per_mode).</dt><dd><p>The dtype is always complex128, even if the wavefunction has real
 coefficients.</p>
 </dd>
 </dl>
 </p>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)">numpy.ndarray</a></p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code></a></span></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the wavefunction has no active determinants.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -163,7 +186,7 @@ coefficients.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Assuming we have a wavefunction already</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">sv_array</span> <span class="o">=</span> <span class="n">create_statevector_from_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">qiskit_sv</span> <span class="o">=</span> <span class="n">Statevector</span><span class="p">(</span><span class="n">sv_array</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Statevector dimension: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sv_array</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Statevector dimension: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">sv_array</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>

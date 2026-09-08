@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.utils.telemetry_events &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.utils.telemetry_events &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.utils.telemetry_events</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Telemetry event logging for QDK Chemistry module.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""Telemetry event logging for QDK Chemistry module."""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -114,7 +115,7 @@
 <div class="viewcode-block" id="get_basis_functions_bucket">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.get_basis_functions_bucket">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">get_basis_functions_bucket</span><span class="p">(</span><span class="n">basis_functions</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Categorize the number of basis functions into buckets for telemetry aggregation.</span>
+<span class="w">    </span><span class="sd">"""Categorize the number of basis functions into buckets for telemetry aggregation.</span>
 
 <span class="sd">    This function groups number of basis functions into discrete buckets to enable</span>
 <span class="sd">    meaningful aggregation and analysis in telemetry data. Rather than tracking</span>
@@ -129,21 +130,21 @@
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(7)</span>
-<span class="sd">        &quot;10&quot;</span>
+<span class="sd">        "10"</span>
 <span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(23)</span>
-<span class="sd">        &quot;30&quot;</span>
+<span class="sd">        "30"</span>
 <span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(150)</span>
-<span class="sd">        &quot;150&quot;</span>
+<span class="sd">        "150"</span>
 <span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(750)</span>
-<span class="sd">        &quot;800&quot;</span>
+<span class="sd">        "800"</span>
 <span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(1500)</span>
-<span class="sd">        &quot;1500+&quot;</span>
-<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(&quot;unknown&quot;)</span>
-<span class="sd">        &quot;unknown&quot;</span>
+<span class="sd">        "1500+"</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket("unknown")</span>
+<span class="sd">        "unknown"</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">==</span> <span class="s2">&quot;unknown&quot;</span><span class="p">:</span>
-        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">==</span> <span class="s2">"unknown"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">"unknown"</span>
 
     <span class="n">basis_functions</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">basis_functions</span><span class="p">)</span>
 
@@ -156,87 +157,87 @@
     <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">&lt;</span> <span class="mi">1500</span><span class="p">:</span>
         <span class="c1"># Buckets of 100 for basis functions 501-1499</span>
         <span class="k">return</span> <span class="nb">str</span><span class="p">(((</span><span class="n">basis_functions</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">100</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
-    <span class="c1"># Returns &quot;1500+&quot; for basis functions &gt;= 1500</span>
-    <span class="k">return</span> <span class="s2">&quot;1500+&quot;</span></div>
+    <span class="c1"># Returns "1500+" for basis functions &gt;= 1500</span>
+    <span class="k">return</span> <span class="s2">"1500+"</span></div>
 
 
 
 <div class="viewcode-block" id="extract_data">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.extract_data">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">extract_data</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract number of basis functions from algorithm result.</span>
+<span class="w">    </span><span class="sd">"""Extract number of basis functions from algorithm result.</span>
 
 <span class="sd">    This function handles both single qdk_data objects and tuple results</span>
 <span class="sd">    (e.g., (energy, qdk_data) pairs) returned by QDK chemistry algorithms.</span>
-<span class="sd">    It extracts the number of basis functions from the qdk_data&#39;s orbital data for telemetry tracking.</span>
+<span class="sd">    It extracts the number of basis functions from the qdk_data's orbital data for telemetry tracking.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        result: Algorithm result, either a qdk_data object or a tuple containing</span>
 <span class="sd">            a qdk_data (typically at index 1 for (energy, wavefunction) pairs).</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        Bucket of basis functions (e.g., &quot;10&quot;, &quot;50&quot;, &quot;100&quot;)</span>
-<span class="sd">        or &quot;unknown&quot; if no qdk_data is available.</span>
+<span class="sd">        Bucket of basis functions (e.g., "10", "50", "100")</span>
+<span class="sd">        or "unknown" if no qdk_data is available.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; # Single qdk_data result</span>
 <span class="sd">        &gt;&gt;&gt; n_basis = extract_data(qdk_data)</span>
-<span class="sd">        &#39;50&#39;</span>
+<span class="sd">        '50'</span>
 
 <span class="sd">        &gt;&gt;&gt; # Tuple result (energy, qdk_data)</span>
 <span class="sd">        &gt;&gt;&gt; n_basis = extract_data((energy, qdk_data))</span>
-<span class="sd">        &#39;100&#39;</span>
+<span class="sd">        '100'</span>
 
 <span class="sd">        &gt;&gt;&gt; # No qdk_data</span>
 <span class="sd">        &gt;&gt;&gt; n_basis = extract_data(some_other_result)</span>
-<span class="sd">        &#39;unknown&#39;</span>
+<span class="sd">        'unknown'</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">qdk_data</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;orbitals&quot;</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">"orbitals"</span><span class="p">):</span>
         <span class="n">qdk_data</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
-    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;orbitals&quot;</span><span class="p">):</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">"orbitals"</span><span class="p">):</span>
         <span class="n">qdk_data</span> <span class="o">=</span> <span class="n">result</span>
 
     <span class="k">if</span> <span class="n">qdk_data</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">orbitals</span> <span class="o">=</span> <span class="n">qdk_data</span><span class="o">.</span><span class="n">orbitals</span>
             <span class="c1"># Check if get_basis_set method exists</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="s2">&quot;get_basis_set&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="s2">"get_basis_set"</span><span class="p">):</span>
                 <span class="n">n_basis</span> <span class="o">=</span> <span class="n">get_basis_functions_bucket</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">())</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="n">n_basis</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+                <span class="n">n_basis</span> <span class="o">=</span> <span class="s2">"unknown"</span>
 
             <span class="k">return</span> <span class="n">n_basis</span>
         <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">):</span>
             <span class="c1"># Silently handle missing attributes</span>
             <span class="k">pass</span>
-    <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span></div>
+    <span class="k">return</span> <span class="s2">"unknown"</span></div>
 
 
 
 <div class="viewcode-block" id="on_qdk_chemistry_import">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_qdk_chemistry_import">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">on_qdk_chemistry_import</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Logs a telemetry event indicating that the QDK Chemistry module has been imported.&quot;&quot;&quot;</span>
-    <span class="n">log_telemetry</span><span class="p">(</span><span class="s2">&quot;qdk_chemistry.import&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+<span class="w">    </span><span class="sd">"""Logs a telemetry event indicating that the QDK Chemistry module has been imported."""</span>
+    <span class="n">log_telemetry</span><span class="p">(</span><span class="s2">"qdk_chemistry.import"</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
 
 
 
 <div class="viewcode-block" id="on_algorithm">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_algorithm">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">on_algorithm</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Logs a telemetry event for the execution of a quantum chemistry algorithm.</span>
+<span class="w">    </span><span class="sd">"""Logs a telemetry event for the execution of a quantum chemistry algorithm.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        algorithm_type: The type or category of the algorithm being executed.</span>
 <span class="sd">        algorithm_name: The specific name of the algorithm.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">log_telemetry</span><span class="p">(</span>
-        <span class="s2">&quot;qdk_chemistry.algorithm&quot;</span><span class="p">,</span>
+        <span class="s2">"qdk_chemistry.algorithm"</span><span class="p">,</span>
         <span class="mi">1</span><span class="p">,</span>
-        <span class="n">properties</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;algorithm_type&quot;</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span> <span class="s2">&quot;algorithm_name&quot;</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">},</span>
+        <span class="n">properties</span><span class="o">=</span><span class="p">{</span><span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span> <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">},</span>
     <span class="p">)</span></div>
 
 
@@ -251,39 +252,39 @@
     <span class="n">error_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="o">**</span><span class="n">properties</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Logs the execution duration and outcome of a chemistry algorithm.</span>
+<span class="w">    </span><span class="sd">"""Logs the execution duration and outcome of a chemistry algorithm.</span>
 
 <span class="sd">    Logs relevant metadata about algorithm execution including timing,</span>
 <span class="sd">    success/failure status, and additional contextual information.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        algorithm_type: The category of algorithm executed (e.g.,</span>
-<span class="sd">            &#39;scf_solver&#39;, &#39;active_space_selector&#39;).</span>
+<span class="sd">            'scf_solver', 'active_space_selector').</span>
 <span class="sd">        duration_sec: The time taken to execute the algorithm,</span>
 <span class="sd">            in seconds.</span>
-<span class="sd">        status: The result of the execution, typically &#39;success&#39;</span>
-<span class="sd">            or &#39;failed&#39;.</span>
+<span class="sd">        status: The result of the execution, typically 'success'</span>
+<span class="sd">            or 'failed'.</span>
 <span class="sd">        algorithm_name: The specific implementation or backend</span>
-<span class="sd">            used (e.g., &#39;qdk&#39;, &#39;pyscf&#39;).</span>
+<span class="sd">            used (e.g., 'qdk', 'pyscf').</span>
 <span class="sd">        error_type: The type of error encountered, if</span>
 <span class="sd">            any. Defaults to None.</span>
 <span class="sd">        properties: Additional contextual information about the</span>
-<span class="sd">            execution (e.g., &#39;num_basis_functions&#39;).</span>
+<span class="sd">            execution (e.g., 'num_basis_functions').</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">telemetry_properties</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;algorithm_type&quot;</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span>
-        <span class="s2">&quot;algorithm_name&quot;</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">,</span>
-        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span>
-        <span class="s2">&quot;error_type&quot;</span><span class="p">:</span> <span class="n">error_type</span><span class="p">,</span>
+        <span class="s2">"algorithm_type"</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span>
+        <span class="s2">"algorithm_name"</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">,</span>
+        <span class="s2">"status"</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span>
+        <span class="s2">"error_type"</span><span class="p">:</span> <span class="n">error_type</span><span class="p">,</span>
         <span class="o">**</span><span class="n">properties</span><span class="p">,</span>
     <span class="p">}</span>
 
     <span class="n">log_telemetry</span><span class="p">(</span>
-        <span class="s2">&quot;qdk_chemistry.algorithm.durationSec&quot;</span><span class="p">,</span>
+        <span class="s2">"qdk_chemistry.algorithm.durationSec"</span><span class="p">,</span>
         <span class="n">duration_sec</span><span class="p">,</span>
         <span class="n">properties</span><span class="o">=</span><span class="n">telemetry_properties</span><span class="p">,</span>
-        <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;histogram&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="s2">"histogram"</span><span class="p">,</span>
     <span class="p">)</span></div>
 
 
@@ -291,7 +292,7 @@
 <div class="viewcode-block" id="telemetry_tracker">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.telemetry_tracker">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">telemetry_tracker</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decorator to track telemetry for algorithm run execution.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Decorator to track telemetry for algorithm run execution."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="n">run_method</span><span class="p">):</span>
         <span class="nd">@wraps</span><span class="p">(</span><span class="n">run_method</span><span class="p">)</span>
@@ -306,7 +307,7 @@
                         <span class="n">algorithm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
                         <span class="n">algorithm_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
                         <span class="n">duration_sec</span><span class="o">=</span><span class="n">duration</span><span class="p">,</span>
-                        <span class="n">status</span><span class="o">=</span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+                        <span class="n">status</span><span class="o">=</span><span class="s2">"success"</span><span class="p">,</span>
                         <span class="n">num_basis_functions</span><span class="o">=</span><span class="n">n_basis</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
@@ -314,7 +315,7 @@
                         <span class="n">algorithm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
                         <span class="n">algorithm_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
                         <span class="n">duration_sec</span><span class="o">=</span><span class="n">duration</span><span class="p">,</span>
-                        <span class="n">status</span><span class="o">=</span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+                        <span class="n">status</span><span class="o">=</span><span class="s2">"success"</span><span class="p">,</span>
                     <span class="p">)</span>
                 <span class="k">return</span> <span class="n">result</span>
 
@@ -324,7 +325,7 @@
                     <span class="n">algorithm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
                     <span class="n">algorithm_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
                     <span class="n">duration_sec</span><span class="o">=</span><span class="n">duration</span><span class="p">,</span>
-                    <span class="n">status</span><span class="o">=</span><span class="s2">&quot;failed&quot;</span><span class="p">,</span>
+                    <span class="n">status</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">,</span>
                     <span class="n">error_type</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
                 <span class="p">)</span>
                 <span class="k">raise</span>

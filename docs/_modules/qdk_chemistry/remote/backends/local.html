@@ -1,0 +1,580 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.remote.backends.local &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.remote.backends.local</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.remote.backends.local</h1><div class="highlight"><pre>
+<span></span><span class="sd">"""Local backend for testing remote execution of QDK/Chemistry algorithms.</span>
+
+<span class="sd">This backend simulates remote execution by running in a subprocess on the</span>
+<span class="sd">local machine. Useful for testing and development.</span>
+<span class="sd">"""</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">shutil</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">tempfile</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">uuid</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DEFAULT_POLL_INTERVAL</span><span class="p">,</span> <span class="n">DEFAULT_TIMEOUT</span><span class="p">,</span> <span class="n">JobState</span><span class="p">,</span> <span class="n">JobStatus</span><span class="p">,</span> <span class="n">RemoteBackend</span><span class="p">,</span> <span class="n">register_backend</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"LocalBackend"</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_windows_process_is_running</span><span class="p">(</span><span class="n">pid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Check process liveness through the Windows process API.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pid: Process identifier to check.</span>
+
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ctypes</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">ctypes</span><span class="w"> </span><span class="kn">import</span> <span class="n">wintypes</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">process_query_limited_information</span> <span class="o">=</span> <span class="mh">0x1000</span>
+    <span class="n">error_access_denied</span> <span class="o">=</span> <span class="mi">5</span>
+    <span class="n">still_active</span> <span class="o">=</span> <span class="mi">259</span>
+    <span class="n">kernel32</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">WinDLL</span><span class="p">(</span><span class="s2">"kernel32"</span><span class="p">,</span> <span class="n">use_last_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># type: ignore[attr-defined]</span>
+
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">OpenProcess</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">DWORD</span><span class="p">,</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">BOOL</span><span class="p">,</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">DWORD</span><span class="p">)</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">OpenProcess</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">HANDLE</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">GetExitCodeProcess</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">HANDLE</span><span class="p">,</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">DWORD</span><span class="p">))</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">GetExitCodeProcess</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">BOOL</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">CloseHandle</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">HANDLE</span><span class="p">,)</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">CloseHandle</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">BOOL</span>
+
+    <span class="n">handle</span> <span class="o">=</span> <span class="n">kernel32</span><span class="o">.</span><span class="n">OpenProcess</span><span class="p">(</span><span class="n">process_query_limited_information</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">pid</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">get_last_error</span><span class="p">()</span> <span class="o">==</span> <span class="n">error_access_denied</span>  <span class="c1"># type: ignore[attr-defined]</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">exit_code</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">DWORD</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">kernel32</span><span class="o">.</span><span class="n">GetExitCodeProcess</span><span class="p">(</span><span class="n">handle</span><span class="p">,</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">byref</span><span class="p">(</span><span class="n">exit_code</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">return</span> <span class="n">exit_code</span><span class="o">.</span><span class="n">value</span> <span class="o">==</span> <span class="n">still_active</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">kernel32</span><span class="o">.</span><span class="n">CloseHandle</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_process_is_running</span><span class="p">(</span><span class="n">pid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Check a process by PID when its original handle is unavailable.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pid: Process identifier to check.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"win32"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_windows_process_is_running</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">ChildProcessError</span><span class="p">):</span>
+        <span class="n">waited_pid</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">waitpid</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">WNOHANG</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">waited_pid</span> <span class="o">==</span> <span class="n">pid</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">ProcessLookupError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="ne">PermissionError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_windows_process_identity</span><span class="p">(</span><span class="n">pid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return the immutable creation time for a Windows process.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pid: Process identifier to inspect.</span>
+
+<span class="sd">    """</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">ctypes</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">ctypes</span><span class="w"> </span><span class="kn">import</span> <span class="n">wintypes</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">process_query_limited_information</span> <span class="o">=</span> <span class="mh">0x1000</span>
+    <span class="n">kernel32</span> <span class="o">=</span> <span class="n">ctypes</span><span class="o">.</span><span class="n">WinDLL</span><span class="p">(</span><span class="s2">"kernel32"</span><span class="p">,</span> <span class="n">use_last_error</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># type: ignore[attr-defined]</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">OpenProcess</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">DWORD</span><span class="p">,</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">BOOL</span><span class="p">,</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">DWORD</span><span class="p">)</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">OpenProcess</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">HANDLE</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">GetProcessTimes</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">wintypes</span><span class="o">.</span><span class="n">HANDLE</span><span class="p">,</span>
+        <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">),</span>
+        <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">),</span>
+        <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">),</span>
+        <span class="n">ctypes</span><span class="o">.</span><span class="n">POINTER</span><span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">GetProcessTimes</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">BOOL</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">CloseHandle</span><span class="o">.</span><span class="n">argtypes</span> <span class="o">=</span> <span class="p">(</span><span class="n">wintypes</span><span class="o">.</span><span class="n">HANDLE</span><span class="p">,)</span>
+    <span class="n">kernel32</span><span class="o">.</span><span class="n">CloseHandle</span><span class="o">.</span><span class="n">restype</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">BOOL</span>
+
+    <span class="n">handle</span> <span class="o">=</span> <span class="n">kernel32</span><span class="o">.</span><span class="n">OpenProcess</span><span class="p">(</span><span class="n">process_query_limited_information</span><span class="p">,</span> <span class="kc">False</span><span class="p">,</span> <span class="n">pid</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">creation_time</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">()</span>
+        <span class="n">exit_time</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">()</span>
+        <span class="n">kernel_time</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">()</span>
+        <span class="n">user_time</span> <span class="o">=</span> <span class="n">wintypes</span><span class="o">.</span><span class="n">FILETIME</span><span class="p">()</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">kernel32</span><span class="o">.</span><span class="n">GetProcessTimes</span><span class="p">(</span><span class="n">handle</span><span class="p">,</span> <span class="n">creation_time</span><span class="p">,</span> <span class="n">exit_time</span><span class="p">,</span> <span class="n">kernel_time</span><span class="p">,</span> <span class="n">user_time</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"windows:</span><span class="si">{</span><span class="n">creation_time</span><span class="o">.</span><span class="n">dwHighDateTime</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">creation_time</span><span class="o">.</span><span class="n">dwLowDateTime</span><span class="si">}</span><span class="s2">"</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">kernel32</span><span class="o">.</span><span class="n">CloseHandle</span><span class="p">(</span><span class="n">handle</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_process_identity</span><span class="p">(</span><span class="n">pid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Return an immutable OS identity for a process, when supported.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pid: Process identifier to inspect.</span>
+
+<span class="sd">    """</span>
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"win32"</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_windows_process_identity</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"linux"</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">process_stat</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="sa">f</span><span class="s2">"/proc/</span><span class="si">{</span><span class="n">pid</span><span class="si">}</span><span class="s2">/stat"</span><span class="p">)</span><span class="o">.</span><span class="n">read_text</span><span class="p">()</span>
+            <span class="n">stat_fields</span> <span class="o">=</span> <span class="n">process_stat</span><span class="o">.</span><span class="n">rsplit</span><span class="p">(</span><span class="s2">")"</span><span class="p">,</span> <span class="n">maxsplit</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">"linux:</span><span class="si">{</span><span class="n">stat_fields</span><span class="p">[</span><span class="mi">19</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="k">return</span> <span class="kc">None</span>
+
+
+<div class="viewcode-block" id="LocalBackend">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend">[docs]</a>
+<span class="nd">@register_backend</span><span class="p">(</span><span class="s2">"local"</span><span class="p">)</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">LocalBackend</span><span class="p">(</span><span class="n">RemoteBackend</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Backend for local execution (useful for testing remote workflows).</span>
+
+<span class="sd">    This backend simulates the remote execution workflow locally:</span>
+
+<span class="sd">    - "Upload" copies files to a temporary directory</span>
+<span class="sd">    - "Execute" runs the script in a subprocess</span>
+<span class="sd">    - "Download" copies files back from the temporary directory</span>
+
+<span class="sd">    This is useful for:</span>
+
+<span class="sd">    - Testing remote execution workflows without a remote system</span>
+<span class="sd">    - Debugging serialization and script generation</span>
+<span class="sd">    - Running algorithms in isolated subprocesses</span>
+
+<span class="sd">    Config options:</span>
+<span class="sd">        timeout (int): Execution timeout in seconds (default: 3600).</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
+<span class="sd">        &gt;&gt;&gt;</span>
+<span class="sd">        &gt;&gt;&gt; scf = create("scf_solver")</span>
+<span class="sd">        &gt;&gt;&gt; energy, wfn = scf.run(structure, 0, 1, "cc-pvdz",</span>
+<span class="sd">        ...                       cache="./cache", remote="local")</span>
+
+<span class="sd">    """</span>
+
+    <span class="n">mcp_safe_config_options</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">"poll_interval"</span><span class="p">,</span> <span class="s2">"timeout"</span><span class="p">})</span>
+
+<div class="viewcode-block" id="LocalBackend.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">poll_interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_POLL_INTERVAL</span><span class="p">,</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">DEFAULT_TIMEOUT</span><span class="p">,</span>
+        <span class="n">python_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span> <span class="o">=</span> <span class="n">sys</span><span class="o">.</span><span class="n">executable</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Initialize the local backend.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            poll_interval: Seconds between job status checks.</span>
+<span class="sd">            timeout: Maximum execution time in seconds.</span>
+<span class="sd">            python_path: Python executable used to launch the remote worker.</span>
+
+<span class="sd">        """</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span>
+            <span class="n">poll_interval</span><span class="o">=</span><span class="n">poll_interval</span><span class="p">,</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span>
+            <span class="n">python_path</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">python_path</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">python_path</span> <span class="o">=</span> <span class="n">python_path</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span><span class="p">:</span> <span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_processes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.connect">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.connect">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Create a temporary working directory."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">(</span><span class="n">prefix</span><span class="o">=</span><span class="s2">"qdk_local_"</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.disconnect">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.disconnect">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Remove the connection workspace when it contains no jobs."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">OSError</span><span class="p">):</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span><span class="o">.</span><span class="n">rmdir</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.upload">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.upload">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">upload</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">local_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Copy a file to the 'remote' working directory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            local_path: Path to local file.</span>
+<span class="sd">            remote_path: Destination path (relative to workdir or absolute).</span>
+
+<span class="sd">        """</span>
+        <span class="n">local_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+        <span class="n">dest_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">remote_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">dest_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
+            <span class="n">dest_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span><span class="p">)</span> <span class="o">/</span> <span class="n">dest_path</span>
+
+        <span class="c1"># Ensure parent directory exists</span>
+        <span class="n">dest_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">local_path</span><span class="p">,</span> <span class="n">dest_path</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.download">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.download">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">download</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">remote_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">local_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Copy a file from the 'remote' working directory.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            remote_path: Path to file in workdir.</span>
+<span class="sd">            local_path: Destination path on local system.</span>
+
+<span class="sd">        """</span>
+        <span class="n">local_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_path</span><span class="p">)</span>
+        <span class="n">local_path</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">source_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">remote_path</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">source_path</span><span class="o">.</span><span class="n">is_absolute</span><span class="p">():</span>
+            <span class="n">source_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span><span class="p">)</span> <span class="o">/</span> <span class="n">source_path</span>
+        <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">source_path</span><span class="p">,</span> <span class="n">local_path</span><span class="p">)</span></div>
+
+
+    <span class="c1"># ── Async job primitives ─────────────────────────────────────────────</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">payload</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Launch a background subprocess and return ``(job_id, backend_state)``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            payload: Serialized execution request.</span>
+
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="n">serialize_inputs</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">job_id</span> <span class="o">=</span> <span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">()</span><span class="o">.</span><span class="n">hex</span><span class="p">[:</span><span class="mi">12</span><span class="p">]</span>
+        <span class="n">job_workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">remote_workdir</span><span class="p">)</span> <span class="o">/</span> <span class="sa">f</span><span class="s2">"job_</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">input_dir</span> <span class="o">=</span> <span class="n">job_workdir</span> <span class="o">/</span> <span class="s2">"input"</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">job_workdir</span> <span class="o">/</span> <span class="s2">"output"</span>
+        <span class="n">input_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">output_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">serialize_inputs</span><span class="p">(</span>
+            <span class="n">input_dir</span><span class="p">,</span>
+            <span class="n">args</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"args"</span><span class="p">],</span>
+            <span class="n">kwargs</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"kwargs"</span><span class="p">],</span>
+            <span class="n">algorithm_type</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"algorithm_type"</span><span class="p">],</span>
+            <span class="n">algorithm_name</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"algorithm_name"</span><span class="p">],</span>
+            <span class="n">settings</span><span class="o">=</span><span class="n">payload</span><span class="p">[</span><span class="s2">"settings"</span><span class="p">],</span>
+            <span class="n">run_hash</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"run_hash"</span><span class="p">),</span>
+            <span class="n">job_cache_key</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"job_cache_key"</span><span class="p">),</span>
+            <span class="n">owner</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"owner"</span><span class="p">),</span>
+            <span class="n">input_hashes</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"input_hashes"</span><span class="p">),</span>
+            <span class="n">force_rerun</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"force_rerun"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+            <span class="n">remote_cache</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"remote_cache"</span><span class="p">),</span>
+            <span class="n">remote_cache_backend</span><span class="o">=</span><span class="n">payload</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"remote_cache_backend"</span><span class="p">),</span>
+        <span class="p">)</span>
+
+        <span class="n">python_path</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">python_path</span><span class="p">)</span>
+        <span class="k">with</span> <span class="p">(</span><span class="n">job_workdir</span> <span class="o">/</span> <span class="s2">"stdout.log"</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">stdout</span><span class="p">,</span> <span class="p">(</span><span class="n">job_workdir</span> <span class="o">/</span> <span class="s2">"stderr.log"</span><span class="p">)</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"w"</span><span class="p">)</span> <span class="k">as</span> <span class="n">stderr</span><span class="p">:</span>
+            <span class="n">proc</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">(</span>
+                <span class="p">[</span>
+                    <span class="n">python_path</span><span class="p">,</span>
+                    <span class="s2">"-m"</span><span class="p">,</span>
+                    <span class="s2">"qdk_chemistry.remote.worker"</span><span class="p">,</span>
+                    <span class="s2">"--input-dir"</span><span class="p">,</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">input_dir</span><span class="p">),</span>
+                    <span class="s2">"--output-dir"</span><span class="p">,</span>
+                    <span class="nb">str</span><span class="p">(</span><span class="n">output_dir</span><span class="p">),</span>
+                <span class="p">],</span>
+                <span class="n">cwd</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">job_workdir</span><span class="p">),</span>
+                <span class="n">stdout</span><span class="o">=</span><span class="n">stdout</span><span class="p">,</span>
+                <span class="n">stderr</span><span class="o">=</span><span class="n">stderr</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="n">backend_state</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"job_id"</span><span class="p">:</span> <span class="n">job_id</span><span class="p">,</span>
+            <span class="s2">"pid"</span><span class="p">:</span> <span class="n">proc</span><span class="o">.</span><span class="n">pid</span><span class="p">,</span>
+            <span class="s2">"process_identity"</span><span class="p">:</span> <span class="n">_process_identity</span><span class="p">(</span><span class="n">proc</span><span class="o">.</span><span class="n">pid</span><span class="p">),</span>
+            <span class="s2">"workdir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_workdir</span><span class="p">),</span>
+            <span class="s2">"output_dir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">output_dir</span><span class="p">),</span>
+            <span class="s2">"job_workdir"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">job_workdir</span><span class="p">),</span>
+        <span class="p">}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_processes</span><span class="p">[</span><span class="n">proc</span><span class="o">.</span><span class="n">pid</span><span class="p">]</span> <span class="o">=</span> <span class="n">proc</span>
+        <span class="k">return</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">backend_state</span>
+
+<div class="viewcode-block" id="LocalBackend.check">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.check">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JobStatus</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Check whether the background subprocess has finished.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the submitted local job.</span>
+
+<span class="sd">        """</span>
+        <span class="n">pid</span> <span class="o">=</span> <span class="n">backend_state</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">]</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">backend_state</span><span class="p">[</span><span class="s2">"output_dir"</span><span class="p">]</span>
+        <span class="n">job_workdir</span> <span class="o">=</span> <span class="n">backend_state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"job_workdir"</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span><span class="p">))</span>
+        <span class="n">manifest</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_dir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"manifest.json"</span>
+
+        <span class="n">process</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_processes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">process</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">return_code</span> <span class="o">=</span> <span class="n">process</span><span class="o">.</span><span class="n">poll</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">return_code</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">status</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_processes</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">pid</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="n">status</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">SUCCEEDED</span> <span class="k">if</span> <span class="n">return_code</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">manifest</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span> <span class="k">else</span> <span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span>
+        <span class="k">elif</span> <span class="n">manifest</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">SUCCEEDED</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">expected_identity</span> <span class="o">=</span> <span class="n">backend_state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"process_identity"</span><span class="p">)</span>
+            <span class="n">identity_matches</span> <span class="o">=</span> <span class="n">expected_identity</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">_process_identity</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span> <span class="o">==</span> <span class="n">expected_identity</span>
+            <span class="n">status</span> <span class="o">=</span> <span class="n">JobState</span><span class="o">.</span><span class="n">RUNNING</span> <span class="k">if</span> <span class="n">identity_matches</span> <span class="ow">and</span> <span class="n">_process_is_running</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span> <span class="k">else</span> <span class="n">JobState</span><span class="o">.</span><span class="n">FAILED</span>
+
+        <span class="c1"># Read logs if available</span>
+        <span class="n">logs</span> <span class="o">=</span> <span class="s2">""</span>
+        <span class="n">stderr_log</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">job_workdir</span><span class="p">)</span> <span class="o">/</span> <span class="s2">"stderr.log"</span>
+        <span class="k">if</span> <span class="n">stderr_log</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="n">logs</span> <span class="o">=</span> <span class="n">stderr_log</span><span class="o">.</span><span class="n">read_text</span><span class="p">()[</span><span class="o">-</span><span class="mi">2000</span><span class="p">:]</span>
+
+        <span class="k">return</span> <span class="n">JobStatus</span><span class="p">(</span>
+            <span class="n">job_id</span><span class="o">=</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"job_id"</span><span class="p">],</span>
+            <span class="n">status</span><span class="o">=</span><span class="n">status</span><span class="p">,</span>
+            <span class="n">logs</span><span class="o">=</span><span class="n">logs</span><span class="p">,</span>
+            <span class="n">metadata</span><span class="o">=</span><span class="p">{</span><span class="s2">"pid"</span><span class="p">:</span> <span class="n">pid</span><span class="p">},</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.cancel">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.cancel">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cancel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Kill the background subprocess.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the submitted local job.</span>
+
+<span class="sd">        """</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>  <span class="c1"># noqa: PLC0415</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">signal</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">process</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_processes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">process</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">process</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+            <span class="k">return</span>
+
+        <span class="n">expected_identity</span> <span class="o">=</span> <span class="n">backend_state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"process_identity"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">expected_identity</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">_process_identity</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">])</span> <span class="o">!=</span> <span class="n">expected_identity</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"Cannot verify local job process identity; refusing to terminate it."</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">ProcessLookupError</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">kill</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"pid"</span><span class="p">],</span> <span class="n">signal</span><span class="o">.</span><span class="n">SIGTERM</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.fetch">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.fetch">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span>
+        <span class="n">local_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Deserialize results from a completed local job.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the completed local job.</span>
+<span class="sd">            local_dir: Optional directory for downloaded result files.</span>
+
+<span class="sd">        """</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.remote.serialization</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+            <span class="n">deserialize_outputs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">output_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"output_dir"</span><span class="p">])</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">output_path</span> <span class="o">/</span> <span class="s2">"manifest.json"</span><span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Job output not found at </span><span class="si">{</span><span class="n">output_path</span><span class="si">}</span><span class="s2">. Job may not have completed successfully."</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">local_dir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">local_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">local_dir</span><span class="p">)</span>
+            <span class="n">local_dir</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">output_path</span><span class="o">.</span><span class="n">iterdir</span><span class="p">():</span>
+                <span class="n">shutil</span><span class="o">.</span><span class="n">copy2</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">local_dir</span> <span class="o">/</span> <span class="n">f</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">deserialize_outputs</span><span class="p">(</span><span class="n">local_dir</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">deserialize_outputs</span><span class="p">(</span><span class="n">output_path</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">result</span></div>
+
+
+<div class="viewcode-block" id="LocalBackend.cleanup_job">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.remote.backends.local.html#qdk_chemistry.remote.backends.local.LocalBackend.cleanup_job">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">cleanup_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">backend_state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Remove one local job directory and its parent when empty.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            backend_state: Persisted state for the terminal local job.</span>
+
+<span class="sd">        """</span>
+        <span class="n">workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"workdir"</span><span class="p">])</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="n">job_workdir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"job_workdir"</span><span class="p">])</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="n">output_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">backend_state</span><span class="p">[</span><span class="s2">"output_dir"</span><span class="p">])</span><span class="o">.</span><span class="n">resolve</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">job_workdir</span><span class="o">.</span><span class="n">parent</span> <span class="o">!=</span> <span class="n">workdir</span> <span class="ow">or</span> <span class="n">output_dir</span><span class="o">.</span><span class="n">parent</span> <span class="o">!=</span> <span class="n">job_workdir</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Local job paths are inconsistent with the backend work directory"</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">):</span>
+            <span class="n">shutil</span><span class="o">.</span><span class="n">rmtree</span><span class="p">(</span><span class="n">job_workdir</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">OSError</span><span class="p">):</span>
+            <span class="n">workdir</span><span class="o">.</span><span class="n">rmdir</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

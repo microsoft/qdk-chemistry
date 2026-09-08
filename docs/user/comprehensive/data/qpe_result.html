@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QpeResult &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>QpeResult &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
@@ -189,7 +190,7 @@ For details on how different <a class="reference internal" href="../../../glossa
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">canonical_phase_fraction</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Alias-resolved phase fraction. Equals <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code> when no alias resolution is performed (e.g., qubitization).</p></td>
+<td><p>Alias-resolved phase fraction consistent with the selected energy branch. Equals <code class="docutils literal notranslate"><span class="pre">phase_fraction</span></code> when the algorithm performs no alias resolution.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">canonical_phase_angle</span></code></p></td>
 <td><p>float</p></td>
@@ -197,15 +198,15 @@ For details on how different <a class="reference internal" href="../../../glossa
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">raw_energy</span></code></p></td>
 <td><p>float</p></td>
-<td><p>Energy computed from the measured phase via the container’s <code class="docutils literal notranslate"><span class="pre">eigenvalue_from_phase</span></code> method.</p></td>
+<td><p>Energy computed from <code class="docutils literal notranslate"><span class="pre">canonical_phase_fraction</span></code> via the container’s <code class="docutils literal notranslate"><span class="pre">eigenvalue_from_phase</span></code> method.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">branching</span></code></p></td>
 <td><p>tuple[float, …]</p></td>
-<td><p>Energy candidates. For the unified <code class="docutils literal notranslate"><span class="pre">from_phase_fraction</span></code> factory, this is a single-element tuple containing <code class="docutils literal notranslate"><span class="pre">raw_energy</span></code>.</p></td>
+<td><p>Sorted energy candidates considered, including <code class="docutils literal notranslate"><span class="pre">raw_energy</span></code>. A single-element tuple when the algorithm performs no alias resolution.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">resolved_energy</span></code></p></td>
 <td><p>float | None</p></td>
-<td><p>Reserved for alias resolution (currently <code class="docutils literal notranslate"><span class="pre">None</span></code> when using <code class="docutils literal notranslate"><span class="pre">from_phase_fraction</span></code>).</p></td>
+<td><p>Candidate from <code class="docutils literal notranslate"><span class="pre">branching</span></code> picked by the algorithm’s alias-resolution rule, or <code class="docutils literal notranslate"><span class="pre">None</span></code> when no resolution was performed.</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">bits_msb_first</span></code></p></td>
 <td><p>tuple[int, …] | None</p></td>
@@ -248,20 +249,20 @@ They can also be constructed manually using <a class="reference internal" href="
 
 <span class="c1"># Time-evolution QPE: U = e^{-iHt}, eigenvalue_from_phase wraps the angle.</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
-    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ZI&quot;</span><span class="p">,</span> <span class="s2">&quot;IZ&quot;</span><span class="p">,</span> <span class="s2">&quot;XX&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
+    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">"ZI"</span><span class="p">,</span> <span class="s2">"IZ"</span><span class="p">,</span> <span class="s2">"XX"</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
 <span class="p">)</span>
 <span class="n">evolution_time</span> <span class="o">=</span> <span class="mf">0.1</span>
 
-<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;trotter&quot;</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">evolution_time</span><span class="p">)</span>
+<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"trotter"</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">evolution_time</span><span class="p">)</span>
 <span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
 <span class="n">container</span> <span class="o">=</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
 
 <span class="n">result</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
-    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;iterative&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">"iterative"</span><span class="p">,</span>
     <span class="n">phase_fraction</span><span class="o">=</span><span class="mf">0.423828125</span><span class="p">,</span>
     <span class="n">eigenvalue_from_phase</span><span class="o">=</span><span class="n">container</span><span class="o">.</span><span class="n">eigenvalue_from_phase</span><span class="p">,</span>
     <span class="n">bits_msb_first</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
-    <span class="n">bitstring_msb_first</span><span class="o">=</span><span class="s2">&quot;0110110010&quot;</span><span class="p">,</span>
+    <span class="n">bitstring_msb_first</span><span class="o">=</span><span class="s2">"0110110010"</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -278,19 +279,19 @@ They can also be constructed manually using <a class="reference internal" href="
 
 <span class="c1"># Qubitization QPE: W = walk operator, E = lambda * cos(2*pi*phi).</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
-    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ZI&quot;</span><span class="p">,</span> <span class="s2">&quot;IZ&quot;</span><span class="p">,</span> <span class="s2">&quot;XX&quot;</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
+    <span class="n">pauli_strings</span><span class="o">=</span><span class="p">[</span><span class="s2">"ZI"</span><span class="p">,</span> <span class="s2">"IZ"</span><span class="p">,</span> <span class="s2">"XX"</span><span class="p">],</span> <span class="n">coefficients</span><span class="o">=</span><span class="p">[</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
 <span class="p">)</span>
 
-<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_unitary_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;lcu&quot;</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_unitary_builder"</span><span class="p">,</span> <span class="s2">"lcu"</span><span class="p">,</span> <span class="n">quantum_walk</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
 <span class="n">walk_container</span> <span class="o">=</span> <span class="n">unitary</span><span class="o">.</span><span class="n">get_container</span><span class="p">()</span>
 
 <span class="n">result_qubitization</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
-    <span class="n">method</span><span class="o">=</span><span class="s2">&quot;qubitization_qpe&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="o">=</span><span class="s2">"qubitization_qpe"</span><span class="p">,</span>
     <span class="n">phase_fraction</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
     <span class="n">eigenvalue_from_phase</span><span class="o">=</span><span class="n">walk_container</span><span class="o">.</span><span class="n">eigenvalue_from_phase</span><span class="p">,</span>
     <span class="n">bits_msb_first</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span>
-    <span class="n">bitstring_msb_first</span><span class="o">=</span><span class="s2">&quot;0100&quot;</span><span class="p">,</span>
+    <span class="n">bitstring_msb_first</span><span class="o">=</span><span class="s2">"0100"</span><span class="p">,</span>
 <span class="p">)</span>
 </pre></div>
 </div>
@@ -302,11 +303,11 @@ They can also be constructed manually using <a class="reference internal" href="
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Inspect the result</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Method: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">method</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase fraction: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Phase angle: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_angle</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> rad&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Raw energy: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">raw_energy</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2"> Ha&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Measured bits: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bits_msb_first</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Method: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">method</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Phase fraction: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_fraction</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Phase angle: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">phase_angle</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2"> rad"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Raw energy: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">raw_energy</span><span class="si">:</span><span class="s2">.8f</span><span class="si">}</span><span class="s2"> Ha"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Measured bits: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bits_msb_first</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Full summary</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
@@ -327,16 +328,16 @@ They can also be constructed manually using <a class="reference internal" href="
 <span class="n">tmpdir</span> <span class="o">=</span> <span class="n">tempfile</span><span class="o">.</span><span class="n">mkdtemp</span><span class="p">()</span>
 
 <span class="c1"># Save to JSON</span>
-<span class="n">result</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;result.qpe_result.json&quot;</span><span class="p">))</span>
+<span class="n">result</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">"result.qpe_result.json"</span><span class="p">))</span>
 
 <span class="c1"># Load from JSON</span>
-<span class="n">loaded</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;result.qpe_result.json&quot;</span><span class="p">))</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">"result.qpe_result.json"</span><span class="p">))</span>
 
 <span class="c1"># Save to HDF5</span>
-<span class="n">result</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;result.qpe_result.h5&quot;</span><span class="p">))</span>
+<span class="n">result</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">"result.qpe_result.h5"</span><span class="p">))</span>
 
 <span class="c1"># Load from HDF5</span>
-<span class="n">loaded_h5</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">&quot;result.qpe_result.h5&quot;</span><span class="p">))</span>
+<span class="n">loaded_h5</span> <span class="o">=</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">,</span> <span class="s2">"result.qpe_result.h5"</span><span class="p">))</span>
 </pre></div>
 </div>
 </div>

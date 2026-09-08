@@ -18,6 +18,7 @@ Subpackages
    qdk_chemistry.migrate
    qdk_chemistry.plugins
    qdk_chemistry.remote
+   qdk_chemistry.ui
    qdk_chemistry.utils
 
 Submodules

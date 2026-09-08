@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.migrate._wavefunction &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.migrate._wavefunction &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -96,7 +97,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.migrate._wavefunction</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Migrate the ``Wavefunction`` serialization schema to the current version.</span>
+<span></span><span class="sd">"""Migrate the ``Wavefunction`` serialization schema to the current version.</span>
 
 <span class="sd">The legacy single-determinant (``sd``), complete-active-space (``cas``) and</span>
 <span class="sd">selected-CI (``sci``) containers were flattened into ``state_vector``; the legacy</span>
@@ -111,7 +112,7 @@
 <span class="sd">Spin-dependent RDM components are carried across by their serialized name; the</span>
 <span class="sd">``(aaaa, aabb, bbbb)`` ordering fix (#499) is a separate data-correctness</span>
 <span class="sd">concern and is intentionally not reinterpreted here.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -125,39 +126,39 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">_io</span><span class="p">,</span> <span class="n">_orbitals</span><span class="p">,</span> <span class="n">_sbt</span>
 
-<span class="n">WAVEFUNCTION_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
-<span class="n">CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.2.0&quot;</span>
-<span class="n">AMPLITUDE_CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
-<span class="n">OLD_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+<span class="n">WAVEFUNCTION_VERSION</span> <span class="o">=</span> <span class="s2">"0.2.0"</span>
+<span class="n">CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">"0.2.0"</span>
+<span class="n">AMPLITUDE_CONTAINER_VERSION</span> <span class="o">=</span> <span class="s2">"0.1.0"</span>
+<span class="n">OLD_VERSION</span> <span class="o">=</span> <span class="s2">"0.1.0"</span>
 
-<span class="n">_STATE_VECTOR_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;sd&quot;</span><span class="p">,</span> <span class="s2">&quot;cas&quot;</span><span class="p">,</span> <span class="s2">&quot;sci&quot;</span><span class="p">}</span>
-<span class="n">_AMPLITUDE_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;mp2&quot;</span><span class="p">,</span> <span class="s2">&quot;coupled_cluster&quot;</span><span class="p">,</span> <span class="s2">&quot;cc&quot;</span><span class="p">}</span>
-<span class="n">_SPIN_HALF_CHARS</span> <span class="o">=</span> <span class="s2">&quot;0ud2&quot;</span>
+<span class="n">_STATE_VECTOR_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"sd"</span><span class="p">,</span> <span class="s2">"cas"</span><span class="p">,</span> <span class="s2">"sci"</span><span class="p">}</span>
+<span class="n">_AMPLITUDE_TYPES</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"mp2"</span><span class="p">,</span> <span class="s2">"coupled_cluster"</span><span class="p">,</span> <span class="s2">"cc"</span><span class="p">}</span>
+<span class="n">_SPIN_HALF_CHARS</span> <span class="o">=</span> <span class="s2">"0ud2"</span>
 
 
 <div class="viewcode-block" id="from_json_doc">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.from_json_doc">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_json_doc</span><span class="p">(</span><span class="n">doc</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize a parsed legacy Wavefunction JSON object into an old-doc.&quot;&quot;&quot;</span>
-    <span class="n">container</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;container&quot;</span><span class="p">,</span> <span class="n">doc</span><span class="p">)</span>
-    <span class="n">tag</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;container_type&quot;</span><span class="p">,</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">))</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)),</span> <span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">&quot;container&quot;</span><span class="p">:</span> <span class="n">container</span><span class="p">}</span></div>
+<span class="w">    </span><span class="sd">"""Normalize a parsed legacy Wavefunction JSON object into an old-doc."""</span>
+    <span class="n">container</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"container"</span><span class="p">,</span> <span class="n">doc</span><span class="p">)</span>
+    <span class="n">tag</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"container_type"</span><span class="p">,</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">))</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"_source_version"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"version"</span><span class="p">)),</span> <span class="s2">"tag"</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">"container"</span><span class="p">:</span> <span class="n">container</span><span class="p">}</span></div>
 
 
 
 <div class="viewcode-block" id="from_hdf5_file">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.from_hdf5_file">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5_file</span><span class="p">(</span><span class="n">path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a legacy Wavefunction HDF5 file into an old-doc.&quot;&quot;&quot;</span>
-    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">_read_wavefunction_group</span><span class="p">(</span><span class="n">handle</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">])</span></div>
+<span class="w">    </span><span class="sd">"""Read a legacy Wavefunction HDF5 file into an old-doc."""</span>
+    <span class="k">with</span> <span class="n">h5py</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="s2">"r"</span><span class="p">)</span> <span class="k">as</span> <span class="n">handle</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_read_wavefunction_group</span><span class="p">(</span><span class="n">handle</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">])</span></div>
 
 
 
 <div class="viewcode-block" id="from_hdf5_group">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.from_hdf5_group">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a legacy Wavefunction HDF5 group (the ``wavefunction`` group) into an old-doc.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Read a legacy Wavefunction HDF5 group (the ``wavefunction`` group) into an old-doc."""</span>
     <span class="k">return</span> <span class="n">_read_wavefunction_group</span><span class="p">(</span><span class="n">group</span><span class="p">)</span></div>
 
 
@@ -165,77 +166,77 @@
 <div class="viewcode-block" id="to_new_json">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.migrate._wavefunction.html#qdk_chemistry.migrate._wavefunction.to_new_json">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">to_new_json</span><span class="p">(</span><span class="n">old</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the migrated Wavefunction JSON object from a normalized old-doc.&quot;&quot;&quot;</span>
-    <span class="n">container</span> <span class="o">=</span> <span class="n">_convert_container</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">&quot;container&quot;</span><span class="p">],</span> <span class="n">old</span><span class="p">[</span><span class="s2">&quot;tag&quot;</span><span class="p">])</span>
+<span class="w">    </span><span class="sd">"""Build the migrated Wavefunction JSON object from a normalized old-doc."""</span>
+    <span class="n">container</span> <span class="o">=</span> <span class="n">_convert_container</span><span class="p">(</span><span class="n">old</span><span class="p">[</span><span class="s2">"container"</span><span class="p">],</span> <span class="n">old</span><span class="p">[</span><span class="s2">"tag"</span><span class="p">])</span>
     <span class="k">return</span> <span class="p">{</span>
-        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">WAVEFUNCTION_VERSION</span><span class="p">,</span>
-        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;container_type&quot;</span><span class="p">],</span>
-        <span class="s2">&quot;container&quot;</span><span class="p">:</span> <span class="n">container</span><span class="p">,</span>
+        <span class="s2">"version"</span><span class="p">:</span> <span class="n">WAVEFUNCTION_VERSION</span><span class="p">,</span>
+        <span class="s2">"container_type"</span><span class="p">:</span> <span class="n">container</span><span class="p">[</span><span class="s2">"container_type"</span><span class="p">],</span>
+        <span class="s2">"container"</span><span class="p">:</span> <span class="n">container</span><span class="p">,</span>
     <span class="p">}</span></div>
 
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_convert_container</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Dispatch a legacy wavefunction container to its converter.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Dispatch a legacy wavefunction container to its converter."""</span>
     <span class="k">if</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">_STATE_VECTOR_TYPES</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_to_state_vector</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">_AMPLITUDE_TYPES</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_to_amplitude</span><span class="p">(</span><span class="n">container</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown legacy wavefunction container type: </span><span class="si">{</span><span class="n">tag</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown legacy wavefunction container type: </span><span class="si">{</span><span class="n">tag</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_convert_orbitals</span><span class="p">(</span><span class="n">orbitals_json</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Migrate an embedded legacy orbitals JSON object to the current schema (idempotent).&quot;&quot;&quot;</span>
-    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">orbitals_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;coefficients&quot;</span><span class="p">)</span>
-    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;SymmetryBlockedTensor&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Migrate an embedded legacy orbitals JSON object to the current schema (idempotent)."""</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">orbitals_json</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"coefficients"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="n">coefficients</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"SymmetryBlockedTensor"</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">orbitals_json</span>  <span class="c1"># already migrated (HDF5 reader path)</span>
     <span class="k">return</span> <span class="n">_orbitals</span><span class="o">.</span><span class="n">to_new_json</span><span class="p">(</span><span class="n">_orbitals</span><span class="o">.</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">orbitals_json</span><span class="p">))</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_to_state_vector</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a legacy sd/cas/sci container to a state-vector container.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Convert a legacy sd/cas/sci container to a state-vector container."""</span>
     <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">CONTAINER_VERSION</span><span class="p">,</span>
-        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="s2">&quot;state_vector&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;wavefunction_type&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wavefunction_type&quot;</span><span class="p">,</span> <span class="s2">&quot;self_dual&quot;</span><span class="p">),</span>
+        <span class="s2">"version"</span><span class="p">:</span> <span class="n">CONTAINER_VERSION</span><span class="p">,</span>
+        <span class="s2">"container_type"</span><span class="p">:</span> <span class="s2">"state_vector"</span><span class="p">,</span>
+        <span class="s2">"wavefunction_type"</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"wavefunction_type"</span><span class="p">,</span> <span class="s2">"self_dual"</span><span class="p">),</span>
     <span class="p">}</span>
 
-    <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;sd&quot;</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;is_complex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;configuration_set&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-            <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_convert_orbitals</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
-            <span class="s2">&quot;configurations&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;determinant&quot;</span><span class="p">]],</span>
+    <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">"sd"</span><span class="p">:</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"is_complex"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"coefficients"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">]</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"configuration_set"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"orbitals"</span><span class="p">:</span> <span class="n">_convert_orbitals</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">]),</span>
+            <span class="s2">"configurations"</span><span class="p">:</span> <span class="p">[</span><span class="n">container</span><span class="p">[</span><span class="s2">"determinant"</span><span class="p">]],</span>
         <span class="p">}</span>
         <span class="k">return</span> <span class="n">new</span>
 
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;is_complex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_complex&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">]</span>
-    <span class="n">config_set</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">&quot;configuration_set&quot;</span><span class="p">]</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;configuration_set&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_convert_orbitals</span><span class="p">(</span><span class="n">config_set</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
-        <span class="s2">&quot;configurations&quot;</span><span class="p">:</span> <span class="n">config_set</span><span class="p">[</span><span class="s2">&quot;configurations&quot;</span><span class="p">],</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"is_complex"</span><span class="p">]</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"is_complex"</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"coefficients"</span><span class="p">]</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">"coefficients"</span><span class="p">]</span>
+    <span class="n">config_set</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="s2">"configuration_set"</span><span class="p">]</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"configuration_set"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"orbitals"</span><span class="p">:</span> <span class="n">_convert_orbitals</span><span class="p">(</span><span class="n">config_set</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">]),</span>
+        <span class="s2">"configurations"</span><span class="p">:</span> <span class="n">config_set</span><span class="p">[</span><span class="s2">"configurations"</span><span class="p">],</span>
     <span class="p">}</span>
-    <span class="k">if</span> <span class="s2">&quot;sector&quot;</span> <span class="ow">in</span> <span class="n">config_set</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;configuration_set&quot;</span><span class="p">][</span><span class="s2">&quot;sector&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">config_set</span><span class="p">[</span><span class="s2">&quot;sector&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="s2">"sector"</span> <span class="ow">in</span> <span class="n">config_set</span><span class="p">:</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"configuration_set"</span><span class="p">][</span><span class="s2">"sector"</span><span class="p">]</span> <span class="o">=</span> <span class="n">config_set</span><span class="p">[</span><span class="s2">"sector"</span><span class="p">]</span>
 
-    <span class="n">rdms</span> <span class="o">=</span> <span class="n">_convert_rdms</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rdms&quot;</span><span class="p">))</span>
+    <span class="n">rdms</span> <span class="o">=</span> <span class="n">_convert_rdms</span><span class="p">(</span><span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"rdms"</span><span class="p">))</span>
     <span class="k">if</span> <span class="n">rdms</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;rdms&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdms</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"rdms"</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdms</span>
     <span class="k">return</span> <span class="n">new</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_convert_rdms</span><span class="p">(</span><span class="n">rdms</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert legacy RDM fields to the current RDM layout.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""Convert legacy RDM fields to the current RDM layout."""</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">rdms</span><span class="p">:</span>
         <span class="k">return</span> <span class="kc">None</span>
     <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="c1"># Spin-traced RDMs are dense and schema-stable: carry through verbatim.</span>
     <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span>
-        <span class="s2">&quot;is_one_rdm_spin_traced_complex&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;one_rdm_spin_traced&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;is_two_rdm_spin_traced_complex&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;two_rdm_spin_traced&quot;</span><span class="p">,</span>
+        <span class="s2">"is_one_rdm_spin_traced_complex"</span><span class="p">,</span>
+        <span class="s2">"one_rdm_spin_traced"</span><span class="p">,</span>
+        <span class="s2">"is_two_rdm_spin_traced_complex"</span><span class="p">,</span>
+        <span class="s2">"two_rdm_spin_traced"</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">rdms</span><span class="p">:</span>
             <span class="n">new</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">rdms</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
@@ -243,45 +244,45 @@
     <span class="c1"># Spin-dependent active RDMs: dense per-channel arrays -&gt; symmetry-blocked.</span>
     <span class="c1"># Restricted (closed-shell) files omit the redundant beta channels; the</span>
     <span class="c1"># symmetry-blocked builders alias them from the alpha channels.</span>
-    <span class="k">if</span> <span class="s2">&quot;one_rdm_aa&quot;</span> <span class="ow">in</span> <span class="n">rdms</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">rdms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_one_rdm_aa_complex&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="n">rdms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_one_rdm_bb_complex&quot;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Complex active-RDM migration is not supported.&quot;</span><span class="p">)</span>
-        <span class="n">bb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">&quot;one_rdm_bb&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;one_rdm_bb&quot;</span> <span class="ow">in</span> <span class="n">rdms</span> <span class="k">else</span> <span class="kc">None</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;active_one_rdm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank2_dict</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">&quot;one_rdm_aa&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="n">bb</span><span class="p">)</span>
-    <span class="k">if</span> <span class="s2">&quot;two_rdm_aaaa&quot;</span> <span class="ow">in</span> <span class="n">rdms</span> <span class="ow">and</span> <span class="s2">&quot;two_rdm_aabb&quot;</span> <span class="ow">in</span> <span class="n">rdms</span><span class="p">:</span>
-        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">rdms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;is_two_rdm_</span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">_complex&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;aaaa&quot;</span><span class="p">,</span> <span class="s2">&quot;aabb&quot;</span><span class="p">,</span> <span class="s2">&quot;bbbb&quot;</span><span class="p">)):</span>
-            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Complex active-RDM migration is not supported.&quot;</span><span class="p">)</span>
-        <span class="n">bbbb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">&quot;two_rdm_bbbb&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">if</span> <span class="s2">&quot;two_rdm_bbbb&quot;</span> <span class="ow">in</span> <span class="n">rdms</span> <span class="k">else</span> <span class="kc">None</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;active_two_rdm&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank4_rdm_dict</span><span class="p">(</span>
-            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">&quot;two_rdm_aaaa&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
-            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">&quot;two_rdm_aabb&quot;</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+    <span class="k">if</span> <span class="s2">"one_rdm_aa"</span> <span class="ow">in</span> <span class="n">rdms</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">rdms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"is_one_rdm_aa_complex"</span><span class="p">)</span> <span class="ow">or</span> <span class="n">rdms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"is_one_rdm_bb_complex"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Complex active-RDM migration is not supported."</span><span class="p">)</span>
+        <span class="n">bb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">"one_rdm_bb"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">if</span> <span class="s2">"one_rdm_bb"</span> <span class="ow">in</span> <span class="n">rdms</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"active_one_rdm"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank2_dict</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">"one_rdm_aa"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span> <span class="n">bb</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"two_rdm_aaaa"</span> <span class="ow">in</span> <span class="n">rdms</span> <span class="ow">and</span> <span class="s2">"two_rdm_aabb"</span> <span class="ow">in</span> <span class="n">rdms</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">rdms</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">"is_two_rdm_</span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">_complex"</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"aaaa"</span><span class="p">,</span> <span class="s2">"aabb"</span><span class="p">,</span> <span class="s2">"bbbb"</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Complex active-RDM migration is not supported."</span><span class="p">)</span>
+        <span class="n">bbbb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">"two_rdm_bbbb"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span> <span class="k">if</span> <span class="s2">"two_rdm_bbbb"</span> <span class="ow">in</span> <span class="n">rdms</span> <span class="k">else</span> <span class="kc">None</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"active_two_rdm"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_sbt</span><span class="o">.</span><span class="n">rank4_rdm_dict</span><span class="p">(</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">"two_rdm_aaaa"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">rdms</span><span class="p">[</span><span class="s2">"two_rdm_aabb"</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">),</span>
             <span class="n">bbbb</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="n">new</span> <span class="ow">or</span> <span class="kc">None</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_to_amplitude</span><span class="p">(</span><span class="n">container</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert a legacy mp2/coupled-cluster container to an amplitude container.&quot;&quot;&quot;</span>
-    <span class="n">amplitude_type</span> <span class="o">=</span> <span class="s2">&quot;moller_plesset&quot;</span> <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;mp2&quot;</span> <span class="k">else</span> <span class="s2">&quot;coupled_cluster&quot;</span>
+<span class="w">    </span><span class="sd">"""Convert a legacy mp2/coupled-cluster container to an amplitude container."""</span>
+    <span class="n">amplitude_type</span> <span class="o">=</span> <span class="s2">"moller_plesset"</span> <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">"mp2"</span> <span class="k">else</span> <span class="s2">"coupled_cluster"</span>
     <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;version&quot;</span><span class="p">:</span> <span class="n">AMPLITUDE_CONTAINER_VERSION</span><span class="p">,</span>
-        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="s2">&quot;amplitude&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;amplitude_type&quot;</span><span class="p">:</span> <span class="n">amplitude_type</span><span class="p">,</span>
-        <span class="s2">&quot;is_complex&quot;</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;is_complex&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+        <span class="s2">"version"</span><span class="p">:</span> <span class="n">AMPLITUDE_CONTAINER_VERSION</span><span class="p">,</span>
+        <span class="s2">"container_type"</span><span class="p">:</span> <span class="s2">"amplitude"</span><span class="p">,</span>
+        <span class="s2">"amplitude_type"</span><span class="p">:</span> <span class="n">amplitude_type</span><span class="p">,</span>
+        <span class="s2">"is_complex"</span><span class="p">:</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"is_complex"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
     <span class="p">}</span>
-    <span class="k">if</span> <span class="s2">&quot;orbitals&quot;</span> <span class="ow">in</span> <span class="n">container</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_convert_orbitals</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">])</span>
-    <span class="n">nested</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"orbitals"</span> <span class="ow">in</span> <span class="n">container</span><span class="p">:</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_convert_orbitals</span><span class="p">(</span><span class="n">container</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">])</span>
+    <span class="n">nested</span> <span class="o">=</span> <span class="n">container</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"wavefunction"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">nested</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
-            <span class="n">nested</span> <span class="k">if</span> <span class="n">nested</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;version&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="n">WAVEFUNCTION_VERSION</span> <span class="k">else</span> <span class="n">to_new_json</span><span class="p">(</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">nested</span><span class="p">))</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">nested</span> <span class="k">if</span> <span class="n">nested</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"version"</span><span class="p">)</span> <span class="o">==</span> <span class="n">WAVEFUNCTION_VERSION</span> <span class="k">else</span> <span class="n">to_new_json</span><span class="p">(</span><span class="n">from_json_doc</span><span class="p">(</span><span class="n">nested</span><span class="p">))</span>
         <span class="p">)</span>
     <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="p">(</span>
-        <span class="s2">&quot;t1_amplitudes_aa&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t1_amplitudes_bb&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t2_amplitudes_abab&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t2_amplitudes_aaaa&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t2_amplitudes_bbbb&quot;</span><span class="p">,</span>
+        <span class="s2">"t1_amplitudes_aa"</span><span class="p">,</span>
+        <span class="s2">"t1_amplitudes_bb"</span><span class="p">,</span>
+        <span class="s2">"t2_amplitudes_abab"</span><span class="p">,</span>
+        <span class="s2">"t2_amplitudes_aaaa"</span><span class="p">,</span>
+        <span class="s2">"t2_amplitudes_bbbb"</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">container</span><span class="p">:</span>
             <span class="n">new</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">container</span><span class="p">[</span><span class="n">key</span><span class="p">]</span>
@@ -292,14 +293,14 @@
 <span class="c1"># HDF5 readers: rebuild the old-JSON-equivalent container from the legacy layout.</span>
 <span class="c1"># --------------------------------------------------------------------------- #</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">_read_wavefunction_group</span><span class="p">(</span><span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Read a legacy wavefunction HDF5 group into an old-doc.&quot;&quot;&quot;</span>
-    <span class="n">container_group</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="s2">&quot;container&quot;</span><span class="p">]</span>
-    <span class="n">tag</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">&quot;container_type&quot;</span><span class="p">)</span>
+<span class="w">    </span><span class="sd">"""Read a legacy wavefunction HDF5 group into an old-doc."""</span>
+    <span class="n">container_group</span> <span class="o">=</span> <span class="n">group</span><span class="p">[</span><span class="s2">"container"</span><span class="p">]</span>
+    <span class="n">tag</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">"container_type"</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">tag</span> <span class="ow">in</span> <span class="n">_AMPLITUDE_TYPES</span><span class="p">:</span>
         <span class="n">container</span> <span class="o">=</span> <span class="n">_read_amplitude_hdf5</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="n">container</span> <span class="o">=</span> <span class="n">_read_state_vector_hdf5</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="n">tag</span><span class="p">)</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;_source_version&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="s2">&quot;version&quot;</span><span class="p">),</span> <span class="s2">&quot;tag&quot;</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">&quot;container&quot;</span><span class="p">:</span> <span class="n">container</span><span class="p">}</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"_source_version"</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="s2">"version"</span><span class="p">),</span> <span class="s2">"tag"</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">"container"</span><span class="p">:</span> <span class="n">container</span><span class="p">}</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_orbitals_to_new</span><span class="p">(</span><span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
@@ -314,90 +315,90 @@
     <span class="n">row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">packed</span><span class="p">)</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
     <span class="n">modes_per_byte</span> <span class="o">=</span> <span class="mi">8</span> <span class="o">//</span> <span class="n">bits_per_mode</span>
     <span class="n">mask</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">bits_per_mode</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
-    <span class="n">chars</span> <span class="o">=</span> <span class="n">_SPIN_HALF_CHARS</span> <span class="k">if</span> <span class="n">bits_per_mode</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;01&quot;</span>
-    <span class="n">occ</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">chars</span> <span class="o">=</span> <span class="n">_SPIN_HALF_CHARS</span> <span class="k">if</span> <span class="n">bits_per_mode</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">"01"</span>
+    <span class="n">occ</span> <span class="o">=</span> <span class="s2">""</span>
     <span class="k">for</span> <span class="n">pos</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">orbital_capacity</span><span class="p">):</span>
         <span class="n">byte</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">row</span><span class="p">[</span><span class="n">pos</span> <span class="o">//</span> <span class="n">modes_per_byte</span><span class="p">])</span>
         <span class="n">value</span> <span class="o">=</span> <span class="p">(</span><span class="n">byte</span> <span class="o">&gt;&gt;</span> <span class="p">((</span><span class="n">pos</span> <span class="o">%</span> <span class="n">modes_per_byte</span><span class="p">)</span> <span class="o">*</span> <span class="n">bits_per_mode</span><span class="p">))</span> <span class="o">&amp;</span> <span class="n">mask</span>
         <span class="n">occ</span> <span class="o">+=</span> <span class="n">chars</span><span class="p">[</span><span class="n">value</span><span class="p">]</span>
-    <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;bits_per_mode&quot;</span><span class="p">:</span> <span class="n">bits_per_mode</span><span class="p">,</span> <span class="s2">&quot;configuration&quot;</span><span class="p">:</span> <span class="n">occ</span><span class="p">}</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s2">"bits_per_mode"</span><span class="p">:</span> <span class="n">bits_per_mode</span><span class="p">,</span> <span class="s2">"configuration"</span><span class="p">:</span> <span class="n">occ</span><span class="p">}</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_decode_configuration_dataset</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode a single packed legacy ``Configuration`` dataset using its stored attrs.</span>
+<span class="w">    </span><span class="sd">"""Decode a single packed legacy ``Configuration`` dataset using its stored attrs.</span>
 
 <span class="sd">    The legacy ``Configuration`` HDF5 dataset stores ``orbital_capacity`` (and, when</span>
 <span class="sd">    present, ``bits_per_mode``) as attributes; legacy files omit ``bits_per_mode``</span>
 <span class="sd">    and default to 2 (spin-1/2). Inferring the capacity from the packed byte count</span>
 <span class="sd">    would over-decode trailing orbitals when it is not a multiple of the modes per</span>
 <span class="sd">    byte, so the attributes are authoritative.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;orbital_capacity&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+<span class="sd">    """</span>
+    <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">"orbital_capacity"</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">bits_per_mode</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;bits_per_mode&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="s2">&quot;bits_per_mode&quot;</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span> <span class="k">else</span> <span class="mi">2</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">"bits_per_mode"</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="s2">"bits_per_mode"</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span> <span class="k">else</span> <span class="mi">2</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="n">_decode_configuration</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">capacity</span><span class="p">,</span> <span class="n">bits_per_mode</span><span class="p">)</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_decode_configurations</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">:</span>
-    <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;orbital_capacity&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">capacity</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">"orbital_capacity"</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span>
     <span class="n">bits_per_mode</span> <span class="o">=</span> <span class="p">(</span>
-        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;bits_per_mode&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="s2">&quot;bits_per_mode&quot;</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span> <span class="k">else</span> <span class="mi">2</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">"bits_per_mode"</span><span class="p">])</span><span class="o">.</span><span class="n">ravel</span><span class="p">()[</span><span class="mi">0</span><span class="p">])</span> <span class="k">if</span> <span class="s2">"bits_per_mode"</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">attrs</span> <span class="k">else</span> <span class="mi">2</span>
     <span class="p">)</span>
     <span class="k">return</span> <span class="p">[</span><span class="n">_decode_configuration</span><span class="p">(</span><span class="n">row</span><span class="p">,</span> <span class="n">capacity</span><span class="p">,</span> <span class="n">bits_per_mode</span><span class="p">)</span> <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">dataset</span><span class="p">)]</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_read_state_vector_hdf5</span><span class="p">(</span><span class="n">container_group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">&quot;is_complex&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Complex wavefunction migration is not supported.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">"is_complex"</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Complex wavefunction migration is not supported."</span><span class="p">)</span>
     <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span>
-        <span class="s2">&quot;wavefunction_type&quot;</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">&quot;wavefunction_type&quot;</span><span class="p">,</span> <span class="s2">&quot;self_dual&quot;</span><span class="p">),</span>
+        <span class="s2">"container_type"</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span>
+        <span class="s2">"wavefunction_type"</span><span class="p">:</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">"wavefunction_type"</span><span class="p">,</span> <span class="s2">"self_dual"</span><span class="p">),</span>
     <span class="p">}</span>
-    <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;sd&quot;</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_orbitals_to_new</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">])</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;determinant&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_decode_configuration_dataset</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">&quot;determinant&quot;</span><span class="p">][</span><span class="s2">&quot;configuration&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">"sd"</span><span class="p">:</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_orbitals_to_new</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">])</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"determinant"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_decode_configuration_dataset</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">"determinant"</span><span class="p">][</span><span class="s2">"configuration"</span><span class="p">])</span>
         <span class="k">return</span> <span class="n">new</span>
 
-    <span class="n">config_set</span> <span class="o">=</span> <span class="n">container_group</span><span class="p">[</span><span class="s2">&quot;configuration_set&quot;</span><span class="p">]</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;is_complex&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;coefficients&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_real_vector</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">&quot;coefficients&quot;</span><span class="p">)</span>
-    <span class="n">new</span><span class="p">[</span><span class="s2">&quot;configuration_set&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-        <span class="s2">&quot;orbitals&quot;</span><span class="p">:</span> <span class="n">_orbitals_to_new</span><span class="p">(</span><span class="n">config_set</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]),</span>
-        <span class="s2">&quot;configurations&quot;</span><span class="p">:</span> <span class="n">_decode_configurations</span><span class="p">(</span><span class="n">config_set</span><span class="p">[</span><span class="s2">&quot;configurations&quot;</span><span class="p">]),</span>
+    <span class="n">config_set</span> <span class="o">=</span> <span class="n">container_group</span><span class="p">[</span><span class="s2">"configuration_set"</span><span class="p">]</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"is_complex"</span><span class="p">]</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"coefficients"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_real_vector</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">"coefficients"</span><span class="p">)</span>
+    <span class="n">new</span><span class="p">[</span><span class="s2">"configuration_set"</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"orbitals"</span><span class="p">:</span> <span class="n">_orbitals_to_new</span><span class="p">(</span><span class="n">config_set</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">]),</span>
+        <span class="s2">"configurations"</span><span class="p">:</span> <span class="n">_decode_configurations</span><span class="p">(</span><span class="n">config_set</span><span class="p">[</span><span class="s2">"configurations"</span><span class="p">]),</span>
     <span class="p">}</span>
-    <span class="k">if</span> <span class="s2">&quot;rdms&quot;</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;rdms&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_rdms_hdf5</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">&quot;rdms&quot;</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">"rdms"</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"rdms"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_rdms_hdf5</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">"rdms"</span><span class="p">])</span>
     <span class="k">return</span> <span class="n">new</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_read_rdms_hdf5</span><span class="p">(</span><span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
     <span class="n">rdms</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{}</span>
-    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;one_rdm_spin_traced&quot;</span><span class="p">,</span> <span class="s2">&quot;one_rdm_aa&quot;</span><span class="p">,</span> <span class="s2">&quot;one_rdm_bb&quot;</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"one_rdm_spin_traced"</span><span class="p">,</span> <span class="s2">"one_rdm_aa"</span><span class="p">,</span> <span class="s2">"one_rdm_bb"</span><span class="p">):</span>
         <span class="n">matrix</span> <span class="o">=</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_matrix</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">matrix</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">rdms</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">matrix</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
-    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;two_rdm_spin_traced&quot;</span><span class="p">,</span> <span class="s2">&quot;two_rdm_aaaa&quot;</span><span class="p">,</span> <span class="s2">&quot;two_rdm_aabb&quot;</span><span class="p">,</span> <span class="s2">&quot;two_rdm_bbbb&quot;</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"two_rdm_spin_traced"</span><span class="p">,</span> <span class="s2">"two_rdm_aaaa"</span><span class="p">,</span> <span class="s2">"two_rdm_aabb"</span><span class="p">,</span> <span class="s2">"two_rdm_bbbb"</span><span class="p">):</span>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">group</span><span class="p">:</span>
             <span class="n">rdms</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_real_vector</span><span class="p">(</span><span class="n">group</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">rdms</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">_read_amplitude_hdf5</span><span class="p">(</span><span class="n">container_group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">,</span> <span class="n">tag</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-    <span class="k">if</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">&quot;is_complex&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Complex wavefunction migration is not supported.&quot;</span><span class="p">)</span>
-    <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">&quot;is_complex&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
-    <span class="k">if</span> <span class="s2">&quot;orbitals&quot;</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">_orbitals_to_new</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">&quot;orbitals&quot;</span><span class="p">])</span>
-    <span class="k">if</span> <span class="s2">&quot;wavefunction&quot;</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
-        <span class="n">nested</span> <span class="o">=</span> <span class="n">_read_wavefunction_group</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">])</span>
-        <span class="n">new</span><span class="p">[</span><span class="s2">&quot;wavefunction&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_new_json</span><span class="p">(</span><span class="n">nested</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">_io</span><span class="o">.</span><span class="n">read_attr</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="s2">"is_complex"</span><span class="p">,</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">"Complex wavefunction migration is not supported."</span><span class="p">)</span>
+    <span class="n">new</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"container_type"</span><span class="p">:</span> <span class="n">tag</span><span class="p">,</span> <span class="s2">"is_complex"</span><span class="p">:</span> <span class="kc">False</span><span class="p">}</span>
+    <span class="k">if</span> <span class="s2">"orbitals"</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">]</span> <span class="o">=</span> <span class="n">_orbitals_to_new</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">"orbitals"</span><span class="p">])</span>
+    <span class="k">if</span> <span class="s2">"wavefunction"</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
+        <span class="n">nested</span> <span class="o">=</span> <span class="n">_read_wavefunction_group</span><span class="p">(</span><span class="n">container_group</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">])</span>
+        <span class="n">new</span><span class="p">[</span><span class="s2">"wavefunction"</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_new_json</span><span class="p">(</span><span class="n">nested</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span>
-        <span class="s2">&quot;t1_amplitudes_aa&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t1_amplitudes_bb&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t2_amplitudes_abab&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t2_amplitudes_aaaa&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;t2_amplitudes_bbbb&quot;</span><span class="p">,</span>
+        <span class="s2">"t1_amplitudes_aa"</span><span class="p">,</span>
+        <span class="s2">"t1_amplitudes_bb"</span><span class="p">,</span>
+        <span class="s2">"t2_amplitudes_abab"</span><span class="p">,</span>
+        <span class="s2">"t2_amplitudes_aaaa"</span><span class="p">,</span>
+        <span class="s2">"t2_amplitudes_bbbb"</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">container_group</span><span class="p">:</span>
             <span class="n">new</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">_read_real_vector</span><span class="p">(</span><span class="n">container_group</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>

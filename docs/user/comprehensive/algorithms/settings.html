@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Settings &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Settings &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -87,6 +88,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -167,21 +170,21 @@ This approach is particularly useful when exploring unfamiliar implementations o
 
 <span class="c1"># List all algorithm types and their implementations</span>
 <span class="k">for</span> <span class="n">algo_type</span><span class="p">,</span> <span class="n">implementations</span> <span class="ow">in</span> <span class="n">available</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">algo_type</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">implementations</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">algo_type</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">implementations</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Display a formatted settings table for a specific implementation</span>
-<span class="n">print_settings</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">print_settings</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"qdk"</span><span class="p">)</span>
 
 <span class="c1"># Inspect settings programmatically</span>
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">type_name</span><span class="p">,</span> <span class="n">default</span><span class="p">,</span> <span class="n">description</span><span class="p">,</span> <span class="n">limits</span> <span class="ow">in</span> <span class="n">inspect_settings</span><span class="p">(</span>
-    <span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span>
+    <span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"qdk"</span>
 <span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">default</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">type_name</span><span class="si">}</span><span class="s2">): </span><span class="si">{</span><span class="n">default</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Create an instance and iterate over its settings</span>
-<span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;  </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -191,13 +194,13 @@ This approach is particularly useful when exploring unfamiliar implementations o
 <span class="c1">// List available implementations for a specific algorithm type</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">scf_names</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">available</span><span class="p">();</span>
 <span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">scf_names</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF solver: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"SCF solver: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="p">}</span>
 
 <span class="c1">// Create an instance and inspect its settings</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">scf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">algorithms</span><span class="o">::</span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 <span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">keys</span><span class="p">())</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;  &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get_as_string</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"  "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">": "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">get_as_string</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="p">}</span>
 </pre></div>
@@ -216,18 +219,18 @@ Settings are validated at execution time, allowing modifications at any point be
 When <code class="docutils literal notranslate"><span class="pre">run()</span></code> is invoked on an algorithm, its settings are automatically locked to ensure reproducibility.
 Any subsequent attempt to modify the settings raises a <code class="docutils literal notranslate"><span class="pre">SettingsAreLocked</span></code> exception.
 To run the same algorithm with different parameters, create a new algorithm instance.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
-<span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore[name-defined]</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
+<span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"hf"</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span><span class="p">)</span>  <span class="c1"># type: ignore[name-defined]</span>
 
 <span class="c1"># Settings are now locked - this raises SettingsAreLocked:</span>
-<span class="c1"># scf.settings().set(&quot;method&quot;, &quot;b3lyp&quot;)</span>
+<span class="c1"># scf.settings().set("method", "b3lyp")</span>
 
 <span class="c1"># Create a new instance for different settings</span>
-<span class="n">scf2</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
-<span class="n">scf2</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;b3lyp&quot;</span><span class="p">)</span>
+<span class="n">scf2</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
+<span class="n">scf2</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"b3lyp"</span><span class="p">)</span>
 <span class="n">energy2</span><span class="p">,</span> <span class="n">wfn2</span> <span class="o">=</span> <span class="n">scf2</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;cc-pvdz&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"cc-pvdz"</span>
 <span class="p">)</span>  <span class="c1"># type: ignore[name-defined]</span>
 </pre></div>
 </div>
@@ -239,27 +242,27 @@ To run the same algorithm with different parameters, create a new algorithm inst
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 
 <span class="c1"># Create an algorithm</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 
 <span class="c1"># Get the settings object for that algorithm</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>
 
 <span class="c1"># Get a parameter</span>
-<span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Max iterations: </span><span class="si">{</span><span class="n">max_iter</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Max iterations: </span><span class="si">{</span><span class="n">max_iter</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get the settings object</span>
 <span class="n">settings</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span>
 
 <span class="c1"># Set an integer value</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
 
 <span class="c1"># Set a string value</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;B3LYP&quot;</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"B3LYP"</span><span class="p">)</span>
 
 <span class="c1"># Set a numeric value</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-8</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">,</span> <span class="mf">1.0e-8</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -271,21 +274,21 @@ To run the same algorithm with different parameters, create a new algorithm inst
 <span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">();</span>
 
 <span class="c1">// Get a parameter</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">max_iter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">);</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Max iterations: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">max_iter</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">max_iter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">int64_t</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"max_iterations"</span><span class="p">);</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Max iterations: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">max_iter</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Get the settings object</span>
 <span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">();</span>
 
 <span class="c1">// Set an integer value</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">"max_iterations"</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
 
 <span class="c1">// Set a string value</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;def2-tzvp&quot;</span><span class="p">);</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">"basis_set"</span><span class="p">,</span><span class="w"> </span><span class="s">"def2-tzvp"</span><span class="p">);</span>
 
 <span class="c1">// Set a numeric value</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-8</span><span class="p">);</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">set</span><span class="p">(</span><span class="s">"convergence_threshold"</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-8</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -297,15 +300,15 @@ This provides a convenient shorthand for configuring algorithms in a single line
 
 <span class="c1"># Pass settings directly to create() as keyword arguments</span>
 <span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span>
+    <span class="s2">"scf_solver"</span><span class="p">,</span>
     <span class="n">max_iterations</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span>
     <span class="n">convergence_threshold</span><span class="o">=</span><span class="mf">1.0e-8</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1"># This is equivalent to:</span>
-<span class="c1"># scf_solver = create(&quot;scf_solver&quot;)</span>
-<span class="c1"># scf_solver.settings().set(&quot;max_iterations&quot;, 100)</span>
-<span class="c1"># scf_solver.settings().set(&quot;convergence_threshold&quot;, 1.0e-8)</span>
+<span class="c1"># scf_solver = create("scf_solver")</span>
+<span class="c1"># scf_solver.settings().set("max_iterations", 100)</span>
+<span class="c1"># scf_solver.settings().set("convergence_threshold", 1.0e-8)</span>
 </pre></div>
 </div>
 <p>This is equivalent to creating the algorithm and then calling <code class="docutils literal notranslate"><span class="pre">settings().set()</span></code> for each parameter, but is more concise for common use cases.
@@ -316,13 +319,13 @@ Use <code class="docutils literal notranslate"><span class="pre">has()</span></c
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check if a setting exists</span>
-<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">):</span>
+<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">"method"</span><span class="p">):</span>
     <span class="c1"># Use the setting</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Method is selected: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;method&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Method is selected: </span><span class="si">{</span><span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'method'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Get with default fallback</span>
-<span class="n">custom_param</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;my_custom_param&quot;</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Custom parameter (with default): </span><span class="si">{</span><span class="n">custom_param</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">custom_param</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"my_custom_param"</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Custom parameter (with default): </span><span class="si">{</span><span class="n">custom_param</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Get all setting keys</span>
 <span class="n">keys</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
@@ -334,29 +337,29 @@ Use <code class="docutils literal notranslate"><span class="pre">has()</span></c
 <span class="n">is_empty</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">empty</span><span class="p">()</span>
 
 <span class="c1"># Validate that required settings exist</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">])</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">([</span><span class="s2">"convergence_threshold"</span><span class="p">])</span>
 
 <span class="c1"># Get a setting as a string representation</span>
-<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+<span class="n">value_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>
 
-<span class="c1"># Update an existing setting (throws if key doesn&#39;t exist)</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
+<span class="c1"># Update an existing setting (throws if key doesn't exist)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">,</span> <span class="mf">1.0e-9</span><span class="p">)</span>
 
 <span class="c1"># Get the type name of a setting</span>
-<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+<span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Check if a setting exists</span>
-<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Basis set is configured: &quot;</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has</span><span class="p">(</span><span class="s">"basis_set"</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Basis set is configured: "</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"basis_set"</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="p">}</span>
 
 <span class="c1">// Get with default fallback</span>
-<span class="k">auto</span><span class="w"> </span><span class="n">custom_param</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_or_default</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;my_custom_param&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">);</span>
-<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Custom parameter (with default): &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">custom_param</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="k">auto</span><span class="w"> </span><span class="n">custom_param</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_or_default</span><span class="o">&lt;</span><span class="kt">int</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"my_custom_param"</span><span class="p">,</span><span class="w"> </span><span class="mi">42</span><span class="p">);</span>
+<span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Custom parameter (with default): "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">custom_param</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 
 <span class="c1">// Get all setting keys</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">keys</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">keys</span><span class="p">();</span>
@@ -368,16 +371,16 @@ Use <code class="docutils literal notranslate"><span class="pre">has()</span></c
 <span class="kt">bool</span><span class="w"> </span><span class="n">is_empty</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">empty</span><span class="p">();</span>
 
 <span class="c1">// Validate that required settings exist</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">validate_required</span><span class="p">({</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">});</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">validate_required</span><span class="p">({</span><span class="s">"basis_set"</span><span class="p">,</span><span class="w"> </span><span class="s">"convergence_threshold"</span><span class="p">});</span>
 
 <span class="c1">// Get a setting as a string representation</span>
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">value_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">value_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s">"convergence_threshold"</span><span class="p">);</span>
 
-<span class="c1">// Update an existing setting (throws if key doesn&#39;t exist)</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">update</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-9</span><span class="p">);</span>
+<span class="c1">// Update an existing setting (throws if key doesn't exist)</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">update</span><span class="p">(</span><span class="s">"convergence_threshold"</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-9</span><span class="p">);</span>
 
 <span class="c1">// Get the type name of a setting</span>
-<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">type_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">);</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">type_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s">"convergence_threshold"</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -396,14 +399,14 @@ For additional information on data persistence, see <a class="reference internal
 <span class="n">os</span><span class="o">.</span><span class="n">chdir</span><span class="p">(</span><span class="n">tmpdir</span><span class="p">)</span>
 
 <span class="c1"># Save settings to JSON file</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;configuration.settings.json&quot;</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"configuration.settings.json"</span><span class="p">)</span>
 
 <span class="c1"># Load settings from JSON file</span>
-<span class="n">settings_from_json_file</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;configuration.settings.json&quot;</span><span class="p">)</span>
+<span class="n">settings_from_json_file</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"configuration.settings.json"</span><span class="p">)</span>
 
 <span class="c1"># Generic file I/O with specified format</span>
-<span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;configuration.settings.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="n">settings_from_file</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;configuration.settings.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"configuration.settings.json"</span><span class="p">,</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="n">settings_from_file</span> <span class="o">=</span> <span class="n">Settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"configuration.settings.json"</span><span class="p">,</span> <span class="s2">"json"</span><span class="p">)</span>
 
 <span class="c1"># Convert to JSON string</span>
 <span class="n">json_data</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
@@ -415,16 +418,16 @@ For additional information on data persistence, see <a class="reference internal
 </div>
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Save settings to JSON file</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">);</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s">"configuration.settings.json"</span><span class="p">);</span>
 
 <span class="c1">// Load settings from JSON file</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">settings_from_json_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="o">::</span><span class="n">from_json_file</span><span class="p">(</span><span class="s">"configuration.settings.json"</span><span class="p">);</span>
 
 <span class="c1">// Generic file I/O with specified format</span>
-<span class="n">settings</span><span class="p">.</span><span class="n">to_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
+<span class="n">settings</span><span class="p">.</span><span class="n">to_file</span><span class="p">(</span><span class="s">"configuration.settings.json"</span><span class="p">,</span><span class="w"> </span><span class="s">"json"</span><span class="p">);</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">settings_from_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">    </span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="o">::</span><span class="n">from_file</span><span class="p">(</span><span class="s">&quot;configuration.settings.json&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;json&quot;</span><span class="p">);</span>
+<span class="w">    </span><span class="n">data</span><span class="o">::</span><span class="n">Settings</span><span class="o">::</span><span class="n">from_file</span><span class="p">(</span><span class="s">"configuration.settings.json"</span><span class="p">,</span><span class="w"> </span><span class="s">"json"</span><span class="p">);</span>
 
 <span class="c1">// Convert to JSON object</span>
 <span class="k">auto</span><span class="w"> </span><span class="n">json_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">to_json</span><span class="p">();</span>
@@ -439,10 +442,10 @@ For additional information on data persistence, see <a class="reference internal
 <div class="literal-block-wrapper docutils container" id="id1">
 <div class="code-block-caption"><span class="caption-text">JSON format</span><a class="headerlink" href="#id1" title="Link to this code"></a></div>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;basis_set&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sto-3g&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;convergence_threshold&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">1e-08</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;max_iterations&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;method&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;hf&quot;</span>
+<span class="w">  </span><span class="nt">"basis_set"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sto-3g"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"convergence_threshold"</span><span class="p">:</span><span class="w"> </span><span class="mf">1e-08</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_iterations"</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"method"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hf"</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -469,9 +472,9 @@ This pattern integrates with the <a class="reference internal" href="factory_pat
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="c1"># Set default values during construction</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;double&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;string&quot;</span><span class="p">,</span> <span class="s2">&quot;default&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="s2">"int"</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">,</span> <span class="s2">"double"</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="s2">"default"</span><span class="p">)</span>
 
 
 </pre></div>
@@ -482,9 +485,9 @@ This pattern integrates with the <a class="reference internal" href="factory_pat
 <span class="w"> </span><span class="k">public</span><span class="o">:</span>
 <span class="w">  </span><span class="n">MySettings</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
 <span class="w">    </span><span class="c1">// Set default values during construction</span>
-<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
-<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;convergence_threshold&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
-<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="s">&quot;default&quot;</span><span class="p">));</span>
+<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">"max_iterations"</span><span class="p">,</span><span class="w"> </span><span class="mi">100</span><span class="p">);</span>
+<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">"convergence_threshold"</span><span class="p">,</span><span class="w"> </span><span class="mf">1e-6</span><span class="p">);</span>
+<span class="w">    </span><span class="n">set_default</span><span class="p">(</span><span class="s">"method"</span><span class="p">,</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="p">(</span><span class="s">"default"</span><span class="p">));</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">};</span>
 </pre></div>
@@ -546,11 +549,11 @@ The following types are supported:</p>
 When setting values, Python objects are validated against the expected type and converted appropriately—for example, Python <code class="docutils literal notranslate"><span class="pre">float</span></code> values become C++ <code class="docutils literal notranslate"><span class="pre">double</span></code>, and Python <code class="docutils literal notranslate"><span class="pre">list</span></code> objects become <code class="docutils literal notranslate"><span class="pre">std::vector</span></code> containers.
 When retrieving values, the reverse conversion occurs transparently.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">get_expected_python_type()</span></code> method can be used to query the expected Python type for any setting:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">expected_type</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">expected_type</span><span class="p">)</span>  <span class="c1"># &quot;float&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">expected_type</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">expected_type</span><span class="p">)</span>  <span class="c1"># "float"</span>
 
-<span class="n">expected_type</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">expected_type</span><span class="p">)</span>  <span class="c1"># &quot;str&quot;</span>
+<span class="n">expected_type</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">"method"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">expected_type</span><span class="p">)</span>  <span class="c1"># "str"</span>
 </pre></div>
 </div>
 <p>This is particularly useful when building dynamic configuration interfaces or validating user input before applying it to settings.</p>
@@ -576,20 +579,20 @@ Constraints are established when algorithm developers define settings using <cod
 <p>Constraints can be queried using <code class="docutils literal notranslate"><span class="pre">has_limits()</span></code> and <code class="docutils literal notranslate"><span class="pre">get_limits()</span></code>:</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
-    <span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">):</span>
+    <span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
     <span class="c1"># Returns (min, max) tuple for bounds, or list for allowed values</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Allowed range: </span><span class="si">{</span><span class="n">limits</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># e.g., (1, 1000)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Allowed range: </span><span class="si">{</span><span class="n">limits</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># e.g., (1, 1000)</span>
 
-<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">):</span>
-    <span class="n">allowed</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Allowed values: </span><span class="si">{</span><span class="n">allowed</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>  <span class="c1"># e.g., [&#39;hf&#39;, &#39;dft&#39;]</span>
+<span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">"method"</span><span class="p">):</span>
+    <span class="n">allowed</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">"method"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Allowed values: </span><span class="si">{</span><span class="n">allowed</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>  <span class="c1"># e.g., ['hf', 'dft']</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">limits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s">&quot;max_iterations&quot;</span><span class="p">);</span>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">settings</span><span class="p">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s">"max_iterations"</span><span class="p">))</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">limits</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s">"max_iterations"</span><span class="p">);</span>
 <span class="w">  </span><span class="c1">// limits is a Constraint variant (BoundConstraint or ListConstraint)</span>
 <span class="p">}</span>
 </pre></div>
@@ -612,23 +615,23 @@ Constraints are established when algorithm developers define settings using <cod
 
 <span class="c1"># Error handling example</span>
 <span class="k">try</span><span class="p">:</span>
-    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;non_existent_setting&quot;</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"non_existent_setting"</span><span class="p">)</span>
 <span class="k">except</span> <span class="n">qdk_chemistry</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">SettingNotFound</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>  <span class="c1"># &quot;Setting not found: non_existent_setting&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>  <span class="c1"># "Setting not found: non_existent_setting"</span>
     <span class="c1"># Use a fallback and continue execution</span>
-    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;non_existent_setting&quot;</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"non_existent_setting"</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Error handling example</span>
 <span class="k">try</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;non_existent_setting&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"non_existent_setting"</span><span class="p">);</span>
 <span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="n">data</span><span class="o">::</span><span class="n">SettingNotFound</span><span class="o">&amp;</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cerr</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">e</span><span class="p">.</span><span class="n">what</span><span class="p">()</span>
-<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w">  </span><span class="c1">// &quot;Setting not found: non_existent_setting&quot;</span>
+<span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span><span class="w">  </span><span class="c1">// "Setting not found: non_existent_setting"</span>
 <span class="w">  </span><span class="c1">// Use a fallback and continue execution</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_or_default</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">&quot;non_existent_setting&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">settings</span><span class="p">.</span><span class="n">get_or_default</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="p">(</span><span class="s">"non_existent_setting"</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">);</span>
 <span class="p">}</span>
 </pre></div>
 </div>

@@ -1,0 +1,8 @@
+qdk\_chemistry.ui.cli module
+============================
+
+.. automodule:: qdk_chemistry.ui.cli
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

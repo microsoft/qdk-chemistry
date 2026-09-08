@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Preparing the trial state &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Preparing the trial state &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -144,10 +145,10 @@ Record trial-state fidelity and state-preparation logical circuit statistics as 
 Explain how determinant truncation changes the ground-state weight, its influence on phase-estimation outcomes, and the cost of preparing the trial state.</p>
 </div>
 </section>
-<section id="example-download">
-<h2>Example download<a class="headerlink" href="#example-download" title="Link to this heading"></a></h2>
-<p>Download <a class="reference download internal" download="" href="../../_downloads/4d1e3a028feb8de74d109fe3e231917d/tutorial_prepare_trial_state.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code></a> and <a class="reference download internal" download="" href="../../_downloads/a13acb484019084c5c91cc66bf9fa153/tutorial_prepare_trial_state.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.ipynb</span></code></a>, and save both files in the tutorial working directory that contains <code class="docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code> and <code class="docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code>.
-Open the files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
+<section id="example-files">
+<h2>Example files<a class="headerlink" href="#example-files" title="Link to this heading"></a></h2>
+<p>Add <a class="reference download internal" download="" href="../../_downloads/4d1e3a028feb8de74d109fe3e231917d/tutorial_prepare_trial_state.py"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code></a> and <a class="reference download internal" download="" href="../../_downloads/a13acb484019084c5c91cc66bf9fa153/tutorial_prepare_trial_state.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.ipynb</span></code></a> to your tutorial working folder.
+Open the new files in Visual Studio Code and review the complete trial-state script, including imports and helper functions omitted from the excerpts below.
 The script imports the tested active-space workflow so that this chapter uses the same selected Hamiltonian and <a class="reference internal" href="../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> reference.
 The Jupyter notebook runs that workflow, renders the one-, two-, and four-determinant logical circuits, and validates their reported structure and gate statistics.</p>
 </section>
@@ -237,7 +238,7 @@ The trial wavefunction is therefore</p>
     <span class="n">reference_wavefunction</span><span class="p">,</span> <span class="n">num_determinants</span>
 <span class="p">)</span>
 <span class="n">projected_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
-    <span class="s2">&quot;projected_multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_pmc&quot;</span>
+    <span class="s2">"projected_multi_configuration_calculator"</span><span class="p">,</span> <span class="s2">"macis_pmc"</span>
 <span class="p">)</span>
 <span class="n">_</span><span class="p">,</span> <span class="n">trial_wavefunction</span> <span class="o">=</span> <span class="n">projected_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">active_hamiltonian</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">top_determinants</span><span class="p">)</span>
@@ -274,7 +275,7 @@ Energy and overlap measure different properties, so the script evaluates fidelit
 <section id="the-trial-state-preparation-logical-circuit">
 <h2>The trial state preparation logical circuit<a class="headerlink" href="#the-trial-state-preparation-logical-circuit" title="Link to this heading"></a></h2>
 <p>The QDK/Chemistry sparse-isometry implementation converts the retained determinants into a binary matrix whose rows represent qubits and whose columns represent occupied-or-unoccupied patterns.
-The method uses binary row operations to reduce the determinant patterns while recording controlled-NOT (CNOT) and X operations, prepares the reduced set of amplitudes, and reverses the recorded operations to expand the state across the compute register, in an optimized version of approaches introduced by Malvetti et al. <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id13" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>.
+The method uses binary row operations to reduce the determinant patterns while recording controlled-NOT (CNOT) and X operations, prepares the reduced set of amplitudes, and reverses the recorded operations to expand the state across the compute register, in an optimized version of approaches introduced by Malvetti et al. <span class="bibtex-citation" id="id2">[<a class="reference internal" href="../../references.html#id14" title="Emanuel Malvetti, Raban Iten, and Roger Colbeck. Quantum circuits for sparse isometries. Quantum, 5:412, 2021. URL: http://arxiv.org/abs/2006.00016, doi:10.22331/q-2021-06-21-412.">MIC21</a>]</span>.
 Students do not need to reproduce this synthesis by hand; it is implemented natively in QDK/Chemistry.
 The important input is the normalized sparse wavefunction and the output is a logical circuit that prepares its amplitudes on the corresponding occupation states.</p>
 <p>Some compute-register wires may have no gates in the state-preparation circuit.
@@ -282,8 +283,7 @@ The register begins in the all-zero occupation state, so a wire needs no prepara
 This does not make the qubit unnecessary: every compute qubit represents an active spin orbital on which the mapped active-space Hamiltonian acts.
 The later controlled time evolution in <a class="reference internal" href="../../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> therefore requires the complete compute register and can couple the prepared determinant support to other configurations in the same sector.
 Removing a gate-free preparation wire would change the Hamiltonian representation and the molecular problem, rather than merely simplify state preparation.</p>
-<p>Before answering the next question, download and open <a class="reference download internal" download="" href="../../_downloads/a13acb484019084c5c91cc66bf9fa153/tutorial_prepare_trial_state.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.ipynb</span></code></a> in Visual Studio Code.
-Save it in the tutorial working directory alongside <code class="docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.py</span></code>, <code class="docutils literal notranslate"><span class="pre">tutorial_choose_active_space.py</span></code>, and <code class="docutils literal notranslate"><span class="pre">tutorial_orbital_coordinates.py</span></code>.
+<p>Before answering the next question, open <a class="reference download internal" download="" href="../../_downloads/a13acb484019084c5c91cc66bf9fa153/tutorial_prepare_trial_state.ipynb"><code class="xref download docutils literal notranslate"><span class="pre">tutorial_prepare_trial_state.ipynb</span></code></a> in Visual Studio Code.
 Choose <strong>Select Kernel</strong>, select <strong>Python Environments</strong>, and choose the <code class="docutils literal notranslate"><span class="pre">.venv</span></code> environment created in <a class="reference internal" href="00_before_you_begin.html"><span class="doc">Before you begin</span></a>.
 Then select <strong>Run All</strong> to execute the shared trial-state workflow and render the one-, two-, and four-determinant logical circuits.
 Compare the gate types and circuit structure before revealing the answer below.</p>
@@ -304,8 +304,8 @@ The exact gate sequence depends on the synthesis method, but the distinction bet
 </details>
 <p>To measure the generated logical-circuit cost, the script traverses the decomposed <a class="reference internal" href="00_before_you_begin.html#tutorial-qsharp"><span class="std std-ref">Q# circuit representation</span></a>, counts displayed gate records that have no nested child operations, and identifies controlled X gates as CNOT gates.
 The script creates the QDK/Chemistry sparse-isometry implementation and inspects the generated Q# logical circuit.
-The factory key <a class="reference internal" href="../../user/comprehensive/algorithms/state_preparation.html#sparse-isometry-gf2x"><span class="std std-ref">sparse_isometry_gf2x</span></a> is the implementation’s current API identifier using a helper function to count gates:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">state_preparation</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+The factory key <a class="reference internal" href="../../user/comprehensive/algorithms/state_preparation.html#sparse-isometry"><span class="std std-ref">sparse_isometry</span></a> selects the current implementation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">state_preparation</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"state_prep"</span><span class="p">,</span> <span class="s2">"sparse_isometry"</span><span class="p">)</span>
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">trial_wavefunction</span><span class="p">)</span>
 <span class="n">num_compute_qubits</span><span class="p">,</span> <span class="n">num_logical_gates</span><span class="p">,</span> <span class="n">logical_gate_counts</span> <span class="o">=</span> <span class="n">circuit_statistics</span><span class="p">(</span>
     <span class="n">circuit</span>

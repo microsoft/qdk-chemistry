@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.conversion module &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.conversion module &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -67,10 +68,14 @@
 <li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#plugins">Plugins</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.plugins.html">qdk_chemistry.plugins package</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#purpose-and-benefits">Purpose and Benefits</a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#available-plugins">Available Plugins</a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#using-plugins">Using Plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#external-plugins">External plugins</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#bundled-integrations">Bundled integrations</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.ChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">ChemistryPlugin</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError"><code class="docutils literal notranslate"><span class="pre">DuplicateRegistrationError</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.PluginRegistrar"><code class="docutils literal notranslate"><span class="pre">PluginRegistrar</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.QdkChemistryPlugin"><code class="docutils literal notranslate"><span class="pre">QdkChemistryPlugin</span></code></a></li>
 <li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.plugins.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.plugins.html#submodules">Submodules</a></li>
 </ul>
 </li>
 </ul>
@@ -152,15 +157,15 @@ and the helper routines assume atomic numbers do not exceed 200.</p>
 BasisSet instance and uses it to initialize a PySCF Mole object. If the BasisSet
 contains ECP shells, they are converted to PySCF’s ECP format.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>basis</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><em>BasisSet</em></a>) – QDK/Chemistry BasisSet instance with populated basis set.</p></li>
-<li><p><strong>charge</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Total charge of the molecule (default: 0).</p></li>
-<li><p><strong>multiplicity</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Spin multiplicity (2S + 1) of the molecule (default: 1).</p></li>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>basis</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a></span>) – QDK/Chemistry BasisSet instance with populated basis set.</p></li>
+<li><p><strong>charge</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – Total charge of the molecule (default: 0).</p></li>
+<li><p><strong>multiplicity</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a></span>) – Spin multiplicity (2S + 1) of the molecule (default: 1).</p></li>
 </ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>PySCF Mole object initialized with the QDK/Chemistry basis set data,
@@ -189,18 +194,18 @@ QDK/Chemistry Hamiltonian data with PySCF’s post-HF methods such as Coupled Cl
 integrals, core energy, and electron counts from the Hamiltonian and configures them in a PySCF SCF object without
 performing an actual SCF calculation.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">RHF</span></code></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><em>Hamiltonian</em></a>) – <p>QDK/Chemistry Hamiltonian object.</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Hamiltonian" title="qdk_chemistry.data.Hamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hamiltonian</span></code></a></span>) – <p>QDK/Chemistry Hamiltonian object.</p>
 <p>Contains the electronic structure information including one- and two-body integrals,
 core energy, and orbital data.</p>
 </p></li>
-<li><p><strong>alpha_occ</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><em>ndarray</em></a>) – Occupation numbers for alpha (spin-up) electrons.</p></li>
-<li><p><strong>beta_occ</strong> (<a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><em>ndarray</em></a>) – Occupation numbers for beta (spin-down) electrons.</p></li>
+<li><p><strong>alpha_occ</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code></a></span>) – Occupation numbers for alpha (spin-up) electrons.</p></li>
+<li><p><strong>beta_occ</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray" title="(in NumPy v2.5)"><code class="xref py py-class docutils literal notranslate"><span class="pre">ndarray</span></code></a></span>) – Occupation numbers for beta (spin-down) electrons.</p></li>
 </ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">RHF</span></code></span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>PySCF RHF object initialized with the Hamiltonian data, ready for post-HF calculations. This is a “fake” SCF
@@ -253,17 +258,17 @@ and returns a corresponding QDK/Chemistry BasisSet instance. Both regular
 basis shells and ECP (Effective Core Potential) shells are extracted and
 converted.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
-<li><p><strong>pyscf_mol</strong> (<em>Mole</em>) – PySCF Mole object with basis set data.</p></li>
-<li><p><strong>structure</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><em>Structure</em></a>) – QDK/Chemistry Structure instance that defines the atomic positions and types.</p></li>
-<li><p><strong>basis_name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em> | </em><em>None</em>) – <p>Name for the basis set.</p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>pyscf_mol</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">Mole</span></code></span>) – PySCF Mole object with basis set data.</p></li>
+<li><p><strong>structure</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a></span>) – QDK/Chemistry Structure instance that defines the atomic positions and types.</p></li>
+<li><p><strong>basis_name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – <p>Name for the basis set.</p>
 <p>If None, attempts to derive from the PySCF molecule’s basis set or defaults to “pyscf_basis”.</p>
 </p></li>
 </ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.BasisSet" title="qdk_chemistry.data.BasisSet"><code class="xref py py-class docutils literal notranslate"><span class="pre">BasisSet</span></code></a></span></p>
 </dd>
 <dt class="field-odd">Returns<span class="colon">:</span></dt>
 <dd class="field-odd"><p>QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,
@@ -286,14 +291,11 @@ primitives creates a separate ECP shell.</p>
 for molecular calculations. It extracts atomic information and formats it with unique labels
 for each atom.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a></span></p>
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>structure</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><code class="xref py py-class docutils literal notranslate"><span class="pre">Structure</span></code></a></span>) – QDK/Chemistry Structure object containing molecular geometry and atomic information.</p>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>structure</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Structure" title="qdk_chemistry.data.Structure"><em>Structure</em></a>) – QDK/Chemistry Structure object containing molecular geometry and atomic information.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p><p>A tuple containing three lists:</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>A tuple containing three lists:</p>
 <ul class="simple">
 <li><p>atoms: List of atom strings in PySCF format, where each string contains
 the atom label and its Cartesian coordinates (x, y, z) in Angstroms.
@@ -305,8 +307,8 @@ element symbols from the structure (e.g., <code class="docutils literal notransl
 </ul>
 </p>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>], <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>], <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]]</p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">tuple</span></code></a></span></p>
 </dd>
 </dl>
 <div class="admonition note">
@@ -321,7 +323,7 @@ element symbols from the structure (e.g., <code class="docutils literal notransl
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="o">...</span><span class="p">)</span>  <span class="c1"># Create or load a structure (coords in Bohr)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">atoms</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">elements</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">structure</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">atoms</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-<span class="go">&#39;H1 0.000000000000 0.757000000000 0.587000000000&#39;</span>
+<span class="go">'H1 0.000000000000 0.757000000000 0.587000000000'</span>
 </pre></div>
 </div>
 </dd></dl>

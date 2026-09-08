@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.base module &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.base module &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="qdk_chemistry.algorithms.dynamical_correlation_calculator module" href="qdk_chemistry.algorithms.dynamical_correlation_calculator.html" />
-    <link rel="prev" title="qdk_chemistry.algorithms.amplitude_amplification module" href="qdk_chemistry.algorithms.amplitude_amplification.html" /> 
+    <link rel="prev" title="qdk_chemistry.algorithms.active_space_selector module" href="qdk_chemistry.algorithms.active_space_selector.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,6 +53,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -84,10 +85,14 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.NuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">NuclearDerivativeCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PopulationAnalyzer"><code class="docutils literal notranslate"><span class="pre">PopulationAnalyzer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QPESubspaceMarking"><code class="docutils literal notranslate"><span class="pre">QPESubspaceMarking</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkActiveSpaceQIOLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkActiveSpaceQIOLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkExpectationEstimator"><code class="docutils literal notranslate"><span class="pre">QdkExpectationEstimator</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkGaugeFixingLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkGaugeFixingLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkHamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">QdkHamiltonianConstructor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2Calculator"><code class="docutils literal notranslate"><span class="pre">QdkMP2Calculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></code></a></li>
@@ -98,6 +103,7 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkNuclearDerivativeCalculator"><code class="docutils literal notranslate"><span class="pre">QdkNuclearDerivativeCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPopulationAnalyzer"><code class="docutils literal notranslate"><span class="pre">QdkPopulationAnalyzer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkQubitMapper"><code class="docutils literal notranslate"><span class="pre">QdkQubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkStabilityChecker"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker</span></code></a></li>
@@ -114,7 +120,6 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.phase_marking_oracle"><code class="docutils literal notranslate"><span class="pre">phase_marking_oracle()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.show_default"><code class="docutils literal notranslate"><span class="pre">show_default()</span></code></a></li>
@@ -217,8 +222,8 @@ integrated into the QDK/Chemistry framework.</p>
 &gt;&gt;&gt; print(settings.to_dict())  # Convert to dict</p>
 <p>Alternative: If you have an existing Settings object</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span> <span class="o">=</span> <span class="n">get_settings_from_somewhere</span><span class="p">()</span>  <span class="c1"># Already has keys defined</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>  <span class="c1"># This works if &quot;method&quot; key exists</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">method</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>     <span class="c1"># This also works</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">"method"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"hf"</span>  <span class="c1"># This works if "method" key exists</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">method</span> <span class="o">=</span> <span class="s2">"hf"</span>     <span class="c1"># This also works</span>
 </pre></div>
 </div>
 <dl class="py method">
@@ -260,11 +265,25 @@ as needed. Non-integer numeric values are displayed in scientific notation.</p>
 <span class="go">Key                  | Value           | Limits              | Description</span>
 <span class="go">------------------------------------------------------------</span>
 <span class="go">max_iterations       | 100             | [1, 1000]           | Maximum number of iterations</span>
-<span class="go">method               | &quot;hf&quot;            | [&quot;hf&quot;, &quot;dft&quot;...]    | Electronic structure method</span>
+<span class="go">method               | "hf"            | ["hf", "dft"...]    | Electronic structure method</span>
 <span class="go">tolerance            | 1.00e-06        | [1.00e-08, 1.00...  | Convergence tolerance</span>
 <span class="go">------------------------------------------------------------</span>
 </pre></div>
 </div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.base.Settings.data_type_name">
+<span class="property"><span class="k"><span class="pre">static</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">data_type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><span class="pre">str</span></a></span></span><a class="headerlink" href="#qdk_chemistry.algorithms.base.Settings.data_type_name" title="Link to this definition"></a></dt>
+<dd><p>Return the wire-format identifier for settings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">&quot;settings&quot;</span></code></p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py method">
@@ -281,7 +300,7 @@ as needed. Non-integer numeric values are displayed in scientific notation.</p>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">empty</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;No settings configured&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">"No settings configured"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -311,13 +330,13 @@ Values must match expected types.</p>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
-<span class="gp">... </span>    <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;hf&#39;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'hf'</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'max_iterations'</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'tolerance'</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'parameters'</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
 <span class="gp">... </span><span class="p">}</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;hf&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'hf'</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -340,13 +359,13 @@ Only predefined settings keys can be updated. Values must match expected types.<
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
-<span class="gp">... </span>    <span class="s1">&#39;method&#39;</span><span class="p">:</span> <span class="s1">&#39;hf&#39;</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;parameters&#39;</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
+<span class="gp">... </span>    <span class="s1">'method'</span><span class="p">:</span> <span class="s1">'hf'</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'max_iterations'</span><span class="p">:</span> <span class="mi">100</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'tolerance'</span><span class="p">:</span> <span class="mf">1e-6</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'parameters'</span><span class="p">:</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">]</span>
 <span class="gp">... </span><span class="p">}</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_dict</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">&#39;method&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;hf&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s1">'method'</span><span class="p">]</span> <span class="o">==</span> <span class="s1">'hf'</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -367,10 +386,10 @@ Only predefined settings keys can be updated. Values must match expected types.<
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">&quot;config.settings.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">,</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="s2">"config.settings.h5"</span><span class="p">,</span> <span class="s2">"hdf5"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">),</span> <span class="s2">"json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -392,8 +411,8 @@ Must have ‘.settings.h5’ extension (e.g., <code class="docutils literal notr
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;config.settings.h5&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.h5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">"config.settings.h5"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">"parameters.settings.h5"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -413,9 +432,9 @@ The JSON format should match the output of <code class="docutils literal notrans
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">json_data</span> <span class="o">=</span> <span class="s1">&#39;{&quot;method&quot;: &quot;hf&quot;, &quot;max_iterations&quot;: 100}&#39;</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">json_data</span> <span class="o">=</span> <span class="s1">'{"method": "hf", "max_iterations": 100}'</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">json_data</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">assert</span> <span class="n">settings</span><span class="p">[</span><span class="s2">"method"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"hf"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -443,10 +462,10 @@ Must have ‘.settings’ before the file extension (e.g., <code class="docutils
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;params.settings.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"params.settings.json"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">))</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -468,10 +487,10 @@ Must have ‘.settings’ before the file extension (e.g., <code class="docutils
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"parameters.settings.json"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">))</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
@@ -491,10 +510,10 @@ Must have ‘.settings.json’ extension (e.g., <code class="docutils literal no
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">"parameters.settings.json"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">))</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -514,9 +533,9 @@ Both methods accept the same JSON string format.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_string</span><span class="p">(</span><span class="s1">&#39;{&quot;method&quot;: &quot;hf&quot;}&#39;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json_string</span><span class="p">(</span><span class="s1">'{"method": "hf"}'</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Equivalent to:</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s1">&#39;{&quot;method&quot;: &quot;hf&quot;}&#39;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="s1">'{"method": "hf"}'</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -541,9 +560,9 @@ Both methods accept the same JSON string format.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">method</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">convergence_threshold</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">method</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"method"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">convergence_threshold</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -568,8 +587,8 @@ Both methods accept the same JSON string format.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">str_val</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>  <span class="c1"># &quot;1e-06&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">str_val</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;100&quot;</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">str_val</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>  <span class="c1"># "1e-06"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">str_val</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_as_string</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>  <span class="c1"># "100"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -593,8 +612,8 @@ Both methods accept the same JSON string format.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">desc</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">desc</span><span class="p">)</span>  <span class="c1"># &quot;Maximum number of iterations&quot;</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">desc</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">desc</span><span class="p">)</span>  <span class="c1"># "Maximum number of iterations"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -620,14 +639,14 @@ This is useful for understanding what type of value is expected before attemptin
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># &quot;float&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">&quot;basis_set&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># &quot;str&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">&quot;active_orbitals&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># &quot;list[int]&quot;</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># "int"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># "float"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">"basis_set"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># "str"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">expected</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_expected_python_type</span><span class="p">(</span><span class="s2">"active_orbitals"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">expected</span><span class="p">)</span>  <span class="c1"># "list[int]"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -653,11 +672,11 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">limits</span><span class="p">)</span>  <span class="c1"># (1, 1000) for a range</span>
 <span class="gp">&gt;&gt;&gt;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">limits</span><span class="p">)</span>  <span class="c1"># [&#39;hf&#39;, &#39;dft&#39;, &#39;mp2&#39;] for allowed values</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">"method"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">limits</span><span class="p">)</span>  <span class="c1"># ['hf', 'dft', 'mp2'] for allowed values</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -682,9 +701,9 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">method</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;default_method&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">params</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">[])</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">method</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"default_method"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">max_iter</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">1000</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">params</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">"parameters"</span><span class="p">,</span> <span class="p">[])</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -755,8 +774,8 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>  <span class="c1"># &quot;double&quot;</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>  <span class="c1"># "int"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>  <span class="c1"># "double"</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -779,8 +798,8 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>  <span class="c1"># &quot;int&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>  <span class="c1"># &quot;double&quot;</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>  <span class="c1"># "int"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">type_name</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_type_name</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>  <span class="c1"># "double"</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -801,9 +820,9 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">method</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">exists</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;nonexistent_key&quot;</span><span class="p">)</span>  <span class="c1"># False</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">"method"</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">method</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"method"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">exists</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">"nonexistent_key"</span><span class="p">)</span>  <span class="c1"># False</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -824,8 +843,8 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_description</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">desc</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_description</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">desc</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_description</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -846,8 +865,8 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">has_limits</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">limits</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">get_limits</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -871,8 +890,8 @@ an enumeration (list of allowed values).</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">is_documented</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;This setting is documented&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">settings</span><span class="o">.</span><span class="n">is_documented</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="s2">"This setting is documented"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -896,10 +915,10 @@ an enumeration (list of allowed values).</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_items</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_items</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -917,10 +936,10 @@ an enumeration (list of allowed values).</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_items</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">all_items</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or iterate directly:</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">settings</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">value</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -940,7 +959,7 @@ an enumeration (list of allowed values).</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">all_keys</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">all_keys</span><span class="p">:</span>
-<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">settings</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="gp">... </span>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">settings</span><span class="p">[</span><span class="n">key</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -955,11 +974,11 @@ This is useful to ensure that settings remain unchanged after they have been val
 <p>Locking is irreversible for the lifetime of the Settings object.
 To modify settings after locking, create a copy of the Settings object.</p>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">"method"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"hf"</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">"max_iterations"</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">lock</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Any further modifications will raise SettingsAreLocked exception</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;dft&quot;</span>  <span class="c1"># Raises SettingsAreLocked</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="p">[</span><span class="s2">"method"</span><span class="p">]</span> <span class="o">=</span> <span class="s2">"dft"</span>  <span class="c1"># Raises SettingsAreLocked</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -986,10 +1005,10 @@ The value must match the expected type for the setting key.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;parameters&quot;</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">])</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"hf"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"parameters"</span><span class="p">,</span> <span class="p">[</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">3.0</span><span class="p">])</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1026,7 +1045,7 @@ The value must match the expected type for the setting key.</p>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">count</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">size</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Settings contain </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> entries&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Settings contain </span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> entries"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1051,7 +1070,7 @@ The value must match the expected type for the setting key.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings_dict</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
-<span class="go">{&#39;method&#39;: &#39;hf&#39;, &#39;max_iterations&#39;: 100, &#39;tolerance&#39;: 1e-06}</span>
+<span class="go">{'method': 'hf', 'max_iterations': 100, 'tolerance': 1e-06}</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Can be used with JSON, pickle, etc.</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -1074,7 +1093,7 @@ The value must match the expected type for the setting key.</p>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings_dict</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_dict</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">settings_dict</span><span class="p">)</span>
-<span class="go">{&#39;method&#39;: &#39;hf&#39;, &#39;max_iterations&#39;: 100, &#39;tolerance&#39;: 1e-06}</span>
+<span class="go">{'method': 'hf', 'max_iterations': 100, 'tolerance': 1e-06}</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Can be used with JSON, pickle, etc.</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -1099,10 +1118,10 @@ The value must match the expected type for the setting key.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">&quot;config.settings.h5&quot;</span><span class="p">,</span> <span class="s2">&quot;hdf5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">,</span> <span class="s2">"json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="s2">"config.settings.h5"</span><span class="p">,</span> <span class="s2">"hdf5"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">),</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">),</span> <span class="s2">"json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1123,8 +1142,8 @@ The value must match the expected type for the setting key.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;config.settings.h5&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.h5&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">"config.settings.h5"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">"parameters.settings.h5"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1147,9 +1166,9 @@ The JSON format preserves all type information and can be used to reconstruct th
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">json_str</span> <span class="o">=</span> <span class="n">settings</span><span class="o">.</span><span class="n">to_json</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">json_str</span><span class="p">)</span>
 <span class="go">{</span>
-<span class="go">    &quot;method&quot;: &quot;hf&quot;,</span>
-<span class="go">    &quot;max_iterations&quot;: 100,</span>
-<span class="go">    &quot;convergence_threshold&quot;: 1e-06</span>
+<span class="go">    "method": "hf",</span>
+<span class="go">    "max_iterations": 100,</span>
+<span class="go">    "convergence_threshold": 1e-06</span>
 <span class="go">}</span>
 </pre></div>
 </div>
@@ -1178,10 +1197,10 @@ Must have ‘.settings’ before the file extension (e.g., <code class="docutils
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;params.settings.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"params.settings.json"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">))</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -1201,10 +1220,10 @@ Must have ‘.settings.json’ extension (e.g., <code class="docutils literal no
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"parameters.settings.json"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">))</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="3">
@@ -1224,10 +1243,10 @@ Must have ‘.settings.json’ extension (e.g., <code class="docutils literal no
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;parameters.settings.json&quot;</span><span class="p">)</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">"parameters.settings.json"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">&quot;config.settings.json&quot;</span><span class="p">))</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="s2">"config.settings.json"</span><span class="p">))</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1281,16 +1300,16 @@ Accepts any Python object for the value, which must match the expected type.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>  <span class="c1"># OK if key exists</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;new_key&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">)</span>     <span class="c1"># Raises SettingNotFound</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>  <span class="c1"># OK if key exists</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">"new_key"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">)</span>     <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
 </div>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">updates</span> <span class="o">=</span> <span class="p">{</span>
-<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-8</span>
+<span class="gp">... </span>    <span class="s1">'max_iterations'</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'tolerance'</span><span class="p">:</span> <span class="mf">1e-8</span>
 <span class="gp">... </span><span class="p">}</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span>  <span class="c1"># OK if both keys exist</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;new_key&#39;</span><span class="p">:</span> <span class="s1">&#39;value&#39;</span><span class="p">})</span>  <span class="c1"># Raises SettingNotFound</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">'new_key'</span><span class="p">:</span> <span class="s1">'value'</span><span class="p">})</span>  <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="2">
@@ -1317,16 +1336,16 @@ Accepts any Python object for the value, which must match the expected type.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>  <span class="c1"># OK if key exists</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">&quot;new_key&quot;</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">)</span>     <span class="c1"># Raises SettingNotFound</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>  <span class="c1"># OK if key exists</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="s2">"new_key"</span><span class="p">,</span> <span class="s2">"value"</span><span class="p">)</span>     <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
 </div>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">updates</span> <span class="o">=</span> <span class="p">{</span>
-<span class="gp">... </span>    <span class="s1">&#39;max_iterations&#39;</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
-<span class="gp">... </span>    <span class="s1">&#39;tolerance&#39;</span><span class="p">:</span> <span class="mf">1e-8</span>
+<span class="gp">... </span>    <span class="s1">'max_iterations'</span><span class="p">:</span> <span class="mi">200</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s1">'tolerance'</span><span class="p">:</span> <span class="mf">1e-8</span>
 <span class="gp">... </span><span class="p">}</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">updates</span><span class="p">)</span>  <span class="c1"># OK if both keys exist</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;new_key&#39;</span><span class="p">:</span> <span class="s1">&#39;value&#39;</span><span class="p">})</span>  <span class="c1"># Raises SettingNotFound</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">'new_key'</span><span class="p">:</span> <span class="s1">'value'</span><span class="p">})</span>  <span class="c1"># Raises SettingNotFound</span>
 </pre></div>
 </div>
 <ol class="arabic simple" start="4">
@@ -1391,7 +1410,7 @@ This is useful for ensuring that all necessary configuration parameters have bee
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;max_iter&quot;</span><span class="p">]</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"max_iter"</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">(</span><span class="n">required</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Raises SettingNotFound if any key is missing</span>
 </pre></div>
@@ -1411,7 +1430,7 @@ This is useful for ensuring that all necessary configuration parameters have bee
 </dd>
 </dl>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;max_iter&quot;</span><span class="p">]</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">required</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"max_iter"</span><span class="p">]</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">settings</span><span class="o">.</span><span class="n">validate_required</span><span class="p">(</span><span class="n">required</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Raises SettingNotFound if any key is missing</span>
 </pre></div>
@@ -1488,23 +1507,23 @@ defined in this base class.</p>
 <span class="gp">... </span>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
 <span class="gp">... </span>        <span class="c1"># Replace with specialized settings</span>
 <span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">ElectronicStructureSettings</span><span class="p">()</span>
-<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
-<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">50</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">,</span> <span class="mf">1e-6</span><span class="p">)</span>
 <span class="gp">...</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="s2">&quot;my_custom_scf&quot;</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="s2">"my_custom_scf"</span>
 <span class="gp">...</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="s2">&quot;scf_solver&quot;</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="s2">"scf_solver"</span>
 <span class="gp">...</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">aliases</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="p">[</span><span class="s2">&quot;my_custom_scf&quot;</span><span class="p">,</span> <span class="s2">&quot;custom_scf&quot;</span><span class="p">]</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="p">[</span><span class="s2">"my_custom_scf"</span><span class="p">,</span> <span class="s2">"custom_scf"</span><span class="p">]</span>
 <span class="gp">...</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
 <span class="gp">... </span>                  <span class="n">spin_multiplicity</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">Wavefunction</span><span class="p">]:</span>
 <span class="gp">... </span>        <span class="c1"># Custom SCF implementation</span>
-<span class="gp">... </span>        <span class="n">max_iter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">)</span>
-<span class="gp">... </span>        <span class="n">threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;convergence_threshold&quot;</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="n">max_iter</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">)</span>
+<span class="gp">... </span>        <span class="n">threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"convergence_threshold"</span><span class="p">)</span>
 <span class="gp">...</span>
 <span class="gp">... </span>        <span class="c1"># ... perform SCF calculation ...</span>
 <span class="gp">... </span>        <span class="n">energy</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span>  <span class="c1"># placeholder</span>
@@ -1516,12 +1535,12 @@ defined in this base class.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">MyCustomScfSolver</span><span class="p">())</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Use it like any built-in algorithm</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;my_custom_scf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"my_custom_scf"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Or using the alias</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">,</span> <span class="s2">&quot;custom_scf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">,</span> <span class="s2">"custom_scf"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Configure and run</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_iterations&quot;</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">scf</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"max_iterations"</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -1560,20 +1579,17 @@ consistent interface for executing the algorithm.</p>
 <p>Same signature as <code class="docutils literal notranslate"><span class="pre">run()</span></code> but returns a hex hash string instead
 of executing. Identical inputs produce identical hashes.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><ul class="simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
 <li><p><strong>args</strong> – The arguments that would be passed to run().</p></li>
 <li><p><strong>kwargs</strong> – The keyword arguments that would be passed to run().</p></li>
 </ul>
 </dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>16-character hex content hash.</p>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>16-character hex content hash.</p>
 </dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1583,14 +1599,11 @@ of executing. Identical inputs produce identical hashes.</p>
 <span class="sig-name descname"><span class="pre">settings</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/base.html#Algorithm.settings"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.base.Algorithm.settings" title="Link to this definition"></a></dt>
 <dd><p>Get the settings for this algorithm.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The settings object associated with this algorithm.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The settings object associated with this algorithm.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference internal" href="#qdk_chemistry.algorithms.base.Settings" title="qdk_chemistry.algorithms.base.Settings">Settings</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1608,14 +1621,11 @@ an example of an algorithm type is “active_space_selector”.
 and an example of an algorithm name is “qdk_valence”,
 indicating the specific algorithm name and origin.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The main name of the algorithm type.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The main name of the algorithm type.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1633,14 +1643,11 @@ an example of an algorithm type is “active_space_selector”.
 and an example of an algorithm name is “qdk_valence”,
 indicating the specific algorithm name and origin.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The main name of the algorithm</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The main name of the algorithm</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1653,14 +1660,11 @@ indicating the specific algorithm name and origin.</p>
 The aliases must include the main name returned by name().</p>
 <p>By default, this method returns a list containing only the main name.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>All aliases of the algorithm’s name including the main name.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>All aliases of the algorithm’s name including the main name.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1678,7 +1682,7 @@ don’t inherit the Python <code class="docutils literal notranslate"><span clas
 <dt class="field-odd">Parameters<span class="colon">:</span></dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>settings</strong> – A <code class="docutils literal notranslate"><span class="pre">Settings</span></code> object containing the <code class="docutils literal notranslate"><span class="pre">AlgorithmRef</span></code>.</p></li>
-<li><p><strong>setting_key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Settings key that holds an <code class="docutils literal notranslate"><span class="pre">AlgorithmRef</span></code> value.</p></li>
+<li><p><strong>setting_key</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – Settings key that holds an <code class="docutils literal notranslate"><span class="pre">AlgorithmRef</span></code> value.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
@@ -1720,20 +1724,20 @@ creating and registering algorithms.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Example custom algorithm type</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizer</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="s2">&quot;geometry_optimizer&quot;</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="s2">"geometry_optimizer"</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Example factory for this algorithm type</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">algorithm_type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="s2">&quot;geometry_optimizer&quot;</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="s2">"geometry_optimizer"</span>
 <span class="gp">...</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">default_algorithm_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="s2">&quot;bfgs&quot;</span>  <span class="c1"># Default algorithm</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="s2">"bfgs"</span>  <span class="c1"># Default algorithm</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Register a custom implementation</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="k">class</span><span class="w"> </span><span class="nc">BfgsOptimizer</span><span class="p">(</span><span class="n">GeometryOptimizer</span><span class="p">):</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="gp">... </span>        <span class="k">return</span> <span class="s2">&quot;bfgs&quot;</span>
+<span class="gp">... </span>        <span class="k">return</span> <span class="s2">"bfgs"</span>
 <span class="gp">... </span>    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">):</span>
 <span class="gp">... </span>        <span class="c1"># Implementation here</span>
 <span class="gp">... </span>        <span class="k">pass</span>
@@ -1746,10 +1750,10 @@ creating and registering algorithms.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">algorithms</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">BfgsOptimizer</span><span class="p">())</span>
 <span class="gp">&gt;&gt;&gt;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Now use via the top-level API</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">,</span> <span class="s2">&quot;bfgs&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">available_opts</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">optimizer</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">"geometry_optimizer"</span><span class="p">,</span> <span class="s2">"bfgs"</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">available_opts</span> <span class="o">=</span> <span class="n">algorithms</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"geometry_optimizer"</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">available_opts</span><span class="p">)</span>
-<span class="go">{&#39;geometry_optimizer&#39;: [&#39;bfgs&#39;]}</span>
+<span class="go">{'geometry_optimizer': ['bfgs']}</span>
 </pre></div>
 </div>
 <div class="admonition seealso">
@@ -1779,14 +1783,11 @@ creating and registering algorithms.</p>
 <p>Derived classes must implement this method to specify the algorithm
 type they manage (e.g., “scf_solver”, “active_space_selector”).</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The algorithm type name.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The algorithm type name.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
@@ -1798,41 +1799,38 @@ type they manage (e.g., “scf_solver”, “active_space_selector”).</p>
 <p>Derived classes must implement this method to specify which algorithm
 should be created when no specific name is provided to <cite>create()</cite>.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The name of the default algorithm implementation.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The name of the default algorithm implementation.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.base.AlgorithmFactory.create">
-<span class="sig-name descname"><span class="pre">create</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/base.html#AlgorithmFactory.create"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.base.AlgorithmFactory.create" title="Link to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">create</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_warnings</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/base.html#AlgorithmFactory.create"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.base.AlgorithmFactory.create" title="Link to this definition"></a></dt>
 <dd><p>Create an algorithm instance by name.</p>
 <p>Creates and returns a new instance of the requested algorithm. If no name
 is provided, creates an instance of the default algorithm for this type.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a> | <a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span>) – <p>The name of the algorithm to create.</p>
+<p>If None or empty, creates the default algorithm.</p>
+</p></li>
+<li><p><strong>suppress_warnings</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span>) – Whether to suppress creation-time warnings.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A new instance of the requested algorithm.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference internal" href="#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a></span></p>
 </dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>name</strong> (<em>Optional</em><em>[</em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – <p>The name of the algorithm to create.</p>
-<p>If None or empty, creates the default algorithm.</p>
-</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>A new instance of the requested algorithm.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference internal" href="#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm">Algorithm</a></p>
-</dd>
-<dt class="field-odd">Raises<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the requested algorithm name is not registered in this factory.</p>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the requested algorithm name is not registered in this factory.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1840,7 +1838,7 @@ is provided, creates an instance of the default algorithm for this type.</p>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create default SCF solver</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">default_scf</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create specific implementation</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_solver</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pyscf_solver</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">"pyscf"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1852,14 +1850,16 @@ is provided, creates an instance of the default algorithm for this type.</p>
 <p>Adds a new algorithm to the factory’s registry. The generator function
 will be called each time an instance of this algorithm is requested.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>generator</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code></a>[[], <a class="reference internal" href="#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><code class="xref py py-class docutils literal notranslate"><span class="pre">Algorithm</span></code></a>]</span>) – <p>A callable that returns a new instance of the algorithm.</p>
+<p>Must return an Algorithm with unique names and aliases.</p>
+</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="qdk_chemistry.plugins.html#qdk_chemistry.plugins.DuplicateRegistrationError" title="qdk_chemistry.plugins.DuplicateRegistrationError"><strong>DuplicateRegistrationError</strong></a> – If an algorithm name or alias is already registered in this factory.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>generator</strong> (<em>Callable</em><em>[</em><em>[</em><em>]</em><em>, </em><a class="reference internal" href="#qdk_chemistry.algorithms.base.Algorithm" title="qdk_chemistry.algorithms.base.Algorithm"><em>Algorithm</em></a><em>]</em>) – <p>A callable that returns a new instance of the algorithm.</p>
-<p>Must return an Algorithm whose name()
-will be used as the registration key.</p>
-</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -1874,22 +1874,19 @@ will be used as the registration key.</p>
 <span class="sig-name descname"><span class="pre">unregister_instance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/base.html#AlgorithmFactory.unregister_instance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.base.AlgorithmFactory.unregister_instance" title="Link to this definition"></a></dt>
 <dd><p>Remove an algorithm implementation from this factory.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>name</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – The name of the algorithm to unregister.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the algorithm was found and removed, False otherwise.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>name</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The name of the algorithm to unregister.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True if the algorithm was found and removed, False otherwise.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">factory</span> <span class="o">=</span> <span class="n">ScfSolverFactory</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">success</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">unregister_instance</span><span class="p">(</span><span class="s2">&quot;my_custom_scf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">success</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">unregister_instance</span><span class="p">(</span><span class="s2">"my_custom_scf"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1899,21 +1896,18 @@ will be used as the registration key.</p>
 <span class="sig-name descname"><span class="pre">available</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/base.html#AlgorithmFactory.available"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.base.AlgorithmFactory.available" title="Link to this definition"></a></dt>
 <dd><p>Get a list of all available algorithm names in this factory.</p>
 <dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Names of all registered algorithms.</p>
 </dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>Names of all registered algorithms.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>]</p>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]</span></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">factory</span> <span class="o">=</span> <span class="n">ScfSolverFactory</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">algos</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">available</span><span class="p">()</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">algos</span><span class="p">)</span>
-<span class="go">[&#39;pyscf&#39;, &#39;qdk&#39;, &#39;my_custom_scf&#39;]</span>
+<span class="go">['pyscf', 'qdk', 'my_custom_scf']</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1923,23 +1917,20 @@ will be used as the registration key.</p>
 <span class="sig-name descname"><span class="pre">has</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/algorithms/base.html#AlgorithmFactory.has"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.algorithms.base.AlgorithmFactory.has" title="Link to this definition"></a></dt>
 <dd><p>Check if an algorithm is registered in this factory.</p>
 <dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>key</strong> (<span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span>) – The algorithm name to check.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the algorithm is registered, False otherwise.</p>
+</dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
-</dd>
-<dt class="field-even">Parameters<span class="colon">:</span></dt>
-<dd class="field-even"><p><strong>key</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – The algorithm name to check.</p>
-</dd>
-<dt class="field-odd">Returns<span class="colon">:</span></dt>
-<dd class="field-odd"><p>True if the algorithm is registered, False otherwise.</p>
-</dd>
-<dt class="field-even">Return type<span class="colon">:</span></dt>
-<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">factory</span> <span class="o">=</span> <span class="n">ScfSolverFactory</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">&quot;pyscf&quot;</span><span class="p">):</span>
-<span class="gp">... </span>    <span class="n">scf</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">&quot;pyscf&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">if</span> <span class="n">factory</span><span class="o">.</span><span class="n">has</span><span class="p">(</span><span class="s2">"pyscf"</span><span class="p">):</span>
+<span class="gp">... </span>    <span class="n">scf</span> <span class="o">=</span> <span class="n">factory</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="s2">"pyscf"</span><span class="p">)</span>
 </pre></div>
 </div>
 </dd></dl>
@@ -1950,16 +1941,16 @@ will be used as the registration key.</p>
 <dd><p>Remove all registered algorithms from this factory.</p>
 <p>This method clears the entire registry. Use with caution as it will
 remove all algorithm implementations, including built-in ones.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
-</dd>
-</dl>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This is typically used internally for cleanup during Python
 interpreter shutdown. Users rarely need to call this directly.</p>
 </div>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></a></span></p>
+</dd>
+</dl>
 </dd></dl>
 
 </dd></dl>
@@ -1970,7 +1961,7 @@ interpreter shutdown. Users rarely need to call this directly.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="qdk_chemistry.algorithms.amplitude_amplification.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.amplitude_amplification module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.algorithms.active_space_selector.html" class="btn btn-neutral float-left" title="qdk_chemistry.algorithms.active_space_selector module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="qdk_chemistry.algorithms.dynamical_correlation_calculator.html" class="btn btn-neutral float-right" title="qdk_chemistry.algorithms.dynamical_correlation_calculator module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

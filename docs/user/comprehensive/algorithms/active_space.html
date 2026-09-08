@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Active space selection &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Active space selection &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -54,6 +54,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -85,6 +86,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -189,7 +192,7 @@ Some selection methods (e.g., entropy-based) may require additional information 
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
 <span class="c1"># Create the default ActiveSpaceSelector instance</span>
-<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_valence&quot;</span><span class="p">)</span>
+<span class="n">active_space_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"active_space_selector"</span><span class="p">,</span> <span class="s2">"qdk_valence"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -213,8 +216,8 @@ See <a class="reference internal" href="#available-implementations">Available im
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the selector using the settings interface</span>
 <span class="c1"># Set the number of electrons and orbitals for the active space</span>
-<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
-<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"num_active_electrons"</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+<span class="n">active_space_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"num_active_orbitals"</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
 
 </pre></div>
 </div>
@@ -222,8 +225,8 @@ See <a class="reference internal" href="#available-implementations">Available im
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Configure the selector using the settings interface</span>
 <span class="w">  </span><span class="c1">// Set the number of electrons and orbitals for the active space</span>
-<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
-<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"num_active_electrons"</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
+<span class="w">  </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"num_active_orbitals"</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -234,51 +237,51 @@ See <a class="reference internal" href="#available-implementations">Available im
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="c1"># Load a molecular structure (water molecule) from inline XYZ file</span>
-<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">&quot;&quot;&quot;</span><span class="se">\</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz</span><span class="p">(</span><span class="s2">"""</span><span class="se">\</span>
 <span class="s2">3</span>
 <span class="s2">Water molecule</span>
 <span class="s2">O    0.000000    0.000000    0.000000</span>
 <span class="s2">H    0.758602    0.000000    0.504284</span>
 <span class="s2">H   -0.758602    0.000000    0.504284</span>
-<span class="s2">&quot;&quot;&quot;</span><span class="p">)</span>
+<span class="s2">"""</span><span class="p">)</span>
 <span class="n">charge</span> <span class="o">=</span> <span class="mi">0</span>
 
 <span class="c1"># First, run SCF to get molecular orbitals</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="n">scf_energy</span><span class="p">,</span> <span class="n">scf_wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;6-31g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"6-31g"</span>
 <span class="p">)</span>
 
 <span class="c1"># Run active space selection</span>
 <span class="n">active_wavefunction</span> <span class="o">=</span> <span class="n">active_space_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
 <span class="n">active_orbitals</span> <span class="o">=</span> <span class="n">active_wavefunction</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">scf_energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Active orbitals summary:</span><span class="se">\n</span><span class="si">{</span><span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SCF Energy: </span><span class="si">{</span><span class="n">scf_energy</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Active orbitals summary:</span><span class="se">\n</span><span class="si">{</span><span class="n">active_orbitals</span><span class="o">.</span><span class="n">get_summary</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Load a molecular structure (water molecule) from inline XYZ file</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz</span><span class="p">(</span><span class="sa">R</span><span class="s">&quot;</span><span class="dl">(</span><span class="s">3</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Structure</span><span class="o">::</span><span class="n">from_xyz</span><span class="p">(</span><span class="sa">R</span><span class="s">"</span><span class="dl">(</span><span class="s">3</span>
 <span class="s">Water molecule</span>
 <span class="s">O    0.000000    0.000000    0.000000</span>
 <span class="s">H    0.758602    0.000000    0.504284</span>
 <span class="s">H   -0.758602    0.000000    0.504284</span>
-<span class="dl">)</span><span class="s">&quot;</span><span class="p">);</span>
+<span class="dl">)</span><span class="s">"</span><span class="p">);</span>
 <span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">charge</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span>
 
 <span class="w">  </span><span class="c1">// First, run SCF to get molecular orbitals</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">scf_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="n">charge</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;6-31g&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="n">charge</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">"6-31g"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Run active space selection</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_wavefunction</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_space_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_orbitals</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_wavefunction</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">();</span>
 
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf_energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Active orbitals summary:</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"SCF Energy: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">scf_energy</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">" Hartree"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Active orbitals summary:</span><span class="se">\n</span><span class="s">"</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_orbitals</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
@@ -294,8 +297,8 @@ You can discover available implementations programmatically:</p>
 <input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">))</span>
-<span class="c1"># [&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, &#39;qdk_autocas_eos&#39;, &#39;qdk_autocas&#39;, &#39;qdk_valence&#39;]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"active_space_selector"</span><span class="p">))</span>
+<span class="c1"># ['pyscf_avas', 'qdk_occupation', 'qdk_autocas_eos', 'qdk_autocas', 'qdk_valence']</span>
 </pre></div>
 </div>
 </div>
@@ -467,7 +470,7 @@ Orbital entropies are computed from the one- and two-electron reduced density ma
 <span id="id2"></span><h4>autoCAS Algorithm<a class="headerlink" href="#autocas-algorithm-details" title="Link to this heading"></a></h4>
 <p>Selecting an appropriate active space is one of the most challenging aspects of multi-configuration calculations.
 Traditional approaches rely on chemical intuition and trial-and-error, which can be unreliable for complex systems.
-The autoCAS algorithm <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id34" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id35" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
+The autoCAS algorithm <span class="bibtex-citation" id="id3">[<a class="reference internal" href="../../../references.html#id37" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id38" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
 <p>autoCAS leverages concepts from quantum information theory to quantify orbital correlation.
 The key insight is that strongly correlated orbitals are highly <em>entangled</em> with the rest of the electronic system.
 This entanglement can be measured using the single-orbital entropy <span class="math notranslate nohighlight">\(s_i^{(1)}\)</span>, which quantifies how much information about orbital <span class="math notranslate nohighlight">\(i\)</span> is “shared” with all other orbitals.</p>
@@ -475,7 +478,7 @@ This entanglement can be measured using the single-orbital entropy <span class="
 <p class="rubric">QDK/Chemistry autoCAS Variants</p>
 <p>QDK/Chemistry provides two entropy-based selection methods:</p>
 <dl class="simple">
-<dt>autoCAS (Histogram-Based Plateau Detection)</dt><dd><p>As described in the original autoCAS protocol <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id34" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id35" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
+<dt>autoCAS (Histogram-Based Plateau Detection)</dt><dd><p>As described in the original autoCAS protocol <span class="bibtex-citation" id="id5">[<a class="reference internal" href="../../../references.html#id37" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id38" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
 This approach is robust for systems with clear entropy gaps but requires tuning of <code class="docutils literal notranslate"><span class="pre">num_bins</span></code> and <code class="docutils literal notranslate"><span class="pre">min_plateau_size</span></code> parameters.
 If none of the entropies exceed the <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, the system is considered single configurational and all orbitals are excluded from the active space.</p>
 </dd>
@@ -506,49 +509,49 @@ The resulting entropies are typically sufficient to identify strongly correlated
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_valence_space_parameters</span>
 
 <span class="c1"># Create a valence space active space selector</span>
-<span class="n">valence_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_valence&quot;</span><span class="p">)</span>
+<span class="n">valence_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"active_space_selector"</span><span class="p">,</span> <span class="s2">"qdk_valence"</span><span class="p">)</span>
 <span class="c1"># Automatically select valence parameters based on the input structure</span>
 <span class="n">num_electrons</span><span class="p">,</span> <span class="n">num_orbitals</span> <span class="o">=</span> <span class="n">compute_valence_space_parameters</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">,</span> <span class="n">charge</span><span class="p">)</span>
-<span class="n">valence_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_electrons&quot;</span><span class="p">,</span> <span class="n">num_electrons</span><span class="p">)</span>
-<span class="n">valence_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_active_orbitals&quot;</span><span class="p">,</span> <span class="n">num_orbitals</span><span class="p">)</span>
+<span class="n">valence_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"num_active_electrons"</span><span class="p">,</span> <span class="n">num_electrons</span><span class="p">)</span>
+<span class="n">valence_selector</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"num_active_orbitals"</span><span class="p">,</span> <span class="n">num_orbitals</span><span class="p">)</span>
 <span class="n">active_valence_wfn</span> <span class="o">=</span> <span class="n">valence_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
 
 <span class="c1"># Create active Hamiltonian</span>
-<span class="n">active_hamiltonian_generator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">active_hamiltonian_generator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 <span class="n">active_hamiltonian</span> <span class="o">=</span> <span class="n">active_hamiltonian_generator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_valence_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 
 <span class="c1"># Run Active Space Calculation with Selected CI</span>
-<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_asci&quot;</span><span class="p">)</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ntdets_max&quot;</span><span class="p">,</span> <span class="mi">50000</span><span class="p">)</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_one_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_two_rdm&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">mc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"multi_configuration_calculator"</span><span class="p">,</span> <span class="s2">"macis_asci"</span><span class="p">)</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"ntdets_max"</span><span class="p">,</span> <span class="mi">50000</span><span class="p">)</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"calculate_one_rdm"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">mc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"calculate_two_rdm"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 <span class="n">mc_energy</span><span class="p">,</span> <span class="n">mc_wavefunction</span> <span class="o">=</span> <span class="n">mc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">active_hamiltonian</span><span class="p">,</span> <span class="n">num_electrons</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">num_electrons</span> <span class="o">//</span> <span class="mi">2</span>
 <span class="p">)</span>
 
 <span class="c1"># Print single orbital entropies which are used by autoCAS to determine the active space</span>
 <span class="n">entropies</span> <span class="o">=</span> <span class="n">mc_wavefunction</span><span class="o">.</span><span class="n">get_single_orbital_entropies</span><span class="p">()</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Single orbital entropies:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Single orbital entropies:"</span><span class="p">)</span>
 <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">entropy</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">entropies</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital </span><span class="si">{</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">entropy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Orbital </span><span class="si">{</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">entropy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
 <span class="c1"># Select active space using autoCAS</span>
-<span class="n">autocas_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_autocas_eos&quot;</span><span class="p">)</span>
+<span class="n">autocas_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"active_space_selector"</span><span class="p">,</span> <span class="s2">"qdk_autocas_eos"</span><span class="p">)</span>
 <span class="n">active_autocas_wfn</span> <span class="o">=</span> <span class="n">autocas_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">mc_wavefunction</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;autoCAS selected active orbitals summary:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"autoCAS selected active orbitals summary:"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">active_autocas_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a valence space active space selector</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">valence_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">valence_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">"qdk_valence"</span><span class="p">);</span>
 <span class="w">  </span><span class="c1">// Automatically select valence parameters based on the input structure</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">num_electrons</span><span class="p">,</span><span class="w"> </span><span class="n">num_orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">qdk</span><span class="o">::</span><span class="n">chemistry</span><span class="o">::</span><span class="n">utils</span><span class="o">::</span><span class="n">compute_valence_space_parameters</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">,</span>
 <span class="w">                                                              </span><span class="n">charge</span><span class="p">);</span>
-<span class="w">  </span><span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_electrons&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="p">);</span>
-<span class="w">  </span><span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;num_active_orbitals&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">num_orbitals</span><span class="p">);</span>
+<span class="w">  </span><span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"num_active_electrons"</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="p">);</span>
+<span class="w">  </span><span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"num_active_orbitals"</span><span class="p">,</span><span class="w"> </span><span class="n">num_orbitals</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_valence_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">valence_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Create active Hamiltonian</span>
@@ -558,25 +561,25 @@ The resulting entropies are typically sufficient to identify strongly correlated
 
 <span class="w">  </span><span class="c1">// Run Active Space Calculation with Selected CI</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">mc_calculator</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;macis_asci&quot;</span><span class="p">);</span>
-<span class="w">  </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;ntdets_max&quot;</span><span class="p">,</span><span class="w"> </span><span class="mi">50000</span><span class="p">);</span>
-<span class="w">  </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;calculate_one_rdm&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
-<span class="w">  </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;calculate_two_rdm&quot;</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">      </span><span class="n">MultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">"macis_asci"</span><span class="p">);</span>
+<span class="w">  </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"ntdets_max"</span><span class="p">,</span><span class="w"> </span><span class="mi">50000</span><span class="p">);</span>
+<span class="w">  </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"calculate_one_rdm"</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
+<span class="w">  </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"calculate_two_rdm"</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">mc_energy</span><span class="p">,</span><span class="w"> </span><span class="n">mc_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span>
 <span class="w">      </span><span class="n">active_hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Print single orbital entropies which are used by autoCAS to determine the</span>
 <span class="w">  </span><span class="c1">// active space</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">entropies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_wavefunction</span><span class="o">-&gt;</span><span class="n">get_single_orbital_entropies</span><span class="p">();</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Single orbital entropies:&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Single orbital entropies:"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">entropies</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">idx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Orbital &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">entropies</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"Orbital "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">": "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">entropies</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 <span class="w">  </span><span class="p">}</span>
 
 <span class="w">  </span><span class="c1">// Select active space using autoCAS</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">autocas_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_autocas_eos&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">autocas_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">"qdk_autocas_eos"</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_autocas_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">autocas_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">mc_wavefunction</span><span class="p">);</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;autoCAS selected active orbitals summary:</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"autoCAS selected active orbitals summary:</span><span class="se">\n</span><span class="s">"</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_autocas_wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
@@ -626,9 +629,9 @@ See the original <a class="reference internal" href="../../../glossary.html#term
 <p class="rubric">Example</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">avas</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;pyscf_avas&quot;</span><span class="p">)</span>
-<span class="n">avas</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ao_labels&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;O 2p&quot;</span><span class="p">,</span> <span class="s2">&quot;O 2s&quot;</span><span class="p">])</span>
-<span class="n">avas</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;canonicalize&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">avas</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"active_space_selector"</span><span class="p">,</span> <span class="s2">"pyscf_avas"</span><span class="p">)</span>
+<span class="n">avas</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"ao_labels"</span><span class="p">,</span> <span class="p">[</span><span class="s2">"O 2p"</span><span class="p">,</span> <span class="s2">"O 2s"</span><span class="p">])</span>
+<span class="n">avas</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"canonicalize"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
 
 <span class="n">active_wavefunction</span> <span class="o">=</span> <span class="n">avas</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">scf_wavefunction</span><span class="p">)</span>
 </pre></div>

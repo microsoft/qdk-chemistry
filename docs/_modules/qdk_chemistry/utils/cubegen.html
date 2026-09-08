@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.utils.cubegen &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.utils.cubegen &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,7 +96,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.utils.cubegen</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Generate cube files for molecular orbitals and electron densities.&quot;&quot;&quot;</span>
+<span></span><span class="sd">"""Generate cube files for molecular orbitals and electron densities."""</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
@@ -106,16 +107,13 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">cubegen</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Orbitals</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AOType</span><span class="p">,</span> <span class="n">Orbitals</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data._spin_channels</span><span class="w"> </span><span class="kn">import</span> <span class="n">spin_channel_matrix</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.symmetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">axes</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">basis_to_pyscf_mol</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">CubeGenerator</span><span class="p">,</span> <span class="n">CubeGrid</span><span class="p">,</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;generate_cubefiles_from_orbitals&quot;</span><span class="p">,</span>
+    <span class="s2">"generate_cubefiles_from_orbitals"</span><span class="p">,</span>
 <span class="p">]</span>
 
 
@@ -128,8 +126,9 @@
     <span class="n">grid_size</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">40</span><span class="p">,</span> <span class="mi">40</span><span class="p">),</span>
     <span class="n">margin</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">3.0</span><span class="p">,</span>
     <span class="n">label_maker</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">],</span> <span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">backend</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"native"</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generate volumetric cube data for molecular orbitals.</span>
+<span class="w">    </span><span class="sd">"""Generate volumetric cube data for molecular orbitals.</span>
 
 <span class="sd">    This method creates cube files containing the spatial distribution of molecular</span>
 <span class="sd">    orbitals on a 3D grid. It supports both canonical and localized orbitals.</span>
@@ -143,27 +142,71 @@
 <span class="sd">        indices: Specific molecular orbital indices to generate cube files for. If None, all orbitals are processed.</span>
 <span class="sd">        grid_size: The size of the grid in each dimension (nx, ny, nz). Default is (40, 40, 40).</span>
 <span class="sd">        margin: The margin (in Bohr radii) to extend around molecule. Default is 3.</span>
-<span class="sd">        label_maker: A function that takes an orbital index and returns a string label for the cube file.</span>
+<span class="sd">        label_maker: A function that takes an orbital index and returns a base label without the ``.cube`` extension.</span>
 
-<span class="sd">            If None, a default labeling scheme is used.</span>
+<span class="sd">            If None, files are labeled with the zero-based orbital index; orbital ``0`` generates</span>
+<span class="sd">            ``orbital_0000.cube``.</span>
+
+<span class="sd">        backend: Which evaluator to use, either ``"native"`` (default) or ``"pyscf"``.</span>
+
+<span class="sd">            The native backend evaluates the orbitals in process with gauXC and needs no</span>
+<span class="sd">            third-party quantum chemistry package. The ``"pyscf"`` backend delegates to</span>
+<span class="sd">            ``pyscf.tools.cubegen`` and is kept for comparison and for falling back if a</span>
+<span class="sd">            difference is ever suspected. PySCF is not installed on Windows, so the</span>
+<span class="sd">            ``"pyscf"`` backend is unavailable there and raises ``ImportError``.</span>
+<span class="sd">            PySCF conversion currently supports only spherical bases. Cartesian bases</span>
+<span class="sd">            must use the native backend.</span>
+
+<span class="sd">            Both backends place grid points identically: the origin is the nuclear bounding</span>
+<span class="sd">            box corner minus ``margin``, and the step is the padded extent divided by</span>
+<span class="sd">            ``n - 1`` along each axis. They also share the same atomic orbital ordering, so</span>
+<span class="sd">            the same coefficient vector means the same thing to both.</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        list[str] | dict[str, str]: Paths or contents of the generated cube files.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``backend`` is not ``"native"`` or ``"pyscf"``, or if</span>
+<span class="sd">            ``backend="pyscf"`` is requested for a Cartesian basis.</span>
+
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">output_folder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">output_folder</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="n">output_folder</span><span class="p">)</span>
         <span class="n">output_folder</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
     <span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis_set</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-    <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
-        <span class="n">mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis_set</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
     <span class="n">nmo</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
     <span class="n">mo_range</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="n">nmo</span><span class="p">)</span>
     <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">,</span> <span class="n">nz</span> <span class="o">=</span> <span class="n">grid_size</span>
+
+    <span class="k">if</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"native"</span><span class="p">:</span>
+        <span class="n">grid</span> <span class="o">=</span> <span class="n">CubeGrid</span><span class="o">.</span><span class="n">from_basis_set</span><span class="p">(</span><span class="n">basis_set</span><span class="p">,</span> <span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="p">,</span> <span class="n">nz</span><span class="p">,</span> <span class="n">margin</span><span class="p">)</span>
+        <span class="n">generator</span> <span class="o">=</span> <span class="n">CubeGenerator</span><span class="p">(</span><span class="n">basis_set</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_write_cube</span><span class="p">(</span><span class="n">coeff</span><span class="p">,</span> <span class="n">outfile_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">generator</span><span class="o">.</span><span class="n">orbital</span><span class="p">(</span><span class="n">coeff</span><span class="p">,</span> <span class="n">grid</span><span class="p">,</span> <span class="n">outfile</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">outfile_name</span><span class="p">))</span>
+
+    <span class="k">elif</span> <span class="n">backend</span> <span class="o">==</span> <span class="s2">"pyscf"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_atomic_orbital_type</span><span class="p">()</span> <span class="o">==</span> <span class="n">AOType</span><span class="o">.</span><span class="n">Cartesian</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"The PySCF cube backend does not support Cartesian basis sets; use backend='native'."</span><span class="p">)</span>
+        <span class="c1"># Imported lazily so that the default path, and therefore this module,</span>
+        <span class="c1"># does not require PySCF to be installed.</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">pyscf.tools</span><span class="w"> </span><span class="kn">import</span> <span class="n">cubegen</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="n">basis_to_pyscf_mol</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis_set</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
+            <span class="n">mol</span> <span class="o">=</span> <span class="n">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis_set</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_write_cube</span><span class="p">(</span><span class="n">coeff</span><span class="p">,</span> <span class="n">outfile_name</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">cubegen</span><span class="o">.</span><span class="n">orbital</span><span class="p">(</span><span class="n">mol</span><span class="p">,</span> <span class="n">outfile</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">outfile_name</span><span class="p">),</span> <span class="n">coeff</span><span class="o">=</span><span class="n">coeff</span><span class="p">,</span> <span class="n">nx</span><span class="o">=</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="o">=</span><span class="n">ny</span><span class="p">,</span> <span class="n">nz</span><span class="o">=</span><span class="n">nz</span><span class="p">,</span> <span class="n">margin</span><span class="o">=</span><span class="n">margin</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unknown cube backend '</span><span class="si">{</span><span class="n">backend</span><span class="si">}</span><span class="s2">'. Expected 'native' or 'pyscf'."</span><span class="p">)</span>
+
     <span class="n">mo_a</span> <span class="o">=</span> <span class="n">spin_channel_matrix</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">())</span>
     <span class="n">mo_b</span> <span class="o">=</span> <span class="n">spin_channel_matrix</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">coefficients</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">beta</span><span class="p">())</span>
 
@@ -176,19 +219,19 @@
             <span class="n">os</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">outfile_name</span> <span class="o">=</span> <span class="n">output_folder</span> <span class="o">/</span> <span class="n">label</span>
-        <span class="n">cubegen</span><span class="o">.</span><span class="n">orbital</span><span class="p">(</span><span class="n">mol</span><span class="p">,</span> <span class="n">outfile</span><span class="o">=</span><span class="n">outfile_name</span><span class="p">,</span> <span class="n">coeff</span><span class="o">=</span><span class="n">coeff</span><span class="p">,</span> <span class="n">nx</span><span class="o">=</span><span class="n">nx</span><span class="p">,</span> <span class="n">ny</span><span class="o">=</span><span class="n">ny</span><span class="p">,</span> <span class="n">nz</span><span class="o">=</span><span class="n">nz</span><span class="p">,</span> <span class="n">margin</span><span class="o">=</span><span class="n">margin</span><span class="p">)</span>
+        <span class="n">_write_cube</span><span class="p">(</span><span class="n">coeff</span><span class="p">,</span> <span class="n">outfile_name</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">output_folder</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outfile_name</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">outfile_name</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">"utf-8"</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
                 <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cubefile_paths</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
-                <span class="n">cubefile_paths</span><span class="p">[</span><span class="n">label</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.cube&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)]</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+                <span class="n">cubefile_paths</span><span class="p">[</span><span class="n">label</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">".cube"</span><span class="p">,</span> <span class="s2">""</span><span class="p">)]</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
             <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">outfile_name</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">cubefile_paths</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span>
             <span class="n">cubefile_paths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">outfile_name</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">label_maker</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">label_maker</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;orbital_</span><span class="si">{</span><span class="n">p</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">&quot;</span>  <span class="c1"># noqa: E731</span>
+        <span class="n">label_maker</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">p</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"orbital_</span><span class="si">{</span><span class="n">p</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">"</span>  <span class="c1"># noqa: E731</span>
 
     <span class="c1"># Loop over all the MOs</span>
     <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">mo_range</span><span class="p">):</span>
@@ -196,15 +239,15 @@
             <span class="k">continue</span>
         <span class="k">if</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">():</span>
             <span class="n">coeff</span> <span class="o">=</span> <span class="n">mo_a</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span>
-            <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label_maker</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">.cube&quot;</span>
+            <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label_maker</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">.cube"</span>
             <span class="n">_generate_cube</span><span class="p">(</span><span class="n">coeff</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">coeff_a</span> <span class="o">=</span> <span class="n">mo_a</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span>
-            <span class="n">label_a</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label_maker</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">_a.cube&quot;</span>
+            <span class="n">label_a</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label_maker</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">_a.cube"</span>
             <span class="n">_generate_cube</span><span class="p">(</span><span class="n">coeff_a</span><span class="p">,</span> <span class="n">label_a</span><span class="p">)</span>
 
             <span class="n">coeff_b</span> <span class="o">=</span> <span class="n">mo_b</span><span class="p">[:,</span> <span class="n">p</span><span class="p">]</span>
-            <span class="n">label_b</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label_maker</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">_b.cube&quot;</span>
+            <span class="n">label_b</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">label_maker</span><span class="p">(</span><span class="n">p</span><span class="p">)</span><span class="si">}</span><span class="s2">_b.cube"</span>
             <span class="n">_generate_cube</span><span class="p">(</span><span class="n">coeff_b</span><span class="p">,</span> <span class="n">label_b</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">output_folder</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>

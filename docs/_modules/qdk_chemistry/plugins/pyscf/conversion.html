@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.conversion &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.conversion &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -96,7 +97,7 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.plugins.pyscf.conversion</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Utilities for converting between QDK/Chemistry and PySCF data structures.</span>
+<span></span><span class="sd">"""Utilities for converting between QDK/Chemistry and PySCF data structures.</span>
 
 <span class="sd">This module provides conversion functions to bridge between QDK/Chemistry and PySCF data structures.</span>
 <span class="sd">It enables integration between the two quantum chemistry libraries by handling the conversion of molecular structures,</span>
@@ -109,8 +110,8 @@
 <span class="sd">* Converting PySCF Mole objects back to QDK/Chemistry BasisSet objects.</span>
 <span class="sd">* Converting QDK/Chemistry Hamiltonian objects to PySCF SCF objects.</span>
 
-<span class="sd">These utilities are essential for workflows that need to leverage both QDK/Chemistry&#39;s data management capabilities and</span>
-<span class="sd">PySCF&#39;s quantum chemistry calculations.</span>
+<span class="sd">These utilities are essential for workflows that need to leverage both QDK/Chemistry's data management capabilities and</span>
+<span class="sd">PySCF's quantum chemistry calculations.</span>
 
 <span class="sd">Note:</span>
 <span class="sd">    Currently supports spherical atomic orbitals only. Cartesian basis set support is planned for future versions,</span>
@@ -123,7 +124,7 @@
 <span class="sd">    &gt;&gt;&gt; # Convert basis set to PySCF Mole object</span>
 <span class="sd">    &gt;&gt;&gt; pyscf_mol = basis_to_pyscf_mol(basis_set)</span>
 
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -131,6 +132,7 @@
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TypeVar</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pyscf</span>
@@ -142,32 +144,34 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseInsensitiveStrEnum</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="s2">&quot;basis_to_pyscf_mol&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;hamiltonian_to_scf&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;pyscf_mol_to_qdk_basis&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;structure_to_pyscf_atom_labels&quot;</span><span class="p">,</span>
+    <span class="s2">"basis_to_pyscf_mol"</span><span class="p">,</span>
+    <span class="s2">"hamiltonian_to_scf"</span><span class="p">,</span>
+    <span class="s2">"pyscf_mol_to_qdk_basis"</span><span class="p">,</span>
+    <span class="s2">"structure_to_pyscf_atom_labels"</span><span class="p">,</span>
 <span class="p">]</span>
+
+<span class="n">_ECPData</span> <span class="o">=</span> <span class="n">TypeVar</span><span class="p">(</span><span class="s2">"_ECPData"</span><span class="p">)</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">SCFType</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to specify the type of SCF calculation out of auto/restricted/unrestricted.</span>
+<span class="w">    </span><span class="sd">"""Enum to specify the type of SCF calculation out of auto/restricted/unrestricted.</span>
 
 <span class="sd">    Attributes:</span>
 <span class="sd">        AUTO: Auto-detect based on restricted character of orbitals/hamiltonian</span>
 <span class="sd">        RESTRICTED: Force restricted calculation</span>
 <span class="sd">        UNRESTRICTED: Force unrestricted calculation</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
-    <span class="n">AUTO</span> <span class="o">=</span> <span class="s2">&quot;auto&quot;</span>
-    <span class="n">RESTRICTED</span> <span class="o">=</span> <span class="s2">&quot;restricted&quot;</span>
-    <span class="n">UNRESTRICTED</span> <span class="o">=</span> <span class="s2">&quot;unrestricted&quot;</span>
+    <span class="n">AUTO</span> <span class="o">=</span> <span class="s2">"auto"</span>
+    <span class="n">RESTRICTED</span> <span class="o">=</span> <span class="s2">"restricted"</span>
+    <span class="n">UNRESTRICTED</span> <span class="o">=</span> <span class="s2">"unrestricted"</span>
 
 
 <div class="viewcode-block" id="structure_to_pyscf_atom_labels">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.conversion.html#qdk_chemistry.plugins.pyscf.conversion.structure_to_pyscf_atom_labels">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert QDK/Chemistry Structure to PySCF atom labels format.</span>
+<span class="w">    </span><span class="sd">"""Convert QDK/Chemistry Structure to PySCF atom labels format.</span>
 
 <span class="sd">    This function transforms a QDK/Chemistry Structure object into the format (a tuple) required by PySCF</span>
 <span class="sd">    for molecular calculations. It extracts atomic information and formats it with unique labels</span>
@@ -183,9 +187,9 @@
 <span class="sd">          the atom label and its Cartesian coordinates (x, y, z) in Angstroms.</span>
 <span class="sd">          Format: ``Symbol&lt;count&gt; x y z`` (e.g., ``H1 0.000000000000 0.000000000000 0.000000000000``).</span>
 <span class="sd">        - pyscf_symbols: List of unique atom labels used in PySCF, where each atom of the same</span>
-<span class="sd">          element is numbered sequentially (e.g., ``[&quot;H1&quot;, &quot;H2&quot;, &quot;O1&quot;]``).</span>
+<span class="sd">          element is numbered sequentially (e.g., ``["H1", "H2", "O1"]``).</span>
 <span class="sd">        - elements: List of atomic symbols without numbering, preserving the original</span>
-<span class="sd">          element symbols from the structure (e.g., ``[&quot;H&quot;, &quot;H&quot;, &quot;O&quot;]``).</span>
+<span class="sd">          element symbols from the structure (e.g., ``["H", "H", "O"]``).</span>
 
 <span class="sd">    Note:</span>
 <span class="sd">        - Coordinates are formatted with 12 decimal places for precision.</span>
@@ -196,9 +200,9 @@
 <span class="sd">        &gt;&gt;&gt; structure = Structure(...)  # Create or load a structure (coords in Bohr)</span>
 <span class="sd">        &gt;&gt;&gt; atoms, pyscf_symbols, elements = structure_to_pyscf_atom_labels(structure)</span>
 <span class="sd">        &gt;&gt;&gt; print(atoms[0])</span>
-<span class="sd">        &#39;H1 0.000000000000 0.757000000000 0.587000000000&#39;</span>
+<span class="sd">        'H1 0.000000000000 0.757000000000 0.587000000000'</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="c1"># Extract Structure</span>
     <span class="n">elements</span> <span class="o">=</span> <span class="n">structure</span><span class="o">.</span><span class="n">get_atomic_symbols</span><span class="p">()</span>
@@ -211,20 +215,44 @@
         <span class="n">symbol</span> <span class="o">=</span> <span class="n">elements</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
         <span class="n">coords</span> <span class="o">=</span> <span class="n">coordinates</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
         <span class="n">element_counts</span><span class="p">[</span><span class="n">symbol</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="n">pyscf_symbols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">symbol</span><span class="si">}{</span><span class="n">element_counts</span><span class="p">[</span><span class="n">symbol</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="n">atoms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">symbol</span><span class="si">}{</span><span class="n">element_counts</span><span class="p">[</span><span class="n">symbol</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coords</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">pyscf_symbols</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">symbol</span><span class="si">}{</span><span class="n">element_counts</span><span class="p">[</span><span class="n">symbol</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="n">atoms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">symbol</span><span class="si">}{</span><span class="n">element_counts</span><span class="p">[</span><span class="n">symbol</span><span class="p">]</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coords</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coords</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coords</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="si">:</span><span class="s2">.12f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">atoms</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">elements</span></div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_key_ecp_data_by_element_or_atom</span><span class="p">(</span>
+    <span class="n">elements</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">pyscf_symbols</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">ecp_data_by_atom</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">_ECPData</span><span class="p">],</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">_ECPData</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">"""Use an element key only when every atom of that element has identical ECP data."""</span>
+    <span class="n">atom_indices_by_element</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">iatm</span><span class="p">,</span> <span class="n">element</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">elements</span><span class="p">):</span>
+        <span class="n">atom_indices_by_element</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">element</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span>
+
+    <span class="n">ecp_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">_ECPData</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">element</span><span class="p">,</span> <span class="n">atom_indices</span> <span class="ow">in</span> <span class="n">atom_indices_by_element</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">element_ecp_data</span> <span class="o">=</span> <span class="p">[</span><span class="n">ecp_data_by_atom</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span> <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="n">atom_indices</span><span class="p">]</span>
+        <span class="n">first_ecp_data</span> <span class="o">=</span> <span class="n">element_ecp_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">first_ecp_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">ecp_data</span> <span class="o">==</span> <span class="n">first_ecp_data</span> <span class="k">for</span> <span class="n">ecp_data</span> <span class="ow">in</span> <span class="n">element_ecp_data</span><span class="p">):</span>
+            <span class="n">ecp_dict</span><span class="p">[</span><span class="n">element</span><span class="p">]</span> <span class="o">=</span> <span class="n">first_ecp_data</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">iatm</span><span class="p">,</span> <span class="n">ecp_data</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">atom_indices</span><span class="p">,</span> <span class="n">element_ecp_data</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">ecp_data</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">ecp_dict</span><span class="p">[</span><span class="n">pyscf_symbols</span><span class="p">[</span><span class="n">iatm</span><span class="p">]]</span> <span class="o">=</span> <span class="n">ecp_data</span>
+
+    <span class="k">return</span> <span class="n">ecp_dict</span>
 
 
 <div class="viewcode-block" id="basis_to_pyscf_mol">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.conversion.html#qdk_chemistry.plugins.pyscf.conversion.basis_to_pyscf_mol">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">basis_to_pyscf_mol</span><span class="p">(</span><span class="n">basis</span><span class="p">:</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">charge</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">multiplicity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">mole</span><span class="o">.</span><span class="n">Mole</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert QDK/Chemistry BasisSet instance to PySCF Mole object.</span>
+<span class="w">    </span><span class="sd">"""Convert QDK/Chemistry BasisSet instance to PySCF Mole object.</span>
 
 <span class="sd">    This function extracts the structure and basis information from the QDK/Chemistry</span>
 <span class="sd">    BasisSet instance and uses it to initialize a PySCF Mole object. If the BasisSet</span>
-<span class="sd">    contains ECP shells, they are converted to PySCF&#39;s ECP format.</span>
+<span class="sd">    contains ECP shells, they are converted to PySCF's ECP format.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        basis: QDK/Chemistry BasisSet instance with populated basis set.</span>
@@ -237,14 +265,14 @@
 
 <span class="sd">    Note:</span>
 <span class="sd">        When ECP shells are present, the function reconstructs the full PySCF ECP</span>
-<span class="sd">        structure from QDK&#39;s ECP shells with radial powers, preserving all</span>
+<span class="sd">        structure from QDK's ECP shells with radial powers, preserving all</span>
 <span class="sd">        exponents, coefficients, and r^n terms for each angular momentum channel.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; pyscf_mol = basis_to_pyscf_mol(basis, charge=0, multiplicity=1)</span>
 <span class="sd">        &gt;&gt;&gt; print(pyscf_mol.atom)</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">atoms</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">elements</span> <span class="o">=</span> <span class="n">structure_to_pyscf_atom_labels</span><span class="p">(</span><span class="n">basis</span><span class="o">.</span><span class="n">get_structure</span><span class="p">())</span>
     <span class="n">natoms</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">atoms</span><span class="p">)</span>
@@ -254,16 +282,16 @@
         <span class="n">atom_basis</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">shells</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_shells_for_atom</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">shell</span> <span class="ow">in</span> <span class="n">shells</span><span class="p">:</span>
-            <span class="n">shell_rec</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">elements</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">:</span><span class="s2">10</span><span class="si">}{</span><span class="nb">str</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="n">shell_rec</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">elements</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">:</span><span class="s2">10</span><span class="si">}{</span><span class="nb">str</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
             <span class="n">exponents</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">exponents</span>
             <span class="n">coefficients</span> <span class="o">=</span> <span class="n">shell</span><span class="o">.</span><span class="n">coefficients</span>
             <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">exponents</span><span class="p">)):</span>
-                <span class="n">shell_rec</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">exponents</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">:</span><span class="s2">16.8f</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coefficients</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">:</span><span class="s2">16.8f</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="n">shell_rec</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">exponents</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">:</span><span class="s2">.17g</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">coefficients</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">:</span><span class="s2">.17g</span><span class="si">}</span><span class="se">\n</span><span class="s2">"</span>
             <span class="n">atom_basis</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">shell_rec</span><span class="p">))</span>
         <span class="n">basis_dict</span><span class="p">[</span><span class="n">pyscf_symbols</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="n">atom_basis</span>
 
     <span class="c1"># TODO Handle Cartesian basis sets</span>
-    <span class="n">mol</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">mole</span><span class="o">.</span><span class="n">Mole</span><span class="p">(</span><span class="n">atom</span><span class="o">=</span><span class="n">atoms</span><span class="p">,</span> <span class="n">basis</span><span class="o">=</span><span class="n">basis_dict</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;Bohr&quot;</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span> <span class="n">spin</span><span class="o">=</span><span class="n">multiplicity</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">mol</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">mole</span><span class="o">.</span><span class="n">Mole</span><span class="p">(</span><span class="n">atom</span><span class="o">=</span><span class="n">atoms</span><span class="p">,</span> <span class="n">basis</span><span class="o">=</span><span class="n">basis_dict</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">"Bohr"</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span> <span class="n">spin</span><span class="o">=</span><span class="n">multiplicity</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Store the original QDK/Chemistry basis name as an attribute for round-trip conversion</span>
     <span class="n">mol</span><span class="o">.</span><span class="n">qdk_basis_name</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_name</span><span class="p">()</span>
@@ -271,63 +299,82 @@
     <span class="c1"># Handle ECP (Effective Core Potential) if present</span>
     <span class="k">if</span> <span class="n">basis</span><span class="o">.</span><span class="n">has_ecp_shells</span><span class="p">()</span> <span class="ow">and</span> <span class="n">basis</span><span class="o">.</span><span class="n">has_ecp_electrons</span><span class="p">():</span>
         <span class="c1"># Build PySCF ECP structure from QDK ECP shells</span>
-        <span class="n">ecp_dict</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">ecp_data_by_atom</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()</span>
 
         <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">natoms</span><span class="p">):</span>
             <span class="n">ncore</span> <span class="o">=</span> <span class="n">ecp_electrons</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span>
+            <span class="n">ecp_shells_atom</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_shells_for_atom</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span>
 
-            <span class="k">if</span> <span class="n">ncore</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
-                <span class="c1"># Get ECP shells for this atom</span>
-                <span class="n">ecp_shells_atom</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_shells_for_atom</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ncore</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">continue</span>
 
-                <span class="k">if</span> <span class="n">ecp_shells_atom</span><span class="p">:</span>
-                    <span class="c1"># Group shells by angular momentum: {l_value: {r_power: [(exp, coeff), ...]}}</span>
-                    <span class="n">shells_by_l</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">ecp_shells_atom</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Atom </span><span class="si">{</span><span class="n">iatm</span><span class="si">}</span><span class="s2"> has </span><span class="si">{</span><span class="n">ncore</span><span class="si">}</span><span class="s2"> ECP electrons but no explicit ECP shells."</span><span class="p">)</span>
 
-                    <span class="k">for</span> <span class="n">shell</span> <span class="ow">in</span> <span class="n">ecp_shells_atom</span><span class="p">:</span>
-                        <span class="c1"># Get l value from orbital type (OrbitalType enum values == l values)</span>
-                        <span class="n">l_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="p">)</span>
+            <span class="c1"># Group shells by angular momentum: {l_value: {r_power: [(exp, coeff), ...]}}</span>
+            <span class="n">shells_by_l</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]]</span> <span class="o">=</span> <span class="p">{}</span>
 
-                        <span class="k">if</span> <span class="n">l_value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">shells_by_l</span><span class="p">:</span>
-                            <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">shell</span> <span class="ow">in</span> <span class="n">ecp_shells_atom</span><span class="p">:</span>
+                <span class="c1"># Get l value from orbital type (OrbitalType enum values == l values)</span>
+                <span class="n">l_value</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">orbital_type</span><span class="p">)</span>
 
-                        <span class="c1"># Each primitive may have different r-power</span>
-                        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">exponents</span><span class="p">)):</span>
-                            <span class="n">r_power</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">rpowers</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
-                            <span class="n">exp</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">exponents</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
-                            <span class="n">coeff</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">coefficients</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+                <span class="k">if</span> <span class="n">l_value</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">shells_by_l</span><span class="p">:</span>
+                    <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
-                            <span class="k">if</span> <span class="n">r_power</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]:</span>
-                                <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">][</span><span class="n">r_power</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="c1"># Each primitive may have different r-power</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">exponents</span><span class="p">)):</span>
+                    <span class="n">r_power</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">rpowers</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+                    <span class="n">exp</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">exponents</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+                    <span class="n">coeff</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">shell</span><span class="o">.</span><span class="n">coefficients</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
 
-                            <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">][</span><span class="n">r_power</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">))</span>
+                    <span class="k">if</span> <span class="n">r_power</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]:</span>
+                        <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">][</span><span class="n">r_power</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
-                    <span class="c1"># Build PySCF format: [ncore, [[l, [term0, term1, ...]], ...]]</span>
-                    <span class="n">l_components</span> <span class="o">=</span> <span class="p">[]</span>
-                    <span class="k">for</span> <span class="n">l_value</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">shells_by_l</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
-                        <span class="c1"># Find max r-power for this l to know array size</span>
-                        <span class="n">max_r</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+                    <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">][</span><span class="n">r_power</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">exp</span><span class="p">,</span> <span class="n">coeff</span><span class="p">))</span>
 
-                        <span class="c1"># Build terms list with empty lists for unused r-powers</span>
-                        <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_r</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
-                        <span class="k">for</span> <span class="n">r_power</span><span class="p">,</span> <span class="n">primitives</span> <span class="ow">in</span> <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                            <span class="n">terms</span><span class="p">[</span><span class="n">r_power</span><span class="p">]</span> <span class="o">=</span> <span class="n">primitives</span>
+            <span class="c1"># Build PySCF format: [ncore, [[l, [term0, term1, ...]], ...]]</span>
+            <span class="n">l_components</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">l_value</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">shells_by_l</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                <span class="c1"># Find max r-power for this l to know array size</span>
+                <span class="n">max_r</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
 
-                        <span class="n">l_components</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">l_value</span><span class="p">,</span> <span class="n">terms</span><span class="p">])</span>
+                <span class="c1"># Build terms list with empty lists for unused r-powers</span>
+                <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">max_r</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span>
+                <span class="k">for</span> <span class="n">r_power</span><span class="p">,</span> <span class="n">primitives</span> <span class="ow">in</span> <span class="n">shells_by_l</span><span class="p">[</span><span class="n">l_value</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="n">terms</span><span class="p">[</span><span class="n">r_power</span><span class="p">]</span> <span class="o">=</span> <span class="n">primitives</span>
 
-                    <span class="c1"># Store in ecp_dict using elements</span>
-                    <span class="n">ecp_dict</span><span class="p">[</span><span class="n">elements</span><span class="p">[</span><span class="n">iatm</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[</span><span class="n">ncore</span><span class="p">,</span> <span class="n">l_components</span><span class="p">]</span>
+                <span class="n">l_components</span><span class="o">.</span><span class="n">append</span><span class="p">([</span><span class="n">l_value</span><span class="p">,</span> <span class="n">terms</span><span class="p">])</span>
 
+            <span class="n">ecp_data_by_atom</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">ncore</span><span class="p">,</span> <span class="n">l_components</span><span class="p">]</span>
+
+        <span class="n">ecp_dict</span> <span class="o">=</span> <span class="n">_key_ecp_data_by_element_or_atom</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">ecp_data_by_atom</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">ecp_dict</span><span class="p">:</span>
             <span class="n">mol</span><span class="o">.</span><span class="n">ecp</span> <span class="o">=</span> <span class="n">ecp_dict</span>
             <span class="c1"># Store ECP name as attribute for roundtrip conversion</span>
             <span class="n">mol</span><span class="o">.</span><span class="n">qdk_ecp_name</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span>
     <span class="k">elif</span> <span class="n">basis</span><span class="o">.</span><span class="n">has_ecp_electrons</span><span class="p">():</span>
         <span class="c1"># Fallback: only ECP name available, no shells</span>
-        <span class="n">mol</span><span class="o">.</span><span class="n">ecp</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span>
+        <span class="n">ecp_name</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_name</span><span class="p">()</span>
+        <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()</span>
+        <span class="n">named_ecp_data_by_atom</span> <span class="o">=</span> <span class="p">{</span><span class="n">iatm</span><span class="p">:</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">ncore</span><span class="p">),</span> <span class="n">ecp_name</span><span class="p">)</span> <span class="k">for</span> <span class="n">iatm</span><span class="p">,</span> <span class="n">ncore</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ecp_electrons</span><span class="p">)</span> <span class="k">if</span> <span class="n">ncore</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">}</span>
+        <span class="n">keyed_named_ecp_data</span> <span class="o">=</span> <span class="n">_key_ecp_data_by_element_or_atom</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">pyscf_symbols</span><span class="p">,</span> <span class="n">named_ecp_data_by_atom</span><span class="p">)</span>
+        <span class="n">ecp_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">key</span><span class="p">:</span> <span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">data</span> <span class="ow">in</span> <span class="n">keyed_named_ecp_data</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+
+        <span class="n">mol</span><span class="o">.</span><span class="n">ecp</span> <span class="o">=</span> <span class="n">ecp_dict</span>
+        <span class="n">mol</span><span class="o">.</span><span class="n">qdk_ecp_name</span> <span class="o">=</span> <span class="n">ecp_name</span>
 
     <span class="n">mol</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">basis</span><span class="o">.</span><span class="n">has_ecp_electrons</span><span class="p">():</span>
+        <span class="n">expected_ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="nb">int</span><span class="p">(</span><span class="n">ncore</span><span class="p">)</span> <span class="k">for</span> <span class="n">ncore</span> <span class="ow">in</span> <span class="n">basis</span><span class="o">.</span><span class="n">get_ecp_electrons</span><span class="p">()]</span>
+        <span class="k">for</span> <span class="n">iatm</span><span class="p">,</span> <span class="n">expected_ncore</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">expected_ecp_electrons</span><span class="p">):</span>
+            <span class="n">actual_ncore</span> <span class="o">=</span> <span class="n">mol</span><span class="o">.</span><span class="n">atom_nelec_core</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">actual_ncore</span> <span class="o">!=</span> <span class="n">expected_ncore</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">"Inconsistent ECP electron count for atom </span><span class="si">{</span><span class="n">iatm</span><span class="si">}</span><span class="s2">: "</span>
+                    <span class="sa">f</span><span class="s2">"basis has </span><span class="si">{</span><span class="n">expected_ncore</span><span class="si">}</span><span class="s2">, mol.atom_nelec_core has </span><span class="si">{</span><span class="n">actual_ncore</span><span class="si">}</span><span class="s2">"</span>
+                <span class="p">)</span>
 
     <span class="k">return</span> <span class="n">mol</span></div>
 
@@ -338,7 +385,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">pyscf_mol_to_qdk_basis</span><span class="p">(</span>
     <span class="n">pyscf_mol</span><span class="p">:</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">mole</span><span class="o">.</span><span class="n">Mole</span><span class="p">,</span> <span class="n">structure</span><span class="p">:</span> <span class="n">Structure</span><span class="p">,</span> <span class="n">basis_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BasisSet</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert PySCF Mole object to QDK/Chemistry BasisSet instance.</span>
+<span class="w">    </span><span class="sd">"""Convert PySCF Mole object to QDK/Chemistry BasisSet instance.</span>
 
 <span class="sd">    This function extracts the basis set information from a PySCF Mole object</span>
 <span class="sd">    and returns a corresponding QDK/Chemistry BasisSet instance. Both regular</span>
@@ -350,7 +397,7 @@
 <span class="sd">        structure: QDK/Chemistry Structure instance that defines the atomic positions and types.</span>
 <span class="sd">        basis_name: Name for the basis set.</span>
 
-<span class="sd">            If None, attempts to derive from the PySCF molecule&#39;s basis set or defaults to &quot;pyscf_basis&quot;.</span>
+<span class="sd">            If None, attempts to derive from the PySCF molecule's basis set or defaults to "pyscf_basis".</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        QDK/Chemistry BasisSet instance initialized with the PySCF basis set data,</span>
@@ -361,18 +408,18 @@
 <span class="sd">        Each combination of (atom, angular momentum, radial power) with non-empty</span>
 <span class="sd">        primitives creates a separate ECP shell.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="c1"># Determine the basis set name if not provided</span>
     <span class="k">if</span> <span class="n">basis_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
         <span class="c1"># Try to extract basis set name from stored QDK/Chemistry basis name (for round-trip conversion)</span>
-        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;qdk_basis_name&quot;</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"qdk_basis_name"</span><span class="p">):</span>
             <span class="n">basis_name</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">qdk_basis_name</span>
         <span class="c1"># Try to extract basis set name from PySCF molecule</span>
-        <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;basis&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">basis</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"basis"</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">basis</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
             <span class="n">basis_name</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">basis</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">basis_name</span> <span class="o">=</span> <span class="s2">&quot;pyscf_basis&quot;</span>
+            <span class="n">basis_name</span> <span class="o">=</span> <span class="s2">"pyscf_basis"</span>
     <span class="c1"># Create shells from PySCF molecule data first</span>
     <span class="n">shells</span> <span class="o">=</span> <span class="p">[]</span>
 
@@ -395,12 +442,13 @@
 
     <span class="c1"># Extract ECP shells if present</span>
     <span class="n">ecp_shells</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;_ecp&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"_ecp"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
         <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">):</span>
             <span class="n">atom_symbol</span> <span class="o">=</span> <span class="n">atom_symbols</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span>
-            <span class="n">element</span> <span class="o">=</span> <span class="n">atom_symbol</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;0123456789&quot;</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
-                <span class="n">ecp_data</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span><span class="p">[</span><span class="n">element</span><span class="p">]</span>  <span class="c1"># noqa: SLF001</span>
+            <span class="n">element</span> <span class="o">=</span> <span class="n">atom_symbol</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"0123456789"</span><span class="p">)</span>
+            <span class="n">ecp_key</span> <span class="o">=</span> <span class="n">atom_symbol</span> <span class="k">if</span> <span class="n">atom_symbol</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span> <span class="k">else</span> <span class="n">element</span>  <span class="c1"># noqa: SLF001</span>
+            <span class="k">if</span> <span class="n">ecp_key</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+                <span class="n">ecp_data</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">_ecp</span><span class="p">[</span><span class="n">ecp_key</span><span class="p">]</span>  <span class="c1"># noqa: SLF001</span>
                 <span class="c1"># Structure: [ncore, [[l, [[[exp, coeff]], ...]], ...]], where the inner structure has r-power terms</span>
                 <span class="n">ecp_components</span> <span class="o">=</span> <span class="n">ecp_data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
 
@@ -423,8 +471,8 @@
                             <span class="n">ecp_shells</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ecp_shell</span><span class="p">)</span>
 
     <span class="c1"># Extract ECP name and electron counts if present</span>
-    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;ecp&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">:</span>
-        <span class="n">ecp_name</span> <span class="o">=</span> <span class="s2">&quot;none&quot;</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"ecp"</span><span class="p">)</span> <span class="ow">and</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">:</span>
+        <span class="n">ecp_name</span> <span class="o">=</span> <span class="s2">"none"</span>
         <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span>
 
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
@@ -432,10 +480,10 @@
             <span class="n">ecp_name</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span>
 
             <span class="c1"># Extract electron counts from PySCF molecule</span>
-            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;atom_nelec_core&quot;</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"atom_nelec_core"</span><span class="p">):</span>
                 <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom_nelec_core</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span> <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">)]</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;ECP electron counts could not be determined from PySCF Mole object.&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"ECP electron counts could not be determined from PySCF Mole object."</span><span class="p">)</span>
 
         <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
             <span class="c1"># Dictionary case: check if all values are strings (uniform ECP name)</span>
@@ -447,17 +495,17 @@
             <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">first_value</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
                 <span class="c1"># Check that all values are strings and identical</span>
                 <span class="k">if</span> <span class="ow">not</span> <span class="nb">all</span><span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">ecp_dict_values</span><span class="p">):</span>
-                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;ECP dictionary contains mixed value types (strings and non-strings).&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"ECP dictionary contains mixed value types (strings and non-strings)."</span><span class="p">)</span>
                 <span class="n">ecp_names_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">ecp_dict_values</span><span class="p">)</span>
                 <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">ecp_names_set</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Non-uniform ECP names are not supported: </span><span class="si">{</span><span class="n">ecp_names_set</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Non-uniform ECP names are not supported: </span><span class="si">{</span><span class="n">ecp_names_set</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
                 <span class="n">ecp_name</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">ecp_names_set</span><span class="p">))</span>
 
                 <span class="c1"># Extract electron counts from PySCF molecule</span>
-                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;atom_nelec_core&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"atom_nelec_core"</span><span class="p">):</span>
                     <span class="n">ecp_electrons</span> <span class="o">=</span> <span class="p">[</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom_nelec_core</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span> <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">)]</span>
                 <span class="k">else</span><span class="p">:</span>
-                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;ECP electron counts could not be determined from PySCF Mole object.&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">"ECP electron counts could not be determined from PySCF Mole object."</span><span class="p">)</span>
 
             <span class="c1"># Case 2: Dictionary with full ECP structure [ncore, [[l, terms], ...]]</span>
             <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">first_value</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">first_value</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
@@ -465,35 +513,37 @@
                 <span class="k">for</span> <span class="n">atom_sym</span><span class="p">,</span> <span class="n">ecp_data</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                     <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">ecp_data</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">ecp_data</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
                         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                            <span class="sa">f</span><span class="s2">&quot;Invalid ECP structure for atom &#39;</span><span class="si">{</span><span class="n">atom_sym</span><span class="si">}</span><span class="s2">&#39;: &quot;</span>
-                            <span class="sa">f</span><span class="s2">&quot;expected [ncore, [[l, terms], ...]], got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">ecp_data</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+                            <span class="sa">f</span><span class="s2">"Invalid ECP structure for atom '</span><span class="si">{</span><span class="n">atom_sym</span><span class="si">}</span><span class="s2">': "</span>
+                            <span class="sa">f</span><span class="s2">"expected [ncore, [[l, terms], ...]], got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">ecp_data</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
                         <span class="p">)</span>
 
                 <span class="c1"># Extract ECP name from stored attribute if available (roundtrip case) otherwise use generic name</span>
-                <span class="n">ecp_name</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">qdk_ecp_name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;qdk_ecp_name&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;custom&quot;</span>
+                <span class="n">ecp_name</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">qdk_ecp_name</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"qdk_ecp_name"</span><span class="p">)</span> <span class="k">else</span> <span class="s2">"custom"</span>
 
                 <span class="c1"># Extract ncore values directly from the ECP dictionary structure</span>
                 <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">):</span>
-                    <span class="n">element</span> <span class="o">=</span> <span class="n">atom_symbols</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">&quot;0123456789&quot;</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">element</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">:</span>
-                        <span class="n">ecp_electrons</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">[</span><span class="n">element</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+                    <span class="n">atom_symbol</span> <span class="o">=</span> <span class="n">atom_symbols</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span>
+                    <span class="n">element</span> <span class="o">=</span> <span class="n">atom_symbol</span><span class="o">.</span><span class="n">rstrip</span><span class="p">(</span><span class="s2">"0123456789"</span><span class="p">)</span>
+                    <span class="n">ecp_key</span> <span class="o">=</span> <span class="n">atom_symbol</span> <span class="k">if</span> <span class="n">atom_symbol</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span> <span class="k">else</span> <span class="n">element</span>
+                    <span class="k">if</span> <span class="n">ecp_key</span> <span class="ow">in</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">:</span>
+                        <span class="n">ecp_electrons</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">[</span><span class="n">ecp_key</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
 
                 <span class="c1"># Validate consistency with mol.atom_nelec_core if available</span>
-                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">&quot;atom_nelec_core&quot;</span><span class="p">):</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="p">,</span> <span class="s2">"atom_nelec_core"</span><span class="p">):</span>
                     <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">):</span>
                         <span class="n">mol_ncore</span> <span class="o">=</span> <span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom_nelec_core</span><span class="p">(</span><span class="n">iatm</span><span class="p">)</span>
                         <span class="k">if</span> <span class="n">ecp_electrons</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span> <span class="o">!=</span> <span class="n">mol_ncore</span><span class="p">:</span>
                             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                                <span class="sa">f</span><span class="s2">&quot;Inconsistent ECP electron count for atom </span><span class="si">{</span><span class="n">iatm</span><span class="si">}</span><span class="s2">: &quot;</span>
-                                <span class="sa">f</span><span class="s2">&quot;ECP dict has </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span><span class="si">}</span><span class="s2">, mol.atom_nelec_core has </span><span class="si">{</span><span class="n">mol_ncore</span><span class="si">}</span><span class="s2">&quot;</span>
+                                <span class="sa">f</span><span class="s2">"Inconsistent ECP electron count for atom </span><span class="si">{</span><span class="n">iatm</span><span class="si">}</span><span class="s2">: "</span>
+                                <span class="sa">f</span><span class="s2">"ECP dict has </span><span class="si">{</span><span class="n">ecp_electrons</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span><span class="si">}</span><span class="s2">, mol.atom_nelec_core has </span><span class="si">{</span><span class="n">mol_ncore</span><span class="si">}</span><span class="s2">"</span>
                             <span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Unsupported ECP dictionary value type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">first_value</span><span class="p">)</span><span class="si">}</span><span class="s2">. &quot;</span>
-                    <span class="s2">&quot;Expected uniform strings or [ncore, [[l, terms], ...]] structure.&quot;</span>
+                    <span class="sa">f</span><span class="s2">"Unsupported ECP dictionary value type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">first_value</span><span class="p">)</span><span class="si">}</span><span class="s2">. "</span>
+                    <span class="s2">"Expected uniform strings or [ncore, [[l, terms], ...]] structure."</span>
                 <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PySCF ECP data must be a string or dict, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PySCF ECP data must be a string or dict, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">ecp</span><span class="p">)</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
 
         <span class="c1"># Create BasisSet with name, shells, ecp_name, ecp_shells, ecp_electrons, structure, and basis type</span>
         <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">n</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">ecp_electrons</span><span class="p">):</span>
@@ -509,9 +559,9 @@
     <span class="n">occ_alpha</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">occ_beta</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">scf_type</span><span class="p">:</span> <span class="n">SCFType</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span><span class="p">,</span>
-    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"hf"</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an Orbitals object to a PySCF SCF object.</span>
+<span class="w">    </span><span class="sd">"""Convert an Orbitals object to a PySCF SCF object.</span>
 
 <span class="sd">    This function takes a QDK/Chemistry Orbitals object and converts it into the appropriate</span>
 <span class="sd">    PySCF self-consistent field (SCF) object based on the orbital characteristics.</span>
@@ -524,12 +574,12 @@
 <span class="sd">        occ_alpha: Occupation numbers for alpha (spin-up) electrons.</span>
 <span class="sd">        occ_beta: Occupation numbers for beta (spin-down) electrons.</span>
 <span class="sd">        scf_type: Type of SCF calculation to create. Can be:</span>
-<span class="sd">            * ``&quot;auto&quot;`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``</span>
-<span class="sd">            * ``&quot;restricted&quot;`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)</span>
-<span class="sd">            * ``&quot;unrestricted&quot;`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)</span>
+<span class="sd">            * ``"auto"`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``</span>
+<span class="sd">            * ``"restricted"`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)</span>
+<span class="sd">            * ``"unrestricted"`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)</span>
 
-<span class="sd">        method: The electronic structure method to use. Default is &quot;hf&quot; (Hartree-Fock).</span>
-<span class="sd">            Any other value is treated as a DFT exchange-correlation functional (e.g., &quot;b3lyp&quot;, &quot;pbe&quot;).</span>
+<span class="sd">        method: The electronic structure method to use. Default is "hf" (Hartree-Fock).</span>
+<span class="sd">            Any other value is treated as a DFT exchange-correlation functional (e.g., "b3lyp", "pbe").</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``</span>
@@ -543,7 +593,7 @@
 <span class="sd">        The function automatically determines the appropriate SCF method based on whether</span>
 <span class="sd">        the orbitals are restricted/unrestricted and closed-shell/open-shell.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">scf_type</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
         <span class="n">scf_type</span> <span class="o">=</span> <span class="n">SCFType</span><span class="p">(</span><span class="n">scf_type</span><span class="o">.</span><span class="n">lower</span><span class="p">())</span>
@@ -554,7 +604,7 @@
     <span class="n">n_electrons</span> <span class="o">=</span> <span class="n">n_alpha</span> <span class="o">+</span> <span class="n">n_beta</span>
     <span class="n">multiplicity</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">n_alpha</span> <span class="o">-</span> <span class="n">n_beta</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span>
 
-    <span class="c1"># Calculate charge from structure&#39;s atomic symbols (accounting for ECPs)</span>
+    <span class="c1"># Calculate charge from structure's atomic symbols (accounting for ECPs)</span>
     <span class="n">basis_set</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span>
     <span class="n">atomic_symbols</span> <span class="o">=</span> <span class="n">basis_set</span><span class="o">.</span><span class="n">get_structure</span><span class="p">()</span><span class="o">.</span><span class="n">get_atomic_symbols</span><span class="p">()</span>
     <span class="n">neutral_electrons</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">charge</span><span class="p">(</span><span class="n">symbol</span><span class="p">)</span> <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="n">atomic_symbols</span><span class="p">)</span>
@@ -582,7 +632,7 @@
         <span class="n">total_occ</span> <span class="o">=</span> <span class="n">occ_alpha</span> <span class="o">+</span> <span class="n">occ_beta</span>
         <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">occ_alpha</span> <span class="o">!=</span> <span class="n">occ_beta</span><span class="p">):</span>
             <span class="c1"># Restricted open-shell</span>
-            <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"hf"</span><span class="p">:</span>
                 <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">ROHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">ROKS</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
@@ -592,7 +642,7 @@
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span> <span class="o">=</span> <span class="n">total_occ</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="c1"># Restricted closed-shell</span>
-            <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"hf"</span><span class="p">:</span>
                 <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RKS</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
@@ -602,7 +652,7 @@
             <span class="n">mf</span><span class="o">.</span><span class="n">mo_occ</span> <span class="o">=</span> <span class="n">total_occ</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="c1"># Unrestricted</span>
-        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;hf&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">method</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">==</span> <span class="s2">"hf"</span><span class="p">:</span>
             <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">UHF</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">mf</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">UKS</span><span class="p">(</span><span class="n">mol</span><span class="p">)</span>
@@ -619,9 +669,9 @@
     <span class="n">n_electrons</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">multiplicity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
     <span class="n">scf_type</span><span class="p">:</span> <span class="n">SCFType</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">SCFType</span><span class="o">.</span><span class="n">AUTO</span><span class="p">,</span>
-    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;hf&quot;</span><span class="p">,</span>
+    <span class="n">method</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"hf"</span><span class="p">,</span>
 <span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert an Orbitals object to a PySCF SCF object.</span>
+<span class="w">    </span><span class="sd">"""Convert an Orbitals object to a PySCF SCF object.</span>
 
 <span class="sd">    This is a convenience wrapper around :func:`orbitals_to_scf` that automatically constructs</span>
 <span class="sd">    occupation arrays from the total number of electrons and spin multiplicity.</span>
@@ -634,12 +684,12 @@
 <span class="sd">        n_electrons: Total number of electrons in the system.</span>
 <span class="sd">        multiplicity: Spin multiplicity (2S + 1), where S is the total spin. Default is 1 (singlet).</span>
 <span class="sd">        scf_type: Type of SCF calculation to create. Can be:</span>
-<span class="sd">            * ``&quot;auto&quot;`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``</span>
-<span class="sd">            * ``&quot;restricted&quot;`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)</span>
-<span class="sd">            * ``&quot;unrestricted&quot;`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)</span>
+<span class="sd">            * ``"auto"`` or ``SCFType.AUTO`` (default): Automatically detect based on ``orbitals.is_restricted()``</span>
+<span class="sd">            * ``"restricted"`` or ``SCFType.RESTRICTED``: Force restricted calculation (RHF or ROHF)</span>
+<span class="sd">            * ``"unrestricted"`` or ``SCFType.UNRESTRICTED``: Force unrestricted calculation (UHF)</span>
 
-<span class="sd">        method: The electronic structure method to use. Default is &quot;hf&quot; (Hartree-Fock).</span>
-<span class="sd">            Any other value is treated as a DFT exchange-correlation functional (e.g., &quot;b3lyp&quot;, &quot;pbe&quot;).</span>
+<span class="sd">        method: The electronic structure method to use. Default is "hf" (Hartree-Fock).</span>
+<span class="sd">            Any other value is treated as a DFT exchange-correlation functional (e.g., "b3lyp", "pbe").</span>
 
 <span class="sd">    Returns:</span>
 <span class="sd">        A PySCF SCF object (RHF, ROHF, or UHF) populated with the molecular orbital data from the input ``Orbitals``</span>
@@ -656,7 +706,7 @@
 <span class="sd">        The function automatically determines the appropriate SCF method based on whether</span>
 <span class="sd">        the orbitals are restricted/unrestricted and closed-shell/open-shell.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">n_orbitals</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
     <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span> <span class="o">=</span> <span class="n">occupations_from_n_electrons_and_multiplicity</span><span class="p">(</span><span class="n">n_orbitals</span><span class="p">,</span> <span class="n">n_electrons</span><span class="p">,</span> <span class="n">multiplicity</span><span class="p">)</span>
@@ -667,10 +717,10 @@
 <div class="viewcode-block" id="hamiltonian_to_scf">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.pyscf.conversion.html#qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">hamiltonian_to_scf</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">alpha_occ</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">beta_occ</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RHF</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert QDK/Chemistry Hamiltonian to PySCF SCF object.</span>
+<span class="w">    </span><span class="sd">"""Convert QDK/Chemistry Hamiltonian to PySCF SCF object.</span>
 
 <span class="sd">    This function creates a PySCF SCF object from a QDK/Chemistry Hamiltonian object, making it possible to use</span>
-<span class="sd">    QDK/Chemistry Hamiltonian data with PySCF&#39;s post-HF methods such as Coupled Cluster. It extracts one- and two-body</span>
+<span class="sd">    QDK/Chemistry Hamiltonian data with PySCF's post-HF methods such as Coupled Cluster. It extracts one- and two-body</span>
 <span class="sd">    integrals, core energy, and electron counts from the Hamiltonian and configures them in a PySCF SCF object without</span>
 <span class="sd">    performing an actual SCF calculation.</span>
 
@@ -684,7 +734,7 @@
 <span class="sd">        beta_occ: Occupation numbers for beta (spin-down) electrons.</span>
 
 <span class="sd">    Returns:</span>
-<span class="sd">        PySCF RHF object initialized with the Hamiltonian data, ready for post-HF calculations. This is a &quot;fake&quot; SCF</span>
+<span class="sd">        PySCF RHF object initialized with the Hamiltonian data, ready for post-HF calculations. This is a "fake" SCF</span>
 <span class="sd">        object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.</span>
 
 <span class="sd">    Raises:</span>
@@ -695,7 +745,7 @@
 <span class="sd">        * This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.</span>
 <span class="sd">        * If a non-model Hamiltonian is passed, this function automatically re-routes to orbitals_to_scf.</span>
 <span class="sd">        * Active spaces are not supported.</span>
-<span class="sd">        * The function creates a &quot;fake&quot; SCF object with the necessary interfaces for post-HF methods without actually</span>
+<span class="sd">        * The function creates a "fake" SCF object with the necessary interfaces for post-HF methods without actually</span>
 <span class="sd">          performing an SCF calculation.</span>
 <span class="sd">        * The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method</span>
 <span class="sd">          initialization.</span>
@@ -718,7 +768,7 @@
 <span class="sd">        &gt;&gt;&gt; cc_calc = cc.CCSD(pyscf_scf)</span>
 <span class="sd">        &gt;&gt;&gt; cc_calc.kernel()</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">orbitals</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
@@ -727,18 +777,18 @@
         <span class="k">return</span> <span class="n">orbitals_to_scf</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="n">occ_alpha</span><span class="o">=</span><span class="n">alpha_occ</span><span class="p">,</span> <span class="n">occ_beta</span><span class="o">=</span><span class="n">beta_occ</span><span class="p">)</span>
     <span class="k">except</span> <span class="ne">RuntimeError</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">is_unrestricted</span><span class="p">():</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;You cannot pass an unrestricted model Hamiltonian here.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"You cannot pass an unrestricted model Hamiltonian here."</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
 
     <span class="n">norb</span> <span class="o">=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
 
     <span class="c1"># Consistency checks</span>
     <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">alpha_occ</span> <span class="o">!=</span> <span class="n">beta_occ</span><span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Open-shell is not supported.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Open-shell is not supported."</span><span class="p">)</span>
     <span class="k">if</span> <span class="p">(</span>
         <span class="n">orbitals</span><span class="o">.</span><span class="n">has_active_space</span><span class="p">()</span>
         <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">spin_channel_indices</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">active_indices</span><span class="p">(),</span> <span class="n">axes</span><span class="o">.</span><span class="n">alpha</span><span class="p">()))</span> <span class="o">!=</span> <span class="n">orbitals</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
     <span class="p">):</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Active space is not supported.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"Active space is not supported."</span><span class="p">)</span>
 
     <span class="c1"># Dummy molecule</span>
     <span class="n">mol</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">M</span><span class="p">()</span>
@@ -755,8 +805,8 @@
     <span class="p">(</span><span class="n">eri</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
     <span class="n">eri</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">eri</span><span class="p">,</span> <span class="p">(</span><span class="n">norb</span><span class="p">,</span> <span class="n">norb</span><span class="p">,</span> <span class="n">norb</span><span class="p">,</span> <span class="n">norb</span><span class="p">))</span>
     <span class="p">(</span><span class="n">h1e</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
-    <span class="c1"># Use _eri directly as it&#39;s the established way to access this in PySCF</span>
-    <span class="c1"># even though it&#39;s technically a private member</span>
+    <span class="c1"># Use _eri directly as it's the established way to access this in PySCF</span>
+    <span class="c1"># even though it's technically a private member</span>
     <span class="n">fake_scf</span><span class="o">.</span><span class="n">_eri</span> <span class="o">=</span> <span class="n">eri</span>  <span class="c1"># noqa: SLF001</span>
     <span class="n">fake_scf</span><span class="o">.</span><span class="n">get_hcore</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="n">h1e</span>
     <span class="n">fake_scf</span><span class="o">.</span><span class="n">get_ovlp</span> <span class="o">=</span> <span class="k">lambda</span> <span class="o">*</span><span class="n">_</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">norb</span><span class="p">)</span>
@@ -779,7 +829,7 @@
     <span class="n">n_electrons</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
     <span class="n">multiplicity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">scf</span><span class="o">.</span><span class="n">RHF</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert QDK/Chemistry Hamiltonian to PySCF SCF object using electron count and spin multiplicity.</span>
+<span class="w">    </span><span class="sd">"""Convert QDK/Chemistry Hamiltonian to PySCF SCF object using electron count and spin multiplicity.</span>
 
 <span class="sd">    This is a convenience wrapper around :func:`hamiltonian_to_scf` that automatically constructs</span>
 <span class="sd">    occupation arrays from the total number of electrons and spin multiplicity.</span>
@@ -807,7 +857,7 @@
 <span class="sd">        &gt;&gt;&gt; cc_calc = cc.CCSD(pyscf_scf)</span>
 <span class="sd">        &gt;&gt;&gt; cc_calc.kernel()</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="n">n_orbitals</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_molecular_orbitals</span><span class="p">()</span>
     <span class="n">alpha_occ</span><span class="p">,</span> <span class="n">beta_occ</span> <span class="o">=</span> <span class="n">occupations_from_n_electrons_and_multiplicity</span><span class="p">(</span><span class="n">n_orbitals</span><span class="p">,</span> <span class="n">n_electrons</span><span class="p">,</span> <span class="n">multiplicity</span><span class="p">)</span>
@@ -818,7 +868,7 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">occupations_from_n_electrons_and_multiplicity</span><span class="p">(</span>
     <span class="n">n_orbitals</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_electrons</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">multiplicity</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert total number of electrons and spin multiplicity to alpha and beta occupation arrays.</span>
+<span class="w">    </span><span class="sd">"""Convert total number of electrons and spin multiplicity to alpha and beta occupation arrays.</span>
 
 <span class="sd">    Args:</span>
 <span class="sd">        n_orbitals: Total number of molecular orbitals.</span>
@@ -832,27 +882,27 @@
 <span class="sd">    Raises:</span>
 <span class="sd">        ValueError: If the total number of electrons or multiplicity is invalid.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="c1"># Validate inputs</span>
     <span class="k">if</span> <span class="n">n_electrons</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The number of electrons must be non-negative, got </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The number of electrons must be non-negative, got </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">multiplicity</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;The multiplicity must be at least 1, got </span><span class="si">{</span><span class="n">multiplicity</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"The multiplicity must be at least 1, got </span><span class="si">{</span><span class="n">multiplicity</span><span class="si">}</span><span class="s2">."</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">n_electrons</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">multiplicity</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;An even number of electrons requires an odd multiplicity.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"An even number of electrons requires an odd multiplicity."</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">n_electrons</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">multiplicity</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;An odd number of electrons requires an even multiplicity.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"An odd number of electrons requires an even multiplicity."</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">n_electrons</span> <span class="o">&lt;</span> <span class="n">multiplicity</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;A multiplicity of </span><span class="si">{</span><span class="n">multiplicity</span><span class="si">}</span><span class="s2"> requires more than </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2"> electrons.&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"A multiplicity of </span><span class="si">{</span><span class="n">multiplicity</span><span class="si">}</span><span class="s2"> requires more than </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2"> electrons."</span><span class="p">)</span>
 
     <span class="c1"># Calculate the number of singly and doubly occupied orbitals</span>
     <span class="n">n_singly_occupied</span> <span class="o">=</span> <span class="n">multiplicity</span> <span class="o">-</span> <span class="mi">1</span>
     <span class="n">n_doubly_occupied</span> <span class="o">=</span> <span class="p">(</span><span class="n">n_electrons</span> <span class="o">-</span> <span class="n">n_singly_occupied</span><span class="p">)</span> <span class="o">//</span> <span class="mi">2</span>
     <span class="k">if</span> <span class="n">n_singly_occupied</span> <span class="o">+</span> <span class="n">n_doubly_occupied</span> <span class="o">&gt;</span> <span class="n">n_orbitals</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;Not enough orbitals (</span><span class="si">{</span><span class="n">n_orbitals</span><span class="si">}</span><span class="s2">) to accommodate </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2"> electrons with a multiplicity of &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">multiplicity</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">n_singly_occupied</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">n_doubly_occupied</span><span class="si">}</span><span class="s2"> orbitals needed).&quot;</span>
+            <span class="sa">f</span><span class="s2">"Not enough orbitals (</span><span class="si">{</span><span class="n">n_orbitals</span><span class="si">}</span><span class="s2">) to accommodate </span><span class="si">{</span><span class="n">n_electrons</span><span class="si">}</span><span class="s2"> electrons with a multiplicity of "</span>
+            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">multiplicity</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">n_singly_occupied</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">n_doubly_occupied</span><span class="si">}</span><span class="s2"> orbitals needed)."</span>
         <span class="p">)</span>
 
     <span class="c1"># Construct occupation arrays</span>

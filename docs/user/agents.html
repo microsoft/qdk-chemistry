@@ -1,0 +1,286 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Working with AI Assistants &mdash; qdk-chemistry 2.2.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=78acbc13" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=b21de401"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="In-depth user guide" href="comprehensive/index.html" />
+    <link rel="prev" title="Features, methods and dependencies" href="features.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Working with AI Assistants</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#getting-started">Getting started</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#what-gets-deployed">What gets deployed</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#customizing-plugin-guidance">Customizing plugin guidance</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#editing-skills">Editing skills</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#mcp-server">MCP server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cli">CLI</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="comprehensive/index.html">In-depth user guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="migrating-data-files.html">Migrating data files between serialization versions</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../tutorials/index.html">Tutorials</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Working with AI Assistants</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user/agents.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="working-with-ai-assistants">
+<span id="agents"></span><h1>Working with AI Assistants<a class="headerlink" href="#working-with-ai-assistants" title="Link to this heading"></a></h1>
+<p>QDK/Chemistry can be used through AI assistants without Python scripting.
+The plugin provides skills with QDK/Chemistry guidance and an MCP server that
+exposes the chemistry pipeline as structured tools. A CLI provides the same
+capabilities for shell-based workflows.</p>
+<nav class="contents local" id="on-this-page">
+<p class="topic-title">On This Page</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#getting-started" id="id1">Getting started</a></p>
+<ul>
+<li><p><a class="reference internal" href="#what-gets-deployed" id="id2">What gets deployed</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#customizing-plugin-guidance" id="id3">Customizing plugin guidance</a></p>
+<ul>
+<li><p><a class="reference internal" href="#editing-skills" id="id4">Editing skills</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#mcp-server" id="id5">MCP server</a></p></li>
+<li><p><a class="reference internal" href="#cli" id="id6">CLI</a></p></li>
+</ul>
+</nav>
+<section id="getting-started">
+<h2><a class="toc-backref" href="#id1" role="doc-backlink">Getting started</a><a class="headerlink" href="#getting-started" title="Link to this heading"></a></h2>
+<ol class="arabic">
+<li><p><strong>Install QDK/Chemistry with MCP support</strong> into a virtual environment (see
+<a class="reference internal" href="quickstart.html"><span class="doc">Quickstart</span></a>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">'qdk-chemistry[mcp]'</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Deploy the plugin</strong> into your project directory:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install the QDK/Chemistry plugin and deploy its skills and MCP configuration.</span>
+qc<span class="w"> </span>plugin<span class="w"> </span>install<span class="w"> </span>qdk-chemistry@qdk-chemistry<span class="w"> </span>--target-dir<span class="w"> </span>.
+
+<span class="c1"># Or install from a local QDK/Chemistry checkout.</span>
+qc<span class="w"> </span>plugin<span class="w"> </span>install<span class="w"> </span>./copilot-plugins/qdk-chemistry<span class="w"> </span>--target-dir<span class="w"> </span>.
+</pre></div>
+</div>
+<p>This creates skills and MCP server configurations
+(<code class="docutils literal notranslate"><span class="pre">.vscode/mcp.json</span></code> and <code class="docutils literal notranslate"><span class="pre">.github/mcp.json</span></code>) for the AI assistant.</p>
+</li>
+<li><p><strong>Open the project</strong> in VS Code (or another compatible client). The MCP
+server starts automatically when the assistant makes its first tool call.</p></li>
+</ol>
+<p>That’s it. Ask the assistant to <em>“run an SCF calculation on water with
+cc-pVDZ”</em> and it will handle structure upload, coordinate conversion,
+SCF, stability check, and result inspection autonomously.</p>
+<section id="what-gets-deployed">
+<h3><a class="toc-backref" href="#id2" role="doc-backlink">What gets deployed</a><a class="headerlink" href="#what-gets-deployed" title="Link to this heading"></a></h3>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Component</p></th>
+<th class="head"><p>Purpose</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">.vscode/mcp.json</span></code></p></td>
+<td><p>Tells VS Code where to find the MCP server</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">.github/mcp.json</span></code></p></td>
+<td><p>Tells GitHub Copilot where to find the MCP server</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">.github/skills/</span></code></p></td>
+<td><p>Domain knowledge: tool reference, workflow patterns, pitfalls, worked examples</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="customizing-plugin-guidance">
+<h2><a class="toc-backref" href="#id3" role="doc-backlink">Customizing plugin guidance</a><a class="headerlink" href="#customizing-plugin-guidance" title="Link to this heading"></a></h2>
+<p>The deployed skills are plain Markdown. Edit them to customize the guidance
+available to the assistant.</p>
+<section id="editing-skills">
+<h3><a class="toc-backref" href="#id4" role="doc-backlink">Editing skills</a><a class="headerlink" href="#editing-skills" title="Link to this heading"></a></h3>
+<p>Skills live in <code class="docutils literal notranslate"><span class="pre">.github/skills/&lt;skill-name&gt;/SKILL.md</span></code> with optional
+<code class="docutils literal notranslate"><span class="pre">references/</span></code> subdirectories. Each skill is a self-contained knowledge
+bundle that the assistant loads on demand.</p>
+<p>To customize a skill, edit the <code class="docutils literal notranslate"><span class="pre">.md</span></code> files directly. For example, to
+add a new workflow pattern:</p>
+<ol class="arabic simple">
+<li><p>Open <code class="docutils literal notranslate"><span class="pre">.github/skills/qdk-chemistry-mcp/SKILL.md</span></code></p></li>
+<li><p>Add your pattern under the appropriate section</p></li>
+<li><p>The assistant will pick it up on the next invocation</p></li>
+</ol>
+<p>To add an entirely new skill, create a new directory under
+<code class="docutils literal notranslate"><span class="pre">.github/skills/</span></code> with a <code class="docutils literal notranslate"><span class="pre">SKILL.md</span></code> file.</p>
+</section>
+</section>
+<section id="mcp-server">
+<h2><a class="toc-backref" href="#id5" role="doc-backlink">MCP server</a><a class="headerlink" href="#mcp-server" title="Link to this heading"></a></h2>
+<p>The MCP server is the interface between the AI assistant and QDK/Chemistry. It
+exposes ~50 tools organized into categories that the assistant discovers via
+<code class="docutils literal notranslate"><span class="pre">list_tools</span></code>.</p>
+<p>MCP support is optional. Installing <code class="docutils literal notranslate"><span class="pre">qdk-chemistry[mcp]</span></code> automatically
+activates the server, transports, workspace middleware, and any visualization
+resources whose widget dependencies are installed.</p>
+<p>Every tool returns a structured JSON envelope with <code class="docutils literal notranslate"><span class="pre">status</span></code> (<code class="docutils literal notranslate"><span class="pre">&quot;ok&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;error&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;exists&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;submitted&quot;</span></code>). All <code class="docutils literal notranslate"><span class="pre">run_*</span></code> tools
+accept <code class="docutils literal notranslate"><span class="pre">overwrite=True</span></code> to bypass the <code class="docutils literal notranslate"><span class="pre">&quot;exists&quot;</span></code> check, and
+<code class="docutils literal notranslate"><span class="pre">remote</span></code>/<code class="docutils literal notranslate"><span class="pre">cache</span></code> parameters for remote execution.</p>
+<p>Start the server manually if needed:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>qcmcp<span class="w">                                    </span><span class="c1"># stdio (default)</span>
+qcmcp<span class="w"> </span>--transport<span class="w"> </span>streamable-http<span class="w"> </span>--port<span class="w"> </span><span class="m">8081</span><span class="w">  </span><span class="c1"># HTTP</span>
+</pre></div>
+</div>
+</section>
+<section id="cli">
+<h2><a class="toc-backref" href="#id6" role="doc-backlink">CLI</a><a class="headerlink" href="#cli" title="Link to this heading"></a></h2>
+<p>The CLI (<code class="docutils literal notranslate"><span class="pre">qc</span></code>) provides the same capabilities as the MCP server for
+shell-based workflows. It’s organized around five concepts:</p>
+<dl class="simple">
+<dt><strong>Algorithms</strong> (<code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">run</span> <span class="pre">...</span></code>)</dt><dd><p>Execute any chemistry algorithm — SCF, active space selection, CASCI,
+MCSCF, qubit mapping, state preparation, QPE. Each command mirrors
+an MCP tool with the same parameters.</p>
+</dd>
+<dt><strong>Data inspection</strong> (<code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">data</span> <span class="pre">...</span></code>)</dt><dd><p>Read back results from project files — summaries, energies, orbital
+indices, circuit QASM, QPE results. Useful for verifying intermediate
+steps or recovering context.</p>
+</dd>
+<dt><strong>Project management</strong> (<code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">project</span> <span class="pre">...</span></code>)</dt><dd><p>Create projects, list files, manage the workspace.</p>
+</dd>
+<dt><strong>Utilities</strong> (<code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">util</span> <span class="pre">...</span></code>)</dt><dd><p>Coordinate conversion, energy unit conversion, valence parameter
+computation, QPE phase resolution.</p>
+</dd>
+<dt><strong>Configuration</strong> (<code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">config</span> <span class="pre">...</span></code>)</dt><dd><p>Query available algorithms, inspect default settings, generate
+config templates for compound algorithms (MCSCF, QPE).</p>
+</dd>
+</dl>
+<p>All algorithm commands accept <code class="docutils literal notranslate"><span class="pre">--cache</span></code>, <code class="docutils literal notranslate"><span class="pre">--remote</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">--remote-config</span></code> for remote execution. Use <code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">--dry-run</span></code> to
+preview parameters without executing, and <code class="docutils literal notranslate"><span class="pre">qc</span> <span class="pre">--help</span></code> for the full
+command list.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="features.html" class="btn btn-neutral float-left" title="Features, methods and dependencies" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="comprehensive/index.html" class="btn btn-neutral float-right" title="In-depth user guide" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

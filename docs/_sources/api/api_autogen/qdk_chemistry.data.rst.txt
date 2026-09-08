@@ -25,6 +25,7 @@ Submodules
 
    qdk_chemistry.data._hashing
    qdk_chemistry.data._spin_channels
+   qdk_chemistry.data._type_name
    qdk_chemistry.data.base
    qdk_chemistry.data.circuit
    qdk_chemistry.data.circuit_executor_data
@@ -33,6 +34,7 @@ Submodules
    qdk_chemistry.data.noise_models
    qdk_chemistry.data.qpe_result
    qdk_chemistry.data.qubit_operator
+   qdk_chemistry.data.registry
    qdk_chemistry.data.symmetries
    qdk_chemistry.data.symmetry
    qdk_chemistry.data.term_partition

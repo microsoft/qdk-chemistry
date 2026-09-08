@@ -16,3 +16,4 @@ Submodules
    qdk_chemistry.algorithms.phase_estimation.circuit_builder.base
    qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder
    qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder
+   qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder

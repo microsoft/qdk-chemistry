@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
@@ -16,7 +16,7 @@
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -50,6 +50,7 @@
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../user/migrating-data-files.html">Migrating data files between serialization versions</a></li>
 </ul>
@@ -95,13 +96,13 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK native qubit mapper using Majorana-level C++ building blocks.</span>
+<span></span><span class="sd">"""QDK native qubit mapper using Majorana-level C++ building blocks.</span>
 
 <span class="sd">This module provides the QdkQubitMapper class for transforming electronic structure</span>
 <span class="sd">Hamiltonians to qubit operators. The encoding is specified by a</span>
 <span class="sd">:class:`~qdk_chemistry.data.MajoranaMapping` passed to ``run()``, making the</span>
 <span class="sd">mapper encoding-agnostic.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -126,37 +127,37 @@
 <span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">MajoranaMapping</span>
 
-<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QdkQubitMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;QdkQubitMapperSettings&quot;</span><span class="p">]</span>
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"QdkQubitMapper"</span><span class="p">,</span> <span class="s2">"QdkQubitMapperSettings"</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="QdkQubitMapperSettings">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapperSettings">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QdkQubitMapperSettings</span><span class="p">(</span><span class="n">QubitMapperSettings</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a QdkQubitMapper.</span>
+<span class="w">    </span><span class="sd">"""Settings configuration for a QdkQubitMapper.</span>
 
 <span class="sd">    Settings:</span>
 <span class="sd">        threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.</span>
 <span class="sd">        integral_threshold (double, default=1e-12): Threshold for filtering small integrals.</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="QdkQubitMapperSettings.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapperSettings.__init__">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QdkQubitMapperSettings.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Initialize QdkQubitMapperSettings."""</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;threshold&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="s2">"threshold"</span><span class="p">,</span>
+            <span class="s2">"double"</span><span class="p">,</span>
             <span class="mf">1e-12</span><span class="p">,</span>
-            <span class="s2">&quot;Threshold for pruning small Pauli coefficients&quot;</span><span class="p">,</span>
+            <span class="s2">"Threshold for pruning small Pauli coefficients"</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
-            <span class="s2">&quot;integral_threshold&quot;</span><span class="p">,</span>
-            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="s2">"integral_threshold"</span><span class="p">,</span>
+            <span class="s2">"double"</span><span class="p">,</span>
             <span class="mf">1e-12</span><span class="p">,</span>
-            <span class="s2">&quot;Threshold for filtering small integrals (improves performance)&quot;</span><span class="p">,</span>
+            <span class="s2">"Threshold for filtering small integrals (improves performance)"</span><span class="p">,</span>
         <span class="p">)</span></div>
 </div>
 
@@ -165,13 +166,13 @@
 <div class="viewcode-block" id="QdkQubitMapper">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapper">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">QdkQubitMapper</span><span class="p">(</span><span class="n">QubitMapper</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;QDK native qubit mapper using Majorana-level C++ engine.</span>
+<span class="w">    </span><span class="sd">"""QDK native qubit mapper using Majorana-level C++ engine.</span>
 
 <span class="sd">    This is a **table-driven** backend: it reads the Pauli-string table</span>
 <span class="sd">    from the :class:`~qdk_chemistry.data.MajoranaMapping` and passes it</span>
 <span class="sd">    directly to the C++ ``majorana_map_hamiltonian`` engine.  Any valid</span>
 <span class="sd">    ``MajoranaMapping`` works — built-in (Jordan-Wigner, Bravyi-Kitaev,</span>
-<span class="sd">    parity, BK-tree, SCBK) or custom user-defined tables.  The mapping&#39;s</span>
+<span class="sd">    parity, BK-tree, SCBK) or custom user-defined tables.  The mapping's</span>
 <span class="sd">    ``name`` and ``base_encoding`` are used only for metadata on the</span>
 <span class="sd">    output :class:`~qdk_chemistry.data.QubitOperator`, not for dispatch.</span>
 
@@ -180,7 +181,7 @@
 <span class="sd">    blocks (aa, ab, ba, bb) independently.</span>
 
 <span class="sd">    The two-body integrals are consumed in the native storage format of the</span>
-<span class="sd">    Hamiltonian&#39;s container (the C++ engine dispatches on the container type):</span>
+<span class="sd">    Hamiltonian's container (the C++ engine dispatches on the container type):</span>
 
 <span class="sd">    * :class:`~qdk_chemistry.data.SparseHamiltonianContainer`: the engine</span>
 <span class="sd">      iterates only the stored non-zero ``(p, q, r, s)`` entries, so both</span>
@@ -204,11 +205,11 @@
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
 <span class="sd">        &gt;&gt;&gt; from qdk_chemistry.data import MajoranaMapping</span>
-<span class="sd">        &gt;&gt;&gt; mapper = create(&quot;qubit_mapper&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; mapper = create("qubit_mapper")</span>
 <span class="sd">        &gt;&gt;&gt; mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)</span>
 <span class="sd">        &gt;&gt;&gt; qh = mapper.run(hamiltonian, mapping)</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
 <div class="viewcode-block" id="QdkQubitMapper.__init__">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapper.__init__">[docs]</a>
@@ -217,24 +218,24 @@
         <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
         <span class="n">integral_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the QdkQubitMapper with default settings.</span>
+<span class="w">        </span><span class="sd">"""Initialize the QdkQubitMapper with default settings.</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            threshold: Threshold for pruning small Pauli coefficients. Default: 1e-12.</span>
 <span class="sd">            integral_threshold: Threshold for filtering small integrals. Default: 1e-12.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QdkQubitMapperSettings</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;threshold&quot;</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;integral_threshold&quot;</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"threshold"</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"integral_threshold"</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="QdkQubitMapper.name">
 <a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapper.name">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="s2">&quot;qdk&quot;</span></div>
+<span class="w">        </span><span class="sd">"""Return the algorithm name."""</span>
+        <span class="k">return</span> <span class="s2">"qdk"</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
@@ -242,7 +243,7 @@
         <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
         <span class="n">mapping</span><span class="p">:</span> <span class="n">MajoranaMapping</span><span class="p">,</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitOperator</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transform a fermionic Hamiltonian to a qubit operator (table-driven).</span>
+<span class="w">        </span><span class="sd">"""Transform a fermionic Hamiltonian to a qubit operator (table-driven).</span>
 
 <span class="sd">        This backend passes the C++ ``MajoranaMapping`` directly to the</span>
 <span class="sd">        native mapper.  The ``base_encoding`` name</span>
@@ -259,14 +260,14 @@
 <span class="sd">        Returns:</span>
 <span class="sd">            QubitOperator: The qubit operator with Pauli strings and coefficients.</span>
 
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
 
         <span class="c1"># Strip tapering — the C++ engine maps the base encoding only</span>
         <span class="n">base_mapping</span> <span class="o">=</span> <span class="n">mapping</span><span class="o">.</span><span class="n">without_tapering</span><span class="p">()</span> <span class="k">if</span> <span class="n">mapping</span><span class="o">.</span><span class="n">tapering</span> <span class="k">else</span> <span class="n">mapping</span>
 
-        <span class="n">threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;threshold&quot;</span><span class="p">))</span>
-        <span class="n">integral_threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;integral_threshold&quot;</span><span class="p">))</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"threshold"</span><span class="p">))</span>
+        <span class="n">integral_threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"integral_threshold"</span><span class="p">))</span>
 
         <span class="n">n_spatial</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">n_spatial</span>
@@ -274,9 +275,9 @@
 
         <span class="k">if</span> <span class="n">base_mapping</span><span class="o">.</span><span class="n">num_modes</span> <span class="o">!=</span> <span class="n">n_spin_orbitals</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;MajoranaMapping has </span><span class="si">{</span><span class="n">base_mapping</span><span class="o">.</span><span class="n">num_modes</span><span class="si">}</span><span class="s2"> modes but the Hamiltonian has &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">n_spin_orbitals</span><span class="si">}</span><span class="s2"> spin-orbitals (2 x </span><span class="si">{</span><span class="n">n_spatial</span><span class="si">}</span><span class="s2"> spatial orbitals). &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;Use MajoranaMapping.jordan_wigner(num_modes=</span><span class="si">{</span><span class="n">n_spin_orbitals</span><span class="si">}</span><span class="s2">) or equivalent.&quot;</span>
+                <span class="sa">f</span><span class="s2">"MajoranaMapping has </span><span class="si">{</span><span class="n">base_mapping</span><span class="o">.</span><span class="n">num_modes</span><span class="si">}</span><span class="s2"> modes but the Hamiltonian has "</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">n_spin_orbitals</span><span class="si">}</span><span class="s2"> spin-orbitals (2 x </span><span class="si">{</span><span class="n">n_spatial</span><span class="si">}</span><span class="s2"> spatial orbitals). "</span>
+                <span class="sa">f</span><span class="s2">"Use MajoranaMapping.jordan_wigner(num_modes=</span><span class="si">{</span><span class="n">n_spin_orbitals</span><span class="si">}</span><span class="s2">) or equivalent."</span>
             <span class="p">)</span>
 
         <span class="c1"># The C++ engine dispatches on the container type: sparse and Cholesky</span>
@@ -294,7 +295,7 @@
         <span class="n">n_qubits</span> <span class="o">=</span> <span class="n">base_mapping</span><span class="o">.</span><span class="n">num_qubits</span>
         <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[</span><span class="n">sparse_pauli_word_to_label</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="n">n_qubits</span><span class="p">)</span> <span class="k">for</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">words</span><span class="p">]</span>
 
-        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="s2"> Pauli terms for </span><span class="si">{</span><span class="n">n_qubits</span><span class="si">}</span><span class="s2"> qubits&quot;</span><span class="p">)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Generated </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="s2"> Pauli terms for </span><span class="si">{</span><span class="n">n_qubits</span><span class="si">}</span><span class="s2"> qubits"</span><span class="p">)</span>
 
         <span class="n">qh</span> <span class="o">=</span> <span class="n">QubitOperator</span><span class="p">(</span>
             <span class="n">pauli_strings</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">,</span>

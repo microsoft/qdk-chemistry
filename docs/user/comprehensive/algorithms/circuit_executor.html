@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Circuit execution &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Circuit execution &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -77,6 +78,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">Circuit execution</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
@@ -187,12 +190,12 @@ Not all backends support noise — see <a class="reference internal" href="#avai
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
 <span class="c1"># Create the default executor (QDK sparse-state simulator)</span>
-<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">)</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">)</span>
 
 <span class="c1"># Or select a specific implementation</span>
-<span class="n">full_state</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">)</span>
-<span class="n">sparse_state</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_sparse_state_simulator&quot;</span><span class="p">)</span>
-<span class="n">aer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qiskit_aer_simulator&quot;</span><span class="p">)</span>
+<span class="n">full_state</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_full_state_simulator"</span><span class="p">)</span>
+<span class="n">sparse_state</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_sparse_state_simulator"</span><span class="p">)</span>
+<span class="n">aer</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qiskit_aer_simulator"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -203,18 +206,18 @@ See <a class="reference internal" href="#available-implementations">Available im
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API (QDK)</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the QDK full-state simulator</span>
-<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">)</span>
-<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
-<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_full_state_simulator"</span><span class="p">)</span>
+<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"type"</span><span class="p">,</span> <span class="s2">"cpu"</span><span class="p">)</span>
+<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"seed"</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">Python API (Qiskit)</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the Qiskit Aer simulator</span>
-<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qiskit_aer_simulator&quot;</span><span class="p">)</span>
-<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;statevector&quot;</span><span class="p">)</span>
-<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
-<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;transpile_optimization_level&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qiskit_aer_simulator"</span><span class="p">)</span>
+<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"method"</span><span class="p">,</span> <span class="s2">"statevector"</span><span class="p">)</span>
+<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"seed"</span><span class="p">,</span> <span class="mi">42</span><span class="p">)</span>
+<span class="n">executor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"transpile_optimization_level"</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -227,22 +230,22 @@ See <a class="reference internal" href="#available-implementations">Available im
 
 <span class="c1"># Define a circuit in OpenQASM</span>
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
-    <span class="n">qasm</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">    include &quot;stdgates.inc&quot;;</span>
+    <span class="n">qasm</span><span class="o">=</span><span class="s2">"""</span>
+<span class="s2">    include "stdgates.inc";</span>
 <span class="s2">    qubit[2] q;</span>
 <span class="s2">    bit[2] c;</span>
 <span class="s2">    x q[0];</span>
 <span class="s2">    cx q[0], q[1];</span>
 <span class="s2">    c[0] = measure q[0];</span>
 <span class="s2">    c[1] = measure q[1];</span>
-<span class="s2">    &quot;&quot;&quot;</span>
+<span class="s2">    """</span>
 <span class="p">)</span>
 
 <span class="c1"># Execute with the QDK sparse-state simulator</span>
-<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_sparse_state_simulator&quot;</span><span class="p">)</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_sparse_state_simulator"</span><span class="p">)</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Bitstring counts: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total shots: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">total_shots</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Bitstring counts: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Total shots: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">total_shots</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -254,31 +257,31 @@ See <a class="reference internal" href="#available-implementations">Available im
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QuantumErrorProfile</span>
 
 <span class="n">circuit</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span>
-    <span class="n">qasm</span><span class="o">=</span><span class="s2">&quot;&quot;&quot;</span>
-<span class="s2">    include &quot;stdgates.inc&quot;;</span>
+    <span class="n">qasm</span><span class="o">=</span><span class="s2">"""</span>
+<span class="s2">    include "stdgates.inc";</span>
 <span class="s2">    qubit[2] q;</span>
 <span class="s2">    bit[2] c;</span>
 <span class="s2">    x q[0];</span>
 <span class="s2">    cx q[0], q[1];</span>
 <span class="s2">    c[0] = measure q[0];</span>
 <span class="s2">    c[1] = measure q[1];</span>
-<span class="s2">    &quot;&quot;&quot;</span>
+<span class="s2">    """</span>
 <span class="p">)</span>
 
 <span class="c1"># Define a noise model</span>
 <span class="n">noise_model</span> <span class="o">=</span> <span class="n">QuantumErrorProfile</span><span class="p">(</span>
-    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;depolarizing&quot;</span><span class="p">,</span>
-    <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Simple depolarizing noise model&quot;</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"depolarizing"</span><span class="p">,</span>
+    <span class="n">description</span><span class="o">=</span><span class="s2">"Simple depolarizing noise model"</span><span class="p">,</span>
     <span class="n">errors</span><span class="o">=</span><span class="p">{</span>
-        <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;depolarizing_error&quot;</span><span class="p">:</span> <span class="mf">0.005</span><span class="p">},</span>
-        <span class="s2">&quot;cx&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;depolarizing_error&quot;</span><span class="p">:</span> <span class="mf">0.007</span><span class="p">},</span>
+        <span class="s2">"x"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"depolarizing_error"</span><span class="p">:</span> <span class="mf">0.005</span><span class="p">},</span>
+        <span class="s2">"cx"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"depolarizing_error"</span><span class="p">:</span> <span class="mf">0.007</span><span class="p">},</span>
     <span class="p">},</span>
 <span class="p">)</span>
 
 <span class="c1"># Execute with noise</span>
-<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+<span class="n">executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">,</span> <span class="s2">"qdk_full_state_simulator"</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="s2">"cpu"</span><span class="p">)</span>
 <span class="n">result</span> <span class="o">=</span> <span class="n">executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">circuit</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">noise</span><span class="o">=</span><span class="n">noise_model</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Noisy bitstring counts: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Noisy bitstring counts: </span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -293,10 +296,10 @@ See <a class="reference internal" href="#available-implementations">Available im
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
 <span class="c1"># List all registered circuit executor implementations</span>
-<span class="n">implementations</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">)</span>
+<span class="n">implementations</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"circuit_executor"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="n">implementations</span>
-<span class="p">)</span>  <span class="c1"># e.g. [&#39;qdk_sparse_state_simulator&#39;, &#39;qdk_full_state_simulator&#39;, &#39;qiskit_aer_simulator&#39;]</span>
+<span class="p">)</span>  <span class="c1"># e.g. ['qdk_sparse_state_simulator', 'qdk_full_state_simulator', 'qiskit_aer_simulator']</span>
 </pre></div>
 </div>
 </div>

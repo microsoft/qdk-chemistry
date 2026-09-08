@@ -6,7 +6,7 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Projected Multi-Configuration calculations &mdash; qdk-chemistry 2.1.0 documentation</title>
+  <title>Projected Multi-Configuration calculations &mdash; qdk-chemistry 2.2.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
@@ -17,7 +17,7 @@
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=20623aea"></script>
+      <script src="../../../_static/documentation_options.js?v=b21de401"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -53,6 +53,7 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../agents.html">Working with AI Assistants</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
 <li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
 <li class="toctree-l2"><a class="reference internal" href="../data/index.html">Data classes</a></li>
@@ -85,6 +86,8 @@
 <li class="toctree-l3"><a class="reference internal" href="amplitude_amplification.html">Amplitude amplification</a></li>
 <li class="toctree-l3"><a class="reference internal" href="evolution_circuit_builder.html">Evolution circuit builder</a></li>
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_unitary_builder.html">Hamiltonian Unitary Builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="propagator.html">Propagator</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian_simulation.html">Hamiltonian simulation</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled circuit mapper</a></li>
 <li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
@@ -177,14 +180,14 @@ The <code class="docutils literal notranslate"><span class="pre">run</span></cod
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 
 <span class="c1"># Create a MACIS PMC calculator instance</span>
-<span class="n">pmc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;projected_multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_pmc&quot;</span><span class="p">)</span>
+<span class="n">pmc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"projected_multi_configuration_calculator"</span><span class="p">,</span> <span class="s2">"macis_pmc"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a MACIS PMC calculator instance</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">pmc_calculator</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;macis_pmc&quot;</span><span class="p">);</span>
+<span class="w">      </span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">"macis_pmc"</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -195,13 +198,13 @@ See <a class="reference internal" href="#available-implementations">Available im
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Configure the PMC calculator using the settings interface</span>
-<span class="n">pmc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;ci_residual_tolerance&quot;</span><span class="p">,</span> <span class="mf">1.0e-6</span><span class="p">)</span>
+<span class="n">pmc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">"ci_residual_tolerance"</span><span class="p">,</span> <span class="mf">1.0e-6</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--1-input--2" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Set the convergence threshold for the CI iterations</span>
-<span class="w">  </span><span class="n">pmc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;ci_residual_tolerance&quot;</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-6</span><span class="p">);</span>
+<span class="w">  </span><span class="n">pmc_calculator</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">"ci_residual_tolerance"</span><span class="p">,</span><span class="w"> </span><span class="mf">1.0e-6</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -215,47 +218,47 @@ See <a class="reference internal" href="#available-implementations">Available im
 
 <span class="c1"># Create a structure (H2 molecule)</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
-<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">]</span>
+<span class="n">symbols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"H"</span><span class="p">,</span> <span class="s2">"H"</span><span class="p">]</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="p">)</span>
 
 <span class="c1"># Run SCF to get orbitals</span>
-<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"scf_solver"</span><span class="p">)</span>
 <span class="n">E_scf</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
-    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">"sto-3g"</span>
 <span class="p">)</span>
 
 <span class="c1"># Build Hamiltonian from orbitals</span>
-<span class="n">ham_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span>
+<span class="n">ham_constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">"hamiltonian_constructor"</span><span class="p">)</span>
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ham_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
 
 <span class="c1"># Define configurations</span>
 <span class="n">configurations</span> <span class="o">=</span> <span class="p">[</span>
     <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-        <span class="s2">&quot;20&quot;</span>
+        <span class="s2">"20"</span>
     <span class="p">),</span>  <span class="c1"># Ground state (both electrons in lowest orbital)</span>
     <span class="n">Configuration</span><span class="o">.</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-        <span class="s2">&quot;02&quot;</span>
+        <span class="s2">"02"</span>
     <span class="p">),</span>  <span class="c1"># Excited state (both electrons in higher orbital)</span>
 <span class="p">]</span>
 
 <span class="c1"># Run the PMC calculation</span>
 <span class="n">E_pmc</span><span class="p">,</span> <span class="n">pmc_wavefunction</span> <span class="o">=</span> <span class="n">pmc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">configurations</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PMC Energy: </span><span class="si">{</span><span class="n">E_pmc</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SCF Energy: </span><span class="si">{</span><span class="n">E_scf</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"PMC Energy: </span><span class="si">{</span><span class="n">E_pmc</span><span class="si">:</span><span class="s2">.10f</span><span class="si">}</span><span class="s2"> Hartree"</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">C++ API</label><div class="tab-content docutils container">
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Create a structure (H2 molecule)</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">Vector3d</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coords</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">},</span><span class="w"> </span><span class="p">{</span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">0.0</span><span class="p">,</span><span class="w"> </span><span class="mf">1.4</span><span class="p">}};</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">&quot;H&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;H&quot;</span><span class="p">};</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="w"> </span><span class="n">symbols</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="s">"H"</span><span class="p">,</span><span class="w"> </span><span class="s">"H"</span><span class="p">};</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">Structure</span><span class="o">&gt;</span><span class="w"> </span><span class="n">structure</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">std</span><span class="o">::</span><span class="n">make_shared</span><span class="o">&lt;</span><span class="n">Structure</span><span class="o">&gt;</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span><span class="w"> </span><span class="n">symbols</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Run SCF to get orbitals</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;sto-3g&quot;</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_scf</span><span class="p">,</span><span class="w"> </span><span class="n">wfn</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">"sto-3g"</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Build Hamiltonian from orbitals</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">ham_constructor</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">HamiltonianConstructorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
@@ -264,17 +267,17 @@ See <a class="reference internal" href="#available-implementations">Available im
 <span class="w">  </span><span class="c1">// Define configurations</span>
 <span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">configurations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span>
 <span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-<span class="w">          </span><span class="s">&quot;20&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state (both electrons in lowest orbital)</span>
+<span class="w">          </span><span class="s">"20"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Ground state (both electrons in lowest orbital)</span>
 <span class="w">      </span><span class="n">Configuration</span><span class="o">::</span><span class="n">from_spin_half_string</span><span class="p">(</span>
-<span class="w">          </span><span class="s">&quot;02&quot;</span><span class="p">),</span><span class="w">  </span><span class="c1">// Excited state (both electrons in higher orbital)</span>
+<span class="w">          </span><span class="s">"02"</span><span class="p">),</span><span class="w">  </span><span class="c1">// Excited state (both electrons in higher orbital)</span>
 <span class="w">  </span><span class="p">};</span>
 
 <span class="w">  </span><span class="c1">// Run the PMC calculation</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">E_pmc</span><span class="p">,</span><span class="w"> </span><span class="n">pmc_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
 <span class="w">      </span><span class="n">pmc_calculator</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="n">configurations</span><span class="p">);</span>
 
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;SCF Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_scf</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;PMC Energy: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_pmc</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot; Hartree&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"SCF Energy: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_scf</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">" Hartree"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">"PMC Energy: "</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">E_pmc</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">" Hartree"</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
@@ -337,7 +340,7 @@ You can discover available implementations programmatically:</p>
 <input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
-<span class="n">available</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;projected_multi_configuration_calculator&quot;</span><span class="p">)</span>
+<span class="n">available</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">"projected_multi_configuration_calculator"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">)</span>
 </pre></div>
 </div>
