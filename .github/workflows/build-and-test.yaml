@@ -290,35 +290,6 @@ jobs:
         if [ $CTEST_EXIT_CODE -ne 0 ]; then
           echo "=== Some tests failed ==="
           echo "Exit code: $CTEST_EXIT_CODE"
-        fi
-
-        cd ${{ github.workspace }}
-
-        if [ "$ENABLE_COVERAGE" = "true" ]; then
-          mkdir -p ${{ github.workspace }}/coverage-reports
-
-          gcovr --root ${{ github.workspace }}/cpp \
-            --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
-            --filter '${{ github.workspace }}/cpp/src/.*' \
-            --filter '${{ github.workspace }}/cpp/include/.*' \
-            --exclude '.*/tests/.*' \
-            --exclude '.*test.*\.cpp' \
-            --exclude '.*gtest.*' \
-            --exclude '.*gmock.*' \
-            --exclude '.*/external/.*' \
-            --cobertura ${{ github.workspace }}/coverage-reports/cpp_coverage.cobertura.xml \
-            --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
-            --markdown ${{ github.workspace }}/coverage-reports/cpp_coverage.md \
-            --markdown-heading-level 5 \
-            --markdown-title 'C++ Coverage Report' \
-            --merge-mode-functions=separate \
-            --gcov-ignore-parse-errors
-
-          echo "C++ Coverage Summary:"
-          cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
-        fi
-
-        if [ $CTEST_EXIT_CODE -ne 0 ]; then
           exit $CTEST_EXIT_CODE
         fi
 
@@ -338,8 +309,13 @@ jobs:
         QDK_CHEMISTRY_ENABLE_COVERAGE: ${{ matrix.enable-coverage && '1' || '0' }}
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
-        # Remove CMake files to build Python package without picking the installed library
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        # On the coverage leg, keep the installed CMake package so find_package(qdk)
+        # reuses the already coverage-instrumented library instead of rebuilding it;
+        # pytest's hits then merge into the .gcda files ctest already wrote. Other
+        # legs still remove it to exercise the from-source build path.
+        if [ "$ENABLE_COVERAGE" != "true" ]; then
+          rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        fi
 
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
@@ -406,6 +382,35 @@ jobs:
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           exit 1
         fi
+
+    - name: Generate C++ coverage report
+      if: matrix.enable-coverage
+      run: |
+        # Run after the Python tests: on this leg the C++ library isn't rebuilt for
+        # the Python package (see "Install Python package"), so pytest exercises the
+        # same coverage-instrumented binary ctest did, and their hits share $BUILD_DIR's
+        # .gcda files.
+        mkdir -p ${{ github.workspace }}/coverage-reports
+
+        gcovr --root ${{ github.workspace }}/cpp \
+          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
+          --filter '${{ github.workspace }}/cpp/src/.*' \
+          --filter '${{ github.workspace }}/cpp/include/.*' \
+          --exclude '.*/tests/.*' \
+          --exclude '.*test.*\.cpp' \
+          --exclude '.*gtest.*' \
+          --exclude '.*gmock.*' \
+          --exclude '.*/external/.*' \
+          --cobertura ${{ github.workspace }}/coverage-reports/cpp_coverage.cobertura.xml \
+          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+          --markdown ${{ github.workspace }}/coverage-reports/cpp_coverage.md \
+          --markdown-heading-level 5 \
+          --markdown-title 'C++ Coverage Report' \
+          --merge-mode-functions=separate \
+          --gcov-ignore-parse-errors
+
+        echo "C++ Coverage Summary:"
+        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
 
     - name: Generate Pybind11 coverage report
       if: matrix.enable-coverage
