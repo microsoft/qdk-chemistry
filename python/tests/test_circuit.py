@@ -192,7 +192,8 @@ class TestUniformSpinBasisRotation:
         try:
             rotated = base.with_uniform_spin_basis_rotation([0.6, 0.0, 0.8])
             assert rotated.num_qubits == 1
-            assert "measure" not in rotated.get_qsharp_circuit().json().lower()
+            qsharp_circuit = json.loads(rotated.get_qsharp_circuit().json())
+            assert [qubit["numResults"] for qubit in qsharp_circuit["qubits"]] == [0]
             assert rotated.get_qir() is not None
         finally:
             set_qsharp_context(None)
