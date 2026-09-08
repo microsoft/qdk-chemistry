@@ -183,6 +183,52 @@ def test_local_install_registers_ancestor_marketplace(
     assert state["plugins"]["qdk-chemistry"]["update_spec"] == "qdk-chemistry@qdk-chemistry"
 
 
+def test_workspace_install_uses_live_local_plugin_without_modifying_source(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = tmp_path / "workspace"
+    checkout = tmp_path / "checkout"
+    source = checkout / "copilot-plugins" / "qdk-chemistry"
+    source.mkdir(parents=True)
+    (source / "plugin.json").write_text(
+        json.dumps({"name": "qdk-chemistry", "skills": "skills/", "mcpServers": ".mcp.json"}),
+        encoding="utf-8",
+    )
+    source_config = {"mcpServers": {"qdk_chemistry": {"type": "stdio", "command": "qcmcp"}}}
+    (source / ".mcp.json").write_text(json.dumps(source_config), encoding="utf-8")
+    skill = source / "skills" / "qdk-chemistry-mcp"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("# QDK Chemistry MCP\n", encoding="utf-8")
+    marketplace = checkout / ".github" / "plugin" / "marketplace.json"
+    marketplace.parent.mkdir(parents=True)
+    marketplace.write_text(
+        json.dumps(
+            {
+                "name": "qdk-chemistry",
+                "plugins": [{"name": "qdk-chemistry", "source": "copilot-plugins/qdk-chemistry"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    command = "/project/.venv/bin/qcmcp"
+    monkeypatch.setattr(
+        plugin_installer,
+        "_commands_for_current_environment",
+        lambda _name: {"qdk_chemistry": command},
+    )
+    monkeypatch.setattr(plugin_installer, "_run_copilot", lambda _arguments, **_kwargs: "")
+
+    result = plugin_installer.install_plugin(str(source), target_dir=workspace)
+
+    assert result["plugin_dir"] == str(source)
+    assert json.loads((source / ".mcp.json").read_text(encoding="utf-8")) == source_config
+    vscode = json.loads((workspace / ".vscode" / "mcp.json").read_text(encoding="utf-8"))
+    assert vscode["servers"]["qdk_chemistry"]["command"] == command
+    state = json.loads((workspace / ".qdk_chem" / "qdk-chemistry-plugin-bindings.json").read_text())
+    assert state["plugins"]["qdk-chemistry"]["live_plugin"] is True
+
+
 def test_local_install_reuses_registered_marketplace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     root = tmp_path / "checkout"
     home = tmp_path / "copilot"

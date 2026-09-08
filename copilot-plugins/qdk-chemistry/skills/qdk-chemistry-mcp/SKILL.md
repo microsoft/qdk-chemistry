@@ -6,8 +6,10 @@ description: 'Describes the QDK Chemistry MCP tool interface, return envelope, a
 
 # QDK Chemistry MCP Tools
 
-Call `bind_workspace` before tools that access projects or files. Tool input
-schemas define required arguments, accepted values, and defaults.
+Call `bind_workspace` once per MCP server process before the first tool that
+accesses projects or files. The binding persists for later calls in that
+process. Tool input schemas define required arguments, accepted values, and
+defaults.
 
 Tools return a status and either a result or an error message. A status of
 `exists` indicates that an output path already contains a valid artifact;

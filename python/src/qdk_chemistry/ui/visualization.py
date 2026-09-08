@@ -30,9 +30,6 @@ from __future__ import annotations
 import json
 import pathlib
 import re
-import secrets
-import threading
-import time
 
 from mcp.types import CallToolResult, TextContent
 
@@ -84,7 +81,6 @@ def _build_html(
     title: str,
     component_name: str,
     app_name: str,
-    embedded_data: dict | None = None,
     min_height: int = 500,
 ) -> str:
     """Build a self-contained HTML page for a qsharp-widgets component."""
@@ -183,11 +179,36 @@ def _build_html(
         "      widgetModule.default.render({ model, el });\n"
         "    }\n"
         "\n"
-        + (
-            "    renderToolData(config.embeddedData);\n"
-            if embedded_data is not None
-            else '    document.getElementById("loading")?.remove();\n'
-        )
+        "    let nextRequestId = 1;\n"
+        "    const pending = new Map();\n"
+        "    window.addEventListener('message', event => {\n"
+        "      const message = event.data;\n"
+        "      if (message?.jsonrpc !== '2.0') return;\n"
+        "      if (message.id != null && pending.has(message.id)) {\n"
+        "        const {resolve, reject} = pending.get(message.id);\n"
+        "        pending.delete(message.id);\n"
+        "        message.error ? reject(new Error(message.error.message)) : resolve(message.result);\n"
+        "      } else if (message.method === 'ui/notifications/tool-result') {\n"
+        "        const result = message.params || {};\n"
+        "        let data = result.structuredContent;\n"
+        "        if (!data) {\n"
+        "          const text = result.content?.find(item => item.type === 'text')?.text;\n"
+        "          if (text) try { data = JSON.parse(text); } catch {}\n"
+        "        }\n"
+        "        if (data) renderToolData(data);\n"
+        "      }\n"
+        "    });\n"
+        "    function request(method, params) {\n"
+        "      const id = nextRequestId++;\n"
+        "      window.parent.postMessage({jsonrpc:'2.0', id, method, params}, '*');\n"
+        "      return new Promise((resolve, reject) => pending.set(id, {resolve, reject}));\n"
+        "    }\n"
+        "    const initialized = await request('ui/initialize', {\n"
+        "      appCapabilities: {},\n"
+        "      clientInfo: {name: config.appName, version: '1.0.0'},\n"
+        "      protocolVersion: '2026-01-26',\n"
+        "    });\n"
+        "    window.parent.postMessage({jsonrpc:'2.0', method:'ui/notifications/initialized'}, '*');\n"
         + "    } catch(e) {\n"
         '      const el = document.getElementById("loading") || document.getElementById("widget-root");\n'
         "      if (el) {\n"
@@ -201,96 +222,72 @@ def _build_html(
         "</body>\n"
         "</html>".replace(
             "</body>",
-            _json_script(
-                "widget-config", {"title": title, "componentName": component_name, "embeddedData": embedded_data}
-            )
+            _json_script("widget-config", {"title": title, "componentName": component_name, "appName": app_name})
             + "\n</body>",
         )
     )
 
 
+def _build_scatter_html() -> str:
+    """Build a static MCP App that renders scatter data from tool results."""
+    return """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Scatter Plot</title>
+<style>
+:root { color-scheme: light dark; }
+html,body { margin:0; width:100%; height:100%; overflow:hidden; background:var(--color-background-primary,#181818); }
+svg { display:block; width:100%; height:100%; }
+text { fill:var(--color-text-primary,#ddd); font-family:var(--font-sans,sans-serif); }
+</style>
+</head>
+<body>
+<svg id="chart" viewBox="0 0 700 450" preserveAspectRatio="xMidYMid meet"></svg>
+<script>
+const ns='http://www.w3.org/2000/svg',svg=document.getElementById('chart');
+function add(name,attrs={},text){const el=document.createElementNS(ns,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));if(text!==undefined)el.textContent=text;svg.append(el);return el;}
+function render(data){
+    svg.replaceChildren(); document.title=data.title||'Scatter Plot';
+    const series=Array.isArray(data.series)?data.series:[], points=[];
+    for(const [group,item] of series.entries())for(let index=0;index<Math.min(item.x?.length||0,item.y?.length||0);index++){
+        const rawX=Number(item.x[index]),rawY=Number(item.y[index]);
+        if(!Number.isFinite(rawX)||!Number.isFinite(rawY)||(data.log_x&&rawX<=0)||(data.log_y&&rawY<=0))continue;
+        points.push({x:data.log_x?Math.log10(rawX):rawX,y:data.log_y?Math.log10(rawY):rawY,rawX,rawY,group,label:item.text?.[index]||item.name||''});
+    }
+    add('rect',{width:700,height:450,fill:'var(--color-background-primary,#181818)'});
+    if(!points.length){add('text',{x:350,y:225,'text-anchor':'middle'},'No data to plot.');return;}
+    let minX=Math.min(...points.map(point=>point.x)),maxX=Math.max(...points.map(point=>point.x));
+    let minY=Math.min(...points.map(point=>point.y)),maxY=Math.max(...points.map(point=>point.y));
+    const padX=(maxX-minX)*.08||1,padY=(maxY-minY)*.08||1;minX-=padX;maxX+=padX;minY-=padY;maxY+=padY;
+    const left=75,top=45,width=595,height=340,tx=value=>left+(value-minX)/(maxX-minX)*width,ty=value=>top+height-(value-minY)/(maxY-minY)*height;
+    add('rect',{x:left,y:top,width,height,fill:'var(--color-background-secondary,#222)',stroke:'var(--color-border-primary,#666)'});
+    add('text',{x:350,y:28,'text-anchor':'middle','font-size':16},data.title||'Scatter Plot');
+    add('text',{x:372,y:430,'text-anchor':'middle','font-size':12},data.x_label||'X');
+    add('text',{x:18,y:215,'text-anchor':'middle','font-size':12,transform:'rotate(-90 18 215)'},data.y_label||'Y');
+    const colors=['#4f8cff','#e05263','#38a169','#d69e2e','#805ad5','#319795'];
+    for(const point of points){const dot=add('circle',{cx:tx(point.x),cy:ty(point.y),r:5,fill:colors[point.group%colors.length]});const title=document.createElementNS(ns,'title');title.textContent=`${point.label}${point.label?' - ':''}${point.rawX}, ${point.rawY}`;dot.append(title);}
+}
+let requestId=1;
+window.addEventListener('message',event=>{const message=event.data;if(message?.id===requestId){window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');}else if(message?.method==='ui/notifications/tool-result'){const data=message.params?.structuredContent;if(data)render(data);}});
+window.parent.postMessage({jsonrpc:'2.0',id:requestId,method:'ui/initialize',params:{appCapabilities:{},clientInfo:{name:'qdk-scatter-plot',version:'1.0.0'},protocolVersion:'2026-01-26'}},'*');
+</script>
+</body>
+</html>"""
+
+
 # ---------------------------------------------------------------------------
-# Widget data bridge: sync tool data → resource HTML
+# Widget tool results
 # ---------------------------------------------------------------------------
 
 
-class _WidgetBridge:
-    """Store tool payloads for unique, single-use ``ui://`` resources.
-
-    Each call to :meth:`send` receives an unguessable resource URI. The
-    matching resource handler removes the payload before rendering it, so
-    concurrent clients cannot overwrite or retrieve each other's data.
-    """
-
-    def __init__(
-        self,
-        *,
-        resource_uri: str,
-        component_name: str,
-        app_name: str,
-        title: str,
-        min_height: int = 500,
-        payload_ttl: float = 300,
-    ) -> None:
-        self.resource_uri_template = f"{resource_uri}/{{token}}"
-        self._resource_uri = resource_uri
-        self._component_name = component_name
-        self._app_name = app_name
-        self._title = title
-        self._min_height = min_height
-        self._payload_ttl = payload_ttl
-        self._payloads: dict[str, tuple[float, dict]] = {}
-        self._lock = threading.Lock()
-
-    def _discard_expired(self, now: float) -> None:
-        expired = [token for token, (created, _) in self._payloads.items() if now - created >= self._payload_ttl]
-        for token in expired:
-            del self._payloads[token]
-
-    # Called by the tool
-    def send(self, payload: dict) -> CallToolResult:
-        """Store *payload* and return its unique resource URI."""
-        token = secrets.token_urlsafe(32)
-        now = time.monotonic()
-        with self._lock:
-            self._discard_expired(now)
-            self._payloads[token] = (now, dict(payload))
-        resource_uri = f"{self._resource_uri}/{token}"
-        return CallToolResult(
-            content=[TextContent(type="text", text=json.dumps(payload))],
-            structuredContent=payload,
-            meta={
-                "ui": {"resourceUri": resource_uri},
-                "ui/resourceUri": resource_uri,
-            },
-        )
-
-    def receive(self, token: str) -> dict | None:
-        """Remove and return the payload for *token*, if it is still valid."""
-        now = time.monotonic()
-        with self._lock:
-            self._discard_expired(now)
-            entry = self._payloads.pop(token, None)
-        return entry[1] if entry is not None else None
-
-    # Called by the resource handler
-    def receive_html(self, token: str) -> str:
-        """Consume *token* and return self-contained HTML for its payload."""
-        payload = self.receive(token)
-        if payload is None:
-            return _expired_visualization_html()
-        return _build_html(
-            title=self._title,
-            component_name=self._component_name,
-            app_name=self._app_name,
-            embedded_data=payload,
-            min_height=self._min_height,
-        )
-
-
-def _expired_visualization_html() -> str:
-    """Return a non-sensitive response for an expired or consumed URI."""
-    return "<html><body><p>This visualization has expired or was already opened.</p></body></html>"
+def _tool_result(payload: dict) -> CallToolResult:
+    """Return a structured visualization result with a text fallback."""
+    return CallToolResult(
+        content=[TextContent(type="text", text=json.dumps(payload))],
+        structuredContent=payload,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -298,44 +295,36 @@ def _expired_visualization_html() -> str:
 # ---------------------------------------------------------------------------
 
 
-def register_visualization_tools(app) -> None:
+def register_visualization_tools(apps) -> None:
     """Register interactive widget-based visualization tools on an MCP server.
 
     Tools are registered only when ``qsharp_widgets`` is installed. Otherwise,
     this function is a no-op.
 
     Args:
-        app: MCP server application that receives the widget resources and
-            tools.
+        apps: MCP Apps extension that receives app resources and tools.
 
     """
     if not _WIDGETS_AVAILABLE:
         return
 
     # ── Circuit viewer ────────────────────────────────────────────
-    _circuit_bridge = _WidgetBridge(
-        resource_uri="ui://qdk-chem-mcp/circuit-viewer",
-        component_name="Circuit",
-        app_name="qdk-circuit-viewer",
-        title="Circuit Viewer",
-        min_height=600,
-    )
-
-    @app.resource(
-        _circuit_bridge.resource_uri_template,
+    circuit_uri = "ui://qdk-chem-mcp/circuit-viewer"
+    apps.add_html_resource(
+        circuit_uri,
+        _build_html(
+            component_name="Circuit",
+            app_name="qdk-circuit-viewer",
+            title="Circuit Viewer",
+            min_height=600,
+        ),
         name="circuit_viewer",
         description="Interactive quantum-circuit diagram (qsharp-widgets Circuit component)",
-        mime_type="text/html;profile=mcp-app",
     )
-    def circuit_viewer_resource(token: str) -> str:
-        return _circuit_bridge.receive_html(token)
 
-    @app.tool(
+    @apps.tool(
+        resource_uri=circuit_uri,
         description="Render a saved Circuit in VS Code MCP Apps.",
-        meta={
-            "ui": {"resourceUri": _circuit_bridge.resource_uri_template},
-            "ui/resourceUri": _circuit_bridge.resource_uri_template,
-        },
         structured_output=False,
     )
     @validate_project
@@ -371,32 +360,25 @@ def register_visualization_tools(app) -> None:
             "circuit_json": circuit_json_str,
         }
 
-        return _circuit_bridge.send(circuit_data)
+        return _tool_result(circuit_data)
 
     # ── Orbital-entanglement chord diagram ────────────────────────
-    _entanglement_bridge = _WidgetBridge(
-        resource_uri="ui://qdk-chem-mcp/orbital-entanglement",
-        component_name="Entanglement",
-        app_name="qdk-orbital-entanglement",
-        title="Orbital Entanglement",
-        min_height=700,
-    )
-
-    @app.resource(
-        _entanglement_bridge.resource_uri_template,
+    entanglement_uri = "ui://qdk-chem-mcp/orbital-entanglement"
+    apps.add_html_resource(
+        entanglement_uri,
+        _build_html(
+            component_name="Entanglement",
+            app_name="qdk-orbital-entanglement",
+            title="Orbital Entanglement",
+            min_height=700,
+        ),
         name="orbital_entanglement",
         description="Interactive orbital-entanglement chord diagram (qsharp-widgets Entanglement component)",
-        mime_type="text/html;profile=mcp-app",
     )
-    def orbital_entanglement_resource(token: str) -> str:
-        return _entanglement_bridge.receive_html(token)
 
-    @app.tool(
+    @apps.tool(
+        resource_uri=entanglement_uri,
         description="Render RDM/MI orbital entanglement with absolute indices in VS Code MCP Apps.",
-        meta={
-            "ui": {"resourceUri": _entanglement_bridge.resource_uri_template},
-            "ui/resourceUri": _entanglement_bridge.resource_uri_template,
-        },
         structured_output=False,
     )
     @validate_project
@@ -497,33 +479,25 @@ def register_visualization_tools(app) -> None:
             "options": options,
         }
 
-        return _entanglement_bridge.send(entanglement_data)
+        return _tool_result(entanglement_data)
 
     # ── Molecule viewer ───────────────────────────────────────────
     molecule_viewer_uri = "ui://qdk-chem-mcp/molecule-viewer"
-    _molecule_bridge = _WidgetBridge(
-        resource_uri=molecule_viewer_uri,
-        component_name="MoleculeViewer",
-        app_name="qdk-molecule-viewer",
-        title="Molecule Viewer",
-        min_height=550,
-    )
-
-    @app.resource(
-        _molecule_bridge.resource_uri_template,
+    apps.add_html_resource(
+        molecule_viewer_uri,
+        _build_html(
+            component_name="MoleculeViewer",
+            app_name="qdk-molecule-viewer",
+            title="Molecule Viewer",
+            min_height=550,
+        ),
         name="molecule_viewer",
         description="Interactive 3D molecule viewer (qsharp-widgets MoleculeViewer component)",
-        mime_type="text/html;profile=mcp-app",
     )
-    def molecule_viewer_resource(token: str) -> str:
-        return _molecule_bridge.receive_html(token)
 
-    @app.tool(
+    @apps.tool(
+        resource_uri=molecule_viewer_uri,
         description="Render a saved Structure in VS Code MCP Apps.",
-        meta={
-            "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
-            "ui/resourceUri": _molecule_bridge.resource_uri_template,
-        },
         structured_output=False,
     )
     @validate_project
@@ -548,15 +522,12 @@ def register_visualization_tools(app) -> None:
             "isoval": 0.02,
         }
 
-        return _molecule_bridge.send(payload)
+        return _tool_result(payload)
 
     # ── Orbital viewer (molecule + orbital isosurfaces) ───────────
-    @app.tool(
+    @apps.tool(
+        resource_uri=molecule_viewer_uri,
         description="Render saved Wavefunction orbitals in VS Code MCP Apps.",
-        meta={
-            "ui": {"resourceUri": _molecule_bridge.resource_uri_template},
-            "ui/resourceUri": _molecule_bridge.resource_uri_template,
-        },
         structured_output=False,
     )
     @validate_project
@@ -605,7 +576,7 @@ def register_visualization_tools(app) -> None:
             "isoval": isoval,
         }
 
-        return _molecule_bridge.send(payload)
+        return _tool_result(payload)
 
     # ── Scatter plot (inline SVG) ─────────────────────────────────
 
@@ -738,29 +709,17 @@ def register_visualization_tools(app) -> None:
             "</html>"
         )
 
-    _scatter_bridge = _WidgetBridge(
-        resource_uri="ui://qdk-chem-mcp/scatter-plot",
-        component_name="ScatterPlot",
-        app_name="qdk-scatter-plot",
-        title="Scatter Plot",
-    )
-
-    @app.resource(
-        _scatter_bridge.resource_uri_template,
+    scatter_uri = "ui://qdk-chem-mcp/scatter-plot"
+    apps.add_html_resource(
+        scatter_uri,
+        _build_scatter_html(),
         name="scatter_plot",
-        description="Interactive Plotly scatter plot with optional log axes and multiple series",
-        mime_type="text/html;profile=mcp-app",
+        description="Interactive SVG scatter plot with optional log axes and multiple series",
     )
-    def scatter_plot_resource(token: str) -> str:
-        payload = _scatter_bridge.receive(token)
-        return _build_plotly_html(payload) if payload is not None else _expired_visualization_html()
 
-    @app.tool(
+    @apps.tool(
+        resource_uri=scatter_uri,
         description="Render numeric series as an SVG scatter plot in VS Code MCP Apps.",
-        meta={
-            "ui": {"resourceUri": _scatter_bridge.resource_uri_template},
-            "ui/resourceUri": _scatter_bridge.resource_uri_template,
-        },
         structured_output=False,
     )
     def visualize_scatter_plot(
@@ -780,4 +739,4 @@ def register_visualization_tools(app) -> None:
             "log_y": log_y,
             "series": series,
         }
-        return _scatter_bridge.send(payload)
+        return _tool_result(payload)
