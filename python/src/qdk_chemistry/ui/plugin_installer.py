@@ -383,18 +383,32 @@ def _workspace_server_configs(
         server = plugin_servers.get(server_name)
         if not isinstance(server, dict):
             raise PluginInstallError(f"required MCP server {server_name!r} is missing from the plugin")
+        command = commands.get(server_name)
+        if not isinstance(command, str):
+            raise PluginInstallError(
+                f"command binding for required MCP server {server_name!r} is missing; rebind from the intended venv"
+            )
         vscode_entry = deepcopy(server)
         vscode_entry["type"] = "stdio"
-        vscode_entry["command"] = commands[server_name]
+        vscode_entry["command"] = command
         vscode_entry.pop("tools", None)
         vscode_servers[server_name] = vscode_entry
 
         github_entry = deepcopy(server)
         github_entry["type"] = "local"
-        github_entry["command"] = commands[server_name]
+        github_entry["command"] = command
         github_entry["tools"] = ["*"]
         github_servers[server_name] = github_entry
     return vscode_servers, github_servers
+
+
+def _live_plugin_dir(record: dict[str, Any] | None, state_root: Path) -> Path | None:
+    if not isinstance(record, dict) or record.get("live_plugin") is not True:
+        return None
+    plugin_dir = record.get("plugin_dir")
+    if not isinstance(plugin_dir, str):
+        raise PluginInstallError(f"invalid live plugin binding beneath {state_root}; reinstall the plugin")
+    return Path(plugin_dir).expanduser().resolve()
 
 
 def _ignore_workspace_state(workspace: Path) -> None:
@@ -555,7 +569,7 @@ def update_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
         if not Path(command).is_file():
             raise PluginInstallError(f"bound MCP command no longer exists: {command}; rebind from the intended venv")
     _run_copilot(["plugin", "update", str(record.get("update_spec") or plugin_name)], home=home)
-    live_plugin_dir = Path(str(record["plugin_dir"])) if record.get("live_plugin") is True else None
+    live_plugin_dir = _live_plugin_dir(record, state_root)
     plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
     workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
     plugin_config = (
@@ -626,11 +640,7 @@ def rebind_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
     home = _copilot_home(target_dir)
     state_root = _state_root(target_dir, home)
     previous = _load_bindings(state_root)["plugins"].get(plugin_name)
-    live_plugin_dir = (
-        Path(str(previous["plugin_dir"]))
-        if isinstance(previous, dict) and previous.get("live_plugin") is True
-        else None
-    )
+    live_plugin_dir = _live_plugin_dir(previous if isinstance(previous, dict) else None, state_root)
     plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
     commands = _commands_for_current_environment(plugin_name)
     workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None

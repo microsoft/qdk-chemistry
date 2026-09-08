@@ -272,6 +272,18 @@ def test_workspace_install_preserves_existing_jsonc_mcp_server(
     assert "qdk_chemistry" in config["servers"]
 
 
+def test_workspace_server_configs_rejects_missing_command_binding(tmp_path: Path) -> None:
+    plugin_dir = _write_plugin(tmp_path / "copilot")
+
+    with pytest.raises(plugin_installer.PluginInstallError, match="rebind from the intended venv"):
+        plugin_installer._workspace_server_configs(plugin_dir, "qdk-chemistry", {})
+
+
+def test_live_plugin_binding_requires_plugin_directory(tmp_path: Path) -> None:
+    with pytest.raises(plugin_installer.PluginInstallError, match="invalid live plugin binding"):
+        plugin_installer._live_plugin_dir({"live_plugin": True}, tmp_path)
+
+
 def test_update_reapplies_recorded_command(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

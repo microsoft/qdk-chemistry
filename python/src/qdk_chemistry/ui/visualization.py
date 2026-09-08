@@ -182,6 +182,7 @@ def _build_html(
         "    let nextRequestId = 1;\n"
         "    const pending = new Map();\n"
         "    window.addEventListener('message', event => {\n"
+        "      if (event.source !== window.parent) return;\n"
         "      const message = event.data;\n"
         "      if (message?.jsonrpc !== '2.0') return;\n"
         "      if (message.id != null && pending.has(message.id)) {\n"
@@ -263,14 +264,19 @@ function render(data){
     const padX=(maxX-minX)*.08||1,padY=(maxY-minY)*.08||1;minX-=padX;maxX+=padX;minY-=padY;maxY+=padY;
     const left=75,top=45,width=595,height=340,tx=value=>left+(value-minX)/(maxX-minX)*width,ty=value=>top+height-(value-minY)/(maxY-minY)*height;
     add('rect',{x:left,y:top,width,height,fill:'var(--color-background-secondary,#222)',stroke:'var(--color-border-primary,#666)'});
+    function ticks(low,high,count=5){const range=high-low,raw=range/count,magnitude=10**Math.floor(Math.log10(raw));let step=magnitude;for(const candidate of [1,2,5,10])if(range/(candidate*magnitude)<=count+1){step=candidate*magnitude;break;}const values=[];for(let value=Math.ceil(low/step)*step;value<=high+step*.01;value+=step)values.push(value);return values;}
+    const format=(value,log)=>log?(10**value).toExponential(1):Number(value.toPrecision(4)).toString();
+    for(const value of ticks(minX,maxX)){const x=tx(value);add('line',{x1:x,y1:top,x2:x,y2:top+height,stroke:'var(--color-border-secondary,#444)','stroke-width':.5});add('text',{x,y:top+height+17,'text-anchor':'middle','font-size':11},format(value,data.log_x));}
+    for(const value of ticks(minY,maxY)){const y=ty(value);add('line',{x1:left,y1:y,x2:left+width,y2:y,stroke:'var(--color-border-secondary,#444)','stroke-width':.5});add('text',{x:left-8,y:y+4,'text-anchor':'end','font-size':11},format(value,data.log_y));}
     add('text',{x:350,y:28,'text-anchor':'middle','font-size':16},data.title||'Scatter Plot');
     add('text',{x:372,y:430,'text-anchor':'middle','font-size':12},data.x_label||'X');
     add('text',{x:18,y:215,'text-anchor':'middle','font-size':12,transform:'rotate(-90 18 215)'},data.y_label||'Y');
     const colors=['#4f8cff','#e05263','#38a169','#d69e2e','#805ad5','#319795'];
-    for(const point of points){const dot=add('circle',{cx:tx(point.x),cy:ty(point.y),r:5,fill:colors[point.group%colors.length]});const title=document.createElementNS(ns,'title');title.textContent=`${point.label}${point.label?' - ':''}${point.rawX}, ${point.rawY}`;dot.append(title);}
+    for(const [group,item] of series.entries()){const groupPoints=points.filter(point=>point.group===group),color=colors[group%colors.length];if(item.mode?.includes('lines')&&groupPoints.length>1)add('path',{d:groupPoints.map((point,index)=>`${index?'L':'M'}${tx(point.x)},${ty(point.y)}`).join(' '),fill:'none',stroke:color,'stroke-width':2});if(item.mode?.includes('markers')??true)for(const point of groupPoints){const dot=add('circle',{cx:tx(point.x),cy:ty(point.y),r:(item.marker_size??8)/2,fill:color});const title=document.createElementNS(ns,'title');title.textContent=`${point.label}${point.label?' - ':''}${point.rawX}, ${point.rawY}`;dot.append(title);}}
+    if(series.length>1||series[0]?.name){let legendY=top+12;for(const [index,item] of series.entries()){const color=colors[index%colors.length];add('rect',{x:left+width-140,y:legendY,width:10,height:10,fill:color,rx:2});add('text',{x:left+width-125,y:legendY+9,'font-size':11},item.name||`Series ${index+1}`);legendY+=18;}}
 }
 let requestId=1;
-window.addEventListener('message',event=>{const message=event.data;if(message?.id===requestId){window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');}else if(message?.method==='ui/notifications/tool-result'){const data=message.params?.structuredContent;if(data)render(data);}});
+window.addEventListener('message',event=>{if(event.source!==window.parent)return;const message=event.data;if(message?.jsonrpc!=='2.0')return;if(message.id===requestId){window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/initialized'},'*');}else if(message.method==='ui/notifications/tool-result'){const data=message.params?.structuredContent;if(data)render(data);}});
 window.parent.postMessage({jsonrpc:'2.0',id:requestId,method:'ui/initialize',params:{appCapabilities:{},clientInfo:{name:'qdk-scatter-plot',version:'1.0.0'},protocolVersion:'2026-01-26'}},'*');
 </script>
 </body>
@@ -579,135 +585,6 @@ def register_visualization_tools(apps) -> None:
         return _tool_result(payload)
 
     # ── Scatter plot (inline SVG) ─────────────────────────────────
-
-    def _build_plotly_html(payload: dict) -> str:
-        """Build a self-contained HTML page with an inline SVG scatter plot.
-
-        Uses pure SVG + vanilla JS (no CDN) so it works in VS Code
-        webview sandboxed iframes.
-        """
-        import math  # noqa: PLC0415
-
-        title = payload.get("title", "Scatter Plot")
-        x_label = payload.get("x_label", "X")
-        y_label = payload.get("y_label", "Y")
-        log_x = payload.get("log_x", False)
-        log_y = payload.get("log_y", False)
-        series_list = payload.get("series", [])
-
-        # Collect all x/y values to compute axis ranges
-        all_x: list[float] = []
-        all_y: list[float] = []
-        for s in series_list:
-            all_x.extend(s.get("x", []))
-            all_y.extend(s.get("y", []))
-
-        if not all_x or not all_y:
-            return "<html><body><p>No data to plot.</p></body></html>"
-
-        if log_x:
-            all_x = [math.log10(v) if v > 0 else 0 for v in all_x]
-        if log_y:
-            all_y = [math.log10(v) if v > 0 else 0 for v in all_y]
-
-        x_min, x_max = min(all_x), max(all_x)
-        y_min, y_max = min(all_y), max(all_y)
-        x_pad = (x_max - x_min) * 0.08 or 1
-        y_pad = (y_max - y_min) * 0.08 or 1
-        x_min -= x_pad
-        x_max += x_pad
-        y_min -= y_pad
-        y_max += y_pad
-
-        # SVG layout
-        w, h = 700, 450
-        ml, mr, mt, mb = 80, 30, 50, 60  # margins
-        pw = w - ml - mr
-        ph = h - mt - mb
-
-        colors = ["#89b4fa", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#74c7ec"]
-
-        def _nice_ticks(lo: float, hi: float, n: int = 5) -> list[float]:
-            rng = hi - lo
-            if rng <= 0:
-                return [lo]
-            raw = rng / n
-            mag = 10 ** math.floor(math.log10(raw))
-            for step in (1, 2, 5, 10):
-                s = step * mag
-                if rng / s <= n + 1:
-                    break
-            start = math.ceil(lo / s) * s
-            ticks = []
-            v = start
-            while v <= hi + s * 0.01:
-                ticks.append(round(v, 10))
-                v += s
-            return ticks
-
-        x_ticks = _nice_ticks(x_min, x_max)
-        y_ticks = _nice_ticks(y_min, y_max)
-
-        chart = {
-            "title": title,
-            "xLabel": x_label,
-            "yLabel": y_label,
-            "logX": log_x,
-            "logY": log_y,
-            "series": series_list,
-            "layout": {"width": w, "height": h, "marginLeft": ml, "marginTop": mt, "plotWidth": pw, "plotHeight": ph},
-            "xRange": [x_min, x_max],
-            "yRange": [y_min, y_max],
-            "xTicks": x_ticks,
-            "yTicks": y_ticks,
-            "colors": colors,
-        }
-
-        return (
-            "<!DOCTYPE html>\n"
-            '<html lang="en">\n'
-            "<head>\n"
-            '<meta charset="utf-8"/>\n'
-            '<meta name="viewport" content="width=device-width,initial-scale=1"/>\n'
-            "<title></title>\n"
-            "<style>\n"
-            "  html, body { margin:0; padding:0; background:#1e1e2e;\n"
-            "    width:100%; height:100%; overflow:hidden; }\n"
-            "  svg { display:block; width:100%; height:100%; }\n"
-            "  #tooltip { position:fixed; pointer-events:none; display:none;\n"
-            "    background:#313244; color:#cdd6f4; padding:8px 12px;\n"
-            "    border-radius:6px; font-size:12px; font-family:system-ui,sans-serif;\n"
-            "    box-shadow:0 2px 8px rgba(0,0,0,0.4); z-index:100;\n"
-            "    max-width:260px; line-height:1.5; }\n"
-            "</style>\n"
-            "</head>\n"
-            "<body>\n"
-            '<div id="tooltip"></div>\n' + _json_script("scatter-plot-data", chart) + "\n<script>\n"
-            "const chart=JSON.parse(document.getElementById('scatter-plot-data').textContent);\n"
-            "document.title=chart.title;\n"
-            "const svgNs='http://www.w3.org/2000/svg', svg=document.createElementNS(svgNs,'svg');\n"
-            "const tip=document.getElementById('tooltip');\n"
-            "const {width:w,height:h,marginLeft:ml,marginTop:mt,plotWidth:pw,plotHeight:ph}=chart.layout;\n"
-            "const [xMin,xMax]=chart.xRange,[yMin,yMax]=chart.yRange;\n"
-            "svg.setAttribute('viewBox',`0 0 ${w} ${h}`); svg.setAttribute('preserveAspectRatio','xMidYMid meet');\n"
-            "function node(name,attrs={},text){const el=document.createElementNS(svgNs,name);for(const [key,value] of Object.entries(attrs))el.setAttribute(key,String(value));if(text!==undefined)el.textContent=text;svg.append(el);return el;}\n"
-            "function tx(value){return ml+(value-xMin)/(xMax-xMin)*pw;} function ty(value){return mt+ph-(value-yMin)/(yMax-yMin)*ph;}\n"
-            "function xText(value){return chart.logX ? (10**value).toFixed(0) : String(value);} function yText(value){return chart.logY ? (10**value).toExponential(1) : String(value);}\n"
-            "node('rect',{width:w,height:h,fill:'#1e1e2e'}); node('rect',{x:ml,y:mt,width:pw,height:ph,fill:'#181825',stroke:'#45475a','stroke-width':1});\n"
-            "for(const value of chart.xTicks){const x=tx(value);if(x>=ml&&x<=ml+pw){node('line',{x1:x,y1:mt,x2:x,y2:mt+ph,stroke:'#313244','stroke-width':.5});node('text',{x,y:mt+ph+16,'text-anchor':'middle',fill:'#a6adc8','font-size':11},xText(value));}}\n"
-            "for(const value of chart.yTicks){const y=ty(value);if(y>=mt&&y<=mt+ph){node('line',{x1:ml,y1:y,x2:ml+pw,y2:y,stroke:'#313244','stroke-width':.5});node('text',{x:ml-8,y:y+4,'text-anchor':'end',fill:'#a6adc8','font-size':11},yText(value));}}\n"
-            "node('text',{x:w/2,y:28,'text-anchor':'middle',fill:'#cdd6f4','font-size':15,'font-weight':600},chart.title);\n"
-            "node('text',{x:ml+pw/2,y:h-8,'text-anchor':'middle',fill:'#a6adc8','font-size':12},chart.xLabel);\n"
-            "node('text',{x:16,y:mt+ph/2,'text-anchor':'middle',fill:'#a6adc8','font-size':12,transform:`rotate(-90,16,${mt+ph/2})`},chart.yLabel);\n"
-            "let activePt; const xH=node('line',{x1:ml,y1:0,x2:ml+pw,y2:0,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'}),xV=node('line',{x1:0,y1:mt,x2:0,y2:mt+ph,stroke:'#585b70','stroke-width':.5,'stroke-dasharray':'4,3',visibility:'hidden'});\n"
-            "function tooltip(point){tip.replaceChildren();const label=document.createElement('b');label.textContent=point.label;tip.append(label,document.createElement('br'),document.createTextNode(`${chart.xLabel}: ${point.x}`),document.createElement('br'),document.createTextNode(`${chart.yLabel}: ${point.y}`));}\n"
-            "for(const [index,series] of chart.series.entries()){const color=chart.colors[index%chart.colors.length],points=[];for(let i=0;i<Math.min(series.x.length,series.y.length);i++){const x=series.x[i],y=series.y[i],px=tx(chart.logX&&x>0?Math.log10(x):x),py=ty(chart.logY&&y>0?Math.log10(y):y);points.push({x,y,px,py,label:series.text?.[i]||`${x}, ${y}`});}if(series.mode?.includes('lines')&&points.length>1)node('path',{d:points.map((point,i)=>`${i?'L':'M'}${point.px.toFixed(1)},${point.py.toFixed(1)}`).join(' '),fill:'none',stroke:color,'stroke-width':2,opacity:.7});if(series.mode?.includes('markers')??true)for(const point of points){const circle=node('circle',{cx:point.px.toFixed(1),cy:point.py.toFixed(1),r:(series.marker_size??8)/2,fill:color,opacity:.9});circle.style.cursor='pointer';circle.addEventListener('mouseenter',()=>{if(activePt)activePt.setAttribute('r',activePt.dataset.origR);activePt=circle;circle.dataset.origR=circle.getAttribute('r');circle.setAttribute('r',String(Number(circle.dataset.origR)*1.8));circle.setAttribute('opacity','1');tooltip(point);tip.style.display='block';xH.setAttribute('y1',String(point.py));xH.setAttribute('y2',String(point.py));xH.setAttribute('visibility','visible');xV.setAttribute('x1',String(point.px));xV.setAttribute('x2',String(point.px));xV.setAttribute('visibility','visible');});circle.addEventListener('mousemove',event=>{tip.style.left=`${event.clientX+16}px`;tip.style.top=`${event.clientY-12}px`;});circle.addEventListener('mouseleave',()=>{circle.setAttribute('r',circle.dataset.origR);circle.setAttribute('opacity','.9');tip.style.display='none';xH.setAttribute('visibility','hidden');xV.setAttribute('visibility','hidden');activePt=null;});}}\n"
-            "if(chart.series.length>1||chart.series[0]?.name){let y=mt+12;for(const [index,series] of chart.series.entries()){const color=chart.colors[index%chart.colors.length];node('rect',{x:ml+pw-140,y,width:10,height:10,fill:color,rx:2});node('text',{x:ml+pw-125,y:y+9,fill:'#cdd6f4','font-size':11},series.name||`Series ${index+1}`);y+=18;}}\n"
-            "document.body.prepend(svg);\n"
-            "</script>\n"
-            "</body>\n"
-            "</html>"
-        )
 
     scatter_uri = "ui://qdk-chem-mcp/scatter-plot"
     apps.add_html_resource(

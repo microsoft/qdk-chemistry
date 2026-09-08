@@ -43,6 +43,7 @@ def test_visualization_tools_use_static_apps_resources(monkeypatch):
         assert resource.mime_type == APP_MIME_TYPE
         assert "ui/initialize" in resource.text
         assert "ui/notifications/tool-result" in resource.text
+        assert "event.source" in resource.text
     for binding in tools.values():
         assert binding.meta is not None
         assert binding.meta["ui"]["resourceUri"] in resources
@@ -68,3 +69,6 @@ def test_scatter_app_does_not_embed_tool_controlled_strings(monkeypatch):
     assert hostile not in html
     assert "textContent=text" in html
     assert "title.textContent=" in html
+    assert "function ticks(" in html
+    assert "Series ${index+1}" in html
+    assert "item.mode?.includes('lines')" in html
