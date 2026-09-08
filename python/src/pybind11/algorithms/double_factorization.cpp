@@ -39,13 +39,18 @@ void bind_double_factorization(py::module &m) {
   ``"cholesky"``
       Run a pivoted Cholesky decomposition of the supermatrix in
       ``O(naux * norb**4)``, stopping at the numerical rank. Every fragment
-      carries sign ``+1``. If the Hamiltonian is already backed by a
-      :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
-      three-center integrals are the first factorization and are reused
-      directly, so the dense ``norb**4`` tensor is never formed. A Cholesky
-      decomposition exists only for a positive semi-definite supermatrix, so a
-      detected breakdown falls back to ``"eigen_decomposition"`` rather than
-      failing.
+      carries sign ``+1``. A Cholesky decomposition exists only for a positive
+      semi-definite supermatrix, so a detected breakdown falls back to
+      ``"eigen_decomposition"`` rather than failing.
+
+If the Hamiltonian is already backed by a
+:class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
+three-center integrals are themselves the first factorization, so they are
+consumed directly and the dense ``norb**4`` tensor is never formed. Either
+method can do this: ``"cholesky"`` reuses the stored vectors as fragments,
+while ``"eigen_decomposition"`` recovers the eigenpairs from their
+``naux x naux`` Gram matrix. The two therefore differ on a redundant input,
+because only the eigen path collapses linearly dependent vectors.
 
 
 See Also:

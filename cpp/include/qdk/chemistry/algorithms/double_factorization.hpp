@@ -125,8 +125,10 @@ std::vector<TwoBodyFragment> double_factorize(
  * decomposition of it. Both produce the same container and drop fragments on
  * the same `||eps||^2` cutoff, so a given `"truncation_threshold"` selects the
  * same fragments from each; only the ordering metric differs. If the input
- * already stores three-center Cholesky vectors, those vectors are reused and
- * compared by squared column norm.
+ * already stores three-center Cholesky vectors, those vectors are consumed
+ * directly rather than expanded into a dense norb^4 tensor: `"cholesky"`
+ * reuses them as fragments, and `"eigen_decomposition"` recovers the
+ * eigenpairs from their naux x naux Gram matrix.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.

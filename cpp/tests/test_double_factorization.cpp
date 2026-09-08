@@ -473,3 +473,74 @@ TEST(DoubleFactorizerCholeskyTest, RunProducesEquivalentFactorizedContainer) {
   EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
   EXPECT_TRUE(factorized->is_restricted());
 }
+
+// The next three tests cover the fast path that consumes a
+// CholeskyHamiltonianContainer's stored vectors instead of expanding them into
+// a dense norb^4 tensor. The input spans rank 3 but is stored as 5 vectors, so
+// the two methods are expected to disagree on the count: that disagreement is
+// what proves each one took its own branch rather than the dense fallback.
+TEST(DoubleFactorizerCholeskyTest, ReusesStoredThreeCenterIntegrals) {
+  constexpr std::size_t norb = 3;
+  const Eigen::MatrixXd vectors =
+      make_rank_deficient_cholesky_vectors(norb, 3, 5, 23);
+  auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
+
+  auto factorized = make_cholesky_factorizer()->run(hamiltonian);
+  const auto& container = as_factorized(factorized);
+
+  // Cholesky consumes the stored columns as fragments, redundancy included.
+  EXPECT_EQ(container.get_num_ranks(), 5u);
+
+  auto [g_aaaa, g_aabb, g_bbbb] = factorized->get_two_body_integrals();
+  auto [expected, expected_aabb, expected_bbbb] =
+      hamiltonian->get_two_body_integrals();
+  EXPECT_TRUE(g_aaaa.isApprox(expected, kReconstructionTolerance))
+      << "max abs deviation: " << (g_aaaa - expected).cwiseAbs().maxCoeff();
+}
+
+TEST(DoubleFactorizerTest, EigenDecompositionUsesGramOfStoredVectors) {
+  constexpr std::size_t norb = 3;
+  const Eigen::MatrixXd vectors =
+      make_rank_deficient_cholesky_vectors(norb, 3, 5, 23);
+  auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
+
+  auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
+  const auto& container = as_factorized(factorized);
+
+  // The Gram matrix's zero modes are the redundant columns, so the eigen path
+  // stops at the true rank rather than returning them as noise.
+  EXPECT_EQ(container.get_num_ranks(), 3u);
+
+  auto [g_aaaa, g_aabb, g_bbbb] = factorized->get_two_body_integrals();
+  auto [expected, expected_aabb, expected_bbbb] =
+      hamiltonian->get_two_body_integrals();
+  EXPECT_TRUE(g_aaaa.isApprox(expected, kReconstructionTolerance))
+      << "max abs deviation: " << (g_aaaa - expected).cwiseAbs().maxCoeff();
+}
+
+TEST(DoubleFactorizerTest, GramShortcutMatchesDenseEigenDecomposition) {
+  constexpr std::size_t norb = 3;
+  const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 23);
+
+  // Same tensor reached two ways: from the stored vectors, which takes the
+  // naux x naux Gram shortcut, and from the dense tensor, which diagonalizes
+  // the norb^2 x norb^2 supermatrix. The shortcut is only valid if these
+  // agree, so this is what pins it.
+  auto stored = make_cholesky_hamiltonian(norb, vectors);
+  auto [dense_tensor, dense_aabb, dense_bbbb] =
+      stored->get_two_body_integrals();
+  auto dense = make_hamiltonian(norb, dense_tensor);
+
+  auto from_stored = DoubleFactorizerFactory::create("qdk")->run(stored);
+  auto from_dense = DoubleFactorizerFactory::create("qdk")->run(dense);
+
+  EXPECT_EQ(as_factorized(from_stored).get_num_ranks(),
+            as_factorized(from_dense).get_num_ranks());
+
+  auto [stored_g, stored_aabb, stored_bbbb] =
+      from_stored->get_two_body_integrals();
+  auto [dense_g, dense_g_aabb, dense_g_bbbb] =
+      from_dense->get_two_body_integrals();
+  EXPECT_TRUE(stored_g.isApprox(dense_g, kReconstructionTolerance))
+      << "max abs deviation: " << (stored_g - dense_g).cwiseAbs().maxCoeff();
+}

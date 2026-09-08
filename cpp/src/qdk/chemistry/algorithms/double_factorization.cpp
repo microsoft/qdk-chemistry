@@ -109,6 +109,26 @@ double fragment_coefficient_one_norm(const TwoBodyFragment& fragment) {
   return fragment.eps.cwiseAbs().sum();
 }
 
+void validate_three_center(const Eigen::MatrixXd& three_center,
+                           std::size_t norb, double truncation_threshold,
+                           const std::string& context) {
+  validate_norb_and_threshold(norb, truncation_threshold, context);
+
+  const std::size_t pair_dim = norb * norb;
+  if (static_cast<std::size_t>(three_center.rows()) != pair_dim) {
+    throw std::invalid_argument(
+        context + ": expected norb^2 = " + std::to_string(pair_dim) +
+        " rows for norb = " + std::to_string(norb) + ", got " +
+        std::to_string(three_center.rows()) + ".");
+  }
+
+  if (!three_center.allFinite()) {
+    throw std::invalid_argument(
+        context +
+        ": cholesky_vectors contains a non-finite value (NaN or infinity).");
+  }
+}
+
 std::vector<TwoBodyFragment> factorize_by_eigendecomposition(
     const Eigen::MatrixXd& supermatrix, std::size_t norb,
     double truncation_threshold) {
@@ -178,21 +198,7 @@ std::vector<TwoBodyFragment> fragments_from_cholesky_vectors(
   QDK_LOG_TRACE_ENTERING();
 
   const std::string context = "fragments_from_cholesky_vectors";
-  validate_norb_and_threshold(norb, truncation_threshold, context);
-
-  const std::size_t pair_dim = norb * norb;
-  if (static_cast<std::size_t>(cholesky_vectors.rows()) != pair_dim) {
-    throw std::invalid_argument(
-        context + ": expected norb^2 = " + std::to_string(pair_dim) +
-        " rows for norb = " + std::to_string(norb) + ", got " +
-        std::to_string(cholesky_vectors.rows()) + ".");
-  }
-
-  if (!cholesky_vectors.allFinite()) {
-    throw std::invalid_argument(
-        context +
-        ": cholesky_vectors contains a non-finite value (NaN or infinity).");
-  }
+  validate_three_center(cholesky_vectors, norb, truncation_threshold, context);
 
   std::vector<TwoBodyFragment> fragments;
   fragments.reserve(static_cast<std::size_t>(cholesky_vectors.cols()));
@@ -218,6 +224,90 @@ std::vector<TwoBodyFragment> fragments_from_cholesky_vectors(
             });
 
   return fragments;
+}
+
+/// Eigen-decompose g = L L^T from its factor L, without forming the dense
+/// norb^4 tensor. L L^T shares its non-zero eigenvalues with the naux x naux
+/// Gram matrix L^T L, whose eigenvector w lifts to an eigenvector of the
+/// supermatrix as L w / sqrt(s). That costs O(naux^2 * norb^2 + naux^3)
+/// instead of the O(norb^6) dense diagonalization, and yields the same
+/// fragments.
+///
+/// naux may exceed the rank of g, which is normal for an active space. The
+/// redundant directions are exact zero modes of the Gram matrix, so they are
+/// dropped rather than returned as numerical noise.
+std::vector<TwoBodyFragment> fragments_from_cholesky_vectors_by_gram(
+    const Eigen::MatrixXd& cholesky_vectors, std::size_t norb,
+    double truncation_threshold) {
+  QDK_LOG_TRACE_ENTERING();
+
+  const std::string context = "fragments_from_cholesky_vectors_by_gram";
+  validate_three_center(cholesky_vectors, norb, truncation_threshold, context);
+
+  const Eigen::Index naux = cholesky_vectors.cols();
+  std::vector<TwoBodyFragment> fragments;
+  if (naux == 0) {
+    return fragments;
+  }
+
+  Eigen::MatrixXd gram = cholesky_vectors.transpose() * cholesky_vectors;
+  Eigen::VectorXd gram_eigenvalues(naux);
+  const int64_t info = lapack::syev(
+      lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(naux),
+      gram.data(), static_cast<int64_t>(naux), gram_eigenvalues.data());
+  if (info != 0) {
+    throw std::runtime_error(
+        context +
+        ": LAPACK syev failed to diagonalize the naux x naux Gram "
+        "matrix (info=" +
+        std::to_string(info) + ").");
+  }
+
+  // g is a Gram matrix, so its exact eigenvalues are non-negative and the
+  // zero modes from redundant columns land at +-eps*scale. Scaling the floor
+  // by naux keeps those below it, the same way factorize_by_cholesky scales
+  // its own floor by the pair dimension.
+  const double noise_floor = std::numeric_limits<double>::epsilon() *
+                             static_cast<double>(naux) *
+                             std::max(gram_eigenvalues.maxCoeff(), 0.0);
+  const double drop_threshold = std::max(truncation_threshold, noise_floor);
+
+  fragments.reserve(static_cast<std::size_t>(naux));
+  // syev returns ascending eigenvalues; walk backwards for decreasing weight.
+  for (Eigen::Index n = naux; n-- > 0;) {
+    const double eigenvalue = gram_eigenvalues[n];
+    if (eigenvalue <= drop_threshold) {
+      continue;
+    }
+
+    const Eigen::VectorXd lifted =
+        cholesky_vectors * gram.col(n) / std::sqrt(eigenvalue);
+
+    TwoBodyFragment fragment;
+    Eigen::VectorXd fragment_eigenvalues;
+    diagonalize_pair_vector(lifted.data(), norb, context, fragment.U,
+                            fragment_eigenvalues);
+
+    // The lifted eigenvector is unit-norm, so it is rescaled exactly as the
+    // dense eigen path rescales its own, giving ||eps||^2 == |eigenvalue|.
+    fragment.sign = 1.0;
+    fragment.eps = std::sqrt(eigenvalue) * fragment_eigenvalues;
+
+    fragments.push_back(std::move(fragment));
+  }
+
+  return fragments;
+}
+
+/// Build fragments from stored three-center integrals for either method.
+std::vector<TwoBodyFragment> fragments_from_three_center(
+    const Eigen::MatrixXd& cholesky_vectors, std::size_t norb,
+    double truncation_threshold, DoubleFactorizationMethod method) {
+  return method == DoubleFactorizationMethod::Cholesky
+             ? fragments_from_cholesky_vectors(cholesky_vectors, norb,
+                                               truncation_threshold)
+             : fragments_from_cholesky_vectors_by_gram(cholesky_vectors, norb,
+                                                       truncation_threshold);
 }
 
 std::vector<TwoBodyFragment> factorize_by_cholesky(
@@ -358,8 +448,7 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
 
   // Stored three-center integrals already are the first factorization.
   const Eigen::MatrixXd* stored_vectors = nullptr;
-  if (method == DoubleFactorizationMethod::Cholesky &&
-      hamiltonian->has_container_type<CholeskyHamiltonianContainer>()) {
+  if (hamiltonian->has_container_type<CholeskyHamiltonianContainer>()) {
     const Eigen::MatrixXd& three_center =
         hamiltonian->get_container<CholeskyHamiltonianContainer>()
             .get_three_center_integrals()
@@ -377,8 +466,8 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
 
   auto fragments =
       stored_vectors != nullptr
-          ? fragments_from_cholesky_vectors(*stored_vectors, norb,
-                                            truncation_threshold)
+          ? fragments_from_three_center(*stored_vectors, norb,
+                                        truncation_threshold, method)
           : double_factorize(std::get<0>(hamiltonian->get_two_body_integrals()),
                              norb, truncation_threshold, method);
 
