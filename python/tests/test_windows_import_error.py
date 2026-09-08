@@ -13,16 +13,18 @@ import pytest
 
 
 @pytest.mark.parametrize("system", ["win32", "linux", "darwin"])
+@pytest.mark.parametrize("error_type", [ImportError, ModuleNotFoundError])
 def test_native_import_error_diagnostic(
     monkeypatch: pytest.MonkeyPatch,
     system: str,
+    error_type: type[ImportError],
 ) -> None:
-    """Report the bundled Windows runtime prerequisite and preserve non-Windows errors."""
+    """Report Windows load failures without masking missing modules or non-Windows errors."""
     spec = importlib.util.find_spec("qdk_chemistry")
     assert spec is not None
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
-    original = ImportError("localized native extension loader error")
+    original = error_type("localized native extension loader error", name="qdk_chemistry._core")
     import_module = importlib.import_module
 
     def fail_import(name: str, package: str | None = None) -> ModuleType:
@@ -36,10 +38,10 @@ def test_native_import_error_diagnostic(
     with pytest.raises(ImportError) as caught:
         spec.loader.exec_module(module)
 
-    if system == "win32":
+    if system == "win32" and error_type is ImportError:
         assert "Visual C++ v14" in str(caught.value)
         assert "includes ARM64" in str(caught.value)
-        assert str(caught.value).endswith("https://aka.ms/vc14/vc_redist.x64.exe")
+        assert "https://aka.ms/vc14/vc_redist.x64.exe" in str(caught.value)
         assert caught.value.__cause__ is original
     else:
         assert caught.value is original

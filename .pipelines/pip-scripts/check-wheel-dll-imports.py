@@ -118,11 +118,7 @@ def _main() -> int:
         print(f"ERROR: cannot inspect {wheel}: {exc}")
         return 1
 
-    packaged_dlls = {
-        PurePosixPath(name).name.upper()
-        for name in binaries
-        if name.lower().endswith(".dll")
-    }
+    packaged_dlls = {PurePosixPath(name).name.upper() for name in binaries}
     unresolved: list[tuple[str, str]] = []
     for name, (regular, delayed) in imports.items():
         print(f"DLL imports for {name}:")

@@ -50,6 +50,8 @@ def _import_core() -> None:
     """Import the native extension with an actionable Windows failure message."""
     try:
         importlib.import_module("qdk_chemistry._core")
+    except ModuleNotFoundError:
+        raise
     except ImportError as exc:
         if _sys.platform == "win32":
             raise ImportError(
