@@ -248,8 +248,8 @@ Geometric neighbor shells
 Built-in lattice factories store Cartesian site positions alongside the adjacency matrix, plus up to two supercell vectors for periodic axes.
 The read-only ``positions`` property returns a copy of the factory-generated ``(num_sites, 2)`` Cartesian position matrix.
 The ``mth_nearest_neighbors(m)`` method returns the canonical pairs ``(i, j)`` in the *m*-th distinct geometric distance shell, where ``m=1`` denotes nearest neighbors.
-Distances are computed lazily when shells are requested, using the minimum image under the factory's periodic boundary conditions.
 The ``nearest_neighbor_shells(shells)`` method classifies multiple requested shells in one pass.
+These pair-only shell methods support open lattices; use ``neighbor_connections(shells)`` when periodic images are required.
 For example, in the bulk or on a sufficiently large open lattice, the first three square-lattice shells have distances :math:`1`, :math:`\sqrt{2}`, and :math:`2`, while the honeycomb-lattice shells have distances :math:`1`, :math:`\sqrt{3}`, and :math:`2` in units of the nearest-neighbor spacing.
 
 Graphs constructed only from adjacency data do not define a geometric embedding, so geometric neighbor shells cannot be queried on them.
@@ -266,7 +266,7 @@ A bond class combines the radial shell with an unoriented displacement axis, so 
 This classification is available for every built-in lattice embedding.
 The number of orientations depends on the geometry: a chain has one orientation per shell, while square, triangular, honeycomb, and kagome lattices generally have several.
 Distinct periodic-image connections remain distinct even when they project onto the same canonical finite-lattice site pair.
-By contrast, ``mth_nearest_neighbors()`` and ``nearest_neighbor_shells()`` intentionally deduplicate those connections and continue to return canonical pairs.
+The pair-only ``mth_nearest_neighbors()`` and ``nearest_neighbor_shells()`` methods instead return canonical pairs for open lattices.
 
 Semantic bond flavors are optional non-negative integer IDs on geometric shell-axis classes.
 Use :class:`~qdk_chemistry.data.BondFlavorDefinition` and ``with_bond_flavors()`` to attach model-specific meanings to any embedded lattice.
@@ -320,7 +320,7 @@ This is the triangular Bravais lattice with a three-point basis in Guo and Franz
 
 For a periodic axis, the corresponding supercell period is
 :math:`N_x\boldsymbol{a}_1` or :math:`N_y\boldsymbol{a}_2`.
-The distance calculation minimizes over integer translations by those periods, so sites across a periodic boundary receive their minimum-image distance.
+The ``neighbor_connections()`` distance calculation considers integer translations by those periods, so physical connections across periodic boundaries are represented correctly.
 The vectors therefore cannot be removed without retaining equivalent geometric information, such as a Gram matrix and fractional basis coordinates.
 Keeping the Cartesian vectors is the shorter representation for these two-dimensional factories.
 

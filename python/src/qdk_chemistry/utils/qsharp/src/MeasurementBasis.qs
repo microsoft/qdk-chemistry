@@ -6,7 +6,7 @@ namespace QDKChemistry.Utils.MeasurementBasis {
 
     /// Rotates every qubit so a subsequent Z measurement observes the same
     /// spin direction.
-    operation ApplyUniformSpinBasisRotation(
+    operation ApplyUniformBasisRotation(
         theta : Double,
         phi : Double,
         qubits : Qubit[],
@@ -18,15 +18,15 @@ namespace QDKChemistry.Utils.MeasurementBasis {
     }
 
     /// Returns an operation that applies a uniform spin-basis rotation.
-    function MakeUniformSpinBasisRotationOp(
+    function MakeUniformBasisRotationOp(
         theta : Double,
         phi : Double,
     ) : Qubit[] => Unit {
-        ApplyUniformSpinBasisRotation(theta, phi, _)
+        ApplyUniformBasisRotation(theta, phi, _)
     }
 
     /// Applies a base circuit followed by a uniform spin-basis rotation.
-    operation MakeUniformSpinBasisRotationCircuit(
+    operation MakeUniformBasisRotationCircuit(
         baseCircuit : Qubit[] => Unit,
         theta : Double,
         phi : Double,
@@ -34,7 +34,7 @@ namespace QDKChemistry.Utils.MeasurementBasis {
     ) : Unit {
         use qs = Qubit[numQubits];
         baseCircuit(qs);
-        ApplyUniformSpinBasisRotation(theta, phi, qs);
+        ApplyUniformBasisRotation(theta, phi, qs);
     }
 
     /// Measures each qubit in the specified Pauli basis and resets it to |0⟩.

@@ -342,17 +342,6 @@ TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
   auto honeycomb = LatticeGraph::honeycomb(2, 2, true, true)
                        .with_bond_flavors(honeycomb_flavor_ids());
   const auto all_connections = honeycomb.neighbor_connections({1, 2, 3});
-  for (std::uint64_t shell = 1; shell <= 3; ++shell) {
-    std::set<std::pair<std::uint64_t, std::uint64_t>> projection;
-    for (const auto& connection : all_connections) {
-      if (connection.bond_class.shell == shell) {
-        projection.emplace(connection.site_i, connection.site_j);
-      }
-    }
-    const auto pairs = honeycomb.mth_nearest_neighbors(shell);
-    EXPECT_EQ(projection, (std::set<std::pair<std::uint64_t, std::uint64_t>>(
-                              pairs.begin(), pairs.end())));
-  }
   std::vector<NeighborConnection> connections;
   std::copy_if(all_connections.begin(), all_connections.end(),
                std::back_inserter(connections), [](const auto& connection) {
@@ -368,7 +357,7 @@ TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
   EXPECT_TRUE(
       std::any_of(flavors_by_pair.begin(), flavors_by_pair.end(),
                   [](const auto& item) { return item.second.size() > 1; }));
-  EXPECT_GT(connections.size(), honeycomb.mth_nearest_neighbors(3).size());
+  EXPECT_GT(connections.size(), flavors_by_pair.size());
 }
 
 TEST_F(LatticeGraphTest, BondFlavorDefinitionsSurviveDataOperations) {
@@ -514,39 +503,7 @@ TEST_F(LatticeGraphTest, BondFlavorHdf5RejectsMalformedMetadata) {
   });
 }
 
-TEST_F(LatticeGraphTest, BoundaryConditionsAffectGeometricNeighborShells) {
-  auto degrees = [](const LatticeGraph& graph, std::uint64_t site) {
-    std::array<std::size_t, 3> result{};
-    for (std::uint64_t m = 1; m <= result.size(); ++m) {
-      const auto shell = graph.mth_nearest_neighbors(m);
-      result[m - 1] =
-          std::count_if(shell.begin(), shell.end(), [site](const auto& edge) {
-            return edge.first == site || edge.second == site;
-          });
-    }
-    return result;
-  };
-
-  EXPECT_EQ(degrees(LatticeGraph::square(5, 5), 0),
-            (std::array<std::size_t, 3>{2, 1, 2}));
-  EXPECT_EQ(degrees(LatticeGraph::square(5, 5, true, false), 0),
-            (std::array<std::size_t, 3>{3, 2, 3}));
-  EXPECT_EQ(degrees(LatticeGraph::square(5, 5, false, true), 0),
-            (std::array<std::size_t, 3>{3, 2, 3}));
-  EXPECT_EQ(degrees(LatticeGraph::square(5, 5, true, true), 0),
-            (std::array<std::size_t, 3>{4, 4, 4}));
-
-  EXPECT_EQ(degrees(LatticeGraph::honeycomb(4, 4), 0),
-            (std::array<std::size_t, 3>{1, 2, 0}));
-  EXPECT_EQ(degrees(LatticeGraph::honeycomb(4, 4, true, false), 0),
-            (std::array<std::size_t, 3>{2, 4, 1}));
-  EXPECT_EQ(degrees(LatticeGraph::honeycomb(4, 4, false, true), 0),
-            (std::array<std::size_t, 3>{2, 4, 1}));
-  EXPECT_EQ(degrees(LatticeGraph::honeycomb(4, 4, true, true), 0),
-            (std::array<std::size_t, 3>{3, 6, 3}));
-}
-
-TEST_F(LatticeGraphTest, GeometricShellValidationAndPeriodicBoundaries) {
+TEST_F(LatticeGraphTest, GeometricShellValidationAndOpenBoundaryRequirement) {
   Eigen::MatrixXd adjacency = Eigen::MatrixXd::Zero(3, 3);
   auto graph = LatticeGraph::from_dense_matrix(adjacency);
   EXPECT_THROW(graph.mth_nearest_neighbors(1), std::runtime_error);
@@ -559,15 +516,9 @@ TEST_F(LatticeGraphTest, GeometricShellValidationAndPeriodicBoundaries) {
                std::invalid_argument);
   EXPECT_THROW(periodic_square.nearest_neighbor_shells({1, 0}),
                std::invalid_argument);
-  EXPECT_TRUE(periodic_square.mth_nearest_neighbors(99).empty());
-
-  const auto shells = periodic_square.nearest_neighbor_shells({2, 1, 99});
-  EXPECT_EQ(shells.at(1), periodic_square.mth_nearest_neighbors(1));
-  EXPECT_EQ(shells.at(2), periodic_square.mth_nearest_neighbors(2));
-  EXPECT_TRUE(shells.at(99).empty());
-  const auto first = periodic_square.mth_nearest_neighbors(1);
-  using Edge = std::pair<std::uint64_t, std::uint64_t>;
-  EXPECT_NE(std::find(first.begin(), first.end(), Edge{0, 3}), first.end());
+  EXPECT_THROW(periodic_square.mth_nearest_neighbors(1), std::runtime_error);
+  EXPECT_THROW(periodic_square.nearest_neighbor_shells({1, 2}),
+               std::runtime_error);
 }
 
 TEST_F(LatticeGraphTest, GeometricShellsAreScaleInvariant) {
@@ -591,8 +542,6 @@ TEST_F(LatticeGraphTest, GeometricShellsAreScaleInvariant) {
     EXPECT_EQ(open.mth_nearest_neighbors(2), (std::vector<Edge>{{0, 2}}));
 
     auto periodic = make_geometry(scale, true);
-    EXPECT_EQ(periodic.mth_nearest_neighbors(1),
-              (std::vector<Edge>{{0, 1}, {0, 2}, {1, 2}}));
     const auto connections = periodic.neighbor_connections({1});
     EXPECT_EQ(connections.size(), 3);
     for (const auto& connection : connections) {
@@ -611,11 +560,10 @@ TEST_F(LatticeGraphTest, GeometricShellsAreScaleInvariant) {
     graph["periods"] = {{scale, 0.0}, {0.0, scale}};
     EXPECT_NO_THROW(LatticeGraph::from_json(graph));
   }
-
   for (const auto& periods :
-       std::vector<nlohmann::json>{{{1.0e-200, 0.0}, {0.0, 1.0e200}},
-                                   {{1.0e-200, 0.0}, {1.0e200, 1.0e200}},
-                                   {{1.0e-200, 0.0}, {5.0e-201, 1.0e-200}}}) {
+       std::vector<nlohmann::json>{{{1.0, 0.0}, {2.0, 0.0}},
+                                   {{1.0, 1.0}, {-2.0, -2.0}},
+                                   {{1.0e-200, 0.0}, {0.0, 1.0e200}}}) {
     EXPECT_THROW(LatticeGraph::from_json(
                      {{"num_sites", 3},
                       {"is_symmetric", true},
@@ -635,51 +583,29 @@ TEST_F(LatticeGraphTest, ConnectionsScaleBeforeSubtractingLargeCoordinates) {
       {"periods", {{1.5e308, 0.0}}},
   });
 
-  EXPECT_EQ(graph.mth_nearest_neighbors(1),
-            (std::vector<std::pair<std::uint64_t, std::uint64_t>>{{0, 1}}));
   const auto connections = graph.neighbor_connections({1});
   ASSERT_EQ(connections.size(), 1);
   EXPECT_NEAR(connections[0].displacement.x() / 3.0e307, 1.0, 1.0e-12);
   EXPECT_EQ(connections[0].image_shift[0], -1);
 }
 
-TEST_F(LatticeGraphTest, SkewPeriodicDistancesSearchAllRelevantImages) {
-  auto triangular = LatticeGraph::triangular(2, 12, true, false);
-  auto triangular_shell = triangular.mth_nearest_neighbors(16);
-  EXPECT_NE(std::find(triangular_shell.begin(), triangular_shell.end(),
-                      std::pair<std::uint64_t, std::uint64_t>{0, 22}),
-            triangular_shell.end());
-
-  auto honeycomb = LatticeGraph::honeycomb(2, 12, true, false);
-  auto honeycomb_shell = honeycomb.mth_nearest_neighbors(46);
-  EXPECT_NE(std::find(honeycomb_shell.begin(), honeycomb_shell.end(),
-                      std::pair<std::uint64_t, std::uint64_t>{0, 44}),
-            honeycomb_shell.end());
-
-  auto kagome = LatticeGraph::kagome(2, 12, true, false);
-  auto kagome_shell = kagome.mth_nearest_neighbors(52);
-  EXPECT_NE(std::find(kagome_shell.begin(), kagome_shell.end(),
-                      std::pair<std::uint64_t, std::uint64_t>{0, 66}),
-            kagome_shell.end());
-}
-
 TEST_F(LatticeGraphTest, GeometrySurvivesSerializationAndPermutation) {
-  auto square = LatticeGraph::square(3, 2, true, false);
-  const auto json = square.to_json();
+  const auto periodic_square = LatticeGraph::square(3, 2, true, false);
+  const auto json = periodic_square.to_json();
   EXPECT_TRUE(json.contains("positions"));
   EXPECT_TRUE(json.contains("periods"));
   EXPECT_FALSE(json.contains("distance_matrix"));
-  auto restored = LatticeGraph::from_json(json);
-  EXPECT_EQ(restored.mth_nearest_neighbors(2), square.mth_nearest_neighbors(2));
+  const auto restored = LatticeGraph::from_json(json);
+  EXPECT_EQ(restored.to_json().at("periods"), json.at("periods"));
 
   const std::filesystem::path filename =
       "test_lattice_graph_geometry.lattice_graph.h5";
-  square.to_hdf5_file(filename.string());
-  auto hdf5_restored = LatticeGraph::from_hdf5_file(filename.string());
-  EXPECT_EQ(hdf5_restored.mth_nearest_neighbors(2),
-            square.mth_nearest_neighbors(2));
+  periodic_square.to_hdf5_file(filename.string());
+  const auto hdf5_restored = LatticeGraph::from_hdf5_file(filename.string());
+  EXPECT_EQ(hdf5_restored.to_json().at("periods"), json.at("periods"));
   std::filesystem::remove(filename);
 
+  const auto square = LatticeGraph::square(3, 2);
   std::vector<std::uint64_t> path = {1, 2, 0, 4, 5, 3};
   auto permuted = LatticeGraph::permute(square, path);
   std::vector<std::uint64_t> inverse_path(path.size());

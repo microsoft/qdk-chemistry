@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from itertools import combinations
+
 import numpy as np
 import pytest
 
@@ -12,6 +14,7 @@ from qdk_chemistry.data import (
     BondFlavorDefinition,
     Hamiltonian,
     LatticeGraph,
+    LayeredPartition,
     QubitOperator,
 )
 from qdk_chemistry.utils.model_hamiltonians import (
@@ -26,6 +29,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     mataga_nishimoto_potential,
     ohno_potential,
 )
+from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 
@@ -38,6 +42,29 @@ def _get_terms_dict(qh: QubitOperator) -> dict[str, float]:
 def _with_standard_kitaev_flavors(graph: LatticeGraph) -> LatticeGraph:
     """Attach the standard honeycomb Kitaev flavor IDs for inspection."""
     return graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
+
+
+def _assert_commuting_disjoint_partition(hamiltonian: QubitOperator) -> LayeredPartition:
+    """Check the algebraic and support invariants of a layered partition."""
+    partition = hamiltonian.term_partition
+    assert isinstance(partition, LayeredPartition)
+    assert partition.strategy == "geometry_coloring"
+    assert sorted(partition.all_indices()) == list(range(len(hamiltonian.pauli_strings)))
+
+    for group in partition.groups:
+        group_indices = [index for layer in group for index in layer]
+        for left, right in combinations(group_indices, 2):
+            assert do_pauli_labels_commute(
+                hamiltonian.pauli_strings[left],
+                hamiltonian.pauli_strings[right],
+            )
+        for layer in group:
+            supports = [
+                {position for position, pauli in enumerate(hamiltonian.pauli_strings[index]) if pauli != "I"}
+                for index in layer
+            ]
+            assert all(left.isdisjoint(right) for left, right in combinations(supports, 2))
+    return partition
 
 
 class TestModelHamiltonians:
@@ -278,6 +305,11 @@ class TestModelHamiltonians:
 
         graph = LatticeGraph.square(n, n, t=7.0)
         assert graph.mth_nearest_neighbors(99) == []
+        periodic_graph = LatticeGraph.square(n, n, periodic_x=True)
+        with pytest.raises(RuntimeError, match="support open lattices only"):
+            periodic_graph.mth_nearest_neighbors(1)
+        with pytest.raises(RuntimeError, match="support open lattices only"):
+            periodic_graph.nearest_neighbor_shells([1, 2])
         with pytest.raises(ValueError, match="m must be > 0"):
             graph.mth_nearest_neighbors(0)
         with pytest.raises(TypeError):
@@ -302,7 +334,8 @@ class TestModelHamiltonians:
             jy=couplings,
             jz=couplings,
         )
-        assert hamiltonian.term_partition is None
+        partition = _assert_commuting_disjoint_partition(hamiltonian)
+        assert [len(group) for group in partition.groups] == [8, 8, 8]
         terms = _get_terms_dict(hamiltonian)
         assert len(terms) == 3 * (len(first_neighbors) + len(second_neighbors))
 
@@ -452,7 +485,7 @@ class TestModelHamiltonians:
             ky=zero_couplings,
             kz=zero_couplings,
         )
-        assert hamiltonian.term_partition is None
+        _assert_commuting_disjoint_partition(hamiltonian)
         terms = _get_terms_dict(hamiltonian)
         expected: dict[str, float] = {}
         for connection in flavored_graph.neighbor_connections([1, 2, 3]):
@@ -480,6 +513,33 @@ class TestModelHamiltonians:
                 pauli[graph.num_sites - 1 - connection.site_j] = component
                 expected_heisenberg["".join(pauli)] = shell_couplings[connection.bond_class.shell] / 4.0
         assert heisenberg_terms == pytest.approx(expected_heisenberg, abs=float_comparison_absolute_tolerance)
+
+    @pytest.mark.parametrize(("shell", "expected_layers"), [(1, 2), (2, 3), (3, 1)])
+    def test_kitaev_shell_partition_uses_optimal_plaquette_edge_coloring(self, shell, expected_layers):
+        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
+        zero_couplings = {1: 0.0, 2: 0.0, 3: 0.0}
+        hamiltonian = create_kitaev_hamiltonian(
+            graph,
+            kx=zero_couplings,
+            ky=zero_couplings,
+            kz=zero_couplings,
+            j={shell: 4.0},
+        )
+
+        partition = _assert_commuting_disjoint_partition(hamiltonian)
+        assert {len(group) for group in partition.groups} == {expected_layers}
+
+    def test_kitaev_mixed_axis_partition_keeps_groups_commuting(self):
+        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
+        hamiltonian = create_kitaev_hamiltonian(
+            graph,
+            kx=0.0,
+            ky=0.0,
+            kz=0.0,
+            gamma_prime=4.0,
+        )
+
+        _assert_commuting_disjoint_partition(hamiltonian)
 
     def test_geometric_flavors_are_optional_and_configurable(self):
         square = LatticeGraph.square(3, 3)

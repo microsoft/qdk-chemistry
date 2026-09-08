@@ -371,8 +371,8 @@ Passing :math:`C=D` expresses both exchange and field terms directly in the crys
 Geometry-aware term grouping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Both :func:`~qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian` and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian` accept an ``include_term_groups`` flag (default ``True``).
-When enabled, the builder consults the lattice's edge coloring and stores the resulting group-and-layer structure on :attr:`~qdk_chemistry.data.QubitOperator.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
+The Heisenberg, Ising, and Kitaev model builders accept an ``include_term_groups`` flag (default ``True``).
+When enabled, the builder stores a group-and-layer structure on :attr:`~qdk_chemistry.data.QubitOperator.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
 
 * each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
@@ -382,8 +382,8 @@ No manual geometry boilerplate is required at the call site.
 
 Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).
 
-Automatic geometry-coloring partitions currently apply to adjacency-based couplings.
-When any spin coupling is specified by geometric neighbor shell, the builder returns an unpartitioned Hamiltonian even if ``include_term_groups=True``.
+For adjacency-based couplings, the builders reuse the coloring stored on the lattice.
+For geometric-shell mappings, each active Pauli interaction family is colored independently using its nonzero pair support.
 
 Parameter flexibility
 ---------------------

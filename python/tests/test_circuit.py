@@ -25,12 +25,18 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
-from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
+from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
+    MatrixCompressionType,
+)
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data import circuit as circuit_module
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, set_qsharp_context
+from qdk_chemistry.utils.qsharp import (
+    QSHARP_UTILS,
+    create_qsharp_context,
+    set_qsharp_context,
+)
 
 
 def strip_ws(s: str) -> str:
@@ -128,9 +134,15 @@ class TestGetQsharpCircuit:
 
     def test_get_circuit_from_factory(self):
         """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
-        state_prep_params = {"rowMap": [1, 0], "stateVector": [0.6, 0.0, 0.0, 0.8], "expansionOps": [], "numQubits": 2}
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": [0.6, 0.0, 0.0, 0.8],
+            "expansionOps": [],
+            "numQubits": 2,
+        }
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         assert circuit.qir is None
@@ -157,7 +169,8 @@ class TestGetQsharpCircuit:
             "numQubits": 4,
         }
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         qsc_pruned = circuit.get_qsharp_circuit(prune_classical_qubits=True)
@@ -168,7 +181,7 @@ class TestGetQsharpCircuit:
         assert len(qsc_pruned_info["qubits"]) == 2
 
 
-class TestUniformSpinBasisRotation:
+class TestUniformBasisRotation:
     """Tests for immutable uniform spin-basis rotation."""
 
     def test_qsharp_rotation_is_measurement_free_and_context_safe(self):
@@ -179,7 +192,11 @@ class TestUniformSpinBasisRotation:
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
                 parameter={
-                    "evo_params": {"pauliExponents": [], "pauliCoefficients": [], "repetitions": 1},
+                    "evo_params": {
+                        "pauliExponents": [],
+                        "pauliCoefficients": [],
+                        "repetitions": 1,
+                    },
                     "target_indices": [0],
                 },
             ),
@@ -201,7 +218,9 @@ class TestUniformSpinBasisRotation:
     def test_oblique_direction_has_expected_measurement_probability(self):
         """Rotating |0> by an oblique direction gives p(0)=(1+n_z)/2."""
         from qdk_chemistry.algorithms import create  # noqa: PLC0415
-        from qdk_chemistry.algorithms.state_preparation import identity_state_prep  # noqa: PLC0415
+        from qdk_chemistry.algorithms.state_preparation import (  # noqa: PLC0415
+            identity_state_prep,
+        )
 
         rotated = identity_state_prep(1).with_uniform_spin_basis_rotation([0.6, 0.0, 0.8], num_qubits=1)
         context = rotated._qsharp_factory.program._qdk_context
@@ -292,7 +311,11 @@ class TestCircuitSerialization:
 
     def test_from_json(self, simple_qasm, simple_qir):
         """Test that from_json reconstructs Circuit correctly."""
-        json_data = {"qasm": simple_qasm, "qir": str(simple_qir), "version": Circuit._serialization_version}
+        json_data = {
+            "qasm": simple_qasm,
+            "qir": str(simple_qir),
+            "version": Circuit._serialization_version,
+        }
         circuit = Circuit.from_json(json_data)
 
         assert circuit.qasm == simple_qasm
@@ -420,7 +443,14 @@ class TestCircuitSerialization:
         """Test that from_json_file loads Circuit from a file."""
         with tempfile.NamedTemporaryFile(mode="w", suffix=".circuit.json", delete=False) as tmp:
             tmp_path = Path(tmp.name)
-            json.dump({"qasm": simple_qasm, "qir": simple_qir, "version": Circuit._serialization_version}, tmp)
+            json.dump(
+                {
+                    "qasm": simple_qasm,
+                    "qir": simple_qir,
+                    "version": Circuit._serialization_version,
+                },
+                tmp,
+            )
 
         try:
             circuit = Circuit.from_json_file(tmp_path)

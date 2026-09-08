@@ -53,7 +53,7 @@ def create_hamiltonian(graph: LatticeGraph) -> QubitOperator:
         g_factors_abc=(2.3, 2.3, 1.3),
         bohr_magneton=5.988e-2,  # meV/T
         crystallographic_transform=crystallographic_transform,
-        include_term_groups=False,
+        include_term_groups=True,
     )
 
 

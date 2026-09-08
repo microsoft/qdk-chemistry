@@ -10,7 +10,9 @@ from enum import IntEnum
 from numbers import Integral
 
 import numpy as np
+import scipy.sparse
 
+from qdk_chemistry._core.data import greedy_edge_coloring
 from qdk_chemistry._core.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
@@ -21,7 +23,12 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_pair_param,
     to_site_param,
 )
-from qdk_chemistry.data import BondFlavorDefinition, LatticeGraph, LayeredPartition, QubitOperator
+from qdk_chemistry.data import (
+    BondFlavorDefinition,
+    LatticeGraph,
+    LayeredPartition,
+    QubitOperator,
+)
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -70,6 +77,7 @@ def _build_geometry_grouped_hamiltonian(
     fields: list[tuple[str, np.ndarray | float]],
     coloring: dict[tuple[int, int], int] | None = None,
     apply_edge_weights: bool = True,
+    color_active_edges: bool = False,
 ) -> QubitOperator:
     r"""Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.
 
@@ -83,8 +91,9 @@ def _build_geometry_grouped_hamiltonian(
     Groups are organised first by single-body field direction (one group
     per direction, each containing a single layer because field terms
     have disjoint support), then by two-body coupling type (one group
-    per ``XX``/``YY``/``ZZ`` block, each split into layers by edge
-    color).  Term indices in
+    per commuting two-body block, each split into layers by edge color).
+    Mixed-axis interactions are kept as one group per disjoint layer because
+    overlapping terms with the same ordered label need not commute. Term indices in
     :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` align with the
     indices stored in the returned :class:`LayeredPartition`.
 
@@ -94,6 +103,7 @@ def _build_geometry_grouped_hamiltonian(
         fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\"X\", hx)]``).
         coloring: Optional edge coloring ``{(i, j): color}`` (``i < j``). Reads ``graph.edge_coloring`` when ``None``.
         apply_edge_weights: Multiply coupling matrices by adjacency weights when ``True``. Defaults to ``True``.
+        color_active_edges: Color each coupling matrix's nonzero support separately. Defaults to ``False``.
 
     Returns:
         QubitOperator: The assembled Hamiltonian carrying a ``LayeredPartition``
@@ -102,9 +112,9 @@ def _build_geometry_grouped_hamiltonian(
     """
     n = graph.num_sites
 
-    if coloring is None:
+    if coloring is None and not color_active_edges:
         coloring = graph.edge_coloring
-    if coloring is None:
+    if coloring is None and not color_active_edges:
         raise ValueError(
             "No edge coloring available on the lattice graph. "
             "Use a factory method that provides one, or pass an explicit coloring."
@@ -129,26 +139,36 @@ def _build_geometry_grouped_hamiltonian(
         if layer_indices:
             groups_layers.append((tuple(layer_indices),))
 
-    # Coupling groups: one group per (XX/YY/ZZ) block; layers given by edge colors.
+    # Coupling groups: commuting equal-axis blocks retain all color layers;
+    # mixed-axis blocks use one group per layer to preserve commutativity.
     for pauli_label, coupling in couplings:
         coupling_mat = to_pair_param(coupling, graph, "coupling")
+        if color_active_edges:
+            support_graph = scipy.sparse.csr_matrix(coupling_mat != 0.0)
+            support_graph += support_graph.T
+            coupling_coloring = greedy_edge_coloring(support_graph, seed=0, trials=32)
+        else:
+            assert coloring is not None
+            coupling_coloring = coloring
+
         color_to_indices: dict[int, list[int]] = {}
-        for (i, j), c in coloring.items():
-            edge_weight = graph.weight(i, j) if apply_edge_weights else 1.0
-            if edge_weight == 0.0:
-                continue
-            coeff_val = coupling_mat[i, j] * edge_weight
-            if coeff_val == 0.0:
+        for (site_i, site_j), color in sorted(coupling_coloring.items(), key=lambda item: (item[1], item[0])):
+            edge_weight = graph.weight(site_i, site_j) if apply_edge_weights else 1.0
+            coefficient = complex(coupling_mat[site_i, site_j] * edge_weight)
+            if coefficient == 0.0:
                 continue
             ps = ["I"] * n
-            ps[i] = pauli_label[0]
-            ps[j] = pauli_label[1]
+            ps[site_i] = pauli_label[0]
+            ps[site_j] = pauli_label[1]
             pauli_strings.append("".join(ps[::-1]))
-            coefficients.append(complex(coeff_val))
-            color_to_indices.setdefault(c, []).append(len(pauli_strings) - 1)
+            coefficients.append(coefficient)
+            color_to_indices.setdefault(color, []).append(len(pauli_strings) - 1)
         if color_to_indices:
             layers = tuple(tuple(color_to_indices[c]) for c in sorted(color_to_indices))
-            groups_layers.append(layers)
+            if pauli_label[0] == pauli_label[1]:
+                groups_layers.append(layers)
+            else:
+                groups_layers.extend((layer,) for layer in layers)
 
     if not pauli_strings:
         # Empty Hamiltonian: emit a single all-identity term with zero coefficient
@@ -206,7 +226,7 @@ def create_heisenberg_hamiltonian(
         hx: External magnetic field in the x direction. Scalar or length-n array. Defaults to 0.
         hy: External magnetic field in the y direction. Defaults to 0.
         hz: External magnetic field in the z direction. Defaults to 0.
-        include_term_groups: Attach a term partition for adjacency-based couplings when ``True``. Defaults to ``True``.
+        include_term_groups: Attach a geometry-coloring term partition when ``True``. Defaults to ``True``.
 
     Returns:
         QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
@@ -224,8 +244,6 @@ def create_heisenberg_hamiltonian(
                 fields=[("X", hx), ("Y", hy), ("Z", hz)],
             )
         Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
-    elif include_term_groups:
-        Logger.debug("Geometric shell couplings use ungrouped Hamiltonian construction.")
 
     n = graph.num_sites
     hx_vec = to_site_param(hx, graph, "hx")
@@ -292,6 +310,31 @@ def create_heisenberg_hamiltonian(
 
         shell_pairs = graph.nearest_neighbor_shells(sorted(requested_shells)) if requested_shells else {}
         adjacency = graph.adjacency_matrix() if len(normalized_shell_couplings) != len(coupling_specs) else None
+
+        if include_term_groups:
+            grouped_couplings: list[tuple[str, np.ndarray]] = []
+            for pauli_char, name, coupling in coupling_specs:
+                matrix = np.zeros((n, n))
+                if name in normalized_shell_couplings:
+                    for shell_index, shell_coupling in normalized_shell_couplings[name]:
+                        values = pair_parameter(shell_coupling, f"{name}[{shell_index}]")
+                        for site_i, site_j in shell_pairs[shell_index]:
+                            matrix[site_i, site_j] = values if isinstance(values, float) else values[site_i, site_j]
+                else:
+                    assert adjacency is not None
+                    values = pair_parameter(coupling, name)
+                    for site_i in range(n):
+                        for site_j in range(site_i + 1, n):
+                            value = values if isinstance(values, float) else values[site_i, site_j]
+                            matrix[site_i, site_j] = value * adjacency[site_i, site_j]
+                grouped_couplings.append((pauli_char * 2, matrix))
+            return _build_geometry_grouped_hamiltonian(
+                graph,
+                couplings=grouped_couplings,
+                fields=[("X", hx), ("Y", hy), ("Z", hz)],
+                apply_edge_weights=False,
+                color_active_edges=True,
+            )
 
         for pauli_char, name, coupling in coupling_specs:
             if name in normalized_shell_couplings:
@@ -390,7 +433,7 @@ def create_kitaev_hamiltonian(
         bohr_magneton: Factor converting magnetic-field units to exchange-energy units. Defaults to 1.
         crystallographic_transform: Proper rotation ``D`` from cubic spin components to crystallographic components.
         spin_basis_transform: Proper rotation from Cartesian to output spin components. Defaults to identity.
-        include_term_groups: Attach an adjacency coloring partition for nearest-neighbor inputs. Defaults to ``True``.
+        include_term_groups: Attach a geometry-coloring term partition. Defaults to ``True``.
 
     Returns:
         QubitOperator: The flavored spin model represented in the requested spin basis.
@@ -547,15 +590,23 @@ def create_kitaev_hamiltonian(
                 coupling_matrices[first + second][site_i, site_j] = exchange[first_index, second_index]
 
     couplings = list(coupling_matrices.items())
-    if include_term_groups and not mapped_parameters and graph.edge_coloring is not None:
-        return _build_geometry_grouped_hamiltonian(
-            graph,
-            couplings=couplings,
-            fields=list(zip(pauli_components, output_field, strict=True)),
-            apply_edge_weights=False,
-        )
-    if include_term_groups and mapped_parameters:
-        Logger.debug("Geometric shell couplings use ungrouped Hamiltonian construction.")
+    if include_term_groups:
+        if mapped_parameters:
+            return _build_geometry_grouped_hamiltonian(
+                graph,
+                couplings=couplings,
+                fields=list(zip(pauli_components, output_field, strict=True)),
+                apply_edge_weights=False,
+                color_active_edges=True,
+            )
+        if graph.edge_coloring is not None:
+            return _build_geometry_grouped_hamiltonian(
+                graph,
+                couplings=couplings,
+                fields=list(zip(pauli_components, output_field, strict=True)),
+                apply_edge_weights=False,
+            )
+        Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
 
     pauli_strings: list[str] = []
     coefficients: list[complex] = []

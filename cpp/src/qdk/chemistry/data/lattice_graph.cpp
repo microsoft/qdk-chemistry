@@ -303,6 +303,8 @@ void LatticeGraph::_validate_geometry(
     throw std::invalid_argument(
         "Periodic vectors must be a finite (1, 2) or (2, 2) matrix.");
   }
+  const double geometry_scale = std::max(positions->cwiseAbs().maxCoeff(),
+                                         periods->cwiseAbs().maxCoeff());
   for (Eigen::Index i = 0; i < periods->rows(); ++i) {
     if (periods->row(i).cwiseAbs().maxCoeff() == 0.0) {
       throw std::invalid_argument("Periodic vectors must be nonzero.");
@@ -310,32 +312,17 @@ void LatticeGraph::_validate_geometry(
     if (!std::isfinite(std::hypot((*periods)(i, 0), (*periods)(i, 1)))) {
       throw std::invalid_argument("Periodic vector lengths must be finite.");
     }
+    if ((periods->row(i) / geometry_scale).cwiseAbs().maxCoeff() == 0.0) {
+      throw std::invalid_argument(
+          "Periodic vectors must be representable at the geometry scale.");
+    }
   }
   if (periods->rows() == 2) {
-    const double period_0_length =
-        std::hypot((*periods)(0, 0), (*periods)(0, 1));
-    const double period_1_length =
-        std::hypot((*periods)(1, 0), (*periods)(1, 1));
-    const double min_period_length = std::min(period_0_length, period_1_length);
-    const double max_period_length = std::max(period_0_length, period_1_length);
-    const double position_span =
-        std::max(positions->col(0).maxCoeff() - positions->col(0).minCoeff(),
-                 positions->col(1).maxCoeff() - positions->col(1).minCoeff());
-    const double geometry_scale = std::max(max_period_length, position_span);
-    if (min_period_length <
-        16.0 * std::numeric_limits<double>::epsilon() * geometry_scale) {
-      throw std::invalid_argument(
-          "Lattice geometry exceeds the supported numerical condition range.");
-    }
-
     const double p0_scale = periods->row(0).cwiseAbs().maxCoeff();
     const double p1_scale = periods->row(1).cwiseAbs().maxCoeff();
     const Eigen::RowVector2d p0 = periods->row(0) / p0_scale;
     const Eigen::RowVector2d p1 = periods->row(1) / p1_scale;
-    const Eigen::RowVector2d u0 = p0 / blas::nrm2(2, p0.data(), 1);
-    const Eigen::RowVector2d u1 = p1 / blas::nrm2(2, p1.data(), 1);
-    const double sine = std::abs(u0.x() * u1.y() - u0.y() * u1.x());
-    if (sine <= 16.0 * std::numeric_limits<double>::epsilon()) {
+    if (p0.x() * p1.y() - p0.y() * p1.x() == 0.0) {
       throw std::invalid_argument(
           "Two periodic vectors must be linearly independent.");
     }
@@ -411,108 +398,16 @@ LatticeGraph::nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
     throw std::runtime_error(
         "Geometric neighbor shells require lattice positions.");
   }
+  if (_periods.has_value()) {
+    throw std::runtime_error(
+        "Geometric neighbor shells support open lattices only.");
+  }
   if (results.empty() || _num_sites < 2) return results;
 
-  const Eigen::Index num_periods = _periods.has_value() ? _periods->rows() : 0;
   Eigen::MatrixXd positions = *_positions;
-  Eigen::MatrixXd periods = _periods.value_or(Eigen::MatrixXd(0, 2));
   double geometry_scale = positions.cwiseAbs().maxCoeff();
-  if (num_periods != 0) {
-    geometry_scale = std::max(geometry_scale, periods.cwiseAbs().maxCoeff());
-  }
   if (geometry_scale == 0.0) geometry_scale = 1.0;
   positions /= geometry_scale;
-  periods /= geometry_scale;
-  const Eigen::RowVector2d origin = positions.row(0);
-  positions.rowwise() -= origin;
-
-  Eigen::RowVector2d period_0 = Eigen::RowVector2d::Zero();
-  Eigen::RowVector2d period_1 = Eigen::RowVector2d::Zero();
-  if (num_periods == 1) {
-    period_0 = periods.row(0);
-  } else if (num_periods == 2) {
-    period_0 = periods.row(0);
-    period_1 = periods.row(1);
-
-    // Gauss reduction preserves the period lattice while making the fixed
-    // 3x3 closest-image search independent of supercell aspect ratio.
-    while (true) {
-      const double length_0 = blas::nrm2(2, period_0.data(), 1);
-      const double length_1 = blas::nrm2(2, period_1.data(), 1);
-      if (length_1 < length_0) {
-        std::swap(period_0, period_1);
-        continue;
-      }
-      const Eigen::RowVector2d unit_0 = period_0 / length_0;
-      const Eigen::RowVector2d normal_0{-unit_0.y(), unit_0.x()};
-      const double parallel = period_1.dot(unit_0);
-      if (2.0 * std::abs(parallel) <=
-          length_0 * (1.0 + 16.0 * std::numeric_limits<double>::epsilon())) {
-        break;
-      }
-      const double perpendicular = period_1.dot(normal_0);
-      const double reduced_parallel = std::remainder(parallel, length_0);
-      const Eigen::RowVector2d reduced =
-          reduced_parallel * unit_0 + perpendicular * normal_0;
-      if (reduced == period_1) {
-        throw std::runtime_error(
-            "Lattice period reduction made no numerical progress.");
-      }
-      period_1 = reduced;
-    }
-  }
-
-  const auto reduce_along =
-      [](const Eigen::RowVector2d& vector,
-         const Eigen::RowVector2d& period) -> Eigen::RowVector2d {
-    const double length = blas::nrm2(2, period.data(), 1);
-    const Eigen::RowVector2d unit = period / length;
-    const Eigen::RowVector2d normal{-unit.y(), unit.x()};
-    const double parallel = vector.dot(unit);
-    const double perpendicular = vector.dot(normal);
-    return (std::remainder(parallel, length) * unit + perpendicular * normal)
-        .eval();
-  };
-
-  auto minimum_image_distance = [&](const Eigen::RowVector2d& displacement) {
-    if (num_periods == 0) {
-      return blas::nrm2(2, displacement.data(), 1);
-    }
-    if (num_periods == 1) {
-      const double period_length = blas::nrm2(2, period_0.data(), 1);
-      const Eigen::RowVector2d unit = period_0 / period_length;
-      const Eigen::RowVector2d normal{-unit.y(), unit.x()};
-      const double parallel = displacement.dot(unit);
-      const double perpendicular = displacement.dot(normal);
-      return std::hypot(std::remainder(parallel, period_length), perpendicular);
-    }
-
-    Eigen::RowVector2d diagonal = period_1;
-    if (period_0.dot(period_1) > 0.0) {
-      diagonal -= period_0;
-    } else {
-      diagonal += period_0;
-    }
-    const std::array<Eigen::RowVector2d, 3> relevant_vectors = {
-        period_0, period_1, diagonal};
-    Eigen::RowVector2d image = displacement;
-    for (int iteration = 0; iteration < 64; ++iteration) {
-      bool reduced = false;
-      for (const auto& period : relevant_vectors) {
-        const Eigen::RowVector2d candidate = reduce_along(image, period);
-        const double current_distance = blas::nrm2(2, image.data(), 1);
-        const double candidate_distance = blas::nrm2(2, candidate.data(), 1);
-        if (candidate_distance <
-            current_distance *
-                (1.0 - 64.0 * std::numeric_limits<double>::epsilon())) {
-          image = candidate;
-          reduced = true;
-        }
-      }
-      if (!reduced) return blas::nrm2(2, image.data(), 1);
-    }
-    throw std::runtime_error("Minimum-image reduction did not converge.");
-  };
 
   struct PairDistance {
     double distance;
@@ -526,7 +421,7 @@ LatticeGraph::nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
       const Eigen::RowVector2d displacement =
           positions.row(static_cast<Eigen::Index>(j)) -
           positions.row(static_cast<Eigen::Index>(i));
-      const double distance = minimum_image_distance(displacement);
+      const double distance = blas::nrm2(2, displacement.data(), 1);
       if (distance == 0.0) {
         continue;
       }

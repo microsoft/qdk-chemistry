@@ -155,7 +155,9 @@ class Circuit(DataClass):
         try:
             from qiskit import qasm3  # noqa: PLC0415
 
-            from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit  # noqa: PLC0415
+            from qdk_chemistry.plugins.qiskit._interop.qir import (  # noqa: PLC0415
+                qir_ir_to_qiskit,
+            )
 
         except ImportError as err:
             raise RuntimeError("Qiskit is not available. Cannot convert circuit to QASM format.") from err
@@ -187,7 +189,9 @@ class Circuit(DataClass):
             return compiled_qir
         if self.qasm:
             return openqasm_compile(
-                self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base
+                self.qasm,
+                output_semantics=OutputSemantics.OpenQasm,
+                target_profile=TargetProfile.Base,
             )
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
@@ -278,7 +282,11 @@ class Circuit(DataClass):
 
         """
         try:
-            from qdk.qre.application import OpenQASMApplication, QIRApplication, QSharpApplication  # noqa: PLC0415
+            from qdk.qre.application import (  # noqa: PLC0415
+                OpenQASMApplication,
+                QIRApplication,
+                QSharpApplication,
+            )
         except ImportError as err:
             raise RuntimeError(
                 "qdk.qre is not available. Install QRE dependencies with: pip install 'qdk-chemistry[qre]'"
@@ -403,10 +411,10 @@ class Circuit(DataClass):
             if resolved_num_qubits is None:
                 raise RuntimeError("num_qubits is required when the circuit width is unknown.")
             measurement_basis = context.code.QDKChemistry.Utils.MeasurementBasis
-            rotation_op = measurement_basis.MakeUniformSpinBasisRotationOp(theta, phi)
+            rotation_op = measurement_basis.MakeUniformBasisRotationOp(theta, phi)
             return Circuit(
                 qsharp_factory=QsharpFactoryData(
-                    program=measurement_basis.MakeUniformSpinBasisRotationCircuit,
+                    program=measurement_basis.MakeUniformBasisRotationCircuit,
                     parameter={
                         "baseCircuit": self._qsharp_op,
                         "theta": theta,

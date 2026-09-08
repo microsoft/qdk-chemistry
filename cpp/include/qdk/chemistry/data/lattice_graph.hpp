@@ -243,54 +243,18 @@ class LatticeGraph : public DataClass {
    */
   const std::optional<Eigen::MatrixXd>& positions() const;
 
-  /**
-   * @brief Return all pairs in the m-th geometric neighbor shell.
-   *
-   * The shells are the distinct positive minimum-image distances between
-   * lattice positions, ordered from shortest to longest. Returned pairs are
-   * canonical (i < j).
-   *
-   * @param m One-based shell index.
-   * @param tolerance Relative tolerance used to group equal distances.
-   * @return Canonical site pairs in the requested shell, or an empty vector if
-   *         the finite lattice has fewer than m shells.
-   * @throws std::invalid_argument If m is zero or tolerance is not positive.
-   * @throws std::runtime_error If this graph has no lattice geometry.
-   */
+  /// Return canonical pairs in an open lattice's m-th geometric shell.
+  /// @throws std::runtime_error If geometry is absent or periodic.
   std::vector<std::pair<std::uint64_t, std::uint64_t>> mth_nearest_neighbors(
       std::uint64_t m, double tolerance = 1.0e-9) const;
 
-  /**
-   * @brief Return the pairs in multiple geometric neighbor shells.
-   *
-   * Pair distances are classified once for all requested shell indices.
-   * Returned pairs are canonical (i < j), and unavailable shells map to empty
-   * vectors.
-   *
-   * @param shells One-based shell indices.
-   * @param tolerance Relative tolerance used to group equal distances.
-   * @return Requested shell indices mapped to their canonical site pairs.
-   * @throws std::invalid_argument If any index is zero or tolerance is not
-   * positive.
-   * @throws std::runtime_error If this graph has no lattice geometry.
-   */
+  /// Classify canonical pairs in multiple open-lattice geometric shells.
+  /// @throws std::runtime_error If geometry is absent or periodic.
   std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
   nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
                           double tolerance = 1.0e-9) const;
 
-  /**
-   * @brief Return physical connections classified by shell and bond axis.
-   *
-   * Unlike nearest_neighbor_shells(), this method preserves distinct periodic
-   * images that collapse onto the same finite-lattice site pair.
-   *
-   * @param shells One-based shell indices.
-   * @param tolerance Relative tolerance used to group distances and axes.
-   * @return Connections in deterministic shell, orientation, and site order.
-   * @throws std::invalid_argument If any index is zero or tolerance is not
-   * positive.
-   * @throws std::runtime_error If this graph has no lattice geometry.
-   */
+  /// Return physical open or periodic connections by shell and bond axis.
   std::vector<NeighborConnection> neighbor_connections(
       const std::vector<std::uint64_t>& shells,
       double tolerance = 1.0e-9) const;

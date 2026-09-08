@@ -41,7 +41,7 @@ def create_hamiltonian(graph: LatticeGraph) -> QubitOperator:
         jx=pauli_couplings,
         jy=pauli_couplings,
         jz=pauli_couplings,
-        include_term_groups=False,
+        include_term_groups=True,
     )
 
 

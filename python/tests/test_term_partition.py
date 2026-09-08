@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from qdk_chemistry._core.data import greedy_edge_coloring
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data import (
     FlatPartition,
@@ -468,6 +469,20 @@ class TestNxTermGroupers:
 
 
 class TestLatticeEdgeColoring:
+    def test_greedy_edge_coloring_binding(self):
+        """The bound C++ colorer returns deterministic disjoint edge layers."""
+        lattice = LatticeGraph.chain(6, periodic=True)
+
+        coloring = greedy_edge_coloring(lattice.sparse_adjacency_matrix(), seed=0, trials=32)
+
+        assert coloring == greedy_edge_coloring(lattice.sparse_adjacency_matrix(), seed=0, trials=32)
+        assert len(set(coloring.values())) == 2
+        sites_by_color: dict[int, set[int]] = {}
+        for edge, color in coloring.items():
+            sites = sites_by_color.setdefault(color, set())
+            assert sites.isdisjoint(edge)
+            sites.update(edge)
+
     def test_chain_two_colors(self):
         """Chain two colors."""
         lat = LatticeGraph.chain(4, periodic=True)

@@ -95,7 +95,21 @@ void bind_lattice_graph(pybind11::module &m) {
       .def_property_readonly(
           "flavor", [](const NeighborConnection &self) { return self.flavor; });
 
-  // Module-level free function: trivial_edge_coloring
+  // Module-level free functions for edge coloring.
+  m.def("greedy_edge_coloring", &greedy_edge_coloring,
+        R"(
+Greedy randomized edge coloring of an arbitrary graph.
+
+Args:
+        adj (scipy.sparse matrix): Sparse adjacency matrix of the graph.
+        seed (int): Random seed.
+        trials (int): Number of shuffled edge-order trials.
+
+Returns:
+        dict[tuple[int, int], int]: Mapping of canonical edges to color labels.
+)",
+        py::arg("adj"), py::arg("seed") = 0, py::arg("trials") = 1);
+
   m.def(
       "trivial_edge_coloring",
       [](const Eigen::SparseMatrix<double> &adj) -> py::dict {
@@ -249,8 +263,9 @@ Returns:
                     &LatticeGraph::mth_nearest_neighbors, R"(
 Return all pairs in the m-th geometric neighbor shell.
 
-Shells are the distinct positive minimum-image distances between lattice
-positions, ordered from shortest to longest. Returned pairs satisfy ``i < j``.
+Shells are the distinct positive distances between positions in an open
+lattice, ordered from shortest to longest. Returned pairs satisfy ``i < j``.
+Periodic lattices are not supported.
 
 Args:
     m (int): One-based shell index.
@@ -261,7 +276,7 @@ Returns:
 
 Raises:
     ValueError: If ``m`` is zero or ``tolerance`` is not positive.
-    RuntimeError: If this graph has no lattice geometry.
+    RuntimeError: If this graph has no lattice geometry or is periodic.
 )",
                     py::arg("m"), py::arg("tolerance") = 1.0e-9);
   lattice_graph.def("nearest_neighbor_shells",
@@ -270,6 +285,7 @@ Return the pairs in multiple geometric neighbor shells.
 
 Pair distances are classified once for all requested one-based shell indices.
 Returned pairs satisfy ``i < j``; unavailable shells map to empty lists.
+Periodic lattices are not supported.
 
 Args:
     shells (list[int]): One-based shell indices.
@@ -280,7 +296,7 @@ Returns:
 
 Raises:
     ValueError: If any shell index is zero or ``tolerance`` is not positive.
-    RuntimeError: If this graph has no lattice geometry.
+    RuntimeError: If this graph has no lattice geometry or is periodic.
 )",
                     py::arg("shells"), py::arg("tolerance") = 1.0e-9);
   lattice_graph.def("neighbor_connections", &LatticeGraph::neighbor_connections,
