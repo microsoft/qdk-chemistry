@@ -403,10 +403,6 @@ jobs:
           echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
         fi
 
-        if [ -n "$BUILD_TEMP" ] && [ -d "$BUILD_TEMP" ]; then
-          find "$BUILD_TEMP" -name "*.gcda" -exec cp {} coverage_build/ \; 2>/dev/null || true
-        fi
-
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           exit 1
         fi
