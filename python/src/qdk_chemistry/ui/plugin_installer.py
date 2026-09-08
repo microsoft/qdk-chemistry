@@ -422,7 +422,10 @@ def _live_plugin_dir(record: dict[str, Any] | None, state_root: Path) -> Path | 
     plugin_dir = record.get("plugin_dir")
     if not isinstance(plugin_dir, str):
         raise PluginInstallError(f"invalid live plugin binding beneath {state_root}; reinstall the plugin")
-    return Path(plugin_dir).expanduser().resolve()
+    resolved = Path(plugin_dir).expanduser().resolve()
+    if not resolved.is_dir():
+        raise PluginInstallError(f"invalid live plugin binding beneath {state_root}; reinstall the plugin")
+    return resolved
 
 
 def _ignore_workspace_state(workspace: Path) -> None:

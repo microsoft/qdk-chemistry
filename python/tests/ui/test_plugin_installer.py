@@ -284,6 +284,16 @@ def test_live_plugin_binding_requires_plugin_directory(tmp_path: Path) -> None:
         plugin_installer._live_plugin_dir({"live_plugin": True}, tmp_path)
 
 
+@pytest.mark.parametrize("plugin_dir", ["missing", "plugin.json"])
+def test_live_plugin_binding_requires_existing_directory(tmp_path: Path, plugin_dir: str) -> None:
+    path = tmp_path / plugin_dir
+    if path.suffix:
+        path.touch()
+
+    with pytest.raises(plugin_installer.PluginInstallError, match="invalid live plugin binding"):
+        plugin_installer._live_plugin_dir({"live_plugin": True, "plugin_dir": str(path)}, tmp_path)
+
+
 def test_update_reapplies_recorded_command(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
