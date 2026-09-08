@@ -5,6 +5,12 @@ parameters:
 - name: buildType
   type: string
   default: Release
+- name: arch
+  type: string
+  default: x64
+  values:
+  - x64
+  - arm64
 
 steps:
 - checkout: self
@@ -13,34 +19,85 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# ecpint and gau2grid generate their sources with Python at CMake configure
+# time, so an interpreter has to be on PATH for the dependency build.
+#
+# The two architectures need different mechanisms. On x64 the image ships Python
+# in the agent tool cache, so UsePythonVersion@0 simply puts it on PATH. On ARM64
+# the tool cache has been empty, so that task falls through to downloading Python
+# and then tries to bootstrap pip from pypi.org -- which the CFSClean network
+# isolation policy blocks by design, since it exists to force package traffic
+# through the Centralized Feed Service. The task treats that as fatal and
+# unregisters the interpreter it just extracted. So provision ARM64 without
+# touching any package feed: ensure-python-windows.ps1 probes PATH and the tool
+# cache first and only downloads when neither yields a usable interpreter, so it
+# costs nothing on an image that does ship one.
+- ${{ if eq(parameters.arch, 'x64') }}:
+  - task: UsePythonVersion@0
+    displayName: Use Python (x64)
+    inputs:
+      versionSpec: '3.13'
+
+- ${{ if eq(parameters.arch, 'arm64') }}:
+  - pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1 -Arch arm64
+    displayName: Use Python (arm64)
+
+# Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
-# Also resolves the MSVC toolset version for the dependency cache key.
-- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
-  displayName: Set up MSVC environment
+# Also resolves the MSVC toolset version and vcpkg triplet for the cache keys.
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1 -Arch ${{ parameters.arch }}
+  displayName: Set up MSVC environment (${{ parameters.arch }})
+
+# The dependency cache key includes a hash of the build plan, so that changing a
+# cmake flag, the build type or the compiler invalidates the cache by itself.
+# Computing it here from the very script that performs the build is what stops
+# the key and the build from ever describing different things.
+- pwsh: |
+    $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+        -SrcDir    "$(System.DefaultWorkingDirectory)" `
+        -BuildType "${{ parameters.buildType }}" `
+        -Triplet   "$(VCPKG_TRIPLET)" `
+        -ClPath    "$(CL_PATH)" `
+        -EmitFingerprint | Select-Object -Last 1
+    if (-not $fp) { throw "The build plan fingerprint came back empty." }
+    Write-Host "deps build plan fingerprint: $fp"
+    Write-Host "##vso[task.setvariable variable=DEPS_FINGERPRINT]$fp"
+  displayName: Compute dependency build plan fingerprint
 
 - task: Cache@2
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
-      vcpkg-overlay/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1
+      vcpkg-overlay/**/*
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
 
+# The key pairs two mechanisms. Azure Pipelines' own file hashing covers the
+# file inputs -- pinned versions, patches, toolchain -- which is declarative and
+# easy to audit. $(DEPS_FINGERPRINT) covers what file hashing cannot see: the
+# cmake flags, build type and compiler identity that live in the build script.
+#
+# They used to hash install-cpp-deps-windows.ps1 instead, which meant an edit
+# anywhere in that script -- even one that only touched diagnostics -- threw away
+# a dependency tree that takes hours to rebuild. The fingerprint is derived from
+# the build plan rather than the file, so it moves when the build would actually
+# differ and stays put otherwise.
+#
+# The r<N> literal remains only as a manual escape hatch; it is no longer what
+# keeps the key honest.
 - task: Cache@2
   displayName: Restore/save C++ deps install cache
   inputs:
     key: >-
-      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1 |
-      .pipelines/toolchains/windows.cmake
+      .pipelines/toolchains/windows.cmake |
+      "$(DEPS_FINGERPRINT)"
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
     cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
@@ -48,6 +105,7 @@ steps:
     & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
         -BuildType "${{ parameters.buildType }}" `
+        -Triplet   "$(VCPKG_TRIPLET)" `
         -ClPath    "$(CL_PATH)"
   displayName: Build and install C++ dependencies
   condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))

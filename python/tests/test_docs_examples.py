@@ -44,15 +44,15 @@ def _generic_python_examples() -> list[Path]:
     return sorted(path for path in PYTHON_EXAMPLES_DIR.glob("*.py") if not path.name.startswith("tutorial_"))
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool]:
-    """Check if an example file requires qiskit, pyscf, openfermion, geomeTRIC or contains slow tests.
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool, bool]:
+    """Check optional dependencies and execution requirements for an example.
 
     Args:
         example_file: Path to the example file to check
 
     Returns:
         Tuple of (requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature,
-                  requires_openfermion, requires_geometric, is_slow)
+              requires_openfermion, requires_geometric, requires_external_service, is_slow)
 
     """
     content = example_file.read_text(encoding="utf-8")
@@ -63,6 +63,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     requires_qiskit_nature = False
     requires_openfermion = False
     requires_geometric = False
+    requires_external_service = False
     is_slow = False
 
     # Check for explicit imports
@@ -150,6 +151,9 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if "# docs-example: slow" in content:
         is_slow = True
 
+    if "# docs-example: requires-external-service" in content:
+        requires_external_service = True
+
     return (
         requires_pyscf,
         requires_qiskit,
@@ -157,6 +161,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
         requires_qiskit_nature,
         requires_openfermion,
         requires_geometric,
+        requires_external_service,
         is_slow,
     )
 
@@ -220,6 +225,7 @@ def _create_test_methods():
                 requires_qiskit_nature,
                 requires_openfermion,
                 requires_geometric,
+                requires_external_service,
                 is_slow,
             ) = check_example_requirements(example_file)
 
@@ -232,6 +238,7 @@ def _create_test_methods():
                 needs_qiskit_nature,
                 needs_openfermion,
                 needs_geometric,
+                needs_external_service,
                 slow,
             ):
                 """Create a test method for the given example file."""
@@ -260,6 +267,8 @@ def _create_test_methods():
                         self.skipTest("OpenFermion not available")
                     if needs_geometric and not GEOMETRIC_AVAILABLE:
                         self.skipTest("geomeTRIC not available")
+                    if needs_external_service:
+                        self.skipTest("Example requires an external service")
                     if slow and not _RUN_SLOW_TESTS:
                         self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
@@ -279,6 +288,7 @@ def _create_test_methods():
                     requires_qiskit_nature,
                     requires_openfermion,
                     requires_geometric,
+                    requires_external_service,
                     is_slow,
                 ),
             )

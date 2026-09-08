@@ -23,15 +23,25 @@ permissions:
 
 jobs:
   published-baseline:
-    name: Exact published baseline (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Exact published baseline (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os:
-        - ubuntu-latest
-        - macos-latest
+        include:
+        - name: Ubuntu x86-64
+          runner: ubuntu-latest
+          architecture: x64
+        - name: macOS Arm64
+          runner: macos-latest
+          architecture: arm64
+        - name: Windows x86-64
+          runner: windows-latest
+          architecture: x64
+        - name: Windows Arm64
+          runner: windows-11-arm
+          architecture: arm64
 
     steps:
     - name: Checkout repository
@@ -41,25 +51,28 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.12'
+        architecture: ${{ matrix.architecture }}
         cache: pip
         cache-dependency-path: python/pyproject.toml
 
     - name: Read tutorial package version
       id: tutorial-version
-      run: |
-        VERSION=$(python -c 'import runpy; print(runpy.run_path("docs/source/tutorials/_versions.py")["GROUND_STATE_TUTORIAL_VERSION"])')
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      run: >-
+        python -c "import os, runpy;
+        version = runpy.run_path('docs/source/tutorials/_versions.py')['GROUND_STATE_TUTORIAL_VERSION'];
+        open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8').write(f'version={version}\n')"
 
     - name: Install published tutorial environment
       run: |
         python -m pip install --upgrade pip
-        python -m pip install \
-          "qdk-chemistry[jupyter]==${{ steps.tutorial-version.outputs.version }}" \
-          nbclient \
-          nbformat \
-          pytest \
-          pytest-env
+        python -m pip install "qdk-chemistry==${{ steps.tutorial-version.outputs.version }}" "ipykernel>=6.0" nbclient nbformat pytest pytest-env
         python -m ipykernel install --user --name python3 --display-name "Python 3"
+
+    - name: Verify published package boundary
+      run: >-
+        python -c "import importlib.util;
+        assert importlib.util.find_spec('pyscf') is None,
+        'the documented tutorial environment must not install PySCF'"
 
     - name: Verify tutorial setup
       env:
@@ -67,17 +80,17 @@ jobs:
       run: python docs/source/_static/examples/python/tutorial_qpe_setup.py
 
     - name: Run tutorial scripts
-      run: |
-        for example in docs/source/_static/examples/python/tutorial_*.py; do
-          if [ "$(basename "$example")" != 'tutorial_qpe_setup.py' ] && ! grep -q '# docs-example: slow' "$example"; then
-            python "$example"
-          fi
-        done
+      run: >-
+        python -c "import subprocess, sys; from pathlib import Path;
+        scripts = sorted(Path('docs/source/_static/examples/python').glob('tutorial_*.py'));
+        [subprocess.run([sys.executable, str(script)], check=True) for script in scripts
+        if script.name != 'tutorial_qpe_setup.py'
+        and '# docs-example: slow' not in script.read_text(encoding='utf-8')]"
 
-    - name: Run exact published tutorial baselines
+    - name: Run full tutorial tests
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: '1'
         QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
       run: >-
         python -m pytest -q --strict-config --strict-markers
-        python/tests/test_sample_tutorial_gs_qpe.py -m tutorial_baseline
+        python/tests/test_sample_tutorial_gs_qpe.py

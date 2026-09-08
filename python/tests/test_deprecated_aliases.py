@@ -25,6 +25,7 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, state_preparation
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 
 class TestQubitHamiltonianDeprecation:
@@ -204,7 +205,15 @@ class TestSparseIsometryDeprecatedSettings:
 
     @pytest.mark.parametrize(
         ("method", "expected"),
-        [("qdk", "dense_pure_state"), ("qiskit", "qiskit_regular_isometry")],
+        [
+            pytest.param("qdk", "dense_pure_state", id="qdk"),
+            pytest.param(
+                "qiskit",
+                "qiskit_regular_isometry",
+                id="qiskit",
+                marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+            ),
+        ],
     )
     def test_dense_preparation_method_maps_to_nested_algorithm(self, method, expected):
         """``dense_preparation_method`` selects the nested dense algorithm instead of raising."""
@@ -212,6 +221,7 @@ class TestSparseIsometryDeprecatedSettings:
             prep = algorithms.create("state_prep", "sparse_isometry", dense_preparation_method=method)
         assert prep.settings().get("dense_state_prep").algorithm_name == expected
 
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     def test_transpile_keys_are_forwarded_to_qiskit_dense_prep(self):
         """The old transpilation keys land on the nested Qiskit algorithm."""
         with pytest.warns(DeprecationWarning, match="basis_gates"):
@@ -238,6 +248,7 @@ class TestSparseIsometryDeprecatedSettings:
         with pytest.raises(ValueError, match="Unknown dense_preparation_method"):
             algorithms.create("state_prep", "sparse_isometry", dense_preparation_method="bogus")
 
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     def test_set_translates_deprecated_key_like_update(self):
         """``set`` is the single-key counterpart of ``update`` and must translate identically."""
         from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (  # noqa: PLC0415

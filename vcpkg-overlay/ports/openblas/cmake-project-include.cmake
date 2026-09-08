@@ -25,21 +25,47 @@ elseif(DYNAMIC_ARCH)
     set(need_target 1) # for C
 elseif(CMAKE_CROSSCOMPILING AND NOT GETARCH_BINARY_DIR)
     set(need_target 1) # for C and for optimized kernel
+elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC" AND
+       (VCPKG_TARGET_ARCHITECTURE MATCHES "^arm" OR
+        CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64|ARM|arm)$"))
+    # QDK overlay change: refuse to build ARM64 OpenBLAS with MSVC.
+    #
+    # MSVC cannot assemble the GNU-syntax ARM64 kernels, and the only fallback
+    # that does build, TARGET=GENERIC, produces blocking parameters that make
+    # the blocked LU factorisation loop forever (getrf_single.c steps its loops
+    # by GEMM_P / GEMM_Q / GEMM_R; a zero step never terminates). That failure
+    # is silent -- the library builds, links, and computes dgemm correctly, then
+    # hangs inside dgetrf above the getf2 crossover -- so it must not be allowed
+    # to happen by accident. The portfile selects clang-cl for this target.
+    message(FATAL_ERROR
+        "OpenBLAS for Windows ARM must be built with clang-cl: MSVC cannot "
+        "assemble the ARM kernels, and the GENERIC fallback hangs in getrf.")
 else()
     message(STATUS "TARGET: <native> (OpenBLAS getarch/getarch_2nd)")
 endif()
 
 if(need_target)
     set(target_default "GENERIC")
-    if(MSVC)
+    # QDK overlay change: guard the ARM paths. CMake's MSVC variable is also true
+    # for clang-cl, so key the "no cpu-specific assembly" fallback off the real
+    # compiler id and let clang-cl keep the optimized ARM kernels. GENERIC must
+    # never be selected on ARM: its blocking parameters hang getrf (see above).
+    if(VCPKG_TARGET_ARCHITECTURE MATCHES "^arm")
+        if(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+            message(FATAL_ERROR
+                "OpenBLAS for Windows ARM must be built with clang-cl: MSVC cannot "
+                "assemble the ARM kernels, and the GENERIC fallback hangs in getrf.")
+        endif()
+        if(VCPKG_TARGET_ARCHITECTURE MATCHES "^arm64")
+            set(target_default "ARMV8")
+        else()
+            set(target_default "ARMV7")
+        endif()
+    elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
         # "does not support the dialect of assembly used in the cpu-specific optimized files"
         # https://github.com/OpenMathLib/OpenBLAS/wiki/How-to-use-OpenBLAS-in-Microsoft-Visual-Studio#cmake-and-visual-studio
     elseif(VCPKG_TARGET_ARCHITECTURE MATCHES "^x64|^x86")
         set(target_default "ATOM")
-    elseif(VCPKG_TARGET_ARCHITECTURE MATCHES "^arm64")
-        set(target_default "ARMV8")
-    elseif(VCPKG_TARGET_ARCHITECTURE MATCHES "^arm")
-        set(target_default "ARMV7")
     endif()
     set(TARGET "${target_default}" CACHE STRING "")
     message(STATUS "TARGET: ${TARGET}")
