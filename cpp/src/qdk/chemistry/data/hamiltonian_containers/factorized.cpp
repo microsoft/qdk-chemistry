@@ -128,7 +128,7 @@ bool FactorizedHamiltonianContainer::is_valid() const {
 
 Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
     const {
-  //   h2_{pqrs} = Σ_{t,c} s_t M^{tc}_{pq} M^{tc}_{rs},
+  //   h2_{pqrs} = Σ_{t,c} M^{tc}_{pq} M^{tc}_{rs},
   //   M^{tc}_{pq} = Σ_b W^{tc}_b U^t_{bp} U^t_{bq},
   // where t indexes ranks and c copies, and p,q,r,s are orbitals. The loop
   // below names the rank index r for symmetry with R; it is not an orbital.
