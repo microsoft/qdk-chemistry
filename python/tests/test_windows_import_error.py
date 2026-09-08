@@ -5,30 +5,41 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from types import SimpleNamespace
+import importlib
+import importlib.util
+from types import ModuleType, SimpleNamespace
 
 import pytest
 
-import qdk_chemistry
 
-
-def test_windows_dll_load_error_identifies_redistributable(
+@pytest.mark.parametrize("system", ["win32", "linux", "darwin"])
+def test_native_import_error_diagnostic(
     monkeypatch: pytest.MonkeyPatch,
+    system: str,
 ) -> None:
-    """Report the machine prerequisite when Windows cannot load the extension."""
-    original = ImportError("DLL load failed while importing _core: The specified module could not be found.")
+    """Report the bundled Windows runtime prerequisite and preserve non-Windows errors."""
+    spec = importlib.util.find_spec("qdk_chemistry")
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    original = ImportError("localized native extension loader error")
+    import_module = importlib.import_module
 
-    def fail_import(_: str) -> None:
+    def fail_import(name: str, package: str | None = None) -> ModuleType:
+        if name != "qdk_chemistry._core":
+            return import_module(name, package)
+        monkeypatch.setattr(module, "_sys", SimpleNamespace(platform=system))
         raise original
 
-    monkeypatch.setattr(
-        qdk_chemistry,
-        "importlib",
-        SimpleNamespace(import_module=fail_import),
-    )
-    monkeypatch.setattr(qdk_chemistry, "_sys", SimpleNamespace(platform="win32"))
+    monkeypatch.setattr(importlib, "import_module", fail_import)
 
-    with pytest.raises(ImportError, match="Visual C\\+\\+ v14") as caught:
-        qdk_chemistry._import_core()
+    with pytest.raises(ImportError) as caught:
+        spec.loader.exec_module(module)
 
-    assert caught.value.__cause__ is original
+    if system == "win32":
+        assert "Visual C++ v14" in str(caught.value)
+        assert "includes ARM64" in str(caught.value)
+        assert str(caught.value).endswith("https://aka.ms/vc14/vc_redist.x64.exe")
+        assert caught.value.__cause__ is original
+    else:
+        assert caught.value is original

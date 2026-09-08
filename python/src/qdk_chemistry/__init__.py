@@ -51,12 +51,12 @@ def _import_core() -> None:
     try:
         importlib.import_module("qdk_chemistry._core")
     except ImportError as exc:
-        if _sys.platform == "win32" and "DLL load failed" in str(exc):
+        if _sys.platform == "win32":
             raise ImportError(
                 "QDK/Chemistry requires the current Microsoft Visual C++ v14 "
-                "Redistributable on Windows. Install it for "
-                "your Python architecture, restart Python, and try again: "
-                "https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist"
+                "Redistributable on Windows. Install the x64 package (which also "
+                "includes ARM64), restart Python, and try again: "
+                "https://aka.ms/vc14/vc_redist.x64.exe"
             ) from exc
         raise
 
