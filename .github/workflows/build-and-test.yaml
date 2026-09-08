@@ -309,13 +309,8 @@ jobs:
         QDK_CHEMISTRY_ENABLE_COVERAGE: ${{ matrix.enable-coverage && '1' || '0' }}
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
-        # On the coverage leg, keep the installed CMake package so find_package(qdk)
-        # reuses the already coverage-instrumented library instead of rebuilding it;
-        # pytest's hits then merge into the .gcda files ctest already wrote. Other
-        # legs still remove it to exercise the from-source build path.
-        if [ "$ENABLE_COVERAGE" != "true" ]; then
-          rm -r ${{ github.workspace }}/install/lib/cmake/qdk
-        fi
+        # Reuse the already-built C++ library via find_package(qdk) instead of rebuilding it from source. On the
+        # coverage leg this also means pytest's hits merge into the .gcda files ctest already wrote.
 
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
@@ -386,10 +381,8 @@ jobs:
     - name: Generate C++ coverage report
       if: matrix.enable-coverage
       run: |
-        # Run after the Python tests: on this leg the C++ library isn't rebuilt for
-        # the Python package (see "Install Python package"), so pytest exercises the
-        # same coverage-instrumented binary ctest did, and their hits share $BUILD_DIR's
-        # .gcda files.
+        # Run after the Python tests so pytest exercises the same coverage-instrumented binary ctest did,
+        # and their hits share $BUILD_DIR's .gcda files.
         mkdir -p ${{ github.workspace }}/coverage-reports
 
         gcovr --root ${{ github.workspace }}/cpp \
@@ -1129,7 +1122,6 @@ jobs:
       env:
         CMAKE_BUILD_TYPE: Release
       run: |
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
         python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
