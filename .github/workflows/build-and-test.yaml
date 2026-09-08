@@ -248,7 +248,7 @@ jobs:
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
 
-    - name: Configure C++ RelWithDebInfo/Coverage build
+    - name: Configure C++ CMake build
       run: |
         if [ "${{ matrix.os-name }}" == "macOS" ]; then
           TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/macos.cmake"
@@ -266,17 +266,17 @@ jobs:
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
 
-    - name: Build C++ RelWithDebInfo/Coverage library
+    - name: Build C++ library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
+    - name: Run C++ tests
       env:
         OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
       run: |
         mkdir -p test-results
         cd "$BUILD_DIR"
 
-        echo "=== Running C++ Tests in Debug Mode with Coverage ==="
+        echo "=== Running C++ Tests ==="
         set +e
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
           ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
@@ -315,9 +315,9 @@ jobs:
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         if [ "${{ matrix.python-version }}" = "3.13" ]; then
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
         else
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
         fi
 
         # Print installed packages for debugging
@@ -331,7 +331,7 @@ jobs:
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
-    - name: Run Python tests
+    - name: Run Python tests & generate coverage report
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
@@ -431,7 +431,7 @@ jobs:
         echo "Pybind11 Coverage Summary:"
         cat ../coverage-reports/pybind11_coverage.txt
 
-    - name: Generate coverage report
+    - name: Write coverage report
       if: matrix.enable-coverage
       run: |
         # Extract coverage percentages
@@ -1122,7 +1122,7 @@ jobs:
       env:
         CMAKE_BUILD_TYPE: Release
       run: |
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
+        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
