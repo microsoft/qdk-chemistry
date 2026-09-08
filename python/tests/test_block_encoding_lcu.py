@@ -214,23 +214,7 @@ class TestLCUBuilder:
         assert circuit._qsharp_factory.parameter["numBlockAncillaQubits"] == 13
 
     def test_alias_sampling_block_encodes_the_hamiltonian(self):
-        r"""Verify :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda`.
-
-        The shape assertions above cannot see whether the entangled scratch register is
-        *uncomputed*: leftover garbage still produces a 15-qubit circuit, but it decoheres the
-        index register and the block stops being :math:`H/\lambda`. This runs the circuit.
-
-        Alias sampling rounds each :math:`p_\ell = |\alpha_\ell|/\lambda` to a multiple of
-        :math:`1/(L 2^\mu)`, so the block is off by at most :math:`\sum_\ell |\tilde p_\ell -
-        p_\ell| \le 2^{-\mu}`. The observed error is about eight times smaller than that bound.
-
-        Each column is compared up to an overall sign because ``SelectSwap`` erases its scratch
-        by measurement, which leaves the circuit a *global* phase of :math:`\pm 1` that is redrawn
-        on every simulator run. It is a true global phase -- the ratio between two runs is uniform
-        over every nonzero amplitude of the full statevector, not just this block -- and therefore
-        unobservable. The uniform-superposition case pins the relative signs *between* columns,
-        which the per-column comparison would otherwise leave free.
-        """
+        r"""Verify :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda`."""
         coefficients = np.array([0.25, 0.5, 0.1])
         bits_precision = 4
         hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=coefficients)

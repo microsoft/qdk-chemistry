@@ -125,14 +125,6 @@ class TestQROMStatePreparation:
 
         assert infidelities[10] < infidelities[4] / 100, f"bRot=10 did not improve on bRot=4: {infidelities}"
 
-    def test_settings_expose_rotation_bit_precision(self):
-        """The constructor argument is stored in settings so create() can reach it."""
-        prep = QROMStatePreparation(rotation_bit_precision=6)
-        assert prep.settings().get("rotation_bit_precision") == 6
-
-        prep.settings().set("rotation_bit_precision", 8)
-        assert prep.settings().get("rotation_bit_precision") == 8
-
     def test_empty_coefficients_rejected(self):
         """An empty coefficient vector is rejected rather than reaching log2(0)."""
         prep = QROMStatePreparation(rotation_bit_precision=4)

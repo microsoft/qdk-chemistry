@@ -26,11 +26,7 @@ from qdk_chemistry.data import (
 
 
 def create_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
-    """Create a ``Wavefunction`` occupying only *indices* of a ``num_qubits`` register.
-
-    Each index is spelled as little-endian occupation-number bits, so ``amplitudes[k]``
-    lands on basis state ``indices[k]``.
-    """
+    """Create a ``Wavefunction`` occupying only *indices* of a ``num_qubits`` register."""
     dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in indices]
     container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, ModelOrbitals(num_qubits))
     return Wavefunction(container)

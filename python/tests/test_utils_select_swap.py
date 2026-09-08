@@ -22,9 +22,6 @@ _DATA_1D = [
     [False, False, False],
 ]
 
-# Six rows, so two of the eight addressable states are unused. A table whose length is not a
-# power of two is the case where the select path and the swap path can disagree on where an
-# out-of-range address lands, which is invisible to a value test.
 _DATA_1D_RAGGED = _DATA_1D[:6]
 
 _DATA_2D = [
@@ -33,9 +30,6 @@ _DATA_2D = [
     [[True, False, False], [False, False, True], [True, True, True]],
 ]
 
-# Six outer rows exercise the aliasing of unused *outer* addresses two levels down the unary
-# iteration tree, which the 3-row table above does not reach: folding the outer index into a
-# single flat lookup passes at nOuter = 3, 4, 5 and 8 but fails at 6.
 _DATA_2D_RAGGED_OUTER = [
     [[True, False, True], [False, True, True], [True, True, False], [False, False, True]],
     [[False, True, False], [True, True, True], [False, False, False], [True, False, True]],
@@ -45,9 +39,6 @@ _DATA_2D_RAGGED_OUTER = [
     [[False, True, True], [True, True, False], [False, False, True], [True, False, False]],
 ]
 
-# A disagreeing phase oracle leaves the address register in a superposition that still
-# collapses to |0...0> roughly half the time, so one shot of the agreement operation is a
-# coin flip, not a verdict. Repeating drives the miss probability below 1e-3.
 _PHASE_TRIALS = 12
 
 
@@ -95,15 +86,7 @@ class TestSelectSwapLoadsCorrectValues:
 
 
 class TestSelectSwapPreservesAddressPhases:
-    """The swap path must agree with the plain-select path as a *phase* oracle.
-
-    A lookup that loads the right bits but routes unused addresses differently from the
-    plain-select path, or that uncomputes incorrectly, still passes every value test above:
-    the damage lands on the phase of the address register, where only these tests see it.
-
-    The 2D sweeps include ``num_swap_bits == 0`` because the combined flattened lookup with
-    an empty butterfly must preserve the same phases as the unary-iteration reference.
-    """
+    """The swap path must agree with the plain-select path as a *phase* oracle."""
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2, 3])
     def test_1d_swap_path_matches_plain_select(self, num_swap_bits):
@@ -165,13 +148,7 @@ class TestSelectSwap2DErasesByMeasurement:
         [(4, 4, 5), (8, 4, 6), (6, 8, 7), (16, 8, 4)],
     )
     def test_adjoint_costs_the_unlookup_whatever_the_swap_width(self, num_outer, num_inner, width):
-        """Erasure cost follows the table size alone, and undercuts the load it undoes.
-
-        The forward pass varies with the swap width, but the adjoint resolves to a single
-        ``Adjoint Select`` over ``outer x inner`` entries however the word was loaded, so its
-        cost is the closed form above for every width. Running the load backwards instead
-        would track the forward cost.
-        """
+        """Erasure cost follows the table size alone, and undercuts the load it undoes."""
         ctx = create_qsharp_context()
         data = [
             [[(o * 31 + i * 7 + b) % 2 == 0 for b in range(width)] for i in range(num_inner)] for o in range(num_outer)

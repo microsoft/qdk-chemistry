@@ -520,11 +520,7 @@ def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:
 
 
 def test_qrom_initial_state_prep_recovers_the_ground_state_energy():
-    """QROM rotates through the shared gradient, so QPE must prepare it before the state prep.
-
-    Without that preparation the rotations leave the gradient dirty and entangled with the
-    system register, which then holds no eigenstate at all.
-    """
+    """QROM rotates through the shared gradient, so QPE must prepare it before the state prep."""
     hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.5, 0.5]))
     energies, _ = np.linalg.eigh(hamiltonian.to_matrix())
     state_preparation = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
