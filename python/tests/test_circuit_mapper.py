@@ -87,9 +87,12 @@ class TestPauliSequenceMapperNonControlled:
         evo_params = circuit._qsharp_factory.parameter["evo_params"]
 
         assert "pauliExponents" not in evo_params
-        assert "batchIds" not in evo_params
         assert evo_params["pauliIndices"] == [[0], [1]]
         assert [[str(p) for p in ops] for ops in evo_params["pauliOps"]] == [["Pauli.X"], ["Pauli.Z"]]
+        # An unbatched container passes empty flag arrays rather than all-default ones,
+        # so the Q# skips both the exemption and the batching walks entirely.
+        assert evo_params["needsControl"] == []
+        assert evo_params["batchIds"] == []
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
@@ -127,6 +130,8 @@ def _sparse_op(terms, *, repetitions=1):
         pauliIndices=[term["qubits"] for term in terms],
         pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
         pauliCoefficients=[term["angle"] for term in terms],
+        needsControl=[],
+        batchIds=[],
         repetitions=repetitions,
     )
     return QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
@@ -212,6 +217,8 @@ class TestSparseUncontrolledEvolution:
             pauliIndices=pauli_indices,
             pauliOps=pauli_ops,
             pauliCoefficients=pauli_coefficients,
+            needsControl=[],
+            batchIds=[],
             repetitions=1,
         )
         op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)

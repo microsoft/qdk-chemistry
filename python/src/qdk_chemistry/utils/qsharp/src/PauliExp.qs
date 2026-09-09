@@ -5,6 +5,9 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import Std.Arrays.Subarray;
+    import QDKChemistry.Utils.HammingWeightPhasing.BatchSegments;
+    import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhaseTerms;
+    import QDKChemistry.Utils.HammingWeightPhasing.TermTargets;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
 
@@ -116,10 +119,23 @@ namespace QDKChemistry.Utils.PauliExp {
     /// term instead lists only its non-identity positions: `pauliIndices[t]` indexes
     /// into `systems` and `pauliOps[t]` holds the matching axis. A term with no entries
     /// is the identity term.
+    ///
+    /// `needsControl[t]` marks whether term `t` must be controlled when the whole
+    /// evolution is. A conjugating factor whose partner also appears in the sequence
+    /// cancels against that partner when the control is off, so controlling it changes
+    /// nothing and only costs gates. An empty array controls every term, which is the
+    /// safe default and what a caller that does not reason about exemptions should pass.
+    ///
+    /// `batchIds[t]` groups consecutive terms that share a rotation angle and act on
+    /// disjoint qubits. Such a group is phased together through a Hamming weight
+    /// register, so its `m` rotations collapse to `O(log m)` at the cost of `m - w(m)`
+    /// Toffolis. `0`, or an empty array, applies the term on its own.
     struct SparseRepPauliExpParams {
         pauliIndices : Int[][],
         pauliOps : Pauli[][],
         pauliCoefficients : Double[],
+        needsControl : Bool[],
+        batchIds : Int[],
         repetitions : Int,
     }
 
@@ -128,20 +144,83 @@ namespace QDKChemistry.Utils.PauliExp {
     /// - `pauliIndices`: For each term, the positions in `systems` carrying a non-identity Pauli.
     /// - `pauliOps`: For each term, the Pauli axis at each position in `pauliIndices`.
     /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
+    /// - `needsControl`: For each term, whether it must be controlled; empty controls all.
     /// - `systems`: An array of qubits representing the system on which the operation acts.
     operation SparsePauliExp(
         pauliIndices : Int[][],
         pauliOps : Pauli[][],
         pauliCoefficients : Double[],
+        needsControl : Bool[],
+        batchIds : Int[],
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
+        body ... {
+            CheckSparseLengths(pauliIndices, pauliOps, pauliCoefficients, needsControl);
+            for (start, count) in SparseSegments(batchIds, Length(pauliCoefficients)) {
+                if count == 1 {
+                    // `Exp` takes the opposite sign to the container's exp(-i theta P) convention.
+                    Exp(pauliOps[start], -pauliCoefficients[start], Subarray(pauliIndices[start], systems));
+                } else {
+                    // `HammingWeightPhaseTerms` already applies exp(-i theta P), so it needs
+                    // no sign flip. Bound to annotated locals so the nested array types infer.
+                    let batchOps : Pauli[][] = pauliOps[start..start + count - 1];
+                    let batchTargets : Qubit[][] = TermTargets(pauliIndices[start..start + count - 1], systems);
+                    HammingWeightPhaseTerms(pauliCoefficients[start], batchOps, batchTargets);
+                }
+            }
+        }
+        controlled (ctls, ...) {
+            CheckSparseLengths(pauliIndices, pauliOps, pauliCoefficients, needsControl);
+            let exemptKnown = Length(needsControl) != 0;
+            for (start, count) in SparseSegments(batchIds, Length(pauliCoefficients)) {
+                if count == 1 {
+                    let targets = Subarray(pauliIndices[start], systems);
+                    if exemptKnown and not needsControl[start] {
+                        // A conjugating factor: its partner is also in the sequence, so with
+                        // the control off the pair cancels and running it bare is exact.
+                        Exp(pauliOps[start], -pauliCoefficients[start], targets);
+                    } else {
+                        Controlled Exp(ctls, (pauliOps[start], -pauliCoefficients[start], targets));
+                    }
+                } else {
+                    let batchOps : Pauli[][] = pauliOps[start..start + count - 1];
+                    let batchTargets : Qubit[][] = TermTargets(pauliIndices[start..start + count - 1], systems);
+                    Controlled HammingWeightPhaseTerms(ctls, (pauliCoefficients[start], batchOps, batchTargets));
+                }
+            }
+        }
+    }
+
+    /// Returns the `(start, count)` blocks a sparse term list is applied in.
+    ///
+    /// Defers to `BatchSegments` when batch identifiers are supplied, and otherwise
+    /// gives every term its own block.
+    function SparseSegments(batchIds : Int[], termCount : Int) : (Int, Int)[] {
+        if Length(batchIds) == 0 {
+            mutable singles : (Int, Int)[] = [];
+            for idx in 0..termCount - 1 {
+                set singles += [(idx, 1)];
+            }
+            return singles;
+        }
+        if Length(batchIds) != termCount {
+            fail "SparsePauliExp: batchIds must be empty or as long as pauliCoefficients.";
+        }
+        return BatchSegments(batchIds);
+    }
+
+    /// Rejects a sparse term list whose parallel arrays disagree in length.
+    function CheckSparseLengths(
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
+        pauliCoefficients : Double[],
+        needsControl : Bool[]
+    ) : Unit {
         if Length(pauliIndices) != Length(pauliCoefficients) or Length(pauliOps) != Length(pauliCoefficients) {
             fail "SparsePauliExp: pauliIndices, pauliOps, and pauliCoefficients must have the same length.";
         }
-
-        for idx in 0..Length(pauliCoefficients) - 1 {
-            // `Exp` takes the opposite sign to the container's exp(-i theta P) convention.
-            Exp(pauliOps[idx], -pauliCoefficients[idx], Subarray(pauliIndices[idx], systems));
+        if Length(needsControl) != 0 and Length(needsControl) != Length(pauliCoefficients) {
+            fail "SparsePauliExp: needsControl must be empty or as long as pauliCoefficients.";
         }
     }
 
@@ -159,6 +238,8 @@ namespace QDKChemistry.Utils.PauliExp {
                     params.pauliIndices,
                     params.pauliOps,
                     params.pauliCoefficients,
+                    params.needsControl,
+                    params.batchIds,
                     systems
                 );
             }
@@ -168,6 +249,8 @@ namespace QDKChemistry.Utils.PauliExp {
                     params.pauliIndices,
                     params.pauliOps,
                     params.pauliCoefficients,
+                    params.needsControl,
+                    params.batchIds,
                     systems
                 );
             }
