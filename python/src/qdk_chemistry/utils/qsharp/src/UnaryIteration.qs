@@ -124,4 +124,25 @@ namespace QDKChemistry.Utils.UnaryIteration {
         Fact(numActions > 0, "numActions must be positive");
         return BitSizeI(numActions - 1);
     }
+
+    internal function UnaryIterationActionIndex(numActions : Int, addressValue : Int) : Int {
+        Fact(numActions > 0, "numActions must be positive");
+        Fact(addressValue >= 0, "addressValue must be nonnegative");
+
+        if numActions == 1 {
+            return 0;
+        }
+
+        let numAddressQubits = AddressQubits(numActions);
+        let addressState = addressValue % (1 <<< numAddressQubits);
+        let lowerSubtreeSize = 1 <<< (numAddressQubits - 1);
+        if addressState < lowerSubtreeSize {
+            return addressState;
+        }
+
+        return lowerSubtreeSize + UnaryIterationActionIndex(
+            numActions - lowerSubtreeSize,
+            addressState - lowerSubtreeSize
+        );
+    }
 }

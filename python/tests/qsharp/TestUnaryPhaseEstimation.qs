@@ -71,9 +71,13 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
             },
             (qubits) => X(qubits[0]),
             ApplyToEach(H, _),
+            QDKChemistry.Utils.PrepSelPrep.NoOpPrepare,
             numQueries,
             1,
-            0
+            0,
+            0,
+            false,
+            false
         );
     }
 }

@@ -58,6 +58,11 @@ def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: b
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 7, 8, 9])
+    def test_action_index_matches_every_address(self, qsharp_test_utils, num_actions):
+        """Classical routing must match the circuit, including unused address states."""
+        assert qsharp_test_utils.UnaryIterationTests.TestUnaryIterationActionIndex(num_actions)
+
     @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 8])
     def test_one_hot_address_selects_exactly_one_action(self, qsharp_test_context, qsharp_test_utils, num_actions):
         """A basis-state address must fire the matching action and only that one."""
@@ -119,7 +124,7 @@ class TestBlockEncodingAgnosticSchedule:
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
         op = qsharp_test_utils.UnaryPhaseEstimationTests.TestMakeSignedPowerScheduleAgainstWalkOp(
             qsharp_test_utils.PrepSelPrepTests.TestMakeBlockEncodingOp(0.7),
-            psp.MakeAncillaReflectionOp(1),
+            psp.MakeAncillaReflectionOp(1, 1),
             num_queries,
             address_value,
             0.9,
@@ -132,14 +137,13 @@ class TestBlockEncodingAgnosticSchedule:
         expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
-    # The identity encoding at theta = 0 cannot test the schedule.
-    @pytest.mark.parametrize("theta", [0.35, 1.3, np.pi / 2])
+    @pytest.mark.parametrize("theta", [0.0, 0.35, 1.3, np.pi / 2])
     def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, qsharp_test_utils, theta):
         """The contract must not depend on what the block encoding encodes."""
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
         op = qsharp_test_utils.UnaryPhaseEstimationTests.TestMakeSignedPowerScheduleAgainstWalkOp(
             qsharp_test_utils.PrepSelPrepTests.TestMakeBlockEncodingOp(theta),
-            psp.MakeAncillaReflectionOp(1),
+            psp.MakeAncillaReflectionOp(1, 1),
             3,
             1,
             0.9,

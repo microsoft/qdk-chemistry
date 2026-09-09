@@ -18,6 +18,7 @@ namespace QDKChemistry.TestUtils.PrepSelPrepTests {
         MakePrepSelPrepOp(
             (ancilla) => Ry(theta, ancilla[0]),
             (ancilla, system) => Controlled Z(ancilla, system[0]),
+            1,
             1
         )
     }
