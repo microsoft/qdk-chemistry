@@ -349,7 +349,7 @@ jobs:
           COV_ARGS=(
             --cov=qdk_chemistry
             --cov-report=xml:../coverage-reports/python_coverage.xml
-            --cov-report=term
+            --cov-report=markdown:../coverage-reports/python_coverage.md
           )
         fi
 
@@ -364,11 +364,6 @@ jobs:
 
         PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
-
-        if [ "$ENABLE_COVERAGE" = "true" ]; then
-          echo "=== Python Test Output ==="
-          cat ../coverage-reports/python_coverage.txt
-        fi
 
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
@@ -436,11 +431,11 @@ jobs:
       run: |
         # Extract coverage percentages
         extract_coverage() {
-          grep '^TOTAL' "$1" 2>/dev/null | tail -1 | grep -oE '[0-9]+(\.[0-9]+)?%' | head -1 | tr -d '%' || true
+          grep -E '^(TOTAL|\|[[:space:]]*TOTAL[[:space:]]*\|)' "$1" 2>/dev/null | tail -1 | grep -oE '[0-9]+(\.[0-9]+)?%' | head -1 | tr -d '%' || true
         }
         CPP_COVERAGE=$(extract_coverage coverage-reports/cpp_coverage.txt)
         CPP_COVERAGE=${CPP_COVERAGE:-0}
-        PYTHON_COVERAGE=$(extract_coverage coverage-reports/python_coverage.txt)
+        PYTHON_COVERAGE=$(extract_coverage coverage-reports/python_coverage.md)
         PYTHON_COVERAGE=${PYTHON_COVERAGE:-0}
         PYBIND11_COVERAGE=$(extract_coverage coverage-reports/pybind11_coverage.txt)
         PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
@@ -459,33 +454,23 @@ jobs:
 
         echo "#### Detailed Coverage Reports" >> "$report"
         echo "" >> "$report"
-        echo "<details>" >> "$report"
-        echo "<summary>C++ Coverage Details</summary>" >> "$report"
+        echo "<details><summary>C++ Coverage Details</summary>" >> "$report"
         echo "" >> "$report"
         # gcovr's markdown writer renders a real GFM table
         cat coverage-reports/cpp_coverage.md >> "$report"
         echo "</details>" >> "$report"
         echo "" >> "$report"
 
-        if [ -f coverage-reports/python_coverage.txt ]; then
-          echo "<details>" >> "$report"
-          echo "<summary>Python Coverage Details</summary>" >> "$report"
-          echo "" >> "$report"
-          echo '```' >> "$report"
-          # coverage.py has no native markdown writer; strip backticks
-          tr -d '`' < coverage-reports/python_coverage.txt >> "$report"
-          echo '```' >> "$report"
-          echo "</details>" >> "$report"
-          echo "" >> "$report"
-        fi
+        echo "<details><summary>Python Coverage Details</summary>" >> "$report"
+        echo "" >> "$report"
+        cat coverage-reports/python_coverage.md >> "$report"
+        echo "</details>" >> "$report"
+        echo "" >> "$report"
 
-        if [ -f coverage-reports/pybind11_coverage.md ]; then
-          echo "<details>" >> "$report"
-          echo "<summary>Pybind11 Coverage Details</summary>" >> "$report"
-          echo "" >> "$report"
-          cat coverage-reports/pybind11_coverage.md >> "$report"
-          echo "</details>" >> "$report"
-        fi
+        echo "<details><summary>Pybind11 Coverage Details</summary>" >> "$report"
+        echo "" >> "$report"
+        cat coverage-reports/pybind11_coverage.md >> "$report"
+        echo "</details>" >> "$report"
 
         cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
