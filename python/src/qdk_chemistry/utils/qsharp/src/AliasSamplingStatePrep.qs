@@ -17,6 +17,8 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.AbsD;
     import Std.Math.Ceiling;
     import Std.Math.Floor;
+    import Std.Math.IsInfinite;
+    import Std.Math.IsNaN;
     import Std.Math.Lg;
     import Std.Math.MinI;
     import Std.StatePreparation.PrepareUniformSuperposition;
@@ -57,6 +59,12 @@ namespace QDKChemistry.Utils.AliasSampling {
             set total += AbsD(coefficients[i]);
         }
 
+        // Checked before the division: a total of infinity sends every ratio to zero, which
+        // silently discretizes to a uniform distribution instead of failing.
+        Fact(
+            not IsNaN(total) and not IsInfinite(total),
+            "alias sampling requires coefficients with a finite total"
+        );
         Fact(total > 0.0, "alias sampling requires at least one non-zero coefficient");
 
         // Scale to bar height × nCoeffs by flooring, keeping the fractional

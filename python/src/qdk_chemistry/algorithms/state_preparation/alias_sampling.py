@@ -158,6 +158,8 @@ class AliasSamplingStatePreparation(StatePreparation):
         weights = coeffs**2
         if not np.all(np.isfinite(weights)):
             raise ValueError("Alias sampling state preparation overflows to infinity when squaring; rescale first.")
+        if not np.isfinite(weights.sum()):
+            raise ValueError("Alias sampling state preparation overflows to infinity when summing; rescale first.")
         if not np.any(weights != 0.0):
             raise ValueError("Alias sampling state preparation requires at least one non-zero coefficient.")
         return weights.tolist(), num_index_qubits

@@ -157,6 +157,25 @@ class TestAliasSamplingStatePreparation:
         with pytest.raises(ValueError, match="overflows to infinity"):
             prep.run(create_dense_wavefunction([1e200, 1.0]))
 
+    def test_coefficients_that_overflow_when_summed_are_rejected(self):
+        """Reviewer counterexample: each square is finite but their total is not.
+
+        1e154 squares to 1e308, which clears the per-entry guard, yet the total overflows.
+        """
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        with pytest.raises(ValueError, match="overflows to infinity when summing"):
+            prep.run(create_dense_wavefunction([1e154, 1e154, 0.0, 0.0]))
+
+    def test_qsharp_rejects_a_nonfinite_total(self):
+        """The Q# discretizer is reachable on its own, so it carries the guard too.
+
+        An infinite total sends every ratio to zero, which discretizes to a uniform
+        distribution rather than failing.
+        """
+        distribution = create_qsharp_context().code.QDKChemistry.Utils.AliasSampling
+        with pytest.raises(Exception, match="finite total"):
+            distribution.DiscretizedProbabilityDistribution(4, [1e308, 1e308, 0.0, 0.0])
+
     def test_zero_coefficients_get_zero_probability(self):
         """A zero coefficient must receive exactly zero probability."""
         bits_precision = 4
