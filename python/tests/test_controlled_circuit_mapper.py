@@ -274,7 +274,7 @@ def _sparse_controlled_op(terms, *, repetitions=1):
         pauliCoefficients=[term["angle"] for term in terms],
         repetitions=repetitions,
     )
-    op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
+    op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpAdjCtlOp(params)
     return QSHARP_UTILS.CircuitComposition.MakeControlledOnFirstQubitOp(op)
 
 
@@ -291,7 +291,7 @@ def _dense_controlled_op(terms, num_qubits, *, repetitions=1):
         pauliCoefficients=[term["angle"] for term in terms],
         repetitions=repetitions,
     )
-    op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(params)
+    op = QSHARP_UTILS.PauliExp.MakeRepPauliExpAdjCtlOp(params)
     return QSHARP_UTILS.CircuitComposition.MakeControlledOnFirstQubitOp(op)
 
 

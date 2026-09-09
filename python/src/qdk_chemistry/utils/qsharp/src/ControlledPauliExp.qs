@@ -4,11 +4,27 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
-    import QDKChemistry.Utils.CircuitComposition.MakeControlledOp;
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import Std.Arrays.Subarray;
+
+    /// Applies repeated sparse Pauli evolution controlled on a single qubit.
+    ///
+    /// This is a named operation rather than a closure so that callables produced by
+    /// `MakeRepControlledPauliExpOp` stay resolvable by the Q# defunctionalizer, which
+    /// runs when a caller such as `HadamardTest` is lowered to QIR.
+    /// # Parameters
+    /// - `params`: The sparse repeated Pauli evolution parameters.
+    /// - `control`: The control qubit.
+    /// - `systems`: The system qubits the evolution acts on.
+    operation RepControlledPauliExp(
+        params : SparseRepPauliExpParams,
+        control : Qubit,
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        Controlled SparseRepPauliExp([control], (params, systems));
+    }
 
     /// A helper operation to create a circuit for repeated Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters
@@ -23,15 +39,13 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         systems : Int[]
     ) : Unit {
         use qs = Qubit[MaxInt([control] + systems) + 1];
-        let controlledOp = MakeControlledOp(SparseRepPauliExp);
-        controlledOp([qs[control]], (params, Subarray(systems, qs)));
+        RepControlledPauliExp(params, qs[control], Subarray(systems, qs));
     }
 
     /// Returns a single-control callable for repeated sparse Pauli evolution.
     function MakeRepControlledPauliExpOp(
         params : SparseRepPauliExpParams
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
-        let controlledOp = MakeControlledOp(SparseRepPauliExp);
-        (control, systems) => controlledOp([control], (params, systems))
+        RepControlledPauliExp(params, _, _)
     }
 }

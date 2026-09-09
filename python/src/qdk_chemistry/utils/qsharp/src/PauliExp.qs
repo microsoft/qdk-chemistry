@@ -83,12 +83,29 @@ namespace QDKChemistry.Utils.PauliExp {
         RepPauliExp(params, Subarray(system, qs));
     }
 
+    /// Uncontrolled entry point for `RepPauliExp`.
+    ///
+    /// Declared without functors on purpose. Callables built by partially applying an
+    /// `Adj + Ctl` operation cannot be resolved by the Q# defunctionalizer once they are
+    /// stored in a plain `Qubit[] => Unit` slot (such as the arguments of
+    /// `CircuitComposition.ApplySequential` or `MeasurementBasis.MakeMeasurementCircuit`),
+    /// which makes lowering those compositions to QIR fail. Forwarding through a plain
+    /// operation keeps the composed circuits statically resolvable.
+    operation ApplyRepPauliExp(params : RepPauliExpParams, systems : Qubit[]) : Unit {
+        RepPauliExp(params, systems);
+    }
+
     /// A helper function to create a callable for repeated Time Evolution for a set of Pauli exponentials.
     /// # Parameters
     /// - `params`: A `RepPauliExpParams` struct containing the parameters for the operation.
     /// # Returns
     /// - `Qubit[] => Unit`: A callable that takes an array of system qubits, and prepares the repeated time evolution on the allocated qubits.
-    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit is Adj + Ctl {
+    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit {
+        ApplyRepPauliExp(params, _)
+    }
+
+    /// Returns an `Adj + Ctl` callable for repeated dense Time Evolution.
+    internal function MakeRepPauliExpAdjCtlOp(params : RepPauliExpParams) : (Qubit[] => Unit is Adj + Ctl) {
         RepPauliExp(params, _)
     }
 
@@ -181,8 +198,21 @@ namespace QDKChemistry.Utils.PauliExp {
         SparseRepPauliExp(params, Subarray(system, qs));
     }
 
+    /// Uncontrolled entry point for `SparseRepPauliExp`; see `ApplyRepPauliExp` for why
+    /// this forwarding operation carries no functors.
+    operation ApplySparseRepPauliExp(params : SparseRepPauliExpParams, systems : Qubit[]) : Unit {
+        SparseRepPauliExp(params, systems);
+    }
+
     /// A helper function to create a callable for repeated sparse Time Evolution.
-    function MakeSparseRepPauliExpOp(params : SparseRepPauliExpParams) : Qubit[] => Unit is Adj + Ctl {
+    function MakeSparseRepPauliExpOp(params : SparseRepPauliExpParams) : Qubit[] => Unit {
+        ApplySparseRepPauliExp(params, _)
+    }
+
+    /// Returns an `Adj + Ctl` callable for repeated sparse Time Evolution.
+    internal function MakeSparseRepPauliExpAdjCtlOp(
+        params : SparseRepPauliExpParams
+    ) : (Qubit[] => Unit is Adj + Ctl) {
         SparseRepPauliExp(params, _)
     }
 }
