@@ -217,7 +217,7 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
   if (!(_energy_gap > 0.0)) {
     QDK_LOGGER().warn(
         "FactorizedHamiltonianContainer::get_lambda_eff: no positive energy "
-        "gap has been set, returning 0. Call set_energy_gap() first.");
+        "gap was supplied at construction, returning 0.");
     return 0.0;
   }
 
