@@ -59,8 +59,6 @@ namespace QDKChemistry.Utils.AliasSampling {
             set total += AbsD(coefficients[i]);
         }
 
-        // Checked before the division: a total of infinity sends every ratio to zero, which
-        // silently discretizes to a uniform distribution instead of failing.
         Fact(
             not IsNaN(total) and not IsInfinite(total),
             "alias sampling requires coefficients with a finite total"
