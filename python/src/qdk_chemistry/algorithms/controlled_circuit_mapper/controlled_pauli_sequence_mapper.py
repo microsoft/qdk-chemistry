@@ -5,10 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk import qsharp
+
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
@@ -79,13 +81,39 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
-        program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params)
+        pauli_indices: list[list[int]] = []
+        pauli_ops: list[list[qsharp.Pauli]] = []
+        angles: list[float] = []
+        needs_control: list[bool] = []
+        batch_ids: list[int] = []
+        for term in unitary_container.step_terms:
+            indices: list[int] = []
+            ops: list[qsharp.Pauli] = []
+            for index, pauli in term.pauli_term.items():
+                indices.append(index)
+                ops.append(getattr(qsharp.Pauli, pauli))
+            pauli_indices.append(indices)
+            pauli_ops.append(ops)
+            angles.append(term.angle)
+            needs_control.append(term.needs_control)
+            batch_ids.append(term.batch)
+
+        # A container whose terms are all controlled carries no exemption, so the flags
+        # are dropped rather than passed as an all-true array the Q# would have to walk.
+        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+            pauliIndices=pauli_indices,
+            pauliOps=pauli_ops,
+            pauliCoefficients=angles,
+            needsControl=[] if all(needs_control) else needs_control,
+            batchIds=[] if not any(batch_ids) else batch_ids,
+            repetitions=unitary_container.step_reps,
+        )
 
         qsharp_factory = QsharpFactoryData(
-            program=program,
+            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
             parameter={"params": evo_params, "control": control_indices[0], "systems": target_indices},
         )
+
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

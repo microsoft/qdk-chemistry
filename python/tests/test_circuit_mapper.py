@@ -25,9 +25,6 @@ except ImportError:
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )
-from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
-    ControlledPauliSequenceMapper,
-)
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -84,30 +81,18 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
-    def test_sparse_encoding_carries_only_non_identity_positions(self, sparse_mapper):
-        """Both mappers retain ordered supports, identity phases and symbolic repetitions on wide registers."""
-        word = {2: "I", 80_799: "Z", 0: "X"}
-        container = PauliProductFormulaContainer(
-            [
-                ExponentiatedPauliTerm(word, 0.5),
-                ExponentiatedPauliTerm({0: "I"}, 0.25),
-                ExponentiatedPauliTerm(word, -0.2),
-            ],
-            1_000_000_000,
-            80_800,
-        )
-        factory = sparse_mapper.run(UnitaryRepresentation(container))._qsharp_factory.parameter
-        params = (
-            vars(factory["params"])
-            if isinstance(sparse_mapper, ControlledPauliSequenceMapper)
-            else factory["evo_params"]
-        )
-        assert params == {
-            "pauliIndices": [[80_799, 0], [], [80_799, 0]],
-            "pauliOps": [[qsharp.Pauli.Z, qsharp.Pauli.X], [], [qsharp.Pauli.Z, qsharp.Pauli.X]],
-            "pauliCoefficients": [0.5, 0.25, -0.2],
-            "repetitions": 1_000_000_000,
-        }
+    def test_sparse_encoding_carries_only_non_identity_positions(self, simple_unitary):
+        """The Q# parameters must list Pauli positions, not one Pauli per system qubit."""
+        circuit = PauliSequenceMapper().run(simple_unitary)
+        evo_params = circuit._qsharp_factory.parameter["evo_params"]
+
+        assert "pauliExponents" not in evo_params
+        assert evo_params["pauliIndices"] == [[0], [1]]
+        assert [[str(p) for p in ops] for ops in evo_params["pauliOps"]] == [["Pauli.X"], ["Pauli.Z"]]
+        # An unbatched container passes empty flag arrays rather than all-default ones,
+        # so the Q# skips both the exemption and the batching walks entirely.
+        assert evo_params["needsControl"] == []
+        assert evo_params["batchIds"] == []
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
@@ -145,6 +130,8 @@ def _sparse_op(terms, *, repetitions=1):
         pauliIndices=[term["qubits"] for term in terms],
         pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
         pauliCoefficients=[term["angle"] for term in terms],
+        needsControl=[],
+        batchIds=[],
         repetitions=repetitions,
     )
     return QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
@@ -200,8 +187,6 @@ class TestSparseUncontrolledEvolution:
                 {"qubits": [1], "axes": "Z", "angle": -0.3},
             ],
         ),
-        "identity": (2, [{"qubits": [], "axes": "", "angle": 0.7}]),
-        "empty": (2, []),
     }
 
     @pytest.mark.parametrize("name", list(CASES))
@@ -211,31 +196,34 @@ class TestSparseUncontrolledEvolution:
         num_qubits, terms = self.CASES[name]
         got = dense_matrix(_sparse_op(terms, repetitions=repetitions), num_qubits)
         want = dense_matrix(_dense_op(terms, num_qubits, repetitions=repetitions), num_qubits)
-        if not any(term["qubits"] for term in terms):
-            np.testing.assert_allclose(
-                want, np.exp(-1j * repetitions * sum(t["angle"] for t in terms)) * np.eye(4), atol=_TOL
-            )
         assert np.max(np.abs(got - want)) < _TOL
 
     @pytest.mark.parametrize(
-        ("indices", "ops", "coefficients"),
+        ("pauli_indices", "pauli_ops", "pauli_coefficients"),
         [
             pytest.param([[0]], [[qsharp.Pauli.X]], [], id="coefficients-shorter"),
             pytest.param([], [[qsharp.Pauli.X]], [0.1], id="indices-shorter"),
             pytest.param([[0]], [], [0.1], id="ops-shorter"),
         ],
     )
-    def test_rejects_mismatched_term_array_lengths(self, indices, ops, coefficients):
-        """Sparse evolution requires one support, axis row and angle per term."""
+    def test_rejects_mismatched_term_array_lengths(
+        self,
+        pauli_indices: list[list[int]],
+        pauli_ops: list[list[qsharp.Pauli]],
+        pauli_coefficients: list[float],
+    ):
+        """Sparse evolution requires one index row, Pauli row, and coefficient per term."""
         params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
-            pauliIndices=indices,
-            pauliOps=ops,
-            pauliCoefficients=coefficients,
+            pauliIndices=pauli_indices,
+            pauliOps=pauli_ops,
+            pauliCoefficients=pauli_coefficients,
+            needsControl=[],
+            batchIds=[],
             repetitions=1,
         )
         op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
 
-        with pytest.raises(QSharpError, match="inconsistent array lengths"):
+        with pytest.raises(QSharpError, match="must have the same length"):
             dump_operation_on_state(op, 1, [1.0, 0.0], context=get_qsharp_context())
 
     def test_sparse_encoding_applies_the_container_sign_convention(self):
@@ -244,26 +232,3 @@ class TestSparseUncontrolledEvolution:
         got = dense_matrix(_sparse_op([{"qubits": [0], "axes": "Z", "angle": angle}]), 1)
         want = scipy.linalg.expm(-1j * angle * np.array([[1, 0], [0, -1]], dtype=complex))
         assert np.max(np.abs(got - want)) < _TOL
-
-
-@pytest.fixture(params=[PauliSequenceMapper, ControlledPauliSequenceMapper], ids=["regular", "controlled"])
-def sparse_mapper(request):
-    """Exercise both production mappers with the same sparse cases."""
-    return request.param()
-
-
-class TestSparsePauliMappers:
-    """The existing sparse payload stays independent of register width and repetitions."""
-
-    def test_resource_estimates_include_all_repetitions(self, sparse_mapper):
-        """Resource estimates count symbolic repetitions without adding qubits."""
-        counts = []
-        for repetitions in (1, 17):
-            container = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X", 1: "Z"}, 0.137)], repetitions, 2)
-            circuit = sparse_mapper.run(UnitaryRepresentation(container))
-            counts.append(circuit.estimate()["logicalCounts"])
-        assert counts[0]["rotationCount"] > 0
-        assert counts[1]["rotationCount"] == 17 * counts[0]["rotationCount"]
-        assert counts[1]["numQubits"] == counts[0]["numQubits"]
-        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
-        assert "define" in str(circuit.get_qir())

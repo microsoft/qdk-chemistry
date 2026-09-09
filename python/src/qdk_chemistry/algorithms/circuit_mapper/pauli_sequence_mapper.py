@@ -5,13 +5,15 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk import qsharp
+
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import CircuitMapper
 
@@ -80,10 +82,36 @@ class PauliSequenceMapper(CircuitMapper):
                 "PauliSequenceMapper only supports PauliProductFormula containers."
             )
 
-        evo_params = _pauli_evolution_parameters(unitary_container)
-        program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
-        evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
+        pauli_indices: list[list[int]] = []
+        pauli_ops: list[list[qsharp.Pauli]] = []
+        angles: list[float] = []
+        batch_ids: list[int] = []
+        for term in unitary_container.step_terms:
+            indices: list[int] = []
+            ops: list[qsharp.Pauli] = []
+            for index, pauli in term.pauli_term.items():
+                indices.append(index)
+                ops.append(getattr(qsharp.Pauli, pauli))
+            pauli_indices.append(indices)
+            pauli_ops.append(ops)
+            angles.append(term.angle)
+            batch_ids.append(term.batch)
+
+        evo_params = {
+            "pauliIndices": pauli_indices,
+            "pauliOps": pauli_ops,
+            "pauliCoefficients": angles,
+            # Uncontrolled evolution, so no term is exempt from a control that never
+            # exists. The Q# treats an empty array as "control every term".
+            "needsControl": [],
+            "batchIds": [] if not any(batch_ids) else batch_ids,
+            "repetitions": unitary_container.step_reps,
+        }
+
         target_indices = list(range(unitary_container.num_qubits))
+        program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
+
+        evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
 
         factory = QsharpFactoryData(
             program=program,
