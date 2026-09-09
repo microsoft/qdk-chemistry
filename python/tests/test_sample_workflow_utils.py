@@ -122,26 +122,30 @@ def _strip_visualization_lines(cell_source: str) -> str:
     return "\n".join(filtered_lines)
 
 
-def _execute_notebook_skip_visualizations(
+def _execute_notebook(
     notebook_path: Path,
     timeout: int = 1800,
     cell_patches: dict[int, dict[str, str]] | None = None,
+    *,
+    skip_visualizations: bool = False,
 ) -> Any:
-    """Execute a notebook after removing visualization-only code.
+    """Execute a notebook with optional source patches for test runtime.
 
     Args:
         notebook_path: Path to the notebook file.
         timeout: Maximum seconds allowed for each cell.
         cell_patches: Optional cell-indexed source replacements used to reduce
             expensive parameters without modifying the notebook on disk.
+        skip_visualizations: Remove visualization-only code before execution.
 
     """
     with open(notebook_path, encoding="utf-8") as notebook_file:
         notebook = nbformat.read(notebook_file, as_version=4)
 
-    for cell in notebook.cells:
-        if cell.cell_type == "code" and cell.source.strip():
-            cell.source = _strip_visualization_lines(cell.source)
+    if skip_visualizations:
+        for cell in notebook.cells:
+            if cell.cell_type == "code" and cell.source.strip():
+                cell.source = _strip_visualization_lines(cell.source)
 
     if cell_patches:
         for cell_index, replacements in cell_patches.items():
@@ -162,6 +166,20 @@ def _execute_notebook_skip_visualizations(
         resources={"metadata": {"path": str(notebook_path.parent)}},
     )
     return client.execute()
+
+
+def _execute_notebook_skip_visualizations(
+    notebook_path: Path,
+    timeout: int = 1800,
+    cell_patches: dict[int, dict[str, str]] | None = None,
+) -> Any:
+    """Execute a notebook after removing visualization-only code."""
+    return _execute_notebook(
+        notebook_path,
+        timeout=timeout,
+        cell_patches=cell_patches,
+        skip_visualizations=True,
+    )
 
 
 def _run_workflow(cmd, cwd: Path) -> subprocess.CompletedProcess[str]:

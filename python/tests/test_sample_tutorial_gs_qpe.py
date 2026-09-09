@@ -18,6 +18,7 @@ import importlib.metadata
 import os
 import runpy
 import sys
+from base64 import b64decode
 from contextlib import suppress
 from importlib.util import module_from_spec, spec_from_file_location
 from math import comb, log
@@ -34,7 +35,7 @@ from qdk_chemistry.utils import Logger
 
 from .test_sample_workflow_utils import (
     _HAS_JUPYTER_KERNEL,
-    _execute_notebook_skip_visualizations,
+    _execute_notebook,
     _requires_notebook_deps,
 )
 
@@ -70,6 +71,60 @@ def _assert_notebook_library_logs_suppressed(notebook) -> None:
     )
     for log_level in ("trace", "debug", "info", "warning", "error", "critical"):
         assert f"[{log_level}]" not in stream_text
+
+
+def _notebook_cell_mime_payloads(
+    notebook,
+    notebook_path: Path,
+    source_marker: str,
+    mime_type: str,
+    minimum_count: int,
+) -> tuple[list[object], str]:
+    """Return one cell's MIME payloads with notebook and cell context."""
+    matching_cells = [
+        (cell_index, cell)
+        for cell_index, cell in enumerate(notebook.cells)
+        if cell.cell_type == "code" and source_marker in cell.source
+    ]
+    assert len(matching_cells) == 1, (
+        f"{notebook_path.name}: expected one code cell containing {source_marker!r}, found {len(matching_cells)}"
+    )
+
+    cell_index, cell = matching_cells[0]
+    location = f"{notebook_path.name} cell {cell.get('id', '<missing>')!r} (index {cell_index})"
+    rich_outputs = [output for output in cell.get("outputs", []) if "data" in output]
+    payloads = [output["data"][mime_type] for output in rich_outputs if mime_type in output["data"]]
+    available_mime_types = sorted({mime for output in rich_outputs for mime in output["data"]})
+    assert len(payloads) >= minimum_count, (
+        f"{location}: expected at least {minimum_count} {mime_type!r} output(s), found {len(payloads)}; "
+        f"available MIME types: {available_mime_types}"
+    )
+    return payloads, location
+
+
+def _assert_widget_view_outputs(
+    notebook,
+    notebook_path: Path,
+    source_marker: str,
+    minimum_count: int,
+) -> None:
+    """Check widget-view MIME payload structure for one notebook cell."""
+    payloads, location = _notebook_cell_mime_payloads(
+        notebook,
+        notebook_path,
+        source_marker,
+        "application/vnd.jupyter.widget-view+json",
+        minimum_count,
+    )
+    for payload in payloads:
+        assert isinstance(payload, dict), f"{location}: widget-view payload is not an object"
+        assert payload.get("version_major") == 2, f"{location}: widget-view major version is not 2"
+        minor_version = payload.get("version_minor")
+        assert isinstance(minor_version, int), f"{location}: widget-view minor version is not an integer"
+        assert minor_version >= 0, f"{location}: widget-view minor version is negative"
+        model_id = payload.get("model_id")
+        assert isinstance(model_id, str), f"{location}: widget-view model_id is not a string"
+        assert model_id, f"{location}: widget-view payload has no model_id"
 
 
 def _require_snapshot_version(
@@ -516,7 +571,7 @@ def test_tutorial_run_iqpe_simulation():
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
 def test_tutorial_choose_active_space_notebook():
-    """Test the Chapter 3 notebook chemistry and visualization-data cells."""
+    """Test the Chapter 3 notebook chemistry and rich visualization outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
     with open(notebook_path, encoding="utf-8") as notebook_file:
@@ -548,7 +603,7 @@ def test_tutorial_choose_active_space_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
-    executed_notebook = _execute_notebook_skip_visualizations(
+    executed_notebook = _execute_notebook(
         notebook_path,
         timeout=360,
         cell_patches={
@@ -560,6 +615,18 @@ def test_tutorial_choose_active_space_notebook():
             },
         },
     )
+    _assert_widget_view_outputs(executed_notebook, notebook_path, "basis_function_cube_data =", 1)
+    entropy_payloads, entropy_location = _notebook_cell_mime_payloads(
+        executed_notebook,
+        notebook_path,
+        "plot_orbital_entropy_selection(result)",
+        "image/png",
+        1,
+    )
+    assert all(
+        isinstance(payload, str) and b64decode(payload).startswith(b"\x89PNG\r\n\x1a\n") for payload in entropy_payloads
+    ), f"{entropy_location}: image/png payload is not a valid PNG"
+    _assert_widget_view_outputs(executed_notebook, notebook_path, "cube_data=cube_data", 1)
     _assert_notebook_library_logs_suppressed(executed_notebook)
 
 
@@ -570,7 +637,7 @@ def test_tutorial_choose_active_space_notebook():
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
 def test_tutorial_prepare_trial_state_notebook():
-    """Test the Chapter 5 notebook circuit data and validation cells."""
+    """Test the Chapter 5 notebook circuit data and rich outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_prepare_trial_state.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
     with open(notebook_path, encoding="utf-8") as notebook_file:
@@ -591,7 +658,36 @@ def test_tutorial_prepare_trial_state_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
-    executed_notebook = _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    executed_notebook = _execute_notebook(notebook_path, timeout=360)
+    _assert_widget_view_outputs(
+        executed_notebook,
+        notebook_path,
+        "display(Circuit(trial_state.circuit.get_qsharp_circuit()))",
+        3,
+    )
+    label_payloads, label_location = _notebook_cell_mime_payloads(
+        executed_notebook,
+        notebook_path,
+        "display(Circuit(trial_state.circuit.get_qsharp_circuit()))",
+        "text/markdown",
+        3,
+    )
+    assert label_payloads == [
+        "### 1-determinant trial state",
+        "### 2-determinant trial state",
+        "### 4-determinant trial state",
+    ], f"{label_location}: unexpected circuit labels"
+    table_payloads, table_location = _notebook_cell_mime_payloads(
+        executed_notebook,
+        notebook_path,
+        'display(Markdown("\\n".join(table_rows)))',
+        "text/markdown",
+        1,
+    )
+    assert isinstance(table_payloads[0], str), f"{table_location}: comparison table payload is not text"
+    assert "| Determinants | Fidelity | Compute qubits |" in table_payloads[0], (
+        f"{table_location}: comparison table header is missing"
+    )
     _assert_notebook_library_logs_suppressed(executed_notebook)
 
 
@@ -602,7 +698,7 @@ def test_tutorial_prepare_trial_state_notebook():
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
 def test_tutorial_visualize_iqpe_circuit_notebook():
-    """Test the Chapter 6 notebook circuit construction and validation cells."""
+    """Test the Chapter 6 notebook circuit construction and rich outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_visualize_iqpe_circuit.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
     with open(notebook_path, encoding="utf-8") as notebook_file:
@@ -624,5 +720,22 @@ def test_tutorial_visualize_iqpe_circuit_notebook():
             assert cell.execution_count is None
             assert not cell.outputs
 
-    executed_notebook = _execute_notebook_skip_visualizations(notebook_path, timeout=360)
+    executed_notebook = _execute_notebook(notebook_path, timeout=360)
+    table_payloads, table_location = _notebook_cell_mime_payloads(
+        executed_notebook,
+        notebook_path,
+        "| Controlled power | Logical qubits |",
+        "text/markdown",
+        1,
+    )
+    assert isinstance(table_payloads[0], str), f"{table_location}: circuit-summary table payload is not text"
+    assert "| Controlled power | Logical qubits | Decomposed logical gates |" in table_payloads[0], (
+        f"{table_location}: circuit-summary table header is missing"
+    )
+    _assert_widget_view_outputs(
+        executed_notebook,
+        notebook_path,
+        "display(Circuit(shortest_circuit.get_qsharp_circuit()))",
+        1,
+    )
     _assert_notebook_library_logs_suppressed(executed_notebook)

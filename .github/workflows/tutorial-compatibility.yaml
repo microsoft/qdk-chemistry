@@ -12,6 +12,7 @@ on:
     - docs/source/_static/examples/python/tutorial_*.ipynb
     - python/pyproject.toml
     - python/tests/test_sample_tutorial_gs_qpe.py
+    - python/tests/test_sample_workflow_utils.py
   workflow_dispatch:
 
 concurrency:
