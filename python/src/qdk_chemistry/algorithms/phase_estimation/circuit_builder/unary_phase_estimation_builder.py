@@ -156,8 +156,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
             ValueError: If the unitary representation is not a quantum walk, if the mapper does
-                not declare its register width, or if the block encoding has no ancilla register
-                for the walk to reflect about.
+                not declare its register width, if the block encoding has no ancilla register
+                for the walk to reflect about, or if the state preparation and block encoding
+                disagree on the shared ancilla count.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -188,14 +189,29 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         if num_qubits is None:
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
         num_system_qubits = qubit_hamiltonian.num_qubits
-        num_ancilla_qubits = num_qubits - num_system_qubits
+
+        block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
+        state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas
+        if block_encoding_shared and state_prep_shared and block_encoding_shared != state_prep_shared:
+            raise ValueError(
+                f"State preparation expects {state_prep_shared} phase gradient ancilla but the "
+                f"block encoding expects {block_encoding_shared}."
+            )
+        num_phase_gradient_ancillas = max(block_encoding_shared, state_prep_shared)
+        prepare_shared_op = (
+            QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState
+            if num_phase_gradient_ancillas
+            else QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        )
+        num_ancilla_qubits = num_qubits - num_system_qubits - block_encoding_shared
         if num_ancilla_qubits <= 0:
             raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")
 
-        apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits)
+        apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits, num_ancilla_qubits)
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
             raise RuntimeError("State preparation has no Q# operation.")
+        self._validate_state_prep_width(state_preparation, num_system_qubits + state_prep_shared)
 
         phase_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=list(range(num_phase_qubits - 1, -1, -1)),
@@ -208,16 +224,20 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "applyBlockEncoding": block_encoding_op,
             "applyReflection": apply_reflection,
             "phaseQubitPrep": QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(phase_prep_params),
+            "prepareSharedOp": prepare_shared_op,
             "numQueries": num_queries,
             "numSystemQubits": num_system_qubits,
             "numAncillas": num_ancilla_qubits,
+            "numSharedAncillas": num_phase_gradient_ancillas,
+            "statePrepUsesShared": bool(state_prep_shared),
+            "blockEncodingUsesShared": bool(block_encoding_shared),
         }
         circuit = Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.UnaryPhaseEstimation.MakeUnaryQPECircuit,
                 parameter=parameters,
             ),
-            num_qubits=num_phase_qubits + num_system_qubits + num_ancilla_qubits,
+            num_qubits=num_phase_qubits + num_system_qubits + num_ancilla_qubits + num_phase_gradient_ancillas,
         )
         return [circuit]
 

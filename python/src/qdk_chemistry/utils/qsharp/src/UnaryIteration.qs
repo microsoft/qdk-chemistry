@@ -9,8 +9,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
     import Std.Math.BitSizeI;
-    import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.Measurement.MResetEachZ;
 
 
     /// Unary iteration
@@ -93,33 +92,29 @@ namespace QDKChemistry.Utils.UnaryIteration {
         if numActions == 1 {
             action(actionOffset, ctl);
         } else {
-            if BeginEstimateCaching("QDKChemistry.Utils.UnaryIteration.SinglyControlledUnaryIterationWithControl", numActions) {
-                use helper = Qubit();
+            use helper = Qubit();
 
-                let (most, tail) = MostAndTail(address[...n - 1]);
+            let (most, tail) = MostAndTail(address[...n - 1]);
 
-                within {
-                    X(tail);
-                } apply {
-                    AND(ctl, tail, helper);
-                }
-
-                SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
-
-                CNOT(ctl, helper);
-
-                SinglyControlledUnaryIterationWithControl(
-                    helper,
-                    most,
-                    numActions - 2^(n - 1),
-                    actionOffset + 2^(n - 1),
-                    action,
-                );
-
-                Adjoint AND(ctl, tail, helper);
-
-                EndEstimateCaching();
+            within {
+                X(tail);
+            } apply {
+                AND(ctl, tail, helper);
             }
+
+            SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
+
+            CNOT(ctl, helper);
+
+            SinglyControlledUnaryIterationWithControl(
+                helper,
+                most,
+                numActions - 2^(n - 1),
+                actionOffset + 2^(n - 1),
+                action,
+            );
+
+            Adjoint AND(ctl, tail, helper);
         }
     }
 
