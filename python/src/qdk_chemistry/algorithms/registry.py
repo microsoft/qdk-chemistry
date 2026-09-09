@@ -44,6 +44,9 @@ if TYPE_CHECKING:
     from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 
 
+_CACHE_MISS = object()
+
+
 class _AlgorithmWrapper:
     """Thin wrapper that adds a ``cache`` kwarg to ``run()``.
 
@@ -69,18 +72,23 @@ class _AlgorithmWrapper:
         self,
         *args: Any,
         cache: Any = None,
+        remote: Any = None,
         force_rerun: bool = False,
         **kwargs: Any,
     ) -> Any:
-        """Execute the algorithm with optional caching.
+        """Execute the algorithm with optional caching and remote execution.
 
-        Without ``cache`` this is equivalent to calling
-        the underlying ``algorithm.run()`` directly.
+        Without cache or remote options this is equivalent to calling the
+        underlying ``algorithm.run()`` directly.
 
         Args:
             *args: Positional arguments for the algorithm.
             cache: Cache backend — a :class:`CacheBackend`, a path
                 (``str`` / ``Path`` → :class:`FolderCache`), or ``None``.
+                Complete records are local cache hits regardless of whether
+                the backend is shared. Remote compute nodes use only backends
+                marked as shared.
+            remote: Remote backend name or instance, or ``None`` for local execution.
             force_rerun: If ``True``, skip the cache lookup and re-execute,
                 overwriting any previously cached result.
             **kwargs: Keyword arguments for the algorithm.
@@ -89,6 +97,18 @@ class _AlgorithmWrapper:
             The algorithm result.
 
         """
+        if remote is not None:
+            from qdk_chemistry.remote.proxy import run as remote_run  # noqa: PLC0415
+
+            return remote_run(
+                self._algo,
+                *args,
+                cache=cache,
+                remote=remote,
+                force_rerun=force_rerun,
+                **kwargs,
+            )
+
         if cache is None:
             return self._algo.run(*args, **kwargs)
 
@@ -122,7 +142,7 @@ class _AlgorithmWrapper:
         # Check the cache (skip on force_rerun)
         if not force_rerun:
             hit = _try_cache_hit(resolved_cache, run_hash)
-            if hit is not None:
+            if hit is not _CACHE_MISS:
                 return hit
 
         # Cache miss — execute locally and store
@@ -140,11 +160,11 @@ class _AlgorithmWrapper:
         return repr(self._algo)
 
 
-def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
-    """Return the cached result if available, else None."""
+def _try_cache_hit(cache: Any, run_hash: str) -> Any:
+    """Return the cached result if available, else the cache-miss sentinel."""
     job = cache.get_job(run_hash)
-    if job is None or not job.output_hashes:
-        return None
+    if job is None or job.output_hashes is None or job.output_is_tuple is None:
+        return _CACHE_MISS
 
     items: list[Any] = []
     for entry in job.output_hashes:
@@ -153,9 +173,11 @@ def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
         else:
             data = cache.get_data(entry["hash"])
             if data is None:
-                return None
+                return _CACHE_MISS
             items.append(data)
-    return items[0] if len(items) == 1 else tuple(items)
+    if job.output_is_tuple:
+        return tuple(items)
+    return items[0] if len(items) == 1 else _CACHE_MISS
 
 
 def _store_result(
@@ -174,9 +196,9 @@ def _store_result(
 
     input_hashes: dict[str, str] = {}
     for i, arg in enumerate(args):
-        input_hashes[f"arg_{i}"] = _item_content_hash(arg)
+        input_hashes[f"args.arg_{i}"] = _item_content_hash(arg)
     for key, val in kwargs.items():
-        input_hashes[key] = _item_content_hash(val)
+        input_hashes[f"kwargs.{key}"] = _item_content_hash(val)
 
     job = Job(
         job_id=run_hash[:12],
@@ -192,6 +214,7 @@ def _store_result(
         run_hash=run_hash,
         input_hashes=input_hashes or None,
         output_hashes=output_hashes,
+        output_is_tuple=isinstance(result, tuple),
     )
 
     # Persist DataClass blobs
@@ -292,7 +315,12 @@ def _resolve_algorithm_name(algorithm_type: str, algorithm_name: str) -> str:
     return algorithm_name
 
 
-def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
+def create(
+    algorithm_type: str,
+    algorithm_name: str | None = None,
+    *suppress_warnings: bool,
+    **kwargs: Any,
+) -> Algorithm:
     """Create an algorithm instance by type and name.
 
     This function creates an algorithm instance from the registry using the specified
@@ -311,6 +339,8 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         algorithm_name (str | None): The specific name of the algorithm implementation to create.
 
             If None or empty string, creates the default algorithm for that type.
+
+        suppress_warnings (bool): Positional-only flag that suppresses creation-time warnings.
 
         kwargs: Optional keyword arguments (passed via ``**kwargs``).
 
@@ -338,6 +368,17 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
+    if len(suppress_warnings) > 1:
+        raise TypeError(f"create() takes at most 3 positional arguments ({len(suppress_warnings) + 2} given)")
+    if "suppress_warnings" in kwargs:
+        raise TypeError(
+            "'suppress_warnings' is positional-only to avoid colliding with algorithm Settings. "
+            "Configure a setting with this name on the returned instance."
+        )
+    suppress_warnings_flag = suppress_warnings[0] if suppress_warnings else False
+    if not isinstance(suppress_warnings_flag, bool):
+        raise TypeError("'suppress_warnings' must be a bool")
+
     algorithm_type = _resolve_algorithm_type(algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
@@ -345,7 +386,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             try:
-                instance = factory.create(algorithm_name)
+                instance = factory.create(algorithm_name, suppress_warnings=suppress_warnings_flag)
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:
@@ -475,22 +516,25 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
-            settings = instance.settings().to_dict()
-            result = []
-            for name, default in settings.items():
-                python_type = instance.settings().get_expected_python_type(name)
-                description = (
-                    instance.settings().get_description(name) if instance.settings().has_description(name) else None
-                )
-                limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
-                result.append((name, python_type, default, description, limits))
-            return result
+            return _inspect_instance_settings(instance)
     available_types = [factory.algorithm_type_name() for factory in __factories]
     raise KeyError(
         f"Algorithm type '{algorithm_type}' is not registered. Available algorithm types: {', '.join(available_types)}"
         "Available algorithm types are influenced by loaded plugins and registered custom algorithms. "
         "Please ensure the relevant plugins are loaded or custom algorithms are registered ahead of calling create()."
     )
+
+
+def _inspect_instance_settings(instance: Algorithm) -> list[tuple[str, str, Any, str | None, Any | None]]:
+    """Inspect settings for an existing algorithm instance."""
+    settings = instance.settings().to_dict()
+    result = []
+    for name, default in settings.items():
+        python_type = instance.settings().get_expected_python_type(name)
+        description = instance.settings().get_description(name) if instance.settings().has_description(name) else None
+        limits = instance.settings().get_limits(name) if instance.settings().has_limits(name) else None
+        result.append((name, python_type, default, description, limits))
+    return result
 
 
 def register(generator: Callable[[], Algorithm]) -> None:
@@ -921,7 +965,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
         IdentityTermGrouper,
@@ -952,6 +998,8 @@ def _register_python_algorithms():
     register(lambda: PauliSequenceMapper())
     register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
+    register(lambda: AliasSamplingStatePreparation())
+    register(lambda: QROMStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: EulerIntegrator())

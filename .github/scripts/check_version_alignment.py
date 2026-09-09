@@ -11,6 +11,9 @@ all version-dependent files are configured to read from it:
 - python/src/qdk_chemistry/utils/telemetry.py (uses importlib.metadata with fallback)
 - docs/source/conf.py (uses Path.read_text())
 - docs/source/changelog.rst (must have entry for current version)
+- copilot-plugins/qdk-chemistry/plugin.json (matches VERSION)
+- copilot-plugins/qdk-chemistry/skills/*/SKILL.md (matches VERSION)
+- .github/plugin/marketplace.json (matches plugin.json)
 
 Exit codes:
     0: All versions are aligned
@@ -22,6 +25,7 @@ Exit codes:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -150,6 +154,60 @@ def check_versions() -> int:
     else:
         errors.append("docs/source/changelog.rst: file not found")
 
+    # Check 7: plugin and skill versions match VERSION
+    plugin_manifest = repo_root / "copilot-plugins/qdk-chemistry/plugin.json"
+    marketplace_manifest = repo_root / ".github/plugin/marketplace.json"
+    try:
+        plugin_version = json.loads(plugin_manifest.read_text())["version"]
+        if plugin_version != canonical_version:
+            errors.append(
+                "copilot-plugins/qdk-chemistry/plugin.json: version is "
+                f"'{plugin_version}', expected '{canonical_version}' from VERSION"
+            )
+
+        skills_directory = plugin_manifest.parent / "skills"
+        skill_files = sorted(skills_directory.glob("*/SKILL.md"))
+        if not skill_files:
+            errors.append("copilot plugin skills: no SKILL.md files found")
+        expected_skill_version = f"v{canonical_version}"
+        for skill_file in skill_files:
+            content = skill_file.read_text()
+            frontmatter = content.split("---", 2)
+            version_match = (
+                re.search(
+                    r"^version:\s*['\"]?([^'\"\s]+)['\"]?\s*$",
+                    frontmatter[1],
+                    re.MULTILINE,
+                )
+                if len(frontmatter) == 3
+                else None
+            )
+            skill_label = skill_file.relative_to(repo_root)
+            if version_match is None:
+                errors.append(f"{skill_label}: missing version in YAML frontmatter")
+            elif version_match.group(1) != expected_skill_version:
+                errors.append(
+                    f"{skill_label}: version is '{version_match.group(1)}', "
+                    f"expected '{expected_skill_version}' from VERSION"
+                )
+
+        # Check 8: plugin marketplace entries match the plugin manifest version
+        marketplace = json.loads(marketplace_manifest.read_text())
+        marketplace_versions = {
+            "metadata.version": marketplace["metadata"]["version"],
+            "plugins[0].version": marketplace["plugins"][0]["version"],
+        }
+        for field, marketplace_version in marketplace_versions.items():
+            if marketplace_version != plugin_version:
+                errors.append(
+                    f".github/plugin/marketplace.json: {field} is "
+                    f"'{marketplace_version}', expected '{plugin_version}' from plugin.json"
+                )
+    except (FileNotFoundError, IndexError, KeyError, json.JSONDecodeError) as exception:
+        errors.append(
+            f"plugin version manifests: invalid or missing data ({exception})"
+        )
+
     # Report results
     if errors:
         print("FAIL: Version check failed:", file=sys.stderr)
@@ -174,6 +232,9 @@ def check_versions() -> int:
     print("    - python/src/qdk_chemistry/utils/telemetry.py")
     print("    - docs/source/conf.py")
     print("    - docs/source/changelog.rst")
+    print("    - copilot-plugins/qdk-chemistry/plugin.json")
+    print("    - copilot-plugins/qdk-chemistry/skills/*/SKILL.md")
+    print("    - .github/plugin/marketplace.json")
     return 0
 
 

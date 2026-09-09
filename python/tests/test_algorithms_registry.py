@@ -19,6 +19,7 @@ from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT_AER,
     QDK_CHEMISTRY_HAS_QISKIT_NATURE,
 )
+from qdk_chemistry.remote.job import Job
 
 try:
     import pyscf  # noqa: F401
@@ -30,6 +31,120 @@ except ImportError:
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
 INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+
+
+def test_algorithm_wrapper_forwards_remote_execution_options(monkeypatch):
+    """Remote execution options are handled outside the wrapped algorithm."""
+    algorithm = object()
+    backend = object()
+    remote_run = MagicMock(return_value="remote result")
+    monkeypatch.setattr("qdk_chemistry.remote.proxy.run", remote_run)
+
+    wrapped = registry._AlgorithmWrapper(algorithm)
+    result = wrapped.run(
+        "input",
+        keyword="value",
+        cache="cache",
+        remote=backend,
+        force_rerun=True,
+    )
+
+    assert result == "remote result"
+    remote_run.assert_called_once_with(
+        algorithm,
+        "input",
+        keyword="value",
+        cache="cache",
+        remote=backend,
+        force_rerun=True,
+    )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        pytest.param(None, id="none"),
+        pytest.param((42,), id="singleton-tuple"),
+        pytest.param((), id="empty-tuple"),
+    ],
+)
+def test_algorithm_wrapper_local_cache_satisfies_remote_run(tmp_path, result):
+    """A complete local result is a cache hit when a remote is later requested."""
+
+    class CachedAlgorithm:
+        calls = 0
+
+        def hash(self):
+            return "cached_result"
+
+        def run(self):
+            self.calls += 1
+            return result
+
+        def type_name(self):
+            return "test_algorithm"
+
+        def name(self):
+            return "cached_result"
+
+        def settings(self):
+            settings = MagicMock()
+            settings.to_dict.return_value = {}
+            return settings
+
+    implementation = CachedAlgorithm()
+    algorithm = registry._AlgorithmWrapper(implementation)
+    backend = MagicMock()
+    backend.submit.side_effect = AssertionError("remote backend was submitted")
+
+    assert algorithm.run(cache=tmp_path) == result
+    assert algorithm.run(cache=tmp_path, remote=backend) == result
+    assert implementation.calls == 1
+    backend.submit.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        pytest.param(None, id="none"),
+        pytest.param((42,), id="singleton-tuple"),
+        pytest.param((), id="empty-tuple"),
+    ],
+)
+def test_algorithm_wrapper_remote_cache_satisfies_local_run(tmp_path, result):
+    """A remotely fetched result is a cache hit for a later local request."""
+    implementation = MagicMock()
+    implementation.hash.return_value = "cached_result"
+    implementation.type_name.return_value = "test_algorithm"
+    implementation.name.return_value = "cached_result"
+    implementation.settings().to_dict.return_value = {}
+    algorithm = registry._AlgorithmWrapper(implementation)
+    backend = MagicMock()
+    job = Job(
+        job_id="remote-job",
+        backend="test",
+        backend_config={},
+        backend_state={},
+        status="succeeded",
+    )
+    job.fetch = MagicMock(return_value=result)
+    job.attach_backend(backend)
+    backend.submit.return_value = job
+
+    assert algorithm.run(cache=tmp_path, remote=backend) == result
+    assert algorithm.run(cache=tmp_path) == result
+    implementation.run.assert_not_called()
+    backend.submit.assert_called_once()
+
+
+def test_algorithm_wrapper_does_not_reserve_poll_interval():
+    """An algorithm can define its own poll_interval keyword argument."""
+    algorithm = MagicMock()
+    wrapped = registry._AlgorithmWrapper(algorithm)
+
+    wrapped.run("input", poll_interval=0.25)
+
+    algorithm.run.assert_called_once_with("input", poll_interval=0.25)
 
 
 class TestRegistryShowDefault:
@@ -491,6 +606,44 @@ _REGISTERED_PAIRS = _all_registered_pairs()
     _REGISTERED_PAIRS,
     ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
 )
+def test_all_registered_algorithms_expose_aliases(algorithm_type: str, algorithm_name: str):
+    """Every registered algorithm exposes its canonical name and lookup aliases."""
+    try:
+        algorithm = registry.create(algorithm_type, algorithm_name)
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+    aliases = algorithm.aliases()
+
+    assert isinstance(aliases, list)
+    assert algorithm.name() == algorithm_name
+    assert algorithm.name() in aliases
+    for alias in aliases:
+        if alias != algorithm.name():
+            assert alias not in registry.available(algorithm_type)
+        assert registry.create(algorithm_type, alias).name() == algorithm.name()
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name"),
+    _REGISTERED_PAIRS,
+    ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
+)
+def test_all_registered_algorithms_expose_hash(algorithm_type: str, algorithm_name: str):
+    """Every registered algorithm exposes its content-hash method."""
+    try:
+        algorithm = registry.create(algorithm_type, algorithm_name)
+    except (ImportError, RuntimeError) as exc:
+        pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+    assert callable(algorithm.hash)
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name"),
+    _REGISTERED_PAIRS,
+    ids=[f"{t}/{n}" for t, n in _REGISTERED_PAIRS],
+)
 class TestStringSettingsHaveGuidance:
     """Every string-typed setting must expose a description or an allowed-values list."""
 
@@ -655,7 +808,7 @@ class TestRegistryRegisterUnregister:
                 return "duplicate_python_algorithm"
 
             def aliases(self):
-                """Return the shared name as the sole alias."""
+                """Return the canonical name as the sole alias."""
                 return [self.name()]
 
             def settings(self):
@@ -694,7 +847,7 @@ class TestRegistryRegisterUnregister:
                 return "aliased_python_algorithm"
 
             def aliases(self):
-                """Return both test registry names."""
+                """Return the canonical name and additional test alias."""
                 return [self.name(), "python_algorithm_alias"]
 
             def settings(self):
@@ -798,7 +951,7 @@ class TestRegistryRegisterUnregister:
                 return "aliased_python_algorithm"
 
             def aliases(self):
-                """Return the primary name and test alias."""
+                """Return the canonical name and additional test alias."""
                 return [self.name(), "python_algorithm_alias"]
 
             def settings(self):
@@ -813,7 +966,7 @@ class TestRegistryRegisterUnregister:
                 return "conflicting_python_algorithm"
 
             def aliases(self):
-                """Return a fresh primary name and an occupied alias."""
+                """Return a fresh canonical name and occupied alias."""
                 return [self.name(), "python_algorithm_alias"]
 
         registry.register(AliasedAlgorithm)
@@ -824,6 +977,38 @@ class TestRegistryRegisterUnregister:
             assert "conflicting_python_algorithm" not in registry.available("expectation_estimator")
         finally:
             registry.unregister("expectation_estimator", "aliased_python_algorithm")
+
+    def test_python_factory_rejects_missing_canonical_name_alias(self):
+        """Python registration enforces that aliases include the canonical name."""
+
+        class InvalidAliasesAlgorithm:
+            def type_name(self):
+                return "expectation_estimator"
+
+            def name(self):
+                return "invalid_python_aliases"
+
+            def aliases(self):
+                return ["other_name"]
+
+        with pytest.raises(ValueError, match="must include its canonical name"):
+            registry.register(InvalidAliasesAlgorithm)
+
+    def test_cpp_factory_rejects_missing_canonical_name_alias(self):
+        """C++ registration enforces that aliases include the canonical name."""
+
+        class InvalidAliasesScf(ScfSolver):
+            def name(self):
+                return "invalid_cpp_aliases"
+
+            def aliases(self):
+                return ["other_name"]
+
+            def _run_impl(self, structure, charge, spin_multiplicity):
+                pass
+
+        with pytest.raises(ValueError, match="must include its canonical name"):
+            registry.register(InvalidAliasesScf)
 
     def test_unregister_custom_algorithm(self):
         """Test unregistering a custom algorithm."""

@@ -53,10 +53,12 @@ from qdk_chemistry.algorithms import create
 required_implementations = (
     create("scf_solver", "qdk"),
     create("active_space_selector", "qdk_autocas_eos"),
+    create("orbital_localizer", "qdk_natural_orbitals"),
+    create("orbital_localizer", "qdk_gauge_fixing"),
     create("hamiltonian_constructor", "qdk"),
     create("multi_configuration_calculator", "macis_cas"),
     create("qubit_mapper", "qdk"),
-    create("state_prep", "sparse_isometry_gf2x"),
+    create("state_prep", "sparse_isometry"),
     create("phase_estimation", "qdk_iterative"),
     create("circuit_executor", "qdk_full_state_simulator"),
 )

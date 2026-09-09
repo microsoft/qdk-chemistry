@@ -7,15 +7,20 @@ endif()
 if(DEFINED QDK_UARCH)
   message(STATUS "Using user-defined uarch: ${QDK_UARCH}")
 else()
+  # CMake regexes are case sensitive, and the spelling of the processor name is
+  # platform specific: Windows reports AMD64 and ARM64, Linux x86_64 and
+  # aarch64. Normalise before matching so every spelling is recognised.
+  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _qdk_system_processor)
+
   # Auto-detect based on the target platform
   if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     # Native MSVC cl has no generic baseline /arch: flag; leave QDK_UARCH unset.
     message(STATUS "Native MSVC: use compiler default ISA.")
     return()
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
+  elseif(_qdk_system_processor MATCHES "x86_64|amd64")
     set(QDK_UARCH "x86-64" CACHE STRING "Target microarchitecture")
     message(STATUS "Auto-detected x86_64 architecture, using: ${QDK_UARCH}")
-  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
+  elseif(_qdk_system_processor MATCHES "aarch64|arm64")
     set(QDK_UARCH "armv8-a" CACHE STRING "Target microarchitecture")
     message(STATUS "Auto-detected ARM64 architecture, using: ${QDK_UARCH}")
   else()

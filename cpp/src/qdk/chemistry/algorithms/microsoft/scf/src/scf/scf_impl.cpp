@@ -93,7 +93,7 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   add_mm_charge_ = cfg.pointcharges != nullptr;
 #endif
 
-  auto n_ecp_electrons = ctx_.basis_set->n_ecp_electrons;
+  auto n_ecp_electrons = ctx_.basis_set->get_n_ecp_electrons();
   auto spin = mol.multiplicity - 1;
   auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
   auto beta = mol.n_electrons - n_ecp_electrons - alpha;

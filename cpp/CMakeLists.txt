@@ -184,6 +184,11 @@ target_compile_definitions(chemistry PUBLIC ${HDF5_DEFINITIONS})
 if(MSVC)
     # MSVC CRT doesn't define M_PI etc. without this.
     target_compile_definitions(chemistry PUBLIC _USE_MATH_DEFINES)
+    # libint2's cxxapi.h checks __cplusplus to require C++11; MSVC reports the
+    # legacy 199711L unless /Zc:__cplusplus is set. clang-cl reports it correctly.
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(chemistry PUBLIC /Zc:__cplusplus)
+    endif()
 endif()
 target_compile_features(chemistry PUBLIC cxx_std_20)
 set_property(TARGET chemistry PROPERTY POSITION_INDEPENDENT_CODE ON)
