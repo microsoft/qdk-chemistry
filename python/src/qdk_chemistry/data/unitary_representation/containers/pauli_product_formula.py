@@ -5,13 +5,17 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import operator
+from array import array
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, overload
 
 import h5py
 import numpy as np
 
-from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash_uint
+from qdk_chemistry.data._hashing import _hash_array, _hash_float, _hash_int, _hash_str, _hash_uint
+from qdk_chemistry.data._sparse_pauli import _validate_sparse_pauli_arrays
 
 from .base import UnitaryContainer
 
@@ -32,6 +36,39 @@ class ExponentiatedPauliTerm:
 
     angle: float
     """The rotation angle for the exponentiation."""
+
+
+@dataclass(frozen=True, eq=False)
+class _PackedStepTerms(Sequence[ExponentiatedPauliTerm]):
+    """Compatibility view that creates term dictionaries only on access."""
+
+    _term_offsets: np.ndarray
+    _qubit_indices: np.ndarray
+    _pauli_codes: np.ndarray
+    _angles: np.ndarray
+
+    def __len__(self) -> int:
+        return len(self._angles)
+
+    @overload
+    def __getitem__(self, index: int) -> ExponentiatedPauliTerm: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[ExponentiatedPauliTerm]: ...
+
+    def __getitem__(self, index: int | slice) -> ExponentiatedPauliTerm | list[ExponentiatedPauliTerm]:
+        if isinstance(index, slice):
+            return [self[i] for i in range(*index.indices(len(self)))]
+        index = operator.index(index)
+        if index < 0:
+            index += len(self)
+        if index < 0 or index >= len(self):
+            raise IndexError("Product-formula term index out of range")
+        begin, end = int(self._term_offsets[index]), int(self._term_offsets[index + 1])
+        return ExponentiatedPauliTerm(
+            pauli_term={int(self._qubit_indices[i]): "IXYZ"[int(self._pauli_codes[i])] for i in range(begin, end)},
+            angle=float(self._angles[index]),
+        )
 
 
 class PauliProductFormulaContainer(UnitaryContainer):
@@ -62,10 +99,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
+    _packed_serialization_version = "0.3.0"
 
     def __init__(
         self,
-        step_terms: list[ExponentiatedPauliTerm],
+        step_terms: Sequence[ExponentiatedPauliTerm],
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
@@ -73,7 +111,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """Initialize a PauliProductFormulaContainer.
 
         Args:
-            step_terms: The list of exponentiated Pauli terms in a single step.
+            step_terms: The sequence of exponentiated Pauli terms in a single step.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
@@ -89,11 +127,77 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
-        self.step_terms = step_terms
+        self.step_terms: Sequence[ExponentiatedPauliTerm] = step_terms
         self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
         super().__init__()
+
+    @classmethod
+    def from_sparse_arrays(
+        cls,
+        term_offsets: np.ndarray,
+        qubit_indices: np.ndarray,
+        pauli_codes: np.ndarray,
+        angles: np.ndarray,
+        *,
+        step_reps: int,
+        num_qubits: int,
+        scale: float = 1.0,
+    ) -> "PauliProductFormulaContainer":
+        """Construct an immutable product formula from packed local Pauli terms.
+
+        Args:
+            term_offsets: Term boundaries, of length ``len(angles) + 1``; equal boundaries encode identity factors.
+            qubit_indices: Sorted, unique non-identity qubit indices within each term.
+            pauli_codes: Non-identity axes encoded as 1 (X), 2 (Y), or 3 (Z).
+            angles: One finite real rotation angle per term; an empty array represents an empty formula.
+            step_reps: Positive integer repetition count, stored without expanding the step.
+            num_qubits: Positive integer register width.
+            scale: Evolution time used for eigenvalue-phase conversion.
+
+        Returns:
+            A container owning read-only arrays and a lazy ``step_terms`` compatibility view.
+
+        Raises:
+            TypeError: If counts or sparse indices are not integers, or angles are not real numbers.
+            ValueError: If dimensions, indices, codes, angles, or the repetition count are invalid.
+
+        """
+        angles = np.asarray(angles)
+        if angles.ndim != 1:
+            raise ValueError("angles must be a one-dimensional array.")
+        if angles.dtype.kind not in "iuf":
+            raise TypeError("angles must contain real numbers.")
+        angles = np.frombuffer(angles.astype(np.float64, copy=False).tobytes(), dtype=np.float64)
+        if not np.all(np.isfinite(angles)):
+            raise ValueError("angles must be finite.")
+        term_offsets, qubit_indices, pauli_codes = _validate_sparse_pauli_arrays(
+            num_qubits, term_offsets, qubit_indices, pauli_codes, len(angles)
+        )
+
+        container = cls.__new__(cls)
+        container.__dict__.update(
+            _term_offsets=term_offsets,
+            _qubit_indices=qubit_indices,
+            _pauli_codes=pauli_codes,
+            _angles=angles,
+            _serialization_version=cls._packed_serialization_version,
+        )
+        step_terms = _PackedStepTerms(term_offsets, qubit_indices, pauli_codes, angles)
+        PauliProductFormulaContainer.__init__(container, step_terms, step_reps, int(num_qubits), float(scale))
+        return container
+
+    @property
+    def has_sparse_terms(self) -> bool:
+        """Return whether this container uses packed sparse terms."""
+        return hasattr(self, "_term_offsets")
+
+    def sparse_term_arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Return read-only offsets (uint64), indices (uint32), codes (uint8), and angles (float64)."""
+        if not self.has_sparse_terms:
+            raise RuntimeError("This product formula does not use packed sparse-term storage.")
+        return self._term_offsets, self._qubit_indices, self._pauli_codes, self._angles
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
@@ -117,13 +221,17 @@ class PauliProductFormulaContainer(UnitaryContainer):
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "pauli_product_formula")
-        _hash_uint(h, len(self.step_terms))
-        for term in self.step_terms:
-            _hash_uint(h, len(term.pauli_term))
-            for qubit_idx in sorted(term.pauli_term.keys()):
-                _hash_int(h, qubit_idx)
-                _hash_str(h, term.pauli_term[qubit_idx])
-            _hash_float(h, term.angle)
+        if self.has_sparse_terms:
+            for values in self.sparse_term_arrays():
+                _hash_array(h, values)
+        else:
+            _hash_uint(h, len(self.step_terms))
+            for term in self.step_terms:
+                _hash_uint(h, len(term.pauli_term))
+                for qubit_idx in sorted(term.pauli_term.keys()):
+                    _hash_int(h, qubit_idx)
+                    _hash_str(h, term.pauli_term[qubit_idx])
+                _hash_float(h, term.angle)
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
         _hash_float(h, self.scale)
@@ -171,6 +279,27 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if set(permutation) != set(range(len(self.step_terms))):
             raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")
 
+        if self.has_sparse_terms:
+            offsets = np.zeros_like(self._term_offsets)
+            indices = np.empty_like(self._qubit_indices)
+            codes = np.empty_like(self._pauli_codes)
+            for destination, source in enumerate(permutation):
+                begin, end = int(self._term_offsets[source]), int(self._term_offsets[source + 1])
+                start = int(offsets[destination])
+                stop = start + end - begin
+                indices[start:stop] = self._qubit_indices[begin:end]
+                codes[start:stop] = self._pauli_codes[begin:end]
+                offsets[destination + 1] = stop
+            return type(self).from_sparse_arrays(
+                offsets,
+                indices,
+                codes,
+                self._angles[permutation],
+                step_reps=self.step_reps,
+                num_qubits=self.num_qubits,
+                scale=self.scale,
+            )
+
         reordered_step_terms: list[ExponentiatedPauliTerm] = []
         for i in permutation:
             reordered_step_terms.append(self.step_terms[i])
@@ -179,6 +308,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=reordered_step_terms,
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
+            scale=self.scale,
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
@@ -214,6 +344,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
             )
 
+        if self.has_sparse_terms or other_container.has_sparse_terms:
+            return self._combine_packed(other_container, atol)
+
         merged: list[ExponentiatedPauliTerm] = []
         for step_terms, step_reps in (
             (self.step_terms, self.step_reps),
@@ -236,6 +369,58 @@ class PauliProductFormulaContainer(UnitaryContainer):
             scale=self.scale,
         )
 
+    def _combine_packed(self, other: "PauliProductFormulaContainer", atol: float) -> "PauliProductFormulaContainer":
+        """Fuse adjacent factors without materializing packed term dictionaries."""
+
+        def factors(container: "PauliProductFormulaContainer") -> Iterator[tuple[np.ndarray, np.ndarray, float]]:
+            if container.has_sparse_terms:
+                offsets, indices, codes, angles = container.sparse_term_arrays()
+                for term_index, angle in enumerate(angles):
+                    begin, end = int(offsets[term_index]), int(offsets[term_index + 1])
+                    yield indices[begin:end], codes[begin:end], float(angle)
+            else:
+                for term in container.step_terms:
+                    items = sorted(term.pauli_term.items())
+                    yield (
+                        np.asarray([index for index, _ in items], dtype=np.uint32),
+                        np.asarray(["IXYZ".index(axis) for _, axis in items], dtype=np.uint8),
+                        term.angle,
+                    )
+
+        offsets = array("Q", [0])
+        indices = array("I")
+        codes = array("B")
+        angles = array("d")
+        for container in (self, other):
+            for _ in range(container.step_reps):
+                for term_indices, term_codes, angle in factors(container):
+                    start = offsets[-2] if angles else 0
+                    if (
+                        angles
+                        and np.array_equal(np.frombuffer(indices, dtype=np.uint32)[start:], term_indices)
+                        and np.array_equal(np.frombuffer(codes, dtype=np.uint8)[start:], term_codes)
+                    ):
+                        angles[-1] += angle
+                        if abs(angles[-1]) <= atol:
+                            angles.pop()
+                            offsets.pop()
+                            del indices[start:]
+                            del codes[start:]
+                    else:
+                        indices.extend(term_indices)
+                        codes.extend(term_codes)
+                        offsets.append(len(indices))
+                        angles.append(angle)
+        return type(self).from_sparse_arrays(
+            np.frombuffer(offsets, dtype=np.uint64),
+            np.frombuffer(indices, dtype=np.uint32),
+            np.frombuffer(codes, dtype=np.uint8),
+            np.frombuffer(angles, dtype=np.float64),
+            step_reps=1,
+            num_qubits=self.num_qubits,
+            scale=self.scale,
+        )
+
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
 
@@ -243,16 +428,20 @@ class PauliProductFormulaContainer(UnitaryContainer):
             dict: Dictionary representation of the PauliProductFormulaContainer
 
         """
-        data: dict[str, Any] = {
-            "container_type": self.type,
-            "step_terms": [
+        data: dict[str, Any] = {"container_type": self.type}
+        if self.has_sparse_terms:
+            data.update(
+                term_offsets=self._term_offsets.tolist(),
+                qubit_indices=self._qubit_indices.tolist(),
+                pauli_codes=self._pauli_codes.tolist(),
+                angles=self._angles.tolist(),
+            )
+        else:
+            data["step_terms"] = [
                 {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
                 for term in self.step_terms
-            ],
-            "step_reps": self.step_reps,
-            "num_qubits": self.num_qubits,
-            "scale": self.scale,
-        }
+            ]
+        data.update(step_reps=self.step_reps, num_qubits=self.num_qubits, scale=self.scale)
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -267,6 +456,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
         group.attrs["step_reps"] = self.step_reps
         group.attrs["num_qubits"] = self.num_qubits
         group.attrs["scale"] = self.scale
+
+        if self.has_sparse_terms:
+            group.create_dataset("term_offsets", data=self._term_offsets)
+            group.create_dataset("qubit_indices", data=self._qubit_indices)
+            group.create_dataset("pauli_codes", data=self._pauli_codes)
+            group.create_dataset("angles", data=self._angles)
+            return
 
         step_terms_group = group.create_group("step_terms")
         for i, term in enumerate(self.step_terms):
@@ -287,7 +483,20 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        cls._validate_json_version(cls._serialization_version, json_data)
+        packed = "term_offsets" in json_data
+        expected_version = cls._packed_serialization_version if packed else cls._serialization_version
+        cls._validate_json_version(expected_version, json_data)
+        if packed:
+            return cls.from_sparse_arrays(
+                json_data["term_offsets"],
+                json_data["qubit_indices"],
+                json_data["pauli_codes"],
+                json_data["angles"],
+                step_reps=json_data["step_reps"],
+                num_qubits=json_data["num_qubits"],
+                scale=json_data.get("scale", 1.0),
+            )
+
         step_terms = []
         for i, term_data in enumerate(json_data["step_terms"]):
             pauli_term: dict[int, str] = {}
@@ -327,14 +536,26 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        cls._validate_hdf5_version(cls._serialization_version, group)
+        packed = "term_offsets" in group
+        cls._validate_hdf5_version(cls._packed_serialization_version if packed else cls._serialization_version, group)
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]
 
+        if packed:
+            return cls.from_sparse_arrays(
+                np.asarray(group["term_offsets"]),
+                np.asarray(group["qubit_indices"]),
+                np.asarray(group["pauli_codes"]),
+                np.asarray(group["angles"]),
+                step_reps=step_reps,
+                num_qubits=num_qubits,
+                scale=float(group.attrs.get("scale", 1.0)),
+            )
+
         step_terms: list[ExponentiatedPauliTerm] = []
         step_terms_group = group["step_terms"]
-        for term_name in step_terms_group:
-            term_group = step_terms_group[term_name]
+        for i in range(len(step_terms_group)):
+            term_group = step_terms_group[f"term_{i}"]
             angle = term_group.attrs["angle"]
             pauli_term: dict[int, str] = {}
             pauli_term_group = term_group["pauli_term"]

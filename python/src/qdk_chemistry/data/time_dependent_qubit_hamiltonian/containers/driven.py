@@ -53,6 +53,8 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
     def evaluate(self, t: float) -> QubitOperator:
         """Return H0 + f(t) * H1 at time *t*.
 
+        An exactly zero drive returns the partitioned base operator unchanged.
+
         Args:
             t: The time at which to evaluate the Hamiltonian.
 
@@ -60,7 +62,10 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
             The qubit operator at the given time.
 
         """
-        return self._base_hamiltonian + self._drive(t) * self._drive_hamiltonian
+        scale = self._drive(t)
+        if scale == 0.0 and self._base_hamiltonian.term_partition is not None:
+            return self._base_hamiltonian
+        return self._base_hamiltonian + scale * self._drive_hamiltonian
 
     @property
     def base_hamiltonian(self) -> QubitOperator:

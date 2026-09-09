@@ -4,6 +4,8 @@
 
 namespace QDKChemistry.Utils.PauliExp {
 
+    import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import Std.Arrays.Mapped;
     import Std.Arrays.Subarray;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
@@ -109,110 +111,75 @@ namespace QDKChemistry.Utils.PauliExp {
         RepPauliExp(params, _)
     }
 
-    /// Sparse form of `RepPauliExpParams`.
-    ///
-    /// The dense `pauliExponents` carries one Pauli per system qubit for every term,
-    /// which is O(terms * qubits). Jordan-Wigner terms are far from dense, so here each
-    /// term instead lists only its non-identity positions: `pauliIndices[t]` indexes
-    /// into `systems` and `pauliOps[t]` holds the matching axis. A term with no entries
-    /// is the identity term.
+    /// Flat non-identity factors; codes 1, 2, and 3 denote X, Y, and Z.
+    /// Equal consecutive offsets encode an identity factor, not an omitted term.
     struct SparseRepPauliExpParams {
-        pauliIndices : Int[][],
-        pauliOps : Pauli[][],
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        pauliCodes : Int[],
         pauliCoefficients : Double[],
         repetitions : Int,
     }
 
-    /// Performs Time Evolution for a sparsely encoded set of Pauli exponentials.
-    /// # Parameters
-    /// - `pauliIndices`: For each term, the positions in `systems` carrying a non-identity Pauli.
-    /// - `pauliOps`: For each term, the Pauli axis at each position in `pauliIndices`.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `systems`: An array of qubits representing the system on which the operation acts.
-    operation SparsePauliExp(
-        pauliIndices : Int[][],
-        pauliOps : Pauli[][],
-        pauliCoefficients : Double[],
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        if Length(pauliIndices) != Length(pauliCoefficients) or Length(pauliOps) != Length(pauliCoefficients) {
-            fail "SparsePauliExp: pauliIndices, pauliOps, and pauliCoefficients must have the same length.";
+    /// Applies one step, accessing only each term's non-identity support.
+    operation SparsePauliExp(params : SparseRepPauliExpParams, systems : Qubit[]) : Unit is Adj + Ctl {
+        if Length(params.termOffsets) != Length(params.pauliCoefficients) + 1 or Length(params.qubitIndices) != Length(params.pauliCodes) {
+            fail "SparsePauliExp: inconsistent array lengths.";
+        }
+        if params.termOffsets[0] != 0 or params.termOffsets[Length(params.termOffsets) - 1] != Length(params.qubitIndices) {
+            fail "SparsePauliExp: offsets must span the support.";
         }
 
-        for idx in 0..Length(pauliCoefficients) - 1 {
-            // `Exp` takes the opposite sign to the container's exp(-i theta P) convention.
-            Exp(pauliOps[idx], -pauliCoefficients[idx], Subarray(pauliIndices[idx], systems));
+        let axes = [PauliX, PauliY, PauliZ];
+        for term in 0..Length(params.pauliCoefficients) - 1 {
+            let first = params.termOffsets[term];
+            let next = params.termOffsets[term + 1];
+            if first < 0 or next < first or next > Length(params.qubitIndices) {
+                fail "SparsePauliExp: offsets must be nondecreasing and within the support.";
+            }
+            let support = first..next - 1;
+            let paulis = Mapped(code -> axes[code - 1], params.pauliCodes[support]);
+            // Exp uses the opposite sign; empty support retains the phase needed by controlled evolution.
+            Exp(paulis, -params.pauliCoefficients[term], Subarray(params.qubitIndices[support], systems));
         }
     }
 
-    /// Performs repeated Time Evolution for a sparsely encoded set of Pauli exponentials.
-    operation SparseRepPauliExp(
-        params : SparseRepPauliExpParams,
-        systems : Qubit[],
-    ) : Unit is Adj + Ctl {
-
+    /// Repeats a step symbolically during resource estimation, and explicitly during simulation.
+    operation SparseRepPauliExp(params : SparseRepPauliExpParams, systems : Qubit[]) : Unit is Adj + Ctl {
         if IsResourceEstimating() {
             within {
                 RepeatEstimates(params.repetitions);
             } apply {
-                SparsePauliExp(
-                    params.pauliIndices,
-                    params.pauliOps,
-                    params.pauliCoefficients,
-                    systems
-                );
+                SparsePauliExp(params, systems);
             }
         } else {
             for _ in 1..params.repetitions {
-                SparsePauliExp(
-                    params.pauliIndices,
-                    params.pauliOps,
-                    params.pauliCoefficients,
-                    systems
-                );
+                SparsePauliExp(params, systems);
             }
         }
     }
 
-    /// A helper operation to create a circuit for repeated sparse Time Evolution.
-    operation MakeSparseRepPauliExpCircuit(
-        params : SparseRepPauliExpParams,
-        system : Int[],
-    ) : Unit {
-        // If no system indices are provided, there is nothing to do.
+    /// Creates a circuit for repeated sparse Pauli evolution.
+    operation MakeSparseRepPauliExpCircuit(params : SparseRepPauliExpParams, system : Int[]) : Unit {
         if Length(system) == 0 {
             return ();
         }
-
-        // Determine the maximum index in the system array to size the qubit register safely.
-        mutable maxIndex = system[0];
-        for idx in 1..Length(system) - 1 {
-            let current = system[idx];
-            if current > maxIndex {
-                set maxIndex = current;
-            }
-        }
-
-        // Allocate enough qubits so that all indices in `system` are valid.
-        use qs = Qubit[maxIndex + 1];
+        use qs = Qubit[MaxInt(system) + 1];
         SparseRepPauliExp(params, Subarray(system, qs));
     }
 
-    /// Uncontrolled entry point for `SparseRepPauliExp`; see `ApplyRepPauliExp` for why
-    /// this forwarding operation carries no functors.
+    /// Plain entry point for composition; see `ApplyRepPauliExp` for the functor-erasure constraint.
     operation ApplySparseRepPauliExp(params : SparseRepPauliExpParams, systems : Qubit[]) : Unit {
         SparseRepPauliExp(params, systems);
     }
 
-    /// A helper function to create a callable for repeated sparse Time Evolution.
+    /// Returns a composable callable for repeated sparse evolution.
     function MakeSparseRepPauliExpOp(params : SparseRepPauliExpParams) : Qubit[] => Unit {
         ApplySparseRepPauliExp(params, _)
     }
 
-    /// Returns an `Adj + Ctl` callable for repeated sparse Time Evolution.
-    internal function MakeSparseRepPauliExpAdjCtlOp(
-        params : SparseRepPauliExpParams
-    ) : (Qubit[] => Unit is Adj + Ctl) {
+    /// Returns an `Adj + Ctl` callable for tests requiring explicit functor application.
+    internal function MakeSparseRepPauliExpAdjCtlOp(params : SparseRepPauliExpParams) : (Qubit[] => Unit is Adj + Ctl) {
         SparseRepPauliExp(params, _)
     }
 }

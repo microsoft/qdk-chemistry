@@ -89,11 +89,9 @@ class TestPauliSequenceMapper:
         evo_params = vars(circuit._qsharp_factory.parameter["params"])
 
         assert "pauliExponents" not in evo_params
-        assert evo_params["pauliIndices"] == [[0], [1]]
-        assert [[str(pauli) for pauli in ops] for ops in evo_params["pauliOps"]] == [
-            ["Pauli.X"],
-            ["Pauli.Z"],
-        ]
+        assert evo_params["termOffsets"] == [0, 1, 2]
+        assert evo_params["qubitIndices"] == [0, 1]
+        assert evo_params["pauliCodes"] == [1, 3]
 
     def test_default_target_indices(self, unitary_rep):
         """Test that default target indices are used when none are provided."""
@@ -269,8 +267,9 @@ class TestPauliSequenceMapper:
 def _sparse_controlled_op(terms, *, repetitions=1):
     """Build controlled sparse evolution using typed Q# parameters."""
     params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
-        pauliIndices=[term["qubits"] for term in terms],
-        pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
+        termOffsets=np.cumsum([0, *(len(term["qubits"]) for term in terms)]).tolist(),
+        qubitIndices=[index for term in terms for index in term["qubits"]],
+        pauliCodes=["IXYZ".index(axis) for term in terms for axis in term["axes"]],
         pauliCoefficients=[term["angle"] for term in terms],
         repetitions=repetitions,
     )

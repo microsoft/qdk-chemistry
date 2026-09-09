@@ -91,10 +91,13 @@ class TestDrivenQubitHamiltonianDriveFunctions:
 
     def test_zero_drive_returns_h0_only(self):
         """Zero drive f(t) = 0 should yield only H0 contributions for H1 terms."""
-        td = DrivenQubitHamiltonian(self._h0(), self._h1(), drive=lambda _t: 0.0)
+        h0 = self._h0()
+        td = DrivenQubitHamiltonian(h0, self._h1(), drive=lambda _t: 0.0)
         snap = td.evaluate(1.0)
-        np.testing.assert_allclose(snap.coefficients[:2], [1.0, 0.5])
-        np.testing.assert_allclose(snap.coefficients[2:], [0.0, 0.0])
+        assert snap is not h0
+        assert snap.term_partition is None
+        assert snap.pauli_strings == ["ZI", "IZ", "XX", "YY"]
+        np.testing.assert_array_equal(snap.coefficients, [1.0, 0.5, 0.0, 0.0])
 
     def test_step_function_drive(self):
         """Step function drive should switch H1 on/off at threshold."""
@@ -139,6 +142,22 @@ class TestDrivenQubitHamiltonianDriveFunctions:
 
 class TestDrivenQubitHamiltonianPartition:
     """Tests for partition preservation through evaluate()."""
+
+    @pytest.mark.parametrize("scale", [0.0, 1e-18])
+    def test_only_exact_zero_drive_reuses_packed_base(self, scale):
+        """A zero drive reuses the grouped object; even a tiny nonzero drive follows normal addition."""
+        h0 = QubitOperator.from_sparse_terms(
+            2, [{1: "Z"}], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),))
+        )
+        h1 = QubitOperator(["IX"], np.array([2.0]))
+        td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
+        snap = td.evaluate(scale)
+        if scale == 0.0:
+            assert snap is h0
+        else:
+            assert snap is not h0
+            assert snap.term_partition is None
+            np.testing.assert_array_equal(snap.coefficients, [1.0, 2.0 * scale])
 
     def test_evaluate_preserves_flat_partition(self):
         """evaluate() should carry through a merged FlatPartition when both h0 and h1 have one."""

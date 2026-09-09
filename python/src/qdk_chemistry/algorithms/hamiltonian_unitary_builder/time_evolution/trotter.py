@@ -20,12 +20,18 @@ References:
 
 from __future__ import annotations
 
+from array import array
+
+import numpy as np
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
 from qdk_chemistry.data import (
+    FlatPartition,
+    LayeredPartition,
     QubitOperator,
     UnitaryRepresentation,
 )
@@ -201,6 +207,15 @@ class Trotter(TimeEvolutionBuilder):
 
         delta = time / num_divisions
 
+        if qubit_hamiltonian.has_sparse_terms:
+            container = self._decompose_packed_trotter_step(
+                qubit_hamiltonian,
+                time=delta,
+                step_reps=num_divisions * power_repetitions,
+                scale=time,
+            )
+            return UnitaryRepresentation(container=container)
+
         terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
         num_qubits = qubit_hamiltonian.num_qubits
@@ -213,6 +228,68 @@ class Trotter(TimeEvolutionBuilder):
         )
 
         return UnitaryRepresentation(container=container)
+
+    def _decompose_packed_trotter_step(
+        self,
+        hamiltonian: QubitOperator,
+        *,
+        time: float,
+        step_reps: int,
+        scale: float,
+    ) -> PauliProductFormulaContainer:
+        """Traverse partition indices without constructing sub-Hamiltonians, labels, or term objects."""
+        threshold = self._settings.get("weight_threshold")
+        if not hamiltonian.is_hermitian(tolerance=threshold):
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
+
+        # Match the legacy complex(c).real precision before applying the threshold.
+        coefficients = np.asarray(hamiltonian.coefficients.real, dtype=np.float64)
+        active = np.abs(coefficients) > threshold
+        groups: list[tuple[tuple[int, ...], ...]] = []
+        if np.any(active):
+            partition = hamiltonian.term_partition
+            if isinstance(partition, LayeredPartition):
+                groups = [tuple(layer for layer in group if layer) for group in partition.groups]
+                groups = [group for group in groups if group]
+                # Match the dense path: sort by the number of nonempty layers, stably.
+                groups.sort(key=len)
+            elif isinstance(partition, FlatPartition):
+                groups = [(group,) for group in partition.groups if group]
+            elif partition is None:
+                groups = [((index,),) for index in range(hamiltonian.num_terms)]
+            else:
+                raise TypeError(
+                    f"Unsupported TermPartition subtype: {type(partition).__name__}. "
+                    "Expected FlatPartition or LayeredPartition."
+                )
+        else:
+            Logger.warn("No coefficients above the tolerance; returning empty term list.")
+
+        source_offsets, source_indices, source_codes = hamiltonian.sparse_term_arrays()
+        offsets = array("Q", [0])
+        indices = array("I")
+        codes = array("B")
+        angles = array("d")
+        for fraction, group_index in self._trotter_schedule(len(groups)):
+            for layer in groups[group_index]:
+                for term_index in layer:
+                    if not active[term_index]:
+                        continue
+                    begin, end = int(source_offsets[term_index]), int(source_offsets[term_index + 1])
+                    indices.frombytes(source_indices[begin:end].tobytes())
+                    codes.frombytes(source_codes[begin:end].tobytes())
+                    offsets.append(len(indices))
+                    angles.append(float(coefficients[term_index]) * time * fraction)
+
+        return PauliProductFormulaContainer.from_sparse_arrays(
+            np.frombuffer(offsets, dtype=np.uint64),
+            np.frombuffer(indices, dtype=np.uint32),
+            np.frombuffer(codes, dtype=np.uint8),
+            np.frombuffer(angles, dtype=np.float64),
+            step_reps=step_reps,
+            num_qubits=hamiltonian.num_qubits,
+            scale=scale,
+        )
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Determine the number of Trotter divisions to use.
@@ -282,7 +359,6 @@ class Trotter(TimeEvolutionBuilder):
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
             return terms
 
-        order = self._settings.get("order")
         grouped_hamiltonians = self._group_terms(qubit_hamiltonian)
 
         if not grouped_hamiltonians:
@@ -293,61 +369,44 @@ class Trotter(TimeEvolutionBuilder):
             [self._commuting_pauli_maps(subgroup, atol=atol) for subgroup in group] for group in grouped_hamiltonians
         ]
 
-        if order == 1:
-            for group in decomposed:
-                for subgroup in group:
-                    terms.extend(
-                        ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time) for mapping, coeff in subgroup
-                    )
-
-        # order = 2 or order = 2k with k>1
-        else:
-            # Build an abstract schedule of (time_fraction, group_index) entries.
-            # The Strang splitting puts group 0..L-2 at half-time on the outside
-            # and group L-1 at full-time in the middle:
-            #   S2(t) = [t/2 * G0, ..., t/2 * G_{L-2}, t * G_{L-1}, t/2 * G_{L-2}, ..., t/2 * G0]
-            n_groups = len(grouped_hamiltonians)
-            schedule: list[tuple[float, int]] = []
-            for g in range(n_groups - 1):
-                schedule.append((0.5, g))
-            schedule.append((1.0, n_groups - 1))
-            for g in range(n_groups - 2, -1, -1):
-                schedule.append((0.5, g))
-
-            # Apply Suzuki recursion at the schedule level for order > 2
-            if order > 2 and order % 2 == 0:
-                for k in range(2, int(order / 2) + 1):
-                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
-                    new_schedule: list[tuple[float, int]] = []
-                    # S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2
-                    for _ in range(2):
-                        for frac, g in schedule:
-                            new_schedule.append((frac * u_k, g))
-                    for frac, g in schedule:
-                        new_schedule.append((frac * (1 - 4 * u_k), g))
-                    for _ in range(2):
-                        for frac, g in schedule:
-                            new_schedule.append((frac * u_k, g))
-                    schedule = new_schedule
-
-            # Reduce the schedule: merge consecutive entries with the same group index
-            reduced: list[tuple[float, int]] = []
-            for frac, g in schedule:
-                if reduced and reduced[-1][1] == g:
-                    reduced[-1] = (reduced[-1][0] + frac, g)
-                else:
-                    reduced.append((frac, g))
-            schedule = reduced
-
-            # Expand the schedule into exponentiated Pauli terms
-            for frac, g in schedule:
-                for subgroup in decomposed[g]:
-                    terms.extend(
-                        ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time * frac)
-                        for mapping, coeff in subgroup
-                    )
+        for fraction, group_index in self._trotter_schedule(len(decomposed)):
+            for subgroup in decomposed[group_index]:
+                terms.extend(
+                    ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff * time * fraction)
+                    for mapping, coeff in subgroup
+                )
 
         return terms
+
+    def _trotter_schedule(self, num_groups: int) -> list[tuple[float, int]]:
+        """Return shared Strang/Suzuki time fractions and group indices for one step."""
+        if num_groups == 0:
+            return []
+        order = self._settings.get("order")
+        if order == 1:
+            return [(1.0, group_index) for group_index in range(num_groups)]
+
+        # Strang splitting: half-time outer groups around a full-time central group.
+        schedule = [(0.5, group_index) for group_index in range(num_groups - 1)]
+        schedule.append((1.0, num_groups - 1))
+        schedule.extend((0.5, group_index) for group_index in range(num_groups - 2, -1, -1))
+
+        # S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k)t) S_{2k-2}(u_k t)^2.
+        for k in range(2, order // 2 + 1):
+            u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
+            schedule = [
+                (fraction * factor, group_index)
+                for factor in (u_k, u_k, 1 - 4 * u_k, u_k, u_k)
+                for fraction, group_index in schedule
+            ]
+
+        reduced: list[tuple[float, int]] = []
+        for fraction, group_index in schedule:
+            if reduced and reduced[-1][1] == group_index:
+                reduced[-1] = (reduced[-1][0] + fraction, group_index)
+            else:
+                reduced.append((fraction, group_index))
+        return reduced
 
     def name(self) -> str:
         """Return the name of the unitary builder."""

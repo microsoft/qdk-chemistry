@@ -208,8 +208,9 @@ class MeasurementData(DataClass):
         """
         return "measurement_data"
 
-    # Serialization version for this class
+    # Dense-only measurements retain the legacy wire format.
     _serialization_version = "0.1.0"
+    _compact_serialization_version = "0.2.0"
 
     def __init__(
         self,
@@ -229,6 +230,8 @@ class MeasurementData(DataClass):
         self.hamiltonians = hamiltonians
         self.bitstring_counts = bitstring_counts if bitstring_counts is not None else []
         self.shots_list = shots_list if shots_list is not None else []
+        if any(hamiltonian.has_sparse_terms for hamiltonian in hamiltonians):
+            self._serialization_version = self._compact_serialization_version
         super().__init__()
 
     def _hash_update(self, h) -> None:
@@ -275,10 +278,14 @@ class MeasurementData(DataClass):
         """
         data = {
             str(i): {
-                "hamiltonian": {
-                    "paulis": hamiltonian.pauli_strings,
-                    "coefficients": hamiltonian.coefficients.tolist(),
-                },
+                "hamiltonian": (
+                    hamiltonian.to_json()
+                    if hamiltonian.has_sparse_terms
+                    else {
+                        "paulis": hamiltonian.pauli_strings,
+                        "coefficients": hamiltonian.coefficients.tolist(),
+                    }
+                ),
                 "bitstring": self.bitstring_counts[i] if i < len(self.bitstring_counts) else None,
                 "shots": self.shots_list[i] if i < len(self.shots_list) else 0,
             }
@@ -301,8 +308,11 @@ class MeasurementData(DataClass):
             ham_group = group.create_group(f"hamiltonian_{i}")
 
             # Store Hamiltonian data
-            ham_group.create_dataset("pauli_strings", data=np.array(hamiltonian.pauli_strings, dtype="S"))
-            ham_group.create_dataset("coefficients", data=hamiltonian.coefficients)
+            if hamiltonian.has_sparse_terms:
+                hamiltonian.to_hdf5(ham_group)
+            else:
+                ham_group.create_dataset("pauli_strings", data=np.array(hamiltonian.pauli_strings, dtype="S"))
+                ham_group.create_dataset("coefficients", data=hamiltonian.coefficients)
 
             # Store bitstring counts if available
             if i < len(self.bitstring_counts) and self.bitstring_counts[i] is not None:
@@ -331,7 +341,9 @@ class MeasurementData(DataClass):
             RuntimeError: If version field is missing or incompatible.
 
         """
-        cls._validate_json_version(cls._serialization_version, json_data)
+        packed = any("term_offsets" in item["hamiltonian"] for key, item in json_data.items() if key != "version")
+        expected_version = cls._compact_serialization_version if packed else cls._serialization_version
+        cls._validate_json_version(expected_version, json_data)
 
         hamiltonians: list[QubitOperator] = []
         bitstring_counts: list[dict[str, int] | None] = []
@@ -343,10 +355,13 @@ class MeasurementData(DataClass):
 
             # Reconstruct QubitOperator
             ham_data = item["hamiltonian"]
-            hamiltonian = QubitOperator(
-                ham_data["paulis"],
-                np.array(ham_data["coefficients"]),
-            )
+            if "version" in ham_data or "term_offsets" in ham_data:
+                hamiltonian = QubitOperator.from_json(ham_data)
+            else:
+                hamiltonian = QubitOperator(
+                    ham_data["paulis"],
+                    np.array(ham_data["coefficients"]),
+                )
             hamiltonians.append(hamiltonian)
 
             # Get bitstring counts
@@ -375,7 +390,9 @@ class MeasurementData(DataClass):
             RuntimeError: If version attribute is missing or incompatible.
 
         """
-        cls._validate_hdf5_version(cls._serialization_version, group)
+        packed = any("term_offsets" in group[key] for key in group if key.startswith("hamiltonian_"))
+        expected_version = cls._compact_serialization_version if packed else cls._serialization_version
+        cls._validate_hdf5_version(expected_version, group)
 
         num_hamiltonians = group.attrs["num_hamiltonians"]
 
@@ -387,9 +404,12 @@ class MeasurementData(DataClass):
             ham_group = group[f"hamiltonian_{i}"]
 
             # Load Hamiltonian data
-            pauli_strings = [s.decode() for s in ham_group["pauli_strings"][:]]
-            coefficients = np.array(ham_group["coefficients"])
-            hamiltonian = QubitOperator(pauli_strings, coefficients)
+            if "version" in ham_group.attrs or "term_offsets" in ham_group:
+                hamiltonian = QubitOperator.from_hdf5(ham_group)
+            else:
+                pauli_strings = [s.decode() for s in ham_group["pauli_strings"][:]]
+                coefficients = np.array(ham_group["coefficients"])
+                hamiltonian = QubitOperator(pauli_strings, coefficients)
             hamiltonians.append(hamiltonian)
 
             # Load bitstring counts if available

@@ -12,9 +12,13 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import qdk
 from qdk import TargetProfile
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 
 __all__ = [
     "QSHARP_UTILS",
@@ -68,6 +72,29 @@ class _SharedContext:
 
 _shared = _SharedContext()
 _thread_local = threading.local()
+
+
+def _pauli_evolution_parameters(container: "PauliProductFormulaContainer") -> dict[str, list[int] | list[float] | int]:
+    """Prepare one flat Q# payload from packed storage or legacy term objects."""
+    if container.has_sparse_terms:
+        arrays = container.sparse_term_arrays()
+        offsets, indices, codes, angles = (values.tolist() for values in arrays)
+    else:
+        offsets, indices, codes, angles = [0], [], [], []
+        for term in container.step_terms:
+            for index, axis in term.pauli_term.items():
+                if axis != "I":
+                    indices.append(index)
+                    codes.append("IXYZ".index(axis))
+            offsets.append(len(indices))
+            angles.append(term.angle)
+    return {
+        "termOffsets": offsets,
+        "qubitIndices": indices,
+        "pauliCodes": codes,
+        "pauliCoefficients": angles,
+        "repetitions": container.step_reps,
+    }
 
 
 def create_qsharp_context(
