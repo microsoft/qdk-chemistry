@@ -8,6 +8,7 @@
 import math
 
 import numpy as np
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.data import (
     Ansatz,
@@ -23,6 +24,29 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import get_qsharp_context
+
+
+def dense_matrix(op, num_qubits: int) -> np.ndarray:
+    """Densify a Q# operation by simulating it on every computational basis state.
+
+    Costs ``2**num_qubits`` simulations, so it is only usable on small registers.
+
+    Args:
+        op: Q# operation to simulate.
+        num_qubits: Width of the register the operation acts on.
+
+    Returns:
+        The operation's matrix, with basis state ``b`` in column ``b``.
+
+    """
+    context = get_qsharp_context()
+    columns = []
+    for basis in range(2**num_qubits):
+        state = [0.0] * (2**num_qubits)
+        state[basis] = 1.0
+        columns.append(dump_operation_on_state(op, num_qubits, state, context=context))
+    return np.array(columns, dtype=complex).T
 
 
 def create_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:

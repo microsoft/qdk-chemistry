@@ -35,9 +35,13 @@ from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .test_helpers import dense_matrix
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
+
+#: ``dump_operation_on_state`` rounds to about six decimals, so exact agreement lands near 1e-6.
+_TOL = 1e-5
 
 
 @pytest.fixture
@@ -117,27 +121,6 @@ class TestPauliSequenceMapperNonControlled:
         )
 
 
-def _dense_matrix(op, num_qubits: int) -> np.ndarray:
-    """Densify a Q# operation by simulating it on every computational basis state.
-
-    Costs ``2**num_qubits`` simulations, so it is only usable on small registers.
-
-    Args:
-        op: Q# operation to simulate.
-        num_qubits: Width of the register the operation acts on.
-
-    Returns:
-        The operation's matrix, with basis state ``b`` in column ``b``.
-
-    """
-    context = get_qsharp_context()
-    columns = []
-    for basis in range(2**num_qubits):
-        state = [0.0] * (2**num_qubits)
-        state[basis] = 1.0
-        columns.append(dump_operation_on_state(op, num_qubits, state, context=context))
-    return np.array(columns, dtype=complex).T
-
 def _sparse_op(terms, *, repetitions=1):
     """Build sparse evolution using typed Q# parameters."""
     params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
@@ -206,8 +189,8 @@ class TestSparseUncontrolledEvolution:
     def test_sparse_matches_dense(self, name, repetitions):
         """Switching to the sparse encoding must not change the unitary."""
         num_qubits, terms = self.CASES[name]
-        got = _dense_matrix(_sparse_op(terms, repetitions=repetitions), num_qubits)
-        want = _dense_matrix(_dense_op(terms, num_qubits, repetitions=repetitions), num_qubits)
+        got = dense_matrix(_sparse_op(terms, repetitions=repetitions), num_qubits)
+        want = dense_matrix(_dense_op(terms, num_qubits, repetitions=repetitions), num_qubits)
         assert np.max(np.abs(got - want)) < _TOL
 
     @pytest.mark.parametrize(
@@ -239,6 +222,6 @@ class TestSparseUncontrolledEvolution:
     def test_sparse_encoding_applies_the_container_sign_convention(self):
         """A single Z rotation must realise exp(-i theta Z), not its conjugate."""
         angle = 0.37
-        got = _dense_matrix(_sparse_op([{"qubits": [0], "axes": "Z", "angle": angle}]), 1)
+        got = dense_matrix(_sparse_op([{"qubits": [0], "axes": "Z", "angle": angle}]), 1)
         want = scipy.linalg.expm(-1j * angle * np.array([[1, 0], [0, -1]], dtype=complex))
         assert np.max(np.abs(got - want)) < _TOL

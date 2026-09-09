@@ -5,6 +5,8 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import Std.Arrays.Subarray;
+    import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.RepeatEstimates;
 
     /// Performs Time Evolution for a set of Pauli exponentials.
     /// # Parameters
@@ -17,7 +19,7 @@ namespace QDKChemistry.Utils.PauliExp {
         pauliExponents : Pauli[][],
         pauliCoefficients : Double[],
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for idx in 0..Length(pauliExponents) - 1 {
             let paulis = pauliExponents[idx];
             let coeff = pauliCoefficients[idx];
@@ -46,7 +48,7 @@ namespace QDKChemistry.Utils.PauliExp {
     operation RepPauliExp(
         params : RepPauliExpParams,
         systems : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for i in 1..params.repetitions {
             PauliExp(params.pauliExponents, params.pauliCoefficients, systems);
         }
@@ -86,7 +88,7 @@ namespace QDKChemistry.Utils.PauliExp {
     /// - `params`: A `RepPauliExpParams` struct containing the parameters for the operation.
     /// # Returns
     /// - `Qubit[] => Unit`: A callable that takes an array of system qubits, and prepares the repeated time evolution on the allocated qubits.
-    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit {
+    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit is Adj + Ctl {
         RepPauliExp(params, _)
     }
 
@@ -115,7 +117,7 @@ namespace QDKChemistry.Utils.PauliExp {
         pauliOps : Pauli[][],
         pauliCoefficients : Double[],
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         if Length(pauliIndices) != Length(pauliCoefficients) or Length(pauliOps) != Length(pauliCoefficients) {
             fail "SparsePauliExp: pauliIndices, pauliOps, and pauliCoefficients must have the same length.";
         }
@@ -130,13 +132,13 @@ namespace QDKChemistry.Utils.PauliExp {
     operation SparseRepPauliExp(
         params : SparseRepPauliExpParams,
         systems : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
 
         if IsResourceEstimating() {
             within {
                 RepeatEstimates(params.repetitions);
             } apply {
-                    SparsePauliExp(
+                SparsePauliExp(
                     params.pauliIndices,
                     params.pauliOps,
                     params.pauliCoefficients,
@@ -153,7 +155,6 @@ namespace QDKChemistry.Utils.PauliExp {
                 );
             }
         }
-    }
     }
 
     /// A helper operation to create a circuit for repeated sparse Time Evolution.
@@ -181,7 +182,7 @@ namespace QDKChemistry.Utils.PauliExp {
     }
 
     /// A helper function to create a callable for repeated sparse Time Evolution.
-    function MakeSparseRepPauliExpOp(params : SparseRepPauliExpParams) : Qubit[] => Unit {
+    function MakeSparseRepPauliExpOp(params : SparseRepPauliExpParams) : Qubit[] => Unit is Adj + Ctl {
         SparseRepPauliExp(params, _)
     }
 }
