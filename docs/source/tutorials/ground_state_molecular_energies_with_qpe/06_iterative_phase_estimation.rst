@@ -467,14 +467,15 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_run_iqpe.py
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
-A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
+A successful run completes all twenty runs and prints the complete-run bitstring counts, modal (most frequent) bitstring, component energies, reconstructed total, reference energy, and signed error.
 
-.. admonition:: What bitstring distribution and energy estimate did the script produce?
+.. admonition:: How should you interpret the repeated-run output?
    :class: quiz-question
    :collapsible: closed
 
-   The bitstring ``010000`` appeared 19 times and ``001111`` appeared once, so ``010000`` was the most frequent result.
-   It produced an active-space energy of :math:`-9.652276065987\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792909\ E_{\mathrm{h}}` after adding the core energy.
+   The printed ``Complete-run bitstring counts`` show the sampled distribution.
+   A separate ``Modal bitstring`` line identifies the unique most frequent result used for energy reconstruction.
+   Read the modal active-space energy, reconstructed total, and signed CASCI error from the current output rather than expecting one exact sampled distribution.
 
 .. admonition:: Does the result meet the teaching target, and what does that establish?
    :class: quiz-question
