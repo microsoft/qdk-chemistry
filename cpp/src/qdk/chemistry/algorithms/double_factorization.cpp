@@ -38,14 +38,12 @@ std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
 ///
 /// Pivoting runs in the symmetric-pair basis of dimension norb(norb+1)/2
 /// rather than the full norb^2, since the supermatrix is symmetric under
-/// p<->q. Each accepted vector is then expanded back to the norb^2 pair basis,
-/// so the result has the same layout a CholeskyHamiltonianContainer stores and
-/// can feed the same second factorization.
+/// p<->q. Accepted vectors are expanded back to the norb^2 pair layout on the
+/// way out, so that computed and stored three-center integrals feed the same
+/// second factorization.
 ///
-/// Chemist permutation symmetry is imposed by averaging, not verified. The
-/// eight-term average below folds the (pq)<->(rs) symmetrization into the
-/// p<->q one, so the norb^4 supermatrix is never materialized; only the
-/// reduced matrix, smaller by about a factor of four per dimension, is.
+/// Chemist permutation symmetry is imposed by averaging rather than verified,
+/// which also keeps the norb^4 supermatrix from ever being materialized.
 ///
 /// @param two_body_integrals Flattened two-electron tensor, size norb^4,
 ///        indexed p*norb^3 + q*norb^2 + r*norb + s.
@@ -392,8 +390,8 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
           : Eigen::MatrixXd(0, 0);
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      hamiltonian->get_core_energy(), u_matrices, w_matrices, wb_matrix,
-      h_alpha, inactive_fock, hamiltonian->get_orbitals(), energy_gap,
+      h_alpha, u_matrices, w_matrices, wb_matrix, hamiltonian->get_orbitals(),
+      hamiltonian->get_core_energy(), inactive_fock, energy_gap,
       hamiltonian->get_type());
 
   return std::make_shared<data::Hamiltonian>(std::move(container));

@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/double_factorization.hpp>
@@ -14,9 +15,12 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -150,6 +154,21 @@ const FactorizedHamiltonianContainer& as_factorized(
   return hamiltonian->get_container<FactorizedHamiltonianContainer>();
 }
 
+/// Trivial (no-symmetry) index set over @p num_modes carrying @p indices, for
+/// model orbitals that declare an explicit active/inactive space.
+std::shared_ptr<const SymmetryBlockedIndexSet> trivial_index_set(
+    std::size_t num_modes, const std::vector<std::size_t>& indices) {
+  auto symmetries =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> extents{
+      {SymmetryLabel{}, num_modes}};
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> selected{
+      {SymmetryLabel{},
+       std::vector<std::uint32_t>(indices.begin(), indices.end())}};
+  return std::make_shared<const SymmetryBlockedIndexSet>(symmetries, extents,
+                                                         std::move(selected));
+}
+
 }  // namespace
 
 TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
@@ -217,6 +236,54 @@ TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
   EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
   EXPECT_TRUE(factorized_h_alpha.isApprox(h_alpha, kReconstructionTolerance));
   EXPECT_TRUE(factorized->is_restricted());
+}
+
+TEST(DoubleFactorizerTest, PreservesInactiveFockAcrossASmallerActiveSpace) {
+  constexpr std::size_t nmo = 4;
+  constexpr std::size_t nact = 2;
+  constexpr double core_energy = 2.5;
+
+  auto orbitals = std::make_shared<ModelOrbitals>(
+      trivial_index_set(nmo, {1, 2}), trivial_index_set(nmo, {0}));
+
+  const Eigen::MatrixXd one_body = make_factors(nact, 1, 7).front();
+  const Eigen::VectorXd two_body = make_two_body(nact, {1.0, 1.0}, 29);
+
+  // Distinct entries, so a matrix that was dropped, zeroed or transposed on
+  // the way through cannot still compare equal.
+  Eigen::MatrixXd inactive_fock(nmo, nmo);
+  for (std::size_t p = 0; p < nmo; ++p) {
+    for (std::size_t q = 0; q < nmo; ++q) {
+      inactive_fock(static_cast<Eigen::Index>(p),
+                    static_cast<Eigen::Index>(q)) =
+          1.0 + static_cast<double>(p * nmo + q);
+    }
+  }
+
+  auto hamiltonian = std::make_shared<Hamiltonian>(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, orbitals, core_energy, inactive_fock));
+  ASSERT_TRUE(hamiltonian->has_inactive_fock_matrix());
+
+  auto factorized = DoubleFactorizerFactory::create("qdk")->run(hamiltonian);
+
+  EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
+  EXPECT_EQ(as_factorized(factorized).get_num_orbitals(), nact);
+
+  auto [factorized_h_alpha, factorized_h_beta] =
+      factorized->get_one_body_integrals();
+  EXPECT_TRUE(factorized_h_alpha.isApprox(one_body, kReconstructionTolerance));
+
+  ASSERT_TRUE(factorized->has_inactive_fock_matrix());
+  auto [factorized_fock, factorized_fock_beta] =
+      factorized->get_inactive_fock_matrix();
+  EXPECT_EQ(factorized_fock.rows(), static_cast<Eigen::Index>(nmo));
+  EXPECT_EQ(factorized_fock.cols(), static_cast<Eigen::Index>(nmo));
+  EXPECT_TRUE(factorized_fock.isApprox(inactive_fock, kReconstructionTolerance))
+      << "the inactive Fock matrix did not survive factorization";
+
+  auto [g_aaaa, g_aabb, g_bbbb] = factorized->get_two_body_integrals();
+  EXPECT_TRUE(g_aaaa.isApprox(two_body, kReconstructionTolerance));
 }
 
 TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {

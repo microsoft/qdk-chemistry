@@ -995,30 +995,30 @@ Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
 )");
 
   factorized_container.def(
-      py::init<double, const Eigen::VectorXd&, const Eigen::VectorXd&,
-               const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, std::shared_ptr<Orbitals>, double,
-               HamiltonianType>(),
+      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
+               const Eigen::VectorXd&, const Eigen::MatrixXd&,
+               std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
+               double, HamiltonianType>(),
       R"(
 Constructor for a factorized Hamiltonian.
 
 Args:
-    core_energy (float): Nuclear and inactive-core energy.
-    u_matrices (numpy.ndarray): U factors flattened in [R,B,N] order.
+    one_body_integrals (numpy.ndarray): One-body integrals with shape [N,N] over the N active spatial orbitals.
+    u_matrices (numpy.ndarray): U factors flattened in [R,B,N] order. Each basis row must be a unit vector.
     w_matrices (numpy.ndarray): W factors flattened in [R,B,C] order.
     wb_matrix (numpy.ndarray): Identity weights with shape [R,C].
-    one_body_integrals (numpy.ndarray): One-body integrals with shape [N,N].
-    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix with shape [N,N], or an empty array.
     orbitals (Orbitals): Restricted orbitals with N active spatial orbitals.
+    core_energy (float): Nuclear and inactive-core energy.
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix over the full molecular-orbital space.
     energy_gap (float, optional): Energy gap for SOS block encoding; defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type; defaults to Hermitian.
 
 Raises:
-    ValueError: If required data, dimensions, or restrictedness are inconsistent.
+    ValueError: If required data, dimensions, or restrictedness are inconsistent, or if a basis row of U is not normalized.
 )",
-      py::arg("core_energy"), py::arg("u_matrices"), py::arg("w_matrices"),
-      py::arg("wb_matrix"), py::arg("one_body_integrals"),
-      py::arg("inactive_fock_matrix"), py::arg("orbitals"),
+      py::arg("one_body_integrals"), py::arg("u_matrices"),
+      py::arg("w_matrices"), py::arg("wb_matrix"), py::arg("orbitals"),
+      py::arg("core_energy"), py::arg("inactive_fock_matrix"),
       py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 

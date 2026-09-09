@@ -18,11 +18,11 @@
 namespace qdk::chemistry::data {
 
 FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
-    double core_energy, const Eigen::VectorXd& u_matrices,
-    const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
     const Eigen::MatrixXd& one_body_integrals,
-    const Eigen::MatrixXd& inactive_fock_matrix,
-    std::shared_ptr<Orbitals> orbitals, double energy_gap, HamiltonianType type)
+    const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
+    const Eigen::MatrixXd& wb_matrix, std::shared_ptr<Orbitals> orbitals,
+    double core_energy, const Eigen::MatrixXd& inactive_fock_matrix,
+    double energy_gap, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _u(u_matrices),
@@ -34,6 +34,31 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
   validate_integral_dimensions();
   validate_restrictedness_consistency();
   validate_active_space_dimensions();
+
+  // get_lambda() treats the W entries as the eigenvalues of the fragment
+  // M^{rc} = sum_b W^{rc}_b u^r_b u^r_b^T, which is only true when each basis
+  // row is a unit vector, so check here.
+  if (has_two_body_integrals()) {
+    const size_t norb = get_num_orbitals();
+    const size_t R = get_num_ranks();
+    const size_t B = get_num_bases();
+    for (size_t r = 0; r < R; ++r) {
+      for (size_t b = 0; b < B; ++b) {
+        const Eigen::Map<const Eigen::VectorXd> basis(
+            _u.data() + (r * B + b) * norb, static_cast<Eigen::Index>(norb));
+        const double deviation = std::abs(basis.squaredNorm() - 1.0);
+        if (deviation > 1e-8) {
+          throw std::invalid_argument(
+              "Factorized Hamiltonian basis row (rank " + std::to_string(r) +
+              ", basis " + std::to_string(b) +
+              ") is not normalized: its squared norm is " +
+              std::to_string(basis.squaredNorm()) +
+              ". Rescale the row to unit length and fold its norm into the "
+              "corresponding W entries.");
+        }
+      }
+    }
+  }
 
   if (!is_valid()) {
     throw std::invalid_argument(
@@ -53,7 +78,7 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     fock_alpha = fa;
   }
   return std::make_unique<FactorizedHamiltonianContainer>(
-      _core_energy, _u, _w, _wb, h1_alpha, fock_alpha, _orbitals, _energy_gap,
+      h1_alpha, _u, _w, _wb, _orbitals, _core_energy, fock_alpha, _energy_gap,
       _type);
 }
 
@@ -90,11 +115,35 @@ double FactorizedHamiltonianContainer::get_two_body_element(
   if (i >= norb || j >= norb || k >= norb || l >= norb) {
     throw std::out_of_range("Orbital index out of range");
   }
-  if (!_cached_two_body) {
-    _build_two_body_cache();
+
+  if (_cached_two_body) {
+    size_t idx = i * norb * norb * norb + j * norb * norb + k * norb + l;
+    return (*_cached_two_body)(idx);
   }
-  size_t idx = i * norb * norb * norb + j * norb * norb + k * norb + l;
-  return (*_cached_two_body)(idx);
+
+  const size_t R = get_num_ranks();
+  const size_t B = get_num_bases();
+  const size_t C = get_num_copies();
+
+  double element = 0.0;
+  for (size_t r = 0; r < R; ++r) {
+    const double* u_rank = _u.data() + r * B * norb;
+    const double* w_rank = _w.data() + r * B * C;
+    for (size_t c = 0; c < C; ++c) {
+      // M^{rc}_{pq} = sum_b W^{rc}_b U^r_{bp} U^r_{bq}, evaluated only at the
+      // two orbital pairs this element needs.
+      double m_ij = 0.0;
+      double m_kl = 0.0;
+      for (size_t b = 0; b < B; ++b) {
+        const double weight = w_rank[b * C + c];
+        const double* basis = u_rank + b * norb;
+        m_ij += weight * basis[i] * basis[j];
+        m_kl += weight * basis[k] * basis[l];
+      }
+      element += m_ij * m_kl;
+    }
+  }
+  return element;
 }
 
 bool FactorizedHamiltonianContainer::has_two_body_integrals() const {
@@ -377,7 +426,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, energy_gap, type);
+      h1, u, w, wb, orbitals, core_energy, fock, energy_gap, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
@@ -509,7 +558,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      core_energy, u, w, wb, h1, fock, orbitals, energy_gap, type);
+      h1, u, w, wb, orbitals, core_energy, fock, energy_gap, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {

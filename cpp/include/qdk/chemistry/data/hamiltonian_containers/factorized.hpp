@@ -28,23 +28,26 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Construct a restricted factorized Hamiltonian.
    *
-   * @param core_energy Nuclear and inactive-core energy.
+   * @param one_body_integrals One-body integrals [N,N] over the N active
+   *        spatial orbitals.
    * @param u_matrices U factors, flattened as [R,B,N].
    * @param w_matrices W factors, flattened as [R,B,C].
    * @param wb_matrix Identity weights [R,C].
-   * @param one_body_integrals One-body integrals [N,N].
-   * @param inactive_fock_matrix Inactive Fock matrix.
    * @param orbitals Orbitals with an active space.
+   * @param core_energy Nuclear and inactive-core energy.
+   * @param inactive_fock_matrix Inactive Fock matrix with full
+   *        molecular-orbital dimensions.
    * @param energy_gap Energy-gap metadata.
    * @param type Hamiltonian type.
-   * @throws std::invalid_argument if dimensions or required data are invalid.
+   * @throws std::invalid_argument if dimensions or required data are invalid,
+   *         or if a basis row of U is not normalized.
    */
   FactorizedHamiltonianContainer(
-      double core_energy, const Eigen::VectorXd& u_matrices,
-      const Eigen::VectorXd& w_matrices, const Eigen::MatrixXd& wb_matrix,
       const Eigen::MatrixXd& one_body_integrals,
-      const Eigen::MatrixXd& inactive_fock_matrix,
-      std::shared_ptr<Orbitals> orbitals, double energy_gap = 0.0,
+      const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
+      const Eigen::MatrixXd& wb_matrix, std::shared_ptr<Orbitals> orbitals,
+      double core_energy, const Eigen::MatrixXd& inactive_fock_matrix,
+      double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /** @brief Destructor. */
