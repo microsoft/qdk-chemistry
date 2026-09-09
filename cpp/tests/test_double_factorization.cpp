@@ -150,28 +150,6 @@ const FactorizedHamiltonianContainer& as_factorized(
   return hamiltonian->get_container<FactorizedHamiltonianContainer>();
 }
 
-/// Sum of |eps_b| over the bases of one rank, read back out of the container.
-/// This is the quantity the fragments are ordered by, and the only way to see
-/// it now that the fragments themselves are an implementation detail.
-double coefficient_one_norm(const FactorizedHamiltonianContainer& container,
-                            std::size_t rank) {
-  const std::size_t bases = container.get_num_bases();
-  return container.get_w_matrices()
-      .segment(static_cast<Eigen::Index>(rank * bases),
-               static_cast<Eigen::Index>(bases))
-      .cwiseAbs()
-      .sum();
-}
-
-double coefficient_squared_norm(const FactorizedHamiltonianContainer& container,
-                                std::size_t rank) {
-  const std::size_t bases = container.get_num_bases();
-  return container.get_w_matrices()
-      .segment(static_cast<Eigen::Index>(rank * bases),
-               static_cast<Eigen::Index>(bases))
-      .squaredNorm();
-}
-
 }  // namespace
 
 TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
@@ -262,30 +240,6 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
       truncated_hamiltonian->get_two_body_integrals();
   EXPECT_FALSE(g_aaaa.isApprox(two_body, kReconstructionTolerance));
   EXPECT_LT((g_aaaa - two_body).cwiseAbs().maxCoeff(), 1e-2);
-}
-
-TEST(DoubleFactorizerTest, SortsFragmentsByDecreasingOneNormContribution) {
-  // The two fragments carry the same information but different coefficient
-  // profiles, so ordering by ||eps||_1 and ordering by ||eps||_2 disagree.
-  // The container has to show the one-norm order, because that is what the
-  // block-encoding cost is built on.
-  constexpr std::size_t norb = 2;
-  Eigen::MatrixXd concentrated = Eigen::MatrixXd::Zero(norb, norb);
-  concentrated(0, 0) = 3.0;
-  Eigen::MatrixXd distributed = Eigen::MatrixXd::Zero(norb, norb);
-  distributed(0, 1) = 2.0;
-  distributed(1, 0) = 2.0;
-
-  auto factorized =
-      DoubleFactorizerFactory::create("qdk")->run(make_hamiltonian(
-          norb, make_two_body({concentrated, distributed}, {1.0, 1.0})));
-  const auto& container = as_factorized(factorized);
-  ASSERT_EQ(container.get_num_ranks(), 2u);
-
-  EXPECT_GT(coefficient_one_norm(container, 0),
-            coefficient_one_norm(container, 1));
-  EXPECT_LT(coefficient_squared_norm(container, 0),
-            coefficient_squared_norm(container, 1));
 }
 
 TEST(DoubleFactorizerTest, RunProducesEquivalentFactorizedContainer) {

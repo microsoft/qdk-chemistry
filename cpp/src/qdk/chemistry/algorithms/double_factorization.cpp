@@ -10,7 +10,6 @@
 #include <lapack.hh>
 #include <limits>
 #include <memory>
-#include <numeric>
 #include <qdk/chemistry/algorithms/double_factorization.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
@@ -226,8 +225,7 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 /// @param norb Number of (spatial) orbitals.
 /// @param u_matrices Resized to naux * norb * norb and filled rank by rank.
 /// @param w_matrices Resized to naux * norb and filled rank by rank.
-/// @return The number of ranks written, one per Cholesky vector, ordered by
-///         decreasing coefficient one-norm sum_b |eps_b|.
+/// @return The number of ranks written, one per Cholesky vector.
 /// @throws std::invalid_argument if `cholesky_vectors` does not have norb^2
 ///         rows or contains a non-finite value.
 /// @throws std::runtime_error if a LAPACK diagonalization fails.
@@ -253,23 +251,25 @@ std::size_t fragments_from_cholesky_vectors(
   const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
   const Eigen::Index num_ranks = cholesky_vectors.cols();
 
-  // Every rank is diagonalized before any is placed, since the ordering key
-  // is the coefficient one-norm and that is only known afterwards.
-  Eigen::MatrixXd rotations(num_orbitals * num_orbitals, num_ranks);
-  Eigen::MatrixXd coefficients(num_orbitals, num_ranks);
+  // syev leaves the eigenvectors as columns in column-major order, which is
+  // bytewise the row-major [basis, orbital] layout the container stores, so
+  // each rank is diagonalized straight into its slot.
+  u_matrices.resize(num_ranks * num_orbitals * num_orbitals);
+  w_matrices.resize(num_ranks * num_orbitals);
+
   bool warned_asymmetric = false;
   for (Eigen::Index q = 0; q < num_ranks; ++q) {
     const Eigen::Map<const RowMajorMatrix> pair_matrix(
         cholesky_vectors.col(q).data(), num_orbitals, num_orbitals);
-    Eigen::Map<Eigen::MatrixXd> rotation(rotations.col(q).data(), num_orbitals,
-                                         num_orbitals);
+    Eigen::Map<Eigen::MatrixXd> rotation(
+        u_matrices.data() + q * num_orbitals * num_orbitals, num_orbitals,
+        num_orbitals);
 
-    // The symmetrized result goes into `rotations`, which is local;
-    // `pair_matrix` is a const map, so the caller's vectors are never written
-    // through. A Cholesky vector is expected to be symmetric in its orbital
-    // pair already. If one is not, only its symmetric part survives here, and
-    // silently factorizing a different matrix than the caller supplied is
-    // worth saying out loud.
+    // `rotation` maps the output buffer and `pair_matrix` is a const map, so
+    // the caller's vectors are never written through. A Cholesky vector is
+    // expected to be symmetric in its orbital pair already. If one is not,
+    // only its symmetric part survives here, and silently factorizing a
+    // different matrix than the caller supplied is worth saying out loud.
     if (!warned_asymmetric) {
       const double asymmetry =
           (pair_matrix - pair_matrix.transpose()).cwiseAbs().maxCoeff();
@@ -285,41 +285,15 @@ std::size_t fragments_from_cholesky_vectors(
     }
     rotation = 0.5 * (pair_matrix + pair_matrix.transpose());
 
-    const int64_t info =
-        lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower,
-                     static_cast<int64_t>(norb), rotation.data(),
-                     static_cast<int64_t>(norb), coefficients.col(q).data());
+    const int64_t info = lapack::syev(
+        lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
+        rotation.data(), static_cast<int64_t>(norb),
+        w_matrices.data() + q * num_orbitals);
     if (info != 0) {
       throw std::runtime_error(
           "double_factorizer: LAPACK syev failed to diagonalize (info=" +
           std::to_string(info) + ").");
     }
-  }
-
-  // Ranks are ordered by decreasing coefficient one-norm because that is what
-  // each fragment contributes to the qubitization one-norm lambda. A caller
-  // that keeps only the leading ranks therefore drops the least significant
-  // fragments first. This order is part of the container's public contract.
-  const Eigen::VectorXd one_norms =
-      coefficients.cwiseAbs().colwise().sum().transpose();
-  std::vector<Eigen::Index> order(static_cast<std::size_t>(num_ranks));
-  std::iota(order.begin(), order.end(), Eigen::Index{0});
-  std::sort(order.begin(), order.end(),
-            [&one_norms](Eigen::Index a, Eigen::Index b) {
-              return one_norms[a] > one_norms[b];
-            });
-
-  // syev leaves the eigenvectors as columns in column-major order, which is
-  // bytewise the row-major [basis, orbital] layout the container stores, so
-  // placing a rank is a plain copy rather than a transpose.
-  u_matrices.resize(num_ranks * num_orbitals * num_orbitals);
-  w_matrices.resize(num_ranks * num_orbitals);
-  for (Eigen::Index r = 0; r < num_ranks; ++r) {
-    const Eigen::Index source = order[static_cast<std::size_t>(r)];
-    u_matrices.segment(r * num_orbitals * num_orbitals,
-                       num_orbitals * num_orbitals) = rotations.col(source);
-    w_matrices.segment(r * num_orbitals, num_orbitals) =
-        coefficients.col(source);
   }
 
   return static_cast<std::size_t>(num_ranks);
