@@ -188,7 +188,10 @@ const Eigen::MatrixXd& FactorizedHamiltonianContainer::get_wb_matrix() const {
 }
 
 size_t FactorizedHamiltonianContainer::get_num_orbitals() const {
-  return _orbitals->get_active_space_indices().first.size();
+  // Taken from the stored one-body matrix rather than from the orbitals'
+  // active-space indices: get_active_space_indices() is deprecated, and the
+  // stored integrals are the dimension every other accessor here is built on.
+  return static_cast<size_t>(std::get<0>(get_one_body_integrals()).rows());
 }
 
 size_t FactorizedHamiltonianContainer::get_num_ranks() const {
@@ -211,10 +214,22 @@ double FactorizedHamiltonianContainer::get_energy_gap() const {
 
 double FactorizedHamiltonianContainer::get_lambda_eff() const {
   // :cite:`Low2025` (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
-  if (!(_energy_gap > 0.0)) return 0.0;
+  if (!(_energy_gap > 0.0)) {
+    QDK_LOGGER().warn(
+        "FactorizedHamiltonianContainer::get_lambda_eff: no positive energy "
+        "gap has been set, returning 0. Call set_energy_gap() first.");
+    return 0.0;
+  }
 
   const double lambda = get_lambda();
-  if (!(_energy_gap < 2.0 * lambda)) return 0.0;
+  if (!(_energy_gap < 2.0 * lambda)) {
+    QDK_LOGGER().warn(
+        "FactorizedHamiltonianContainer::get_lambda_eff: the energy gap "
+        "({:.6e}) is not below 2*lambda ({:.6e}), so the expression under the "
+        "square root is non-positive. Returning 0.",
+        _energy_gap, 2.0 * lambda);
+    return 0.0;
+  }
 
   return std::sqrt(_energy_gap * (2.0 * lambda - _energy_gap));
 }

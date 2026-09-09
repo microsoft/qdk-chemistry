@@ -34,7 +34,9 @@ void bind_double_factorization(py::module &m) {
     chemist permutation symmetry by averaging, and reduced by a pivoted
     Cholesky decomposition in ``O(naux * norb**4)`` that stops at the
     numerical rank. Pivoting stops once the largest remaining residual
-    diagonal drops to ``truncation_threshold``.
+    diagonal drops to ``truncation_threshold``, or to a noise floor scaled
+    to the largest supermatrix diagonal, whichever is larger; a threshold
+    below that floor therefore has no further effect.
   - A :class:`qdk_chemistry.data.CholeskyHamiltonianContainer` already stores
     such vectors, so they are consumed directly and the dense ``norb**4``
     tensor is never formed. ``truncation_threshold`` is ignored in that case,

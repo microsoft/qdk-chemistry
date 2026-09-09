@@ -106,6 +106,10 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
   }
 
   Eigen::VectorXd residual_diagonal = reduced.diagonal();
+  // The floor is deliberately relative to the largest diagonal rather than
+  // clamped at an absolute value: integrals in atomic units can legitimately
+  // sit many orders of magnitude below 1, and an absolute floor would discard
+  // every fragment of such a tensor instead of resolving it.
   const double diagonal_scale = std::max(residual_diagonal.maxCoeff(), 0.0);
   const double noise_floor = std::numeric_limits<double>::epsilon() *
                              static_cast<double>(reduced_dim) * diagonal_scale;
@@ -142,6 +146,53 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 
     residual_diagonal -= column.cwiseAbs2();
     vectors.push_back(std::move(column));
+  }
+
+  // The pivot loop only ever inspects the residual *diagonal*, so a negative
+  // eigenvalue whose eigenvector is spread across off-diagonal entries can
+  // reach this point undetected and leave L L^T reproducing a different
+  // tensor. Certify the factorization instead of assuming it: for a genuinely
+  // positive semi-definite residual R the largest entry lies on the diagonal
+  // (|R_ij| <= sqrt(R_ii R_jj)), so max|g - L L^T| cannot exceed the value
+  // pivoting stopped at. The safety factor keeps ordinary rounding and
+  // truncation error, measured at up to 0.99 of the bare bound, from tripping
+  // the check.
+  //
+  // Indefiniteness smaller than `stop_threshold` stays undetectable here, and
+  // necessarily so: truncation discards information of exactly that size, so
+  // it cannot be told apart from truncation error.
+  constexpr double residual_safety_factor = 8.0;
+  const double deviation_tolerance =
+      residual_safety_factor * (stop_threshold + noise_floor);
+
+  Eigen::MatrixXd basis(static_cast<Eigen::Index>(reduced_dim),
+                        static_cast<Eigen::Index>(vectors.size()));
+  for (std::size_t q = 0; q < vectors.size(); ++q) {
+    basis.col(static_cast<Eigen::Index>(q)) = vectors[q];
+  }
+
+  // Compare against g in column blocks so the reconstruction never needs a
+  // second reduced_dim x reduced_dim allocation.
+  constexpr Eigen::Index block_columns = 256;
+  const auto columns = static_cast<Eigen::Index>(reduced_dim);
+  double max_deviation = 0.0;
+  for (Eigen::Index start = 0; start < columns; start += block_columns) {
+    const Eigen::Index width = std::min(block_columns, columns - start);
+    const Eigen::MatrixXd reconstructed =
+        basis * basis.middleRows(start, width).transpose();
+    max_deviation = std::max(max_deviation,
+                             (reduced.middleCols(start, width) - reconstructed)
+                                 .cwiseAbs()
+                                 .maxCoeff());
+  }
+
+  if (max_deviation > deviation_tolerance) {
+    throw std::invalid_argument(
+        "double_factorizer: the two-electron supermatrix is not positive "
+        "semi-definite, so it has no Cholesky decomposition. The recovered "
+        "vectors reproduce it only to " +
+        std::to_string(max_deviation) + ", against a tolerance of " +
+        std::to_string(deviation_tolerance) + ".");
   }
 
   // Expand each reduced vector over both orders of its orbital pair.
@@ -206,11 +257,32 @@ std::size_t fragments_from_cholesky_vectors(
   // is the coefficient one-norm and that is only known afterwards.
   Eigen::MatrixXd rotations(num_orbitals * num_orbitals, num_ranks);
   Eigen::MatrixXd coefficients(num_orbitals, num_ranks);
+  bool warned_asymmetric = false;
   for (Eigen::Index q = 0; q < num_ranks; ++q) {
     const Eigen::Map<const RowMajorMatrix> pair_matrix(
         cholesky_vectors.col(q).data(), num_orbitals, num_orbitals);
     Eigen::Map<Eigen::MatrixXd> rotation(rotations.col(q).data(), num_orbitals,
                                          num_orbitals);
+
+    // The symmetrized result goes into `rotations`, which is local;
+    // `pair_matrix` is a const map, so the caller's vectors are never written
+    // through. A Cholesky vector is expected to be symmetric in its orbital
+    // pair already. If one is not, only its symmetric part survives here, and
+    // silently factorizing a different matrix than the caller supplied is
+    // worth saying out loud.
+    if (!warned_asymmetric) {
+      const double asymmetry =
+          (pair_matrix - pair_matrix.transpose()).cwiseAbs().maxCoeff();
+      const double scale = pair_matrix.cwiseAbs().maxCoeff();
+      if (asymmetry > 1e-8 * std::max(scale, 1.0)) {
+        QDK_LOGGER().warn(
+            "double_factorizer: Cholesky vector {} is not symmetric in its "
+            "orbital pair (largest asymmetry {:.3e}); only its symmetric part "
+            "is factorized.",
+            static_cast<long long>(q), asymmetry);
+        warned_asymmetric = true;
+      }
+    }
     rotation = 0.5 * (pair_matrix + pair_matrix.transpose());
 
     const int64_t info =
@@ -224,6 +296,10 @@ std::size_t fragments_from_cholesky_vectors(
     }
   }
 
+  // Ranks are ordered by decreasing coefficient one-norm because that is what
+  // each fragment contributes to the qubitization one-norm lambda. A caller
+  // that keeps only the leading ranks therefore drops the least significant
+  // fragments first. This order is part of the container's public contract.
   const Eigen::VectorXd one_norms =
       coefficients.cwiseAbs().colwise().sum().transpose();
   std::vector<Eigen::Index> order(static_cast<std::size_t>(num_ranks));
@@ -283,11 +359,14 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
     throw std::invalid_argument(type_name() +
                                 ": norb must be greater than zero.");
   }
-  if (truncation_threshold < 0.0 || std::isnan(truncation_threshold)) {
+  // The settings constraint already rejects a negative threshold when it is
+  // set, but NaN compares false against any bound and so survives it. It has
+  // to be caught here because it would make every pivot comparison false and
+  // silently yield zero fragments.
+  if (std::isnan(truncation_threshold)) {
     throw std::invalid_argument(type_name() +
-                                ": truncation_threshold must be "
-                                "non-negative, got " +
-                                std::to_string(truncation_threshold) + ".");
+                                ": truncation_threshold must be a number, "
+                                "got NaN.");
   }
 
   // First factorization. Stored three-center integrals already are one, so
@@ -301,6 +380,11 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
             .first;
 
     if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
+      QDK_LOGGER().info(
+          "double_factorizer: using the stored three-center integrals as the "
+          "first factorization; truncation_threshold={:.3e} is ignored "
+          "because those vectors were already truncated when they were built.",
+          truncation_threshold);
       cholesky_vectors = &three_center;
     } else {
       QDK_LOGGER().debug(

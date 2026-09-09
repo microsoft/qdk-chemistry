@@ -29,7 +29,10 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         "Cutoff for the pivoted Cholesky decomposition of the two-electron "
         "supermatrix: pivoting stops once the largest remaining residual "
         "diagonal drops to it. Must be non-negative; 0.0 keeps every "
-        "numerically resolvable fragment. Ignored when the input Hamiltonian "
+        "numerically resolvable fragment, which is not the same as keeping "
+        "every fragment: pivoting always stops at a noise floor scaled to the "
+        "largest supermatrix diagonal, so a value below that floor has no "
+        "further effect. Ignored when the input Hamiltonian "
         "is backed by a CholeskyHamiltonianContainer, because its stored "
         "vectors are already the first factorization and were truncated when "
         "they were built.",
@@ -67,9 +70,10 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
  *   were built.
  *
  * A Cholesky decomposition exists only for a positive semi-definite
- * supermatrix. Exact two-electron integrals are positive semi-definite, but
- * approximate or synthetic ones need not be, and such an input is rejected
- * rather than silently truncated.
+ * supermatrix. Exact two-electron integrals are positive semi-definite; a
+ * tensor that is not — an approximate or synthetic one, or a shifted one such
+ * as a BLISS-modified Hamiltonian — is rejected rather than silently
+ * factorized into a different tensor.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.
