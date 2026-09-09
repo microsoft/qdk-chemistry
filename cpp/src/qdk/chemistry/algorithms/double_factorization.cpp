@@ -80,6 +80,7 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
       two_body_integrals.data(), static_cast<Eigen::Index>(pair_dim),
       static_cast<Eigen::Index>(pair_dim));
 
+  // keeps only pairs satisfying (p\le q).
   const std::size_t reduced_dim = norb * (norb + 1) / 2;
   std::vector<std::pair<std::size_t, std::size_t>> pairs;
   pairs.reserve(reduced_dim);
@@ -89,6 +90,7 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
     }
   }
 
+  // Symmetrize the input
   Eigen::MatrixXd reduced(reduced_dim, reduced_dim);
   for (std::size_t p = 0; p < reduced_dim; ++p) {
     const auto [i, j] = pairs[p];
@@ -105,10 +107,7 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
   }
 
   Eigen::VectorXd residual_diagonal = reduced.diagonal();
-  // The floor is deliberately relative to the largest diagonal rather than
-  // clamped at an absolute value: integrals in atomic units can legitimately
-  // sit many orders of magnitude below 1, and an absolute floor would discard
-  // every fragment of such a tensor instead of resolving it.
+  // Numerical floor relative to the largest diagonal
   const double diagonal_scale = std::max(residual_diagonal.maxCoeff(), 0.0);
   const double noise_floor = std::numeric_limits<double>::epsilon() *
                              static_cast<double>(reduced_dim) * diagonal_scale;
@@ -116,6 +115,7 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 
   std::vector<Eigen::VectorXd> vectors;
   vectors.reserve(reduced_dim);
+  // At every iteration, selects the largest remaining diagonal
   for (std::size_t step = 0; step < reduced_dim; ++step) {
     Eigen::Index pivot = 0;
     const double pivot_value = residual_diagonal.maxCoeff(&pivot);
@@ -123,8 +123,6 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 
     // A residual diagonal that goes convincingly negative means the
     // supermatrix has a negative eigenvalue, so no L with g = L L^T exists.
-    // Continuing would return a factorization of a different tensor, so this
-    // is reported rather than truncated away.
     if (most_negative < -noise_floor) {
       throw std::invalid_argument(
           "double_factorizer: the two-electron supermatrix is not positive "
@@ -149,17 +147,11 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 
   // The pivot loop only ever inspects the residual *diagonal*, so a negative
   // eigenvalue whose eigenvector is spread across off-diagonal entries can
-  // reach this point undetected and leave L L^T reproducing a different
-  // tensor. Certify the factorization instead of assuming it: for a genuinely
-  // positive semi-definite residual R the largest entry lies on the diagonal
-  // (|R_ij| <= sqrt(R_ii R_jj)), so max|g - L L^T| cannot exceed the value
-  // pivoting stopped at. The safety factor keeps ordinary rounding and
-  // truncation error, measured at up to 0.99 of the bare bound, from tripping
-  // the check.
-  //
-  // Indefiniteness smaller than `stop_threshold` stays undetectable here, and
-  // necessarily so: truncation discards information of exactly that size, so
-  // it cannot be told apart from truncation error.
+  // reach this point undetected.
+  // Certify: for a positive semi-definite residual R the largest entry lies
+  // on the diagonal (|R_ij| <= sqrt(R_ii R_jj)), so max|g - L L^T| cannot
+  // exceed the value pivoting stopped at. The safety factor keeps rounding and
+  // truncation error.
   constexpr double residual_safety_factor = 8.0;
   const double deviation_tolerance =
       residual_safety_factor * (stop_threshold + noise_floor);
@@ -170,8 +162,6 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
     basis.col(static_cast<Eigen::Index>(q)) = vectors[q];
   }
 
-  // Compare against g in column blocks so the reconstruction never needs a
-  // second reduced_dim x reduced_dim allocation.
   constexpr Eigen::Index block_columns = 256;
   const auto columns = static_cast<Eigen::Index>(reduced_dim);
   double max_deviation = 0.0;
@@ -244,8 +234,7 @@ std::size_t fragments_from_cholesky_vectors(
 
   if (!cholesky_vectors.allFinite()) {
     throw std::invalid_argument(
-        "double_factorizer: cholesky_vectors contains a non-finite value (NaN "
-        "or infinity).");
+        "double_factorizer: cholesky_vectors contains a non-finite value.");
   }
 
   const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
@@ -267,9 +256,7 @@ std::size_t fragments_from_cholesky_vectors(
 
     // `rotation` maps the output buffer and `pair_matrix` is a const map, so
     // the caller's vectors are never written through. A Cholesky vector is
-    // expected to be symmetric in its orbital pair already. If one is not,
-    // only its symmetric part survives here, and silently factorizing a
-    // different matrix than the caller supplied is worth saying out loud.
+    // pair already.
     if (!warned_asymmetric) {
       const double asymmetry =
           (pair_matrix - pair_matrix.transpose()).cwiseAbs().maxCoeff();
@@ -354,10 +341,9 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
             .first;
 
     if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
-      QDK_LOGGER().info(
+      QDK_LOGGER().debug(
           "double_factorizer: using the stored three-center integrals as the "
-          "first factorization; truncation_threshold={:.3e} is ignored "
-          "because those vectors were already truncated when they were built.",
+          "first factorization; truncation_threshold={:.3e} is ignored.",
           truncation_threshold);
       cholesky_vectors = &three_center;
     } else {

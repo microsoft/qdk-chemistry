@@ -29,13 +29,8 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         "Cutoff for the pivoted Cholesky decomposition of the two-electron "
         "supermatrix: pivoting stops once the largest remaining residual "
         "diagonal drops to it. Must be non-negative; 0.0 keeps every "
-        "numerically resolvable fragment, which is not the same as keeping "
-        "every fragment: pivoting always stops at a noise floor scaled to the "
-        "largest supermatrix diagonal, so a value below that floor has no "
-        "further effect. Ignored when the input Hamiltonian "
-        "is backed by a CholeskyHamiltonianContainer, because its stored "
-        "vectors are already the first factorization and were truncated when "
-        "they were built.",
+        "numerically resolvable fragment. Ignored when the input Hamiltonian "
+        "is backed by a CholeskyHamiltonianContainer.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }

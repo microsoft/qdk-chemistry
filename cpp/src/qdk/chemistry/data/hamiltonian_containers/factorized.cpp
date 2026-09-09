@@ -188,9 +188,6 @@ const Eigen::MatrixXd& FactorizedHamiltonianContainer::get_wb_matrix() const {
 }
 
 size_t FactorizedHamiltonianContainer::get_num_orbitals() const {
-  // Taken from the stored one-body matrix rather than from the orbitals'
-  // active-space indices: get_active_space_indices() is deprecated, and the
-  // stored integrals are the dimension every other accessor here is built on.
   return static_cast<size_t>(std::get<0>(get_one_body_integrals()).rows());
 }
 

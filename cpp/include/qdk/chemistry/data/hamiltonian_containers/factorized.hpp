@@ -202,10 +202,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @brief Reconstruct the shared two-body cache. */
   void _build_two_body_cache() const;
 
-  // Matches the other Hamiltonian containers. A container written at "0.1.0"
-  // is swept into the legacy migration chain in migrate/_hamiltonian.py, whose
-  // single step "0.1.0" -> "0.2.0" was written for the four-center, Cholesky
-  // and sparse payloads and does not describe this one.
+  /** Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 };
 
