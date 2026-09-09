@@ -4,12 +4,16 @@
 
 #include <algorithm>
 #include <limits>
+#include <memory>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
+
+#include "microsoft/ctf12_hamiltonian.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -146,6 +150,13 @@ void EffectiveHamiltonianConstructor::_validate_inputs(
   }
 }
 
-void EffectiveHamiltonianConstructorFactory::register_default_instances() {}
+void EffectiveHamiltonianConstructorFactory::register_default_instances() {
+  QDK_LOG_TRACE_ENTERING();
+
+  EffectiveHamiltonianConstructorFactory::register_instance(
+      []() -> EffectiveHamiltonianConstructorFactory::return_type {
+        return std::make_unique<microsoft::CtF12HamiltonianConstructor>();
+      });
+}
 
 }  // namespace qdk::chemistry::algorithms

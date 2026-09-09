@@ -29,6 +29,7 @@ void bind_nuclear_hessian(py::module& m);
 void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
+void bind_auxiliary_basis(py::module& m);
 void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
@@ -86,6 +87,7 @@ PYBIND11_MODULE(_core, m) {
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
+  bind_auxiliary_basis(data);
   bind_orbitals(data);
   bind_lattice_graph(data);
   bind_hamiltonian(data);

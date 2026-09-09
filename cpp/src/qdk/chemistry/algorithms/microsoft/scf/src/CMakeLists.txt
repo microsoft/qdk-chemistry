@@ -42,8 +42,10 @@ target_sources(chemistry PRIVATE
 ###############################################################################
 
 target_sources(chemistry PRIVATE
+  util/cabs.cpp
   util/blas_threads.cpp
   util/gauxc_util.cpp
+  util/geminal_eri.cpp
   util/int1e.cpp
   util/libint2_util.cpp
   util/matrix_exp.cpp
@@ -83,6 +85,7 @@ target_sources(chemistry PRIVATE
   scf/cpscf.cpp
   scf/guess.cpp
   scf/scf_impl.cpp
+  scf/dense_hamiltonian_scf.cpp
   scf/ks_impl.cpp
   scf/scf_solver.cpp
 )

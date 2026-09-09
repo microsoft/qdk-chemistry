@@ -3,6 +3,7 @@
 // license information.
 
 // Basis Set usage examples.
+#include <cassert>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
@@ -28,6 +29,23 @@ int main() {
       {0, "def2-svp"}, {1, "sto-3g"}, {2, "sto-3g"}};  // O at 0, H at 1 and 2
   auto basis_from_index = BasisSet::from_index_map(index_basis_map, structure);
   // end-cell-loading
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-loading-with-aux
+  // Build the primary and auxiliary inputs independently
+  auto primary_basis = BasisSet::from_basis_name("def2-svp", structure);
+  auto auxiliary_structure = std::make_shared<Structure>(structure);
+  auto aux_basis = AuxiliaryBasis::from_basis_name("def2-universal-jfit",
+                                                   auxiliary_structure);
+  auto named_auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::JFit, aux_basis}});
+
+  assert(named_auxiliary_bases->get_auxiliary_basis(AuxiliaryBasisRole::JFit) ==
+         aux_basis);
+  assert(primary_basis->get_structure()->content_hash() ==
+         aux_basis->get_structure()->content_hash());
+  // end-cell-loading-with-aux
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
@@ -166,6 +184,32 @@ int main() {
   auto supported_elements =
       BasisSet::get_supported_elements_for_basis_set("sto-3g");
   // end-cell-library
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-auxiliary
+  // Create custom auxiliary shells
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(0, OrbitalType::S, std::vector{5.0},
+                          std::vector{2.0});
+  aux_shells.emplace_back(1, OrbitalType::S, std::vector{4.0},
+                          std::vector{1.5});
+
+  // Construct a named auxiliary basis for this molecular structure
+  auto auxiliary_basis = std::make_shared<AuxiliaryBasis>(
+      "my-aux-fit", aux_shells, auxiliary_structure);
+  AuxiliaryBasisCollection custom_auxiliary_bases(
+      {{AuxiliaryBasisRole::RIFit, auxiliary_basis}});
+
+  // Query auxiliary data
+  auto stored_aux =
+      custom_auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole::RIFit);
+  std::string aux_name = stored_aux->get_name();
+  size_t num_aux = stored_aux->get_num_shells();
+
+  // Retrieve auxiliary shell data
+  auto all_aux_shells = stored_aux->get_shells();
+  // end-cell-auxiliary
   // --------------------------------------------------------------------------------------------
 
   return 0;

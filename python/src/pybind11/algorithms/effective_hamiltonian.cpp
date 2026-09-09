@@ -5,14 +5,17 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include <qdk/chemistry.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/ctf12_hamiltonian.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
+// Trampoline class for enabling Python inheritance
 class EffectiveHamiltonianConstructorBase
     : public EffectiveHamiltonianConstructor,
       public pybind11::trampoline_self_life_support {
@@ -41,10 +44,12 @@ class EffectiveHamiltonianConstructorBase
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Wavefunction> reference,
       std::shared_ptr<Hamiltonian> hamiltonian,
-      std::shared_ptr<const SymmetryBlockedIndexSet> p_indices) const override {
+      std::shared_ptr<const SymmetryBlockedIndexSet> p_indices,
+      std::shared_ptr<const AuxiliaryBasisCollection> auxiliary_bases)
+      const override {
     PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>,
                            EffectiveHamiltonianConstructor, _run_impl,
-                           reference, hamiltonian, p_indices);
+                           reference, hamiltonian, p_indices, auxiliary_bases);
   }
 };
 
@@ -59,6 +64,10 @@ wavefunction and an input Hamiltonian in the explicitly specified P-space.
 
 ``p_indices`` holds absolute molecular-orbital indices, drawn from the same
 index universe as ``Orbitals.active_indices()``.
+
+Methods that need a secondary Gaussian basis (for example the complementary
+auxiliary basis of an explicitly correlated method) read it from the optional
+``auxiliary_bases`` argument. Implementations that do not need one ignore it.
 
 The returned Hamiltonian is expressed over ``P`` and must satisfy:
 
@@ -90,13 +99,15 @@ Default constructor for the abstract base class; typically called via
 )");
   constructor.def("run", &EffectiveHamiltonianConstructor::run,
                   py::arg("reference"), py::arg("hamiltonian"),
-                  py::arg("p_indices"), R"(
+                  py::arg("p_indices"), py::arg("auxiliary_bases") = nullptr,
+                  R"(
 Construct the effective Hamiltonian acting on the target space ``P``.
 
 Args:
     reference: Reference wavefunction providing the reference state.
     hamiltonian: Input Hamiltonian built over the whole window :math:`W = P \cup Q`.
     p_indices: Absolute molecular-orbital indices of the target space ``P``, which must lie within the input Hamiltonian's active orbital window.
+    auxiliary_bases: Auxiliary bases required by the method, or ``None``.
 
 Returns:
     The effective Hamiltonian acting on ``P``, following the output contract documented on this class.
@@ -166,13 +177,15 @@ Returns:
 )");
   constructor.def("hash", &EffectiveHamiltonianConstructor::hash,
                   py::arg("reference"), py::arg("hamiltonian"),
-                  py::arg("p_indices"), R"(
+                  py::arg("p_indices"), py::arg("auxiliary_bases") = nullptr,
+                  R"(
 Compute a deterministic content hash for a run with these inputs.
 
 Args:
     reference: Reference wavefunction providing the reference state.
     hamiltonian: Input Hamiltonian built over the whole window :math:`W = P \cup Q`.
     p_indices: Target ``P`` indices within the input Hamiltonian's active orbital window.
+    auxiliary_bases: Auxiliary bases required by the method, or ``None``.
 
 Returns:
     str: 16-character hex content hash.
@@ -186,4 +199,44 @@ Returns:
       EffectiveHamiltonianConstructorFactory, EffectiveHamiltonianConstructor,
       EffectiveHamiltonianConstructorBase>(
       m, "EffectiveHamiltonianConstructorFactory");
+
+  py::class_<microsoft::CtF12HamiltonianConstructor,
+             EffectiveHamiltonianConstructor, py::smart_holder>(
+      m, "QdkCtF12HamiltonianConstructor", R"(
+QDK implementation of the canonical transcorrelated F12 (CT-F12) effective
+Hamiltonian.
+
+Applies an approximate canonical (unitary) similarity transformation of the
+molecular Hamiltonian with a fixed-amplitude Slater-type geminal generator,
+yielding an a priori Hermitian two-body effective Hamiltonian over the target
+space ``P``. The dressed integrals are rebuilt from the reference orbitals, so
+the input Hamiltonian only fixes the outer orbital window; occupied orbitals
+outside ``P`` are folded into the constant energy term and the inactive Fock
+matrix.
+
+The complementary auxiliary basis set (CABS) is the external space the
+transformation folds in, so it is required: pass it as the
+``AuxiliaryBasisRole.CABS`` entry of ``auxiliary_bases``.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    constructor = alg.QdkCtF12HamiltonianConstructor()
+    constructor.settings().set("gamma", 1.5)
+    dressed = constructor.run(reference, hamiltonian, p_indices, auxiliary_bases)
+
+See Also:
+    :class:`EffectiveHamiltonianConstructor`
+    :class:`QdkCtF12ScfSolver`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a CT-F12 effective-Hamiltonian constructor with default settings.
+
+)");
 }

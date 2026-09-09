@@ -8,9 +8,19 @@
 ################################################################################
 # docs:xyz ../data/water.structure.xyz
 # start-cell-loading
-import numpy as np
 from pathlib import Path
-from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
+
+import numpy as np
+from qdk_chemistry.data import (
+    AOType,
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
+    BasisSet,
+    OrbitalType,
+    Shell,
+    Structure,
+)
 
 # Load a water molecule structure from inline XYZ file
 structure = Structure.from_xyz("""\
@@ -32,6 +42,24 @@ basis_from_element = BasisSet.from_element_map(basis_map, structure)
 index_basis_map = {0: "def2-svp", 1: "sto-3g", 2: "sto-3g"}  # O at 0, H at 1 and 2
 basis_from_index = BasisSet.from_index_map(index_basis_map, structure)
 # end-cell-loading
+################################################################################
+
+################################################################################
+# start-cell-loading-with-aux
+# Build the primary and auxiliary inputs independently
+primary_basis = BasisSet.from_basis_name("def2-svp", structure)
+aux_basis = AuxiliaryBasis.from_basis_name("def2-universal-jfit", structure)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: aux_basis})
+
+assert auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.JFIT) is aux_basis
+assert (
+    primary_basis.get_structure().content_hash()
+    == aux_basis.get_structure().content_hash()
+)
+print(f"Primary shells: {primary_basis.get_num_shells()}")
+print(f"Auxiliary shells: {aux_basis.get_num_shells()}")
+print(f"Auxiliary name: {aux_basis.get_name()}")
+# end-cell-loading-with-aux
 ################################################################################
 
 ################################################################################
@@ -127,6 +155,30 @@ basis_set = BasisSet.from_hdf5_file("molecule.basis_set.h5")
 # end-cell-serialization
 Path("molecule.basis_set.json").unlink()
 Path("molecule.basis_set.h5").unlink()
+################################################################################
+
+################################################################################
+# start-cell-auxiliary
+# Create custom auxiliary shells
+aux_shells = [
+    Shell(0, OrbitalType.S, np.array([5.0]), np.array([2.0])),
+    Shell(1, OrbitalType.S, np.array([4.0]), np.array([1.5])),
+]
+
+# Construct a named auxiliary basis for this molecular structure
+auxiliary_basis = AuxiliaryBasis("my-aux-fit", aux_shells, structure)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.RIFIT: auxiliary_basis})
+stored_auxiliary = auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.RIFIT)
+
+# Query auxiliary data
+print(f"Auxiliary name: {stored_auxiliary.get_name()}")
+print(f"Num aux shells: {stored_auxiliary.get_num_shells()}")
+
+# Retrieve auxiliary shell data
+for i in range(stored_auxiliary.get_num_shells()):
+    s = stored_auxiliary.get_shell(i)
+    print(f"  Aux shell {i}: atom={s.atom_index}, type={s.orbital_type}")
+# end-cell-auxiliary
 ################################################################################
 
 ################################################################################

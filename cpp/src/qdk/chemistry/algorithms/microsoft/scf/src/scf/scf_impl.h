@@ -253,7 +253,7 @@ class SCFImpl {
   /**
    * @brief Build one-electron integrals (overlap, kinetic, nuclear attraction)
    */
-  void build_one_electron_integrals_();
+  virtual void build_one_electron_integrals_();
 
   /**
    * @brief Compute orthogonalization matrix from overlap matrix
@@ -274,7 +274,7 @@ class SCFImpl {
    *
    * @return Nuclear-nuclear repulsion energy (Hartree)
    */
-  double calc_nuclear_repulsion_energy_();
+  virtual double calc_nuclear_repulsion_energy_();
 
   /**
    * @brief Run SCF iteration using the configured algorithm
@@ -284,7 +284,7 @@ class SCFImpl {
   /**
    * @brief Calculate molecular properties (dipole, quadrupole, populations)
    */
-  void properties_();
+  virtual void properties_();
 
   /**
    * @brief Update the Fock matrix (virtual method for HF/DFT specialization)

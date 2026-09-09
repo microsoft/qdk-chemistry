@@ -644,19 +644,27 @@ TEST_F(OrbitalsTest, InactiveSpaceManagement) {
   orb.to_json_file("test.orbitals.json");
   auto orb_json = Orbitals::from_json_file("test.orbitals.json");
   EXPECT_TRUE(orb_json->has_active_space());
-  EXPECT_TRUE(orb_json->get_active_space_indices().first.empty());
-  EXPECT_TRUE(orb_json->get_active_space_indices().second.empty());
-  EXPECT_EQ(inactive_indices, orb_json->get_inactive_space_indices().first);
-  EXPECT_EQ(inactive_indices, orb_json->get_inactive_space_indices().second);
+  EXPECT_TRUE(
+      spin_channel_indices(orb_json->active_indices(), axes::alpha()).empty());
+  EXPECT_TRUE(
+      spin_channel_indices(orb_json->active_indices(), axes::beta()).empty());
+  EXPECT_EQ(inactive_indices,
+            spin_channel_indices(orb_json->inactive_indices(), axes::alpha()));
+  EXPECT_EQ(inactive_indices,
+            spin_channel_indices(orb_json->inactive_indices(), axes::beta()));
 
   // HDF5 round-trip preserves the explicit empty active space too.
   orb.to_hdf5_file("test.orbitals.h5");
   auto orb_hdf5 = Orbitals::from_hdf5_file("test.orbitals.h5");
   EXPECT_TRUE(orb_hdf5->has_active_space());
-  EXPECT_TRUE(orb_hdf5->get_active_space_indices().first.empty());
-  EXPECT_TRUE(orb_hdf5->get_active_space_indices().second.empty());
-  EXPECT_EQ(inactive_indices, orb_hdf5->get_inactive_space_indices().first);
-  EXPECT_EQ(inactive_indices, orb_hdf5->get_inactive_space_indices().second);
+  EXPECT_TRUE(
+      spin_channel_indices(orb_hdf5->active_indices(), axes::alpha()).empty());
+  EXPECT_TRUE(
+      spin_channel_indices(orb_hdf5->active_indices(), axes::beta()).empty());
+  EXPECT_EQ(inactive_indices,
+            spin_channel_indices(orb_hdf5->inactive_indices(), axes::alpha()));
+  EXPECT_EQ(inactive_indices,
+            spin_channel_indices(orb_hdf5->inactive_indices(), axes::beta()));
 }
 
 TEST_F(OrbitalsTest, ActiveSpaceSerialization) {

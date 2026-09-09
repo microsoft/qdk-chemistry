@@ -26,7 +26,10 @@ from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESub
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
-from qdk_chemistry.algorithms.effective_hamiltonian_constructor import EffectiveHamiltonianConstructor
+from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
+    EffectiveHamiltonianConstructor,
+    QdkCtF12HamiltonianConstructor,
+)
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
@@ -65,7 +68,7 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
-from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, QdkStabilizedScfSolver, ScfSolver
+from qdk_chemistry.algorithms.scf_solver import QdkCtF12ScfSolver, QdkScfSolver, QdkStabilizedScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -97,6 +100,8 @@ __all__ = [
     "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkCtF12HamiltonianConstructor",
+    "QdkCtF12ScfSolver",
     "QdkExpectationEstimator",
     "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",

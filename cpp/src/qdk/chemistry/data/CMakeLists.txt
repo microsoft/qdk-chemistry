@@ -1,5 +1,7 @@
 target_sources(chemistry PRIVATE
     ansatz.cpp
+    auxiliary_basis.cpp
+    basis_library.cpp
     basis_set.cpp
     configuration.cpp
     lattice_graph.cpp
@@ -19,6 +21,7 @@ target_sources(chemistry PRIVATE
     nuclear_hessian.cpp
     pauli_operator.cpp
     settings.cpp
+    shell.cpp
     stability_result.cpp
     structure.cpp
     symmetry/symmetry.cpp

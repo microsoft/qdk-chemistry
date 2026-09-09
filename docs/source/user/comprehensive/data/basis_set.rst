@@ -98,6 +98,22 @@ The library supports three methods for loading basis sets:
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
+Primary and auxiliary bases are independent values constructed against the same molecular structure. Group auxiliary bases in an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, keyed by role. The collection is an independent data model for future algorithm inputs and is not stored on the primary basis or wavefunction. Current algorithms do not consume it; computational integration such as density fitting is outside this feature:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-loading-with-aux
+      :end-before: // end-cell-loading-with-aux
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-loading-with-aux
+      :end-before: # end-cell-loading-with-aux
+
 Creating a basis set
 --------------------
 
@@ -165,15 +181,41 @@ The ``Shell`` structure contains information about a group of basis functions:
       :start-after: // start-cell-shells
       :end-before: // end-cell-shells
 
+Auxiliary basis sets
+--------------------
+
+An auxiliary basis is a secondary basis supplied to algorithms that require one. Density fitting (DF/RI) is the most common consumer, but the class carries no algorithm-specific role.
+The auxiliary name, shells, orbital representation, and molecular structure form an independent :class:`~qdk_chemistry.data.AuxiliaryBasis` value.
+
+Construct an :class:`~qdk_chemistry.data.AuxiliaryBasis` explicitly for custom data, or load it from the library with :meth:`~qdk_chemistry.data.AuxiliaryBasis.from_basis_name`. The role belongs to its entry in :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, not to the auxiliary value itself. :class:`~qdk_chemistry.data.AuxiliaryBasisRole` provides ``JFIT``, ``JKFIT``, ``RIFIT``, and ``CABS`` tags. Basis-family names remain ordinary auxiliary-basis names: for example, tag an MP2FIT-named basis as ``RIFIT`` or an OptRI/OptRI+ basis as ``CABS``.
+
+A collection may carry several roles simultaneously. Exact lookup is available through :meth:`~qdk_chemistry.data.AuxiliaryBasisCollection.get_auxiliary_basis`. :meth:`~qdk_chemistry.data.AuxiliaryBasisCollection.resolve_auxiliary_basis` additionally permits a ``JKFIT`` entry to satisfy a ``JFIT`` requirement, but never the inverse. :func:`~qdk_chemistry.data.with_auxiliary_basis` returns a new collection with one role added or replaced.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-auxiliary
+      :end-before: // end-cell-auxiliary
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-auxiliary
+      :end-before: # end-cell-auxiliary
+
 Serialization
 -------------
 
-The :class:`~qdk_chemistry.data.BasisSet` class supports serialization to and from JSON and HDF5 formats.
+The :class:`~qdk_chemistry.data.BasisSet`, :class:`~qdk_chemistry.data.AuxiliaryBasis`, and :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` classes support serialization to and from JSON and HDF5 formats independently.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 .. note::
    All basis set-related files require the ``.basis_set`` suffix before the file type extension, for example ``molecule.basis_set.json`` and ``h2.basis_set.h5`` for JSON and HDF5 files respectively.
    This naming convention is enforced to maintain consistency across the QDK/Chemistry ecosystem.
+
+   Standalone auxiliary basis files use the ``.auxiliary_basis`` suffix, for example ``water.auxiliary_basis.json``. Tagged collections use ``.auxiliary_basis_collection``.
 
 File formats
 ~~~~~~~~~~~~
@@ -193,27 +235,27 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
          "atom_index": 0,
          "shells": [
            {
-             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
+                   "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
              "exponents": [3.425250914, 0.6239137298, 0.168855404],
-             "orbital_type": "s"
-           },
+                   "orbital_type": "s"
+                },
            {
-             "coefficients": [0.1559162750, 0.6076837186],
-             "exponents": [0.7868272350, 0.1881288540],
-             "orbital_type": "p"
+                   "coefficients": [0.1559162750, 0.6076837186],
+                   "exponents": [0.7868272350, 0.1881288540],
+                   "orbital_type": "p"
            }
          ]
-       },
-       {
-         "atom_index": 1,
-         "shells": ["..."]
+          },
+          {
+             "atom_index": 1,
+             "shells": ["..."]
        }
      ],
-     "basis_type": "spherical",
-     "name": "6-31G",
-     "num_atoms": 2,
-     "num_basis_functions": 9,
-     "num_shells": 3
+       "basis_type": "spherical",
+       "name": "6-31G",
+       "num_atoms": 2,
+       "num_basis_functions": 9,
+       "num_shells": 3
    }
 
 HDF5 format
@@ -223,15 +265,15 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. code-block:: text
 
-   /
-   ├── shells/             # Group
-   │   ├── atom_indices    # Dataset: uint32, 1D Array of atom indices
-   │   ├── coefficients    # Dataset: float64, 1D Array of orbital coefficients
-   │   ├── exponents       # Dataset: float64, 1D Array of orbital exponents
-   │   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
-   │   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
-   └── metadata/           # Group
-       └── name            # Attribute: string value of the basis set name
+      /
+      ├── shells/             # Group
+      │   ├── atom_indices    # Dataset: uint32, 1D Array of atom indices
+      │   ├── coefficients    # Dataset: float64, 1D Array of orbital coefficients
+      │   ├── exponents       # Dataset: float64, 1D Array of orbital exponents
+      │   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
+      │   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
+      └── metadata/           # Group
+         └── name            # Attribute: string value of the basis set name
 
 .. tab:: Python API
 

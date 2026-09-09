@@ -13,6 +13,9 @@ target_sources(chemistry PRIVATE
     localization/vvhv.cpp
     hamiltonian.cpp
     cholesky_hamiltonian.cpp
+    ctf12_hamiltonian.cpp
+    ctf12_f12.cpp
+    f12_scf.cpp
     macis_asci.cpp
     macis_base.cpp
     macis_cas.cpp

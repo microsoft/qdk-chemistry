@@ -383,12 +383,18 @@ TEST_F(ModelOrbitalsTest, EmptyActiveSpaceHDF5RoundTrip) {
 
   EXPECT_NE(std::dynamic_pointer_cast<ModelOrbitals>(reconstructed), nullptr);
   EXPECT_TRUE(reconstructed->has_active_space());
-  EXPECT_TRUE(reconstructed->get_active_space_indices().first.empty());
-  EXPECT_TRUE(reconstructed->get_active_space_indices().second.empty());
-  EXPECT_EQ(inactive_indices,
-            reconstructed->get_inactive_space_indices().first);
-  EXPECT_EQ(inactive_indices,
-            reconstructed->get_inactive_space_indices().second);
+  EXPECT_TRUE(
+      spin_channel_indices(reconstructed->active_indices(), axes::alpha())
+          .empty());
+  EXPECT_TRUE(
+      spin_channel_indices(reconstructed->active_indices(), axes::beta())
+          .empty());
+  EXPECT_EQ(
+      inactive_indices,
+      spin_channel_indices(reconstructed->inactive_indices(), axes::alpha()));
+  EXPECT_EQ(
+      inactive_indices,
+      spin_channel_indices(reconstructed->inactive_indices(), axes::beta()));
 
   std::filesystem::remove(filename);
 }

@@ -306,6 +306,26 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   return internal_basis_set;
 }
 
+std::shared_ptr<qcs::BasisSet> convert_auxiliary_basis_from_qdk(
+    const qdk::chemistry::data::AuxiliaryBasis& qdk_auxiliary_basis,
+    bool normalize) {
+  QDK_LOG_TRACE_ENTERING();
+
+  auto structure = qdk_auxiliary_basis.get_structure();
+  auto mol = convert_to_molecule(*structure, 0, 1);
+
+  auto basis_json = convert_to_json(qdk_auxiliary_basis);
+  auto internal_basis_set =
+      qcs::BasisSet::from_serialized_json(mol, basis_json);
+
+  if (internal_basis_set->mode == qcs::BasisMode::RAW && normalize) {
+    _norm_psi4_mode(internal_basis_set->shells);
+    internal_basis_set->mode = qcs::BasisMode::PSI4;
+  }
+
+  return internal_basis_set;
+}
+
 nlohmann::ordered_json convert_to_json(
     const qdk::chemistry::data::Shell& shell) {
   QDK_LOG_TRACE_ENTERING();
@@ -376,6 +396,39 @@ nlohmann::ordered_json convert_to_json(
        {"atom_ecp_electrons", ecp_electrons}});
 
   return j;
+}
+
+nlohmann::ordered_json convert_to_json(
+    const qdk::chemistry::data::AuxiliaryBasis& auxiliary_basis) {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (auxiliary_basis.get_atomic_orbital_type() !=
+      qdk::chemistry::data::AOType::Spherical) {
+    throw std::runtime_error("QDK Does Not Support Cartesian Atomic Orbitals");
+  }
+
+  std::vector<nlohmann::ordered_json> json_shells;
+  for (const auto& sh : auxiliary_basis.get_shells()) {
+    json_shells.push_back(convert_to_json(sh));
+  }
+
+  auto structure = auxiliary_basis.get_structure();
+  auto nuclear_charges = structure->get_nuclear_charges();
+  std::vector<unsigned> nuclear_charges_unsigned(nuclear_charges.size());
+  std::transform(nuclear_charges.begin(), nuclear_charges.end(),
+                 nuclear_charges_unsigned.begin(),
+                 [](double z) { return static_cast<unsigned>(z); });
+
+  return nlohmann::ordered_json(
+      {{"name", auxiliary_basis.get_name()},
+       {"pure", true},
+       {"mode", "RAW"},
+       {"atoms", nuclear_charges_unsigned},
+       {"num_atomic_orbitals", auxiliary_basis.get_num_auxiliary_orbitals()},
+       {"electron_shells", json_shells},
+       {"ecp_shells", std::vector<nlohmann::ordered_json>{}},
+       {"atom_ecp_electrons",
+        std::vector<std::size_t>(auxiliary_basis.get_num_atoms(), 0)}});
 }
 
 std::vector<unsigned> compute_shell_map(
