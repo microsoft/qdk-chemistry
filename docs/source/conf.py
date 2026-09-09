@@ -209,7 +209,7 @@ html_theme_options = {
 }
 # Deliberately not named sidebar-nav-bs: the theme drops that template on pages
 # that have no sub-navigation, such as the landing page.
-html_sidebars = {"**": ["sidebar-nav-all"]}
+html_sidebars = {"**": ["sidebar-nav-all.html"]}
 templates_path = ["_templates"]  # Path to custom HTML templates
 html_static_path: list[str] = ["_static"]  # Path to static files (CSS, JS, images)
 html_css_files = [  # Include custom CSS file for additional styling
