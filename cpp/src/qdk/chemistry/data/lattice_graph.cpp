@@ -234,8 +234,10 @@ LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
       (graph.adjacency_ +
        Eigen::SparseMatrix<double>(graph.adjacency_.transpose()));
   sym.makeCompressed();
-  return LatticeGraph(std::move(sym), std::nullopt, graph._positions,
+  LatticeGraph result(std::move(sym), std::nullopt, graph._positions,
                       graph._periods, graph._bond_flavor_definitions);
+  result._integer_embedding = graph._integer_embedding;
+  return result;
 }
 
 std::uint64_t LatticeGraph::num_sites() const { return _num_sites; }
@@ -404,6 +406,21 @@ LatticeGraph::nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
   }
   if (results.empty() || _num_sites < 2) return results;
 
+  if (_integer_embedding.has_value()) {
+    std::set<std::uint64_t> requested_shells(shells.begin(), shells.end());
+    for (const auto& connection :
+         _integer_neighbor_connections(requested_shells, tolerance)) {
+      results.at(connection.bond_class.shell)
+          .emplace_back(connection.site_i, connection.site_j);
+    }
+    for (auto& [shell, pairs] : results) {
+      (void)shell;
+      std::sort(pairs.begin(), pairs.end());
+      pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
+    }
+    return results;
+  }
+
   Eigen::MatrixXd positions = *_positions;
   double geometry_scale = positions.cwiseAbs().maxCoeff();
   if (geometry_scale == 0.0) geometry_scale = 1.0;
@@ -461,6 +478,204 @@ LatticeGraph::nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
   return results;
 }
 
+std::vector<NeighborConnection> LatticeGraph::_integer_neighbor_connections(
+    const std::set<std::uint64_t>& requested_shells, double tolerance) const {
+  const auto& embedding = *_integer_embedding;
+  const int basis_size = static_cast<int>(embedding.basis.size());
+  const auto site_at = [&](int x, int y, int basis) {
+    if (x < 0 || x >= embedding.nx || y < 0 || y >= embedding.ny) return -1;
+    const auto index = basis_size * (y * embedding.nx + x) + basis;
+    return embedding.site_by_coordinate[index];
+  };
+
+  struct Stencil {
+    int source_basis;
+    int target_basis;
+    int dx;
+    int dy;
+    double distance;
+    std::uint64_t shell = 0;
+    Eigen::RowVector2d axis;
+    std::uint32_t orientation = 0;
+  };
+  std::vector<Stencil> stencils;
+  const int max_shell = static_cast<int>(*requested_shells.rbegin());
+  const int min_dx = embedding.periodic_x ? -max_shell : 1 - embedding.nx;
+  const int max_dx = embedding.periodic_x ? max_shell : embedding.nx - 1;
+  const int min_dy = embedding.periodic_y ? -max_shell : 1 - embedding.ny;
+  const int max_dy = embedding.periodic_y ? max_shell : embedding.ny - 1;
+  for (int source_basis = 0; source_basis < basis_size; ++source_basis) {
+    for (int target_basis = 0; target_basis < basis_size; ++target_basis) {
+      for (int dy = min_dy; dy <= max_dy; ++dy) {
+        for (int dx = min_dx; dx <= max_dx; ++dx) {
+          const auto key = std::tie(dx, dy, source_basis, target_basis);
+          const auto reverse =
+              std::make_tuple(-dx, -dy, target_basis, source_basis);
+          if (key >= reverse) continue;
+
+          bool exists = embedding.periodic_x || embedding.periodic_y;
+          for (int y = std::max(0, -dy);
+               !exists && y < std::min(embedding.ny, embedding.ny - dy); ++y) {
+            for (int x = std::max(0, -dx);
+                 x < std::min(embedding.nx, embedding.nx - dx); ++x) {
+              if (site_at(x, y, source_basis) >= 0 &&
+                  site_at(x + dx, y + dy, target_basis) >= 0) {
+                exists = true;
+                break;
+              }
+            }
+          }
+          if (!exists) continue;
+
+          const Eigen::RowVector2d displacement =
+              static_cast<double>(dx) * embedding.a1 +
+              static_cast<double>(dy) * embedding.a2 +
+              embedding.basis[target_basis] - embedding.basis[source_basis];
+          const double distance = blas::nrm2(2, displacement.data(), 1);
+          if (distance == 0.0) continue;
+          Eigen::RowVector2d axis = displacement / distance;
+          if (axis.x() < -tolerance ||
+              (std::abs(axis.x()) <= tolerance && axis.y() < 0.0)) {
+            axis = -axis;
+          }
+          stencils.push_back(
+              {source_basis, target_basis, dx, dy, distance, 0, axis, 0});
+        }
+      }
+    }
+  }
+
+  std::sort(
+      stencils.begin(), stencils.end(), [](const auto& lhs, const auto& rhs) {
+        return std::tie(lhs.distance, lhs.dx, lhs.dy, lhs.source_basis,
+                        lhs.target_basis) < std::tie(rhs.distance, rhs.dx,
+                                                     rhs.dy, rhs.source_basis,
+                                                     rhs.target_basis);
+      });
+  std::uint64_t shell = 0;
+  double shell_distance = 0.0;
+  std::map<std::uint64_t, std::vector<Eigen::RowVector2d>> axes_by_shell;
+  for (auto& stencil : stencils) {
+    const double distance_difference =
+        std::abs(stencil.distance - shell_distance);
+    const bool same_shell =
+        shell != 0 &&
+        distance_difference <=
+            tolerance * std::max(stencil.distance, shell_distance);
+    if (!same_shell) {
+      ++shell;
+      shell_distance = stencil.distance;
+    }
+    stencil.shell = shell;
+    if (!requested_shells.contains(shell)) continue;
+    auto& axes = axes_by_shell[shell];
+    if (std::none_of(axes.begin(), axes.end(), [&](const auto& axis) {
+          return (axis - stencil.axis).norm() <= tolerance;
+        })) {
+      axes.push_back(stencil.axis);
+    }
+  }
+  for (auto& [current_shell, axes] : axes_by_shell) {
+    (void)current_shell;
+    std::sort(axes.begin(), axes.end(), [](const auto& lhs, const auto& rhs) {
+      return std::atan2(lhs.y(), lhs.x()) < std::atan2(rhs.y(), rhs.x());
+    });
+  }
+  for (auto& stencil : stencils) {
+    if (!requested_shells.contains(stencil.shell)) continue;
+    const auto& axes = axes_by_shell.at(stencil.shell);
+    stencil.orientation = static_cast<std::uint32_t>(std::distance(
+        axes.begin(),
+        std::find_if(axes.begin(), axes.end(), [&](const auto& axis) {
+          return (axis - stencil.axis).norm() <= tolerance;
+        })));
+  }
+
+  std::vector<NeighborConnection> result;
+  std::set<std::tuple<std::uint64_t, std::uint64_t, std::int64_t, std::int64_t>>
+      seen;
+  const auto wrap = [](int coordinate, int extent) {
+    int image = coordinate / extent;
+    int wrapped = coordinate % extent;
+    if (wrapped < 0) {
+      wrapped += extent;
+      --image;
+    }
+    return std::pair{wrapped, image};
+  };
+  for (const auto& stencil : stencils) {
+    if (!requested_shells.contains(stencil.shell)) continue;
+    const int y_begin = embedding.periodic_y ? 0 : std::max(0, -stencil.dy);
+    const int y_end = embedding.periodic_y
+                          ? embedding.ny
+                          : std::min(embedding.ny, embedding.ny - stencil.dy);
+    const int x_begin = embedding.periodic_x ? 0 : std::max(0, -stencil.dx);
+    const int x_end = embedding.periodic_x
+                          ? embedding.nx
+                          : std::min(embedding.nx, embedding.nx - stencil.dx);
+    for (int y = y_begin; y < y_end; ++y) {
+      for (int x = x_begin; x < x_end; ++x) {
+        const auto [target_x, image_x] =
+            embedding.periodic_x ? wrap(x + stencil.dx, embedding.nx)
+                                 : std::pair{x + stencil.dx, 0};
+        const auto [target_y, image_y] =
+            embedding.periodic_y ? wrap(y + stencil.dy, embedding.ny)
+                                 : std::pair{y + stencil.dy, 0};
+        int site_i = site_at(x, y, stencil.source_basis);
+        int site_j = site_at(target_x, target_y, stencil.target_basis);
+        if (site_i < 0 || site_j < 0) continue;
+        Eigen::RowVector2d displacement =
+            static_cast<double>(stencil.dx) * embedding.a1 +
+            static_cast<double>(stencil.dy) * embedding.a2 +
+            embedding.basis[stencil.target_basis] -
+            embedding.basis[stencil.source_basis];
+        std::array<std::int64_t, 2> image_shift{};
+        if (embedding.periodic_x) image_shift[0] = image_x;
+        if (embedding.periodic_y) {
+          image_shift[embedding.periodic_x ? 1 : 0] = image_y;
+        }
+        const bool negative_second = image_shift[0] == 0 && image_shift[1] < 0;
+        const bool reverse_image = image_shift[0] < 0 || negative_second;
+        if (site_i > site_j || (site_i == site_j && reverse_image)) {
+          std::swap(site_i, site_j);
+          displacement = -displacement;
+          image_shift[0] = -image_shift[0];
+          image_shift[1] = -image_shift[1];
+        }
+        if (!seen.emplace(site_i, site_j, image_shift[0], image_shift[1])
+                 .second) {
+          continue;
+        }
+        std::optional<BondFlavorId> flavor;
+        for (const auto& definition : _bond_flavor_definitions) {
+          if (definition.shell == stencil.shell &&
+              (definition.axis - stencil.axis).norm() <= tolerance) {
+            flavor = definition.flavor;
+            break;
+          }
+        }
+        result.push_back({static_cast<std::uint64_t>(site_i),
+                          static_cast<std::uint64_t>(site_j),
+                          {stencil.shell, stencil.orientation, stencil.axis},
+                          displacement,
+                          image_shift,
+                          flavor});
+      }
+    }
+  }
+  std::sort(result.begin(), result.end(), [](const auto& lhs, const auto& rhs) {
+    if (lhs.bond_class.shell != rhs.bond_class.shell) {
+      return lhs.bond_class.shell < rhs.bond_class.shell;
+    }
+    if (lhs.bond_class.orientation != rhs.bond_class.orientation) {
+      return lhs.bond_class.orientation < rhs.bond_class.orientation;
+    }
+    return std::tie(lhs.site_i, lhs.site_j, lhs.image_shift) <
+           std::tie(rhs.site_i, rhs.site_j, rhs.image_shift);
+  });
+  return result;
+}
+
 std::vector<NeighborConnection> LatticeGraph::neighbor_connections(
     const std::vector<std::uint64_t>& shells, double tolerance) const {
   if (!std::isfinite(tolerance) || tolerance <= 0.0) {
@@ -478,6 +693,10 @@ std::vector<NeighborConnection> LatticeGraph::neighbor_connections(
   if (!_positions.has_value()) {
     throw std::runtime_error(
         "Geometric neighbor connections require lattice positions.");
+  }
+
+  if (_integer_embedding.has_value()) {
+    return _integer_neighbor_connections(requested_shells, tolerance);
   }
 
   struct Candidate {
@@ -694,8 +913,10 @@ LatticeGraph LatticeGraph::with_bond_flavors(
     double tolerance) const {
   auto normalized = definitions;
   _validate_bond_flavors(_positions, normalized, tolerance);
-  return LatticeGraph(adjacency_, _edge_coloring, _positions, _periods,
+  LatticeGraph result(adjacency_, _edge_coloring, _positions, _periods,
                       std::move(normalized));
+  result._integer_embedding = _integer_embedding;
+  return result;
 }
 
 const std::vector<BondFlavorDefinition>& LatticeGraph::bond_flavor_definitions()
@@ -733,6 +954,17 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
   LatticeGraph g(
       std::move(adj), chain_coloring(static_cast<std::int64_t>(N), periodic),
       std::move(positions), detail::lattice_periods((periodic ? N : 0) * a1));
+  std::vector<int> site_by_coordinate(N);
+  std::iota(site_by_coordinate.begin(), site_by_coordinate.end(), 0);
+  g._integer_embedding = IntegerEmbedding{
+      N,
+      1,
+      a1,
+      a2,
+      std::vector<Eigen::RowVector2d>(basis.begin(), basis.end()),
+      std::move(site_by_coordinate),
+      periodic,
+      false};
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -799,6 +1031,17 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
                  std::move(positions),
                  detail::lattice_periods((periodic_x ? Nx : 0) * a1,
                                          (periodic_y ? Ny : 0) * a2));
+  std::vector<int> site_by_coordinate(N);
+  std::iota(site_by_coordinate.begin(), site_by_coordinate.end(), 0);
+  g._integer_embedding = IntegerEmbedding{
+      Nx,
+      Ny,
+      a1,
+      a2,
+      std::vector<Eigen::RowVector2d>(basis.begin(), basis.end()),
+      std::move(site_by_coordinate),
+      periodic_x,
+      periodic_y};
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -880,6 +1123,17 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   LatticeGraph g(std::move(adj), std::move(coloring), std::move(positions),
                  detail::lattice_periods((periodic_x ? Nx : 0) * a1,
                                          (periodic_y ? Ny : 0) * a2));
+  std::vector<int> site_by_coordinate(N);
+  std::iota(site_by_coordinate.begin(), site_by_coordinate.end(), 0);
+  g._integer_embedding = IntegerEmbedding{
+      Nx,
+      Ny,
+      a1,
+      a2,
+      std::vector<Eigen::RowVector2d>(basis.begin(), basis.end()),
+      std::move(site_by_coordinate),
+      periodic_x,
+      periodic_y};
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -1004,9 +1258,19 @@ LatticeGraph LatticeGraph::_honeycomb(std::uint64_t num_cells_x,
         color;
   }
 
-  return LatticeGraph(std::move(adj), std::move(coloring), std::move(positions),
-                      detail::lattice_periods((periodic_x ? Nx : 0) * a1,
-                                              (periodic_y ? Ny : 0) * a2));
+  LatticeGraph graph(std::move(adj), std::move(coloring), std::move(positions),
+                     detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                             (periodic_y ? Ny : 0) * a2));
+  graph._integer_embedding = IntegerEmbedding{
+      Nx,
+      Ny,
+      a1,
+      a2,
+      std::vector<Eigen::RowVector2d>(basis.begin(), basis.end()),
+      std::move(old_to_new),
+      periodic_x,
+      periodic_y};
+  return graph;
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -1089,9 +1353,21 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
       Eigen::RowVector2d(0.5, std::sqrt(3.0) / 2.0)};
   auto positions = detail::lattice_positions(Nx, Ny, a1, a2, basis);
   auto coloring = greedy_edge_coloring(adj, coloring_seed, 32);
-  return LatticeGraph(std::move(adj), std::move(coloring), std::move(positions),
-                      detail::lattice_periods((periodic_x ? Nx : 0) * a1,
-                                              (periodic_y ? Ny : 0) * a2));
+  LatticeGraph graph(std::move(adj), std::move(coloring), std::move(positions),
+                     detail::lattice_periods((periodic_x ? Nx : 0) * a1,
+                                             (periodic_y ? Ny : 0) * a2));
+  std::vector<int> site_by_coordinate(N);
+  std::iota(site_by_coordinate.begin(), site_by_coordinate.end(), 0);
+  graph._integer_embedding = IntegerEmbedding{
+      Nx,
+      Ny,
+      a1,
+      a2,
+      std::vector<Eigen::RowVector2d>(basis.begin(), basis.end()),
+      std::move(site_by_coordinate),
+      periodic_x,
+      periodic_y};
+  return graph;
 }
 
 namespace detail {
@@ -1366,7 +1642,7 @@ nlohmann::json LatticeGraph::to_json() const {
     for (const auto& definition : _bond_flavor_definitions) {
       definitions.push_back({definition.shell, definition.axis.x(),
                              definition.axis.y(),
-                             static_cast<std::uint8_t>(definition.flavor)});
+                             static_cast<BondFlavorId>(definition.flavor)});
     }
     j["bond_flavor_definitions"] = std::move(definitions);
   }
@@ -1809,9 +2085,17 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     }
   }
 
-  return LatticeGraph(std::move(new_adj), std::move(new_coloring),
+  LatticeGraph result(std::move(new_adj), std::move(new_coloring),
                       std::move(new_positions), graph._periods,
                       graph._bond_flavor_definitions);
+  if (graph._integer_embedding.has_value()) {
+    auto embedding = *graph._integer_embedding;
+    for (auto& site : embedding.site_by_coordinate) {
+      if (site >= 0) site = static_cast<int>(inv_p[site]);
+    }
+    result._integer_embedding = std::move(embedding);
+  }
+  return result;
 }
 
 }  // namespace qdk::chemistry::data

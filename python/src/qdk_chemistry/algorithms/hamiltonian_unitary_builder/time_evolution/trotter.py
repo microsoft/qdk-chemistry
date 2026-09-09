@@ -20,12 +20,18 @@ References:
 
 from __future__ import annotations
 
+from array import array
+
+import numpy as np
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
 from qdk_chemistry.data import (
+    FlatPartition,
+    LayeredPartition,
     QubitOperator,
     UnitaryRepresentation,
 )
@@ -201,6 +207,15 @@ class Trotter(TimeEvolutionBuilder):
 
         delta = time / num_divisions
 
+        if qubit_hamiltonian.has_sparse_terms:
+            container = self._decompose_packed_trotter_step(
+                qubit_hamiltonian,
+                time=delta,
+                step_reps=num_divisions * power_repetitions,
+                scale=time,
+            )
+            return UnitaryRepresentation(container=container)
+
         terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
         num_qubits = qubit_hamiltonian.num_qubits
@@ -213,6 +228,85 @@ class Trotter(TimeEvolutionBuilder):
         )
 
         return UnitaryRepresentation(container=container)
+
+    def _decompose_packed_trotter_step(
+        self,
+        hamiltonian: QubitOperator,
+        *,
+        time: float,
+        step_reps: int,
+        scale: float,
+    ) -> PauliProductFormulaContainer:
+        """Decompose packed terms without constructing labels or term objects."""
+        if not hamiltonian.is_hermitian(tolerance=self._settings.get("weight_threshold")):
+            raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
+
+        partition = hamiltonian.term_partition
+        if isinstance(partition, LayeredPartition):
+            groups = [group for group in partition.groups if group]
+        elif isinstance(partition, FlatPartition):
+            groups = [((group),) for group in partition.groups if group]
+        elif partition is None:
+            groups = [((index,),) for index in range(hamiltonian.num_terms)]
+        else:
+            raise TypeError(f"Unsupported TermPartition subtype: {type(partition).__name__}.")
+        groups.sort(key=len)
+
+        order = self._settings.get("order")
+        schedule: list[tuple[float, int]] = []
+        if order == 1:
+            schedule = [(1.0, index) for index in range(len(groups))]
+        else:
+            for index in range(len(groups) - 1):
+                schedule.append((0.5, index))
+            schedule.append((1.0, len(groups) - 1))
+            for index in range(len(groups) - 2, -1, -1):
+                schedule.append((0.5, index))
+            if order > 2:
+                for k in range(2, order // 2 + 1):
+                    coefficient = 1 / (4 - 4 ** (1 / (2 * k - 1)))
+                    previous = schedule
+                    schedule = []
+                    for factor in (coefficient, coefficient, 1 - 4 * coefficient, coefficient, coefficient):
+                        schedule.extend((fraction * factor, index) for fraction, index in previous)
+
+            reduced: list[tuple[float, int]] = []
+            for fraction, index in schedule:
+                if reduced and reduced[-1][1] == index:
+                    reduced[-1] = (reduced[-1][0] + fraction, index)
+                else:
+                    reduced.append((fraction, index))
+            schedule = reduced
+
+        source_offsets, source_qubits, source_paulis = hamiltonian.sparse_term_arrays()
+        offsets = array("Q", [0])
+        qubits = array("I")
+        paulis = array("B")
+        angles = array("d")
+        threshold = self._settings.get("weight_threshold")
+        for fraction, group_index in schedule:
+            for layer in groups[group_index]:
+                for term_index in layer:
+                    coefficient = float(complex(hamiltonian.coefficients[term_index]).real)
+                    if abs(coefficient) <= threshold:
+                        continue
+                    begin = int(source_offsets[term_index])
+                    end = int(source_offsets[term_index + 1])
+                    for position in range(begin, end):
+                        qubits.append(int(source_qubits[position]))
+                        paulis.append(int(source_paulis[position]))
+                    offsets.append(len(qubits))
+                    angles.append(coefficient * time * fraction)
+
+        return PauliProductFormulaContainer.from_sparse_arrays(
+            np.frombuffer(offsets, dtype=np.uint64).copy(),
+            np.frombuffer(qubits, dtype=np.uint32).copy(),
+            np.frombuffer(paulis, dtype=np.uint8).copy(),
+            np.frombuffer(angles, dtype=float).copy(),
+            step_reps=step_reps,
+            num_qubits=hamiltonian.num_qubits,
+            scale=scale,
+        )
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Determine the number of Trotter divisions to use.

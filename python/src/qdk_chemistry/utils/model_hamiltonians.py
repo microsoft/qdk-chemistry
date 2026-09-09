@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from array import array
 from collections.abc import Iterable, Mapping
 from enum import IntEnum
 from numbers import Integral
@@ -185,6 +186,73 @@ def _build_geometry_grouped_hamiltonian(
     )
 
 
+def _build_sparse_grouped_hamiltonian(
+    graph: LatticeGraph,
+    *,
+    couplings: list[tuple[str, dict[tuple[int, int], float]]],
+    fields: list[tuple[str, np.ndarray | float]],
+) -> QubitOperator:
+    """Assemble grouped local terms without dense matrices or Pauli labels."""
+    n = graph.num_sites
+    offsets = array("Q", [0])
+    qubits = array("I")
+    paulis = array("B")
+    coefficients = array("d")
+    pauli_code = {"X": 1, "Y": 2, "Z": 3}
+    groups_layers: list[tuple[tuple[int, ...], ...]] = []
+    coloring_cache: dict[tuple[tuple[int, int], ...], dict[tuple[int, int], int]] = {}
+
+    def append_term(factors: tuple[tuple[int, str], ...], coefficient: float) -> int:
+        for qubit, pauli in sorted(factors):
+            qubits.append(qubit)
+            paulis.append(pauli_code[pauli])
+        offsets.append(len(qubits))
+        coefficients.append(coefficient)
+        return len(coefficients) - 1
+
+    for pauli, field in fields:
+        values = to_site_param(field, graph, "field")
+        layer = tuple(append_term(((site, pauli),), float(value)) for site, value in enumerate(values) if value != 0.0)
+        if layer:
+            groups_layers.append((layer,))
+
+    for label, coupling in couplings:
+        if not coupling:
+            continue
+        edges = tuple(sorted(coupling))
+        coloring = coloring_cache.get(edges)
+        if coloring is None:
+            rows = np.fromiter((edge[0] for edge in edges), dtype=np.int64)
+            cols = np.fromiter((edge[1] for edge in edges), dtype=np.int64)
+            support = scipy.sparse.csr_matrix((np.ones(len(edges)), (rows, cols)), shape=(n, n))
+            support += support.T
+            coloring = greedy_edge_coloring(support, seed=0, trials=32)
+            coloring_cache[edges] = coloring
+        color_to_indices: dict[int, list[int]] = {}
+        for edge, color in sorted(coloring.items(), key=lambda item: (item[1], item[0])):
+            color_to_indices.setdefault(color, []).append(
+                append_term(((edge[0], label[0]), (edge[1], label[1])), coupling[edge])
+            )
+        layers = tuple(tuple(color_to_indices[color]) for color in sorted(color_to_indices))
+        if label[0] == label[1]:
+            groups_layers.append(layers)
+        else:
+            groups_layers.extend((layer,) for layer in layers)
+
+    if not coefficients:
+        append_term((), 0.0)
+        groups_layers = [((0,),)]
+    partition = LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers))
+    return QubitOperator.from_sparse_arrays(
+        n,
+        np.frombuffer(offsets, dtype=np.uint64).copy(),
+        np.frombuffer(qubits, dtype=np.uint32).copy(),
+        np.frombuffer(paulis, dtype=np.uint8).copy(),
+        np.asarray(coefficients, dtype=complex),
+        term_partition=partition,
+    )
+
+
 def create_heisenberg_hamiltonian(
     graph: LatticeGraph,
     jx: np.ndarray | float | Mapping[int, np.ndarray | float],
@@ -309,33 +377,35 @@ def create_heisenberg_hamiltonian(
             normalized_shell_couplings[name] = normalized_mapping
 
         shell_pairs = graph.nearest_neighbor_shells(sorted(requested_shells)) if requested_shells else {}
-        adjacency = graph.adjacency_matrix() if len(normalized_shell_couplings) != len(coupling_specs) else None
 
         if include_term_groups:
-            grouped_couplings: list[tuple[str, np.ndarray]] = []
+            grouped_couplings: list[tuple[str, dict[tuple[int, int], float]]] = []
+            adjacency = scipy.sparse.triu(graph.sparse_adjacency_matrix(), k=1).tocoo()
+            adjacency_edges = list(zip(adjacency.row, adjacency.col, adjacency.data, strict=True))
             for pauli_char, name, coupling in coupling_specs:
-                matrix = np.zeros((n, n))
+                records: dict[tuple[int, int], float] = {}
                 if name in normalized_shell_couplings:
                     for shell_index, shell_coupling in normalized_shell_couplings[name]:
                         values = pair_parameter(shell_coupling, f"{name}[{shell_index}]")
                         for site_i, site_j in shell_pairs[shell_index]:
-                            matrix[site_i, site_j] = values if isinstance(values, float) else values[site_i, site_j]
-                else:
-                    assert adjacency is not None
-                    values = pair_parameter(coupling, name)
-                    for site_i in range(n):
-                        for site_j in range(site_i + 1, n):
                             value = values if isinstance(values, float) else values[site_i, site_j]
-                            matrix[site_i, site_j] = value * adjacency[site_i, site_j]
-                grouped_couplings.append((pauli_char * 2, matrix))
-            return _build_geometry_grouped_hamiltonian(
+                            if value != 0.0:
+                                records[site_i, site_j] = float(value)
+                else:
+                    values = pair_parameter(coupling, name)
+                    for site_i, site_j, weight in adjacency_edges:
+                        value = values if isinstance(values, float) else values[site_i, site_j]
+                        coefficient = float(value * weight)
+                        if coefficient != 0.0:
+                            records[int(site_i), int(site_j)] = coefficient
+                grouped_couplings.append((pauli_char * 2, records))
+            return _build_sparse_grouped_hamiltonian(
                 graph,
                 couplings=grouped_couplings,
                 fields=[("X", hx), ("Y", hy), ("Z", hz)],
-                apply_edge_weights=False,
-                color_active_edges=True,
             )
 
+        adjacency = graph.adjacency_matrix() if len(normalized_shell_couplings) != len(coupling_specs) else None
         for pauli_char, name, coupling in coupling_specs:
             if name in normalized_shell_couplings:
                 for shell_index, shell_coupling in normalized_shell_couplings[name]:
@@ -579,6 +649,22 @@ def create_kitaev_hamiltonian(
         exchange_by_pair[pair] += transformed
 
     pauli_components = ("X", "Y", "Z")
+    if include_term_groups and mapped_parameters:
+        sparse_couplings = []
+        for first_index, first in enumerate(pauli_components):
+            for second_index, second in enumerate(pauli_components):
+                records = {
+                    pair: float(exchange[first_index, second_index])
+                    for pair, exchange in exchange_by_pair.items()
+                    if exchange[first_index, second_index] != 0.0
+                }
+                sparse_couplings.append((first + second, records))
+        return _build_sparse_grouped_hamiltonian(
+            graph,
+            couplings=sparse_couplings,
+            fields=list(zip(pauli_components, output_field, strict=True)),
+        )
+
     coupling_matrices = {
         first + second: np.zeros((graph.num_sites, graph.num_sites))
         for first in pauli_components
@@ -591,14 +677,6 @@ def create_kitaev_hamiltonian(
 
     couplings = list(coupling_matrices.items())
     if include_term_groups:
-        if mapped_parameters:
-            return _build_geometry_grouped_hamiltonian(
-                graph,
-                couplings=couplings,
-                fields=list(zip(pauli_components, output_field, strict=True)),
-                apply_edge_weights=False,
-                color_active_edges=True,
-            )
         if graph.edge_coloring is not None:
             return _build_geometry_grouped_hamiltonian(
                 graph,

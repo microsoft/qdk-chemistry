@@ -14,6 +14,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <set>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -627,6 +628,20 @@ class LatticeGraph : public DataClass {
       const std::optional<Eigen::MatrixXd>& positions,
       std::vector<BondFlavorDefinition>& definitions, double tolerance);
 
+  struct IntegerEmbedding {
+    int nx;
+    int ny;
+    Eigen::RowVector2d a1;
+    Eigen::RowVector2d a2;
+    std::vector<Eigen::RowVector2d> basis;
+    std::vector<int> site_by_coordinate;
+    bool periodic_x;
+    bool periodic_y;
+  };
+
+  std::vector<NeighborConnection> _integer_neighbor_connections(
+      const std::set<std::uint64_t>& shells, double tolerance) const;
+
   static LatticeGraph _honeycomb(std::uint64_t num_cells_x,
                                  std::uint64_t num_cells_y,
                                  bool remove_open_corners, bool periodic_x,
@@ -652,6 +667,8 @@ class LatticeGraph : public DataClass {
   std::optional<Eigen::MatrixXd> _periods;
   /// Optional semantic labels for selected shell-axis classes.
   std::vector<BondFlavorDefinition> _bond_flavor_definitions;
+  /// Integer cell coordinates retained by built-in lattice factories.
+  std::optional<IntegerEmbedding> _integer_embedding;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,

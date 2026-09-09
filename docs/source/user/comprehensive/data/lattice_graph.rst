@@ -263,6 +263,8 @@ The ``neighbor_connections(shells)`` method retains more geometric information t
 Each :class:`~qdk_chemistry.data.NeighborConnection` identifies a physical connection by its two finite-lattice sites, periodic image shift, Cartesian displacement, and :class:`~qdk_chemistry.data.BondClass`.
 A bond class combines the radial shell with an unoriented displacement axis, so vectors :math:`\boldsymbol{d}` and :math:`-\boldsymbol{d}` share one orientation class.
 
+Built-in factories retain their integer unit-cell coordinates and generate requested shell connections from integer offset stencils. User-supplied and deserialized Cartesian geometries use the general all-pairs fallback.
+
 This classification is available for every built-in lattice embedding.
 The number of orientations depends on the geometry: a chain has one orientation per shell, while square, triangular, honeycomb, and kagome lattices generally have several.
 Distinct periodic-image connections remain distinct even when they project onto the same canonical finite-lattice site pair.

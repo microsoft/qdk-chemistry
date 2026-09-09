@@ -143,6 +143,24 @@ class TestPauliProductFormulaContainer:
             restored = PauliProductFormulaContainer.from_hdf5(f["container"])
 
         assert restored.type == container.type
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_packed_roundtrip(self, tmp_path, file_format):
+        container = PauliProductFormulaContainer.from_sparse_arrays(
+            np.array([0, 1, 3], dtype=np.uint64),
+            np.array([0, 0, 1], dtype=np.uint32),
+            np.array([1, 2, 3], dtype=np.uint8),
+            np.array([0.5, 0.25]),
+            step_reps=3,
+            num_qubits=2,
+        )
+        path = tmp_path / f"packed.pauli_product_formula_container.{file_format}"
+        container.to_file(path, file_format)
+        restored = PauliProductFormulaContainer.from_file(path, file_format)
+
+        assert restored.has_sparse_terms
+        assert list(restored.step_terms) == list(container.step_terms)
+        assert restored.step_reps == 3
         assert restored.num_qubits == container.num_qubits
         assert restored.step_reps == container.step_reps
         assert len(restored.step_terms) == len(container.step_terms)

@@ -374,6 +374,8 @@ Geometry-aware term grouping
 The Heisenberg, Ising, and Kitaev model builders accept an ``include_term_groups`` flag (default ``True``).
 When enabled, the builder stores a group-and-layer structure on :attr:`~qdk_chemistry.data.QubitOperator.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
 
+Shell-based grouped Heisenberg and Kitaev builders store each Pauli term by its non-identity qubit indices and axes, rather than materializing a register-width string. The :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` attribute remains a sequence-compatible view and constructs individual dense labels only when accessed. Use ``num_terms`` to inspect large operators without materializing labels.
+
 * each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
 

@@ -5,6 +5,7 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import Std.Arrays.Subarray;
+    import Std.ResourceEstimation.*;
 
     /// Performs Time Evolution for a set of Pauli exponentials.
     /// # Parameters
@@ -47,9 +48,89 @@ namespace QDKChemistry.Utils.PauliExp {
         params : RepPauliExpParams,
         systems : Qubit[],
     ) : Unit {
-        for i in 1..params.repetitions {
-            PauliExp(params.pauliExponents, params.pauliCoefficients, systems);
+        if IsResourceEstimating() {
+            within {
+                RepeatEstimates(params.repetitions);
+            } apply {
+                PauliExp(params.pauliExponents, params.pauliCoefficients, systems);
+            }
+        } else {
+            for _ in 1..params.repetitions {
+                PauliExp(params.pauliExponents, params.pauliCoefficients, systems);
+            }
         }
+    }
+
+    operation SparsePauliExp(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        systems : Qubit[],
+    ) : Unit {
+        for term in 0..Length(pauliCoefficients) - 1 {
+            let first = termOffsets[term];
+            let last = termOffsets[term + 1] - 1;
+            if first <= last {
+                let range = first..last;
+                let activeQubits = Subarray(qubitIndices[range], systems);
+                Exp(paulis[range], -pauliCoefficients[term], activeQubits);
+            }
+        }
+    }
+
+    operation RepSparsePauliExp(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+        systems : Qubit[],
+    ) : Unit {
+        if IsResourceEstimating() {
+            within {
+                RepeatEstimates(repetitions);
+            } apply {
+                SparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, systems);
+            }
+        } else {
+            for _ in 1..repetitions {
+                SparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, systems);
+            }
+        }
+    }
+
+    operation MakeRepSparsePauliExpCircuit(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+        system : Int[],
+    ) : Unit {
+        if Length(system) == 0 {
+            return ();
+        }
+        mutable maxIndex = system[0];
+        for idx in 1..Length(system) - 1 {
+            if system[idx] > maxIndex {
+                set maxIndex = system[idx];
+            }
+        }
+        use qs = Qubit[maxIndex + 1];
+        RepSparsePauliExp(
+            termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, Subarray(system, qs)
+        );
+    }
+
+    function MakeRepSparsePauliExpOp(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+    ) : Qubit[] => Unit {
+        RepSparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, _)
     }
 
     /// A helper operation to create a circuit for repeated Time Evolution for a set of Pauli exponentials.

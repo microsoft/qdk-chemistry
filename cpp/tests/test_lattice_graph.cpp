@@ -338,6 +338,86 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
       LatticeGraph::honeycomb_plaquettes(2, 2, true, true).content_hash());
 }
 
+TEST_F(LatticeGraphTest, IntegerConnectionsScaleToLargeBuiltInLattices) {
+  const auto graph =
+      LatticeGraph::honeycomb_plaquettes(200, 200).with_bond_flavors(
+          honeycomb_flavor_ids());
+  const auto connections = graph.neighbor_connections({1, 2, 3});
+  std::array<std::size_t, 3> counts{};
+  for (const auto& connection : connections) {
+    ++counts.at(connection.bond_class.shell - 1);
+    EXPECT_TRUE(connection.flavor.has_value());
+  }
+  EXPECT_EQ(graph.num_sites(), 80800);
+  EXPECT_EQ(counts, (std::array<std::size_t, 3>{120799, 240796, 120000}));
+
+  const auto square = LatticeGraph::square(200, 200);
+  const auto shells = square.nearest_neighbor_shells({1, 2});
+  EXPECT_EQ(square.num_sites(), 40000);
+  EXPECT_EQ(shells.at(1).size(), 79600);
+  EXPECT_EQ(shells.at(2).size(), 79202);
+}
+
+TEST_F(LatticeGraphTest, IntegerConnectionsMatchCartesianFallback) {
+  const auto cached =
+      LatticeGraph::honeycomb_plaquettes(4, 4).with_bond_flavors(
+          honeycomb_flavor_ids());
+  const auto fallback = LatticeGraph::from_json(cached.to_json());
+  const auto expect_same_connections =
+      [](const LatticeGraph& lhs, const LatticeGraph& rhs, const auto& shells) {
+        const auto lhs_connections = lhs.neighbor_connections(shells);
+        const auto rhs_connections = rhs.neighbor_connections(shells);
+        ASSERT_EQ(lhs_connections.size(), rhs_connections.size());
+        for (std::size_t i = 0; i < lhs_connections.size(); ++i) {
+          const auto& lhs_connection = lhs_connections[i];
+          const auto& rhs_connection = rhs_connections[i];
+          EXPECT_EQ(lhs_connection.site_i, rhs_connection.site_i);
+          EXPECT_EQ(lhs_connection.site_j, rhs_connection.site_j);
+          EXPECT_EQ(lhs_connection.bond_class.shell,
+                    rhs_connection.bond_class.shell);
+          EXPECT_EQ(lhs_connection.bond_class.orientation,
+                    rhs_connection.bond_class.orientation);
+          EXPECT_TRUE(lhs_connection.bond_class.axis.isApprox(
+              rhs_connection.bond_class.axis));
+          EXPECT_TRUE(lhs_connection.displacement.isApprox(
+              rhs_connection.displacement));
+          EXPECT_EQ(lhs_connection.image_shift, rhs_connection.image_shift);
+          EXPECT_EQ(lhs_connection.flavor, rhs_connection.flavor);
+        }
+      };
+  expect_same_connections(cached, fallback,
+                          std::vector<std::uint64_t>{1, 2, 3});
+
+  for (std::uint64_t nx = 1; nx <= 2; ++nx) {
+    for (std::uint64_t ny = 1; ny <= 2; ++ny) {
+      const auto honeycomb = LatticeGraph::honeycomb(nx, ny);
+      const auto restored = LatticeGraph::from_json(honeycomb.to_json());
+      expect_same_connections(honeycomb, restored,
+                              std::vector<std::uint64_t>{1, 2, 3});
+    }
+  }
+
+  for (const auto& graph :
+       {LatticeGraph::chain(5), LatticeGraph::square(3, 4),
+        LatticeGraph::triangular(3, 4), LatticeGraph::kagome(3, 2)}) {
+    expect_same_connections(graph, LatticeGraph::from_json(graph.to_json()),
+                            std::vector<std::uint64_t>{1, 2, 3, 4, 5, 6});
+  }
+
+  const std::vector<LatticeGraph> periodic_graphs = {
+      LatticeGraph::chain(5, true),
+      LatticeGraph::square(3, 4, true, false),
+      LatticeGraph::square(3, 4, false, true),
+      LatticeGraph::square(3, 4, true, true),
+      LatticeGraph::triangular(3, 4, true, true),
+      LatticeGraph::honeycomb(3, 4, true, true),
+      LatticeGraph::kagome(3, 2, true, true)};
+  for (const auto& graph : periodic_graphs) {
+    expect_same_connections(graph, LatticeGraph::from_json(graph.to_json()),
+                            std::vector<std::uint64_t>{1, 2, 3, 4, 5, 6});
+  }
+}
+
 TEST_F(LatticeGraphTest, PeriodicConnectionsPreserveFlavorMultiplicity) {
   auto honeycomb = LatticeGraph::honeycomb(2, 2, true, true)
                        .with_bond_flavors(honeycomb_flavor_ids());
