@@ -15,7 +15,7 @@ from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash
 
 from .base import UnitaryContainer
 
-__all__ = ["ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
+__all__ = ["MIN_USEFUL_BATCH", "ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
 
 
 @dataclass(frozen=True)
@@ -32,6 +32,49 @@ class ExponentiatedPauliTerm:
 
     angle: float
     """The rotation angle for the exponentiation."""
+
+    needs_control: bool = True
+    """Whether a controlled mapper must control this factor.
+
+    A product formula that conjugates a phase layer, :math:`V D V^{\\dagger}`,
+    satisfies :math:`C(V D V^{\\dagger}) = V\\, C(D)\\, V^{\\dagger}`: with the control
+    off the conjugating factors cancel against their own adjoints, so only the phase
+    layer needs controlling. Marking the conjugating factors ``False`` lets a
+    controlled mapper emit them bare, which matters because controlling a rotation
+    costs the same whether its angle is fixed or arbitrary -- a fixed ``pi/8`` factor
+    is one T gate uncontrolled but two rotations controlled.
+
+    Terms marked ``False`` must genuinely cancel: the emitting builder is
+    responsible for laying them out so they undo each other last-in-first-out, and
+    the builder's tests assert it.
+    """
+
+    batch: int = 0
+    """Identifier grouping factors that share one angle, or ``0`` when unbatched.
+
+    Factors with the same positive identifier are applied together by Hamming weight
+    phasing: each Pauli string is rotated onto a single :math:`Z`, the number of
+    excited representatives is computed into an ancilla register, and one rotation per
+    *weight bit* replaces one rotation per *term*. A batch of :math:`m` terms therefore
+    costs :math:`O(\\log m)` rotations plus :math:`m - w(m)` Toffolis instead of
+    :math:`m` rotations, which pays off once the batch is larger than roughly
+    :data:`MIN_USEFUL_BATCH` terms.
+
+    Members must be consecutive, share an angle, act on pairwise disjoint qubits, and
+    need control; the emitting builder is responsible for forming batches that way,
+    and the builder's tests assert it.
+    """
+
+
+#: Batch size below which Hamming weight phasing is not worth its arithmetic.
+#:
+#: Measured with the resource estimator on controlled equal-angle batches: a batch of
+#: ``m`` terms costs ``3*ceil(log2(m+1)) + 1`` rotations and ``2*(m - w(m))`` CCZ,
+#: against ``2m`` rotations unbatched. At eight terms that is 13 rotations and 14 CCZ
+#: versus 16 rotations, roughly break-even once a CCZ is counted at four T and a
+#: rotation at several tens; below that the arithmetic costs more than the rotations
+#: it removes.
+MIN_USEFUL_BATCH = 8
 
 
 class PauliProductFormulaContainer(UnitaryContainer):
@@ -61,7 +104,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.2.1"
 
     def __init__(
         self,
@@ -108,7 +151,17 @@ class PauliProductFormulaContainer(UnitaryContainer):
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
+        Raises:
+            ValueError: If the evolution time (``scale``) is zero, so the phase carries no
+                energy information and the inversion ``E = -angle / t`` is undefined.
+
         """
+        if self.scale == 0:
+            raise ValueError(
+                "Cannot recover an eigenvalue: the evolution time (scale) is zero, so the "
+                "measured phase carries no energy information and E = -angle / t is undefined. "
+                "Build the unitary with a non-zero evolution time."
+            )
         angle = (phase_fraction % 1.0) * (2 * np.pi)
         if angle > np.pi:
             angle -= 2 * np.pi
@@ -124,6 +177,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 _hash_int(h, qubit_idx)
                 _hash_str(h, term.pauli_term[qubit_idx])
             _hash_float(h, term.angle)
+            _hash_uint(h, int(term.needs_control))
+            _hash_uint(h, term.batch)
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
         _hash_float(h, self.scale)
@@ -179,10 +234,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=reordered_step_terms,
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
+            scale=self.scale,
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
-        """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
+        r"""Combine two Trotter evolutions, merging adjacent identical Pauli terms.
 
         The terms from ``self`` (repeated ``step_reps`` times) are followed by the
         terms from ``other_container`` (also repeated according to its
@@ -201,7 +257,38 @@ class PauliProductFormulaContainer(UnitaryContainer):
             A single ``PauliProductFormulaContainer`` representing the combined
             evolution with adjacent identical terms fused.
 
+        Raises:
+            ValueError: If the two containers act on a different number of qubits or
+                carry a different ``scale``; or if either container holds a term with a
+                non-zero ``batch`` or with ``needs_control=False``. Both flags describe a
+                term's neighbours -- that a batch stays consecutive, that a conjugation is
+                closed by its own adjoint -- and combining flattens and repeats the term
+                lists, which reorders those neighbours and silently invalidates the flag.
+
+        Note:
+            ``atol`` is a *screening* threshold, not an error bound. Dropping a fused
+            term whose summed angle falls below ``atol`` discards up to ``atol`` of
+            rotation on that Pauli string, so merging a chain that drops :math:`k`
+            terms permits up to :math:`k \cdot \mathrm{atol}` of accumulated operator
+            error -- the error is additive in the number of terms removed, and is not
+            re-scaled by how many were kept. The default (:math:`10^{-12}`) sits far
+            below typical Trotter error, but a caller fusing many containers, or one
+            needing a guaranteed operator-norm bound, should size ``atol`` against the
+            total number of expected cancellations rather than a single one.
+
         """
+        for label, container in (("self", self), ("other_container", other_container)):
+            for term in container.step_terms:
+                if term.batch or not term.needs_control:
+                    raise ValueError(
+                        f"Cannot combine: {label} holds a term with batch={term.batch} and "
+                        f"needs_control={term.needs_control}. Both flags are statements about a "
+                        "term's neighbours -- that a batch stays consecutive, that a conjugation is "
+                        "closed by its own adjoint -- and combining flattens and repeats the term "
+                        "lists, which reorders those neighbours and silently invalidates the flag. "
+                        "Combine plain terms and batch or exempt the result, or map each container "
+                        "to a circuit separately."
+                    )
         if self.num_qubits != other_container.num_qubits:
             raise ValueError(
                 f"Cannot combine PauliProductFormulaContainer instances with different "
@@ -246,7 +333,12 @@ class PauliProductFormulaContainer(UnitaryContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "step_terms": [
-                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
+                {
+                    "pauli_term": {str(k): v for k, v in term.pauli_term.items()},
+                    "angle": term.angle,
+                    "needs_control": term.needs_control,
+                    "batch": term.batch,
+                }
                 for term in self.step_terms
             ],
             "step_reps": self.step_reps,
@@ -272,6 +364,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
         for i, term in enumerate(self.step_terms):
             term_group = step_terms_group.create_group(f"term_{i}")
             term_group.attrs["angle"] = term.angle
+            term_group.attrs["needs_control"] = term.needs_control
+            term_group.attrs["batch"] = term.batch
             pauli_term_group = term_group.create_group("pauli_term")
             for qubit_index, pauli_operator in term.pauli_term.items():
                 pauli_term_group.attrs[str(qubit_index)] = pauli_operator
@@ -306,7 +400,14 @@ class PauliProductFormulaContainer(UnitaryContainer):
                         f"(expected {str(qubit_index)!r})"
                     )
                 pauli_term[qubit_index] = v
-            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_data["angle"]))
+            step_terms.append(
+                ExponentiatedPauliTerm(
+                    pauli_term=pauli_term,
+                    angle=term_data["angle"],
+                    needs_control=bool(term_data.get("needs_control", True)),
+                    batch=int(term_data.get("batch", 0)),
+                )
+            )
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
         return cls(
@@ -333,8 +434,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         step_terms: list[ExponentiatedPauliTerm] = []
         step_terms_group = group["step_terms"]
-        for term_name in step_terms_group:
-            term_group = step_terms_group[term_name]
+        # Indexed explicitly rather than by iterating the group: HDF5 lists members in
+        # alphabetical order, which puts "term_10" before "term_2", and a product
+        # formula's factor order is part of what it means.
+        for i in range(len(step_terms_group)):
+            term_group = step_terms_group[f"term_{i}"]
             angle = term_group.attrs["angle"]
             pauli_term: dict[int, str] = {}
             pauli_term_group = term_group["pauli_term"]
@@ -342,7 +446,14 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 qubit_index = int(qubit_index_str)
                 pauli_operator = pauli_term_group.attrs[qubit_index_str]
                 pauli_term[qubit_index] = pauli_operator
-            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle))
+            step_terms.append(
+                ExponentiatedPauliTerm(
+                    pauli_term=pauli_term,
+                    angle=angle,
+                    needs_control=bool(term_group.attrs.get("needs_control", True)),
+                    batch=int(term_group.attrs.get("batch", 0)),
+                )
+            )
 
         return cls(
             step_terms=step_terms,

@@ -27,7 +27,7 @@ from qdk_chemistry.data import (
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 
-def dense_matrix(op, num_qubits: int) -> np.ndarray:
+def dense_matrix(op, num_qubits: int, context=None) -> np.ndarray:
     """Densify a Q# operation by simulating it on every computational basis state.
 
     Costs ``2**num_qubits`` simulations, so it is only usable on small registers.
@@ -35,12 +35,16 @@ def dense_matrix(op, num_qubits: int) -> np.ndarray:
     Args:
         op: Q# operation to simulate.
         num_qubits: Width of the register the operation acts on.
+        context: Q# context to simulate in. Defaults to the shared context; pass one
+            explicitly when the operation needs a profile the shared context does not
+            provide, such as the unrestricted profile for integer output.
 
     Returns:
         The operation's matrix, with basis state ``b`` in column ``b``.
 
     """
-    context = get_qsharp_context()
+    if context is None:
+        context = get_qsharp_context()
     columns = []
     for basis in range(2**num_qubits):
         state = [0.0] * (2**num_qubits)

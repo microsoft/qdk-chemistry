@@ -84,6 +84,8 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         pauli_indices: list[list[int]] = []
         pauli_ops: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
+        needs_control: list[bool] = []
+        batch_ids: list[int] = []
         for term in unitary_container.step_terms:
             indices: list[int] = []
             ops: list[qsharp.Pauli] = []
@@ -93,11 +95,17 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             pauli_indices.append(indices)
             pauli_ops.append(ops)
             angles.append(term.angle)
+            needs_control.append(term.needs_control)
+            batch_ids.append(term.batch)
 
+        # A container whose terms are all controlled carries no exemption, so the flags
+        # are dropped rather than passed as an all-true array the Q# would have to walk.
         evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
             pauliIndices=pauli_indices,
             pauliOps=pauli_ops,
             pauliCoefficients=angles,
+            needsControl=[] if all(needs_control) else needs_control,
+            batchIds=[] if not any(batch_ids) else batch_ids,
             repetitions=unitary_container.step_reps,
         )
 

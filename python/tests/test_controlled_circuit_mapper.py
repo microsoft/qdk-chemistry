@@ -272,6 +272,8 @@ def _sparse_controlled_op(terms, *, repetitions=1):
         pauliIndices=[term["qubits"] for term in terms],
         pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
         pauliCoefficients=[term["angle"] for term in terms],
+        needsControl=[],
+        batchIds=[],
         repetitions=repetitions,
     )
     op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpAdjCtlOp(params)

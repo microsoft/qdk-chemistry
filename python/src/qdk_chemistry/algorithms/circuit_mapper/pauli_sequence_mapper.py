@@ -85,6 +85,7 @@ class PauliSequenceMapper(CircuitMapper):
         pauli_indices: list[list[int]] = []
         pauli_ops: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
+        batch_ids: list[int] = []
         for term in unitary_container.step_terms:
             indices: list[int] = []
             ops: list[qsharp.Pauli] = []
@@ -94,11 +95,16 @@ class PauliSequenceMapper(CircuitMapper):
             pauli_indices.append(indices)
             pauli_ops.append(ops)
             angles.append(term.angle)
+            batch_ids.append(term.batch)
 
         evo_params = {
             "pauliIndices": pauli_indices,
             "pauliOps": pauli_ops,
             "pauliCoefficients": angles,
+            # Uncontrolled evolution, so no term is exempt from a control that never
+            # exists. The Q# treats an empty array as "control every term".
+            "needsControl": [],
+            "batchIds": [] if not any(batch_ids) else batch_ids,
             "repetitions": unitary_container.step_reps,
         }
 

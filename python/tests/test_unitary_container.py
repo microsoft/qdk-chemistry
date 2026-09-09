@@ -211,6 +211,46 @@ class TestPauliProductFormulaContainer:
         assert result.step_terms[4].pauli_term == {0: "Z"}
         assert np.isclose(result.step_terms[4].angle, 1.5, atol=1e-14)
 
+    def test_combine_rejects_a_batched_term(self):
+        """Combining flattens and repeats the term lists, breaking a batch's consecutiveness."""
+        batched = PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3, batch=1),
+                ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.3, batch=1),
+            ],
+            step_reps=1,
+            num_qubits=2,
+        )
+        plain = PauliProductFormulaContainer(
+            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.2)],
+            step_reps=1,
+            num_qubits=2,
+        )
+        with pytest.raises(ValueError, match="batch"):
+            plain.combine(batched)
+        with pytest.raises(ValueError, match="batch"):
+            batched.combine(plain)
+
+    def test_combine_rejects_a_control_exempt_term(self):
+        """A control exemption is a claim about a term's adjoint neighbour, which combining reorders."""
+        exempt = PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3, needs_control=False),
+                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.3, needs_control=False),
+            ],
+            step_reps=1,
+            num_qubits=1,
+        )
+        plain = PauliProductFormulaContainer(
+            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2)],
+            step_reps=1,
+            num_qubits=1,
+        )
+        with pytest.raises(ValueError, match="needs_control"):
+            plain.combine(exempt)
+        with pytest.raises(ValueError, match="needs_control"):
+            exempt.combine(plain)
+
     def test_summary(self, container):
         """Test the summary generation of the container."""
         summary = container.get_summary()
@@ -219,3 +259,103 @@ class TestPauliProductFormulaContainer:
         assert "Number of qubits: 2" in summary
         assert "Number of step terms: 3" in summary
         assert "Step repetitions: 4" in summary
+
+
+class TestEigenvalueFromPhaseZeroScale:
+    """A zero evolution time makes the phase-to-energy inversion undefined."""
+
+    def test_zero_scale_raises_a_descriptive_error_not_zero_division(self):
+        """``scale`` defaults to the evolution time, which is ``0.0`` for a default builder.
+
+        Reaching ``E = -angle / t`` with ``t = 0`` previously raised a bare ``ZeroDivisionError``.
+        It now raises a ``ValueError`` explaining that the evolution time is zero.
+        """
+        container = PauliProductFormulaContainer(
+            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3)],
+            step_reps=1,
+            num_qubits=1,
+            scale=0.0,
+        )
+        with pytest.raises(ValueError, match="evolution time.*is zero"):
+            container.eigenvalue_from_phase(0.25)
+
+    def test_nonzero_scale_still_inverts(self):
+        """A non-zero scale is unaffected by the guard."""
+        container = PauliProductFormulaContainer(
+            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3)],
+            step_reps=1,
+            num_qubits=1,
+            scale=2.0,
+        )
+        assert np.isfinite(container.eigenvalue_from_phase(0.25))
+
+
+class TestBatchHashing:
+    """Batching changes the circuit, so it must change the content hash."""
+
+    @staticmethod
+    def _container(terms):
+        return PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=4)
+
+    def test_batch_changes_the_hash(self):
+        """Two containers differing only in batching are different circuits to cost."""
+        plain = self._container([ExponentiatedPauliTerm({0: "Z"}, 0.3), ExponentiatedPauliTerm({1: "Z"}, 0.3)])
+        batched = self._container(
+            [
+                ExponentiatedPauliTerm({0: "Z"}, 0.3, batch=1),
+                ExponentiatedPauliTerm({1: "Z"}, 0.3, batch=1),
+            ]
+        )
+        assert plain.content_hash() != batched.content_hash()
+
+
+class TestBatchSerialization:
+    """Round-tripping must preserve batching, or a reloaded circuit costs differently."""
+
+    @staticmethod
+    def _container():
+        return PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm({0: "X", 1: "Y"}, 0.4, needs_control=False),
+                ExponentiatedPauliTerm({2: "Z"}, 0.3, batch=1),
+                ExponentiatedPauliTerm({3: "Z"}, 0.3, batch=1),
+                ExponentiatedPauliTerm({0: "X", 1: "Y"}, -0.4, needs_control=False),
+            ],
+            step_reps=2,
+            num_qubits=4,
+            scale=0.75,
+        )
+
+    def test_json_round_trip_preserves_flags(self):
+        """``needs_control`` and ``batch`` both survive JSON."""
+        original = self._container()
+        restored = PauliProductFormulaContainer.from_json(original.to_json())
+        assert [t.batch for t in restored.step_terms] == [0, 1, 1, 0]
+        assert [t.needs_control for t in restored.step_terms] == [False, True, True, False]
+        assert restored.content_hash() == original.content_hash()
+
+    def test_hdf5_round_trip_preserves_flags(self, tmp_path):
+        """``needs_control`` and ``batch`` both survive HDF5."""
+        original = self._container()
+        path = tmp_path / "container.h5"
+        with h5py.File(path, "w") as handle:
+            original.to_hdf5(handle)
+        with h5py.File(path, "r") as handle:
+            restored = PauliProductFormulaContainer.from_hdf5(handle)
+        assert [t.batch for t in restored.step_terms] == [0, 1, 1, 0]
+        assert restored.content_hash() == original.content_hash()
+
+    def test_hdf5_round_trip_preserves_order_past_ten_terms(self, tmp_path):
+        """HDF5 lists members alphabetically, which puts ``term_10`` before ``term_2``.
+
+        A product formula's factor order is part of what it means, so reading the group
+        back in listing order silently changes the unitary once there are eleven terms.
+        """
+        terms = [ExponentiatedPauliTerm({0: "X"}, float(i) / 10.0) for i in range(12)]
+        original = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=1)
+        path = tmp_path / "many.h5"
+        with h5py.File(path, "w") as handle:
+            original.to_hdf5(handle)
+        with h5py.File(path, "r") as handle:
+            restored = PauliProductFormulaContainer.from_hdf5(handle)
+        assert [t.angle for t in restored.step_terms] == [t.angle for t in terms]
