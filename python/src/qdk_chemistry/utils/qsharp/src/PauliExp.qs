@@ -89,4 +89,96 @@ namespace QDKChemistry.Utils.PauliExp {
     function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit {
         RepPauliExp(params, _)
     }
+
+    /// Sparse form of `RepPauliExpParams`.
+    ///
+    /// The dense `pauliExponents` carries one Pauli per system qubit for every term,
+    /// which is O(terms * qubits). Jordan-Wigner terms are far from dense, so here each
+    /// term instead lists only its non-identity positions: `pauliIndices[t]` indexes
+    /// into `systems` and `pauliOps[t]` holds the matching axis. A term with no entries
+    /// is the identity term.
+    struct SparseRepPauliExpParams {
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+    }
+
+    /// Performs Time Evolution for a sparsely encoded set of Pauli exponentials.
+    /// # Parameters
+    /// - `pauliIndices`: For each term, the positions in `systems` carrying a non-identity Pauli.
+    /// - `pauliOps`: For each term, the Pauli axis at each position in `pauliIndices`.
+    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
+    /// - `systems`: An array of qubits representing the system on which the operation acts.
+    /// # Returns
+    /// - `Unit`: The operation prepares the time evolution on the allocated qubits.
+    operation SparsePauliExp(
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
+        pauliCoefficients : Double[],
+        systems : Qubit[]
+    ) : Unit {
+        for idx in 0..Length(pauliCoefficients) - 1 {
+            // `Exp` takes the opposite sign to the container's exp(-i theta P) convention.
+            Exp(pauliOps[idx], -pauliCoefficients[idx], Subarray(pauliIndices[idx], systems));
+        }
+    }
+
+    /// Performs repeated Time Evolution for a sparsely encoded set of Pauli exponentials.
+    /// # Parameters
+    /// - `params`: A `SparseRepPauliExpParams` struct containing the parameters for the operation.
+    /// - `systems`: An array of qubits representing the system on which the operation acts.
+    /// # Returns
+    /// - `Unit`: The operation prepares the repeated time evolution on the allocated qubits.
+    operation SparseRepPauliExp(
+        params : SparseRepPauliExpParams,
+        systems : Qubit[],
+    ) : Unit {
+        for _ in 1..params.repetitions {
+            SparsePauliExp(
+                params.pauliIndices,
+                params.pauliOps,
+                params.pauliCoefficients,
+                systems
+            );
+        }
+    }
+
+    /// A helper operation to create a circuit for repeated sparse Time Evolution.
+    /// # Parameters
+    /// - `params`: A `SparseRepPauliExpParams` struct containing the parameters for the operation.
+    /// - `system`: An array of integers representing the indices of the system qubits.
+    /// # Returns
+    /// - `Unit`: The operation prepares the repeated time evolution on the allocated qubits.
+    operation MakeSparseRepPauliExpCircuit(
+        params : SparseRepPauliExpParams,
+        system : Int[],
+    ) : Unit {
+        // If no system indices are provided, there is nothing to do.
+        if Length(system) == 0 {
+            return ();
+        }
+
+        // Determine the maximum index in the system array to size the qubit register safely.
+        mutable maxIndex = system[0];
+        for idx in 1..Length(system) - 1 {
+            let current = system[idx];
+            if current > maxIndex {
+                set maxIndex = current;
+            }
+        }
+
+        // Allocate enough qubits so that all indices in `system` are valid.
+        use qs = Qubit[maxIndex + 1];
+        SparseRepPauliExp(params, Subarray(system, qs));
+    }
+
+    /// A helper function to create a callable for repeated sparse Time Evolution.
+    /// # Parameters
+    /// - `params`: A `SparseRepPauliExpParams` struct containing the parameters for the operation.
+    /// # Returns
+    /// - `Qubit[] => Unit`: A callable that takes an array of system qubits, and prepares the repeated time evolution on the allocated qubits.
+    function MakeSparseRepPauliExpOp(params : SparseRepPauliExpParams) : Qubit[] => Unit {
+        SparseRepPauliExp(params, _)
+    }
 }

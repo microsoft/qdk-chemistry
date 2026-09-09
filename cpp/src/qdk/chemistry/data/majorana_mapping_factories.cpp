@@ -406,13 +406,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
   auto get_bilinear =
       [&](std::size_t p,
           std::size_t q) -> std::pair<std::complex<double>, SparsePauliWord> {
-    if (p < q) {
-      auto b = jw_base.bilinear(p, q);
-      return {b.first, b.second};
-    } else {
-      auto b = jw_base.bilinear(q, p);
-      return {-b.first, b.second};
-    }
+    return jw_base.bilinear_product(p, q);
   };
 
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
