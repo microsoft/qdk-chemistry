@@ -431,7 +431,7 @@ jobs:
         echo "Pybind11 Coverage Summary:"
         cat ../coverage-reports/pybind11_coverage.txt
 
-    - name: Write coverage report
+    - name: Add coverage report to job summary
       if: matrix.enable-coverage
       run: |
         # Extract coverage percentages
@@ -446,7 +446,9 @@ jobs:
         PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
 
         report=coverage-reports/coverage-report.md
-        echo "| Component | Coverage |" > "$report"
+        echo "## 📊 Coverage Summary" > "$report"
+        echo "" >> "$report"
+        echo "| Component | Coverage |" >> "$report"
         echo "|-----------|----------|" >> "$report"
         echo "| C++ Library | ${CPP_COVERAGE}% |" >> "$report"
         echo "| Python Package | ${PYTHON_COVERAGE}% |" >> "$report"
@@ -485,6 +487,8 @@ jobs:
           echo "</details>" >> "$report"
         fi
 
+        cat "$report" >> "$GITHUB_STEP_SUMMARY"
+
     # Fork PRs are skipped by the action itself (no write access), not by this condition.
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
@@ -512,15 +516,6 @@ jobs:
         language: Python
         label: code-coverage/python
         fail-on-error: false
-
-    - name: Add coverage to job summary
-      if: matrix.enable-coverage
-      run: |
-        {
-          echo "## 📊 Coverage Summary"
-          echo ""
-          cat coverage-reports/coverage-report.md
-        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Build documentation
       if: matrix.python-version == '3.13'
