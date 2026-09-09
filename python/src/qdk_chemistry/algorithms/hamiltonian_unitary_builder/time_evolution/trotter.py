@@ -352,8 +352,13 @@ class Trotter(TimeEvolutionBuilder):
 
         return terms
 
-    def rpe_category(self) -> str:
-        """Return the Trotter category used by robust phase estimation."""
+    def evolution_category(self) -> str:
+        """Identify the deterministic Trotter simulation family.
+
+        Returns:
+            ``"trotter"``.
+
+        """
         return "trotter"
 
     def name(self) -> str:

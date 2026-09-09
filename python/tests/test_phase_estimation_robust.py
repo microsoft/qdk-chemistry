@@ -12,6 +12,7 @@ QDK circuit stack against exact diagonalization.
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import os
 from dataclasses import dataclass
@@ -20,13 +21,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     QdkRobustPhaseEstimationCircuitBuilder,
 )
 from qdk_chemistry.algorithms.phase_estimation.experiment_scheduler import (
     QdkRobustPhaseEstimationExperimentScheduler,
     _AlgorithmSnapshot,
-    _num_rounds,
 )
 from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (
     RobustPhaseEstimation,
@@ -36,6 +37,7 @@ from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    CircuitExecutorData,
     QuantumErrorProfile,
     QubitOperator,
     RobustPhaseEstimationCircuitSet,
@@ -103,6 +105,12 @@ def test_resolve_energy_rejects_nonpositive_time() -> None:
         RobustPhaseEstimation._resolve_energy(0.1, 0.0, 0, 1.0, 1, correction="linear")
 
 
+@pytest.mark.parametrize("theta", [-np.pi, np.pi, 3 * np.pi])
+def test_resolve_energy_preserves_principal_interval_boundary(theta: float) -> None:
+    """Both representations of the phase cut map to the closed negative-angle endpoint."""
+    assert RobustPhaseEstimation._resolve_energy(theta, 1.0, 0, 1.0, 1, correction="linear") == pytest.approx(np.pi)
+
+
 def _qdrift_forward_phase(energy: float, lambda_norm: float, evolution_time: float, num_samples: int) -> float:
     """Return the expected qDRIFT signal phase for one eigenenergy."""
     step_angle = lambda_norm * evolution_time / num_samples
@@ -150,7 +158,7 @@ def test_rpe_math_recovers_energy_from_ideal_signal(energy: float) -> None:
     """Ideal geometric-ladder phases reconstruct the corresponding eigenenergy."""
     lambda_norm = 1.5
     base_time = np.pi / (2 * lambda_norm)
-    total_rounds = _num_rounds(lambda_norm, epsilon=1e-3)
+    total_rounds = int(np.ceil(np.log2(lambda_norm / 1e-3)))
     theta = 0.0
     for round_index in range(total_rounds + 1):
         evolution_time = (2**round_index) * base_time
@@ -204,21 +212,21 @@ class _FakeUnitary:
     seed: int | None
 
 
-class _FakeUnitaryBuilder:
+class _FakeUnitaryBuilder(Trotter):
     """Build fake unitaries and record exact settings."""
 
-    def __init__(self, settings: Settings, records: list[dict[str, object]], rpe_category: str) -> None:
+    def __init__(self, settings: Settings, records: list[dict[str, object]], evolution_category: str) -> None:
         self._settings = settings
         self._records = records
-        self._rpe_category = rpe_category
+        self._evolution_category = evolution_category
 
-    def rpe_category(self) -> str:
+    def evolution_category(self) -> str:
         """Return the category of the replaced unitary builder."""
-        return self._rpe_category
+        return self._evolution_category
 
-    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
-        """Map an RPE unitary tolerance using the replaced builder's contract."""
-        if self._rpe_category != "partial_randomized":
+    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
+        """Map the unitary tolerance using the replaced builder's contract."""
+        if self._evolution_category != "partial_randomized":
             return epsilon_unitary
         split = float(self._settings.get("accuracy_split"))
         split = min(max(split, 1e-6), 1.0 - 1e-6)
@@ -442,6 +450,29 @@ def test_post_process_uses_experiment_identity_after_reordering() -> None:
     assert result.resolved_energy == pytest.approx(energy, abs=1e-6)
 
 
+def test_post_process_averages_each_randomized_draw() -> None:
+    """Different count totals do not change the equal weighting of randomized draws."""
+    circuit_set = _make_scheduler(target_accuracy=1.0, unitary_builder_name="qdrift", energy_correction="linear").run(
+        _DUMMY_STATE_PREPARATION, QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0]))
+    )
+    assert circuit_set.num_rounds == 1
+    assert len(circuit_set.experiment_specs) == 30
+    results = tuple(
+        _RpeExecutionResult(
+            spec,
+            CircuitExecutorData({"0": 1} if index < 15 else {"1": 100}, 1 if index < 15 else 100, "test"),
+            CircuitExecutorData({"0": 1}, 1, "test"),
+        )
+        for index, spec in enumerate(circuit_set.experiment_specs)
+    )
+
+    result = RobustPhaseEstimation()._post_process(
+        circuit_set, results, requested_executor_seed=None, executor_root_seed=None
+    )
+
+    assert result.resolved_energy == pytest.approx(-1.0)
+
+
 @pytest.mark.parametrize("energy", [0.4, -0.3, 0.75, 0.0])
 def test_driver_recovers_energy_exact_mode(monkeypatch: pytest.MonkeyPatch, energy: float) -> None:
     """Linear RPE recovers an injected ideal energy through builder/executor composition."""
@@ -503,14 +534,29 @@ def test_robust_phase_estimation_name() -> None:
     assert RobustPhaseEstimation().name() == "qdk_robust"
 
 
-def test_energy_correction_auto_selection() -> None:
-    """Auto correction maps only pure randomized-product evolution to the tangent map."""
-    auto = QdkRobustPhaseEstimationExperimentScheduler()
-    assert auto._select_correction("qdrift") == "qdrift_tangent"
-    assert auto._select_correction("partial_randomized") == "linear"
-    assert auto._select_correction("deterministic_or_exact") == "linear"
-    forced = QdkRobustPhaseEstimationExperimentScheduler(energy_correction="qdrift_tangent")
-    assert forced._select_correction("partial_randomized") == "qdrift_tangent"
+@pytest.mark.parametrize(
+    ("builder_name", "correction", "expected"),
+    [
+        ("qdrift", "auto", "qdrift_tangent"),
+        ("partially_randomized", "auto", "linear"),
+        ("trotter", "auto", "linear"),
+        ("partially_randomized", "qdrift_tangent", "qdrift_tangent"),
+        ("qdrift", "linear", "linear"),
+    ],
+)
+def test_energy_correction_auto_selection(builder_name: str, correction: str, expected: str) -> None:
+    """The scheduled correction follows the evolution family unless explicitly overridden."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.5,
+        seed=7,
+        energy_correction=correction,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
+    )
+    circuit_set = scheduler.run(
+        _DUMMY_STATE_PREPARATION, QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0]))
+    )
+
+    assert circuit_set.energy_correction == expected
 
 
 def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -535,7 +581,7 @@ def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.Mo
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
     metadata = result.metadata
-    final_round = _num_rounds(1.0, epsilon_rpe)
+    final_round = int(np.ceil(np.log2(1.0 / epsilon_rpe)))
     final_time = (2**final_round) * np.pi / 2.0
     exact_energy_bound = phase_error / final_time
     propagated_energy_bound = (2.0 / np.pi) * epsilon_rpe * phase_error
@@ -604,7 +650,7 @@ def test_trotter_uses_independent_default_tolerances() -> None:
     assert circuit_set.epsilon_unitary == pytest.approx(0.85)
     assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.0)
     assert circuit_set.error_budget_mode == "independent_trotter"
-    assert circuit_set.num_rounds == _num_rounds(1.0, target_accuracy) + 1
+    assert circuit_set.num_rounds == 8
     for round_data in circuit_set.rounds:
         ref = round_data.unitary_builder_configuration
         assert ref.settings is not None
@@ -703,11 +749,18 @@ def test_partial_builder_rejects_invalid_independent_unitary_budget(
         scheduler.run(_DUMMY_STATE_PREPARATION, QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
-@pytest.mark.parametrize(("unitary_name", "randomized"), [("trotter", False), ("qdrift", True)])
+@pytest.mark.parametrize(
+    ("unitary_name", "randomized", "expected_seed_hash"),
+    [
+        ("trotter", False, "90d4cf4b544ca3a5e9bc7afe04cd16d27529d13bb56345bd127bfc5d2a799513"),
+        ("qdrift", True, "25aa67aeea22d3285959c7e622164302d90bb3d2a3026574678c1c2b95a7084a"),
+    ],
+)
 def test_executor_uses_manifest_shots(
     monkeypatch: pytest.MonkeyPatch,
     unitary_name: str,
     randomized: bool,
+    expected_seed_hash: str,
 ) -> None:
     """Execution honors deterministic multi-shot specs and randomized one-shot draws."""
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
@@ -723,23 +776,39 @@ def test_executor_uses_manifest_shots(
     else:
         expected = [shots for round_data in circuit_set.rounds for shots in (round_data.shots_per_basis,) * 2]
     assert executor.shot_calls == expected
-    expected_seeds: list[int | None] = []
-    for round_data in circuit_set.rounds:
-        draw_indices = range(round_data.num_draws) if randomized else (None,)
-        for draw_index in draw_indices:
-            for basis_index in (0, 1):
-                expected_seeds.append(
-                    RobustPhaseEstimation._measurement_seed(
-                        42,
-                        round_data.round_index,
-                        draw_index,
-                        basis_index=basis_index,
-                    )
-                )
-    assert executor.seed_calls == expected_seeds
+    assert len(executor.seed_calls) == len(expected)
+    seed_bytes = np.asarray(executor.seed_calls, dtype="<u4").tobytes()
+    assert hashlib.sha256(seed_bytes).hexdigest() == expected_seed_hash
     assert len(set(executor.seed_calls)) == len(executor.seed_calls)
     assert result.metadata["requested_executor_seed"] == 42
     assert result.metadata["executor_root_seed"] == 42
+
+
+def test_executor_entropy_seed_is_resolved_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """One entropy-backed measurement root is shared by the entire execution."""
+    driver = RobustPhaseEstimation(
+        circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=-1)
+    )
+    builder = _make_builder(target_accuracy=0.5)
+    _, executor = _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2))
+    original_seed_sequence = np.random.SeedSequence
+    entropy_calls: list[int] = []
+
+    def seed_sequence(entropy: int | list[int] | None = None) -> np.random.SeedSequence:
+        if entropy is None:
+            entropy_calls.append(1234)
+            return original_seed_sequence(1234)
+        return original_seed_sequence(entropy)
+
+    monkeypatch.setattr(np.random, "SeedSequence", seed_sequence)
+    result = driver.run(_DUMMY_STATE_PREPARATION, QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
+
+    assert entropy_calls == [1234]
+    assert result.metadata["requested_executor_seed"] == -1
+    assert result.metadata["executor_root_seed"] == int(
+        original_seed_sequence(1234).generate_state(1, dtype=np.uint32)[0]
+    )
+    assert len(set(executor.seed_calls)) == len(executor.seed_calls) == 4
 
 
 def test_executor_forwards_noise_to_every_x_y_circuit(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -917,7 +986,7 @@ def test_independent_tolerances_bound_noncommuting_trotter_ground_energy(
 
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
-    final_round = _num_rounds(lambda_norm, epsilon_rpe)
+    final_round = int(np.ceil(np.log2(lambda_norm / epsilon_rpe)))
     final_time = (2**final_round) * np.pi / (2.0 * lambda_norm)
     ladder_bound = np.arcsin(epsilon_unitary) / final_time
     product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)
@@ -955,7 +1024,7 @@ def test_product_budget_reaches_one_millihartree_for_h2_sto3g(monkeypatch: pytes
 
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
-    final_round = _num_rounds(lambda_norm, epsilon_rpe)
+    final_round = int(np.ceil(np.log2(lambda_norm / epsilon_rpe)))
     final_time = (2**final_round) * np.pi / (2.0 * lambda_norm)
     ladder_bound = np.arcsin(epsilon_unitary) / final_time
     product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)

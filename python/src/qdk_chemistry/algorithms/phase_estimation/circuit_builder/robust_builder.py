@@ -50,10 +50,20 @@ class RobustPhaseEstimationCircuitBuilderSettings(Settings):
 
 
 class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
-    """Abstract circuit builder for robust phase estimation."""
+    """Abstract circuit builder for robust phase estimation.
+
+    ``run`` returns the complete circuit list through ``_run_impl``. Scheduling
+    and streaming are also exposed for bounded-memory execution and replay.
+    Override ``iter_build`` to customize circuit construction for both paths.
+    """
 
     def __init__(self, experiment_scheduler: AlgorithmRef | None = None) -> None:
-        """Initialize robust phase estimation circuit construction."""
+        """Initialize robust phase estimation circuit construction.
+
+        Args:
+            experiment_scheduler: Optional reference configuring workload scheduling; defaults to the QDK scheduler.
+
+        """
         super().__init__()
         self._settings = RobustPhaseEstimationCircuitBuilderSettings()
         if experiment_scheduler is not None:
@@ -64,7 +74,19 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Resolve one reproducible RPE workload."""
+        """Resolve one reproducible RPE workload without constructing circuits.
+
+        Args:
+            state_preparation: Circuit preparing the state for every experiment.
+            qubit_hamiltonian: Hamiltonian whose evolution is scheduled.
+
+        Returns:
+            The nested scheduler's circuit set, including concrete randomized-draw seeds.
+
+        Raises:
+            TypeError: If the configured scheduler has the wrong algorithm type.
+
+        """
         scheduler = self._create_nested("experiment_scheduler")
         if not isinstance(scheduler, RobustPhaseEstimationExperimentScheduler):
             raise TypeError(
@@ -77,7 +99,22 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
         self,
         circuit_set: RobustPhaseEstimationCircuitSet,
     ) -> Iterator[tuple[RobustPhaseEstimationExperimentSpec, Circuit, Circuit]]:
-        """Build scheduled X/Y circuit pairs one at a time."""
+        """Build scheduled X/Y circuit pairs one at a time.
+
+        This is the shared construction path for eager ``run``/``build`` and
+        streamed RPE execution. Reiteration uses the same recorded draw seeds.
+
+        Args:
+            circuit_set: Frozen workload containing inputs, per-round settings, and experiment identities.
+
+        Yields:
+            Each experiment specification followed by its X and Y circuits, built from the same unitary draw.
+
+        Raises:
+            TypeError: If the workload is not an RPE circuit set or a declared power is not an integer.
+            ValueError: If a nested unitary builder has a power other than one.
+
+        """
         if not isinstance(circuit_set, RobustPhaseEstimationCircuitSet):
             raise TypeError(f"circuit_set must be a RobustPhaseEstimationCircuitSet, got {type(circuit_set)} instead.")
         hadamard_configuration = _AlgorithmSnapshot.from_ref(circuit_set.hadamard_test_circuit_builder_configuration)
@@ -107,7 +144,15 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
             yield experiment_spec, x_circuit, y_circuit
 
     def build(self, circuit_set: RobustPhaseEstimationCircuitSet) -> list[Circuit]:
-        """Materialize the canonical flat circuit list for one RPE workload."""
+        """Materialize the canonical flat circuit list for one RPE workload.
+
+        Args:
+            circuit_set: Previously scheduled workload to build without rescheduling.
+
+        Returns:
+            All circuits in manifest order, with X immediately followed by Y for each experiment.
+
+        """
         circuits: list[Circuit] = []
         for _, x_circuit, y_circuit in self.iter_build(circuit_set):
             circuits.extend((x_circuit, y_circuit))
@@ -119,7 +164,16 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
-        """Schedule and build robust phase estimation circuits."""
+        """Schedule and build robust phase estimation circuits.
+
+        Args:
+            state_preparation: Circuit preparing the input state.
+            qubit_hamiltonian: Hamiltonian whose evolution signals will be measured.
+
+        Returns:
+            The complete flat circuit list, consistent with the shared QPE-builder contract.
+
+        """
 
 
 class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder):
@@ -130,9 +184,23 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> list[Circuit]:
-        """Schedule once and return the canonical flat circuit list."""
+        """Schedule once and return the canonical flat circuit list.
+
+        Args:
+            state_preparation: Circuit preparing the input state for each Hadamard test.
+            qubit_hamiltonian: Hamiltonian used to schedule and construct the evolution circuits.
+
+        Returns:
+            All scheduled X/Y pairs flattened in manifest order; use ``iter_build`` for lazy construction.
+
+        """
         return self.build(self.schedule(state_preparation, qubit_hamiltonian))
 
     def name(self) -> str:
-        """Return the QDK robust circuit-builder name."""
+        """Return the QDK robust circuit-builder name.
+
+        Returns:
+            ``"qdk_robust"``.
+
+        """
         return "qdk_robust"

@@ -37,14 +37,6 @@ class HamiltonianUnitaryBuilder(Algorithm):
         """Initialize the HamiltonianUnitaryBuilder."""
         super().__init__()
 
-    def rpe_category(self) -> str:
-        """Return the builder category used by robust phase estimation."""
-        return "deterministic_or_exact"
-
-    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
-        """Map an RPE full-unitary tolerance to this builder's target accuracy."""
-        return epsilon_unitary
-
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
@@ -121,6 +113,30 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
     def __init__(self):
         """Initialize the TimeEvolutionBuilder."""
         super().__init__()
+
+    def evolution_category(self) -> str:
+        """Describe the simulation family independently of its registered name.
+
+        Returns:
+            The evolution family; the default is ``"deterministic_or_exact"``.
+
+        """
+        return "deterministic_or_exact"
+
+    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
+        """Convert a full-evolution tolerance into the builder's accuracy parameter.
+
+        The default leaves the tolerance unchanged. Builders with a different
+        error-budget convention override this conversion.
+
+        Args:
+            epsilon_unitary: Requested additive error tolerance for the full evolution.
+
+        Returns:
+            The corresponding value of the builder's ``target_accuracy`` setting, when supported.
+
+        """
+        return epsilon_unitary
 
     def _resolve_power(self) -> tuple[float, int]:
         """Resolve the power setting into effective time scale and power repetitions.

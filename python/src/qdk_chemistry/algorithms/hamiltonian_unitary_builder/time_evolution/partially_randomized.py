@@ -647,12 +647,25 @@ class PartiallyRandomized(QDrift):
                 best_ld = ld
         return best_ld
 
-    def rpe_category(self) -> str:
-        """Return the partially randomized category used by robust phase estimation."""
+    def evolution_category(self) -> str:
+        """Identify the partially randomized simulation family.
+
+        Returns:
+            ``"partial_randomized"``.
+
+        """
         return "partial_randomized"
 
-    def rpe_target_accuracy(self, epsilon_unitary: float) -> float:
-        """Map an additive RPE tolerance to the builder's quadrature target."""
+    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
+        """Convert an additive tolerance to the builder's quadrature error budget.
+
+        Args:
+            epsilon_unitary: Requested sum of the deterministic and randomized error budgets.
+
+        Returns:
+            The quadrature target whose split components sum to ``epsilon_unitary``.
+
+        """
         split = float(self._settings.get("accuracy_split"))
         split = min(max(split, ACCURACY_SPLIT_MIN), ACCURACY_SPLIT_MAX)
         return epsilon_unitary / (math.sqrt(split) + math.sqrt(1.0 - split))

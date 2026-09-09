@@ -12,6 +12,7 @@ from abc import abstractmethod
 import numpy as np
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -35,24 +36,6 @@ __all__ = [
 _UNSET_BUDGET_VALUE = -1.0
 _DEFAULT_RPE_EPSILON_UNITARY = 0.85
 _SUPPORTED_RPE_CATEGORIES = frozenset({"deterministic_or_exact", "trotter", "qdrift", "partial_randomized"})
-
-
-def _num_rounds(lambda_norm: float, epsilon: float) -> int:
-    """Return the number of RPE time-doubling rounds after the base round."""
-    if epsilon <= 0.0:
-        raise ValueError(f"epsilon must be positive, received {epsilon}.")
-    if lambda_norm < 0.0:
-        raise ValueError(f"lambda_norm must be non-negative, received {lambda_norm}.")
-    if lambda_norm <= epsilon:
-        return 0
-    return int(np.ceil(np.log2(lambda_norm / epsilon)))
-
-
-def _qdrift_schedule(total_rounds: int, round_index: int) -> tuple[int, int]:
-    """Return the per-basis shot count and qDRIFT sample count for one round."""
-    shots = int(np.ceil(np.e * (11 + 4 * (total_rounds - round_index))))
-    samples = 2 ** (2 * round_index + 1)
-    return shots, samples
 
 
 class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
@@ -135,7 +118,20 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         unitary_builder: AlgorithmRef | None = None,
         hadamard_test_circuit_builder: AlgorithmRef | None = None,
     ) -> None:
-        """Initialize robust phase estimation workload scheduling."""
+        """Initialize robust phase estimation workload scheduling.
+
+        Args:
+            target_accuracy: Requested absolute accuracy of the final energy estimate.
+            base_time: Base evolution time; zero selects the coefficient-norm default.
+            unitary_accuracy_fraction: Optional legacy fractional error allocation for non-Trotter evolution.
+            energy_correction: Phase-to-energy mapping, or ``"auto"`` to select it from the evolution family.
+            seed: Unitary-draw root seed; a negative value requests entropy once per randomized workload.
+            epsilon_rpe: Optional explicit energy tolerance, paired with ``epsilon_unitary`` for supported families.
+            epsilon_unitary: Optional full-unitary error tolerance, converted to the builder's native accuracy setting.
+            unitary_builder: Reference to a time-evolution builder; its power must be one.
+            hadamard_test_circuit_builder: Reference to the builder used for each X/Y circuit pair.
+
+        """
         super().__init__()
         self._settings = RobustPhaseEstimationExperimentSchedulerSettings()
         self._settings.set("target_accuracy", target_accuracy)
@@ -154,7 +150,12 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             self._settings.set("hadamard_test_circuit_builder", hadamard_test_circuit_builder)
 
     def type_name(self) -> str:
-        """Return the RPE experiment-scheduler type name."""
+        """Return the RPE experiment-scheduler type name.
+
+        Returns:
+            ``"rpe_experiment_scheduler"``.
+
+        """
         return "rpe_experiment_scheduler"
 
     @abstractmethod
@@ -163,18 +164,37 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Resolve and return a reproducible RPE workload."""
+        """Resolve and return a reproducible RPE workload.
+
+        Args:
+            state_preparation: Circuit preparing the state used for every Hadamard test.
+            qubit_hamiltonian: Hamiltonian whose time-evolution signals will be measured.
+
+        Returns:
+            A serializable workload with resolved settings and draw seeds, without materialized circuits.
+
+        """
 
 
 class RobustPhaseEstimationExperimentSchedulerFactory(AlgorithmFactory):
     """Factory for robust phase estimation experiment schedulers."""
 
     def algorithm_type_name(self) -> str:
-        """Return the RPE experiment-scheduler type name."""
+        """Return the RPE experiment-scheduler type name.
+
+        Returns:
+            ``"rpe_experiment_scheduler"``.
+
+        """
         return "rpe_experiment_scheduler"
 
     def default_algorithm_name(self) -> str:
-        """Return the default QDK scheduler name."""
+        """Return the default QDK scheduler name.
+
+        Returns:
+            ``"qdk"``.
+
+        """
         return "qdk"
 
 
@@ -186,24 +206,49 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Resolve rounds, randomized draws, and execution metadata."""
+        """Resolve rounds, randomized draws, and execution metadata.
+
+        The workload includes round zero and every subsequent time doubling.
+        Deterministic rounds use one multi-shot X/Y pair. Randomized rounds use
+        one independently seeded unitary per shot, shared by the two bases.
+
+        Args:
+            state_preparation: State-preparation circuit stored with the workload.
+            qubit_hamiltonian: Hamiltonian used to choose the norm, time ladder, and nested builder settings.
+
+        Returns:
+            A reproducible circuit set containing rounds, per-basis shots, draw seeds, and input data.
+
+        Raises:
+            TypeError: If the configured builder is not a time-evolution builder or its capabilities are malformed.
+            ValueError: If the evolution family, power, base time, or error-budget settings are unsupported or invalid.
+
+        """
         unitary_ref = self._settings.get("unitary_builder")
         hadamard_ref = self._settings.get("hadamard_test_circuit_builder")
         unitary_snapshot = _AlgorithmSnapshot.from_ref(unitary_ref)
         hadamard_snapshot = _AlgorithmSnapshot.from_ref(hadamard_ref)
-        _validate_unitary_builder_power(unitary_snapshot)
+        unitary_snapshot.validate_unit_power()
 
         unitary_builder = unitary_snapshot.create()
-        declared_category = self._resolve_rpe_category(unitary_snapshot, unitary_builder)
+        if not isinstance(unitary_builder, TimeEvolutionBuilder):
+            raise TypeError(
+                "RPE requires a TimeEvolutionBuilder; "
+                f"'{unitary_snapshot.algorithm_type}/{unitary_snapshot.algorithm_name}' "
+                "does not represent supported time evolution. Block encodings and quantum walks are not supported."
+            )
+        declared_category = self._resolve_evolution_category(unitary_snapshot, unitary_builder)
         category = "deterministic_or_exact" if declared_category == "trotter" else declared_category
-        correction = self._select_correction(category)
+        correction = str(self._settings.get("energy_correction"))
+        if correction == "auto":
+            correction = "qdrift_tangent" if category == "qdrift" else "linear"
         epsilon_total = float(self._settings.get("target_accuracy"))
         fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(
             category,
             epsilon_total,
             is_trotter=declared_category == "trotter",
         )
-        nested_epsilon_unitary = self._resolve_rpe_target_accuracy(
+        nested_epsilon_unitary = self._resolve_target_accuracy(
             unitary_snapshot,
             unitary_builder,
             epsilon_unitary,
@@ -219,15 +264,26 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
                 f"got base_time={base_time:.6g} and lambda_norm={lambda_norm:.6g}."
             )
 
-        total_round = _num_rounds(lambda_norm, epsilon_rpe)
+        if epsilon_rpe <= 0.0:
+            raise ValueError(f"epsilon must be positive, received {epsilon_rpe}.")
+        if lambda_norm < 0.0:
+            raise ValueError(f"lambda_norm must be non-negative, received {lambda_norm}.")
+        total_round = 0 if lambda_norm <= epsilon_rpe else int(np.ceil(np.log2(lambda_norm / epsilon_rpe)))
         randomized = category in ("qdrift", "partial_randomized")
         requested_seed = int(self._settings.get("seed"))
-        root_seed = self._resolve_root_seed(requested_seed) if randomized else None
+        root_seed = None
+        if randomized:
+            root_seed = (
+                requested_seed
+                if requested_seed >= 0
+                else int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
+            )
 
         rounds: list[RobustPhaseEstimationRound] = []
         experiment_specs: list[RobustPhaseEstimationExperimentSpec] = []
         for round_index in range(total_round + 1):
-            shots, samples = _qdrift_schedule(total_round, round_index)
+            shots = int(np.ceil(np.e * (11 + 4 * (total_round - round_index))))
+            samples = 2 ** (2 * round_index + 1)
             evolution_time = float((2**round_index) * base_time)
             updates: dict[str, object] = {"time": evolution_time}
             if category == "qdrift" and unitary_snapshot.has_setting("num_samples"):
@@ -240,8 +296,9 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
 
             if randomized:
                 assert root_seed is not None
-                draw_seeds = tuple(self._derive_seed(root_seed, round_index, draw) for draw in range(shots))
-                for draw_index, draw_seed in enumerate(draw_seeds):
+                for draw_index in range(shots):
+                    sequence = np.random.SeedSequence([root_seed, round_index, draw_index])
+                    draw_seed = int(sequence.generate_state(1, dtype=np.uint32)[0])
                     experiment_specs.append(
                         RobustPhaseEstimationExperimentSpec(
                             experiment_index=len(experiment_specs),
@@ -295,41 +352,67 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         )
 
     @staticmethod
-    def _resolve_rpe_category(snapshot: _AlgorithmSnapshot, builder: Algorithm) -> str:
-        """Return and validate the unitary builder's declared RPE category."""
-        category_resolver = getattr(builder, "rpe_category", None)
+    def _resolve_evolution_category(snapshot: _AlgorithmSnapshot, builder: TimeEvolutionBuilder) -> str:
+        """Return and validate the declared evolution family supported by this scheduler.
+
+        Args:
+            snapshot: Builder configuration used to identify invalid capability declarations.
+            builder: Instantiated time-evolution builder whose family is queried.
+
+        Returns:
+            The supported evolution category, independent of the builder's registry name.
+
+        Raises:
+            TypeError: If the capability is not callable or does not return a string.
+            ValueError: If the declared family has no scheduling policy.
+
+        """
+        category_resolver = getattr(builder, "evolution_category", None)
         if not callable(category_resolver):
             raise TypeError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' must implement rpe_category()."
+                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' "
+                "must implement evolution_category()."
             )
         category = category_resolver()
         if not isinstance(category, str):
             raise TypeError(
                 f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned a non-string "
-                "RPE category."
+                "evolution category."
             )
         if category not in _SUPPORTED_RPE_CATEGORIES:
             supported = ", ".join(sorted(_SUPPORTED_RPE_CATEGORIES))
             raise ValueError(
                 f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned unsupported "
-                f"RPE category {category!r}; expected one of: {supported}."
+                f"evolution category {category!r}; expected one of: {supported}."
             )
         return category
 
     @staticmethod
-    def _resolve_rpe_target_accuracy(
+    def _resolve_target_accuracy(
         snapshot: _AlgorithmSnapshot,
-        builder: Algorithm,
+        builder: TimeEvolutionBuilder,
         epsilon_unitary: float,
     ) -> float:
-        """Map and validate the RPE unitary tolerance for a nested builder."""
-        target_resolver = getattr(builder, "rpe_target_accuracy", None)
-        if target_resolver is None:
-            return epsilon_unitary
+        """Map and validate the RPE unitary tolerance for a nested builder.
+
+        Args:
+            snapshot: Builder configuration used to identify invalid tolerance conversions.
+            builder: Instantiated time-evolution builder defining the accuracy convention.
+            epsilon_unitary: Full-unitary tolerance selected by the scheduler.
+
+        Returns:
+            The finite, nonnegative value for the nested builder's native accuracy setting.
+
+        Raises:
+            TypeError: If the conversion is not callable or its result is nonnumeric or nonfinite.
+            ValueError: If the converted accuracy is negative.
+
+        """
+        target_resolver = getattr(builder, "target_accuracy_from_unitary_tolerance", None)
         if not callable(target_resolver):
             raise TypeError(
                 f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' defines a non-callable "
-                "rpe_target_accuracy attribute."
+                "target_accuracy_from_unitary_tolerance attribute."
             )
         target_accuracy = target_resolver(epsilon_unitary)
         if not isinstance(target_accuracy, int | float) or not np.isfinite(target_accuracy):
@@ -344,13 +427,6 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             )
         return float(target_accuracy)
 
-    def _select_correction(self, category: str) -> str:
-        """Resolve the configured phase-to-energy correction."""
-        mode = str(self._settings.get("energy_correction"))
-        if mode != "auto":
-            return mode
-        return "qdrift_tangent" if category == "qdrift" else "linear"
-
     def _resolve_budget(
         self,
         category: str,
@@ -358,7 +434,20 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         *,
         is_trotter: bool,
     ) -> tuple[float, float, float, str]:
-        """Resolve and validate the RPE and unitary error budgets."""
+        """Resolve and validate the RPE and unitary error budgets.
+
+        Args:
+            category: Normalized evolution category used to choose a budget policy.
+            epsilon_total: Requested final energy accuracy.
+            is_trotter: Whether to use the independent Trotter tolerance policy.
+
+        Returns:
+            The legacy fraction, RPE energy tolerance, unitary tolerance, and budget-mode name.
+
+        Raises:
+            ValueError: If the configured tolerances or legacy options are invalid for the selected policy.
+
+        """
         configured_fraction = float(self._settings.get("unitary_accuracy_fraction"))
         explicit_rpe = float(self._settings.get("epsilon_rpe"))
         explicit_unitary = float(self._settings.get("epsilon_unitary"))
@@ -422,24 +511,11 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             epsilon_rpe = epsilon_total
         return fraction, epsilon_rpe, epsilon_unitary, "fraction"
 
-    @staticmethod
-    def _resolve_root_seed(requested_seed: int) -> int:
-        """Return a concrete root seed for one circuit set."""
-        if requested_seed >= 0:
-            return requested_seed
-        return int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
-
-    @staticmethod
-    def _derive_seed(root_seed: int, round_index: int, draw_index: int) -> int:
-        """Derive one independent reproducible unitary-builder seed."""
-        sequence = np.random.SeedSequence([root_seed, round_index, draw_index])
-        return int(sequence.generate_state(1, dtype=np.uint32)[0])
-
     def name(self) -> str:
-        """Return the QDK scheduler name."""
+        """Return the QDK scheduler name.
+
+        Returns:
+            ``"qdk"``.
+
+        """
         return "qdk"
-
-
-def _validate_unitary_builder_power(snapshot: _AlgorithmSnapshot) -> None:
-    """Require RPE to be the sole owner of the evolution power schedule."""
-    snapshot.validate_unit_power()

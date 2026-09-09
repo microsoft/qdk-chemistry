@@ -662,11 +662,11 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         assert np.isclose(eps_d**2 + eps_r**2, eps**2, atol=1e-15)
 
     @pytest.mark.parametrize("split", [0.1, 0.5, 0.9])
-    def test_rpe_target_accuracy_bounds_additive_error(self, split: float):
-        """The mapped quadrature components sum to the full RPE unitary budget."""
+    def test_target_accuracy_from_unitary_tolerance_bounds_additive_error(self, split: float):
+        """The mapped quadrature components sum to the full unitary budget."""
         epsilon_unitary = 0.85
         mapper = PartiallyRandomized(accuracy_split=split)
-        target_accuracy = mapper.rpe_target_accuracy(epsilon_unitary)
+        target_accuracy = mapper.target_accuracy_from_unitary_tolerance(epsilon_unitary)
         builder = PartiallyRandomized(target_accuracy=target_accuracy, accuracy_split=split)
 
         eps_d, eps_r = builder._split_accuracy()

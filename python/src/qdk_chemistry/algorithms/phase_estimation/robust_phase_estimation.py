@@ -56,13 +56,21 @@ class _RpeExecutionResult:
     y_result: CircuitExecutorData
 
 
-def _wrap_to_principal(angle: float) -> float:
-    """Wrap an angle into the principal interval ``[-pi, pi)``."""
-    return float((angle + np.pi) % (2 * np.pi) - np.pi)
-
-
 def _rpe_angle_update(previous_angle: float, measured_phase: float, round_index: int) -> float:
-    """Select the measured-phase alias closest to the previous RPE estimate."""
+    """Select the measured-phase alias closest to the previous RPE estimate.
+
+    Args:
+        previous_angle: Previous estimate of the phase at the base evolution time, in radians.
+        measured_phase: Measured phase at the current round's evolution time, in radians.
+        round_index: Nonnegative number of time doublings since the base round.
+
+    Returns:
+        The closest alias at the base time; the result need not lie in the principal interval.
+
+    Raises:
+        ValueError: If the round index is negative.
+
+    """
     if round_index < 0:
         raise ValueError(f"round_index must be non-negative, received {round_index}.")
     scale = 2**round_index
@@ -107,7 +115,13 @@ class RobustPhaseEstimation(PhaseEstimation):
         qpe_circuit_builder: AlgorithmRef | None = None,
         circuit_executor: AlgorithmRef | None = None,
     ) -> None:
-        """Initialize robust phase estimation orchestration."""
+        """Initialize robust phase estimation orchestration.
+
+        Args:
+            qpe_circuit_builder: Optional robust-builder reference, including its nested scheduler configuration.
+            circuit_executor: Optional backend reference used to execute all X/Y experiments.
+
+        """
         Logger.trace_entering()
         super().__init__()
         self._settings = RobustPhaseEstimationSettings()
@@ -123,7 +137,21 @@ class RobustPhaseEstimation(PhaseEstimation):
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        """Schedule, stream, and post-process one robust phase estimation run."""
+        """Schedule, stream, and post-process one robust phase estimation run.
+
+        The builder is scheduled once and its ``iter_build`` path is consumed
+        lazily. Calling its eager ``run`` instead would materialize the complete
+        circuit list and discard the workload needed for execution metadata.
+
+        Args:
+            state_preparation: Circuit preparing the input state for each experiment.
+            qubit_hamiltonian: Hamiltonian whose evolution phases are estimated.
+            noise: Optional error profile forwarded unchanged to every basis-circuit execution.
+
+        Returns:
+            The energy estimate with resolved schedule, error-budget, and seed metadata.
+
+        """
         Logger.trace_entering()
         circuit_builder = self._create_circuit_builder()
         circuit_set = circuit_builder.schedule(state_preparation, qubit_hamiltonian)
@@ -134,7 +162,16 @@ class RobustPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
     ) -> RobustPhaseEstimationCircuitSet:
-        """Resolve one reproducible workload without constructing circuits."""
+        """Resolve one reproducible workload without constructing circuits.
+
+        Args:
+            state_preparation: Circuit to store as the workload's input-state preparation.
+            qubit_hamiltonian: Hamiltonian used to resolve the schedule.
+
+        Returns:
+            A serializable circuit set that can be reused without drawing new scheduling entropy.
+
+        """
         return self._create_circuit_builder().schedule(state_preparation, qubit_hamiltonian)
 
     def execute_circuit_set(
@@ -143,13 +180,33 @@ class RobustPhaseEstimation(PhaseEstimation):
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        """Build and execute a previously scheduled RPE workload."""
+        """Build and execute a previously scheduled RPE workload.
+
+        Args:
+            circuit_set: Recorded workload to replay with its original round settings and unitary seeds.
+            noise: Optional error profile forwarded to every X/Y execution.
+
+        Returns:
+            The energy estimate and metadata, including the measurement root seed chosen for this execution.
+
+        Raises:
+            TypeError: If the supplied workload is not an RPE circuit set.
+
+        """
         if not isinstance(circuit_set, RobustPhaseEstimationCircuitSet):
             raise TypeError(f"circuit_set must be a RobustPhaseEstimationCircuitSet, got {type(circuit_set)} instead.")
         return self._execute_with_builder(self._create_circuit_builder(), circuit_set, noise=noise)
 
     def _create_circuit_builder(self) -> RobustPhaseEstimationCircuitBuilder:
-        """Create and validate the configured robust QPE circuit builder."""
+        """Create and validate the configured robust QPE circuit builder.
+
+        Returns:
+            A fresh robust builder initialized from the algorithm's settings.
+
+        Raises:
+            TypeError: If the nested algorithm is not a robust QPE circuit builder.
+
+        """
         circuit_builder = self._create_nested("qpe_circuit_builder")
         if not isinstance(circuit_builder, RobustPhaseEstimationCircuitBuilder):
             raise TypeError(
@@ -165,7 +222,17 @@ class RobustPhaseEstimation(PhaseEstimation):
         *,
         noise: QuantumErrorProfile | None,
     ) -> QpeResult:
-        """Stream one workload through execution and post-processing."""
+        """Stream one workload through execution and post-processing.
+
+        Args:
+            circuit_builder: Builder whose shared ``iter_build`` implementation constructs each pair on demand.
+            circuit_set: Previously scheduled workload; no scheduling is repeated.
+            noise: Optional profile forwarded to the executor.
+
+        Returns:
+            The reconstructed energy and execution metadata.
+
+        """
         Logger.info(
             f"RobustPhaseEstimation: lambda={circuit_set.lambda_norm:.6g}, "
             f"base_time={circuit_set.base_time:.6g}, rounds={circuit_set.num_rounds}, "
@@ -189,25 +256,43 @@ class RobustPhaseEstimation(PhaseEstimation):
         *,
         noise: QuantumErrorProfile | None,
     ) -> tuple[tuple[_RpeExecutionResult, ...], int | None, int | None]:
-        """Execute streamed X/Y circuit pairs while preserving experiment identities."""
-        requested_executor_seed, executor_root_seed = self._resolve_executor_seed_configuration()
+        """Execute streamed X/Y circuit pairs while preserving experiment identities.
+
+        Args:
+            experiments: Ordered specification/X-circuit/Y-circuit triples produced lazily by the builder.
+            noise: Optional error profile passed to each execution.
+
+        Returns:
+            Paired results, the requested executor seed, and its resolved root; unsupported seeds remain ``None``.
+
+        """
+        executor_ref = self._settings.get("circuit_executor")
+        requested_executor_seed = None
+        executor_root_seed = None
+        if executor_ref.settings is not None and executor_ref.settings.has("seed"):
+            requested_executor_seed = int(executor_ref.settings.get("seed"))
+            executor_root_seed = (
+                requested_executor_seed
+                if requested_executor_seed >= 0
+                else int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
+            )
         shared_executor = self._create_executor(None) if executor_root_seed is None else None
         execution_results: list[_RpeExecutionResult] = []
         for experiment_spec, x_circuit, y_circuit in experiments:
-            real_seed = self._measurement_seed(
-                executor_root_seed,
-                experiment_spec.round_index,
-                experiment_spec.draw_index,
-                basis_index=0,
+            measurement_seeds: list[int | None] = [None, None]
+            if executor_root_seed is not None:
+                draw_component = 0 if experiment_spec.draw_index is None else experiment_spec.draw_index + 1
+                for basis_index in (0, 1):
+                    sequence = np.random.SeedSequence(
+                        [executor_root_seed, experiment_spec.round_index, draw_component, basis_index]
+                    )
+                    measurement_seeds[basis_index] = int(sequence.generate_state(1, dtype=np.uint32)[0])
+            real_executor = (
+                shared_executor if shared_executor is not None else self._create_executor(measurement_seeds[0])
             )
-            imag_seed = self._measurement_seed(
-                executor_root_seed,
-                experiment_spec.round_index,
-                experiment_spec.draw_index,
-                basis_index=1,
+            imag_executor = (
+                shared_executor if shared_executor is not None else self._create_executor(measurement_seeds[1])
             )
-            real_executor = shared_executor if shared_executor is not None else self._create_executor(real_seed)
-            imag_executor = shared_executor if shared_executor is not None else self._create_executor(imag_seed)
             execution_results.append(
                 _RpeExecutionResult(
                     experiment_spec=experiment_spec,
@@ -225,7 +310,24 @@ class RobustPhaseEstimation(PhaseEstimation):
         requested_executor_seed: int | None,
         executor_root_seed: int | None,
     ) -> QpeResult:
-        """Reconstruct the round signals and resolve the final energy."""
+        """Reconstruct the round signals and resolve the final energy.
+
+        Each draw contributes equally to the round's X/Y expectations, even if
+        returned count totals differ. Empty counts contribute zero.
+
+        Args:
+            circuit_set: Schedule defining round times, experiment identities, and the energy correction.
+            execution_results: X/Y counts associated with their experiment specifications, in any order.
+            requested_executor_seed: Original measurement-seed setting, or ``None`` when unsupported.
+            executor_root_seed: Concrete measurement root used for this execution, or ``None`` when unsupported.
+
+        Returns:
+            An energy estimate with the resolved workload and measurement-seed metadata.
+
+        Raises:
+            RuntimeError: If a round has a different number of results than its manifest specifies.
+
+        """
         theta = 0.0
         for round_data in circuit_set.rounds:
             round_results = tuple(
@@ -236,12 +338,15 @@ class RobustPhaseEstimation(PhaseEstimation):
                     f"Round {round_data.round_index} expected {round_data.num_draws} execution results, "
                     f"received {len(round_results)}."
                 )
-            real_part = sum(self._expectation_from_counts(result.x_result) for result in round_results) / float(
-                round_data.num_draws
-            )
-            imag_part = sum(self._expectation_from_counts(result.y_result) for result in round_results) / float(
-                round_data.num_draws
-            )
+            signal_sums = [0.0, 0.0]
+            for result in round_results:
+                for basis_index, execution_data in enumerate((result.x_result, result.y_result)):
+                    counts = execution_data.bitstring_counts
+                    num_zero = int(counts.get("0", 0))
+                    num_one = int(counts.get("1", 0))
+                    total = num_zero + num_one
+                    signal_sums[basis_index] += (num_zero - num_one) / total if total else 0.0
+            real_part, imag_part = (component / float(round_data.num_draws) for component in signal_sums)
             measured_phase = float(np.angle(complex(real_part, imag_part)))
             theta = _rpe_angle_update(theta, measured_phase, round_data.round_index)
             Logger.debug(
@@ -280,43 +385,20 @@ class RobustPhaseEstimation(PhaseEstimation):
             metadata=metadata,
         )
 
-    @staticmethod
-    def _expectation_from_counts(execution_data: CircuitExecutorData) -> float:
-        """Return a Z expectation value from one-bit execution counts."""
-        counts = execution_data.bitstring_counts
-        num_zero = int(counts.get("0", 0))
-        num_one = int(counts.get("1", 0))
-        total = num_zero + num_one
-        return (num_zero - num_one) / total if total else 0.0
-
-    def _resolve_executor_seed_configuration(self) -> tuple[int | None, int | None]:
-        """Return the configured executor seed and concrete measurement root."""
-        executor_ref = self._settings.get("circuit_executor")
-        if executor_ref.settings is None or not executor_ref.settings.has("seed"):
-            return None, None
-        requested_seed = int(executor_ref.settings.get("seed"))
-        if requested_seed >= 0:
-            return requested_seed, requested_seed
-        root_seed = int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
-        return requested_seed, root_seed
-
-    @staticmethod
-    def _measurement_seed(
-        root_seed: int | None,
-        round_index: int,
-        draw_index: int | None,
-        *,
-        basis_index: int,
-    ) -> int | None:
-        """Derive an independent reproducible executor seed for one measurement stream."""
-        if root_seed is None:
-            return None
-        draw_component = 0 if draw_index is None else draw_index + 1
-        sequence = np.random.SeedSequence([root_seed, round_index, draw_component, basis_index])
-        return int(sequence.generate_state(1, dtype=np.uint32)[0])
-
     def _create_executor(self, seed: int | None) -> CircuitExecutor:
-        """Create the configured executor, optionally overriding its seed."""
+        """Create the configured executor, optionally overriding its seed.
+
+        Args:
+            seed: Measurement seed override, or ``None`` to retain the configured executor settings.
+
+        Returns:
+            A fresh circuit executor without modifying the source algorithm reference.
+
+        Raises:
+            RuntimeError: If a seed override is requested for an executor without a seed setting.
+            TypeError: If the nested algorithm is not a circuit executor.
+
+        """
         if seed is None:
             executor = self._create_nested("circuit_executor")
         else:
@@ -342,14 +424,30 @@ class RobustPhaseEstimation(PhaseEstimation):
         *,
         correction: str,
     ) -> float:
-        """Map the recovered per-base-time phase to an energy."""
+        """Map the recovered per-base-time phase to an energy.
+
+        Args:
+            theta: Recovered phase at the base evolution time, in radians.
+            base_time: Positive base evolution time.
+            total_rounds: Final round index, equal to the number of doublings after round zero.
+            lambda_norm: Hamiltonian coefficient one-norm used by the qDRIFT correction.
+            final_samples: Reference qDRIFT sample count for the final round.
+            correction: Resolved mapping; ``"qdrift_tangent"`` uses the tangent correction, otherwise linear.
+
+        Returns:
+            The energy estimate obtained from the principal base-time phase.
+
+        Raises:
+            ValueError: If the base time is nonpositive or the tangent correction has no final samples.
+
+        """
         if base_time <= 0.0:
             raise ValueError(f"base_time must be positive, received {base_time}.")
-        if correction != "qdrift_tangent":
-            return -_wrap_to_principal(theta) / base_time
-        if final_samples < 1:
+        if correction == "qdrift_tangent" and final_samples < 1:
             raise ValueError(f"final_samples must be at least 1, received {final_samples}.")
-        principal = _wrap_to_principal(theta)
+        principal = float((theta + np.pi) % (2 * np.pi) - np.pi)
+        if correction != "qdrift_tangent":
+            return -principal / base_time
         final_time = (2**total_rounds) * base_time
         final_phase = principal * (2**total_rounds)
         step_angle = lambda_norm * final_time / final_samples
@@ -359,5 +457,10 @@ class RobustPhaseEstimation(PhaseEstimation):
         return float(-lambda_norm * np.tan(final_phase / final_samples) / denominator)
 
     def name(self) -> str:
-        """Return the robust phase estimation algorithm name."""
+        """Return the robust phase estimation algorithm name.
+
+        Returns:
+            ``"qdk_robust"``.
+
+        """
         return "qdk_robust"

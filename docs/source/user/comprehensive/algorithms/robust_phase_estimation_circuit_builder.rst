@@ -11,6 +11,7 @@ Overview
 
 Create the circuit builder through the ``"qpe_circuit_builder"`` factory type with implementation name ``"qdk_robust"``.
 Its standard ``run`` method accepts a state-preparation :class:`~qdk_chemistry.data.Circuit` and a :class:`~qdk_chemistry.data.QubitOperator`, then returns a flat ``list[Circuit]`` consistent with the other QPE builders.
+The concrete ``_run_impl`` schedules once and returns that complete list.
 
 The robust builder additionally exposes three workload-aware methods:
 
@@ -23,6 +24,9 @@ The robust builder additionally exposes three workload-aware methods:
 ``iter_build(circuit_set)``
    Yield ``(experiment_spec, x_circuit, y_circuit)`` tuples one at a time.
    The final RPE algorithm uses this path to keep memory bounded for independently randomized draws.
+
+Both eager and streaming construction use :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitBuilder.iter_build`.
+Override this shared method to customize both paths; overriding only ``_run_impl`` changes eager construction, not the estimator's streaming path.
 
 Call ``schedule`` only once when the configured seed is ``-1``.
 Scheduling concretizes one entropy-backed root seed, and all later construction or execution should consume that same circuit set.
@@ -54,7 +58,7 @@ The nested experiment scheduler defines:
      - Description
    * - ``unitary_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Time-evolution builder used to realize each scheduled unitary. Its ``power`` must be ``1`` because RPE owns the evolution-time ladder.
+     - A :class:`~qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.TimeEvolutionBuilder` used to realize each scheduled unitary. Its ``power`` must be ``1`` because RPE owns the evolution-time ladder; block encodings and quantum walks are not supported.
    * - ``hadamard_test_circuit_builder``
      - :class:`~qdk_chemistry.data.AlgorithmRef`
      - Builder used to generate the X- and Y-basis Hadamard tests.
