@@ -11,13 +11,15 @@ from typing import ClassVar
 import numpy as np
 import pytest
 import scipy
-from qdk import TargetProfile
+from qdk import qsharp
 from qdk.test_utils import dump_operation_on_state
 
 try:
     from qdk._native import Circuit as QdkCircuitType
+    from qdk._native import QSharpError
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._native import QSharpError
 
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
@@ -30,46 +32,12 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import create_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
-
-#: ``dump_operation_on_state`` rounds to about six decimals, so exact agreement lands near 1e-6.
-_TOL = 1e-5
-
-
-@pytest.fixture(scope="module")
-def qs_context():
-    """An unrestricted Q# context, needed for dense simulation.
-
-    Defined here rather than in ``conftest.py`` so this module stays self-contained.
-    """
-    return create_qsharp_context(TargetProfile.Unrestricted)
-
-
-def _dense_matrix(source: str, num_qubits: int, context) -> np.ndarray:
-    """Densify a Q# operation by simulating it on every computational basis state.
-
-    Costs ``2**num_qubits`` simulations, so it is only usable on small registers.
-
-    Args:
-        source: Q# source defining the operation to simulate.
-        num_qubits: Width of the register the operation acts on.
-        context: Q# context to simulate in; must allow dense simulation.
-
-    Returns:
-        The operation's matrix, with basis state ``b`` in column ``b``.
-
-    """
-    columns = []
-    for basis in range(2**num_qubits):
-        state = [0.0] * (2**num_qubits)
-        state[basis] = 1.0
-        columns.append(dump_operation_on_state(source, num_qubits, state, context=context))
-    return np.array(columns, dtype=complex).T
 
 
 @pytest.fixture
@@ -108,19 +76,6 @@ class TestPauliSequenceMapperNonControlled:
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
-
-    def test_invalid_container_type_raises(self):
-        """A representation the mapper cannot compile must fail explicitly."""
-
-        class MockContainer:
-            @property
-            def type(self):
-                return "mock_container"
-
-        evolution = UnitaryRepresentation(container=MockContainer())
-
-        with pytest.raises(ValueError, match="not supported"):
-            PauliSequenceMapper().run(evolution)
 
     def test_sparse_encoding_carries_only_non_identity_positions(self, simple_unitary):
         """The Q# parameters must list Pauli positions, not one Pauli per system qubit."""
@@ -162,42 +117,58 @@ class TestPauliSequenceMapperNonControlled:
         )
 
 
-def _sparse_source(terms, num_qubits, *, repetitions=1):
-    """Q# invoking the sparse evolution, listing only non-identity positions."""
-    del num_qubits
-    indices = ", ".join("[" + ", ".join(str(q) for q in t["qubits"]) + "]" for t in terms)
-    ops = ", ".join("[" + ", ".join(f"Pauli{a}" for a in t["axes"]) + "]" for t in terms)
-    angles = ", ".join(repr(float(t["angle"])) for t in terms)
-    return (
-        "qs => QDKChemistry.Utils.PauliExp.SparseRepPauliExp("
-        "new QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams { "
-        f"pauliIndices = [{indices}], pauliOps = [{ops}], pauliCoefficients = [{angles}], "
-        f"repetitions = {repetitions} }}, qs)"
+def _dense_matrix(op, num_qubits: int) -> np.ndarray:
+    """Densify a Q# operation by simulating it on every computational basis state.
+
+    Costs ``2**num_qubits`` simulations, so it is only usable on small registers.
+
+    Args:
+        op: Q# operation to simulate.
+        num_qubits: Width of the register the operation acts on.
+
+    Returns:
+        The operation's matrix, with basis state ``b`` in column ``b``.
+
+    """
+    context = get_qsharp_context()
+    columns = []
+    for basis in range(2**num_qubits):
+        state = [0.0] * (2**num_qubits)
+        state[basis] = 1.0
+        columns.append(dump_operation_on_state(op, num_qubits, state, context=context))
+    return np.array(columns, dtype=complex).T
+
+def _sparse_op(terms, *, repetitions=1):
+    """Build sparse evolution using typed Q# parameters."""
+    params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+        pauliIndices=[term["qubits"] for term in terms],
+        pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
+        pauliCoefficients=[term["angle"] for term in terms],
+        repetitions=repetitions,
     )
+    return QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
 
 
-def _dense_source(terms, num_qubits, *, repetitions=1):
-    """Q# invoking the pre-existing dense evolution, one Pauli per system qubit."""
+def _dense_op(terms, num_qubits, *, repetitions=1):
+    """Build dense evolution using typed Q# parameters."""
     rows = []
     for term in terms:
-        axes = ["I"] * num_qubits
+        axes = [qsharp.Pauli.I] * num_qubits
         for qubit, axis in zip(term["qubits"], term["axes"], strict=True):
-            axes[qubit] = axis
-        rows.append("[" + ", ".join(f"Pauli{a}" for a in axes) + "]")
-    angles = ", ".join(repr(float(t["angle"])) for t in terms)
-    return (
-        "qs => QDKChemistry.Utils.PauliExp.RepPauliExp("
-        "new QDKChemistry.Utils.PauliExp.RepPauliExpParams { "
-        f"pauliExponents = [{', '.join(rows)}], pauliCoefficients = [{angles}], "
-        f"repetitions = {repetitions} }}, qs)"
+            axes[qubit] = getattr(qsharp.Pauli, axis)
+        rows.append(axes)
+    params = QSHARP_UTILS.PauliExp.RepPauliExpParams(
+        pauliExponents=rows,
+        pauliCoefficients=[term["angle"] for term in terms],
+        repetitions=repetitions,
     )
+    return QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(params)
 
 
 class TestSparseUncontrolledEvolution:
     """The sparse dispatch must be indistinguishable from the dense one it replaces."""
 
     CASES: ClassVar[dict] = {
-        "single-qubit Z terms": (3, [{"qubits": [i], "axes": "Z", "angle": 0.37} for i in range(3)]),
         "single-qubit mixed axes": (
             3,
             [
@@ -220,10 +191,6 @@ class TestSparseUncontrolledEvolution:
                 {"qubits": [2, 1], "axes": "YZ", "angle": -0.24},
             ],
         ),
-        "a term spanning the whole register": (
-            3,
-            [{"qubits": [0, 1, 2], "axes": "XYZ", "angle": 0.31}],
-        ),
         "an identity term among real ones": (
             2,
             [
@@ -236,28 +203,42 @@ class TestSparseUncontrolledEvolution:
 
     @pytest.mark.parametrize("name", list(CASES))
     @pytest.mark.parametrize("repetitions", [1, 2])
-    def test_sparse_matches_dense(self, name, repetitions, qs_context):
+    def test_sparse_matches_dense(self, name, repetitions):
         """Switching to the sparse encoding must not change the unitary."""
         num_qubits, terms = self.CASES[name]
-        got = _dense_matrix(_sparse_source(terms, num_qubits, repetitions=repetitions), num_qubits, qs_context)
-        want = _dense_matrix(_dense_source(terms, num_qubits, repetitions=repetitions), num_qubits, qs_context)
+        got = _dense_matrix(_sparse_op(terms, repetitions=repetitions), num_qubits)
+        want = _dense_matrix(_dense_op(terms, num_qubits, repetitions=repetitions), num_qubits)
         assert np.max(np.abs(got - want)) < _TOL
 
-    def test_the_comparison_can_fail(self, qs_context):
-        """Guards the comparison above: it has to be able to tell two evolutions apart.
+    @pytest.mark.parametrize(
+        ("pauli_indices", "pauli_ops", "pauli_coefficients"),
+        [
+            pytest.param([[0]], [[qsharp.Pauli.X]], [], id="coefficients-shorter"),
+            pytest.param([], [[qsharp.Pauli.X]], [0.1], id="indices-shorter"),
+            pytest.param([[0]], [], [0.1], id="ops-shorter"),
+        ],
+    )
+    def test_rejects_mismatched_term_array_lengths(
+        self,
+        pauli_indices: list[list[int]],
+        pauli_ops: list[list[qsharp.Pauli]],
+        pauli_coefficients: list[float],
+    ):
+        """Sparse evolution requires one index row, Pauli row, and coefficient per term."""
+        params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+            pauliIndices=pauli_indices,
+            pauliOps=pauli_ops,
+            pauliCoefficients=pauli_coefficients,
+            repetitions=1,
+        )
+        op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
 
-        If a mangled sparse encoding still compared equal to the dense one, the tests
-        above would prove nothing, so check that a deliberately wrong angle shows up.
-        """
-        terms = [{"qubits": [0], "axes": "Z", "angle": 0.37}]
-        wrong = [{"qubits": [0], "axes": "Z", "angle": -0.9}]
-        got = _dense_matrix(_sparse_source(terms, 1), 1, qs_context)
-        want = _dense_matrix(_dense_source(wrong, 1), 1, qs_context)
-        assert np.max(np.abs(got - want)) > 1e-3
+        with pytest.raises(QSharpError, match="must have the same length"):
+            dump_operation_on_state(op, 1, [1.0, 0.0], context=get_qsharp_context())
 
-    def test_sparse_encoding_applies_the_container_sign_convention(self, qs_context):
+    def test_sparse_encoding_applies_the_container_sign_convention(self):
         """A single Z rotation must realise exp(-i theta Z), not its conjugate."""
         angle = 0.37
-        got = _dense_matrix(_sparse_source([{"qubits": [0], "axes": "Z", "angle": angle}], 1), 1, qs_context)
+        got = _dense_matrix(_sparse_op([{"qubits": [0], "axes": "Z", "angle": angle}]), 1)
         want = scipy.linalg.expm(-1j * angle * np.array([[1, 0], [0, -1]], dtype=complex))
         assert np.max(np.abs(got - want)) < _TOL

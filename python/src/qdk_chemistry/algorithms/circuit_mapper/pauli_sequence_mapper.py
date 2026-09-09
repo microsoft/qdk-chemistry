@@ -43,9 +43,6 @@ class PauliSequenceMapper(CircuitMapper):
 
     Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
     indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
-    The parameter payload is therefore proportional to the total Pauli weight instead of
-    ``terms x qubits``, which matters for the near-identity terms a Jordan-Wigner
-    Hamiltonian produces.
 
     Notes:
         * Requires a ``PauliProductFormulaContainer`` for the unitary representation.
