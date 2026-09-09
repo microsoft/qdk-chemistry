@@ -41,6 +41,9 @@ class PauliSequenceMapper(CircuitMapper):
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; R_z(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
 
+    Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
+    indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
+
     Notes:
         * Requires a ``PauliProductFormulaContainer`` for the unitary representation.
 
@@ -79,25 +82,30 @@ class PauliSequenceMapper(CircuitMapper):
                 "PauliSequenceMapper only supports PauliProductFormula containers."
             )
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
+        pauli_indices: list[list[int]] = []
+        pauli_ops: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
         for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
+            indices: list[int] = []
+            ops: list[qsharp.Pauli] = []
             for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
+                indices.append(index)
+                ops.append(getattr(qsharp.Pauli, pauli))
+            pauli_indices.append(indices)
+            pauli_ops.append(ops)
             angles.append(term.angle)
 
         evo_params = {
-            "pauliExponents": pauli_terms,
+            "pauliIndices": pauli_indices,
+            "pauliOps": pauli_ops,
             "pauliCoefficients": angles,
             "repetitions": unitary_container.step_reps,
         }
 
         target_indices = list(range(unitary_container.num_qubits))
-        program = QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit
+        program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
 
-        evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)
+        evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
 
         factory = QsharpFactoryData(
             program=program,

@@ -6,10 +6,12 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+from typing import ClassVar
 
 import numpy as np
 import pytest
 import scipy
+from qdk import qsharp
 
 try:
     from qdk._native import Circuit as QdkCircuitType
@@ -27,11 +29,16 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .test_helpers import dense_matrix
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
+
+#: ``dump_operation_on_state`` rounds to about six decimals, so exact agreement lands near 1e-6.
+_TOL = 1e-5
 
 
 @pytest.fixture
@@ -72,6 +79,21 @@ class TestPauliSequenceMapper:
 
         assert isinstance(circuit, Circuit)
         assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
+
+    def test_sparse_encoding_carries_only_non_identity_positions(self, unitary_rep):
+        """The controlled mapper must reuse the sparse repeated-evolution parameters."""
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [2])
+
+        circuit = mapper.run(unitary_rep)
+        evo_params = vars(circuit._qsharp_factory.parameter["params"])
+
+        assert "pauliExponents" not in evo_params
+        assert evo_params["pauliIndices"] == [[0], [1]]
+        assert [[str(pauli) for pauli in ops] for ops in evo_params["pauliOps"]] == [
+            ["Pauli.X"],
+            ["Pauli.Z"],
+        ]
 
     def test_default_target_indices(self, unitary_rep):
         """Test that default target indices are used when none are provided."""
@@ -242,3 +264,86 @@ class TestPauliSequenceMapper:
 
         with pytest.raises(ValueError, match="length"):
             mapper.run(unitary_rep)
+
+
+def _sparse_controlled_op(terms, *, repetitions=1):
+    """Build controlled sparse evolution using typed Q# parameters."""
+    params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+        pauliIndices=[term["qubits"] for term in terms],
+        pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
+        pauliCoefficients=[term["angle"] for term in terms],
+        repetitions=repetitions,
+    )
+    op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpAdjCtlOp(params)
+    return QSHARP_UTILS.CircuitComposition.MakeControlledOnFirstQubitOp(op)
+
+
+def _dense_controlled_op(terms, num_qubits, *, repetitions=1):
+    """Build controlled dense evolution using typed Q# parameters."""
+    rows = []
+    for term in terms:
+        axes = [qsharp.Pauli.I] * num_qubits
+        for qubit, axis in zip(term["qubits"], term["axes"], strict=True):
+            axes[qubit] = getattr(qsharp.Pauli, axis)
+        rows.append(axes)
+    params = QSHARP_UTILS.PauliExp.RepPauliExpParams(
+        pauliExponents=rows,
+        pauliCoefficients=[term["angle"] for term in terms],
+        repetitions=repetitions,
+    )
+    op = QSHARP_UTILS.PauliExp.MakeRepPauliExpAdjCtlOp(params)
+    return QSHARP_UTILS.CircuitComposition.MakeControlledOnFirstQubitOp(op)
+
+
+class TestSparseControlledEvolution:
+    """Sparse controlled evolution must match control of the dense representation."""
+
+    CASES: ClassVar[dict] = {
+        "single-qubit mixed axes": (
+            3,
+            [
+                {"qubits": [0], "axes": "X", "angle": 0.4},
+                {"qubits": [1], "axes": "Y", "angle": -0.9},
+                {"qubits": [2], "axes": "Z", "angle": 0.15},
+            ],
+        ),
+        "two-qubit adjacent": (
+            3,
+            [
+                {"qubits": [0, 1], "axes": "ZZ", "angle": 0.37},
+                {"qubits": [1, 2], "axes": "XX", "angle": -0.5},
+            ],
+        ),
+        "two-qubit non-adjacent, unsorted indices": (
+            4,
+            [
+                {"qubits": [3, 0], "axes": "XY", "angle": 0.62},
+                {"qubits": [2, 1], "axes": "YZ", "angle": -0.24},
+            ],
+        ),
+        "an identity term among real ones": (
+            2,
+            [
+                {"qubits": [0], "axes": "X", "angle": 0.5},
+                {"qubits": [], "axes": "", "angle": 0.8},
+                {"qubits": [1], "axes": "Z", "angle": -0.3},
+            ],
+        ),
+    }
+
+    @pytest.mark.parametrize("name", list(CASES))
+    @pytest.mark.parametrize("repetitions", [1, 2])
+    def test_sparse_matches_dense(self, name, repetitions):
+        """Switching to sparse encoding must not change controlled evolution."""
+        num_qubits, terms = self.CASES[name]
+        got = dense_matrix(_sparse_controlled_op(terms, repetitions=repetitions), num_qubits + 1)
+        want = dense_matrix(_dense_controlled_op(terms, num_qubits, repetitions=repetitions), num_qubits + 1)
+        assert np.max(np.abs(got - want)) < _TOL
+
+    @pytest.mark.parametrize("name", list(CASES))
+    def test_control_off_branch_is_the_identity(self, name):
+        """With the control off, sparse evolution must leave the targets unchanged."""
+        num_qubits, terms = self.CASES[name]
+        got = dense_matrix(_sparse_controlled_op(terms), num_qubits + 1)
+        control_off_size = 2**num_qubits
+        assert np.max(np.abs(got[:control_off_size, :control_off_size] - np.eye(control_off_size))) < _TOL
