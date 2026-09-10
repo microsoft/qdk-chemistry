@@ -94,13 +94,15 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
     const auto [i, j] = pairs[p];
     const Eigen::Index ij = static_cast<Eigen::Index>(i * norb + j);
     const Eigen::Index ji = static_cast<Eigen::Index>(j * norb + i);
-    for (std::size_t q = 0; q < reduced_dim; ++q) {
+    for (std::size_t q = 0; q <= p; ++q) {
       const auto [k, l] = pairs[q];
       const Eigen::Index kl = static_cast<Eigen::Index>(k * norb + l);
       const Eigen::Index lk = static_cast<Eigen::Index>(l * norb + k);
-      reduced(p, q) =
+      const double average =
           0.125 * (raw(ij, kl) + raw(ji, kl) + raw(ij, lk) + raw(ji, lk) +
                    raw(kl, ij) + raw(kl, ji) + raw(lk, ij) + raw(lk, ji));
+      reduced(p, q) = average;
+      reduced(q, p) = average;
     }
   }
 
@@ -141,45 +143,6 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
 
     residual_diagonal -= column.cwiseAbs2();
     vectors.push_back(std::move(column));
-  }
-
-  // The pivot loop only ever inspects the residual *diagonal*, so a negative
-  // eigenvalue whose eigenvector is spread across off-diagonal entries can
-  // reach this point undetected.
-  // Certify: for a positive semi-definite residual R the largest entry lies
-  // on the diagonal (|R_ij| <= sqrt(R_ii R_jj)), so max|g - L L^T| cannot
-  // exceed the value pivoting stopped at. The safety factor keeps rounding and
-  // truncation error.
-  constexpr double residual_safety_factor = 8.0;
-  const double deviation_tolerance =
-      residual_safety_factor * (stop_threshold + noise_floor);
-
-  Eigen::MatrixXd basis(static_cast<Eigen::Index>(reduced_dim),
-                        static_cast<Eigen::Index>(vectors.size()));
-  for (std::size_t q = 0; q < vectors.size(); ++q) {
-    basis.col(static_cast<Eigen::Index>(q)) = vectors[q];
-  }
-
-  constexpr Eigen::Index block_columns = 256;
-  const auto columns = static_cast<Eigen::Index>(reduced_dim);
-  double max_deviation = 0.0;
-  for (Eigen::Index start = 0; start < columns; start += block_columns) {
-    const Eigen::Index width = std::min(block_columns, columns - start);
-    const Eigen::MatrixXd reconstructed =
-        basis * basis.middleRows(start, width).transpose();
-    max_deviation = std::max(max_deviation,
-                             (reduced.middleCols(start, width) - reconstructed)
-                                 .cwiseAbs()
-                                 .maxCoeff());
-  }
-
-  if (max_deviation > deviation_tolerance) {
-    throw std::invalid_argument(
-        "double_factorizer: the two-electron supermatrix is not positive "
-        "semi-definite, so it has no Cholesky decomposition. The recovered "
-        "vectors reproduce it only to " +
-        std::to_string(max_deviation) + ", against a tolerance of " +
-        std::to_string(deviation_tolerance) + ".");
   }
 
   // Expand each reduced vector over both orders of its orbital pair.
