@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <Eigen/Dense>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -16,6 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
@@ -27,353 +29,244 @@ using RowMajorMatrix =
 
 std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
   QDK_LOG_TRACE_ENTERING();
+
   return std::make_unique<DoubleFactorizer>();
 }
 
-std::unique_ptr<DoubleFactorizer> make_cholesky_double_factorizer() {
+/// First factorization: pivoted Cholesky decomposition of the two-electron
+/// supermatrix.
+///
+/// Pivoting runs in the symmetric-pair basis of dimension norb(norb+1)/2
+/// rather than the full norb^2, since the supermatrix is symmetric under
+/// p<->q. Accepted vectors are expanded back to the norb^2 pair layout on the
+/// way out, so that computed and stored three-center integrals feed the same
+/// second factorization.
+///
+/// Chemist permutation symmetry is imposed by averaging rather than verified,
+/// which also keeps the norb^4 supermatrix from ever being materialized.
+///
+/// @param two_body_integrals Flattened two-electron tensor, size norb^4,
+///        indexed p*norb^3 + q*norb^2 + r*norb + s.
+/// @param norb Number of (spatial) orbitals.
+/// @param truncation_threshold Pivoting stops once the largest remaining
+///        residual diagonal falls to or below this value.
+/// @return norb^2 x naux matrix L with g_pqrs = sum_Q L_(pq),Q L_(rs),Q.
+/// @throws std::invalid_argument if `two_body_integrals` is not norb^4 long,
+///         contains a non-finite value, or is not positive semi-definite,
+///         since no Cholesky decomposition exists in that last case.
+Eigen::MatrixXd cholesky_vectors_from_two_body(
+    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
+    double truncation_threshold) {
   QDK_LOG_TRACE_ENTERING();
-  return std::make_unique<CholeskyDoubleFactorizer>();
-}
 
-void validate_norb_and_threshold(std::size_t norb, double truncation_threshold,
-                                 const std::string& context) {
-  if (norb == 0) {
-    throw std::invalid_argument(context + ": norb must be greater than zero.");
-  }
-
-  if (truncation_threshold < 0.0 || std::isnan(truncation_threshold)) {
-    throw std::invalid_argument(context +
-                                ": truncation_threshold must be "
-                                "non-negative, got " +
-                                std::to_string(truncation_threshold) + ".");
-  }
-}
-
-/// Reshape a length-norb^2 pair vector, indexed row-major as p*norb + q, into
-/// an norb x norb matrix and diagonalize it. Averaging enforces the p<->q
-/// generator, which is load-bearing rather than cosmetic: within a degenerate
-/// block the basis LAPACK returns is arbitrary and need not be symmetric.
-void diagonalize_pair_vector(const double* pair_vector, std::size_t norb,
-                             const std::string& context,
-                             Eigen::MatrixXd& eigenvectors,
-                             Eigen::VectorXd& eigenvalues) {
-  const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
-  const Eigen::Map<const RowMajorMatrix> raw(pair_vector, num_orbitals,
-                                             num_orbitals);
-  eigenvectors = 0.5 * (raw + raw.transpose());
-  eigenvalues.resize(num_orbitals);
-
-  const int64_t info = lapack::syev(
-      lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
-      eigenvectors.data(), static_cast<int64_t>(norb), eigenvalues.data());
-  if (info != 0) {
-    throw std::runtime_error(context +
-                             ": LAPACK syev failed to diagonalize a "
-                             "fragment matrix (info=" +
-                             std::to_string(info) + ").");
-  }
-}
-
-/// Reshape the flattened tensor into the (pq),(rs) supermatrix and impose the
-/// (pq)<->(rs) generator by averaging.
-Eigen::MatrixXd build_supermatrix(const Eigen::VectorXd& two_body_integrals,
-                                  std::size_t pair_dim) {
-  const Eigen::Index pair_size = static_cast<Eigen::Index>(pair_dim);
-  const Eigen::Map<const RowMajorMatrix> raw(two_body_integrals.data(),
-                                             pair_size, pair_size);
-  return 0.5 * (raw + raw.transpose());
-}
-
-void validate_two_body_integrals(const Eigen::VectorXd& two_body_integrals,
-                                 std::size_t norb, std::size_t pair_dim,
-                                 const std::string& context) {
+  const std::size_t pair_dim = norb * norb;
   const std::size_t expected = pair_dim * pair_dim;
   if (static_cast<std::size_t>(two_body_integrals.size()) != expected) {
     throw std::invalid_argument(
-        context + ": expected norb^4 = " + std::to_string(expected) +
+        "double_factorizer: expected norb^4 = " + std::to_string(expected) +
         " elements for norb = " + std::to_string(norb) + ", got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
 
   if (!two_body_integrals.allFinite()) {
-    throw std::invalid_argument(context +
-                                ": two_body_integrals contains a non-finite "
-                                "value (NaN or infinity).");
-  }
-}
-
-}  // namespace
-
-std::vector<TwoBodyFragment> eigen_decompose_two_body(
-    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold) {
-  QDK_LOG_TRACE_ENTERING();
-
-  const std::string context = "eigen_decompose_two_body";
-  validate_norb_and_threshold(norb, truncation_threshold, context);
-
-  const std::size_t pair_dim = norb * norb;
-  validate_two_body_integrals(two_body_integrals, norb, pair_dim, context);
-
-  const Eigen::Index pair_size = static_cast<Eigen::Index>(pair_dim);
-
-  // Assumes chemist permutation symmetry: averaging imposes the (pq)<->(rs)
-  // and p<->q generators rather than checking them, and the rest follow.
-  Eigen::MatrixXd supermatrix_eigenvectors =
-      build_supermatrix(two_body_integrals, pair_dim);
-  Eigen::VectorXd supermatrix_eigenvalues(pair_dim);
-
-  // Dense diagonalization costs O(norb^6) and materializes all norb^2
-  // eigenpairs. CholeskyDoubleFactorizer avoids both for a positive
-  // semi-definite supermatrix.
-  const int64_t supermatrix_info = lapack::syev(
-      lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(pair_dim),
-      supermatrix_eigenvectors.data(), static_cast<int64_t>(pair_dim),
-      supermatrix_eigenvalues.data());
-  if (supermatrix_info != 0) {
-    throw std::runtime_error(
-        "eigen_decompose_two_body: LAPACK syev failed to diagonalize the "
-        "two-body supermatrix (info=" +
-        std::to_string(supermatrix_info) + ").");
+    throw std::invalid_argument(
+        "double_factorizer: two_body_integrals contains a non-finite "
+        "value (NaN or infinity).");
   }
 
-  // Sort by decreasing |eigenvalue| so the largest contributions come first.
-  // The reshaped eigenvector has unit Frobenius norm, so |eigenvalue| is
-  // exactly the fragment weight ||eps||^2 that the Cholesky path sorts on.
-  // Within a degenerate block the eigenvector basis LAPACK returns is
-  // arbitrary, so eps is not fixed by the tensor alone.
-  std::vector<std::size_t> order(pair_dim);
-  for (std::size_t n = 0; n < pair_dim; ++n) {
-    order[n] = n;
-  }
-  std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
-    return std::abs(supermatrix_eigenvalues[a]) >
-           std::abs(supermatrix_eigenvalues[b]);
-  });
+  const Eigen::Map<const RowMajorMatrix> raw(
+      two_body_integrals.data(), static_cast<Eigen::Index>(pair_dim),
+      static_cast<Eigen::Index>(pair_dim));
 
-  std::vector<TwoBodyFragment> fragments;
-  fragments.reserve(pair_dim);
-  for (std::size_t n : order) {
-    const double eigenvalue = supermatrix_eigenvalues[n];
-    if (std::abs(eigenvalue) < truncation_threshold) {
-      continue;
+  // keeps only pairs satisfying (p\le q).
+  const std::size_t reduced_dim = norb * (norb + 1) / 2;
+  std::vector<std::pair<std::size_t, std::size_t>> pairs;
+  pairs.reserve(reduced_dim);
+  for (std::size_t p = 0; p < norb; ++p) {
+    for (std::size_t q = p; q < norb; ++q) {
+      pairs.emplace_back(p, q);
+    }
+  }
+
+  // Symmetrize the input
+  Eigen::MatrixXd reduced(reduced_dim, reduced_dim);
+  for (std::size_t p = 0; p < reduced_dim; ++p) {
+    const auto [i, j] = pairs[p];
+    const Eigen::Index ij = static_cast<Eigen::Index>(i * norb + j);
+    const Eigen::Index ji = static_cast<Eigen::Index>(j * norb + i);
+    for (std::size_t q = 0; q <= p; ++q) {
+      const auto [k, l] = pairs[q];
+      const Eigen::Index kl = static_cast<Eigen::Index>(k * norb + l);
+      const Eigen::Index lk = static_cast<Eigen::Index>(l * norb + k);
+      const double average =
+          0.125 * (raw(ij, kl) + raw(ji, kl) + raw(ij, lk) + raw(ji, lk) +
+                   raw(kl, ij) + raw(kl, ji) + raw(lk, ij) + raw(lk, ji));
+      reduced(p, q) = average;
+      reduced(q, p) = average;
+    }
+  }
+
+  Eigen::VectorXd residual_diagonal = reduced.diagonal();
+  // Numerical floor relative to the largest diagonal
+  const double diagonal_scale = std::max(residual_diagonal.maxCoeff(), 0.0);
+  const double noise_floor = std::numeric_limits<double>::epsilon() *
+                             static_cast<double>(reduced_dim) * diagonal_scale;
+  const double stop_threshold = std::max(truncation_threshold, noise_floor);
+
+  std::vector<Eigen::VectorXd> vectors;
+  vectors.reserve(reduced_dim);
+  // At every iteration, selects the largest remaining diagonal
+  for (std::size_t step = 0; step < reduced_dim; ++step) {
+    Eigen::Index pivot = 0;
+    const double pivot_value = residual_diagonal.maxCoeff(&pivot);
+    const double most_negative = residual_diagonal.minCoeff();
+
+    // A residual diagonal that goes convincingly negative means the
+    // supermatrix has a negative eigenvalue, so no L with g = L L^T exists.
+    if (most_negative < -noise_floor) {
+      throw std::invalid_argument(
+          "double_factorizer: the two-electron supermatrix is not positive "
+          "semi-definite, so it has no Cholesky decomposition. Its most "
+          "negative residual diagonal is " +
+          std::to_string(most_negative) + ".");
     }
 
-    TwoBodyFragment fragment;
-    Eigen::VectorXd fragment_eigenvalues;
-    diagonalize_pair_vector(supermatrix_eigenvectors.data() +
-                                static_cast<Eigen::Index>(n) * pair_size,
-                            norb, context, fragment.U, fragment_eigenvalues);
+    if (pivot_value <= stop_threshold) {
+      break;
+    }
 
-    fragment.sign = (eigenvalue >= 0.0) ? 1.0 : -1.0;
-    fragment.eps = std::sqrt(std::abs(eigenvalue)) * fragment_eigenvalues;
+    Eigen::VectorXd column = reduced.col(pivot);
+    for (const auto& vector : vectors) {
+      column -= vector * vector[pivot];
+    }
+    column /= std::sqrt(pivot_value);
 
-    fragments.push_back(std::move(fragment));
+    residual_diagonal -= column.cwiseAbs2();
+    vectors.push_back(std::move(column));
   }
 
-  return fragments;
+  // Expand each reduced vector over both orders of its orbital pair.
+  Eigen::MatrixXd cholesky_vectors =
+      Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(pair_dim),
+                            static_cast<Eigen::Index>(vectors.size()));
+  for (std::size_t q = 0; q < vectors.size(); ++q) {
+    const Eigen::Index target = static_cast<Eigen::Index>(q);
+    for (std::size_t p = 0; p < reduced_dim; ++p) {
+      const auto [i, j] = pairs[p];
+      cholesky_vectors(static_cast<Eigen::Index>(i * norb + j), target) =
+          vectors[q][p];
+      cholesky_vectors(static_cast<Eigen::Index>(j * norb + i), target) =
+          vectors[q][p];
+    }
+  }
+  return cholesky_vectors;
 }
 
-std::vector<TwoBodyFragment> fragments_from_cholesky_vectors(
+/// Second factorization, shared by both inputs: diagonalize every Cholesky
+/// vector of an L satisfying g_pqrs = sum_Q L_(pq),Q L_(rs),Q, writing the
+/// result straight into the flat arrays FactorizedHamiltonianContainer takes.
+///
+/// Column Q reshapes into the norb x norb matrix M^Q, whose eigenpairs are
+/// rank Q: the eigenvectors are the orbital rotation and the eigenvalues the
+/// coefficients. Because L already carries the fragment magnitude, the
+/// eigenvalues are used unscaled.
+///
+/// @param cholesky_vectors norb^2 x naux matrix. Row index is the row-major
+///        pair p*norb + q, column index is the Cholesky (auxiliary) index.
+/// @param norb Number of (spatial) orbitals.
+/// @param u_matrices Resized to naux * norb * norb and filled rank by rank.
+/// @param w_matrices Resized to naux * norb and filled rank by rank.
+/// @return The number of ranks written, one per Cholesky vector.
+/// @throws std::invalid_argument if `cholesky_vectors` does not have norb^2
+///         rows or contains a non-finite value.
+/// @throws std::runtime_error if a LAPACK diagonalization fails.
+std::size_t fragments_from_cholesky_vectors(
     const Eigen::MatrixXd& cholesky_vectors, std::size_t norb,
-    double truncation_threshold) {
+    Eigen::VectorXd& u_matrices, Eigen::VectorXd& w_matrices) {
   QDK_LOG_TRACE_ENTERING();
-
-  const std::string context = "fragments_from_cholesky_vectors";
-  validate_norb_and_threshold(norb, truncation_threshold, context);
 
   const std::size_t pair_dim = norb * norb;
   if (static_cast<std::size_t>(cholesky_vectors.rows()) != pair_dim) {
     throw std::invalid_argument(
-        context + ": expected norb^2 = " + std::to_string(pair_dim) +
+        "double_factorizer: expected norb^2 = " + std::to_string(pair_dim) +
         " rows for norb = " + std::to_string(norb) + ", got " +
         std::to_string(cholesky_vectors.rows()) + ".");
   }
 
   if (!cholesky_vectors.allFinite()) {
     throw std::invalid_argument(
-        context +
-        ": cholesky_vectors contains a non-finite value (NaN or infinity).");
+        "double_factorizer: cholesky_vectors contains a non-finite value.");
   }
 
-  std::vector<TwoBodyFragment> fragments;
-  fragments.reserve(static_cast<std::size_t>(cholesky_vectors.cols()));
-  for (Eigen::Index q = 0; q < cholesky_vectors.cols(); ++q) {
-    TwoBodyFragment fragment;
-    diagonalize_pair_vector(cholesky_vectors.col(q).data(), norb, context,
-                            fragment.U, fragment.eps);
+  const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
+  const Eigen::Index num_ranks = cholesky_vectors.cols();
 
-    // The Cholesky vector already carries the fragment magnitude, so eps is
-    // not rescaled the way the eigen path rescales a unit-norm eigenvector.
-    if (fragment.eps.squaredNorm() < truncation_threshold) {
-      continue;
+  // syev leaves the eigenvectors as columns in column-major order, which is
+  // bytewise the row-major [basis, orbital] layout the container stores, so
+  // each rank is diagonalized straight into its slot.
+  u_matrices.resize(num_ranks * num_orbitals * num_orbitals);
+  w_matrices.resize(num_ranks * num_orbitals);
+
+  bool warned_asymmetric = false;
+  for (Eigen::Index q = 0; q < num_ranks; ++q) {
+    const Eigen::Map<const RowMajorMatrix> pair_matrix(
+        cholesky_vectors.col(q).data(), num_orbitals, num_orbitals);
+    Eigen::Map<Eigen::MatrixXd> rotation(
+        u_matrices.data() + q * num_orbitals * num_orbitals, num_orbitals,
+        num_orbitals);
+
+    // `rotation` maps the output buffer and `pair_matrix` is a const map, so
+    // the caller's vectors are never written through. A Cholesky vector is
+    // pair already.
+    if (!warned_asymmetric) {
+      const double asymmetry =
+          (pair_matrix - pair_matrix.transpose()).cwiseAbs().maxCoeff();
+      const double scale = pair_matrix.cwiseAbs().maxCoeff();
+      if (asymmetry > 1e-8 * std::max(scale, 1.0)) {
+        QDK_LOGGER().warn(
+            "double_factorizer: Cholesky vector {} is not symmetric in its "
+            "orbital pair (largest asymmetry {:.3e}); only its symmetric part "
+            "is factorized.",
+            static_cast<long long>(q), asymmetry);
+        warned_asymmetric = true;
+      }
     }
+    rotation = 0.5 * (pair_matrix + pair_matrix.transpose());
 
-    fragment.sign = 1.0;
-    fragments.push_back(std::move(fragment));
+    const int64_t info = lapack::syev(
+        lapack::Job::Vec, lapack::Uplo::Lower, static_cast<int64_t>(norb),
+        rotation.data(), static_cast<int64_t>(norb),
+        w_matrices.data() + q * num_orbitals);
+    if (info != 0) {
+      throw std::runtime_error(
+          "double_factorizer: LAPACK syev failed to diagonalize (info=" +
+          std::to_string(info) + ").");
+    }
   }
 
-  // The pivot order is the order in which residual error is removed, which is
-  // not the order of fragment weight, so sorting is a separate step.
-  std::sort(fragments.begin(), fragments.end(),
-            [](const TwoBodyFragment& a, const TwoBodyFragment& b) {
-              return a.eps.squaredNorm() > b.eps.squaredNorm();
-            });
-
-  return fragments;
+  return static_cast<std::size_t>(num_ranks);
 }
 
-std::vector<TwoBodyFragment> cholesky_decompose_two_body(
-    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold) {
-  QDK_LOG_TRACE_ENTERING();
-
-  const std::string context = "cholesky_decompose_two_body";
-  validate_norb_and_threshold(norb, truncation_threshold, context);
-
-  const std::size_t pair_dim = norb * norb;
-  validate_two_body_integrals(two_body_integrals, norb, pair_dim, context);
-
-  const Eigen::MatrixXd supermatrix =
-      build_supermatrix(two_body_integrals, pair_dim);
-  Eigen::VectorXd residual_diagonal = supermatrix.diagonal();
-
-  // Roundoff in the residual diagonal accumulates across the rank-one updates,
-  // so both tolerances have to scale with the magnitude of the supermatrix and
-  // with its dimension. A bare machine epsilon reports a positive
-  // semi-definite supermatrix as indefinite once norb grows past a handful of
-  // orbitals, which would silently send every realistic input down the
-  // O(norb^6) fallback.
-  const double scale = std::max(residual_diagonal.maxCoeff(), 1.0);
-  const double noise_floor = std::numeric_limits<double>::epsilon() * scale *
-                             static_cast<double>(pair_dim);
-
-  // A pivot's fragment weight obeys ||eps||^2 <= pair_dim * pivot, so stopping
-  // here can only skip fragments that truncation would have dropped anyway.
-  const double stop_threshold = std::max(
-      noise_floor, truncation_threshold / static_cast<double>(pair_dim));
-
-  // A supermatrix built from a tensor with p<->q symmetry annihilates every
-  // antisymmetric pair vector, so its range, and hence the Cholesky rank, is
-  // bounded by the symmetric pair dimension.
-  const Eigen::Index max_rank =
-      static_cast<Eigen::Index>(norb * (norb + 1) / 2);
-  Eigen::MatrixXd cholesky_vectors(static_cast<Eigen::Index>(pair_dim),
-                                   max_rank);
-  Eigen::Index num_vectors = 0;
-  bool is_positive_semi_definite = true;
-
-  while (num_vectors < max_rank) {
-    // Indefiniteness shows up on the minimum residual diagonal, not on the
-    // pivot: the pivot is the maximum and merely decays towards zero, which
-    // hides a negative direction rather than exposing it.
-    if (residual_diagonal.minCoeff() < -noise_floor) {
-      is_positive_semi_definite = false;
-      break;
-    }
-
-    Eigen::Index pivot = 0;
-    const double pivot_value = residual_diagonal.maxCoeff(&pivot);
-    if (pivot_value <= stop_threshold) {
-      break;
-    }
-
-    Eigen::VectorXd column = supermatrix.col(pivot);
-    for (Eigen::Index s = 0; s < num_vectors; ++s) {
-      column -= cholesky_vectors.col(s) * cholesky_vectors(pivot, s);
-    }
-    column /= std::sqrt(pivot_value);
-
-    residual_diagonal -= column.cwiseAbs2();
-    cholesky_vectors.col(num_vectors) = column;
-    ++num_vectors;
-  }
-
-  // Exhausting the rank bound with error left over means the input violated
-  // the p<->q symmetry the bound assumes. The eigen path imposes that symmetry
-  // per fragment instead of relying on it, so it still returns a usable
-  // factorization.
-  if (is_positive_semi_definite && num_vectors == max_rank &&
-      residual_diagonal.maxCoeff() > stop_threshold) {
-    is_positive_semi_definite = false;
-  }
-
-  if (!is_positive_semi_definite) {
-    QDK_LOGGER().debug(
-        "cholesky_decompose_two_body: supermatrix is not positive "
-        "semi-definite for num_orbitals={}, falling back to "
-        "eigen_decompose_two_body.",
-        norb);
-    return eigen_decompose_two_body(two_body_integrals, norb,
-                                    truncation_threshold);
-  }
-
-  return fragments_from_cholesky_vectors(cholesky_vectors.leftCols(num_vectors),
-                                         norb, truncation_threshold);
-}
-
-std::vector<TwoBodyFragment> DoubleFactorizer::_compute_fragments(
-    const data::Hamiltonian& hamiltonian, std::size_t norb,
-    double truncation_threshold) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  const Eigen::VectorXd& g_aaaa =
-      std::get<0>(hamiltonian.get_two_body_integrals());
-
-  return eigen_decompose_two_body(g_aaaa, norb, truncation_threshold);
-}
-
-std::vector<TwoBodyFragment> CholeskyDoubleFactorizer::_compute_fragments(
-    const data::Hamiltonian& hamiltonian, std::size_t norb,
-    double truncation_threshold) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  using qdk::chemistry::data::CholeskyHamiltonianContainer;
-
-  // Stored three-center integrals already are the first factorization, so
-  // reusing them skips both expanding them into a dense norb^4 tensor and
-  // re-deriving a decomposition that is already on hand.
-  if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
-    const Eigen::MatrixXd& three_center =
-        hamiltonian.get_container<CholeskyHamiltonianContainer>()
-            .get_three_center_integrals()
-            .first;
-
-    if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
-      return fragments_from_cholesky_vectors(three_center, norb,
-                                             truncation_threshold);
-    }
-
-    QDK_LOGGER().debug(
-        "CholeskyDoubleFactorizer: stored three-center integrals have {} rows "
-        "but num_orbitals={} implies {}, decomposing the dense tensor instead.",
-        three_center.rows(), norb, norb * norb);
-  }
-
-  const Eigen::VectorXd& g_aaaa =
-      std::get<0>(hamiltonian.get_two_body_integrals());
-
-  return cholesky_decompose_two_body(g_aaaa, norb, truncation_threshold);
-}
+}  // namespace
 
 std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
   QDK_LOG_TRACE_ENTERING();
 
+  using qdk::chemistry::data::CholeskyHamiltonianContainer;
   using qdk::chemistry::data::FactorizedHamiltonianContainer;
 
   if (!hamiltonian) {
-    throw std::invalid_argument(name() + ": hamiltonian is null");
+    throw std::invalid_argument(type_name() + ": hamiltonian is null");
   }
   if (!hamiltonian->is_restricted()) {
     throw std::invalid_argument(
-        name() + " currently only supports restricted Hamiltonians.");
+        type_name() + " currently only supports restricted Hamiltonians.");
   }
   if (!hamiltonian->has_two_body_integrals()) {
     throw std::invalid_argument(
-        name() +
-        ": the Hamiltonian carries no two-body integrals to "
-        "factorize.");
+        type_name() +
+        ": the Hamiltonian carries no two-body integrals to factorize.");
   }
 
   const double truncation_threshold =
@@ -382,52 +275,76 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   const Eigen::MatrixXd& h_alpha =
       std::get<0>(hamiltonian->get_one_body_integrals());
 
-  // Deriving norb from the one-body block rather than the two-body tensor
-  // keeps implementations that never materialize a dense tensor viable.
   const std::size_t norb = static_cast<std::size_t>(h_alpha.rows());
 
-  auto fragments = _compute_fragments(*hamiltonian, norb, truncation_threshold);
+  if (norb == 0) {
+    throw std::invalid_argument(type_name() +
+                                ": norb must be greater than zero.");
+  }
+  // The settings constraint already rejects a negative threshold when it is
+  // set, but NaN compares false against any bound and so survives it. It has
+  // to be caught here because it would make every pivot comparison false and
+  // silently yield zero fragments.
+  if (std::isnan(truncation_threshold)) {
+    throw std::invalid_argument(type_name() +
+                                ": truncation_threshold must be a number, "
+                                "got NaN.");
+  }
+
+  // First factorization. Stored three-center integrals already are one, so
+  // they are used as-is and the dense norb^4 tensor is never formed; that is
+  // also why truncation_threshold does not apply to them.
+  const Eigen::MatrixXd* cholesky_vectors = nullptr;
+  if (hamiltonian->has_container_type<CholeskyHamiltonianContainer>()) {
+    const Eigen::MatrixXd& three_center =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>()
+            .get_three_center_integrals()
+            .first;
+
+    if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
+      QDK_LOGGER().debug(
+          "double_factorizer: using the stored three-center integrals as the "
+          "first factorization; truncation_threshold={:.3e} is ignored.",
+          truncation_threshold);
+      cholesky_vectors = &three_center;
+    } else {
+      QDK_LOGGER().debug(
+          "double_factorizer: stored three-center integrals have {} rows but "
+          "num_orbitals={} implies {}, decomposing the dense tensor instead.",
+          three_center.rows(), norb, norb * norb);
+    }
+  }
+
+  Eigen::MatrixXd computed_vectors;
+  if (cholesky_vectors == nullptr) {
+    const Eigen::VectorXd& two_body =
+        std::get<0>(hamiltonian->get_two_body_integrals());
+    computed_vectors =
+        cholesky_vectors_from_two_body(two_body, norb, truncation_threshold);
+    cholesky_vectors = &computed_vectors;
+  }
+
+  // Second factorization, identical for either source. The container takes
+  // R = num_ranks fragments over B = norb bases, with C = 1 copy each.
+  Eigen::VectorXd u_matrices;
+  Eigen::VectorXd w_matrices;
+  const std::size_t num_ranks = fragments_from_cholesky_vectors(
+      *cholesky_vectors, norb, u_matrices, w_matrices);
 
   QDK_LOGGER().debug(
-      "{}: num_orbitals={}, truncation_threshold={}, "
-      "retained {} of {} candidate fragments.",
-      name(), norb, truncation_threshold, fragments.size(), norb * norb);
+      "double_factorizer: num_orbitals={}, truncation_threshold={}, retained "
+      "{} fragments.",
+      norb, truncation_threshold, num_ranks);
 
-  if (fragments.empty()) {
+  if (num_ranks == 0) {
     throw std::invalid_argument(
-        name() +
+        type_name() +
         ": truncation_threshold=" + std::to_string(truncation_threshold) +
         " leaves the factorized Hamiltonian with no two-body term at all.");
   }
 
-  // R = number of fragments, B = norb bases, C = 1.
-  const std::size_t num_ranks = fragments.size();
-  const std::size_t num_bases = norb;
-  const std::size_t num_copies = 1;
-
-  using RowMajorMatrix =
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-
-  Eigen::VectorXd u_matrices(num_ranks * num_bases * norb);
-  Eigen::VectorXd w_matrices(num_ranks * num_bases * num_copies);
-  Eigen::VectorXd signs(num_ranks);
-
-  for (std::size_t r = 0; r < num_ranks; ++r) {
-    const TwoBodyFragment& fragment = fragments[r];
-    const Eigen::Index rank = static_cast<Eigen::Index>(r);
-    const Eigen::Index bases = static_cast<Eigen::Index>(num_bases);
-    const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
-
-    signs(rank) = fragment.sign;
-    w_matrices.segment(rank * bases, bases) = fragment.eps;
-    Eigen::Map<RowMajorMatrix>(u_matrices.data() + rank * bases * num_orbitals,
-                               bases, num_orbitals) = fragment.U.transpose();
-  }
-
   const Eigen::MatrixXd wb_matrix =
-      Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(num_ranks),
-                            static_cast<Eigen::Index>(num_copies));
-  constexpr double energy_gap = 0.0;
+      Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(num_ranks), 1);
 
   const Eigen::MatrixXd inactive_fock =
       hamiltonian->has_inactive_fock_matrix()
@@ -435,9 +352,8 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
           : Eigen::MatrixXd(0, 0);
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      hamiltonian->get_core_energy(), u_matrices, w_matrices, wb_matrix,
-      h_alpha, inactive_fock, hamiltonian->get_orbitals(), signs, energy_gap,
-      hamiltonian->get_type());
+      h_alpha, u_matrices, w_matrices, wb_matrix, hamiltonian->get_orbitals(),
+      hamiltonian->get_core_energy(), inactive_fock, hamiltonian->get_type());
 
   return std::make_shared<data::Hamiltonian>(std::move(container));
 }
@@ -446,7 +362,6 @@ void DoubleFactorizerFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   DoubleFactorizerFactory::register_instance(&make_double_factorizer);
-  DoubleFactorizerFactory::register_instance(&make_cholesky_double_factorizer);
 }
 
 }  // namespace qdk::chemistry::algorithms

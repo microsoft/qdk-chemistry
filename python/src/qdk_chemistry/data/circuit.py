@@ -59,7 +59,7 @@ class CircuitMetadata:
     """The phase gradient ancillas that should be initialized once and reused in multiple subroutines."""
 
     def __post_init__(self) -> None:
-        """Reject counts that cannot describe a register.
+        """Reject invalid metadata.
 
         Raises:
             ValueError: If ``num_phase_gradient_ancillas`` is negative.
@@ -114,7 +114,7 @@ class Circuit(DataClass):
                 knows it. Scratch qubits a circuit allocates internally are not counted.
                 Defaults to None.
             metadata: Metadata specific to the subroutines this circuit is built from.
-                Defaults to None, meaning nothing is declared.
+                Defaults to None.
 
         Notes:
             At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.

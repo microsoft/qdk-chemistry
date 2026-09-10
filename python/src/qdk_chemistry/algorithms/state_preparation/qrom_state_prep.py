@@ -26,9 +26,8 @@ class QROMStatePreparationSettings(Settings):
             "rotation_bit_precision",
             "int",
             10,
-            "Number of bits of precision used for the QROM-loaded Ry rotation angles. Higher "
-            "values reduce the synthesis error of each multiplexed rotation at the cost of a "
-            "wider QROM output register. The upper bound of 30 is a sanity limit as 2^-30 is already far "
+            "Number of bits of precision used for the QROM-loaded Ry rotation angles. "
+            "The upper bound of 30 is a sanity limit as 2^-30 is already far "
             "below chemical accuracy.",
             (1, 30),
         )
@@ -70,9 +69,6 @@ class QROMStatePreparation(StatePreparation):
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         r"""State preparation using QROM-based SBM decomposition from a Wavefunction.
 
-        Extracts amplitudes from the wavefunction and builds a QROM state prep
-        circuit using n layers of multiplexed Ry rotations.
-
         Args:
             wavefunction: The target wavefunction.
 
@@ -88,14 +84,14 @@ class QROMStatePreparation(StatePreparation):
         allocate_phase_gradient = bool(self._settings.get("allocate_phase_gradient"))
 
         if allocate_phase_gradient:
-            # Self-contained: the gradient is allocated and prepared inside the callable,
-            # so it is invisible to the caller and no ancilla is declared.
+            # Self-contained: the gradient is allocated and prepared inside the callable.
             qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOp(params)
             num_qubits = params.numStateQubits
             num_gradient_ancillas = 0
         else:
             # The caller owns `qs[n..n + bRot - 1]`, must leave the gradient in it, and must
-            # exclude it from any reflection about |0>. A walk pays for the gradient once.
+            # exclude it from any reflection about |0>. An end to end circuit pays for the
+            # gradient once.
             qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOpWithPhaseGradient(params)
             num_qubits = params.numStateQubits + params.rotationBitPrecision
             num_gradient_ancillas = params.rotationBitPrecision
@@ -136,8 +132,6 @@ class QROMStatePreparation(StatePreparation):
         coeffs, num_state_qubits = self._dense_state_vector(wavefunction, "QROM state preparation")
         if not np.all(np.isfinite(coeffs)):
             raise ValueError("QROM state preparation requires finite coefficients.")
-        # The Q# angle tree stores |c|^2, so finite coefficients are not enough: 1e200 squares
-        # to infinity and every ratio taken from that subtree collapses to NaN.
         if not np.all(np.isfinite(coeffs**2)):
             raise ValueError("QROM state preparation overflows to infinity when squaring; rescale first.")
         if not np.any(coeffs != 0.0):

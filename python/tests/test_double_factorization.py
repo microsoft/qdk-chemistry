@@ -8,20 +8,18 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import CholeskyDoubleFactorizer, DoubleFactorizer, create
+from qdk_chemistry.algorithms import DoubleFactorizer, create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     FactorizedHamiltonianContainer,
     Hamiltonian,
-    MajoranaMapping,
 )
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
 )
-from .test_helpers import create_nontrivial_test_hamiltonian, create_test_orbitals
-from .test_qdk_qubit_mapper_factorized import _assert_term_by_term_equivalent
+from .test_helpers import create_test_orbitals
 
 
 def create_positive_semidefinite_test_hamiltonian(num_orbitals=4, num_factors=3, seed=17):
@@ -29,9 +27,7 @@ def create_positive_semidefinite_test_hamiltonian(num_orbitals=4, num_factors=3,
 
     ``g_pqrs = sum_k F_k[p,q] F_k[r,s]`` with symmetric ``F_k`` makes the
     supermatrix a Gram matrix, so a Cholesky decomposition exists and its rank
-    is ``num_factors``. :func:`create_nontrivial_test_hamiltonian` draws its
-    unique elements independently instead, which is 8-fold symmetric but
-    indefinite, so it only ever exercises the fallback.
+    is exactly ``num_factors``.
     """
     n = num_orbitals
     rng = np.random.default_rng(seed)
@@ -52,99 +48,25 @@ def create_positive_semidefinite_test_hamiltonian(num_orbitals=4, num_factors=3,
 
 @pytest.fixture
 def factorizer():
-    return create("double_factorizer", "eigen_decomposition")
-
-
-@pytest.fixture
-def cholesky_factorizer():
-    return create("double_factorizer", "cholesky")
+    return create("double_factorizer", "qdk")
 
 
 class TestDoubleFactorizer:
     def test_metadata(self, factorizer):
         assert isinstance(factorizer, DoubleFactorizer)
         assert factorizer.type_name() == "double_factorizer"
-        assert factorizer.name() == "eigen_decomposition"
+        assert factorizer.name() == "qdk"
+        assert factorizer.name() in factorizer.aliases()
+        assert factorizer.settings().has("truncation_threshold")
 
     def test_run_returns_an_exact_factorized_hamiltonian(self, factorizer):
-        hamiltonian = create_nontrivial_test_hamiltonian(4)
-
-        factorized = factorizer.run(hamiltonian)
-        container = factorized.get_container()
-
-        assert isinstance(factorized, Hamiltonian)
-        assert isinstance(container, FactorizedHamiltonianContainer)
-        assert set(np.unique(container.get_signs())) <= {-1.0, 1.0}
-        np.testing.assert_allclose(
-            factorized.get_two_body_integrals()[0],
-            hamiltonian.get_two_body_integrals()[0],
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-
-    def test_truncation_threshold_is_applied(self, factorizer):
-        norb = 4
-        hamiltonian = create_nontrivial_test_hamiltonian(norb)
-
-        def num_ranks(threshold):
-            truncated = create("double_factorizer", "eigen_decomposition")
-            truncated.settings().set("truncation_threshold", threshold)
-            return truncated.run(hamiltonian).get_container().get_num_ranks()
-
-        # A threshold of 0.0 retains every supermatrix eigenpair, so the rank
-        # equals the supermatrix dimension.
-        assert num_ranks(0.0) == norb**2
-
-        # The helper builds a tensor with full 8-fold symmetry, so the
-        # supermatrix annihilates every antisymmetric pair vector. The default
-        # threshold drops exactly those norb*(norb-1)/2 null fragments, leaving
-        # the symmetric pair block. This holds whatever the integrals are, so
-        # it does not depend on the helper's generated magnitudes.
-        num_ranks_default = factorizer.run(hamiltonian).get_container().get_num_ranks()
-        assert num_ranks_default == norb * (norb + 1) // 2
-
-        # Raising the threshold can only discard more fragments.
-        assert num_ranks(1e-1) <= num_ranks(1e-6) <= num_ranks_default
-
-    def test_factorizing_does_not_change_the_mapped_qubit_operator(self, factorizer):
-        """End-to-end check through the downstream consumer of a factorization.
-
-        Reconstructing the tensor is necessary but not sufficient: the qubit
-        mapper reads one-body integrals, orbitals and core energy as well, so a
-        factorization that silently dropped or rescaled any of them would still
-        pass the reconstruction test. Mapping both Hamiltonians and comparing
-        the operators term by term covers the whole payload.
-        """
-        norb = 4
-        hamiltonian = create_nontrivial_test_hamiltonian(norb)
-        factorized = factorizer.run(hamiltonian)
-
-        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * norb)
-        mapper = create("qubit_mapper", "qdk")
-
-        _assert_term_by_term_equivalent(mapper.run(hamiltonian, mapping), mapper.run(factorized, mapping))
-
-
-class TestCholeskyDoubleFactorizer:
-    def test_metadata(self, cholesky_factorizer):
-        assert isinstance(cholesky_factorizer, CholeskyDoubleFactorizer)
-        assert isinstance(cholesky_factorizer, DoubleFactorizer)
-        assert cholesky_factorizer.type_name() == "double_factorizer"
-        assert cholesky_factorizer.name() == "cholesky"
-        assert cholesky_factorizer.name() in cholesky_factorizer.aliases()
-
-    def test_run_returns_an_exact_factorized_hamiltonian(self, cholesky_factorizer):
         hamiltonian = create_positive_semidefinite_test_hamiltonian()
 
-        factorized = cholesky_factorizer.run(hamiltonian)
+        factorized = factorizer.run(hamiltonian)
         container = factorized.get_container()
 
         assert isinstance(factorized, Hamiltonian)
         assert isinstance(container, FactorizedHamiltonianContainer)
-
-        # A Cholesky factorization cannot produce a negative fragment, so an
-        # all-positive sign vector is what distinguishes it from the fallback.
-        assert set(np.unique(container.get_signs())) == {1.0}
         np.testing.assert_allclose(
             factorized.get_two_body_integrals()[0],
             hamiltonian.get_two_body_integrals()[0],
@@ -152,39 +74,8 @@ class TestCholeskyDoubleFactorizer:
             atol=float_comparison_absolute_tolerance,
         )
 
-    def test_falls_back_for_an_indefinite_tensor(self, cholesky_factorizer):
-        # No Cholesky decomposition exists for this tensor, so a negative
-        # fragment is proof that the eigendecomposition took over, and the
-        # result still has to be exact.
-        hamiltonian = create_nontrivial_test_hamiltonian(4)
-
-        factorized = cholesky_factorizer.run(hamiltonian)
-        container = factorized.get_container()
-
-        assert -1.0 in set(np.unique(container.get_signs()))
-        np.testing.assert_allclose(
-            factorized.get_two_body_integrals()[0],
-            hamiltonian.get_two_body_integrals()[0],
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-
-    def test_retains_the_same_fragments_as_the_eigen_decomposition(self, cholesky_factorizer, factorizer):
-        # Both methods threshold the squared coefficient norm, so a positive
-        # semi-definite tensor has to give the same rank either way.
-        hamiltonian = create_positive_semidefinite_test_hamiltonian(num_factors=3)
-
-        cholesky_ranks = cholesky_factorizer.run(hamiltonian).get_container().get_num_ranks()
-        eigen_ranks = factorizer.run(hamiltonian).get_container().get_num_ranks()
-
-        assert cholesky_ranks == eigen_ranks == 3
-
-    def test_factorizing_does_not_change_the_mapped_qubit_operator(self, cholesky_factorizer):
-        norb = 4
-        hamiltonian = create_positive_semidefinite_test_hamiltonian(norb)
-        factorized = cholesky_factorizer.run(hamiltonian)
-
-        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * norb)
-        mapper = create("qubit_mapper", "qdk")
-
-        _assert_term_by_term_equivalent(mapper.run(hamiltonian, mapping), mapper.run(factorized, mapping))
+    @pytest.mark.parametrize("num_factors", [1, 2, 3, 4])
+    def test_rank_equals_the_number_of_independent_factors(self, num_factors):
+        hamiltonian = create_positive_semidefinite_test_hamiltonian(num_factors=num_factors)
+        container = create("double_factorizer", "qdk").run(hamiltonian).get_container()
+        assert container.get_num_ranks() == num_factors

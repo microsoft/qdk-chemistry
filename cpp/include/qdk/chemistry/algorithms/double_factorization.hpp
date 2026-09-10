@@ -3,24 +3,14 @@
 // license information.
 
 #pragma once
-#include <Eigen/Dense>
-#include <cstddef>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
-#include <vector>
 
 namespace qdk::chemistry::algorithms {
-
-/**
- * @file
- * @brief Double factorization of a Hamiltonian's two-electron integrals.
- *
- * @note Equation numbers here refer to :cite:`Low2025`.
- */
 
 /**
  * @class DoubleFactorizerSettings
@@ -36,110 +26,49 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
   DoubleFactorizerSettings() {
     set_default<double>(
         "truncation_threshold", 1e-12,
-        "Drop fragments whose squared coefficient norm ||eps||^2 is below "
-        "this threshold. For eigen_decomposition this equals the two-electron "
-        "supermatrix eigenvalue magnitude. Must be non-negative; 0.0 keeps "
-        "every fragment the method produces, including the numerically null "
-        "ones, though cholesky still stops at the numerical rank.",
+        "Cutoff for the pivoted Cholesky decomposition of the two-electron "
+        "supermatrix: pivoting stops once the largest remaining residual "
+        "diagonal drops to it. Must be non-negative; 0.0 keeps every "
+        "numerically resolvable fragment. Ignored when the input Hamiltonian "
+        "is backed by a CholeskyHamiltonianContainer.",
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
   ~DoubleFactorizerSettings() override = default;
 };
 
-/// A single low-rank ("perfect square") two-electron fragment:
-///
-/// g^(f)_pqrs = sign * (sum_b eps_b U_pb U_qb) (sum_b' eps_b' U_rb' U_sb')
-struct TwoBodyFragment {
-  Eigen::MatrixXd U;    ///< norb x norb orbital rotation. Column b is
-                        ///< new-orbital vector b in the original basis.
-  Eigen::VectorXd eps;  ///< norb coefficients. The fragment's weight is
-                        ///< ||eps||^2, which for eigen_decompose_two_body
-                        ///< equals the supermatrix eigenvalue magnitude.
-  double sign = 1.0;    ///< +1.0 or -1.0.
-};
-
-/// Eigen-decompose the spin-free two-electron tensor g_pqrs, flattened as
-/// p*norb^3 + q*norb^2 + r*norb + s, into low-rank fragments.
-///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4.
-///        Chemist permutation symmetry is imposed by averaging, not verified.
-/// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose supermatrix eigenvalue
-///        magnitude falls below this threshold are dropped. 0.0 retains every
-///        fragment.
-/// @return The retained fragments, sorted by decreasing eigenvalue magnitude.
-/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
-///         or contains a non-finite value.
-/// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> eigen_decompose_two_body(
-    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = 1e-12);
-
-/// Build low-rank fragments from Cholesky vectors of the two-electron
-/// supermatrix, i.e. from an L satisfying g_pqrs = sum_Q L_(pq),Q L_(rs),Q.
-///
-/// Column Q is reshaped into the norb x norb matrix M^Q, whose eigenpairs give
-/// the fragment directly. Because L already carries the fragment magnitude,
-/// `eps` is used unscaled, and every fragment has sign +1: an L exists only
-/// when the supermatrix is positive semi-definite.
-///
-/// @param cholesky_vectors norb^2 x naux matrix. Row index is the row-major
-///        pair p*norb + q, column index is the Cholesky (auxiliary) index.
-/// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose squared coefficient norm
-///        ||eps||^2 falls below this threshold are dropped.
-/// @return The retained fragments, sorted by decreasing ||eps||^2.
-/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `cholesky_vectors` does not have norb^2
-///         rows or contains a non-finite value.
-/// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> fragments_from_cholesky_vectors(
-    const Eigen::MatrixXd& cholesky_vectors, std::size_t norb,
-    double truncation_threshold = 1e-12);
-
-/// Decompose the spin-free two-electron tensor g_pqrs, flattened as
-/// p*norb^3 + q*norb^2 + r*norb + s, by pivoted Cholesky decomposition of the
-/// two-electron supermatrix :cite:`Beebe1977` :cite:`Koch2003`.
-///
-/// This costs O(naux * norb^4) rather than the O(norb^6) of a dense
-/// diagonalization, and stops at the numerical rank instead of materializing
-/// all norb^2 eigenpairs.
-///
-/// A Cholesky decomposition exists only for a positive semi-definite
-/// supermatrix. Exact two-electron integrals are positive semi-definite, but
-/// approximate or synthetic ones need not be, so a detected breakdown falls
-/// back to eigen_decompose_two_body() rather than failing. The fallback is
-/// observable in the result: it is the only way a fragment can carry sign -1.
-///
-/// @param two_body_integrals Flattened two-electron tensor, size norb^4.
-///        Chemist permutation symmetry is imposed by averaging, not verified.
-/// @param norb Number of (spatial) orbitals.
-/// @param truncation_threshold Fragments whose squared coefficient norm
-///        ||eps||^2 falls below this threshold are dropped. This is the same
-///        quantity the eigen path thresholds, so a given value selects the
-///        same fragments from either method.
-/// @return The retained fragments, sorted by decreasing ||eps||^2.
-/// @throws std::invalid_argument if `norb` is zero, if `truncation_threshold`
-///         is negative or NaN, or if `two_body_integrals` is not norb^4 long
-///         or contains a non-finite value.
-/// @throws std::runtime_error if a LAPACK diagonalization fails.
-std::vector<TwoBodyFragment> cholesky_decompose_two_body(
-    const Eigen::VectorXd& two_body_integrals, std::size_t norb,
-    double truncation_threshold = 1e-12);
-
 /**
  * @class DoubleFactorizer
- * @brief Exact double factorization by nested eigen-decomposition
+ * @brief Exact double factorization of a Hamiltonian's two-electron integrals
  *        :cite:`vonBurg2021`.
  *
  * Maps a Hamiltonian carrying dense four-index two-electron integrals to an
  * equivalent Hamiltonian backed by a
  * qdk::chemistry::data::FactorizedHamiltonianContainer, whose two-electron
- * tensor is stored as a signed sum of low-rank fragments
- *   g_pqrs = sum_t s_t (sum_b eps^t_b U^t_bp U^t_bq)
- *                      (sum_b' eps^t_b' U^t_b'r U^t_b's).
+ * tensor is stored as a sum of low-rank squares
+ *   g_pqrs = sum_t (sum_b eps^t_b U^t_bp U^t_bq)
+ *                  (sum_b' eps^t_b' U^t_b'r U^t_b's).
+ *
+ * The factorization has two steps. The first produces Cholesky vectors L with
+ * g = L L^T; the second diagonalizes each vector into its (U, eps) fragment.
+ * Only the first step depends on how the input stores its integrals:
+ *
+ * - Dense four-index integrals are reshaped into the (pq),(rs) supermatrix,
+ *   given chemist permutation symmetry by averaging rather than by
+ *   verification, and reduced by a pivoted Cholesky decomposition costing
+ *   O(naux * norb^4), which stops at the numerical rank rather than
+ *   materializing all norb^2 eigenpairs.
+ * - A qdk::chemistry::data::CholeskyHamiltonianContainer already stores such
+ *   vectors, so they are consumed directly and the dense norb^4 tensor is
+ *   never formed. `"truncation_threshold"` is ignored in that case: the
+ *   stored vectors are the first factorization, already truncated when they
+ *   were built.
+ *
+ * A Cholesky decomposition exists only for a positive semi-definite
+ * supermatrix. Exact two-electron integrals are positive semi-definite; a
+ * tensor that is not — an approximate or synthetic one, or a shifted one such
+ * as a BLISS-modified Hamiltonian — is rejected rather than silently
+ * factorized into a different tensor.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.
@@ -176,9 +105,9 @@ class DoubleFactorizer
   /**
    * @brief Access the algorithm's name.
    *
-   * @return "eigen_decomposition".
+   * @return "qdk".
    */
-  std::string name() const override { return "eigen_decomposition"; }
+  std::string name() const override { return "qdk"; }
 
   /**
    * @brief Access the algorithm's type name.
@@ -197,73 +126,6 @@ class DoubleFactorizer
    */
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian) const override;
-
-  /**
-   * @brief Produce the low-rank fragments for a Hamiltonian.
-   *
-   * Overridden by implementations that use a different factorization, or that
-   * can exploit a more compact input than the dense four-index tensor. Only
-   * this step differs between implementations; the container assembly, the
-   * carried-over one-body data and the validation are shared.
-   *
-   * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
-   * @param hamiltonian The validated, restricted input Hamiltonian.
-   * @param norb Number of active spatial orbitals.
-   * @param truncation_threshold Fragments whose squared coefficient norm
-   *        ||eps||^2 falls below this threshold are dropped.
-   * \endcond
-   * @return The retained fragments.
-   */
-  virtual std::vector<TwoBodyFragment> _compute_fragments(
-      const data::Hamiltonian& hamiltonian, std::size_t norb,
-      double truncation_threshold) const;
-};
-
-/**
- * @class CholeskyDoubleFactorizer
- * @brief Double factorization whose first step is a pivoted Cholesky
- *        decomposition :cite:`Beebe1977` :cite:`Koch2003` rather than an
- *        eigen-decomposition.
- *
- * Produces the same container as DoubleFactorizer and thresholds the same
- * quantity, but reaches it in O(naux * norb^4) instead of O(norb^6) and stops
- * at the numerical rank. Every fragment carries sign +1.
- *
- * When the input Hamiltonian is already backed by a
- * qdk::chemistry::data::CholeskyHamiltonianContainer, the stored three-center
- * integrals are the first factorization, so they are reused directly and the
- * dense norb^4 tensor is never formed.
- *
- * Falls back to the eigen-decomposition when the two-electron supermatrix is
- * not positive semi-definite, since no Cholesky decomposition exists then.
- */
-class CholeskyDoubleFactorizer : public DoubleFactorizer {
- public:
-  /**
-   * @brief Default constructor. Uses default DoubleFactorizerSettings.
-   */
-  CholeskyDoubleFactorizer() = default;
-
-  /**
-   * @brief Virtual destructor.
-   */
-  ~CholeskyDoubleFactorizer() override = default;
-
-  /**
-   * @brief Access the algorithm's name.
-   *
-   * @return "cholesky".
-   */
-  std::string name() const final { return "cholesky"; }
-
- protected:
-  /**
-   * @brief Factorize by pivoted Cholesky, reusing stored three-center
-   *        integrals when the Hamiltonian already carries them.
-   */
-  std::vector<TwoBodyFragment> _compute_fragments(
-      const data::Hamiltonian& hamiltonian, std::size_t norb,
-      double truncation_threshold) const override;
 };
 
 /**
@@ -275,7 +137,7 @@ struct DoubleFactorizerFactory
     : public AlgorithmFactory<DoubleFactorizer, DoubleFactorizerFactory> {
   static std::string algorithm_type_name() { return "double_factorizer"; }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return "eigen_decomposition"; }
+  static std::string default_algorithm_name() { return "qdk"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

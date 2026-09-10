@@ -19,13 +19,34 @@ using namespace qdk::chemistry::python;
 void bind_double_factorization(py::module &m) {
   py::class_<DoubleFactorizer, py::smart_holder> double_factorizer(
       m, "DoubleFactorizer", R"(
-  Double-factorize a restricted Hamiltonian by nested eigendecomposition.
+  Double-factorize a restricted Hamiltonian into low-rank two-electron fragments.
 
   The result is backed by a
-  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` containing signed
-  low-rank fragments. Chemist permutation symmetry is imposed by averaging.
-  Modes below the absolute ``truncation_threshold`` are omitted. One-body data,
-  core energy, orbitals, inactive Fock data, and Hamiltonian type are preserved.
+  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` holding a sum of
+  low-rank squares. One-body data, core energy, orbitals, inactive Fock data,
+  and Hamiltonian type are preserved.
+
+  The factorization has two steps. The first produces Cholesky vectors ``L``
+  with ``g = L L^T``; the second diagonalizes each vector into its fragment.
+  Only the first step depends on how the input stores its integrals:
+
+  - Dense four-index integrals are reshaped into the supermatrix, given
+    chemist permutation symmetry by averaging, and reduced by a pivoted
+    Cholesky decomposition in ``O(naux * norb**4)`` that stops at the
+    numerical rank. Pivoting stops once the largest remaining residual
+    diagonal drops to ``truncation_threshold``, or to a noise floor scaled
+    to the largest supermatrix diagonal, whichever is larger; a threshold
+    below that floor therefore has no further effect.
+  - A :class:`qdk_chemistry.data.CholeskyHamiltonianContainer` already stores
+    such vectors, so they are consumed directly and the dense ``norb**4``
+    tensor is never formed. ``truncation_threshold`` is ignored in that case,
+    because the stored vectors are the first factorization and were already
+    truncated when they were built.
+
+  A Cholesky decomposition exists only for a positive semi-definite
+  supermatrix. Exact two-electron integrals are positive semi-definite, but
+  approximate or synthetic ones need not be, and such an input raises
+  ``ValueError`` rather than being silently truncated.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
@@ -50,9 +71,6 @@ Returns:
 Raises:
   ValueError: If the input or its two-electron integrals are invalid, or no fragment survives truncation.
   RuntimeError: If an eigendecomposition fails.
-
-Note:
-  Calling this method locks the settings.
 )",
                         py::arg("hamiltonian"));
 
@@ -68,7 +86,7 @@ Returns:
 Return the implementation name.
 
 Returns:
-  str: ``"eigen_decomposition"``.
+  str: ``"qdk"``.
 )");
 
   double_factorizer.def("aliases", &DoubleFactorizer::aliases, R"(
@@ -96,49 +114,4 @@ Returns:
   });
 
   qdk::chemistry::python::bind_create_nested(double_factorizer);
-
-  py::class_<CholeskyDoubleFactorizer, DoubleFactorizer, py::smart_holder>(
-      m, "CholeskyDoubleFactorizer", R"(
-  Double-factorize a restricted Hamiltonian by pivoted Cholesky decomposition.
-
-  Produces the same
-  :class:`qdk_chemistry.data.FactorizedHamiltonianContainer` as
-  :class:`DoubleFactorizer` and thresholds the same quantity, but reaches it
-  without diagonalizing the two-electron supermatrix, and stops at the
-  numerical rank instead of forming all ``norb**2`` eigenpairs. Every fragment
-  carries sign ``+1``.
-
-  If the Hamiltonian is already backed by a
-  :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`, its stored
-  three-center integrals are the first factorization and are reused directly,
-  so the dense ``norb**4`` tensor is never formed.
-
-  A Cholesky decomposition exists only for a positive semi-definite
-  supermatrix. Exact two-electron integrals are positive semi-definite, but
-  approximate or synthetic ones need not be, so a detected breakdown falls
-  back to the eigendecomposition rather than failing.
-
-Typical usage:
-
-.. code-block:: python
-
-    import qdk_chemistry.algorithms as alg
-
-    factorizer = alg.CholeskyDoubleFactorizer()
-    factorized = factorizer.run(hamiltonian)
-
-See Also:
-    :class:`DoubleFactorizer`
-    :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
-
-References:
-    :cite:`Beebe1977`
-    :cite:`Koch2003`
-)")
-      .def(py::init<>(), R"(
-Create a Cholesky double factorizer with default settings.
-)")
-      .def("__repr__", [](const CholeskyDoubleFactorizer &) {
-        return "<qdk_chemistry.algorithms.CholeskyDoubleFactorizer>";
-      });
 }

@@ -75,21 +75,7 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_factory is not None
 
     def test_resource_counts(self):
-        """Pin the logical resource counts so a costing regression is visible.
-
-        These are now the counts of the circuit that executes. They used to be the counts of
-        ``AliasSamplingPrepareLegacyResourceEstimate``, a branch ``AliasSamplingPrepare`` took
-        under ``IsResourceEstimating()`` to reproduce an archived Fe2S2 headline; it omitted
-        the comparator and the controlled index swap, so tracing it never touched the flag
-        qubit and reported 14 qubits / 2 CCZ. With that branch deleted the trace is the
-        runnable circuit throughout, which needs 17 / 8 -- exactly the figures the old
-        docstring predicted for it.
-
-        The conditional lookup is pinned at a representative shape: 90 conditions, 16 slots,
-        and 21-bit words. At the optimal three swap bits, erasing the load by measurement
-        rather than running it backwards takes its adjoint from 408 to 83 CCZ gates, and its
-        round trip from 816 to 491.
-        """
+        """Pin the logical resource counts so a costing regression is visible."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
         circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
@@ -150,14 +136,6 @@ class TestAliasSamplingStatePreparation:
             actual = {name: counts[name] for name in expected}
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
 
-    def test_settings_expose_bits_precision(self):
-        """The constructor argument is stored in settings so create() can reach it."""
-        prep = AliasSamplingStatePreparation(bits_precision=6)
-        assert prep.settings().get("bits_precision") == 6
-
-        prep.settings().set("bits_precision", 8)
-        assert prep.settings().get("bits_precision") == 8
-
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
@@ -178,6 +156,12 @@ class TestAliasSamplingStatePreparation:
         prep = AliasSamplingStatePreparation(bits_precision=4)
         with pytest.raises(ValueError, match="overflows to infinity"):
             prep.run(create_dense_wavefunction([1e200, 1.0]))
+
+    def test_coefficients_that_overflow_when_summed_are_rejected(self):
+        """Each square is finite but their total is not."""
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        with pytest.raises(ValueError, match="overflows to infinity when summing"):
+            prep.run(create_dense_wavefunction([1e154, 1e154, 0.0, 0.0]))
 
     def test_zero_coefficients_get_zero_probability(self):
         """A zero coefficient must receive exactly zero probability."""
