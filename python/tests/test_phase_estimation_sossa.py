@@ -74,7 +74,6 @@ def _build_h2_dfthc_data():
         "basis_vectors": np.asarray(container["u_matrices"], dtype=float).reshape(n_ranks, n_bases, n_orb),
         "two_body_weights": np.asarray(container["w_matrices"], dtype=float).reshape(n_ranks, n_bases, n_copies),
         "identity_weight": np.asarray(container["wb_matrix"], dtype=float).reshape(n_ranks, n_copies),
-        "signs": np.asarray(container["signs"], dtype=float),
         "core_energy": float(container["core_energy"]),
         "N": n_orb,
         "R": n_ranks,
@@ -409,13 +408,13 @@ def _build_h2_sossa_problem():
     )
 
     fh = FactorizedHamiltonianContainer(
-        0.0,
-        data["basis_vectors"].flatten(),
-        data["two_body_weights"].flatten(),
-        data["identity_weight"],
-        data["h1"],
-        np.zeros((n_orb, n_orb)),
-        create_test_orbitals(n_orb),
+        one_body_integrals=data["h1"],
+        u_matrices=data["basis_vectors"].flatten(),
+        w_matrices=data["two_body_weights"].flatten(),
+        wb_matrix=data["identity_weight"],
+        orbitals=create_test_orbitals(n_orb),
+        core_energy=0.0,
+        inactive_fock_matrix=np.zeros((n_orb, n_orb)),
     )
     sossa_op = to_sossa_operator(fh)
     container = SOSSABuilder().run(sossa_op).get_container()
@@ -573,13 +572,13 @@ class TestSOSSAQPEIntegration:
         orbitals = create_test_orbitals(n_orb)
         inactive_fock = np.zeros((n_orb, n_orb))
         fh = FactorizedHamiltonianContainer(
-            0.0,
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
-            data["h1"],
-            inactive_fock,
-            orbitals,
+            one_body_integrals=data["h1"],
+            u_matrices=data["basis_vectors"].flatten(),
+            w_matrices=data["two_body_weights"].flatten(),
+            wb_matrix=data["identity_weight"],
+            orbitals=orbitals,
+            core_energy=0.0,
+            inactive_fock_matrix=inactive_fock,
         )
 
         # Step 1: SOSSABuilder → UnitaryRepresentation
@@ -704,13 +703,13 @@ class TestSOSSAQPEIntegration:
         )
 
         fh = FactorizedHamiltonianContainer(
-            0.0,
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
-            data["h1"],
-            np.zeros((n_orb, n_orb)),
-            create_test_orbitals(n_orb),
+            one_body_integrals=data["h1"],
+            u_matrices=data["basis_vectors"].flatten(),
+            w_matrices=data["two_body_weights"].flatten(),
+            wb_matrix=data["identity_weight"],
+            orbitals=create_test_orbitals(n_orb),
+            core_energy=0.0,
+            inactive_fock_matrix=np.zeros((n_orb, n_orb)),
         )
         # ``Hamiltonian`` takes ownership of the C++ container, so read the scalar
         # offset off ``fh`` first: ``macis_cas`` returns an energy that includes it.
@@ -726,13 +725,13 @@ class TestSOSSAQPEIntegration:
         n_orb = data["N"]
         orbitals = create_test_orbitals(n_orb)
         fh = FactorizedHamiltonianContainer(
-            0.0,
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
-            data["h1"],
-            np.zeros((n_orb, n_orb)),
-            orbitals,
+            one_body_integrals=data["h1"],
+            u_matrices=data["basis_vectors"].flatten(),
+            w_matrices=data["two_body_weights"].flatten(),
+            wb_matrix=data["identity_weight"],
+            orbitals=orbitals,
+            core_energy=0.0,
+            inactive_fock_matrix=np.zeros((n_orb, n_orb)),
         )
         # ``to_sossa_operator`` transfers ownership of the C++ container, so read the
         # scalar offset off ``fh`` before it is consumed.
@@ -762,13 +761,13 @@ class TestSOSSAQPEIntegration:
         n_orb = data["N"]
         orbitals = create_test_orbitals(n_orb)
         fh = FactorizedHamiltonianContainer(
-            0.0,
-            data["basis_vectors"].flatten(),
-            data["two_body_weights"].flatten(),
-            data["identity_weight"],
-            data["h1"],
-            np.zeros((n_orb, n_orb)),
-            orbitals,
+            one_body_integrals=data["h1"],
+            u_matrices=data["basis_vectors"].flatten(),
+            w_matrices=data["two_body_weights"].flatten(),
+            wb_matrix=data["identity_weight"],
+            orbitals=orbitals,
+            core_energy=0.0,
+            inactive_fock_matrix=np.zeros((n_orb, n_orb)),
         )
         container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
 
