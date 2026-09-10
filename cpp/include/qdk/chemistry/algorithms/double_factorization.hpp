@@ -54,21 +54,18 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
  * Only the first step depends on how the input stores its integrals:
  *
  * - Dense four-index integrals are reshaped into the (pq),(rs) supermatrix,
- *   given chemist permutation symmetry by averaging rather than by
- *   verification, and reduced by a pivoted Cholesky decomposition costing
- *   O(naux * norb^4), which stops at the numerical rank rather than
- *   materializing all norb^2 eigenpairs.
+ *   given chemist permutation symmetry by averaging, and reduced by a pivoted
+ *   Cholesky decomposition costing O(naux * norb^4), which stops at the
+ *   numerical rank.
  * - A qdk::chemistry::data::CholeskyHamiltonianContainer already stores such
- *   vectors, so they are consumed directly and the dense norb^4 tensor is
- *   never formed. `"truncation_threshold"` is ignored in that case: the
- *   stored vectors are the first factorization, already truncated when they
- *   were built.
+ *   vectors, so they are consumed directly. `"truncation_threshold"` is
+ *   ignored.
  *
  * A Cholesky decomposition exists only for a positive semi-definite
- * supermatrix. Exact two-electron integrals are positive semi-definite; a
- * tensor that is not — an approximate or synthetic one, or a shifted one such
- * as a BLISS-modified Hamiltonian — is rejected rather than silently
- * factorized into a different tensor.
+ * supermatrix, and the caller guarantees that property. Exact two-electron
+ * integrals have it by construction. Indefiniteness is rejected once it shows
+ * up in the residual diagonal; a negative direction whose diagonal stays below
+ * the truncation threshold is truncated away undetected.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.

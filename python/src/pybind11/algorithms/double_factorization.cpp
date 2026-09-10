@@ -32,21 +32,19 @@ void bind_double_factorization(py::module &m) {
 
   - Dense four-index integrals are reshaped into the supermatrix, given
     chemist permutation symmetry by averaging, and reduced by a pivoted
-    Cholesky decomposition in ``O(naux * norb**4)`` that stops at the
-    numerical rank. Pivoting stops once the largest remaining residual
-    diagonal drops to ``truncation_threshold``, or to a noise floor scaled
-    to the largest supermatrix diagonal, whichever is larger; a threshold
-    below that floor therefore has no further effect.
+    Cholesky decomposition in ``O(naux * norb**4)``. Pivoting stops once the
+    largest remaining residual diagonal drops to ``truncation_threshold``, or
+    to a noise floor scaled to the largest supermatrix diagonal, whichever is
+    larger; a threshold below that floor therefore has no further effect.
   - A :class:`qdk_chemistry.data.CholeskyHamiltonianContainer` already stores
-    such vectors, so they are consumed directly and the dense ``norb**4``
-    tensor is never formed. ``truncation_threshold`` is ignored in that case,
-    because the stored vectors are the first factorization and were already
-    truncated when they were built.
+    such vectors, so they are consumed directly. ``truncation_threshold`` is
+    ignored.
 
   A Cholesky decomposition exists only for a positive semi-definite
-  supermatrix. Exact two-electron integrals are positive semi-definite, but
-  approximate or synthetic ones need not be, and such an input raises
-  ``ValueError`` rather than being silently truncated.
+  supermatrix, and the caller guarantees that property. Exact two-electron
+  integrals have it by construction. Indefiniteness raises ``ValueError`` once
+  it shows up in the residual diagonal; a negative direction whose diagonal
+  stays below ``truncation_threshold`` is truncated away undetected.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`

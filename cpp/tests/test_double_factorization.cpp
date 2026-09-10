@@ -186,8 +186,8 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
 
   // A Cholesky decomposition exists only for a positive semi-definite
   // supermatrix. Stopping at the breakdown would yield an exact factorization
-  // of a *different* tensor and a silently wrong lambda, so an indefinite
-  // input is rejected rather than approximated.
+  // of a *different* tensor and a silently wrong lambda, so indefiniteness is
+  // rejected whenever it shows up in the residual diagonal, as it does here.
   EXPECT_THROW(factorizer->run(
                    make_hamiltonian(4, make_two_body(4, {1.0, -1.0, 1.0}, 5))),
                std::invalid_argument);

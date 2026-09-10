@@ -1088,7 +1088,7 @@ Returns:
     float: Block-encoding normalization.
 
 Raises:
-    RuntimeError: If the adjusted one-body matrix cannot be diagonalized.
+    RuntimeError: If the adjusted one-body matrix is not symmetric, or if it cannot be diagonalized.
 )");
 
   factorized_container.def("get_h1_prime",
