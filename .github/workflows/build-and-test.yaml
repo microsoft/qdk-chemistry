@@ -174,10 +174,6 @@ jobs:
           flex \
           googletest
 
-    - name: Install gcovr
-      if: matrix.enable-coverage
-      run: python -m pip install 'gcovr>=8.4'
-
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
       id: cache-doxygen
@@ -339,9 +335,6 @@ jobs:
       run: |
         set -e
         mkdir -p ../test-results
-
-        BUILD_TEMP=$(find . -type d -path './build/cp*' -print -quit)
-        echo "Found build directory: $BUILD_TEMP"
 
         COV_ARGS=()
         if [ "$ENABLE_COVERAGE" = "true" ]; then

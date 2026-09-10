@@ -63,7 +63,7 @@ coverage = [
   "coverage",
   "pytest",
   "pytest-cov",
-  "gcovr"
+  "gcovr>=8.4"
 ]
 discovery = [
   # azure-identity (via msal) and azure-storage-blob both pull in cryptography, which publishes no win-arm64 wheel
