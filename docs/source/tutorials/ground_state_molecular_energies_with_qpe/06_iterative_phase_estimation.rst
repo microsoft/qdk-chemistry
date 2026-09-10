@@ -50,7 +50,7 @@ An :term:`IQPE` calculation requires four kinds of information:
 Previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
 Those chapters also recorded two classical quantities with distinct roles: the core energy and the selected-space :term:`CASCI` reference.
 When the IQPE problem is prepared, the active-space component of the known CASCI reference configures the evolution time.
-After phase estimation, adding the core energy reconstructs the selected-space molecular total.
+After phase estimation, adding the core energy reconstructs the selected-space total energy.
 The selected-space CASCI reference then validates that reconstructed total.
 
 During IQPE, the compute register stores the encoded active-space wavefunction.
@@ -429,7 +429,7 @@ Negating that angle and dividing by the evolution time maps the measured phase t
 
    E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{-\alpha}{t}.
 
-This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space total energy.
 Finite phase resolution, sampling, and product-formula time evolution all contribute error.
 As :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
 The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
