@@ -45,13 +45,13 @@ class SOSQubitMapper(QubitMapper):
         container: FactorizedHamiltonianContainer,
         mapping: MajoranaMapping,
     ) -> QubitOperator:
-        """Map a validated factorized container to a SOSSA qubit operator."""
-        if np.any(np.asarray(container.get_signs(), dtype=float) < 0.0):
-            raise ValueError(
-                "SOSQubitMapper requires a positive semi-definite factorization: the container "
-                "has negative per-rank signs, so it is not a sum of squares"
-            )
+        """Map a validated factorized container to a SOSSA qubit operator.
 
+        The container no longer carries per-rank signs to check: it stores the two-body
+        tensor as a plain sum of squares, so it is positive semi-definite by construction,
+        and ``DoubleFactorizer`` rejects a supermatrix that admits no Cholesky factor
+        before one can be built.
+        """
         num_orbitals = container.get_num_orbitals()
         num_ranks = container.get_num_ranks()
         num_bases = container.get_num_bases()
