@@ -328,6 +328,8 @@ class TestSparseControlledEvolution:
                 {"qubits": [1], "axes": "Z", "angle": -0.3},
             ],
         ),
+        "identity": (2, [{"qubits": [], "axes": "", "angle": 0.7}]),
+        "empty": (2, []),
     }
 
     @pytest.mark.parametrize("name", list(CASES))

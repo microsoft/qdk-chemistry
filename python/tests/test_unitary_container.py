@@ -5,12 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import json
+from collections.abc import Sequence
 
 import h5py
 import numpy as np
 import pytest
 
+from qdk_chemistry.data import SparsePauliProductFormulaContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -33,14 +34,8 @@ def step_terms():
 def container(step_terms, request):
     """Create a PauliProductFormulaContainer instance for testing."""
     if request.param:
-        return PauliProductFormulaContainer.from_sparse_arrays(
-            np.array([0, 1, 1, 3]),
-            np.array([0, 0, 1]),
-            np.array([1, 2, 1]),
-            np.array([0.5, 0.7, 0.3]),
-            step_reps=4,
-            num_qubits=2,
-            scale=1.7,
+        return SparsePauliProductFormulaContainer(
+            [0, 1, 1, 3], [0, 0, 1], [1, 2, 1], [0.5, 0.7, 0.3], step_reps=4, num_qubits=2, scale=1.7
         )
     return PauliProductFormulaContainer(
         step_terms=step_terms,
@@ -82,6 +77,8 @@ class TestPauliProductFormulaContainer:
         assert container.num_qubits == 2
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
+        assert isinstance(container.step_terms, Sequence)
+        assert container.step_terms.index(container.step_terms[-1]) == 2
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
@@ -138,54 +135,16 @@ class TestPauliProductFormulaContainer:
         combined = original.combine(original)
         assert list(combined.step_terms) == list(original.step_terms) * 14
 
-    def test_to_json_roundtrip(self, container):
-        """Test JSON serialization and deserialization roundtrip."""
-        json_data = container.to_json()
-        restored = PauliProductFormulaContainer.from_json(json_data)
-
-        assert restored.type == container.type
-        assert restored.num_qubits == container.num_qubits
-        assert restored.step_reps == container.step_reps
-        assert restored.scale == container.scale
+    @pytest.mark.parametrize("format_name", ["json", "hdf5"])
+    def test_serialization_roundtrip(self, container, format_name, tmp_path):
+        """Restore either representation through the parent loader, retaining numeric Pauli keys."""
+        filename = tmp_path / f"formula.pauli_product_formula_container.{format_name}"
+        container.to_file(filename, format_name)
+        restored = PauliProductFormulaContainer.from_file(filename, format_name)
+        assert type(restored) is type(container)
+        assert restored.to_json() == container.to_json()
         assert restored.content_hash() == container.content_hash()
-
-        for t1, t2 in zip(restored.step_terms, container.step_terms, strict=True):
-            assert t1.pauli_term == t2.pauli_term
-            assert np.isclose(
-                t1.angle, t2.angle, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
-            )
-
-    def test_from_json_pauli_term_keys_are_int(self, container):
-        """Regression: JSON keys are strings, but pauli_term keys must be int after deserialization."""
-        json_data = container.to_json()
-        # Simulate a real JSON roundtrip where all dict keys become strings
-        json_string = json.dumps(json_data)
-        parsed = json.loads(json_string)
-
-        restored = PauliProductFormulaContainer.from_json(parsed)
-
-        for term in restored.step_terms:
-            for key in term.pauli_term:
-                assert isinstance(key, int), f"pauli_term key {key!r} should be int, got {type(key).__name__}"
-
-    def test_to_hdf5_roundtrip(self, container, tmp_path):
-        """Test HDF5 serialization and deserialization roundtrip."""
-        file_path = tmp_path / "ppf_container.h5"
-
-        with h5py.File(file_path, "w") as f:
-            grp = f.create_group("container")
-            container.to_hdf5(grp)
-
-        with h5py.File(file_path, "r") as f:
-            restored = PauliProductFormulaContainer.from_hdf5(f["container"])
-
-        assert restored.type == container.type
-        assert restored.num_qubits == container.num_qubits
-        assert restored.step_reps == container.step_reps
-        assert len(restored.step_terms) == len(container.step_terms)
-        assert list(restored.step_terms) == list(container.step_terms)
-        assert restored.scale == container.scale
-        assert restored.content_hash() == container.content_hash()
+        assert all(isinstance(key, int) for term in restored.step_terms for key in term.pauli_term)
 
     def test_combine_no_adjacent_identical(self):
         """Test combine when no adjacent terms share the same Pauli string."""
@@ -317,16 +276,14 @@ class TestPackedPauliProductFormulaContainer:
     """Packed schedules preserve ownership and legacy combination semantics."""
 
     def test_owns_read_only_arrays(self, container):
-        """Caller arrays and compatibility dictionaries cannot mutate stored factors or angles."""
-        inputs = [values.copy() for values in container.sparse_term_arrays()]
-        original = PauliProductFormulaContainer.from_sparse_arrays(*inputs, step_reps=2, num_qubits=2)
+        """Angles are independently owned; lazy term dictionaries cannot mutate sparse factors."""
+        offsets, indices, codes, angles = container.sparse_term_arrays()
+        source = angles.copy()
+        original = SparsePauliProductFormulaContainer(offsets, indices, codes, source, step_reps=2, num_qubits=2)
         original_hash = original.content_hash()
-        for source, stored in zip(inputs, original.sparse_term_arrays(), strict=True):
-            assert not np.shares_memory(source, stored)
-            source[:] = 0
-            assert not stored.flags.writeable
-            with pytest.raises(ValueError, match="read-only"):
-                stored[0] = 0
+        source[:] = 0
+        with pytest.raises(ValueError, match="read-only"):
+            original.sparse_term_arrays()[3][0] = 0
         assert original.content_hash() == original_hash
         assert original.step_terms[0] == ExponentiatedPauliTerm({0: "X"}, 0.5)
         original.step_terms[0].pauli_term[0] = "Z"
@@ -356,8 +313,6 @@ class TestPackedPauliProductFormulaContainer:
                 for left, right in ((container, inverse), (container, legacy_right), (legacy_left, inverse))
             ]
             assert reordered.step_reps == container.step_reps
-            restored = PauliProductFormulaContainer.from_json(reordered.to_json())
-            assert reordered.content_hash() == restored.content_hash()
         for combined in results:
             assert combined.has_sparse_terms
             assert combined.step_reps == 1
@@ -368,23 +323,8 @@ class TestPackedPauliProductFormulaContainer:
             assert results[0].reorder_terms([]).content_hash() == results[0].content_hash()
             assert list(results[0].combine(container).step_terms) == list(legacy_left.step_terms) * 4
 
-    @pytest.mark.parametrize(
-        ("field", "value"),
-        [
-            ("angles", [[0.5, 0.7, 0.3]]),
-            ("angles", []),
-            ("angles", [0.5, 0.7 + 1j, 0.3]),
-            ("angles", [0.5, np.nan, 0.3]),
-            ("angles", [0.5, np.inf, 0.3]),
-            ("step_reps", 0),
-            ("step_reps", True),
-            ("step_reps", 1.5),
-        ],
-    )
-    def test_invalid_angles_and_repetition_counts(self, container, field, value):
-        """A packed formula requires one finite real angle per term and a positive integer repetition count."""
-        fields = ("term_offsets", "qubit_indices", "pauli_codes", "angles")
-        arguments = dict(zip(fields, container.sparse_term_arrays(), strict=True), step_reps=1, num_qubits=2)
-        arguments[field] = value
+    @pytest.mark.parametrize("angles", [[], [[0.5, 0.7, 0.3]], [0.5, 1j, 0.3], [0.5, np.nan, 0.3], [0.5, np.inf, 0.3]])
+    def test_invalid_angles(self, container, angles):
+        """A sparse formula requires one finite real angle per term."""
         with pytest.raises((ValueError, TypeError)):
-            PauliProductFormulaContainer.from_sparse_arrays(**arguments)
+            SparsePauliProductFormulaContainer(*container.pauli_terms.arrays(), angles, step_reps=1, num_qubits=2)

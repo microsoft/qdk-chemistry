@@ -35,6 +35,9 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_formula import (
+    SparsePauliProductFormulaContainer,
+)
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["Trotter", "TrotterSettings"]
@@ -267,7 +270,7 @@ class Trotter(TimeEvolutionBuilder):
         terms = csr_matrix(
             (source_codes, source_indices, source_offsets), shape=(hamiltonian.num_terms, hamiltonian.num_qubits)
         )[np.frombuffer(selected, dtype=np.int64)]
-        return PauliProductFormulaContainer.from_sparse_arrays(
+        return SparsePauliProductFormulaContainer(
             terms.indptr,
             terms.indices,
             terms.data,

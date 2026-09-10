@@ -328,18 +328,13 @@ class TestSparseSpinHamiltonians:
         assert isinstance(partition, LayeredPartition)
         assert partition.num_groups == 3
         assert sorted(partition.all_indices()) == list(range(actual.num_terms))
-        offsets, qubits, paulis = actual.sparse_term_arrays()
+        terms = actual.pauli_strings
         for group in partition.groups:
-            axes: set[int] = set()
-            for layer in group:
-                occupied: set[int] = set()
-                for term in layer:
-                    start, end = int(offsets[term]), int(offsets[term + 1])
-                    sites = qubits[start:end].tolist()
-                    assert occupied.isdisjoint(sites)
-                    occupied.update(sites)
-                    axes.update(paulis[start:end].tolist())
+            axes = {axis for layer in group for term in layer for _, axis in terms.factors(term)}
             assert len(axes) == 1
+            for layer in group:
+                sites = [qubit for term in layer for qubit, _ in terms.factors(term)]
+                assert len(sites) == len(set(sites))
 
     @pytest.mark.parametrize("shape", [(1, 2), (2, 1)])
     def test_native_coloring_rejects_rectangular_adjacency(self, shape: tuple[int, int]) -> None:
@@ -371,18 +366,13 @@ class TestSparseSpinHamiltonians:
         side = 200
         graph = LatticeGraph.square(side, side, t=-0.5)
         num_edges = 2 * side * (side - 1)
-        get_attribute = QubitOperator.__getattribute__
-
-        def reject_label_access(operator: QubitOperator, name: str) -> object:
-            """Fail if construction requests the dense-label compatibility view."""
-            if name == "pauli_strings":
-                raise AssertionError("Dense labels requested")
-            return get_attribute(operator, name)
 
         with (
             patch.object(LatticeGraph, "adjacency_matrix", side_effect=AssertionError("Dense adjacency requested")),
             patch.object(model_hamiltonians, "to_pair_param", side_effect=AssertionError("Scalar matrix expanded")),
-            patch.object(QubitOperator, "__getattribute__", new=reject_label_access),
+            patch(
+                "qdk_chemistry.data.SparsePauliTerms.__getitem__", side_effect=AssertionError("Dense labels requested")
+            ),
         ):
             actual = create_heisenberg_hamiltonian(
                 graph, 1.0, -2.0, 3.0, hx=1.0, include_term_groups=include_term_groups

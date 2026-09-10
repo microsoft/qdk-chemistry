@@ -190,6 +190,8 @@ class TestSparseUncontrolledEvolution:
                 {"qubits": [1], "axes": "Z", "angle": -0.3},
             ],
         ),
+        "identity": (2, [{"qubits": [], "axes": "", "angle": 0.7}]),
+        "empty": (2, []),
     }
 
     @pytest.mark.parametrize("name", list(CASES))
@@ -199,6 +201,10 @@ class TestSparseUncontrolledEvolution:
         num_qubits, terms = self.CASES[name]
         got = dense_matrix(_sparse_op(terms, repetitions=repetitions), num_qubits)
         want = dense_matrix(_dense_op(terms, num_qubits, repetitions=repetitions), num_qubits)
+        if not any(term["qubits"] for term in terms):
+            np.testing.assert_allclose(
+                want, np.exp(-1j * repetitions * sum(t["angle"] for t in terms)) * np.eye(4), atol=_TOL
+            )
         assert np.max(np.abs(got - want)) < _TOL
 
     @pytest.mark.parametrize(
@@ -237,21 +243,6 @@ def packed_mapper(request):
     return request.param()
 
 
-@pytest.fixture(scope="module")
-def packed_controlled_on_register():
-    """Adapt the production single-control callable to the matrix helper."""
-    context = get_qsharp_context()
-    context.eval(
-        """
-        function PackedMapperOnRegister(op : ((Qubit, Qubit[]) => Unit is Adj + Ctl))
-            : (Qubit[] => Unit is Adj + Ctl) {
-            qs => op(qs[0], qs[1...])
-        }
-        """
-    )
-    return context.code.PackedMapperOnRegister
-
-
 class TestPackedPauliMappers:
     """Packed mapping preserves the unitary and stays compact in both control modes."""
 
@@ -267,6 +258,8 @@ class TestPackedPauliMappers:
         assert counts[0]["rotationCount"] > 0
         assert counts[1]["rotationCount"] == 17 * counts[0]["rotationCount"]
         assert counts[1]["numQubits"] == counts[0]["numQubits"]
+        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
+        assert "define" in str(circuit.get_qir())
 
     def test_payload_stays_flat_and_repetitions_stay_symbolic(self, packed_mapper, monkeypatch):
         """Large registers and repetition counts must not expand term dictionaries or labels."""
@@ -302,37 +295,6 @@ class TestPackedPauliMappers:
             assert factory["systems"] == list(reversed(range(80_800)))
         else:
             assert circuit.num_qubits == 80_800
-
-    @pytest.mark.parametrize(
-        ("offsets", "indices", "codes", "angles"),
-        [
-            pytest.param([0, 1, 3, 3, 4], [0, 0, 1, 1], [1, 3, 2, 3], [0.2, -0.45, 0.7, 0.1], id="mixed"),
-            pytest.param([0, 0], [], [], [0.7], id="identity"),
-            pytest.param([0], [], [], [], id="empty"),
-        ],
-    )
-    def test_packed_matches_legacy_including_global_phase(
-        self, offsets, indices, codes, angles, packed_mapper, packed_controlled_on_register
-    ):
-        """Preserve mixed terms, empty formulas, controlled identity phases, and QIR lowering."""
-        container = PauliProductFormulaContainer.from_sparse_arrays(
-            offsets, indices, codes, angles, step_reps=3, num_qubits=2
-        )
-        legacy = PauliProductFormulaContainer(list(container.step_terms), 3, 2)
-        packed_circuit = packed_mapper.run(UnitaryRepresentation(container))
-        legacy_circuit = PauliSequenceMapper().run(UnitaryRepresentation(legacy))
-        expected = dense_matrix(legacy_circuit._qsharp_op, 2)
-        if not indices:
-            np.testing.assert_allclose(expected, np.exp(-3j * sum(angles)) * np.eye(4), atol=_TOL)
-        if isinstance(packed_mapper, ControlledPauliSequenceMapper):
-            actual = dense_matrix(packed_controlled_on_register(packed_circuit._qsharp_op), 3)
-            expected = scipy.linalg.block_diag(np.eye(4), expected)
-        else:
-            actual = dense_matrix(packed_circuit._qsharp_op, 2)
-        np.testing.assert_allclose(actual, expected, atol=_TOL)
-        if indices:
-            assert isinstance(packed_circuit.get_qsharp_circuit(), QdkCircuitType)
-            assert "define" in str(packed_circuit.get_qir())
 
     def test_qsharp_rejects_malformed_packed_payload(self):
         """The Q# entry point validates offsets even when Python construction is bypassed."""

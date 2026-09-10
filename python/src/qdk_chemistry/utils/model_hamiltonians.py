@@ -22,7 +22,6 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_site_param,
 )
 from qdk_chemistry.data import LatticeGraph, LayeredPartition, QubitOperator
-from qdk_chemistry.data._sparse_pauli import _PAULI_CODES
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -99,14 +98,14 @@ def _build_sparse_hamiltonian(
             pair_values = matrix[edges.row, edges.col]
         # Cast before multiplying, preserving Python-double arithmetic and its nonfinite behavior.
         with np.errstate(over="ignore", under="ignore", invalid="ignore"):
-            edge_couplings.append((_PAULI_CODES[axis], np.multiply(pair_values, edges.data, dtype=float)))
+            edge_couplings.append(("IXYZ".index(axis), np.multiply(pair_values, edges.data, dtype=float)))
 
     field_values: list[tuple[int, np.ndarray]] = []
     for axis, field in fields:
         value = float(field) if isinstance(field, int | float | np.integer | np.floating) else field
         if isinstance(value, float) and value == 0.0:
             continue
-        field_values.append((_PAULI_CODES[axis], to_site_param(value, graph, f"h{axis.lower()}")))
+        field_values.append(("IXYZ".index(axis), to_site_param(value, graph, f"h{axis.lower()}")))
 
     if coloring is None:
         for index, (i, j) in enumerate(zip(edges.row, edges.col, strict=True)):

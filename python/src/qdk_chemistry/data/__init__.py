@@ -129,6 +129,10 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQub
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_formula import (
+    SparsePauliProductFormulaContainer,
+    SparsePauliTerms,
+)
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -186,6 +190,8 @@ __all__ = [
     "SettingsAreLockedError",
     "Shell",
     "SparseHamiltonianContainer",
+    "SparsePauliProductFormulaContainer",
+    "SparsePauliTerms",
     "SpinChannel",
     "StabilityResult",
     "StateVectorContainer",

@@ -295,7 +295,7 @@ Sparse storage
 ~~~~~~~~~~~~~~
 
 Spin-model builders iterate sparse adjacency edges and retain scalar couplings without expanding them into dense pair matrices.
-The returned :class:`~qdk_chemistry.data.QubitOperator` stores only non-identity Pauli factors in packed arrays, for grouped and ungrouped construction alike.
+The returned :class:`~qdk_chemistry.data.QubitOperator` uses :class:`~qdk_chemistry.data.SparsePauliTerms` to store only non-identity factors, for grouped and ungrouped construction alike.
 The :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` and :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_arrays` constructors also make this representation available for arbitrary operators.
 Use :meth:`~qdk_chemistry.data.QubitOperator.iter_sparse_terms` or :meth:`~qdk_chemistry.data.QubitOperator.sparse_term_arrays` to inspect it without constructing full-register labels.
 The ``pauli_strings`` compatibility view materializes labels on access; dense matrix conversion remains appropriate only for small systems.
