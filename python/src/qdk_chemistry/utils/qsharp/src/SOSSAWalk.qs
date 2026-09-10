@@ -494,10 +494,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             CNOT(sysRegDown[j], sysRegDown[j + 1]);
 
             // DQ rotations: x_o in [0, N)
-            // No extra control on sysRegDown[j+1]: the CNOT sandwich already
-            // restricts the 1-excitation subspace, and the Givens rotation must
-            // act on ALL sectors (0, 1, 2 excitations) so that its adjoint
-            // properly uncomputes after MajoranaOp changes the particle number.
+            // sysRegDown[j+1] joins the controls: inside the CNOT sandwich only the
+            // singly-occupied states carry it, so the rotation stays in the 1-excitation
+            // subspace. Ungated, the chain applies -2*theta instead of the theta of Eq. 93.
             for a in 0..N - 1 {
                 let angle = params.OneBodyRotationAngles[a][j];
                 ApplyControlledOnInt(
