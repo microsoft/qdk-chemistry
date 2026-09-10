@@ -60,17 +60,17 @@ class ExponentiatedPauliTerm:
     :math:`m` rotations, which pays off once the batch is larger than roughly
     :data:`MIN_USEFUL_BATCH` terms.
 
-    Members must be consecutive, share an angle, act on pairwise disjoint qubits, and
-    need control; the emitting builder is responsible for forming batches that way,
-    and the builder's tests assert it.
+    Members must be consecutive, share an angle and ``needs_control`` value, and act
+    on pairwise disjoint qubits; the emitting builder is responsible for forming
+    batches that way, and the builder's tests assert it.
     """
 
 
 #: Batch size below which Hamming weight phasing is not worth its arithmetic.
 #:
 #: Measured with the resource estimator on controlled equal-angle batches: a batch of
-#: ``m`` terms costs ``3*ceil(log2(m+1)) + 1`` rotations and ``2*(m - w(m))`` CCZ,
-#: against ``2m`` rotations unbatched. At eight terms that is 13 rotations and 14 CCZ
+#: ``m`` terms costs ``3*ceil(log2(m+1)) + 1`` rotations and ``m - w(m)`` CCZ,
+#: against ``2m`` rotations unbatched. At eight terms that is 13 rotations and 7 CCZ
 #: versus 16 rotations, roughly break-even once a CCZ is counted at four T and a
 #: rotation at several tens; below that the arithmetic costs more than the rotations
 #: it removes.
@@ -88,9 +88,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
     * :math:`\theta_j` is the rotation angle for that term
     * :math:`\prod_{j \in \pi}` is a permutation defining the multiplication order
 
-    The full time-evolution unitary is:
-    :math:`U(t) \approx \left[ U_{\mathrm{step}}\!\left(\tfrac{t}{r}\right) \right]^{r}`,
-    where ``step_reps = r`` is the number of repeated steps.
+    The execution order is a one-time prefix, the repeated step, and a one-time suffix:
+    :math:`U_{\mathrm{before}}`, then
+    :math:`\left[U_{\mathrm{step}}\!\left(\tfrac{t}{r}\right)\right]^r`, then
+    :math:`U_{\mathrm{after}}`, where ``step_reps = r``. The boundary term lists are
+    empty by default, recovering an ordinary repeated product formula.
     """
 
     @staticmethod
@@ -104,7 +106,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.2.1"
+    _serialization_version = "0.3.0"
 
     def __init__(
         self,
@@ -112,6 +114,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
+        before_repeated_terms: list[ExponentiatedPauliTerm] | None = None,
+        after_repeated_terms: list[ExponentiatedPauliTerm] | None = None,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
@@ -120,6 +124,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
+            before_repeated_terms: Terms applied once before the repeated step.
+            after_repeated_terms: Terms applied once after the repeated step.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
@@ -132,7 +138,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
+        self.before_repeated_terms = [] if before_repeated_terms is None else before_repeated_terms
         self.step_terms = step_terms
+        self.after_repeated_terms = [] if after_repeated_terms is None else after_repeated_terms
         self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
@@ -170,15 +178,21 @@ class PauliProductFormulaContainer(UnitaryContainer):
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "pauli_product_formula")
-        _hash_uint(h, len(self.step_terms))
-        for term in self.step_terms:
-            _hash_uint(h, len(term.pauli_term))
-            for qubit_idx in sorted(term.pauli_term.keys()):
-                _hash_int(h, qubit_idx)
-                _hash_str(h, term.pauli_term[qubit_idx])
-            _hash_float(h, term.angle)
-            _hash_uint(h, int(term.needs_control))
-            _hash_uint(h, term.batch)
+        for section_name, terms in (
+            ("before_repeated", self.before_repeated_terms),
+            ("step", self.step_terms),
+            ("after_repeated", self.after_repeated_terms),
+        ):
+            _hash_str(h, section_name)
+            _hash_uint(h, len(terms))
+            for term in terms:
+                _hash_uint(h, len(term.pauli_term))
+                for qubit_idx in sorted(term.pauli_term.keys()):
+                    _hash_int(h, qubit_idx)
+                    _hash_str(h, term.pauli_term[qubit_idx])
+                _hash_float(h, term.angle)
+                _hash_uint(h, int(term.needs_control))
+                _hash_uint(h, term.batch)
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
         _hash_float(h, self.scale)
@@ -235,6 +249,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
             scale=self.scale,
+            before_repeated_terms=self.before_repeated_terms,
+            after_repeated_terms=self.after_repeated_terms,
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
@@ -278,7 +294,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         """
         for label, container in (("self", self), ("other_container", other_container)):
-            for term in container.step_terms:
+            all_terms = container.before_repeated_terms + container.step_terms + container.after_repeated_terms
+            for term in all_terms:
                 if term.batch or not term.needs_control:
                     raise ValueError(
                         f"Cannot combine: {label} holds a term with batch={term.batch} and "
@@ -302,12 +319,14 @@ class PauliProductFormulaContainer(UnitaryContainer):
             )
 
         merged: list[ExponentiatedPauliTerm] = []
-        for step_terms, step_reps in (
-            (self.step_terms, self.step_reps),
-            (other_container.step_terms, other_container.step_reps),
-        ):
-            for _ in range(step_reps):
-                for term in step_terms:
+        for container in (self, other_container):
+            sections = (
+                (container.before_repeated_terms, 1),
+                (container.step_terms, container.step_reps),
+                (container.after_repeated_terms, 1),
+            )
+            for terms, repetitions in sections:
+                for term in terms * repetitions:
                     if merged and merged[-1].pauli_term == term.pauli_term:
                         new_angle = merged[-1].angle + term.angle
                         if abs(new_angle) > atol:
@@ -330,17 +349,23 @@ class PauliProductFormulaContainer(UnitaryContainer):
             dict: Dictionary representation of the PauliProductFormulaContainer
 
         """
-        data: dict[str, Any] = {
-            "container_type": self.type,
-            "step_terms": [
+
+        def encode_terms(terms: list[ExponentiatedPauliTerm]) -> list[dict[str, Any]]:
+            return [
                 {
                     "pauli_term": {str(k): v for k, v in term.pauli_term.items()},
                     "angle": term.angle,
                     "needs_control": term.needs_control,
                     "batch": term.batch,
                 }
-                for term in self.step_terms
-            ],
+                for term in terms
+            ]
+
+        data: dict[str, Any] = {
+            "container_type": self.type,
+            "before_repeated_terms": encode_terms(self.before_repeated_terms),
+            "step_terms": encode_terms(self.step_terms),
+            "after_repeated_terms": encode_terms(self.after_repeated_terms),
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
             "scale": self.scale,
@@ -360,15 +385,20 @@ class PauliProductFormulaContainer(UnitaryContainer):
         group.attrs["num_qubits"] = self.num_qubits
         group.attrs["scale"] = self.scale
 
-        step_terms_group = group.create_group("step_terms")
-        for i, term in enumerate(self.step_terms):
-            term_group = step_terms_group.create_group(f"term_{i}")
-            term_group.attrs["angle"] = term.angle
-            term_group.attrs["needs_control"] = term.needs_control
-            term_group.attrs["batch"] = term.batch
-            pauli_term_group = term_group.create_group("pauli_term")
-            for qubit_index, pauli_operator in term.pauli_term.items():
-                pauli_term_group.attrs[str(qubit_index)] = pauli_operator
+        for section_name, terms in (
+            ("before_repeated_terms", self.before_repeated_terms),
+            ("step_terms", self.step_terms),
+            ("after_repeated_terms", self.after_repeated_terms),
+        ):
+            section_group = group.create_group(section_name)
+            for i, term in enumerate(terms):
+                term_group = section_group.create_group(f"term_{i}")
+                term_group.attrs["angle"] = term.angle
+                term_group.attrs["needs_control"] = term.needs_control
+                term_group.attrs["batch"] = term.batch
+                pauli_term_group = term_group.create_group("pauli_term")
+                for qubit_index, pauli_operator in term.pauli_term.items():
+                    pauli_term_group.attrs[str(qubit_index)] = pauli_operator
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "PauliProductFormulaContainer":
@@ -381,33 +411,46 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        cls._validate_json_version(cls._serialization_version, json_data)
-        step_terms = []
-        for i, term_data in enumerate(json_data["step_terms"]):
-            pauli_term: dict[int, str] = {}
-            for k, v in term_data["pauli_term"].items():
-                if not isinstance(k, str):
-                    raise TypeError(f"step_terms[{i}].pauli_term: expected str key, got {type(k).__name__} ({k!r})")
-                try:
-                    qubit_index = int(k)
-                except ValueError as exc:
-                    raise ValueError(
-                        f"step_terms[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
-                    ) from exc
-                if str(qubit_index) != k:
-                    raise ValueError(
-                        f"step_terms[{i}].pauli_term: key {k!r} is not a canonical integer "
-                        f"(expected {str(qubit_index)!r})"
+        version = str(json_data.get("version", ""))
+        if version.startswith("0.2."):
+            cls._validate_json_version("0.2.1", json_data)
+        else:
+            cls._validate_json_version(cls._serialization_version, json_data)
+
+        def decode_terms(section_name: str) -> list[ExponentiatedPauliTerm]:
+            terms: list[ExponentiatedPauliTerm] = []
+            for i, term_data in enumerate(json_data.get(section_name, [])):
+                pauli_term: dict[int, str] = {}
+                for k, v in term_data["pauli_term"].items():
+                    if not isinstance(k, str):
+                        raise TypeError(
+                            f"{section_name}[{i}].pauli_term: expected str key, got {type(k).__name__} ({k!r})"
+                        )
+                    try:
+                        qubit_index = int(k)
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"{section_name}[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
+                        ) from exc
+                    if str(qubit_index) != k:
+                        raise ValueError(
+                            f"{section_name}[{i}].pauli_term: key {k!r} is not a canonical integer "
+                            f"(expected {str(qubit_index)!r})"
+                        )
+                    pauli_term[qubit_index] = v
+                terms.append(
+                    ExponentiatedPauliTerm(
+                        pauli_term=pauli_term,
+                        angle=term_data["angle"],
+                        needs_control=bool(term_data.get("needs_control", True)),
+                        batch=int(term_data.get("batch", 0)),
                     )
-                pauli_term[qubit_index] = v
-            step_terms.append(
-                ExponentiatedPauliTerm(
-                    pauli_term=pauli_term,
-                    angle=term_data["angle"],
-                    needs_control=bool(term_data.get("needs_control", True)),
-                    batch=int(term_data.get("batch", 0)),
                 )
-            )
+            return terms
+
+        before_repeated_terms = decode_terms("before_repeated_terms")
+        step_terms = decode_terms("step_terms")
+        after_repeated_terms = decode_terms("after_repeated_terms")
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
         return cls(
@@ -415,6 +458,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps=step_reps,
             num_qubits=num_qubits,
             scale=json_data.get("scale", 1.0),
+            before_repeated_terms=before_repeated_terms,
+            after_repeated_terms=after_repeated_terms,
         )
 
     @classmethod
@@ -428,38 +473,49 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        cls._validate_hdf5_version(cls._serialization_version, group)
+        version = str(group.attrs.get("version", ""))
+        if version.startswith("0.2."):
+            cls._validate_hdf5_version("0.2.1", group)
+        else:
+            cls._validate_hdf5_version(cls._serialization_version, group)
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]
 
-        step_terms: list[ExponentiatedPauliTerm] = []
-        step_terms_group = group["step_terms"]
-        # Indexed explicitly rather than by iterating the group: HDF5 lists members in
-        # alphabetical order, which puts "term_10" before "term_2", and a product
-        # formula's factor order is part of what it means.
-        for i in range(len(step_terms_group)):
-            term_group = step_terms_group[f"term_{i}"]
-            angle = term_group.attrs["angle"]
-            pauli_term: dict[int, str] = {}
-            pauli_term_group = term_group["pauli_term"]
-            for qubit_index_str in pauli_term_group.attrs:
-                qubit_index = int(qubit_index_str)
-                pauli_operator = pauli_term_group.attrs[qubit_index_str]
-                pauli_term[qubit_index] = pauli_operator
-            step_terms.append(
-                ExponentiatedPauliTerm(
-                    pauli_term=pauli_term,
-                    angle=angle,
-                    needs_control=bool(term_group.attrs.get("needs_control", True)),
-                    batch=int(term_group.attrs.get("batch", 0)),
+        def decode_terms(section_name: str) -> list[ExponentiatedPauliTerm]:
+            if section_name not in group:
+                return []
+            terms: list[ExponentiatedPauliTerm] = []
+            section_group = group[section_name]
+            # Indexed explicitly rather than by iterating the group: HDF5 lists members in
+            # alphabetical order, which puts "term_10" before "term_2".
+            for i in range(len(section_group)):
+                term_group = section_group[f"term_{i}"]
+                pauli_term: dict[int, str] = {}
+                pauli_term_group = term_group["pauli_term"]
+                for qubit_index_str in pauli_term_group.attrs:
+                    qubit_index = int(qubit_index_str)
+                    pauli_term[qubit_index] = pauli_term_group.attrs[qubit_index_str]
+                terms.append(
+                    ExponentiatedPauliTerm(
+                        pauli_term=pauli_term,
+                        angle=term_group.attrs["angle"],
+                        needs_control=bool(term_group.attrs.get("needs_control", True)),
+                        batch=int(term_group.attrs.get("batch", 0)),
+                    )
                 )
-            )
+            return terms
+
+        before_repeated_terms = decode_terms("before_repeated_terms")
+        step_terms = decode_terms("step_terms")
+        after_repeated_terms = decode_terms("after_repeated_terms")
 
         return cls(
             step_terms=step_terms,
             step_reps=step_reps,
             num_qubits=num_qubits,
             scale=float(group.attrs.get("scale", 1.0)),
+            before_repeated_terms=before_repeated_terms,
+            after_repeated_terms=after_repeated_terms,
         )
 
     def get_summary(self) -> str:
@@ -471,6 +527,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """
         lines = ["Pauli Product Formula Container"]
         lines.append(f"  Number of qubits: {self.num_qubits}")
+        lines.append(f"  Number of terms before repetitions: {len(self.before_repeated_terms)}")
         lines.append(f"  Number of step terms: {len(self.step_terms)}")
         lines.append(f"  Step repetitions: {self.step_reps}")
+        lines.append(f"  Number of terms after repetitions: {len(self.after_repeated_terms)}")
         return "\n".join(lines)

@@ -40,23 +40,33 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_
 from .test_helpers import dense_matrix
 
 batch_equal_angles = PlaquetteTrotter._batch_equal_angles
-plaquette_error_constant = PlaquetteTrotter._plaquette_error_constant
-plaquette_parts = PlaquetteTrotter._plaquette_parts
 plaquette_sections = PlaquetteTrotter._plaquette_sections
-plaquette_trotter_steps = PlaquetteTrotter._plaquette_trotter_steps
+
+
+def _single_spin_hop_layer(
+    section: list[tuple[int, ...]], num_sites: int, hopping: float, time: float
+) -> list[ExponentiatedPauliTerm]:
+    """Return the first spin block from a hopping layer built for both spins."""
+    terms = PlaquetteTrotter()._hop_layer(
+        section,
+        num_sites=num_sites,
+        hopping=hopping,
+        time=time,
+        first_batch=1,
+    )
+    return [term for term in terms if all(qubit < num_sites for qubit in term.pauli_term)]
 
 
 def _plaquette_terms(sites: tuple[int, ...], hopping: float, time: float) -> list[ExponentiatedPauliTerm]:
-    """Flatten one plaquette's structural blocks for test assertions."""
-    head, middle, tail = plaquette_parts(sites, hopping, time)
-    return head + middle + tail
+    """Return one plaquette's factors through the hopping-layer implementation."""
+    return _single_spin_hop_layer([sites], max(sites) + 1, hopping, time)
 
 
 #: Name under which the plaquette builder is registered.
 _PLAQUETTE_ALGORITHM = "plaquette"
 
 
-def _hubbard_operator(width: int, height: int, interaction: float):
+def _hubbard_operator(width: int, height: int, interaction: float, *, hopping: float = 1.0):
     """Jordan-Wigner image of the periodic Hubbard model on a ``width`` by ``height`` lattice.
 
     Both directions wrap. At 2x2 the two wrap directions land on the same pair of
@@ -67,8 +77,30 @@ def _hubbard_operator(width: int, height: int, interaction: float):
     """
     lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
     return create("qubit_mapper").run(
-        create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=interaction),
+        create_hubbard_hamiltonian(lattice, epsilon=0.0, t=hopping, U=interaction),
         mapping=MajoranaMapping.jordan_wigner(2 * width * height),
+    )
+
+
+def _shifted_hubbard_operator(side: int, interaction: float = 4.0) -> QubitOperator:
+    r"""Return Campbell's particle-hole shifted Hamiltonian without its known scalar offset.
+
+    Setting the one-body site energy to ``-U/2`` turns
+    :math:`U n_{i\uparrow}n_{i\downarrow}` into :math:`(U/4)Z_{i\uparrow}Z_{i\downarrow}-U/4`.
+    The scalar is removed because it is restored classically when converting the
+    phase-estimation result back to the unshifted fixed-particle-number energy.
+    """
+    lattice = LatticeGraph.square(side, side, periodic_x=True, periodic_y=True)
+    mapped = create("qubit_mapper").run(
+        create_hubbard_hamiltonian(lattice, epsilon=-interaction / 2.0, t=1.0, U=interaction),
+        mapping=MajoranaMapping.jordan_wigner(2 * side * side),
+    )
+    keep = [index for index, label in enumerate(mapped.pauli_strings) if set(label) != {"I"}]
+    return QubitOperator(
+        pauli_strings=[mapped.pauli_strings[index] for index in keep],
+        coefficients=mapped.coefficients[keep],
+        encoding=mapped.encoding,
+        fermion_mode_order=mapped.fermion_mode_order,
     )
 
 
@@ -81,6 +113,62 @@ def _plaquette_container(side: int, *, time: float = 0.05, interaction: float = 
     """One second-order plaquette step of the periodic ``side`` x ``side`` Hubbard model."""
     operator = _hubbard_operator(side, side, interaction)
     return _plaquette_builder(side, time=time).run(operator).get_container()
+
+
+def _bound_parameter_operator(num_sites: int, hopping: float, interaction: float) -> QubitOperator:
+    """Minimal operator carrying the Hubbard parameters read by the bound."""
+    num_qubits = 2 * num_sites
+
+    def label(terms: dict[int, str]) -> str:
+        axes = ["I"] * num_qubits
+        for qubit, axis in terms.items():
+            axes[-qubit - 1] = axis
+        return "".join(axes)
+
+    return QubitOperator(
+        pauli_strings=[
+            label({0: "X", 1: "X"}),
+            label({0: "Y", 1: "Y"}),
+            label({num_sites: "X", num_sites + 1: "X"}),
+            label({num_sites: "Y", num_sites + 1: "Y"}),
+            label({0: "Z", num_sites: "Z"}),
+        ],
+        coefficients=np.array([-hopping / 2.0, -hopping / 2.0, -hopping / 2.0, -hopping / 2.0, interaction / 4.0]),
+    )
+
+
+def _resolved_plaquette_steps(
+    time: float,
+    target_accuracy: float,
+    num_divisions: int = 1,
+    *,
+    side: int = 8,
+    hopping: float = 1.0,
+    interaction: float = 4.0,
+) -> int:
+    """Resolve the step count from representative uniform Hubbard parameters."""
+    builder = PlaquetteTrotter(
+        lattice_width=side,
+        lattice_height=side,
+        time=time,
+        target_accuracy=target_accuracy,
+        num_divisions=num_divisions,
+    )
+    operator = _bound_parameter_operator(side * side, hopping, interaction)
+    return builder._resolve_num_divisions(operator, time)
+
+
+def _inferred_plaquette_error_constant(side: int, hopping: float = 1.0, interaction: float = 4.0) -> float:
+    """Recover W from the resolver with negligible integer-rounding error."""
+    probe_time = 1e9
+    divisions = _resolved_plaquette_steps(
+        time=probe_time,
+        target_accuracy=1.0,
+        side=side,
+        hopping=hopping,
+        interaction=interaction,
+    )
+    return (divisions / probe_time) ** 2
 
 
 _PAULI = {
@@ -185,7 +273,8 @@ class TestPlaquetteTerms:
 
     @pytest.mark.parametrize("sites", [(0, 1, 2, 3), (0, 1, 4, 3), (1, 2, 4, 5), (4, 3, 0, 1)])
     @pytest.mark.parametrize("time", [0.05, 0.4, 1.3])
-    def test_reproduces_exact_evolution(self, sites, time):
+    @pytest.mark.parametrize("hopping", [1.0, -1.0])
+    def test_reproduces_exact_evolution(self, sites, time, hopping):
         """The emitted terms equal ``exp(-i t H)`` regardless of the cycle's orientation.
 
         The sign conventions here are subtle -- four of eight plausible ones are wrong --
@@ -198,8 +287,8 @@ class TestPlaquetteTerms:
         ascending-only cycle never reaches.
         """
         num_modes = 6
-        terms = _plaquette_terms(sites, hopping=1.0, time=time)
-        expected = scipy.linalg.expm(-1j * time * _cycle_hamiltonian(sites, num_modes))
+        terms = _plaquette_terms(sites, hopping=hopping, time=time)
+        expected = scipy.linalg.expm(-1j * time * hopping * _cycle_hamiltonian(sites, num_modes))
         assert np.allclose(_unitary_from_terms(terms, num_modes), expected, atol=1e-10)
 
     def test_only_two_terms_need_rotation_synthesis(self):
@@ -260,35 +349,22 @@ class TestPlaquetteTrotter:
         with pytest.raises(ValueError, match="order 2 only"):
             builder.run(_hubbard_operator(4, 4, 8.0))
 
-    def test_emits_campbells_factor_ordering(self):
-        """The step must be the ordering W_PLAQ is derived for, not merely some Strang form.
+    def test_decomposes_the_repeated_body_into_one_interaction_and_three_tile_applications(self):
+        """The decomposition itself must emit Campbell's four-factor Eq. (E2) body."""
+        side = 4
+        time = 0.05
+        operator = _shifted_hubbard_operator(side)
+        builder = _plaquette_builder(side, time=time)
+        body = builder._decompose_trotter_step(operator, time=time)
+        container = builder.run(operator).get_container()
 
-        Campbell's Eq. (D2) (arXiv:2012.09238v4, App. D) halves the interaction across
-        the two ends and runs the second hopping section at full time in the middle. Any
-        symmetric ordering is a valid second-order formula, so a wrong one stays
-        *correct* and only invalidates the error constant -- which no convergence test
-        would catch.
-        """
-        container = _plaquette_container(4)
-        # The interaction terms are the only ones acting on two Z's of the same site pair;
-        # the hopping network carries an X or a Y on every factor.
-        kinds = [
-            "diagonal" if set(term.pauli_term.values()) <= {"Z"} else "hopping"
-            for term in container.step_terms
-            if term.pauli_term
-        ]
-        assert kinds[0] == "diagonal", "the step must open on the halved interaction layer"
-        assert kinds[-1] == "diagonal", "the step must close on the halved interaction layer"
-
-        interaction = [
-            term.angle
-            for term in container.step_terms
-            if term.pauli_term and set(term.pauli_term.values()) <= {"Z"} and len(term.pauli_term) == 2
-        ]
-        half = len(interaction) // 2
-        assert np.allclose(sorted(interaction[:half]), sorted(interaction[half:])), (
-            "the two interaction half-layers must carry equal angles"
-        )
+        assert body == container.step_terms
+        interaction = [term for term in body if term.pauli_term and set(term.pauli_term.values()) <= {"Z"}]
+        hopping = [term for term in body if term.pauli_term and not set(term.pauli_term.values()) <= {"Z"}]
+        assert body[-len(interaction) :] == interaction
+        assert len(interaction) == side * side
+        assert sum(not term.needs_control for term in hopping) == 3 * (side * side // 2) * 8
+        assert sum(term.needs_control for term in hopping) == 3 * (side * side // 2) * 2
 
     def test_uses_four_times_fewer_rotations_on_the_hopping(self):
         """The whole point: four bonds cost two synthesized rotations, not eight."""
@@ -325,6 +401,25 @@ class TestPlaquetteTrotter:
         with pytest.raises(ValueError, match="uniform hopping"):
             _plaquette_builder(side).run(detuned)
 
+    def test_preserves_the_hopping_sign(self):
+        """The plaquette phases reverse when the Hamiltonian's hopping reverses."""
+        side = 2
+        time = 0.13
+        positive = (
+            _plaquette_builder(side, time=time)
+            .run(_hubbard_operator(side, side, interaction=0.0, hopping=1.0))
+            .get_container()
+        )
+        negative = (
+            _plaquette_builder(side, time=time)
+            .run(_hubbard_operator(side, side, interaction=0.0, hopping=-1.0))
+            .get_container()
+        )
+
+        positive_phases = [term.angle for term in positive.step_terms if term.needs_control]
+        negative_phases = [term.angle for term in negative.step_terms if term.needs_control]
+        assert negative_phases == pytest.approx([-angle for angle in positive_phases])
+
     def test_rejects_interleaved_mode_ordering(self):
         """The tiling reads the register as spin-blocked; interleaved would mis-address sites."""
         side = 4
@@ -356,7 +451,7 @@ class TestPlaquetteTrotter:
             encoding=operator.encoding,
             fermion_mode_order=operator.fermion_mode_order,
         )
-        with pytest.raises(ValueError, match="does not match a periodic|different hopping graphs"):
+        with pytest.raises(ValueError, match=r"does not match a periodic|different hopping graphs"):
             _plaquette_builder(side).run(punctured)
 
     def test_rejects_spin_flip_hopping(self):
@@ -369,6 +464,65 @@ class TestPlaquetteTrotter:
         operator = QubitOperator(pauli_strings=["".join(reversed(label))], coefficients=np.array([0.5]))
         with pytest.raises(ValueError, match="spin-up and spin-down"):
             _plaquette_builder(side).run(operator)
+
+    def test_repeated_formula_has_one_interaction_and_three_hopping_sections_per_body(self):
+        """Campbell E2 hoists the interaction half-layers outside the repeated bulk body."""
+        side = 4
+        operator = _hubbard_operator(side, side, interaction=8.0)
+        container = (
+            PlaquetteTrotter(
+                lattice_width=side,
+                lattice_height=side,
+                time=0.15,
+                num_divisions=3,
+            )
+            .run(operator)
+            .get_container()
+        )
+
+        assert container.step_reps == 3
+        assert container.before_repeated_terms
+        assert len(container.after_repeated_terms) == len(container.before_repeated_terms)
+        for before, after in zip(
+            container.before_repeated_terms, reversed(container.after_repeated_terms), strict=True
+        ):
+            assert before.pauli_term == after.pauli_term
+            assert before.angle == pytest.approx(-after.angle)
+            assert not before.needs_control
+            assert not after.needs_control
+
+        interaction_count = len(container.before_repeated_terms)
+        full_interaction = container.step_terms[-interaction_count:]
+        for half, full in zip(container.before_repeated_terms, full_interaction, strict=True):
+            assert full.pauli_term == half.pauli_term
+            assert full.angle == pytest.approx(2.0 * half.angle)
+            assert full.needs_control
+
+        hopping = container.step_terms[:-interaction_count]
+        fixed_factors = [term for term in hopping if not term.needs_control]
+        arbitrary_factors = [term for term in hopping if term.needs_control and term.pauli_term]
+        assert len(fixed_factors) == 3 * (side * side // 2) * 8
+        assert len(arbitrary_factors) == 3 * (side * side // 2) * 2
+
+    def test_hopping_only_repetitions_keep_the_whole_step(self):
+        """The E2 rewrite is unnecessary when the interaction layer is empty."""
+        side = 2
+        operator = _hubbard_operator(side, side, interaction=0.0)
+        container = (
+            PlaquetteTrotter(
+                lattice_width=side,
+                lattice_height=side,
+                time=0.15,
+                num_divisions=2,
+            )
+            .run(operator)
+            .get_container()
+        )
+
+        assert container.step_reps == 2
+        assert container.step_terms
+        assert container.before_repeated_terms == []
+        assert container.after_repeated_terms == []
 
 
 class TestControlExemption:
@@ -568,7 +722,7 @@ class TestPlaquetteErrorConstant:
     @pytest.mark.parametrize("side", [4, 6, 8, 12, 16])
     def test_reproduces_campbells_published_constant(self, side):
         """The constant must match the published table, not merely scale like it."""
-        ours = plaquette_error_constant(side, side, hopping=1.0, interaction=4.0)
+        ours = _inferred_plaquette_error_constant(side)
         assert ours == pytest.approx(self._TABLE_I[side], rel=0.05)
 
     def test_vanishes_for_the_lattice_whose_sections_commute(self):
@@ -577,15 +731,15 @@ class TestPlaquetteErrorConstant:
         Campbell's Table III (arXiv:2012.09238v4) records the commutator norm as
         exactly 0 there, which is a sharp check that the tiling matches his.
         """
-        with_interaction = plaquette_error_constant(4, 4, hopping=1.0, interaction=4.0)
+        with_interaction = _inferred_plaquette_error_constant(4)
         # W_SO2 alone, i.e. the constant with the commutator contribution removed
         w_so2 = 4.0 / 6.0 * 16 * (math.sqrt(5.0) + 8.0) + 16.0 / 24.0 * 24.0
         assert with_interaction == pytest.approx(w_so2, rel=1e-9)
 
     def test_exact_and_extensive_branches_agree_at_the_cutoff(self):
         """The switch to the thermodynamic limit must not jump."""
-        below = plaquette_error_constant(40, 40, 1.0, 4.0) / 1600
-        above = plaquette_error_constant(44, 44, 1.0, 4.0) / 1936
+        below = _inferred_plaquette_error_constant(40) / 1600
+        above = _inferred_plaquette_error_constant(44) / 1936
         assert below == pytest.approx(above, rel=1e-3)
 
     @pytest.mark.slow
@@ -596,20 +750,27 @@ class TestPlaquetteErrorConstant:
     def test_commutator_limit_matches_exact_10000_site_norm(self):
         """The fitted per-site limit agrees with the exact 100x100 lattice norm."""
         num_sites = 10_000
-        contribution = plaquette_error_constant(
-            100,
-            100,
-            hopping=1.0,
-            interaction=0.0,
-            exact_norm_max_sites=num_sites,
-        )
-        commutator_norm_per_site = contribution * (24.0 / 3.0) / num_sites
-        assert commutator_norm_per_site == pytest.approx(3.229, rel=2e-3)
+        fitted = _inferred_plaquette_error_constant(100, interaction=0.0) * (24.0 / 3.0) / num_sites
+
+        section_matrices = []
+        for cycles in plaquette_sections(100, 100):
+            matrix = np.zeros((num_sites, num_sites))
+            for cycle in cycles:
+                for index in range(4):
+                    site_a, site_b = cycle[index], cycle[(index + 1) % 4]
+                    matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
+            section_matrices.append(matrix)
+        matrix_p, matrix_g = section_matrices
+        inner = matrix_p @ matrix_g - matrix_g @ matrix_p
+        outer = inner @ matrix_g - matrix_g @ inner
+        exact = float(np.linalg.svd(outer, compute_uv=False).sum()) / num_sites
+
+        assert fitted == pytest.approx(exact, rel=2e-3)
 
     def test_step_count_falls_as_accuracy_loosens(self):
         """R scales as sqrt(1/epsilon); a looser target cannot need more steps."""
-        tight = plaquette_trotter_steps(8, 8, 1.0, 4.0, time=1.0, target_accuracy=0.01)
-        loose = plaquette_trotter_steps(8, 8, 1.0, 4.0, time=1.0, target_accuracy=1.0)
+        tight = _resolved_plaquette_steps(time=1.0, target_accuracy=0.01)
+        loose = _resolved_plaquette_steps(time=1.0, target_accuracy=1.0)
         assert tight > loose
         assert loose >= 1
 
@@ -621,14 +782,36 @@ class TestPlaquetteErrorConstant:
         r = t sqrt(W/epsilon). The t^{3/2} form belongs to the per-step *unitary* error
         W s^3, which is a dimensionless quantity and not the one phase estimation reads.
         """
-        base = plaquette_trotter_steps(8, 8, 1.0, 4.0, time=1.0, target_accuracy=1e-3)
-        quadrupled = plaquette_trotter_steps(8, 8, 1.0, 4.0, time=4.0, target_accuracy=1e-3)
+        base = _resolved_plaquette_steps(time=1.0, target_accuracy=1e-3)
+        quadrupled = _resolved_plaquette_steps(time=4.0, target_accuracy=1e-3)
         assert quadrupled == pytest.approx(base * 4, rel=0.02)
 
-    def test_rejects_a_non_positive_accuracy(self):
-        """A zero or negative target has no meaningful step count."""
-        with pytest.raises(ValueError, match="target_accuracy must be positive"):
-            plaquette_trotter_steps(8, 8, 1.0, 4.0, time=1.0, target_accuracy=0.0)
+    def test_zero_accuracy_uses_manual_divisions(self):
+        """Zero target accuracy disables automatic step sizing."""
+        assert _resolved_plaquette_steps(time=1.0, target_accuracy=0.0, num_divisions=7) == 7
+
+
+class TestCampbellTableIResources:
+    """Pre-HWP non-Clifford counts quoted for one bulk plaquette step in Table I."""
+
+    @pytest.mark.parametrize("side", [4, 6, 8, 12, 16])
+    def test_shifted_bulk_matches_the_published_gate_formulas(self, side):
+        """The particle-hole shift leaves one interaction rotation per lattice site."""
+        container = (
+            PlaquetteTrotter(
+                lattice_width=side,
+                lattice_height=side,
+                time=0.2,
+                num_divisions=2,
+            )
+            .run(_shifted_hubbard_operator(side))
+            .get_container()
+        )
+
+        fixed_t = sum(not term.needs_control for term in container.step_terms)
+        arbitrary_rotations = sum(term.needs_control and bool(term.pauli_term) for term in container.step_terms)
+        assert fixed_t == 12 * side * side
+        assert arbitrary_rotations == 4 * side * side
 
 
 class TestRecoversTheClassicalGroundStateEnergy:
@@ -832,9 +1015,9 @@ class TestPlaquetteBatchEmission:
     def test_batches_the_number_and_interaction_families(self, side, phase_sizes):
         """Jordan-Wigner gives 2L^2 single-Z factors and L^2 ZZ factors, each degenerate.
 
-        Campbell's Eq. (D2) (arXiv:2012.09238v4, App. D) halves the interaction across
-        the two ends of the step, so each of those two families appears once per
-        half-layer: four diagonal batches of sizes ``[L^2, L^2, 2L^2, 2L^2]``.
+        Campbell's Eq. (E2) (arXiv:2012.09238v4, App. E) moves the interaction
+        half-layers to the one-time boundaries, leaving one full interaction in the
+        repeated body. Its two diagonal batches therefore have sizes ``[L^2, 2L^2]``.
 
         The hopping layers add their own batches. Each section application hoists the
         plaquettes' fused ``XX``/``YY`` phases together; ``XX`` and ``YY`` share a bond
@@ -853,7 +1036,7 @@ class TestPlaquetteBatchEmission:
         for term in container.step_terms:
             if term.batch:
                 sizes[term.batch] = sizes.get(term.batch, 0) + 1
-        diagonal = [side * side, side * side, 2 * side * side, 2 * side * side]
+        diagonal = [side * side, 2 * side * side]
         assert sorted(sizes.values()) == sorted(diagonal + phase_sizes)
 
     @pytest.mark.parametrize("side", [4, 6])
@@ -1000,12 +1183,8 @@ class TestPlaquetteBatchEmission:
         plaq_b = (1, 3, 7, 5)
         time = 0.37
 
-        head_a, mid_a, tail_a = plaquette_parts(plaq_a, 1.0, time)
-        head_b, mid_b, tail_b = plaquette_parts(plaq_b, 1.0, time)
-        per_plaquette = head_a + mid_a + tail_a + head_b + mid_b + tail_b
-        # The builder's hoist: every head, then every phase, then every tail in the
-        # reversed plaquette order so the uncontrolled factors still cancel LIFO.
-        hoisted = head_a + head_b + mid_a + mid_b + tail_b + tail_a
+        per_plaquette = _plaquette_terms(plaq_a, 1.0, time) + _plaquette_terms(plaq_b, 1.0, time)
+        hoisted = _single_spin_hop_layer([plaq_a, plaq_b], num_modes, 1.0, time)
 
         def sig(terms):
             return [(tuple(sorted(t.pauli_term.items())), round(t.angle, 12)) for t in terms]

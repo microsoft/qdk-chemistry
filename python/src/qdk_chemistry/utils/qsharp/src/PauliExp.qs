@@ -5,6 +5,7 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import Std.Arrays.Subarray;
+    import Std.Diagnostics.Fact;
     import QDKChemistry.Utils.HammingWeightPhasing.BatchSegments;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhaseTerms;
     import QDKChemistry.Utils.HammingWeightPhasing.TermTargets;
@@ -185,7 +186,19 @@ namespace QDKChemistry.Utils.PauliExp {
                 } else {
                     let batchOps : Pauli[][] = pauliOps[start..start + count - 1];
                     let batchTargets : Qubit[][] = TermTargets(pauliIndices[start..start + count - 1], systems);
-                    Controlled HammingWeightPhaseTerms(ctls, (pauliCoefficients[start], batchOps, batchTargets));
+                    if exemptKnown {
+                        for offset in 1..count - 1 {
+                            Fact(
+                                needsControl[start + offset] == needsControl[start],
+                                "SparsePauliExp: every term in a batch must share needsControl."
+                            );
+                        }
+                    }
+                    if exemptKnown and not needsControl[start] {
+                        HammingWeightPhaseTerms(pauliCoefficients[start], batchOps, batchTargets);
+                    } else {
+                        Controlled HammingWeightPhaseTerms(ctls, (pauliCoefficients[start], batchOps, batchTargets));
+                    }
                 }
             }
         }
@@ -255,6 +268,65 @@ namespace QDKChemistry.Utils.PauliExp {
                 );
             }
         }
+    }
+
+    /// A sparse product formula with one-time terms surrounding a repeated body.
+    struct SegmentedSparseRepPauliExpParams {
+        beforeRepeated : SparseRepPauliExpParams,
+        repeated : SparseRepPauliExpParams,
+        afterRepeated : SparseRepPauliExpParams,
+    }
+
+    /// Applies a one-time prefix, a repeated sparse product formula, and a one-time suffix.
+    operation SegmentedSparseRepPauliExp(
+        params : SegmentedSparseRepPauliExpParams,
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        SparseRepPauliExp(params.beforeRepeated, systems);
+        SparseRepPauliExp(params.repeated, systems);
+        SparseRepPauliExp(params.afterRepeated, systems);
+    }
+
+    /// Allocates a register and applies segmented sparse Pauli evolution to selected indices.
+    operation MakeSegmentedSparseRepPauliExpCircuit(
+        evoParams : SegmentedSparseRepPauliExpParams,
+        system : Int[],
+    ) : Unit {
+        if Length(system) == 0 {
+            return ();
+        }
+
+        mutable maxIndex = system[0];
+        for idx in 1..Length(system) - 1 {
+            if system[idx] > maxIndex {
+                set maxIndex = system[idx];
+            }
+        }
+
+        use qs = Qubit[maxIndex + 1];
+        SegmentedSparseRepPauliExp(evoParams, Subarray(system, qs));
+    }
+
+    /// Uncontrolled entry point for segmented sparse Pauli evolution.
+    operation ApplySegmentedSparseRepPauliExp(
+        params : SegmentedSparseRepPauliExpParams,
+        systems : Qubit[],
+    ) : Unit {
+        SegmentedSparseRepPauliExp(params, systems);
+    }
+
+    /// Returns an uncontrolled callable for segmented sparse Pauli evolution.
+    function MakeSegmentedSparseRepPauliExpOp(
+        params : SegmentedSparseRepPauliExpParams
+    ) : Qubit[] => Unit {
+        ApplySegmentedSparseRepPauliExp(params, _)
+    }
+
+    /// Returns an `Adj + Ctl` callable for segmented sparse Pauli evolution.
+    internal function MakeSegmentedSparseRepPauliExpAdjCtlOp(
+        params : SegmentedSparseRepPauliExpParams
+    ) : (Qubit[] => Unit is Adj + Ctl) {
+        SegmentedSparseRepPauliExp(params, _)
     }
 
     /// A helper operation to create a circuit for repeated sparse Time Evolution.

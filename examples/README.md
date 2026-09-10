@@ -75,7 +75,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
 - `benchmark/fermi_hubbard.ipynb`: Jupyter notebook benchmarking fault-tolerant quantum resource estimation for ground-state quantum phase estimation of the 2D Fermi-Hubbard model across a sweep of lattice sizes.
-- `benchmark/sample_hubbard_resources.py`: command-line form of that benchmark, for sweeping lattice sizes unattended. Writes one CSV row per size as it finishes and can resume an interrupted sweep, which matters because the larger lattices are bound by memory rather than by the mapper's qubit ceiling.
+- `benchmark/sample_hubbard_resources.py`: command-line form of that benchmark for estimating one lattice size unattended and writing the result to CSV.
 
 ## Companion datasets and assets
 

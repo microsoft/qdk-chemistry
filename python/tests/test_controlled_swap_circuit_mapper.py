@@ -305,6 +305,35 @@ class TestControlledSwapPauliSequenceMapper:
             rtol=float_comparison_relative_tolerance,
         )
 
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+    def test_one_time_sections_execute_inside_the_same_sandwich(self, cswap_mapper):
+        """Segmented CSWAP evolution preserves order, repetitions, and the full vacuum phase."""
+        before = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2)
+        repeated = ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.3)
+        after = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=-0.1)
+        container = PauliProductFormulaContainer(
+            step_terms=[repeated],
+            step_reps=2,
+            num_qubits=2,
+            before_repeated_terms=[before],
+            after_repeated_terms=[after],
+        )
+
+        circuit = cswap_mapper.run(UnitaryRepresentation(container))
+        block = Operator(circuit.get_qiskit_circuit()).data[0:8, 0:8]
+        before_matrix = build_product_formula_matrix([(before.pauli_term, before.angle)], 2)
+        step_matrix = build_product_formula_matrix([(repeated.pauli_term, repeated.angle)], 2)
+        after_matrix = build_product_formula_matrix([(after.pauli_term, after.angle)], 2)
+        expected = controlled_unitary(after_matrix @ np.linalg.matrix_power(step_matrix, 2) @ before_matrix)
+
+        assert np.allclose(
+            block / block[0, 0],
+            expected,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert circuit._qsharp_factory.parameter["vacuumPhase"] == pytest.approx(-0.7)
+
 
 class TestVacuumPreservationValidation:
     """Tests for the vacuum-preservation validation of the input product formula."""

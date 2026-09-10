@@ -64,6 +64,45 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         }
     }
 
+    /// Performs segmented evolution inside one controlled-SWAP sandwich.
+    operation SegmentedRepControlledSwapPauliExp(
+        beforePauliExponents : Pauli[][],
+        beforePauliCoefficients : Double[],
+        pauliExponents : Pauli[][],
+        pauliCoefficients : Double[],
+        afterPauliExponents : Pauli[][],
+        afterPauliCoefficients : Double[],
+        repetitions : Int,
+        vacuumPhase : Double,
+        control : Qubit,
+        systems : Qubit[]
+    ) : Unit is Adj {
+        use vacuum = Qubit[Length(systems)];
+        within {
+            for i in 0..Length(systems) - 1 {
+                Controlled SWAP([control], (systems[i], vacuum[i]));
+            }
+        } apply {
+            for idx in 0..Length(beforePauliExponents) - 1 {
+                Exp(beforePauliExponents[idx], -beforePauliCoefficients[idx], vacuum);
+            }
+            for _ in 1..repetitions {
+                if BeginEstimateCaching("SegmentedControlledSwapPauliExp", 0) {
+                    for idx in 0..Length(pauliExponents) - 1 {
+                        Exp(pauliExponents[idx], -pauliCoefficients[idx], vacuum);
+                    }
+                    EndEstimateCaching();
+                }
+            }
+            for idx in 0..Length(afterPauliExponents) - 1 {
+                Exp(afterPauliExponents[idx], -afterPauliCoefficients[idx], vacuum);
+            }
+        }
+        if AbsD(vacuumPhase) > 1e-12 {
+            R1(vacuumPhase, control);
+        }
+    }
+
     /// Parameters for the repeated CSWAP-sandwich controlled Pauli evolution.
     /// # Fields
     /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
@@ -75,6 +114,20 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     struct RepControlledSwapPauliExpParams {
         pauliExponents : Pauli[][],
         pauliCoefficients : Double[],
+        repetitions : Int,
+        vacuumPhase : Double,
+        control : Int,
+        systems : Int[],
+    }
+
+    /// Parameters for segmented evolution inside a controlled-SWAP sandwich.
+    struct SegmentedRepControlledSwapPauliExpParams {
+        beforePauliExponents : Pauli[][],
+        beforePauliCoefficients : Double[],
+        pauliExponents : Pauli[][],
+        pauliCoefficients : Double[],
+        afterPauliExponents : Pauli[][],
+        afterPauliCoefficients : Double[],
         repetitions : Int,
         vacuumPhase : Double,
         control : Int,
@@ -130,6 +183,59 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         RepControlledSwapPauliExp(
             params.pauliExponents,
             params.pauliCoefficients,
+            params.repetitions,
+            params.vacuumPhase,
+            _,
+            _
+        )
+    }
+
+    /// Allocates a register for segmented controlled-SWAP evolution.
+    operation MakeSegmentedRepControlledSwapPauliExpCircuit(
+        beforePauliExponents : Pauli[][],
+        beforePauliCoefficients : Double[],
+        pauliExponents : Pauli[][],
+        pauliCoefficients : Double[],
+        afterPauliExponents : Pauli[][],
+        afterPauliCoefficients : Double[],
+        repetitions : Int,
+        vacuumPhase : Double,
+        control : Int,
+        systems : Int[]
+    ) : Unit {
+        mutable maxIndex = control;
+        for idx in systems {
+            if idx > maxIndex {
+                set maxIndex = idx;
+            }
+        }
+
+        use qs = Qubit[maxIndex + 1];
+        SegmentedRepControlledSwapPauliExp(
+            beforePauliExponents,
+            beforePauliCoefficients,
+            pauliExponents,
+            pauliCoefficients,
+            afterPauliExponents,
+            afterPauliCoefficients,
+            repetitions,
+            vacuumPhase,
+            qs[control],
+            Subarray(systems, qs)
+        );
+    }
+
+    /// Returns a callable for segmented controlled-SWAP evolution.
+    function MakeSegmentedRepControlledSwapPauliExpOp(
+        params : SegmentedRepControlledSwapPauliExpParams
+    ) : (Qubit, Qubit[]) => Unit is Adj {
+        SegmentedRepControlledSwapPauliExp(
+            params.beforePauliExponents,
+            params.beforePauliCoefficients,
+            params.pauliExponents,
+            params.pauliCoefficients,
+            params.afterPauliExponents,
+            params.afterPauliCoefficients,
             params.repetitions,
             params.vacuumPhase,
             _,

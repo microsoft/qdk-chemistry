@@ -349,3 +349,69 @@ class TestSparseControlledEvolution:
         got = dense_matrix(_sparse_controlled_op(terms), num_qubits + 1)
         control_off_size = 2**num_qubits
         assert np.max(np.abs(got[:control_off_size, :control_off_size] - np.eye(control_off_size))) < _TOL
+
+    def test_one_time_conjugators_are_bare_but_the_repeated_body_is_controlled(self):
+        """Exempt prefix and suffix factors cancel with control off and conjugate the on branch."""
+        sparse_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams
+        before = sparse_params(
+            pauliIndices=[[0]],
+            pauliOps=[[qsharp.Pauli.X]],
+            pauliCoefficients=[0.2],
+            needsControl=[False],
+            batchIds=[],
+            repetitions=1,
+        )
+        repeated = sparse_params(
+            pauliIndices=[[0]],
+            pauliOps=[[qsharp.Pauli.Z]],
+            pauliCoefficients=[0.3],
+            needsControl=[],
+            batchIds=[],
+            repetitions=3,
+        )
+        after = sparse_params(
+            pauliIndices=[[0]],
+            pauliOps=[[qsharp.Pauli.X]],
+            pauliCoefficients=[-0.2],
+            needsControl=[False],
+            batchIds=[],
+            repetitions=1,
+        )
+        params = QSHARP_UTILS.PauliExp.SegmentedSparseRepPauliExpParams(
+            beforeRepeated=before, repeated=repeated, afterRepeated=after
+        )
+        evolution = QSHARP_UTILS.PauliExp.MakeSegmentedSparseRepPauliExpAdjCtlOp(params)
+        op = QSHARP_UTILS.CircuitComposition.MakeControlledOnFirstQubitOp(evolution)
+
+        actual = dense_matrix(op, 2)
+        x = np.array([[0, 1], [1, 0]], dtype=complex)
+        z = np.array([[1, 0], [0, -1]], dtype=complex)
+        conjugated = (
+            scipy.linalg.expm(1j * 0.2 * x) @ scipy.linalg.expm(-1j * 0.9 * z) @ scipy.linalg.expm(-1j * 0.2 * x)
+        )
+
+        assert np.max(np.abs(actual[:2, :2] - np.eye(2))) < _TOL
+        assert np.max(np.abs(actual[2:, 2:] - conjugated)) < _TOL
+
+    def test_exempt_boundary_batches_are_not_controlled(self):
+        """HWP remains useful for a bare Campbell boundary around controlled evolution."""
+        terms = [
+            ExponentiatedPauliTerm({index: "Z"}, 0.2, needs_control=False, batch=1)
+            for index in range(8)
+        ]
+        inverse = [
+            ExponentiatedPauliTerm(term.pauli_term, -term.angle, needs_control=False, batch=2)
+            for term in reversed(terms)
+        ]
+        container = PauliProductFormulaContainer(
+            step_terms=[],
+            step_reps=3,
+            num_qubits=8,
+            before_repeated_terms=terms,
+            after_repeated_terms=inverse,
+        )
+        mapper = ControlledPauliSequenceMapper()
+        mapper.settings().set("control_indices", [8])
+        counts = mapper.run(UnitaryRepresentation(container)).estimate()["logicalCounts"]
+
+        assert counts["rotationCount"] == 8
