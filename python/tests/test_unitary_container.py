@@ -72,6 +72,19 @@ class TestPauliProductFormulaContainer:
         assert container.num_qubits == 2
         assert container.step_reps == 4
         assert len(container.step_terms) == 4
+        assert container.before_repeated_terms == []
+        assert container.after_repeated_terms == []
+
+    def test_one_time_boundaries_are_distinct_from_the_repeated_step(self):
+        """Moving a factor across a repetition boundary changes the represented circuit."""
+        term = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.25)
+        before = PauliProductFormulaContainer(step_terms=[], step_reps=3, num_qubits=1, before_repeated_terms=[term])
+        repeated = PauliProductFormulaContainer(step_terms=[term], step_reps=3, num_qubits=1)
+        after = PauliProductFormulaContainer(step_terms=[], step_reps=3, num_qubits=1, after_repeated_terms=[term])
+
+        assert before.before_repeated_terms == [term]
+        assert after.after_repeated_terms == [term]
+        assert len({before.content_hash(), repeated.content_hash(), after.content_hash()}) == 3
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
@@ -94,12 +107,77 @@ class TestPauliProductFormulaContainer:
 
     def test_update_ordering(self, container):
         """Test setting a new valid evolution ordering."""
+        before = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.1)
+        after = ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=-0.1)
+        container = PauliProductFormulaContainer(
+            step_terms=container.step_terms,
+            step_reps=container.step_reps,
+            num_qubits=container.num_qubits,
+            before_repeated_terms=[before],
+            after_repeated_terms=[after],
+        )
         updated_container = container.reorder_terms([1, 2, 3, 0])
 
         assert updated_container.step_terms[0] == container.step_terms[1]
         assert updated_container.step_terms[1] == container.step_terms[2]
         assert updated_container.step_terms[2] == container.step_terms[3]
         assert updated_container.step_terms[3] == container.step_terms[0]
+        assert updated_container.before_repeated_terms == [before]
+        assert updated_container.after_repeated_terms == [after]
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_one_time_boundaries_roundtrip(self, file_format, tmp_path):
+        """Both persistence formats preserve the one-time prefix and suffix."""
+        before = ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.2, needs_control=False)
+        repeated = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.4, batch=3)
+        after = ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.2, needs_control=False)
+        original = PauliProductFormulaContainer(
+            step_terms=[repeated],
+            step_reps=5,
+            num_qubits=1,
+            before_repeated_terms=[before],
+            after_repeated_terms=[after],
+        )
+
+        if file_format == "json":
+            restored = PauliProductFormulaContainer.from_json(json.loads(json.dumps(original.to_json())))
+        else:
+            path = tmp_path / "bounded.h5"
+            with h5py.File(path, "w") as handle:
+                original.to_hdf5(handle)
+            with h5py.File(path, "r") as handle:
+                restored = PauliProductFormulaContainer.from_hdf5(handle)
+
+        assert restored.content_hash() == original.content_hash()
+        assert restored.before_repeated_terms == [before]
+        assert restored.step_terms == [repeated]
+        assert restored.after_repeated_terms == [after]
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_loads_the_previous_flat_wire_format_with_empty_boundaries(self, file_format, tmp_path):
+        """The new reader upgrades 0.2 files, while 0.3 makes old readers reject new fields."""
+        term = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.4)
+        old = PauliProductFormulaContainer(step_terms=[term], step_reps=2, num_qubits=1)
+
+        if file_format == "json":
+            payload = old.to_json()
+            payload["version"] = "0.2.1"
+            del payload["before_repeated_terms"]
+            del payload["after_repeated_terms"]
+            restored = PauliProductFormulaContainer.from_json(payload)
+        else:
+            path = tmp_path / "flat.h5"
+            with h5py.File(path, "w") as handle:
+                old.to_hdf5(handle)
+                handle.attrs["version"] = "0.2.1"
+                del handle["before_repeated_terms"]
+                del handle["after_repeated_terms"]
+            with h5py.File(path, "r") as handle:
+                restored = PauliProductFormulaContainer.from_hdf5(handle)
+
+        assert restored.step_terms == [term]
+        assert restored.before_repeated_terms == []
+        assert restored.after_repeated_terms == []
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
@@ -297,7 +375,7 @@ class TestEigenvalueFromPhaseZeroScale:
             num_qubits=1,
             scale=0.0,
         )
-        with pytest.raises(ValueError, match="evolution time.*is zero"):
+        with pytest.raises(ValueError, match=r"evolution time.*is zero"):
             container.eigenvalue_from_phase(0.25)
 
     def test_nonzero_scale_still_inverts(self):

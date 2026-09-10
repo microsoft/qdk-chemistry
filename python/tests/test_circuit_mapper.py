@@ -123,6 +123,31 @@ class TestPauliSequenceMapperNonControlled:
             rtol=float_comparison_relative_tolerance,
         )
 
+    def test_one_time_boundaries_surround_the_repeated_step(self):
+        """A noncommuting prefix and suffix execute once, on the correct sides of the loop."""
+        before = ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.2)
+        repeated = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3)
+        after = ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=-0.4)
+        container = PauliProductFormulaContainer(
+            step_terms=[repeated],
+            step_reps=3,
+            num_qubits=1,
+            before_repeated_terms=[before],
+            after_repeated_terms=[after],
+        )
+
+        actual = dense_matrix(PauliSequenceMapper().run(UnitaryRepresentation(container))._qsharp_op, 1)
+        x = np.array([[0, 1], [1, 0]], dtype=complex)
+        y = np.array([[0, -1j], [1j, 0]], dtype=complex)
+        z = np.array([[1, 0], [0, -1]], dtype=complex)
+        expected = (
+            scipy.linalg.expm(-1j * after.angle * y)
+            @ np.linalg.matrix_power(scipy.linalg.expm(-1j * repeated.angle * z), container.step_reps)
+            @ scipy.linalg.expm(-1j * before.angle * x)
+        )
+
+        assert np.max(np.abs(actual - expected)) < _TOL
+
 
 def _sparse_op(terms, *, repetitions=1):
     """Build sparse evolution using typed Q# parameters."""

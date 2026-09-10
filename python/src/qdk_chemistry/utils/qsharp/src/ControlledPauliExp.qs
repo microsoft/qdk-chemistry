@@ -5,6 +5,8 @@
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.PauliExp.SegmentedSparseRepPauliExp;
+    import QDKChemistry.Utils.PauliExp.SegmentedSparseRepPauliExpParams;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import Std.Arrays.Subarray;
@@ -47,5 +49,31 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         params : SparseRepPauliExpParams
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         RepControlledPauliExp(params, _, _)
+    }
+
+    /// Applies segmented sparse Pauli evolution controlled on a single qubit.
+    operation SegmentedRepControlledPauliExp(
+        params : SegmentedSparseRepPauliExpParams,
+        control : Qubit,
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        Controlled SegmentedSparseRepPauliExp([control], (params, systems));
+    }
+
+    /// Allocates a register and applies segmented controlled Pauli evolution.
+    operation MakeSegmentedRepControlledPauliExpCircuit(
+        params : SegmentedSparseRepPauliExpParams,
+        control : Int,
+        systems : Int[]
+    ) : Unit {
+        use qs = Qubit[MaxInt([control] + systems) + 1];
+        SegmentedRepControlledPauliExp(params, qs[control], Subarray(systems, qs));
+    }
+
+    /// Returns a single-control callable for segmented sparse Pauli evolution.
+    function MakeSegmentedRepControlledPauliExpOp(
+        params : SegmentedSparseRepPauliExpParams
+    ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
+        SegmentedRepControlledPauliExp(params, _, _)
     }
 }

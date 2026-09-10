@@ -35,11 +35,15 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter, TrotterSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     MIN_USEFUL_BATCH,
     ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils import Logger
 
@@ -129,11 +133,72 @@ class PlaquetteTrotter(Trotter):
         """Return ``plaquette`` as the algorithm name."""
         return "plaquette"
 
+    def _trotter(
+        self, qubit_hamiltonian: QubitOperator, time: float, power_repetitions: int = 1
+    ) -> UnitaryRepresentation:
+        r"""Build Campbell's segmented plaquette product formula.
+
+        Campbell's Eqs. (E1)--(E2) rewrite repeated symmetric steps
+        :math:`D^{1/2} P^{1/2} G P^{1/2} D^{1/2}` as
+        :math:`D^{1/2}(P^{1/2} G P^{1/2} D)^rD^{-1/2}` after ``r`` repetitions.
+        :meth:`_decompose_trotter_step` emits the four-factor repeated body; this
+        method adds the one-time boundary factors, which are left bare in a
+        controlled circuit.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian being evolved.
+            time: Total evolution time before applying the power strategy.
+            power_repetitions: Number of times to repeat the full evolution.
+
+        Returns:
+            The segmented product-formula representation.
+
+        """
+        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
+        delta = time / num_divisions
+        step_terms = self._decompose_trotter_step(
+            qubit_hamiltonian,
+            time=delta,
+            atol=self._settings.get("weight_threshold"),
+        )
+        num_sites = self._settings.get("lattice_width") * self._settings.get("lattice_height")
+        _, diagonal, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
+        diagonal = [term for term in diagonal if term.pauli_term]
+        boundary = self._diagonal_layer(diagonal, delta * 0.5)
+        before_repeated = [
+            ExponentiatedPauliTerm(
+                pauli_term=dict(term.pauli_term),
+                angle=term.angle,
+                needs_control=False,
+                batch=term.batch,
+            )
+            for term in boundary
+        ]
+        after_repeated = [
+            ExponentiatedPauliTerm(
+                pauli_term=dict(term.pauli_term),
+                angle=-term.angle,
+                needs_control=False,
+                batch=term.batch,
+            )
+            for term in reversed(boundary)
+        ]
+
+        return UnitaryRepresentation(
+            container=PauliProductFormulaContainer(
+                step_terms=step_terms,
+                step_reps=num_divisions * power_repetitions,
+                num_qubits=qubit_hamiltonian.num_qubits,
+                scale=time,
+                before_repeated_terms=before_repeated,
+                after_repeated_terms=after_repeated,
+            )
+        )
+
     def _resolve_num_divisions(self, qubit_hamiltonian, time: float) -> int:
         """Determine the step count from Campbell's plaquette-specific error constant.
 
-        derived for this
-        exact splitting (arXiv:2012.09238v4, Eq. (20) and App. D).
+        Derived for this exact splitting (Eq. (20) and App. D).
 
         Args:
             qubit_hamiltonian: The Hamiltonian being evolved.
@@ -159,7 +224,10 @@ class PlaquetteTrotter(Trotter):
             )
 
         hopping, _, _ = self._split_hopping(qubit_hamiltonian, width * height, self._settings.get("weight_threshold"))
+        hopping = abs(hopping)
         num_sites = width * height
+
+        # Reverse-engineers the Hubbard interaction magnitude (|U|) from the Jordan-Wigner-mapped Hamiltonian.
         interaction = 0.0
         for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=1e-12):
             positions = [index for index, axis in enumerate(reversed(label)) if axis != "I"]
@@ -168,14 +236,45 @@ class PlaquetteTrotter(Trotter):
                 if high - low == num_sites:
                     interaction = abs(coeff) * 4.0
                     break
-        automatic = self._plaquette_trotter_steps(
-            width=width,
-            height=height,
-            hopping=hopping,
-            interaction=interaction,
-            time=time,
-            target_accuracy=target_accuracy,
+
+        # R_p and R_g are the one-spin, unit-hopping matrices for the two tilings.
+        # Evaluate their trace norms exactly through 1600 sites; beyond that use the
+        # thermodynamic limits 16/pi^2 and 3.229 per site, respectively.
+        if num_sites <= 1600:
+            section_matrices: list[np.ndarray] = []
+            for cycles in self._plaquette_sections(width, height):
+                matrix = np.zeros((num_sites, num_sites))
+                for cycle in cycles:
+                    for index in range(4):
+                        site_a, site_b = cycle[index], cycle[(index + 1) % 4]
+                        matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
+                section_matrices.append(matrix)
+            matrix_p, matrix_g = section_matrices
+
+            inner = matrix_p @ matrix_g - matrix_g @ matrix_p
+            outer = inner @ matrix_g - matrix_g @ inner
+            hopping_norm = float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum()) * hopping
+            commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * hopping**3
+        else:
+            hopping_norm = 16.0 / math.pi**2 * num_sites * hopping
+            commutator_norm = 3.229 * num_sites * hopping**3
+
+        # 1. W_SO2 from Eq. (C3), in the dimensionful R convention of Eq. (10).
+        w_so2 = (
+            interaction * hopping**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + interaction**2 / 24.0 * hopping_norm
         )
+        # 2. The extra plaquette-splitting contribution from Eq. (D10).
+        w_extra2 = 3.0 / 24.0 * commutator_norm
+        # 3. The complete plaquette error constant from Eq. (D6).
+        w_plaquette = w_so2 + w_extra2
+
+        # 4. Eq. (F2) gives epsilon_TS <= W s^2. Requiring this upper bound to
+        # meet target_accuracy gives s <= sqrt(target_accuracy / W).
+        if w_plaquette <= 0.0 or time == 0.0:
+            automatic = 1
+        else:
+            max_step_size = math.sqrt(target_accuracy / w_plaquette)
+            automatic = max(1, math.ceil(abs(time) / max_step_size))
         Logger.debug(f"PlaquetteTrotter: bound gives r={automatic}, manual is {manual}.")
         return max(manual, automatic)
 
@@ -185,7 +284,12 @@ class PlaquetteTrotter(Trotter):
         time: float,
         atol: float = 1e-12,
     ) -> list[ExponentiatedPauliTerm]:
-        """Return one Trotter step, with the hopping expressed as plaquettes.
+        r"""Return the repeated bulk body of Campbell's plaquette formula.
+
+        The returned terms implement
+        :math:`P^{1/2} G P^{1/2} D`: three hopping-tile layers followed by one
+        full interaction layer. :meth:`_trotter` supplies the one-time
+        :math:`D^{1/2}` and :math:`D^{-1/2}` boundary layers.
 
         Args:
             qubit_hamiltonian: The Hamiltonian to decompose.
@@ -244,14 +348,7 @@ class PlaquetteTrotter(Trotter):
                 f"{extra} operator bond(s) outside the lattice. Check the lattice dimensions, "
                 "the boundary conditions, and that sites are numbered row-major."
             )
-
-        # Campbell's Eq. (D2) (arXiv:2012.09238v4, App. D) ordering: the interaction is
-        # halved at the two ends and the second hopping section runs at full time in
-        # the middle.
-        #
-        # Batch identifiers unique across the whole step: the two
-        # diagonal half-layers and each of the three section applications hoist and batch
-        # their own equal-angle families from a first identifier past all already issued.
+        # we use hwp to batch layers of L^2 or L^2/2 identical rotations.
         batch = 1
         constant = [term for term in diagonal if not term.pauli_term]
         diagonal = [term for term in diagonal if term.pauli_term]
@@ -260,10 +357,8 @@ class PlaquetteTrotter(Trotter):
             if constant
             else []
         )
-        # Step 1: half the interaction.
-        opening = self._diagonal_layer(diagonal, time * 0.5, first_batch=batch)
-        batch = self._next_batch(opening, batch)
-        # Step 2: half of hopping section A.
+        # For each tile, we diagonalize R_plaq and realize the tile with 2 Z rotations and 4 F gates.
+        # Repeated body 1: half of hopping section A.
         hop_a_open = self._hop_layer(
             section_a,
             num_sites=num_sites,
@@ -272,7 +367,7 @@ class PlaquetteTrotter(Trotter):
             first_batch=batch,
         )
         batch = self._next_batch(hop_a_open, batch)
-        # Step 3: all of hopping section B.
+        # Repeated body 2: all of hopping section B.
         hop_b = self._hop_layer(
             section_b,
             num_sites=num_sites,
@@ -281,7 +376,7 @@ class PlaquetteTrotter(Trotter):
             first_batch=batch,
         )
         batch = self._next_batch(hop_b, batch)
-        # Step 4: the remaining half of section A.
+        # Repeated body 3: the remaining half of section A.
         hop_a_close = self._hop_layer(
             section_a,
             num_sites=num_sites,
@@ -290,9 +385,10 @@ class PlaquetteTrotter(Trotter):
             first_batch=batch,
         )
         batch = self._next_batch(hop_a_close, batch)
-        # Step 5: the remaining half of the interaction.
-        closing = self._diagonal_layer(diagonal, time * 0.5, first_batch=batch)
-        return merged + opening + hop_a_open + hop_b + hop_a_close + closing
+        # Repeated body 4: one full interaction layer.
+        # for the interaction, after the chemical potential shift, each interaction corresponds to 1 rotation.
+        interaction = self._diagonal_layer(diagonal, time, first_batch=batch)
+        return hop_a_open + hop_b + hop_a_close + merged + interaction
 
     def _split_hopping(self, qubit_hamiltonian, num_sites, atol):
         """Separate the uniform hopping amplitude, the diagonal terms, and the bond graph.
@@ -313,51 +409,71 @@ class PlaquetteTrotter(Trotter):
                 connects the two spin blocks, or the two spin sectors disagree.
 
         """
-        magnitudes: set[float] = set()
+        hopping_terms: dict[int, dict[frozenset[int], dict[str, float]]] = {0: {}, 1: {}}
         diagonal: list[ExponentiatedPauliTerm] = []
-        # Tracked per spin sector: a bond present for one spin but not the other would
-        # otherwise be hidden by folding the two blocks together, and the tiling applies
-        # every plaquette to both spins.
-        bonds: dict[int, set[frozenset[int]]] = {0: set(), 1: set()}
         for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
             mapping = self._pauli_label_to_map(label)
             axes = [position for position, axis in mapping.items() if axis in "XY"]
-            if len(axes) != 2:
+            if not axes:
                 diagonal.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=coeff))
                 continue
+            if len(axes) != 2:
+                raise ValueError(
+                    f"The term {label!r} is not a Jordan-Wigner hopping string: expected exactly two X/Y endpoints."
+                )
 
-            # A Jordan-Wigner hopping bond contributes two Paulis of weight t/2, whose
-            # X/Y endpoints are the two modes it connects.
-            magnitudes.add(round(abs(coeff), 12))
-            first, second = axes
+            first, second = sorted(axes)
             if (first < num_sites) != (second < num_sites):
                 raise ValueError(
                     f"The term {label!r} hops between the spin-up and spin-down blocks. "
                     "PlaquetteTrotter tiles each spin sector separately and cannot express "
                     "spin-flip hopping."
                 )
+            endpoint_axis = mapping[first]
+            expected_support = set(range(first, second + 1))
+            if (
+                endpoint_axis not in "XY"
+                or mapping[second] != endpoint_axis
+                or set(mapping) != expected_support
+                or any(mapping[position] != "Z" for position in range(first + 1, second))
+            ):
+                raise ValueError(f"The term {label!r} is not a canonical Jordan-Wigner XX/YY hopping string.")
             spin = 0 if first < num_sites else 1
-            bonds[spin].add(frozenset((first % num_sites, second % num_sites)))
+            bond = frozenset((first % num_sites, second % num_sites))
+            components = hopping_terms[spin].setdefault(bond, {})
+            components[endpoint_axis] = components.get(endpoint_axis, 0.0) + coeff
 
-        if not magnitudes:
+        if not hopping_terms[0] and not hopping_terms[1]:
             raise ValueError("The Hamiltonian carries no hopping terms; nothing to tile into plaquettes.")
-        if len(magnitudes) > 1:
-            raise ValueError(
-                f"PlaquetteTrotter requires a uniform hopping amplitude, but found "
-                f"{len(magnitudes)} distinct magnitudes: {sorted(magnitudes)}."
-            )
-        if bonds[0] != bonds[1]:
+        if hopping_terms[0].keys() != hopping_terms[1].keys():
             raise ValueError(
                 f"The two spin sectors carry different hopping graphs "
-                f"({len(bonds[0])} and {len(bonds[1])} bonds). PlaquetteTrotter applies the same "
+                f"({len(hopping_terms[0])} and {len(hopping_terms[1])} bonds). PlaquetteTrotter applies the same "
                 "tiling to both spins."
             )
 
-        hopping = 2.0 * next(iter(magnitudes))
+        coefficients: set[float] = set()
+        for spin_terms in hopping_terms.values():
+            for components in spin_terms.values():
+                if components.keys() != {"X", "Y"} or not math.isclose(
+                    components["X"], components["Y"], rel_tol=0.0, abs_tol=atol
+                ):
+                    raise ValueError(
+                        "PlaquetteTrotter requires uniform hopping with matching XX and YY coefficients on every bond."
+                    )
+                coefficients.add(round(components["X"], 12))
+        if len(coefficients) > 1:
+            raise ValueError(
+                f"PlaquetteTrotter requires a uniform hopping amplitude, but found "
+                f"{len(coefficients)} distinct signed coefficients: {sorted(coefficients)}."
+            )
+
+        hopping = -2.0 * next(iter(coefficients))
         Logger.debug(
-            f"PlaquetteTrotter: hopping t={hopping}, {len(bonds[0])} bonds per spin, {len(diagonal)} diagonal terms."
+            f"PlaquetteTrotter: hopping t={hopping}, {len(hopping_terms[0])} bonds per spin, "
+            f"{len(diagonal)} diagonal terms."
         )
-        return hopping, diagonal, bonds[0]
+        return hopping, diagonal, set(hopping_terms[0])
 
     @staticmethod
     def _plaquette_sections(width: int, height: int) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
@@ -400,7 +516,14 @@ class PlaquetteTrotter(Trotter):
         time: float,
         first_batch: int,
     ) -> list[ExponentiatedPauliTerm]:
-        """Evolve every plaquette of *section* for both spin sectors.
+        r"""Evolve every plaquette of *section* for both spin sectors.
+
+        Each plaquette evolution is the conjugation :math:`U_V D U_V^\dagger`.
+        Campbell's Appendix E absorbs the innermost Fourier-transform butterfly
+        into the two eigenvalue phases, leaving four fixed factors on each side
+        and two synthesized rotations in the middle (Eqs. (E11)--(E14)). The
+        structural blocks are hoisted across each vertex-disjoint section so its
+        equal-angle phase families can use Hamming-weight phasing.
 
         Args:
             section: The section's four-cycles, or empty for the 2x2 lattice.
@@ -418,8 +541,41 @@ class PlaquetteTrotter(Trotter):
         tails_per_plaquette: list[list[ExponentiatedPauliTerm]] = []
         for spin_offset in (0, num_sites):
             for cycle in section:
-                shifted = tuple(site + spin_offset for site in cycle)
-                head, middle, tail = self._plaquette_parts(shifted, hopping, time)
+                sites = tuple(site + spin_offset for site in cycle)
+                head: list[ExponentiatedPauliTerm] = []
+
+                # These are the two remaining radix-2 butterflies after Campbell's
+                # innermost one is fused into the phase layer. Their Jordan-Wigner
+                # strings allow nonadjacent modes without a fermionic swap network.
+                for local_i, local_j in ((0, 2), (1, 3)):
+                    mode_i, mode_j = sites[local_i], sites[local_j]
+                    low, high = min(mode_i, mode_j), max(mode_i, mode_j)
+                    string = dict.fromkeys(range(low + 1, high), "Z")
+                    half = math.pi / 8.0 if mode_i < mode_j else -math.pi / 8.0
+                    head += [
+                        ExponentiatedPauliTerm(
+                            pauli_term={**string, low: "X", high: "Y"}, angle=-half, needs_control=False
+                        ),
+                        ExponentiatedPauliTerm(
+                            pauli_term={**string, low: "Y", high: "X"}, angle=half, needs_control=False
+                        ),
+                    ]
+
+                # G_01^dagger exp(i alpha n_0) exp(-i alpha n_1) G_01 becomes
+                # the two equal-angle XX/YY rotations on the plaquette's first bond.
+                kappa = 2.0 * hopping * time
+                low, high = min(sites[0], sites[1]), max(sites[0], sites[1])
+                string = dict.fromkeys(range(low + 1, high), "Z")
+                middle = [
+                    ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "X"}, angle=-kappa / 2.0),
+                    ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "Y"}, angle=-kappa / 2.0),
+                ]
+                tail = [
+                    ExponentiatedPauliTerm(
+                        pauli_term=dict(term.pauli_term), angle=-term.angle, needs_control=term.needs_control
+                    )
+                    for term in reversed(head)
+                ]
                 heads += head
                 phases += middle
                 tails_per_plaquette.append(tail)
@@ -429,95 +585,6 @@ class PlaquetteTrotter(Trotter):
             tails += tail
         phases = self._batch_equal_angles(phases, first_batch=first_batch)
         return heads + phases + tails
-
-    @staticmethod
-    def _plaquette_parts(
-        sites: tuple[int, ...], hopping: float, time: float
-    ) -> tuple[list[ExponentiatedPauliTerm], list[ExponentiatedPauliTerm], list[ExponentiatedPauliTerm]]:
-        r"""Return one plaquette's evolution split into its three structural blocks.
-
-        The evolution is the conjugation :math:`U_V\, D\, U_V^{\dagger}`. Written out in
-        full that is a six-factor Givens network, two eigenvalue phases, and the adjoint
-        network. Campbell's Appendix E instead absorbs the innermost butterfly into the
-        phases, using
-
-        .. math::
-
-            G_{01}^{\dagger}\,
-            e^{i\alpha n_0} e^{-i\alpha n_1}\,
-            G_{01}
-            = e^{i(\alpha/2) XX} e^{i(\alpha/2) YY},
-
-        which holds because :math:`G_{01}^{\dagger}(Z_1 - Z_0)G_{01} = XX + YY`. The two
-        factors that produced the phases then disappear from both the network and its
-        adjoint, so the plaquette costs four fixed factors instead of six:
-
-        * ``head`` -- four ``pi/8`` butterfly factors (``needs_control=False``).
-        * ``middle`` -- the two fused arbitrary-angle ``XX``/``YY`` rotations.
-        * ``tail`` -- four factors, the exact reverse-and-negate of ``head``.
-
-        That is eight T gates and two synthesized rotations per plaquette rather than
-        twelve and two, which is what takes the step from :math:`18 L^2` to Campbell's
-        published :math:`12 L^2` (arXiv:2012.09238v4, App. E Eqs. (E11)--(E14)).
-
-        Keeping the blocks separate lets :meth:`PlaquetteTrotter._decompose_trotter_step`
-        hoist the phases of a whole section together so equal-angle families can be
-        Hamming-weight phased; see that method for why the hoisting is exact.
-
-        Args:
-            sites: The plaquette's four modes in cycle order.
-            hopping: Hopping amplitude :math:`t`.
-            time: Evolution time.
-
-        Returns:
-            ``(head, middle, tail)``. ``tail`` equals ``head`` reversed with every angle
-            negated, so concatenating heads in one order and tails in the exactly reversed
-            order keeps the uncontrolled factors cancelling strictly last-in-first-out.
-
-        """
-        # The target is U_V D U_V^dagger with U_V = G1 G2 G3 as a matrix product, so the
-        # factor applied first is G1^dagger: the network runs forwards inverted, then the
-        # eigenvalue layer, then the network backwards. G3 = G_{01} is fused into the
-        # eigenvalue layer below and so is absent here.
-        head: list[ExponentiatedPauliTerm] = []
-        # Radix-2 butterfly pairs of the four-point Fourier transform, in cycle-local
-        # indices. Every butterfly of a uniform four-cycle sits at the same pi/4 angle, so
-        # each factor below is a fixed pi/8 rotation costing one T gate.
-        for local_i, local_j in ((0, 2), (1, 3)):
-            mode_i, mode_j = sites[local_i], sites[local_j]
-            low, high = min(mode_i, mode_j), max(mode_i, mode_j)
-            # The Jordan-Wigner parity string is carried inside the rotation, so the modes
-            # need not be adjacent and no fermionic swap network is required.
-            string = dict.fromkeys(range(low + 1, high), "Z")
-            half = math.pi / 8.0 if mode_i < mode_j else -math.pi / 8.0
-            # exp(theta (a_i^dag a_j - a_j^dag a_i)) as its two commuting Pauli factors.
-            head += [
-                ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "Y"}, angle=-half, needs_control=False),
-                ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "X"}, angle=half, needs_control=False),
-            ]
-
-        # The fused eigenvalue layer. Both rotations carry the same angle and act on the
-        # plaquette's first bond, which is horizontal and therefore adjacent in row-major
-        # order for every cycle except the wrapping ones, where the parity string below is
-        # what keeps the identity exact.
-        kappa = 2.0 * hopping * time
-        low, high = min(sites[0], sites[1]), max(sites[0], sites[1])
-        string = dict.fromkeys(range(low + 1, high), "Z")
-        middle = [
-            ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "X"}, angle=-kappa / 2.0),
-            ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "Y"}, angle=-kappa / 2.0),
-        ]
-
-        # Reversing and negating the head is what makes the conjugating factors undo each
-        # other strictly last-in-first-out, which the builder's tests verify.
-        tail = [
-            ExponentiatedPauliTerm(
-                pauli_term=dict(term.pauli_term), angle=-term.angle, needs_control=term.needs_control
-            )
-            for term in reversed(head)
-        ]
-
-        return head, middle, tail
 
     @classmethod
     def _diagonal_layer(
@@ -588,134 +655,6 @@ class PlaquetteTrotter(Trotter):
     def _next_batch(terms: list[ExponentiatedPauliTerm], current: int) -> int:
         """Return the first batch identifier free after emitting *terms*."""
         return max((term.batch for term in terms if term.batch), default=current - 1) + 1
-
-    @classmethod
-    def _plaquette_trotter_steps(
-        cls,
-        width: int,
-        height: int,
-        hopping: float,
-        interaction: float,
-        time: float,
-        target_accuracy: float,
-    ) -> int:
-        r"""Return the number of plaquette Trotter steps meeting *target_accuracy*.
-
-        ``target_accuracy`` is a ground-state ENERGY tolerance, so the step count comes
-        from Campbell's Eq. (F2) (arXiv:2012.09238v4, App. F): a step of duration
-        :math:`s` biases the energy by at most :math:`W s^2`. That bias does not
-        accumulate over the repetitions. Section V of the same paper gives the reason --
-        the repeated unitary is :math:`\exp(i H_\mathrm{eff} s)` for one fixed
-        :math:`H_\mathrm{eff}` with :math:`\|H - H_\mathrm{eff}\| \le W s^2`, and
-        phase estimation reads an eigenvalue of that :math:`H_\mathrm{eff}`. Kivlichan
-        et al. (arXiv:1902.10673v4, Eq. (8)) reach the same bound independently.
-
-        So :math:`W (t/r)^2 = \epsilon` gives :math:`r = t \sqrt{W / \epsilon}`.
-
-        The per-step *unitary* error is :math:`W s^3`, which would instead give
-        :math:`r = t^{3/2}\sqrt{W/\epsilon}`. That is the wrong quantity here, and
-        dimensionally so: with :math:`\hbar = 1`, :math:`[W] = E^3`, so :math:`W s^3`
-        is dimensionless while an energy tolerance is not. Converting the accumulated
-        norm error :math:`W t^3 / r^2` to an energy divides it by :math:`t`, which
-        returns :math:`W t^2 / r^2` and the same formula as above.
-
-        Args:
-            width: Lattice columns.
-            height: Lattice rows.
-            hopping: Uniform hopping amplitude.
-            interaction: On-site interaction strength.
-            time: Total evolution time.
-            target_accuracy: Ground-state energy tolerance.
-
-        Returns:
-            The number of steps, at least one.
-
-        Raises:
-            ValueError: If ``target_accuracy`` is not positive.
-
-        """
-        if target_accuracy <= 0.0:
-            raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
-        constant = cls._plaquette_error_constant(width, height, hopping, interaction)
-        if constant <= 0.0 or time == 0.0:
-            return 1
-        return max(1, math.ceil(abs(time) * math.sqrt(constant / target_accuracy)))
-
-    @classmethod
-    def _plaquette_error_constant(
-        cls,
-        width: int,
-        height: int,
-        hopping: float,
-        interaction: float,
-        commutator_norm_per_site: float = 3.229,
-        exact_norm_max_sites: int = 1600,
-    ) -> float:
-        r"""Return Campbell's second-order error constant :math:`W_\mathrm{PLAQ}`.
-
-        For a step of duration :math:`s` the *unitary* error is at most
-        :math:`W_\mathrm{PLAQ}s^3` and the *energy* bias at most
-        :math:`W_\mathrm{PLAQ}s^2` (arXiv:2012.09238v4, Table I caption and Eq. (F2));
-        the latter is what sizes the step count, since phase estimation reads an
-        energy. Here
-
-        .. math::
-            W_\mathrm{PLAQ} \le W_\mathrm{SO2}
-                + \tfrac{3}{24}\, \lVert [[R_p, R_g], R_g] \rVert_1 ,
-
-        .. math::
-            W_\mathrm{SO2} \le \tfrac{u \tau^2}{6} L^2 (\sqrt5 + 8)
-                + \tfrac{u^2}{24} \lVert R \rVert_1 ,
-
-        Here :math:`R_p` and :math:`R_g` are the two tilings' single-particle hopping
-        matrices. Their trace norms are evaluated exactly through 1600 sites; above that
-        the extensive limits stand in, :math:`16/\pi^2` per site for
-        :math:`\lVert R \rVert_1` and *commutator_norm_per_site* for the double
-        commutator. That default is measured from the exact values below the cutoff and is
-        flat to 0.2% from :math:`L = 32` onwards.
-
-        Args:
-            width: Lattice columns.
-            height: Lattice rows.
-            hopping: Hopping amplitude :math:`\tau`.
-            interaction: On-site interaction :math:`u`.
-            commutator_norm_per_site: Per-site double-commutator limit used beyond the exact cutoff.
-            exact_norm_max_sites: Largest site count whose trace norms are evaluated exactly.
-
-        Returns:
-            The constant :math:`W_\mathrm{PLAQ}`.
-
-        References:
-            Campbell (2022), arXiv:2012.09238v4: Eq. (10); Eq. (20) (Sec. III);
-            and App. D Eqs. (D6)-(D10).
-
-        """
-        import numpy as np  # noqa: PLC0415
-
-        num_sites = width * height
-        if num_sites <= exact_norm_max_sites:
-            sections = []
-            for cycles in cls._plaquette_sections(width, height):
-                matrix = np.zeros((num_sites, num_sites))
-                for cycle in cycles:
-                    for index in range(4):
-                        site_a, site_b = cycle[index], cycle[(index + 1) % 4]
-                        matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
-                sections.append(matrix)
-            matrix_p, matrix_g = sections
-
-            inner = matrix_p @ matrix_g - matrix_g @ matrix_p
-            outer = inner @ matrix_g - matrix_g @ inner
-            hopping_norm = float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum()) * hopping
-            commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * hopping**3
-        else:
-            hopping_norm = 16.0 / math.pi**2 * num_sites * hopping
-            commutator_norm = commutator_norm_per_site * num_sites * hopping**3
-
-        w_so2 = (
-            interaction * hopping**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + interaction**2 / 24.0 * hopping_norm
-        )
-        return w_so2 + (3.0 / 24.0) * commutator_norm
 
 
 class PlaquetteTrotterSettings(TrotterSettings):

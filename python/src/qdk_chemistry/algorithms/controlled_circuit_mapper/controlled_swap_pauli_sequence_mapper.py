@@ -11,7 +11,10 @@ from qdk import qsharp
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -203,32 +206,54 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         vacuum_phase = self._vacuum_phase(unitary_container)
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        angles: list[float] = []
-        for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
-            for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
-            angles.append(term.angle)
+        def encode_terms(
+            terms: list[ExponentiatedPauliTerm],
+        ) -> tuple[list[list[qsharp.Pauli]], list[float]]:
+            pauli_terms: list[list[qsharp.Pauli]] = []
+            angles: list[float] = []
+            for term in terms:
+                base_terms: list[qsharp.Pauli] = [qsharp.Pauli.I] * unitary_container.num_qubits
+                for index, pauli in term.pauli_term.items():
+                    base_terms[index] = getattr(qsharp.Pauli, pauli)
+                pauli_terms.append(base_terms.copy())
+                angles.append(term.angle)
+            return pauli_terms, angles
 
-        controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
-            pauliExponents=pauli_terms,
-            pauliCoefficients=angles,
-            repetitions=unitary_container.step_reps,
-            vacuumPhase=vacuum_phase,
-            control=control_indices[0],
-            systems=target_indices,
-        )
+        pauli_terms, angles = encode_terms(unitary_container.step_terms)
+        if unitary_container.before_repeated_terms or unitary_container.after_repeated_terms:
+            before_terms, before_angles = encode_terms(unitary_container.before_repeated_terms)
+            after_terms, after_angles = encode_terms(unitary_container.after_repeated_terms)
+            controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.SegmentedRepControlledSwapPauliExpParams(
+                beforePauliExponents=before_terms,
+                beforePauliCoefficients=before_angles,
+                pauliExponents=pauli_terms,
+                pauliCoefficients=angles,
+                afterPauliExponents=after_terms,
+                afterPauliCoefficients=after_angles,
+                repetitions=unitary_container.step_reps,
+                vacuumPhase=vacuum_phase,
+                control=control_indices[0],
+                systems=target_indices,
+            )
+            program = QSHARP_UTILS.ControlledSwapPauliExp.MakeSegmentedRepControlledSwapPauliExpCircuit
+            controlled_unitary_op = QSHARP_UTILS.ControlledSwapPauliExp.MakeSegmentedRepControlledSwapPauliExpOp(
+                controlled_evo_params
+            )
+        else:
+            controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
+                pauliExponents=pauli_terms,
+                pauliCoefficients=angles,
+                repetitions=unitary_container.step_reps,
+                vacuumPhase=vacuum_phase,
+                control=control_indices[0],
+                systems=target_indices,
+            )
+            program = QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit
+            controlled_unitary_op = QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpOp(
+                controlled_evo_params
+            )
 
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit,
-            parameter=vars(controlled_evo_params),
-        )
-
-        controlled_unitary_op = QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpOp(
-            controlled_evo_params
-        )
+        qsharp_factory = QsharpFactoryData(program=program, parameter=vars(controlled_evo_params))
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
 
@@ -248,17 +273,26 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the vacuum is not an eigenstate of the product formula.
 
         """
-        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        # A residual left by one step leaks again on every repetition, so the per-step budget shrinks.
-        atol = self._settings.get("vacuum_preservation_tolerance") / container.step_reps
-        phase = _vacuum_eigenphase(terms, atol)
-        if phase is None:
-            raise ValueError(
-                "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "
-                "Pauli terms could not be split into contiguous, mutually commuting blocks that leave "
-                "|0...0> invariant, so the CSWAP sandwich would leak the vacuum and decohere the control. "
-                "The mapper applies to particle-conserving Hamiltonians; group such a Hamiltonian with "
-                "the 'vacuum_annihilating' term grouper before building the unitary, e.g. "
-                "registry.create('term_grouper', 'vacuum_annihilating').run(qubit_hamiltonian)."
-            )
-        return container.step_reps * phase
+        sections = (
+            ("before_repeated_terms", container.before_repeated_terms, 1),
+            ("step_terms", container.step_terms, container.step_reps),
+            ("after_repeated_terms", container.after_repeated_terms, 1),
+        )
+        applications = (
+            container.step_reps + bool(container.before_repeated_terms) + bool(container.after_repeated_terms)
+        )
+        atol = self._settings.get("vacuum_preservation_tolerance") / applications
+        total_phase = 0.0
+        for section_name, section_terms, repetitions in sections:
+            terms = [(term.pauli_term, term.angle) for term in section_terms]
+            phase = _vacuum_eigenphase(terms, atol)
+            if phase is None:
+                raise ValueError(
+                    "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula; "
+                    f"{section_name} does not preserve the vacuum. Its Pauli terms could not be split into contiguous, "
+                    "mutually commuting blocks that leave |0...0> invariant, so the CSWAP sandwich would leak "
+                    "the vacuum and decohere the control. Group particle-conserving Hamiltonians with the "
+                    "'vacuum_annihilating' term grouper before building the unitary."
+                )
+            total_phase += repetitions * phase
+        return total_phase
