@@ -21,11 +21,16 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 
 @pytest.fixture
 def step_terms():
-    """Create a list of ExponentiatedPauliTerm instances for testing."""
+    """Create a list of ExponentiatedPauliTerm instances for testing.
+
+    Carries a control-exempt conjugating pair and a two-member batch as well as plain
+    terms, so that anything round-tripping this fixture also covers both flags.
+    """
     return [
-        ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
-        ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=1.2),
-        ExponentiatedPauliTerm(pauli_term={0: "Y", 1: "X"}, angle=0.3),
+        ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5, needs_control=False),
+        ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=1.2, batch=1),
+        ExponentiatedPauliTerm(pauli_term={0: "Y", 1: "X"}, angle=0.3, batch=1),
+        ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.5, needs_control=False),
     ]
 
 
@@ -66,7 +71,7 @@ class TestPauliProductFormulaContainer:
         assert container.type == "pauli_product_formula"
         assert container.num_qubits == 2
         assert container.step_reps == 4
-        assert len(container.step_terms) == 3
+        assert len(container.step_terms) == 4
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
@@ -89,11 +94,12 @@ class TestPauliProductFormulaContainer:
 
     def test_update_ordering(self, container):
         """Test setting a new valid evolution ordering."""
-        updated_container = container.reorder_terms([1, 2, 0])
+        updated_container = container.reorder_terms([1, 2, 3, 0])
 
         assert updated_container.step_terms[0] == container.step_terms[1]
         assert updated_container.step_terms[1] == container.step_terms[2]
-        assert updated_container.step_terms[2] == container.step_terms[0]
+        assert updated_container.step_terms[2] == container.step_terms[3]
+        assert updated_container.step_terms[3] == container.step_terms[0]
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
@@ -101,19 +107,26 @@ class TestPauliProductFormulaContainer:
             container.reorder_terms([0, 1])
 
         with pytest.raises(ValueError, match="Invalid permutation"):
-            container.reorder_terms([0, 1, 3])
+            container.reorder_terms([0, 1, 2, 4])
 
     def test_to_json_roundtrip(self, container):
-        """Test JSON serialization and deserialization roundtrip."""
+        """Test JSON serialization and deserialization roundtrip.
+
+        The fixture carries both flags, so this also covers that ``needs_control`` and
+        ``batch`` survive: a reloaded circuit that lost either would cost differently.
+        """
         json_data = container.to_json()
         restored = PauliProductFormulaContainer.from_json(json_data)
 
         assert restored.type == container.type
         assert restored.num_qubits == container.num_qubits
         assert restored.step_reps == container.step_reps
+        assert restored.content_hash() == container.content_hash()
 
         for t1, t2 in zip(restored.step_terms, container.step_terms, strict=True):
             assert t1.pauli_term == t2.pauli_term
+            assert t1.needs_control == t2.needs_control
+            assert t1.batch == t2.batch
             assert np.isclose(
                 t1.angle, t2.angle, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
@@ -132,7 +145,11 @@ class TestPauliProductFormulaContainer:
                 assert isinstance(key, int), f"pauli_term key {key!r} should be int, got {type(key).__name__}"
 
     def test_to_hdf5_roundtrip(self, container, tmp_path):
-        """Test HDF5 serialization and deserialization roundtrip."""
+        """Test HDF5 serialization and deserialization roundtrip.
+
+        The fixture carries both flags, so this also covers that ``needs_control`` and
+        ``batch`` survive HDF5.
+        """
         file_path = tmp_path / "ppf_container.h5"
 
         with h5py.File(file_path, "w") as f:
@@ -146,6 +163,9 @@ class TestPauliProductFormulaContainer:
         assert restored.num_qubits == container.num_qubits
         assert restored.step_reps == container.step_reps
         assert len(restored.step_terms) == len(container.step_terms)
+        assert restored.content_hash() == container.content_hash()
+        assert [t.batch for t in restored.step_terms] == [t.batch for t in container.step_terms]
+        assert [t.needs_control for t in restored.step_terms] == [t.needs_control for t in container.step_terms]
 
     def test_combine_no_adjacent_identical(self):
         """Test combine when no adjacent terms share the same Pauli string."""
@@ -211,45 +231,46 @@ class TestPauliProductFormulaContainer:
         assert result.step_terms[4].pauli_term == {0: "Z"}
         assert np.isclose(result.step_terms[4].angle, 1.5, atol=1e-14)
 
-    def test_combine_rejects_a_batched_term(self):
-        """Combining flattens and repeats the term lists, breaking a batch's consecutiveness."""
-        batched = PauliProductFormulaContainer(
-            step_terms=[
-                ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3, batch=1),
-                ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.3, batch=1),
-            ],
-            step_reps=1,
-            num_qubits=2,
-        )
-        plain = PauliProductFormulaContainer(
-            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.2)],
-            step_reps=1,
-            num_qubits=2,
-        )
-        with pytest.raises(ValueError, match="batch"):
-            plain.combine(batched)
-        with pytest.raises(ValueError, match="batch"):
-            batched.combine(plain)
+    @pytest.mark.parametrize(
+        ("terms", "num_qubits", "match"),
+        [
+            pytest.param(
+                [
+                    ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3, batch=1),
+                    ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.3, batch=1),
+                ],
+                2,
+                "batch",
+                id="batched",
+            ),
+            pytest.param(
+                [
+                    ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3, needs_control=False),
+                    ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.3, needs_control=False),
+                ],
+                1,
+                "needs_control",
+                id="control-exempt",
+            ),
+        ],
+    )
+    def test_combine_rejects_neighbour_dependent_terms(self, terms, num_qubits, match):
+        """Both flags are claims about a term's neighbours, which combining invalidates.
 
-    def test_combine_rejects_a_control_exempt_term(self):
-        """A control exemption is a claim about a term's adjoint neighbour, which combining reorders."""
-        exempt = PauliProductFormulaContainer(
-            step_terms=[
-                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3, needs_control=False),
-                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.3, needs_control=False),
-            ],
-            step_reps=1,
-            num_qubits=1,
-        )
+        A batch must stay consecutive and an exemption must keep its adjoint partner
+        adjacent, but combining flattens and repeats the term lists. Rejected from
+        either side, since the order of the operands must not decide correctness.
+        """
+        special = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=num_qubits)
         plain = PauliProductFormulaContainer(
-            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2)],
+            step_terms=[ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=0.2)],
             step_reps=1,
-            num_qubits=1,
+            num_qubits=num_qubits,
         )
-        with pytest.raises(ValueError, match="needs_control"):
-            plain.combine(exempt)
-        with pytest.raises(ValueError, match="needs_control"):
-            exempt.combine(plain)
+        with pytest.raises(ValueError, match=match):
+            plain.combine(special)
+        with pytest.raises(ValueError, match=match):
+            special.combine(plain)
 
     def test_summary(self, container):
         """Test the summary generation of the container."""
@@ -257,7 +278,7 @@ class TestPauliProductFormulaContainer:
 
         assert "Pauli Product Formula Container" in summary
         assert "Number of qubits: 2" in summary
-        assert "Number of step terms: 3" in summary
+        assert "Number of step terms: 4" in summary
         assert "Step repetitions: 4" in summary
 
 
@@ -309,47 +330,14 @@ class TestBatchHashing:
         assert plain.content_hash() != batched.content_hash()
 
 
-class TestBatchSerialization:
-    """Round-tripping must preserve batching, or a reloaded circuit costs differently."""
-
-    @staticmethod
-    def _container():
-        return PauliProductFormulaContainer(
-            step_terms=[
-                ExponentiatedPauliTerm({0: "X", 1: "Y"}, 0.4, needs_control=False),
-                ExponentiatedPauliTerm({2: "Z"}, 0.3, batch=1),
-                ExponentiatedPauliTerm({3: "Z"}, 0.3, batch=1),
-                ExponentiatedPauliTerm({0: "X", 1: "Y"}, -0.4, needs_control=False),
-            ],
-            step_reps=2,
-            num_qubits=4,
-            scale=0.75,
-        )
-
-    def test_json_round_trip_preserves_flags(self):
-        """``needs_control`` and ``batch`` both survive JSON."""
-        original = self._container()
-        restored = PauliProductFormulaContainer.from_json(original.to_json())
-        assert [t.batch for t in restored.step_terms] == [0, 1, 1, 0]
-        assert [t.needs_control for t in restored.step_terms] == [False, True, True, False]
-        assert restored.content_hash() == original.content_hash()
-
-    def test_hdf5_round_trip_preserves_flags(self, tmp_path):
-        """``needs_control`` and ``batch`` both survive HDF5."""
-        original = self._container()
-        path = tmp_path / "container.h5"
-        with h5py.File(path, "w") as handle:
-            original.to_hdf5(handle)
-        with h5py.File(path, "r") as handle:
-            restored = PauliProductFormulaContainer.from_hdf5(handle)
-        assert [t.batch for t in restored.step_terms] == [0, 1, 1, 0]
-        assert restored.content_hash() == original.content_hash()
+class TestHdf5TermOrdering:
+    """A product formula's factor order is part of what it means."""
 
     def test_hdf5_round_trip_preserves_order_past_ten_terms(self, tmp_path):
         """HDF5 lists members alphabetically, which puts ``term_10`` before ``term_2``.
 
-        A product formula's factor order is part of what it means, so reading the group
-        back in listing order silently changes the unitary once there are eleven terms.
+        Reading the group back in listing order would silently change the unitary once
+        there are eleven terms, which no round trip with fewer would catch.
         """
         terms = [ExponentiatedPauliTerm({0: "X"}, float(i) / 10.0) for i in range(12)]
         original = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=1)
