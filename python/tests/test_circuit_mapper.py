@@ -89,10 +89,8 @@ class TestPauliSequenceMapperNonControlled:
         assert "pauliExponents" not in evo_params
         assert evo_params["pauliIndices"] == [[0], [1]]
         assert [[str(p) for p in ops] for ops in evo_params["pauliOps"]] == [["Pauli.X"], ["Pauli.Z"]]
-        # An unbatched container passes empty flag arrays rather than all-default ones,
-        # so the Q# skips both the exemption and the batching walks entirely.
-        assert evo_params["needsControl"] == []
-        assert evo_params["batchIds"] == []
+        assert "needsControl" not in evo_params
+        assert "batchIds" not in evo_params
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
@@ -123,27 +121,24 @@ class TestPauliSequenceMapperNonControlled:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_one_time_boundaries_surround_the_repeated_step(self):
-        """A noncommuting prefix and suffix execute once, on the correct sides of the loop."""
-        before = ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.2)
+    def test_outer_conjugation_surrounds_the_repeated_step(self):
+        """A noncommuting conjugation executes once around the repeated body."""
+        conjugating = ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.2)
         repeated = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3)
-        after = ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=-0.4)
         container = PauliProductFormulaContainer(
             step_terms=[repeated],
             step_reps=3,
             num_qubits=1,
-            before_repeated_terms=[before],
-            after_repeated_terms=[after],
+            conjugating_terms=[conjugating],
         )
 
         actual = dense_matrix(PauliSequenceMapper().run(UnitaryRepresentation(container))._qsharp_op, 1)
         x = np.array([[0, 1], [1, 0]], dtype=complex)
-        y = np.array([[0, -1j], [1j, 0]], dtype=complex)
         z = np.array([[1, 0], [0, -1]], dtype=complex)
         expected = (
-            scipy.linalg.expm(-1j * after.angle * y)
+            scipy.linalg.expm(1j * conjugating.angle * x)
             @ np.linalg.matrix_power(scipy.linalg.expm(-1j * repeated.angle * z), container.step_reps)
-            @ scipy.linalg.expm(-1j * before.angle * x)
+            @ scipy.linalg.expm(-1j * conjugating.angle * x)
         )
 
         assert np.max(np.abs(actual - expected)) < _TOL
@@ -155,8 +150,6 @@ def _sparse_op(terms, *, repetitions=1):
         pauliIndices=[term["qubits"] for term in terms],
         pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
         pauliCoefficients=[term["angle"] for term in terms],
-        needsControl=[],
-        batchIds=[],
         repetitions=repetitions,
     )
     return QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
@@ -242,8 +235,6 @@ class TestSparseUncontrolledEvolution:
             pauliIndices=pauli_indices,
             pauliOps=pauli_ops,
             pauliCoefficients=pauli_coefficients,
-            needsControl=[],
-            batchIds=[],
             repetitions=1,
         )
         op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)

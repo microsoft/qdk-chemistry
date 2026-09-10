@@ -5,10 +5,10 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import Std.Arrays.Subarray;
+    import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
-    import QDKChemistry.Utils.HammingWeightPhasing.BatchSegments;
-    import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhaseTerms;
-    import QDKChemistry.Utils.HammingWeightPhasing.TermTargets;
+    import Std.Intrinsic.AND;
+    import Std.Math.BitSizeI;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
 
@@ -108,11 +108,6 @@ namespace QDKChemistry.Utils.PauliExp {
         ApplyRepPauliExp(params, _)
     }
 
-    /// Returns an `Adj + Ctl` callable for repeated dense Time Evolution.
-    internal function MakeRepPauliExpAdjCtlOp(params : RepPauliExpParams) : (Qubit[] => Unit is Adj + Ctl) {
-        RepPauliExp(params, _)
-    }
-
     /// Sparse form of `RepPauliExpParams`.
     ///
     /// The dense `pauliExponents` carries one Pauli per system qubit for every term,
@@ -121,22 +116,10 @@ namespace QDKChemistry.Utils.PauliExp {
     /// into `systems` and `pauliOps[t]` holds the matching axis. A term with no entries
     /// is the identity term.
     ///
-    /// `needsControl[t]` marks whether term `t` must be controlled when the whole
-    /// evolution is. A conjugating factor whose partner also appears in the sequence
-    /// cancels against that partner when the control is off, so controlling it changes
-    /// nothing and only costs gates. An empty array controls every term, which is the
-    /// safe default and what a caller that does not reason about exemptions should pass.
-    ///
-    /// `batchIds[t]` groups consecutive terms that share a rotation angle and act on
-    /// disjoint qubits. Such a group is phased together through a Hamming weight
-    /// register, so its `m` rotations collapse to `O(log m)` at the cost of `m - w(m)`
-    /// Toffolis. `0`, or an empty array, applies the term on its own.
     struct SparseRepPauliExpParams {
         pauliIndices : Int[][],
         pauliOps : Pauli[][],
         pauliCoefficients : Double[],
-        needsControl : Bool[],
-        batchIds : Int[],
         repetitions : Int,
     }
 
@@ -145,95 +128,28 @@ namespace QDKChemistry.Utils.PauliExp {
     /// - `pauliIndices`: For each term, the positions in `systems` carrying a non-identity Pauli.
     /// - `pauliOps`: For each term, the Pauli axis at each position in `pauliIndices`.
     /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `needsControl`: For each term, whether it must be controlled; empty controls all.
     /// - `systems`: An array of qubits representing the system on which the operation acts.
     operation SparsePauliExp(
         pauliIndices : Int[][],
         pauliOps : Pauli[][],
         pauliCoefficients : Double[],
-        needsControl : Bool[],
-        batchIds : Int[],
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        body ... {
-            CheckSparseLengths(pauliIndices, pauliOps, pauliCoefficients, needsControl);
-            for (start, count) in SparseSegments(batchIds, Length(pauliCoefficients)) {
-                if count == 1 {
-                    // `Exp` takes the opposite sign to the container's exp(-i theta P) convention.
-                    Exp(pauliOps[start], -pauliCoefficients[start], Subarray(pauliIndices[start], systems));
-                } else {
-                    // `HammingWeightPhaseTerms` already applies exp(-i theta P), so it needs
-                    // no sign flip. Bound to annotated locals so the nested array types infer.
-                    let batchOps : Pauli[][] = pauliOps[start..start + count - 1];
-                    let batchTargets : Qubit[][] = TermTargets(pauliIndices[start..start + count - 1], systems);
-                    HammingWeightPhaseTerms(pauliCoefficients[start], batchOps, batchTargets);
-                }
-            }
+        CheckSparseLengths(pauliIndices, pauliOps, pauliCoefficients);
+        for idx in 0..Length(pauliCoefficients) - 1 {
+            // `Exp` takes the opposite sign to the container's exp(-i theta P) convention.
+            Exp(pauliOps[idx], -pauliCoefficients[idx], Subarray(pauliIndices[idx], systems));
         }
-        controlled (ctls, ...) {
-            CheckSparseLengths(pauliIndices, pauliOps, pauliCoefficients, needsControl);
-            let exemptKnown = Length(needsControl) != 0;
-            for (start, count) in SparseSegments(batchIds, Length(pauliCoefficients)) {
-                if count == 1 {
-                    let targets = Subarray(pauliIndices[start], systems);
-                    if exemptKnown and not needsControl[start] {
-                        // A conjugating factor: its partner is also in the sequence, so with
-                        // the control off the pair cancels and running it bare is exact.
-                        Exp(pauliOps[start], -pauliCoefficients[start], targets);
-                    } else {
-                        Controlled Exp(ctls, (pauliOps[start], -pauliCoefficients[start], targets));
-                    }
-                } else {
-                    let batchOps : Pauli[][] = pauliOps[start..start + count - 1];
-                    let batchTargets : Qubit[][] = TermTargets(pauliIndices[start..start + count - 1], systems);
-                    if exemptKnown {
-                        for offset in 1..count - 1 {
-                            Fact(
-                                needsControl[start + offset] == needsControl[start],
-                                "SparsePauliExp: every term in a batch must share needsControl."
-                            );
-                        }
-                    }
-                    if exemptKnown and not needsControl[start] {
-                        HammingWeightPhaseTerms(pauliCoefficients[start], batchOps, batchTargets);
-                    } else {
-                        Controlled HammingWeightPhaseTerms(ctls, (pauliCoefficients[start], batchOps, batchTargets));
-                    }
-                }
-            }
-        }
-    }
-
-    /// Returns the `(start, count)` blocks a sparse term list is applied in.
-    ///
-    /// Defers to `BatchSegments` when batch identifiers are supplied, and otherwise
-    /// gives every term its own block.
-    function SparseSegments(batchIds : Int[], termCount : Int) : (Int, Int)[] {
-        if Length(batchIds) == 0 {
-            mutable singles : (Int, Int)[] = [];
-            for idx in 0..termCount - 1 {
-                set singles += [(idx, 1)];
-            }
-            return singles;
-        }
-        if Length(batchIds) != termCount {
-            fail "SparsePauliExp: batchIds must be empty or as long as pauliCoefficients.";
-        }
-        return BatchSegments(batchIds);
     }
 
     /// Rejects a sparse term list whose parallel arrays disagree in length.
     function CheckSparseLengths(
         pauliIndices : Int[][],
         pauliOps : Pauli[][],
-        pauliCoefficients : Double[],
-        needsControl : Bool[]
+        pauliCoefficients : Double[]
     ) : Unit {
         if Length(pauliIndices) != Length(pauliCoefficients) or Length(pauliOps) != Length(pauliCoefficients) {
             fail "SparsePauliExp: pauliIndices, pauliOps, and pauliCoefficients must have the same length.";
-        }
-        if Length(needsControl) != 0 and Length(needsControl) != Length(pauliCoefficients) {
-            fail "SparsePauliExp: needsControl must be empty or as long as pauliCoefficients.";
         }
     }
 
@@ -251,8 +167,6 @@ namespace QDKChemistry.Utils.PauliExp {
                     params.pauliIndices,
                     params.pauliOps,
                     params.pauliCoefficients,
-                    params.needsControl,
-                    params.batchIds,
                     systems
                 );
             }
@@ -262,34 +176,290 @@ namespace QDKChemistry.Utils.PauliExp {
                     params.pauliIndices,
                     params.pauliOps,
                     params.pauliCoefficients,
-                    params.needsControl,
-                    params.batchIds,
                     systems
                 );
             }
         }
     }
 
-    /// A sparse product formula with one-time terms surrounding a repeated body.
-    struct SegmentedSparseRepPauliExpParams {
-        beforeRepeated : SparseRepPauliExpParams,
-        repeated : SparseRepPauliExpParams,
-        afterRepeated : SparseRepPauliExpParams,
+    /// Resolves sparse term positions to their system qubits.
+    internal function TermTargets(pauliIndices : Int[][], systems : Qubit[]) : Qubit[][] {
+        mutable targets : Qubit[][] = [];
+        for indices in pauliIndices {
+            set targets += [Subarray(indices, systems)];
+        }
+        return targets;
     }
 
-    /// Applies a one-time prefix, a repeated sparse product formula, and a one-time suffix.
-    operation SegmentedSparseRepPauliExp(
-        params : SegmentedSparseRepPauliExpParams,
+    /// Returns the qubit carrying each mapped term's phase.
+    internal function HammingWeightRepresentatives(targets : Qubit[][]) : Qubit[] {
+        mutable representatives : Qubit[] = [];
+        for term in targets {
+            set representatives += [term[Length(term) - 1]];
+        }
+        return representatives;
+    }
+
+    /// Rotates one nonempty Pauli string onto a single Z representative.
+    internal operation MapPauliTermToSingleZ(ops : Pauli[], targets : Qubit[]) : Unit is Adj + Ctl {
+        Fact(Length(ops) == Length(targets), "MapPauliTermToSingleZ needs one Pauli axis per target.");
+        Fact(Length(ops) > 0, "MapPauliTermToSingleZ needs a non-empty Pauli string.");
+        for i in 0..Length(ops) - 1 {
+            if ops[i] == PauliX {
+                H(targets[i]);
+            } elif ops[i] == PauliY {
+                Adjoint S(targets[i]);
+                H(targets[i]);
+            } else {
+                Fact(ops[i] == PauliZ, "MapPauliTermToSingleZ does not accept PauliI.");
+            }
+        }
+        let last = Length(targets) - 1;
+        for i in 0..last - 1 {
+            CNOT(targets[i], targets[last]);
+        }
+    }
+
+    /// Plans an optimal adder tree for a Hamming-weight computation.
+    internal function HammingWeightSchedule(count : Int) : ((Int, Int, Int, Int)[], Int[], Int) {
+        if count <= 0 {
+            return ([], [], 0);
+        }
+        let levels = BitSizeI(count);
+        mutable initial : Int[] = [];
+        for i in 0..count - 1 {
+            set initial += [i];
+        }
+        mutable buckets : Int[][] = [[], size = levels + 1];
+        set buckets w/= 0 <- initial;
+        mutable schedule : (Int, Int, Int, Int)[] = [];
+        mutable next = count;
+
+        for k in 0..levels - 1 {
+            mutable current = buckets[k];
+            mutable upper = buckets[k + 1];
+            while Length(current) >= 3 {
+                set schedule += [(current[0], current[1], current[2], next)];
+                set current = current[3...] + [current[2]];
+                set upper += [next];
+                set next += 1;
+            }
+            if Length(current) == 2 {
+                set schedule += [(current[0], current[1], -1, next)];
+                set current = [current[1]];
+                set upper += [next];
+                set next += 1;
+            }
+            set buckets w/= k <- current;
+            set buckets w/= k + 1 <- upper;
+        }
+
+        mutable finalBits : Int[] = [];
+        for k in 0..levels - 1 {
+            set finalBits += [Length(buckets[k]) == 1 ? buckets[k][0] | -1];
+        }
+        return (schedule, finalBits, next);
+    }
+
+    /// Compresses three equal-significance bits into a sum and carry.
+    internal operation FullAdderStep(a : Qubit, b : Qubit, c : Qubit, carry : Qubit) : Unit is Adj {
+        CNOT(a, b);
+        CNOT(a, c);
+        AND(b, c, carry);
+        CNOT(a, carry);
+        CNOT(b, c);
+        CNOT(a, c);
+    }
+
+    /// Compresses two equal-significance bits into a sum and carry.
+    internal operation HalfAdderStep(a : Qubit, b : Qubit, carry : Qubit) : Unit is Adj {
+        AND(a, b, carry);
+        CNOT(a, b);
+    }
+
+    /// Computes a Hamming weight into a little-endian output register.
+    internal operation ComputeHammingWeight(
+        inputs : Qubit[],
+        scratch : Qubit[],
+        weight : Qubit[]
+    ) : Unit is Adj {
+        let (schedule, finalBits, _) = HammingWeightSchedule(Length(inputs));
+        let work = inputs + scratch;
+        for (a, b, c, carry) in schedule {
+            if c < 0 {
+                HalfAdderStep(work[a], work[b], work[carry]);
+            } else {
+                FullAdderStep(work[a], work[b], work[c], work[carry]);
+            }
+        }
+        for k in 0..Length(finalBits) - 1 {
+            if finalBits[k] >= 0 {
+                CNOT(work[finalBits[k]], weight[k]);
+            }
+        }
+    }
+
+    /// Applies equal-angle Z phases using logarithmically many rotations.
+    internal operation HammingWeightPhase(theta : Double, inputs : Qubit[]) : Unit is Adj + Ctl {
+        let count = Length(inputs);
+        let bits = BitSizeI(count);
+        let (schedule, _, _) = HammingWeightSchedule(count);
+        use scratch = Qubit[Length(schedule)];
+        use weight = Qubit[bits];
+        within {
+            ComputeHammingWeight(inputs, scratch, weight);
+        } apply {
+            for k in 0..bits - 1 {
+                let scale = IntAsDouble(1 <<< k);
+                Rz(2.0 * theta * scale, weight[k]);
+                R(PauliI, -2.0 * theta * scale, weight[k]);
+            }
+            R(PauliI, 2.0 * theta * IntAsDouble(count), inputs[0]);
+        }
+    }
+
+    /// Applies one equal-angle batch, selecting HWP only at its measured break-even size.
+    internal operation HammingWeightPhaseTerms(
+        theta : Double,
+        pauliOps : Pauli[][],
+        targets : Qubit[][]
+    ) : Unit is Adj + Ctl {
+        Fact(Length(pauliOps) == Length(targets), "HammingWeightPhaseTerms needs one axis list per term.");
+        // For a controlled batch of m terms, HWP costs 3 ceil(log2(m + 1)) + 1
+        // rotations and m - w(m) AND operations, versus 2m rotations term by term.
+        if Length(targets) < 8 {
+            for t in 0..Length(targets) - 1 {
+                Exp(pauliOps[t], -theta, targets[t]);
+            }
+        } else {
+            within {
+                for t in 0..Length(targets) - 1 {
+                    MapPauliTermToSingleZ(pauliOps[t], targets[t]);
+                }
+            } apply {
+                HammingWeightPhase(theta, HammingWeightRepresentatives(targets));
+            }
+        }
+    }
+
+    /// One equal-angle group in a structured sparse product formula.
+    ///
+    /// A singleton is one Pauli exponential. Multiple entries are a batch whose
+    /// lowering policy is owned by `HammingWeightPhaseTerms`.
+    struct SparsePauliExpGroupParams {
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
+        angle : Double,
+    }
+
+    /// Applies one plain or batched equal-angle group.
+    operation SparsePauliExpGroup(
+        params : SparsePauliExpGroupParams,
         systems : Qubit[],
     ) : Unit is Adj + Ctl {
-        SparseRepPauliExp(params.beforeRepeated, systems);
-        SparseRepPauliExp(params.repeated, systems);
-        SparseRepPauliExp(params.afterRepeated, systems);
+        if Length(params.pauliIndices) != Length(params.pauliOps) {
+            fail "SparsePauliExpGroup: pauliIndices and pauliOps must have the same length.";
+        }
+        if Length(params.pauliIndices) == 0 {
+            fail "SparsePauliExpGroup: a group must contain at least one Pauli term.";
+        }
+        if Length(params.pauliIndices) == 1 {
+            Exp(params.pauliOps[0], -params.angle, Subarray(params.pauliIndices[0], systems));
+        } else {
+            HammingWeightPhaseTerms(
+                params.angle,
+                params.pauliOps,
+                TermTargets(params.pauliIndices, systems)
+            );
+        }
     }
 
-    /// Allocates a register and applies segmented sparse Pauli evolution to selected indices.
-    operation MakeSegmentedSparseRepPauliExpCircuit(
-        evoParams : SegmentedSparseRepPauliExpParams,
+    /// Applies a sequence of plain or batched groups.
+    operation SparsePauliExpGroups(
+        groups : SparsePauliExpGroupParams[],
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        for group in groups {
+            SparsePauliExpGroup(group, systems);
+        }
+    }
+
+    /// One direct group or a structured `within { V } apply { D }` block.
+    struct ConjugatedSparsePauliExpParams {
+        withinGroups : SparsePauliExpGroupParams[],
+        applyGroups : SparsePauliExpGroupParams[],
+    }
+
+    /// Applies a direct block or a conjugation whose `within` block stays bare under control.
+    operation ConjugatedSparsePauliExp(
+        params : ConjugatedSparsePauliExpParams,
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        if Length(params.withinGroups) == 0 {
+            SparsePauliExpGroups(params.applyGroups, systems);
+        } else {
+            within {
+                SparsePauliExpGroups(params.withinGroups, systems);
+            } apply {
+                SparsePauliExpGroups(params.applyGroups, systems);
+            }
+        }
+    }
+
+    /// Applies one structured product-formula step.
+    operation StructuredSparsePauliExpStep(
+        blocks : ConjugatedSparsePauliExpParams[],
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        for block in blocks {
+            ConjugatedSparsePauliExp(block, systems);
+        }
+    }
+
+    /// A repeated structured product formula, optionally conjugated once as a whole.
+    struct StructuredSparseRepPauliExpParams {
+        conjugatingGroups : SparsePauliExpGroupParams[],
+        stepBlocks : ConjugatedSparsePauliExpParams[],
+        repetitions : Int,
+    }
+
+    /// Applies the repeated structured step, using estimator-native repetition when available.
+    operation RepeatedStructuredSparsePauliExp(
+        params : StructuredSparseRepPauliExpParams,
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        if IsResourceEstimating() {
+            within {
+                RepeatEstimates(params.repetitions);
+            } apply {
+                StructuredSparsePauliExpStep(params.stepBlocks, systems);
+            }
+        } else {
+            for _ in 1..params.repetitions {
+                StructuredSparsePauliExpStep(params.stepBlocks, systems);
+            }
+        }
+    }
+
+    /// Applies `V step^r V^dagger`; Q# controls only `step^r` automatically.
+    operation StructuredSparseRepPauliExp(
+        params : StructuredSparseRepPauliExpParams,
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        if Length(params.conjugatingGroups) == 0 {
+            RepeatedStructuredSparsePauliExp(params, systems);
+        } else {
+            within {
+                SparsePauliExpGroups(params.conjugatingGroups, systems);
+            } apply {
+                RepeatedStructuredSparsePauliExp(params, systems);
+            }
+        }
+    }
+
+    /// Allocates a register and applies structured sparse Pauli evolution.
+    operation MakeStructuredSparseRepPauliExpCircuit(
+        evoParams : StructuredSparseRepPauliExpParams,
         system : Int[],
     ) : Unit {
         if Length(system) == 0 {
@@ -304,29 +474,22 @@ namespace QDKChemistry.Utils.PauliExp {
         }
 
         use qs = Qubit[maxIndex + 1];
-        SegmentedSparseRepPauliExp(evoParams, Subarray(system, qs));
+        StructuredSparseRepPauliExp(evoParams, Subarray(system, qs));
     }
 
-    /// Uncontrolled entry point for segmented sparse Pauli evolution.
-    operation ApplySegmentedSparseRepPauliExp(
-        params : SegmentedSparseRepPauliExpParams,
+    /// Uncontrolled entry point for structured sparse Pauli evolution.
+    operation ApplyStructuredSparseRepPauliExp(
+        params : StructuredSparseRepPauliExpParams,
         systems : Qubit[],
     ) : Unit {
-        SegmentedSparseRepPauliExp(params, systems);
+        StructuredSparseRepPauliExp(params, systems);
     }
 
-    /// Returns an uncontrolled callable for segmented sparse Pauli evolution.
-    function MakeSegmentedSparseRepPauliExpOp(
-        params : SegmentedSparseRepPauliExpParams
+    /// Returns an uncontrolled callable for structured sparse Pauli evolution.
+    function MakeStructuredSparseRepPauliExpOp(
+        params : StructuredSparseRepPauliExpParams
     ) : Qubit[] => Unit {
-        ApplySegmentedSparseRepPauliExp(params, _)
-    }
-
-    /// Returns an `Adj + Ctl` callable for segmented sparse Pauli evolution.
-    internal function MakeSegmentedSparseRepPauliExpAdjCtlOp(
-        params : SegmentedSparseRepPauliExpParams
-    ) : (Qubit[] => Unit is Adj + Ctl) {
-        SegmentedSparseRepPauliExp(params, _)
+        ApplyStructuredSparseRepPauliExp(params, _)
     }
 
     /// A helper operation to create a circuit for repeated sparse Time Evolution.
@@ -364,10 +527,4 @@ namespace QDKChemistry.Utils.PauliExp {
         ApplySparseRepPauliExp(params, _)
     }
 
-    /// Returns an `Adj + Ctl` callable for repeated sparse Time Evolution.
-    internal function MakeSparseRepPauliExpAdjCtlOp(
-        params : SparseRepPauliExpParams
-    ) : (Qubit[] => Unit is Adj + Ctl) {
-        SparseRepPauliExp(params, _)
-    }
 }

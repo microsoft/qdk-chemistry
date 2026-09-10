@@ -7,6 +7,7 @@
 
 import math
 import os
+from collections.abc import Sequence
 from typing import ClassVar
 
 import numpy as np
@@ -29,31 +30,106 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    MIN_USEFUL_BATCH,
+    BatchedExponentiatedPauliTerm,
+    ConjugatedExponentiatedPauliTerm,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .test_helpers import dense_matrix
 
 batch_equal_angles = PlaquetteTrotter._batch_equal_angles
 plaquette_sections = PlaquetteTrotter._plaquette_sections
 
+_HWP_BREAK_EVEN = 8
+
+
+def _expand_groups(
+    groups: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm],
+) -> list[ExponentiatedPauliTerm]:
+    """Expand structural equal-angle groups into plain Pauli exponentials."""
+    expanded: list[ExponentiatedPauliTerm] = []
+    for group in groups:
+        if isinstance(group, ExponentiatedPauliTerm):
+            expanded.append(group)
+        else:
+            expanded.extend(ExponentiatedPauliTerm(pauli_term=term, angle=group.angle) for term in group.pauli_terms)
+    return expanded
+
+
+def _expand_terms(
+    terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm],
+) -> list[ExponentiatedPauliTerm]:
+    """Expand batches and implicit conjugate tails into execution-order leaves."""
+    expanded: list[ExponentiatedPauliTerm] = []
+    for term in terms:
+        if isinstance(term, ConjugatedExponentiatedPauliTerm):
+            within = _expand_groups(term.within_terms)
+            expanded.extend(within)
+            expanded.extend(_expand_groups(term.apply_terms))
+            expanded.extend(
+                ExponentiatedPauliTerm(pauli_term=leaf.pauli_term, angle=-leaf.angle) for leaf in reversed(within)
+            )
+        else:
+            expanded.extend(_expand_groups([term]))
+    return expanded
+
+
+def _structured_batches(
+    terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm],
+) -> list[BatchedExponentiatedPauliTerm]:
+    """Collect batches from direct terms and conjugated apply blocks."""
+    batches: list[BatchedExponentiatedPauliTerm] = []
+    for term in terms:
+        if isinstance(term, BatchedExponentiatedPauliTerm):
+            batches.append(term)
+        elif isinstance(term, ConjugatedExponentiatedPauliTerm):
+            batches.extend(group for group in term.apply_terms if isinstance(group, BatchedExponentiatedPauliTerm))
+    return batches
+
+
+def _unbatch_container(container: PauliProductFormulaContainer) -> PauliProductFormulaContainer:
+    """Return an equivalent structure with every HWP group expanded into leaves."""
+    step_terms: list[ExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm] = []
+    for term in container.step_terms:
+        if isinstance(term, ConjugatedExponentiatedPauliTerm):
+            step_terms.append(
+                ConjugatedExponentiatedPauliTerm(
+                    within_terms=_expand_groups(term.within_terms),
+                    apply_terms=_expand_groups(term.apply_terms),
+                )
+            )
+        else:
+            step_terms.extend(_expand_groups([term]))
+    return PauliProductFormulaContainer(
+        step_terms=step_terms,
+        step_reps=container.step_reps,
+        num_qubits=container.num_qubits,
+        scale=container.scale,
+        conjugating_terms=_expand_groups(container.conjugating_terms),
+    )
+
+
+def _term_signature(terms: Sequence[ExponentiatedPauliTerm]) -> list[tuple[tuple[tuple[int, str], ...], float]]:
+    """Return a sortable signature for an ordered leaf sequence."""
+    return [(tuple(sorted(term.pauli_term.items())), round(term.angle, 12)) for term in terms]
+
 
 def _single_spin_hop_layer(
     section: list[tuple[int, ...]], num_sites: int, hopping: float, time: float
 ) -> list[ExponentiatedPauliTerm]:
     """Return the first spin block from a hopping layer built for both spins."""
-    terms = PlaquetteTrotter()._hop_layer(
+    layer = PlaquetteTrotter()._hop_layer(
         section,
         num_sites=num_sites,
         hopping=hopping,
         time=time,
-        first_batch=1,
     )
+    assert layer is not None
+    terms = _expand_terms([layer])
     return [term for term in terms if all(qubit < num_sites for qubit in term.pauli_term)]
 
 
@@ -115,23 +191,25 @@ def _plaquette_container(side: int, *, time: float = 0.05, interaction: float = 
     return _plaquette_builder(side, time=time).run(operator).get_container()
 
 
+def _pauli_label(terms: dict[int, str], num_qubits: int) -> str:
+    """Encode a sparse Pauli map as the operator's big-endian label."""
+    axes = ["I"] * num_qubits
+    for qubit, axis in terms.items():
+        axes[-qubit - 1] = axis
+    return "".join(axes)
+
+
 def _bound_parameter_operator(num_sites: int, hopping: float, interaction: float) -> QubitOperator:
     """Minimal operator carrying the Hubbard parameters read by the bound."""
     num_qubits = 2 * num_sites
 
-    def label(terms: dict[int, str]) -> str:
-        axes = ["I"] * num_qubits
-        for qubit, axis in terms.items():
-            axes[-qubit - 1] = axis
-        return "".join(axes)
-
     return QubitOperator(
         pauli_strings=[
-            label({0: "X", 1: "X"}),
-            label({0: "Y", 1: "Y"}),
-            label({num_sites: "X", num_sites + 1: "X"}),
-            label({num_sites: "Y", num_sites + 1: "Y"}),
-            label({0: "Z", num_sites: "Z"}),
+            _pauli_label({0: "X", 1: "X"}, num_qubits),
+            _pauli_label({0: "Y", 1: "Y"}, num_qubits),
+            _pauli_label({num_sites: "X", num_sites + 1: "X"}, num_qubits),
+            _pauli_label({num_sites: "Y", num_sites + 1: "Y"}, num_qubits),
+            _pauli_label({0: "Z", num_sites: "Z"}, num_qubits),
         ],
         coefficients=np.array([-hopping / 2.0, -hopping / 2.0, -hopping / 2.0, -hopping / 2.0, interaction / 4.0]),
     )
@@ -205,7 +283,7 @@ def _cycle_hamiltonian(sites, num_modes: int) -> np.ndarray:
 def _unitary_from_terms(terms, num_modes: int) -> np.ndarray:
     """Compose terms under the container convention: angle ``a`` means ``exp(-i a P)``."""
     out = np.eye(2**num_modes, dtype=complex)
-    for term in terms:
+    for term in _expand_terms(terms):
         if not term.pauli_term:
             out = np.exp(-1j * term.angle) * out
             continue
@@ -255,7 +333,7 @@ class TestPlaquetteSections:
         """The 2x2 torus is itself one four-cycle, so the second section is empty.
 
         Both sides degenerate together here, unlike a 2xL lattice: the lone cycle
-        already covers all four bonds exactly once, so emitting the shifted section as
+        already covers all four bonds exactly once, so emitting a separate gold tiling as
         well would evolve every bond twice over.
         """
         section_a, section_b = plaquette_sections(2, 2)
@@ -282,7 +360,7 @@ class TestPlaquetteTerms:
         interleave non-adjacent modes, whose Jordan-Wigner strings must thread through the
         butterfly correctly. ``(4, 3, 0, 1)`` is the same four-cycle as ``(0, 1, 4, 3)``
         walked in the opposite orientation, so both its butterfly pairs descend and its
-        first bond descends: exactly the section-B cycles the tiling really emits (e.g.
+        first bond descends: exactly the gold cycles the tiling really emits (e.g.
         ``(15, 12, 0, 3)`` at 4x4), which exercise the ``-pi/8`` butterfly branch that an
         ascending-only cycle never reaches.
         """
@@ -320,6 +398,11 @@ class TestPlaquetteTerms:
 
 class TestPlaquetteTrotter:
     """Tests for the builder."""
+
+    @staticmethod
+    def _xy_support(label: str) -> frozenset[int]:
+        """Return the X/Y endpoint positions in a little-endian Pauli label."""
+        return frozenset(index for index, axis in enumerate(reversed(label)) if axis in "XY")
 
     def test_requires_a_lattice_shape(self):
         """Without a lattice the builder cannot know the tiling."""
@@ -359,24 +442,28 @@ class TestPlaquetteTrotter:
         container = builder.run(operator).get_container()
 
         assert body == container.step_terms
-        interaction = [term for term in body if term.pauli_term and set(term.pauli_term.values()) <= {"Z"}]
-        hopping = [term for term in body if term.pauli_term and not set(term.pauli_term.values()) <= {"Z"}]
-        assert body[-len(interaction) :] == interaction
+        hopping = body[:3]
+        assert all(isinstance(term, ConjugatedExponentiatedPauliTerm) for term in hopping)
+        hopping = [term for term in hopping if isinstance(term, ConjugatedExponentiatedPauliTerm)]
+        interaction = _expand_terms(body[3:])
         assert len(interaction) == side * side
-        assert sum(not term.needs_control for term in hopping) == 3 * (side * side // 2) * 8
-        assert sum(term.needs_control for term in hopping) == 3 * (side * side // 2) * 2
+        assert all(term.pauli_term and set(term.pauli_term.values()) <= {"Z"} for term in interaction)
+        assert sum(2 * len(term.within_terms) for term in hopping) == 3 * (side * side // 2) * 8
+        assert sum(len(_expand_groups(term.apply_terms)) for term in hopping) == 3 * (side * side // 2) * 2
 
     def test_uses_four_times_fewer_rotations_on_the_hopping(self):
         """The whole point: four bonds cost two synthesized rotations, not eight."""
         container = _plaquette_container(4)
         eighth = math.pi / 8.0
+        hopping = [term for term in container.step_terms if isinstance(term, ConjugatedExponentiatedPauliTerm)]
         fixed = sum(
-            1
-            for term in container.step_terms
-            if term.pauli_term and np.isclose(term.angle / eighth, round(term.angle / eighth))
+            2
+            for layer in hopping
+            for term in layer.within_terms
+            if np.isclose(term.angle / eighth, round(term.angle / eighth))
         )
-        # Campbell's Eq. (D2) (arXiv:2012.09238v4, App. D) applies section A at half
-        # time twice and section B at full time once, so three section applications, two
+        # Campbell's Eq. (D2) applies the pink tiling at half time twice and the gold
+        # tiling at full time once, so three tiling applications, two
         # spins, four cycles each, eight fixed terms -- eight rather than twelve because
         # the innermost butterfly is fused into the eigenvalue phases (App. E Eq. (E13)).
         assert fixed == 3 * 2 * 4 * 8
@@ -416,8 +503,18 @@ class TestPlaquetteTrotter:
             .get_container()
         )
 
-        positive_phases = [term.angle for term in positive.step_terms if term.needs_control]
-        negative_phases = [term.angle for term in negative.step_terms if term.needs_control]
+        positive_phases = [
+            term.angle
+            for layer in positive.step_terms
+            if isinstance(layer, ConjugatedExponentiatedPauliTerm)
+            for term in _expand_groups(layer.apply_terms)
+        ]
+        negative_phases = [
+            term.angle
+            for layer in negative.step_terms
+            if isinstance(layer, ConjugatedExponentiatedPauliTerm)
+            for term in _expand_groups(layer.apply_terms)
+        ]
         assert negative_phases == pytest.approx([-angle for angle in positive_phases])
 
     def test_rejects_interleaved_mode_ordering(self):
@@ -439,12 +536,8 @@ class TestPlaquetteTrotter:
         operator = _hubbard_operator(side, side, 8.0)
         # Drop one bond's two Pauli terms, leaving the lattice with a hole.
         labels = list(operator.pauli_strings)
-
-        def support(label):
-            return frozenset(i for i, axis in enumerate(reversed(label)) if axis in "XY")
-
-        target = support(next(label for label in labels if len(support(label)) == 2))
-        keep = [index for index, label in enumerate(labels) if support(label) != target]
+        target = self._xy_support(next(label for label in labels if len(self._xy_support(label)) == 2))
+        keep = [index for index, label in enumerate(labels) if self._xy_support(label) != target]
         punctured = QubitOperator(
             pauli_strings=[labels[i] for i in keep],
             coefficients=operator.coefficients[keep],
@@ -481,28 +574,19 @@ class TestPlaquetteTrotter:
         )
 
         assert container.step_reps == 3
-        assert container.before_repeated_terms
-        assert len(container.after_repeated_terms) == len(container.before_repeated_terms)
-        for before, after in zip(
-            container.before_repeated_terms, reversed(container.after_repeated_terms), strict=True
-        ):
-            assert before.pauli_term == after.pauli_term
-            assert before.angle == pytest.approx(-after.angle)
-            assert not before.needs_control
-            assert not after.needs_control
-
-        interaction_count = len(container.before_repeated_terms)
-        full_interaction = container.step_terms[-interaction_count:]
-        for half, full in zip(container.before_repeated_terms, full_interaction, strict=True):
+        assert container.conjugating_terms
+        interaction_half = _expand_groups(container.conjugating_terms)
+        full_interaction = [term for term in _expand_terms(container.step_terms[3:]) if term.pauli_term]
+        assert len(full_interaction) == len(interaction_half)
+        for half, full in zip(interaction_half, full_interaction, strict=True):
             assert full.pauli_term == half.pauli_term
             assert full.angle == pytest.approx(2.0 * half.angle)
-            assert full.needs_control
 
-        hopping = container.step_terms[:-interaction_count]
-        fixed_factors = [term for term in hopping if not term.needs_control]
-        arbitrary_factors = [term for term in hopping if term.needs_control and term.pauli_term]
-        assert len(fixed_factors) == 3 * (side * side // 2) * 8
-        assert len(arbitrary_factors) == 3 * (side * side // 2) * 2
+        hopping = container.step_terms[:3]
+        assert all(isinstance(term, ConjugatedExponentiatedPauliTerm) for term in hopping)
+        hopping = [term for term in hopping if isinstance(term, ConjugatedExponentiatedPauliTerm)]
+        assert sum(2 * len(term.within_terms) for term in hopping) == 3 * (side * side // 2) * 8
+        assert sum(len(_expand_groups(term.apply_terms)) for term in hopping) == 3 * (side * side // 2) * 2
 
     def test_hopping_only_repetitions_keep_the_whole_step(self):
         """The E2 rewrite is unnecessary when the interaction layer is empty."""
@@ -521,74 +605,54 @@ class TestPlaquetteTrotter:
 
         assert container.step_reps == 2
         assert container.step_terms
-        assert container.before_repeated_terms == []
-        assert container.after_repeated_terms == []
+        assert container.conjugating_terms == []
 
 
-class TestControlExemption:
-    """Tests for the factors the plaquette scheme exempts from control."""
+class TestConjugationStructure:
+    """Tests for the plaquette basis changes represented by Q# ``within`` blocks."""
 
-    def test_conjugating_factors_are_exempt_and_phases_are_not(self):
-        """Only the two eigenvalue phases should need controlling."""
-        terms = _plaquette_terms((0, 1, 4, 3), hopping=1.0, time=0.05)
-        exempt = [t for t in terms if not t.needs_control]
-        controlled = [t for t in terms if t.needs_control]
-        # Eight, not twelve: the fused butterfly is absorbed into the phases, so two
-        # factors leave the network and two leave its adjoint.
-        assert len(exempt) == 8, "the Givens network should be exempt from control"
-        assert len(controlled) == 2, "only the eigenvalue phases should be controlled"
+    def test_basis_change_and_phases_are_separate_blocks(self):
+        """Each spin-resolved plaquette has four basis factors and two phases."""
+        layer = PlaquetteTrotter()._hop_layer([(0, 1, 4, 3)], num_sites=5, hopping=1.0, time=0.05)
+        assert layer is not None
+        assert len(layer.within_terms) == 8
+        assert len(_expand_groups(layer.apply_terms)) == 4
 
     def test_control_off_branch_is_the_identity(self):
-        """With the control off only the exempt factors run, and they must cancel.
-
-        This is the property that makes the exemption sound. If it fails the circuit
-        is wrong on the control-off branch, which is invisible to any check that only
-        inspects the control-on evolution.
-        """
-        num_modes = 6
-        terms = _plaquette_terms((0, 1, 4, 3), hopping=1.0, time=0.37)
-        control_off = [t for t in terms if not t.needs_control]
+        """The implicit adjoint of a ``within`` block exactly cancels its basis change."""
+        num_modes = 5
+        layer = PlaquetteTrotter()._hop_layer([(0, 1, 4, 3)], num_sites=5, hopping=1.0, time=0.37)
+        assert layer is not None
+        within = [
+            term for term in _expand_groups(layer.within_terms) if all(qubit < num_modes for qubit in term.pauli_term)
+        ]
+        control_off = within + [
+            ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=-term.angle) for term in reversed(within)
+        ]
         assert np.allclose(_unitary_from_terms(control_off, num_modes), np.eye(2**num_modes), atol=1e-10)
 
     def test_control_on_branch_still_reproduces_the_evolution(self):
-        """Exempting factors must not change the control-on evolution."""
+        """The structured basis change must not alter the control-on evolution."""
         num_modes, time = 6, 0.37
         sites = (0, 1, 4, 3)
         terms = _plaquette_terms(sites, hopping=1.0, time=time)
         expected = scipy.linalg.expm(-1j * time * _cycle_hamiltonian(sites, num_modes))
         assert np.allclose(_unitary_from_terms(terms, num_modes), expected, atol=1e-10)
 
-    def test_the_emitted_step_exempt_factors_cancel_lifo(self):
-        """Re-homes the container's removed cancellation check into a builder assertion.
-
-        With the control off only the exempt factors run, so across the whole interleaved
-        step they must undo each other strictly last-in-first-out; anything left on the
-        stack would survive into the control-off branch and corrupt the circuit. This walks
-        the emitted step as the container used to and asserts the stack empties.
-        """
+    def test_the_emitted_step_uses_three_conjugated_hopping_blocks(self):
+        """The pink, gold, and pink hopping layers each own their implicit adjoint."""
         side = 4
         container = _plaquette_container(side)
-        stack: list[ExponentiatedPauliTerm] = []
-        for term in container.step_terms:
-            if term.needs_control:
-                continue
-            if (
-                stack
-                and stack[-1].pauli_term == term.pauli_term
-                and np.isclose(stack[-1].angle + term.angle, 0.0, atol=1e-12)
-            ):
-                stack.pop()
-            else:
-                stack.append(term)
-        assert stack == [], "the exempt factors do not cancel last-in-first-out"
+        assert all(isinstance(term, ConjugatedExponentiatedPauliTerm) for term in container.step_terms[:3])
 
-    def test_a_whole_step_has_the_expected_exempt_count(self):
-        """Consecutive plaquettes interleave their sandwiches, but the exempt-factor count is fixed."""
+    def test_a_whole_step_has_the_expected_basis_change_count(self):
+        """The three hopping tilings have Campbell's fixed-factor count."""
         container = _plaquette_container(4)
-        exempt = sum(1 for t in container.step_terms if not t.needs_control)
-        # Three section applications, two spins, four cycles, eight conjugating factors
+        hopping = [term for term in container.step_terms[:3] if isinstance(term, ConjugatedExponentiatedPauliTerm)]
+        fixed = sum(2 * len(term.within_terms) for term in hopping)
+        # Three tiling applications, two spins, four cycles, eight conjugating factors
         # per cycle once the innermost butterfly is fused into the phases.
-        assert exempt == 3 * 2 * 4 * 8
+        assert fixed == 3 * 2 * 4 * 8
 
 
 class TestPlaquetteIterativePhaseEstimation:
@@ -598,8 +662,8 @@ class TestPlaquetteIterativePhaseEstimation:
     decomposition is exact -- the emitted step reproduces exp(-iHt) to machine
     precision -- and phase estimation must land on an exact eigenvalue. That makes
     this the sharpest available check on the whole chain: the builder's lattice
-    validation, the tiling, the emitted terms, the container's control-exemption
-    bookkeeping, the controlled mapper, and the Q#. A fault anywhere in it shifts the
+    validation, the tiling, the emitted conjugations, the controlled mapper, and Q#.
+    A fault anywhere in that chain shifts the
     recovered phase.
 
     In particular it exercises the control-OFF branch, which no test of the evolution
@@ -655,7 +719,6 @@ class TestPlaquetteIterativePhaseEstimation:
             ),
             qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params),
         )
-
         iqpe = IterativePhaseEstimation(shots_per_bit=25)
         iqpe.settings().set(
             "qpe_circuit_builder",
@@ -678,6 +741,15 @@ class TestPlaquetteIterativePhaseEstimation:
         iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42))
         return iqpe.run(qubit_hamiltonian=operator, state_preparation=state_prep)
 
+    def _emitted_unitary(self, operator: QubitOperator, name: str, **settings) -> np.ndarray:
+        """Build one step with *name* and return its dense unitary."""
+        container = (
+            create("hamiltonian_unitary_builder", name, time=self._TIME, num_divisions=1, order=2, **settings)
+            .run(operator)
+            .get_container()
+        )
+        return _unitary_from_terms(container.step_terms, operator.num_qubits)
+
     def test_recovers_the_exact_eigenvalue(self):
         """The plaquette circuit must reproduce the eigenvalue to simulator precision."""
         result = self._run()
@@ -698,16 +770,10 @@ class TestPlaquetteIterativePhaseEstimation:
         dense = pauli_to_dense_matrix(list(labels), list(coefficients))
         exact = scipy.linalg.expm(-1j * self._TIME * dense)
 
-        def emitted(name, **settings):
-            container = (
-                create("hamiltonian_unitary_builder", name, time=self._TIME, num_divisions=1, order=2, **settings)
-                .run(operator)
-                .get_container()
-            )
-            return _unitary_from_terms(container.step_terms, operator.num_qubits)
-
-        plaquette = emitted(_PLAQUETTE_ALGORITHM, lattice_width=self._WIDTH, lattice_height=self._HEIGHT)
-        term_by_term = emitted("trotter")
+        plaquette = self._emitted_unitary(
+            operator, _PLAQUETTE_ALGORITHM, lattice_width=self._WIDTH, lattice_height=self._HEIGHT
+        )
+        term_by_term = self._emitted_unitary(operator, "trotter")
         assert np.max(np.abs(plaquette - exact)) < 1e-12
         assert np.max(np.abs(term_by_term - exact)) > 1e-6
 
@@ -726,7 +792,7 @@ class TestPlaquetteErrorConstant:
         assert ours == pytest.approx(self._TABLE_I[side], rel=0.05)
 
     def test_vanishes_for_the_lattice_whose_sections_commute(self):
-        """At 4x4 the two sections commute, so only the interaction term survives.
+        """At 4x4 the pink and gold hopping terms commute, so only :math:`H_I` survives.
 
         Campbell's Table III (arXiv:2012.09238v4) records the commutator norm as
         exactly 0 there, which is a sharp check that the tiling matches his.
@@ -808,8 +874,11 @@ class TestCampbellTableIResources:
             .get_container()
         )
 
-        fixed_t = sum(not term.needs_control for term in container.step_terms)
-        arbitrary_rotations = sum(term.needs_control and bool(term.pauli_term) for term in container.step_terms)
+        hopping = [term for term in container.step_terms[:3] if isinstance(term, ConjugatedExponentiatedPauliTerm)]
+        fixed_t = sum(2 * len(term.within_terms) for term in hopping)
+        hopping_rotations = sum(len(_expand_groups(term.apply_terms)) for term in hopping)
+        interaction_rotations = len([term for term in _expand_terms(container.step_terms[3:]) if term.pauli_term])
+        arbitrary_rotations = hopping_rotations + interaction_rotations
         assert fixed_t == 12 * side * side
         assert arbitrary_rotations == 4 * side * side
 
@@ -915,82 +984,55 @@ class TestRecoversTheClassicalGroundStateEnergy:
 _TOL = 1e-5
 
 
-def _uncontrolled_source(terms, *, batched, repetitions=1):
-    """Q# invoking the sparse *uncontrolled* evolution, with batching on or off."""
-    indices = ", ".join("[" + ", ".join(str(q) for q in t["qubits"]) + "]" for t in terms)
-    ops = ", ".join("[" + ", ".join(f"Pauli{a}" for a in t["axes"]) + "]" for t in terms)
-    angles = ", ".join(repr(float(t["angle"])) for t in terms)
-    ids = ", ".join(str(t["batch"] if batched else 0) for t in terms)
-    return (
-        "qs => QDKChemistry.Utils.PauliExp.SparseRepPauliExp("
-        "new QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams { "
-        f"pauliIndices = [{indices}], pauliOps = [{ops}], pauliCoefficients = [{angles}], "
-        f"needsControl = [], batchIds = [{ids}], repetitions = {repetitions} }}, qs)"
-    )
-
-
 class TestBatchEqualAngles:
-    """The pure grouping the plaquette builder applies to its diagonal layer.
+    """The structural grouping the plaquette builder applies to equal-angle terms.
 
     These exercise ``batch_equal_angles`` directly -- no builder, no Q# -- so they are
     the fast, unit-level checks on the grouping itself.
     """
 
-    @pytest.mark.parametrize(
-        ("count", "expected_batches"),
-        [(MIN_USEFUL_BATCH, {1}), (MIN_USEFUL_BATCH - 1, {0})],
-    )
-    def test_the_useful_threshold_gates_batching(self, count, expected_batches):
-        """A degenerate family batches only once it is worth the adder tree.
-
-        At MIN_USEFUL_BATCH the disjoint equal-angle terms fuse into one batch; one
-        member short of it the tree costs more than it saves, so they stay loose.
-        """
+    @pytest.mark.parametrize(("count", "is_batched"), [(2, True), (1, False)])
+    def test_groups_every_nontrivial_family(self, count, is_batched):
+        """Python records equal-angle structure; Q# owns the HWP cost threshold."""
         terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(count)]
-        assert {t.batch for t in batch_equal_angles(terms)} == expected_batches
+        grouped = batch_equal_angles(terms)
+        assert isinstance(grouped[0], BatchedExponentiatedPauliTerm) is is_batched
 
     def test_separates_families_with_different_angles(self):
-        """Two angles cannot share a register, so they get separate identifiers."""
-        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(MIN_USEFUL_BATCH)]
-        terms += [
-            ExponentiatedPauliTerm({i: "Z", i + 1: "Z"}, -0.25) for i in range(100, 100 + 2 * MIN_USEFUL_BATCH, 2)
-        ]
+        """Two angles cannot share a register, so they become separate objects."""
+        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(_HWP_BREAK_EVEN)]
+        terms += [ExponentiatedPauliTerm({i: "Z", i + 1: "Z"}, -0.25) for i in range(100, 100 + 2 * _HWP_BREAK_EVEN, 2)]
         grouped = batch_equal_angles(terms)
-        assert {t.batch for t in grouped} == {1, 2}
+        batches = [term for term in grouped if isinstance(term, BatchedExponentiatedPauliTerm)]
+        assert len(batches) == 2
+        assert {batch.angle for batch in batches} == {-0.25, 0.25}
 
     def test_splits_an_overlapping_family(self):
-        """Sharing a qubit forces a second register rather than a rejected container."""
+        """A family with no disjoint pair stays as plain exponentials."""
         terms = [ExponentiatedPauliTerm({0: "Z", i: "Z"}, 0.25) for i in range(1, 5)]
-        groups = {t.batch for t in batch_equal_angles(terms, min_batch=1)}
-        assert len(groups) == 4
+        assert all(isinstance(term, ExponentiatedPauliTerm) for term in batch_equal_angles(terms))
 
     def test_max_batch_chunks_a_large_family(self):
         """A batch needs about one ancilla per member, so the size must be capable of a cap."""
-        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(4 * MIN_USEFUL_BATCH)]
-        grouped = batch_equal_angles(terms, max_batch=MIN_USEFUL_BATCH)
-        sizes: dict[int, int] = {}
-        for term in grouped:
-            sizes[term.batch] = sizes.get(term.batch, 0) + 1
-        assert sorted(sizes) == [1, 2, 3, 4]
-        assert set(sizes.values()) == {MIN_USEFUL_BATCH}
+        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(4 * _HWP_BREAK_EVEN)]
+        grouped = batch_equal_angles(terms, max_batch=_HWP_BREAK_EVEN)
+        batches = [term for term in grouped if isinstance(term, BatchedExponentiatedPauliTerm)]
+        assert len(batches) == 4
+        assert {len(batch.pauli_terms) for batch in batches} == {_HWP_BREAK_EVEN}
 
     def test_keeps_the_identity_unbatched(self):
         """An identity factor has no representative qubit."""
         terms = [ExponentiatedPauliTerm({}, 0.25)]
-        terms += [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(MIN_USEFUL_BATCH)]
+        terms += [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(_HWP_BREAK_EVEN)]
         grouped = batch_equal_angles(terms)
-        identity = next(t for t in grouped if not t.pauli_term)
-        assert identity.batch == 0
+        identity = next(term for term in grouped if isinstance(term, ExponentiatedPauliTerm))
+        assert identity.pauli_term == {}
 
     def test_preserves_the_factors(self):
         """Reordering is only sound because it keeps exactly the same multiset."""
-        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(MIN_USEFUL_BATCH)]
+        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(_HWP_BREAK_EVEN)]
         terms += [ExponentiatedPauliTerm({99: "X"}, 0.9)]
-
-        def key(term):
-            return (tuple(sorted(term.pauli_term.items())), term.angle)
-
-        assert sorted(map(key, batch_equal_angles(terms))) == sorted(map(key, terms))
+        assert sorted(_term_signature(_expand_groups(batch_equal_angles(terms)))) == sorted(_term_signature(terms))
 
 
 class TestPlaquetteBatchEmission:
@@ -1011,43 +1053,46 @@ class TestPlaquetteBatchEmission:
     and that the reorder is an exact identity.
     """
 
-    @pytest.mark.parametrize(("side", "phase_sizes"), [(4, [8, 8, 8, 8]), (6, [18, 18, 12, 12, 18, 18])])
-    def test_batches_the_number_and_interaction_families(self, side, phase_sizes):
+    @staticmethod
+    def _commute(left: dict[int, str], right: dict[int, str]) -> bool:
+        """Return whether two sparse Pauli strings commute."""
+        return sum(1 for qubit in set(left) & set(right) if left[qubit] != right[qubit]) % 2 == 0
+
+    @pytest.mark.parametrize(
+        ("side", "expected_sizes"),
+        [
+            (4, [4, 4, 4, 4, 8, 8, 8, 8, 16, 32]),
+            (6, [6, 6, 12, 12, 18, 18, 18, 18, 36, 72]),
+        ],
+    )
+    def test_batches_the_hopping_and_interaction_families(self, side, expected_sizes):
         """Jordan-Wigner gives 2L^2 single-Z factors and L^2 ZZ factors, each degenerate.
 
         Campbell's Eq. (E2) (arXiv:2012.09238v4, App. E) moves the interaction
         half-layers to the one-time boundaries, leaving one full interaction in the
         repeated body. Its two diagonal batches therefore have sizes ``[L^2, 2L^2]``.
 
-        The hopping layers add their own batches. Each section application hoists the
+        The hopping layers add their own batches. Each tiling application hoists the
         plaquettes' fused ``XX``/``YY`` phases together; ``XX`` and ``YY`` share a bond
         so they cannot occupy one register, but each axis batches across the section.
 
-        The two section-A applications reach the full ``L^2/2``. Section B does not: its
+        The two pink applications reach the full ``L^2/2``. The gold tiling does not: its
         horizontally wrapping cycles put the fused bond at Jordan-Wigner distance
         ``L-1`` rather than 1, so those phases carry a parity string and overlap their
-        neighbours. At ``L=6`` that costs six of the eighteen, leaving twelve. At
-        ``L=4`` only four of the eight survive as disjoint, which is below
-        MIN_USEFUL_BATCH, so section B contributes no phase batch at all and the step
-        has four rather than six.
+        neighbours. Python records each maximal disjoint group; Q# decides whether its
+        size reaches the HWP break-even point.
         """
         container = _plaquette_container(side)
-        sizes: dict[int, int] = {}
-        for term in container.step_terms:
-            if term.batch:
-                sizes[term.batch] = sizes.get(term.batch, 0) + 1
-        diagonal = [side * side, 2 * side * side]
-        assert sorted(sizes.values()) == sorted(diagonal + phase_sizes)
+        sizes = sorted(len(batch.pauli_terms) for batch in _structured_batches(container.step_terms))
+        assert sizes == expected_sizes
 
     @pytest.mark.parametrize("side", [4, 6])
     def test_emitted_batches_are_well_formed(self, side):
         """Every emitted batch is one applicable Hamming-weight block of a degenerate family.
 
-        Re-homes the container's removed batch validation into a builder assertion, and
-        folds in which families the batcher may target. Each batch must be consecutive in
-        the step, single-angle, on pairwise-disjoint qubits, controlled, never the
-        identity, and at least MIN_USEFUL_BATCH strong -- a smaller family costs more adder
-        tree than it saves. Batching must also never touch the fixed-angle Givens network:
+        Re-homes the container's batch validation into a builder assertion, and folds
+        in which families the batcher may target. Each batch must be single-angle, on
+        pairwise-disjoint qubits, and never the identity. Batching must also never touch the fixed-angle Givens network:
         only the interaction layer's single ``Z`` and ``ZZ`` factors and the plaquettes'
         fused ``XX``/``YY`` phases carry the arbitrary angles worth batching, so every
         batched factor is controlled, off the fixed ``pi/8`` grid, and pure ``Z`` or a
@@ -1056,78 +1101,52 @@ class TestPlaquetteBatchEmission:
         """
         container = _plaquette_container(side)
         eighth = math.pi / 8.0
-        members: dict[int, list[int]] = {}
-        for index, term in enumerate(container.step_terms):
-            assert term.batch >= 0, "a batch identifier is negative"
-            if term.batch:
-                members.setdefault(term.batch, []).append(index)
-        assert members, "the builder emitted no batch"
-        for batch, indices in members.items():
-            assert indices == list(range(indices[0], indices[-1] + 1)), f"batch {batch} is not consecutive"
-            assert len(indices) >= MIN_USEFUL_BATCH, f"batch {batch} is below the useful threshold"
-            angles = [container.step_terms[i].angle for i in indices]
-            assert max(angles) - min(angles) <= 1e-12, f"batch {batch} mixes angles"
+        batches = _structured_batches(container.step_terms)
+        assert batches, "the builder emitted no batch"
+        for batch in batches:
+            assert len(batch.pauli_terms) >= 2
             seen: set[int] = set()
-            for i in indices:
-                term = container.step_terms[i]
-                assert term.pauli_term, f"batch {batch} contains the identity term"
-                assert term.needs_control, f"batch {batch} contains a control-exempt term"
-                assert not np.isclose(term.angle / eighth, round(term.angle / eighth)), (
-                    f"batch {batch} tagged a fixed-angle network factor, which saves nothing"
+            for pauli_term in batch.pauli_terms:
+                assert pauli_term
+                assert not np.isclose(batch.angle / eighth, round(batch.angle / eighth)), (
+                    "a batch tagged a fixed-angle network factor, which saves nothing"
                 )
-                off_diagonal = {value for value in term.pauli_term.values() if value != "Z"}
-                assert off_diagonal in ({"X"}, {"Y"}, set()), f"unexpected batched factor {term.pauli_term}"
-                support = set(term.pauli_term)
-                assert not (support & seen), f"batch {batch} reuses a qubit"
+                off_diagonal = {value for value in pauli_term.values() if value != "Z"}
+                assert off_diagonal in ({"X"}, {"Y"}, set()), f"unexpected batched factor {pauli_term}"
+                support = set(pauli_term)
+                assert not (support & seen), "a batch reuses a qubit"
                 seen |= support
 
     def test_the_freed_phases_are_batched(self):
-        """Each section-A application hoists its plaquette phases into two disjoint batches.
+        """Each pink application hoists its plaquette phases into two disjoint batches.
 
         On 4x4 a section evolves ``L^2/2 = 8`` plaquettes. After Campbell's fusion each
         contributes an ``XX`` and a ``YY`` rotation on its first bond, and since those
         two share a bond they cannot occupy one Hamming weight register: the section
-        yields one batch per axis, eight members each, exactly MIN_USEFUL_BATCH.
+        yields one batch per axis, eight members each, exactly the Q# HWP break-even size.
 
-        Only the two section-A applications reach that size. Section B's horizontally
+        Only the two pink applications reach that size. The gold tiling's horizontally
         wrapping cycles put the fused bond at Jordan-Wigner distance ``L-1``, so their
-        phases carry a parity string and overlap; at 4x4 only four of its eight stay
-        disjoint, which is below the threshold, so section B contributes no phase batch
-        and the step has four rather than six.
+        phases carry a parity string and split into four-member structural batches,
+        which Q# executes term by term.
         """
         side = 4
         container = _plaquette_container(side)
-        members: dict[int, list] = {}
-        for term in container.step_terms:
-            if term.batch:
-                members.setdefault(term.batch, []).append(term)
-        # A phase batch carries an X or a Y axis; the interaction's batches are pure Z.
-        phase_batches = [
-            terms
-            for terms in members.values()
-            if any(axis in {"X", "Y"} for t in terms for axis in t.pauli_term.values())
+        hopping = [term for term in container.step_terms[:3] if isinstance(term, ConjugatedExponentiatedPauliTerm)]
+        pink_batches = [
+            group
+            for layer in (hopping[0], hopping[2])
+            for group in layer.apply_terms
+            if isinstance(group, BatchedExponentiatedPauliTerm)
         ]
-        assert len(phase_batches) == 4, "each section-A application must give one XX and one YY batch"
-        for terms in phase_batches:
-            assert len(terms) == side * side // 2, "a phase batch is one section's plaquette count"
-            support: set[int] = set()
-            for term in terms:
-                assert not (support & set(term.pauli_term)), "a phase batch reuses a qubit"
-                support |= set(term.pauli_term)
-            axes = {frozenset(v for v in t.pauli_term.values() if v != "Z") for t in terms}
-            assert axes in ({frozenset("X")}, {frozenset("Y")}), "a phase batch mixes axes"
-            assert all(t.needs_control for t in terms), "a phase must be controlled, unlike the network"
+        gold_batches = [group for group in hopping[1].apply_terms if isinstance(group, BatchedExponentiatedPauliTerm)]
+        assert [len(batch.pauli_terms) for batch in pink_batches] == [8, 8, 8, 8]
+        assert [len(batch.pauli_terms) for batch in gold_batches] == [4, 4, 4, 4]
 
     def test_batching_reduces_the_controlled_rotation_count(self):
         """The point of the whole exercise, measured rather than asserted."""
         container = _plaquette_container(4)
-        plain_terms = [
-            ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=term.angle, needs_control=term.needs_control)
-            for term in container.step_terms
-        ]
-        plain = PauliProductFormulaContainer(
-            step_terms=plain_terms, step_reps=container.step_reps, num_qubits=container.num_qubits
-        )
+        plain = _unbatch_container(container)
         counts = []
         for candidate in (plain, container):
             mapper = create(
@@ -1142,31 +1161,14 @@ class TestPlaquetteBatchEmission:
 
     def test_batched_and_loose_terms_agree_as_unitaries(self):
         """A phased family and its loose terms represent the same unitary."""
-        raw = [ExponentiatedPauliTerm({i: "Z"}, 0.31) for i in range(MIN_USEFUL_BATCH)]
+        raw = [ExponentiatedPauliTerm({i: "Z"}, 0.31) for i in range(_HWP_BREAK_EVEN)]
         grouped = batch_equal_angles(raw)
-        assert any(term.batch for term in grouped)
-
-        def dicts(terms):
-            rows = []
-            for term in terms:
-                qubits = sorted(term.pauli_term)
-                rows.append(
-                    {
-                        "qubits": qubits,
-                        "axes": "".join(term.pauli_term[q] for q in qubits),
-                        "angle": term.angle,
-                        "batch": term.batch,
-                    }
-                )
-            return rows
-
-        width = MIN_USEFUL_BATCH
-        # A fresh context rather than the shared one: these are Q# source strings, and
-        # evaluating them into the process-wide context leaves definitions behind that
-        # break a later test file's compilation.
-        context = create_qsharp_context()
-        got = dense_matrix(_uncontrolled_source(dicts(grouped), batched=True), width, context)
-        want = dense_matrix(_uncontrolled_source(dicts(raw), batched=False), width, context)
+        assert isinstance(grouped[0], BatchedExponentiatedPauliTerm)
+        grouped_container = PauliProductFormulaContainer(grouped, step_reps=1, num_qubits=_HWP_BREAK_EVEN)
+        raw_container = PauliProductFormulaContainer(raw, step_reps=1, num_qubits=_HWP_BREAK_EVEN)
+        mapper = create("circuit_mapper", "pauli_sequence")
+        got = dense_matrix(mapper.run(UnitaryRepresentation(grouped_container))._qsharp_op, _HWP_BREAK_EVEN)
+        want = dense_matrix(mapper.run(UnitaryRepresentation(raw_container))._qsharp_op, _HWP_BREAK_EVEN)
         assert np.max(np.abs(got - want)) < _TOL
 
     def test_hoisting_is_an_identity_even_when_the_strings_interleave(self):
@@ -1186,11 +1188,10 @@ class TestPlaquetteBatchEmission:
         per_plaquette = _plaquette_terms(plaq_a, 1.0, time) + _plaquette_terms(plaq_b, 1.0, time)
         hoisted = _single_spin_hop_layer([plaq_a, plaq_b], num_modes, 1.0, time)
 
-        def sig(terms):
-            return [(tuple(sorted(t.pauli_term.items())), round(t.angle, 12)) for t in terms]
-
-        assert sig(per_plaquette) != sig(hoisted), "the hoist must actually move factors"
-        assert sorted(sig(per_plaquette)) == sorted(sig(hoisted)), "the hoist must keep the same factors"
+        assert _term_signature(per_plaquette) != _term_signature(hoisted), "the hoist must actually move factors"
+        assert sorted(_term_signature(per_plaquette)) == sorted(_term_signature(hoisted)), (
+            "the hoist must keep the same factors"
+        )
 
         section_h = _cycle_hamiltonian(plaq_a, num_modes) + _cycle_hamiltonian(plaq_b, num_modes)
         exact = scipy.linalg.expm(-1j * time * section_h)
@@ -1208,9 +1209,6 @@ class TestPlaquetteBatchEmission:
         side = 4
         num_sites = side * side
 
-        def commute(a, b):
-            return sum(1 for q in set(a) & set(b) if a[q] != b[q]) % 2 == 0
-
         for section in plaquette_sections(side, side):
             plaquettes = []
             for spin_offset in (0, num_sites):
@@ -1221,7 +1219,7 @@ class TestPlaquetteBatchEmission:
                 for j in range(i + 1, len(plaquettes)):
                     for fi in plaquettes[i]:
                         for fj in plaquettes[j]:
-                            assert commute(fi.pauli_term, fj.pauli_term), "cross-plaquette factors anticommute"
+                            assert self._commute(fi.pauli_term, fj.pauli_term), "cross-plaquette factors anticommute"
 
     def test_the_batched_step_reproduces_the_exact_evolution(self):
         """On the 2x2 lattice the hoisted, batched step is exact."""
