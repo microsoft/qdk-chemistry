@@ -3,6 +3,7 @@
 // license information.
 
 #include <qdk/chemistry/algorithms/active_space.hpp>
+#include <qdk/chemistry/algorithms/double_factorization.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/geometry_optimization.hpp>
@@ -16,6 +17,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
