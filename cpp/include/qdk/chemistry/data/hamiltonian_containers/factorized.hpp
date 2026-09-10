@@ -138,7 +138,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
    *
    * @throws std::runtime_error if the adjusted one-body matrix is not
-   *         symmetric.
+   *         symmetric, or if it cannot be diagonalized.
    */
   double get_lambda() const;
 
