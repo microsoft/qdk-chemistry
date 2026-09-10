@@ -347,13 +347,23 @@ The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :
 
 .. rubric:: Example
 
-::
+.. tab:: Python API
 
-    from qdk_chemistry.algorithms import registry
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-run-lcu
+      :end-before: # end-cell-run-lcu
 
-    lcu = registry.create("hamiltonian_unitary_builder", "lcu")
-    lcu.settings().update({"quantum_walk": True})
-    unitary = lcu.run(qubit_hamiltonian)
+To use alias sampling for the PREPARE oracle, pass an
+:class:`~qdk_chemistry.data.AlgorithmRef` to the
+:class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`:
+
+.. tab:: Python API -- alias sampling PREPARE
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-lcu-prepare
+      :end-before: # end-cell-lcu-prepare
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
 

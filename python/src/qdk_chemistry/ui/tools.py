@@ -71,11 +71,6 @@ _REMOTE_WAITER_POOL = concurrent.futures.ThreadPoolExecutor(
 )
 
 if MCP_AVAILABLE:
-    # Register MCP Apps visualization tools (interactive UI via ui:// resources).
-    from .visualization import register_visualization_tools
-
-    register_visualization_tools(app)
-
     app.middleware.append(workspace_binding_middleware)
 
 

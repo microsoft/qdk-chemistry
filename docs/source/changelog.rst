@@ -4,6 +4,14 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.2.1
+=============
+
+- Raised the ``qdk`` floor to 1.31.0
+- Fixed local Copilot plugin installation and MCP Apps
+- Hardened the Windows wheel runtime prerequisite: import now raises a clear error when the Visual C++ v14 Redistributable is missing, and installation instructions document the requirement
+- Updated the molecular QPE tutorial to the current ``sparse_isometry`` API and added coverage testing it against the published 2.2 wheels
+
 Version 2.2.0
 =============
 
