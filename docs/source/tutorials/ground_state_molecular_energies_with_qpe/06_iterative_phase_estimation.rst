@@ -467,7 +467,8 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_run_iqpe.py
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
-A successful run completes all twenty runs and prints the complete-run bitstring counts, modal (most frequent) bitstring, component energies, reconstructed total, reference energy, and signed error.
+A successful run completes all twenty runs and prints ``Complete-run bitstring counts`` and the ``Modal bitstring`` selected for energy reconstruction.
+The remaining summary lines report ``Modal active-space energy``, ``Core energy``, ``Modal total energy``, ``CASCI algorithmic reference``, ``Modal energy error``, and ``Total IQPE runtime``.
 
 .. admonition:: How should you interpret the repeated-run output?
    :class: quiz-question
@@ -475,7 +476,7 @@ A successful run completes all twenty runs and prints the complete-run bitstring
 
    The printed ``Complete-run bitstring counts`` show the sampled distribution.
    A separate ``Modal bitstring`` line identifies the unique most frequent result used for energy reconstruction.
-   Read the modal active-space energy, reconstructed total, and signed CASCI error from the current output rather than expecting one exact sampled distribution.
+   Read ``Modal active-space energy``, ``Modal total energy``, and ``Modal energy error`` from the current output rather than expecting one exact sampled distribution.
 
 .. admonition:: Does the result meet the teaching target, and what does that establish?
    :class: quiz-question
