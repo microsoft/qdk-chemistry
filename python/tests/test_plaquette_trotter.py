@@ -35,7 +35,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 )
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 from .test_helpers import dense_matrix
 
@@ -70,6 +70,17 @@ def _hubbard_operator(width: int, height: int, interaction: float):
         create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=interaction),
         mapping=MajoranaMapping.jordan_wigner(2 * width * height),
     )
+
+
+def _plaquette_builder(side: int, *, time: float = 0.05) -> PlaquetteTrotter:
+    """A second-order plaquette builder for a square ``side`` x ``side`` lattice."""
+    return PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=time, num_divisions=1)
+
+
+def _plaquette_container(side: int, *, time: float = 0.05, interaction: float = 8.0):
+    """One second-order plaquette step of the periodic ``side`` x ``side`` Hubbard model."""
+    operator = _hubbard_operator(side, side, interaction)
+    return _plaquette_builder(side, time=time).run(operator).get_container()
 
 
 _PAULI = {
@@ -172,10 +183,20 @@ class TestPlaquetteSections:
 class TestPlaquetteTerms:
     """Tests for the single-plaquette decomposition."""
 
-    @pytest.mark.parametrize("sites", [(0, 1, 2, 3), (0, 1, 4, 3), (1, 2, 4, 5)])
+    @pytest.mark.parametrize("sites", [(0, 1, 2, 3), (0, 1, 4, 3), (1, 2, 4, 5), (4, 3, 0, 1)])
     @pytest.mark.parametrize("time", [0.05, 0.4, 1.3])
     def test_reproduces_exact_evolution(self, sites, time):
-        """The emitted terms equal ``exp(-i t H)`` even for non-adjacent modes."""
+        """The emitted terms equal ``exp(-i t H)`` regardless of the cycle's orientation.
+
+        The sign conventions here are subtle -- four of eight plausible ones are wrong --
+        so the cases span the axes that flip a sign. ``(0, 1, 4, 3)`` and ``(1, 2, 4, 5)``
+        interleave non-adjacent modes, whose Jordan-Wigner strings must thread through the
+        butterfly correctly. ``(4, 3, 0, 1)`` is the same four-cycle as ``(0, 1, 4, 3)``
+        walked in the opposite orientation, so both its butterfly pairs descend and its
+        first bond descends: exactly the section-B cycles the tiling really emits (e.g.
+        ``(15, 12, 0, 3)`` at 4x4), which exercise the ``-pi/8`` butterfly branch that an
+        ascending-only cycle never reaches.
+        """
         num_modes = 6
         terms = _plaquette_terms(sites, hopping=1.0, time=time)
         expected = scipy.linalg.expm(-1j * time * _cycle_hamiltonian(sites, num_modes))
@@ -211,21 +232,15 @@ class TestPlaquetteTerms:
 class TestPlaquetteTrotter:
     """Tests for the builder."""
 
-    @staticmethod
-    def _hubbard(side, interaction=8.0):
-        return _hubbard_operator(side, side, interaction)
-
     def test_requires_a_lattice_shape(self):
         """Without a lattice the builder cannot know the tiling."""
         with pytest.raises(ValueError, match="lattice_width"):
-            PlaquetteTrotter(order=2, time=0.05, num_divisions=1).run(self._hubbard(4))
+            PlaquetteTrotter(order=2, time=0.05, num_divisions=1).run(_hubbard_operator(4, 4, 8.0))
 
     def test_rejects_a_lattice_that_does_not_match_the_operator(self):
         """A shape mismatch is an error rather than a silently wrong circuit."""
         with pytest.raises(ValueError, match="needs 72 qubits"):
-            PlaquetteTrotter(lattice_width=6, lattice_height=6, order=2, time=0.05, num_divisions=1).run(
-                self._hubbard(4)
-            )
+            _plaquette_builder(6).run(_hubbard_operator(4, 4, 8.0))
 
     def test_rejects_an_order_other_than_two(self):
         """The error constant is second order, so no other order may be sized by it.
@@ -240,10 +255,10 @@ class TestPlaquetteTrotter:
 
     def test_rejects_an_order_set_after_construction(self):
         """Settings are mutable, so the constructor check alone would be bypassable."""
-        builder = PlaquetteTrotter(lattice_width=4, lattice_height=4, order=2, time=0.05, num_divisions=1)
+        builder = _plaquette_builder(4)
         builder.settings().set("order", 1)
         with pytest.raises(ValueError, match="order 2 only"):
-            builder.run(self._hubbard(4))
+            builder.run(_hubbard_operator(4, 4, 8.0))
 
     def test_emits_campbells_factor_ordering(self):
         """The step must be the ordering W_PLAQ is derived for, not merely some Strang form.
@@ -254,12 +269,7 @@ class TestPlaquetteTrotter:
         *correct* and only invalidates the error constant -- which no convergence test
         would catch.
         """
-        side = 4
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(self._hubbard(side))
-            .get_container()
-        )
+        container = _plaquette_container(4)
         # The interaction terms are the only ones acting on two Z's of the same site pair;
         # the hopping network carries an X or a Y on every factor.
         kinds = [
@@ -282,13 +292,7 @@ class TestPlaquetteTrotter:
 
     def test_uses_four_times_fewer_rotations_on_the_hopping(self):
         """The whole point: four bonds cost two synthesized rotations, not eight."""
-        side = 4
-        operator = self._hubbard(side)
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(operator)
-            .get_container()
-        )
+        container = _plaquette_container(4)
         eighth = math.pi / 8.0
         fixed = sum(
             1
@@ -304,7 +308,7 @@ class TestPlaquetteTrotter:
     def test_rejects_non_uniform_hopping(self):
         """The fixed-angle Fourier network only exists for a uniform cycle."""
         side = 4
-        operator = self._hubbard(side)
+        operator = _hubbard_operator(side, side, 8.0)
         # Detune a single bond so the hopping is no longer uniform.
         labels = list(operator.pauli_strings)
         coefficients = operator.coefficients.copy()
@@ -319,12 +323,12 @@ class TestPlaquetteTrotter:
             fermion_mode_order=operator.fermion_mode_order,
         )
         with pytest.raises(ValueError, match="uniform hopping"):
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(detuned)
+            _plaquette_builder(side).run(detuned)
 
     def test_rejects_interleaved_mode_ordering(self):
         """The tiling reads the register as spin-blocked; interleaved would mis-address sites."""
         side = 4
-        operator = self._hubbard(side)
+        operator = _hubbard_operator(side, side, 8.0)
         interleaved = QubitOperator(
             pauli_strings=list(operator.pauli_strings),
             coefficients=operator.coefficients.copy(),
@@ -332,14 +336,12 @@ class TestPlaquetteTrotter:
             fermion_mode_order="interleaved",
         )
         with pytest.raises(ValueError, match="spin-blocked"):
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(
-                interleaved
-            )
+            _plaquette_builder(side).run(interleaved)
 
     def test_rejects_a_hopping_graph_that_is_not_the_declared_lattice(self):
         """A bond graph mismatch must raise rather than emit a circuit for another Hamiltonian."""
         side = 4
-        operator = self._hubbard(side)
+        operator = _hubbard_operator(side, side, 8.0)
         # Drop one bond's two Pauli terms, leaving the lattice with a hole.
         labels = list(operator.pauli_strings)
 
@@ -355,9 +357,7 @@ class TestPlaquetteTrotter:
             fermion_mode_order=operator.fermion_mode_order,
         )
         with pytest.raises(ValueError, match="does not match a periodic|different hopping graphs"):
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(
-                punctured
-            )
+            _plaquette_builder(side).run(punctured)
 
     def test_rejects_spin_flip_hopping(self):
         """Each spin sector is tiled separately, so cross-block hopping cannot be expressed."""
@@ -368,7 +368,7 @@ class TestPlaquetteTrotter:
         label[side * side] = "Y"
         operator = QubitOperator(pauli_strings=["".join(reversed(label))], coefficients=np.array([0.5]))
         with pytest.raises(ValueError, match="spin-up and spin-down"):
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1).run(operator)
+            _plaquette_builder(side).run(operator)
 
 
 class TestControlExemption:
@@ -413,11 +413,7 @@ class TestControlExemption:
         the emitted step as the container used to and asserts the stack empties.
         """
         side = 4
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(TestPlaquetteTrotter._hubbard(side))
-            .get_container()
-        )
+        container = _plaquette_container(side)
         stack: list[ExponentiatedPauliTerm] = []
         for term in container.step_terms:
             if term.needs_control:
@@ -434,13 +430,7 @@ class TestControlExemption:
 
     def test_a_whole_step_has_the_expected_exempt_count(self):
         """Consecutive plaquettes interleave their sandwiches, but the exempt-factor count is fixed."""
-        side = 4
-        operator = TestPlaquetteTrotter._hubbard(side)
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(operator)
-            .get_container()
-        )
+        container = _plaquette_container(4)
         exempt = sum(1 for t in container.step_terms if not t.needs_control)
         # Three section applications, two spins, four cycles, eight conjugating factors
         # per cycle once the innermost butterfly is fused into the phases.
@@ -751,18 +741,24 @@ def _uncontrolled_source(terms, *, batched, repetitions=1):
 
 
 class TestBatchEqualAngles:
-    """The grouping the plaquette builder applies to its diagonal layer."""
+    """The pure grouping the plaquette builder applies to its diagonal layer.
 
-    def test_groups_a_degenerate_family(self):
-        """Terms sharing an angle and acting disjointly become one batch."""
-        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(MIN_USEFUL_BATCH)]
-        grouped = batch_equal_angles(terms)
-        assert {t.batch for t in grouped} == {1}
+    These exercise ``batch_equal_angles`` directly -- no builder, no Q# -- so they are
+    the fast, unit-level checks on the grouping itself.
+    """
 
-    def test_leaves_a_small_family_alone(self):
-        """Below the threshold the adder tree costs more than it saves."""
-        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(MIN_USEFUL_BATCH - 1)]
-        assert {t.batch for t in batch_equal_angles(terms)} == {0}
+    @pytest.mark.parametrize(
+        ("count", "expected_batches"),
+        [(MIN_USEFUL_BATCH, {1}), (MIN_USEFUL_BATCH - 1, {0})],
+    )
+    def test_the_useful_threshold_gates_batching(self, count, expected_batches):
+        """A degenerate family batches only once it is worth the adder tree.
+
+        At MIN_USEFUL_BATCH the disjoint equal-angle terms fuse into one batch; one
+        member short of it the tree costs more than it saves, so they stay loose.
+        """
+        terms = [ExponentiatedPauliTerm({i: "Z"}, 0.25) for i in range(count)]
+        assert {t.batch for t in batch_equal_angles(terms)} == expected_batches
 
     def test_separates_families_with_different_angles(self):
         """Two angles cannot share a register, so they get separate identifiers."""
@@ -808,16 +804,23 @@ class TestBatchEqualAngles:
         assert sorted(map(key, batch_equal_angles(terms))) == sorted(map(key, terms))
 
 
-class TestPlaquetteBatching:
-    """The builder must tag the Hubbard diagonal, which is where the degeneracy is."""
+class TestPlaquetteBatchEmission:
+    """What the builder actually emits as Hamming-weight batches, and whether it stays exact.
 
-    @staticmethod
-    def _hubbard(side, interaction=8.0):
-        lattice = LatticeGraph.square(side, side, periodic_x=True, periodic_y=True)
-        return create("qubit_mapper").run(
-            create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=interaction),
-            mapping=MajoranaMapping.jordan_wigner(2 * side * side),
-        )
+    Integration-level counterpart to ``TestBatchEqualAngles``: these run the builder and
+    inspect the emitted step, or evolve it against ``exp(-i t H)``.
+
+    The interesting batches come from a rotation-count optimization that hoists the
+    plaquette phases. A section's plaquettes are vertex-disjoint on the lattice, so they
+    act on disjoint fermionic modes and their Jordan-Wigner images are Majorana bilinears
+    on disjoint Majorana indices, which commute. That lets each plaquette's two eigenvalue
+    phases be pulled out of its Givens network and emitted together for the whole section,
+    where equal-angle families on disjoint sites become Hamming-weight batches. Buried at
+    positions 6-7 of every 14-term plaquette they never could be, because batching needs
+    the equal-angle terms consecutive. These tests pin that the builder performs the hoist,
+    batches the freed phases and the interaction diagonal, keeps every batch well formed,
+    and that the reorder is an exact identity.
+    """
 
     @pytest.mark.parametrize(("side", "phase_sizes"), [(4, [8, 8, 8, 8]), (6, [18, 18, 12, 12, 18, 18])])
     def test_batches_the_number_and_interaction_families(self, side, phase_sizes):
@@ -839,11 +842,7 @@ class TestPlaquetteBatching:
         MIN_USEFUL_BATCH, so section B contributes no phase batch at all and the step
         has four rather than six.
         """
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(self._hubbard(side))
-            .get_container()
-        )
+        container = _plaquette_container(side)
         sizes: dict[int, int] = {}
         for term in container.step_terms:
             if term.batch:
@@ -851,174 +850,47 @@ class TestPlaquetteBatching:
         diagonal = [side * side, side * side, 2 * side * side, 2 * side * side]
         assert sorted(sizes.values()) == sorted(diagonal + phase_sizes)
 
-    def test_only_degenerate_phase_families_are_batched(self):
-        """Batching targets arbitrary-angle families, never the fixed-angle network.
+    @pytest.mark.parametrize("side", [4, 6])
+    def test_emitted_batches_are_well_formed(self, side):
+        """Every emitted batch is one applicable Hamming-weight block of a degenerate family.
 
-        Two kinds qualify: the interaction layer's single ``Z`` and ``ZZ`` factors, and
-        the plaquettes' fused ``XX``/``YY`` eigenvalue phases. The Givens network's
-        factors carry fixed ``pi/8`` angles that are already one T gate each, so
-        batching them would buy nothing and they must stay untagged.
+        Re-homes the container's removed batch validation into a builder assertion, and
+        folds in which families the batcher may target. Each batch must be consecutive in
+        the step, single-angle, on pairwise-disjoint qubits, controlled, never the
+        identity, and at least MIN_USEFUL_BATCH strong -- a smaller family costs more adder
+        tree than it saves. Batching must also never touch the fixed-angle Givens network:
+        only the interaction layer's single ``Z`` and ``ZZ`` factors and the plaquettes'
+        fused ``XX``/``YY`` phases carry the arbitrary angles worth batching, so every
+        batched factor is controlled, off the fixed ``pi/8`` grid, and pure ``Z`` or a
+        single off-diagonal axis. A ``pi/8`` network factor is already one T gate and
+        would gain nothing.
         """
-        side = 4
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(self._hubbard(side))
-            .get_container()
-        )
+        container = _plaquette_container(side)
         eighth = math.pi / 8.0
-        for term in container.step_terms:
-            if not term.batch:
-                continue
-            assert term.needs_control, "an exempt factor must never be batched"
-            assert not np.isclose(term.angle / eighth, round(term.angle / eighth)), (
-                "a fixed-angle network factor was batched, which saves nothing"
-            )
-            axes = {value for value in term.pauli_term.values() if value != "Z"}
-            assert axes in ({"X"}, {"Y"}, set()), f"unexpected batched factor {term.pauli_term}"
-
-    def test_the_emitted_step_has_well_formed_batches(self):
-        """Re-homes the container's removed batch validation into a builder assertion.
-
-        Every batch the builder emits must be applicable as one Hamming-weight block: its
-        members consecutive in the step, sharing a single angle, acting on pairwise-disjoint
-        qubits, controlled, never the identity, and at least two strong. The container used
-        to reject a batch that broke any of these; now the builder owns it, so it is checked
-        on the real emitted step.
-        """
-        for side in (4, 6):
-            container = (
-                PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-                .run(self._hubbard(side))
-                .get_container()
-            )
-            members: dict[int, list[int]] = {}
-            for index, term in enumerate(container.step_terms):
-                assert term.batch >= 0, "a batch identifier is negative"
-                if term.batch:
-                    members.setdefault(term.batch, []).append(index)
-            assert members, "the builder emitted no batch"
-            for batch, indices in members.items():
-                assert indices == list(range(indices[0], indices[-1] + 1)), f"batch {batch} is not consecutive"
-                assert len(indices) >= 2, f"batch {batch} has a single member"
-                angles = [container.step_terms[i].angle for i in indices]
-                assert max(angles) - min(angles) <= 1e-12, f"batch {batch} mixes angles"
-                seen: set[int] = set()
-                for i in indices:
-                    term = container.step_terms[i]
-                    assert term.pauli_term, f"batch {batch} contains the identity term"
-                    assert term.needs_control, f"batch {batch} contains a control-exempt term"
-                    support = set(term.pauli_term)
-                    assert not (support & seen), f"batch {batch} reuses a qubit"
-                    seen |= support
-
-    def test_batching_reduces_the_controlled_rotation_count(self):
-        """The point of the whole exercise, measured rather than asserted."""
-        side = 4
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(self._hubbard(side))
-            .get_container()
-        )
-        plain_terms = [
-            ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=term.angle, needs_control=term.needs_control)
-            for term in container.step_terms
-        ]
-        plain = PauliProductFormulaContainer(
-            step_terms=plain_terms, step_reps=container.step_reps, num_qubits=container.num_qubits
-        )
-        counts = []
-        for candidate in (plain, container):
-            mapper = create(
-                "controlled_circuit_mapper",
-                "pauli_sequence",
-                control_indices=[0],
-                target_indices=list(range(1, container.num_qubits + 1)),
-            )
-            estimate = mapper.run(UnitaryRepresentation(candidate)).estimate()
-            counts.append(estimate["logicalCounts"]["rotationCount"])
-        assert counts[1] < counts[0]
-
-
-class TestRotationBatching:
-    """The plaquette builder emits useful Hamming-weight phasing batches."""
-
-    @staticmethod
-    def _hubbard(side, interaction=8.0):
-        """Jordan-Wigner image of a uniform ``side`` x ``side`` Fermi-Hubbard model."""
-        lattice = LatticeGraph.square(side, side, periodic_x=True, periodic_y=True)
-        return create("qubit_mapper").run(
-            create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=interaction),
-            mapping=MajoranaMapping.jordan_wigner(2 * side * side),
-        )
-
-    def _container(self, side):
-        """One second-order plaquette step of the ``side`` x ``side`` Hubbard model."""
-        builder = PlaquetteTrotter(
-            lattice_width=side,
-            lattice_height=side,
-            order=2,
-            time=0.05,
-            num_divisions=1,
-        )
-        return builder.run(self._hubbard(side)).get_container()
-
-    def test_every_emitted_batch_meets_the_useful_threshold(self):
-        """A family below MIN_USEFUL_BATCH costs more than it saves, so it must stay unbatched."""
-        container = self._container(4)
-        sizes: dict[int, int] = {}
-        for term in container.step_terms:
+        members: dict[int, list[int]] = {}
+        for index, term in enumerate(container.step_terms):
+            assert term.batch >= 0, "a batch identifier is negative"
             if term.batch:
-                sizes[term.batch] = sizes.get(term.batch, 0) + 1
-        assert sizes
-        assert all(size >= MIN_USEFUL_BATCH for size in sizes.values())
-
-    def test_batched_and_loose_terms_agree_as_unitaries(self, qs_context):
-        """A phased family and its loose terms represent the same unitary."""
-        raw = [ExponentiatedPauliTerm({i: "Z"}, 0.31) for i in range(MIN_USEFUL_BATCH)]
-        grouped = batch_equal_angles(raw)
-        assert any(term.batch for term in grouped)
-
-        def dicts(terms):
-            rows = []
-            for term in terms:
-                qubits = sorted(term.pauli_term)
-                rows.append(
-                    {
-                        "qubits": qubits,
-                        "axes": "".join(term.pauli_term[q] for q in qubits),
-                        "angle": term.angle,
-                        "batch": term.batch,
-                    }
+                members.setdefault(term.batch, []).append(index)
+        assert members, "the builder emitted no batch"
+        for batch, indices in members.items():
+            assert indices == list(range(indices[0], indices[-1] + 1)), f"batch {batch} is not consecutive"
+            assert len(indices) >= MIN_USEFUL_BATCH, f"batch {batch} is below the useful threshold"
+            angles = [container.step_terms[i].angle for i in indices]
+            assert max(angles) - min(angles) <= 1e-12, f"batch {batch} mixes angles"
+            seen: set[int] = set()
+            for i in indices:
+                term = container.step_terms[i]
+                assert term.pauli_term, f"batch {batch} contains the identity term"
+                assert term.needs_control, f"batch {batch} contains a control-exempt term"
+                assert not np.isclose(term.angle / eighth, round(term.angle / eighth)), (
+                    f"batch {batch} tagged a fixed-angle network factor, which saves nothing"
                 )
-            return rows
-
-        width = MIN_USEFUL_BATCH
-        got = dense_matrix(_uncontrolled_source(dicts(grouped), batched=True), width, qs_context)
-        want = dense_matrix(_uncontrolled_source(dicts(raw), batched=False), width, qs_context)
-        assert np.max(np.abs(got - want)) < _TOL
-
-
-class TestPlaquettePhaseHoisting:
-    """Locks in the rotation-count optimization that hoists the plaquette phases.
-
-    A section's plaquettes are vertex-disjoint on the lattice, so they act on disjoint
-    fermionic modes and their Jordan-Wigner images are Majorana bilinears on disjoint
-    Majorana indices, which commute. That lets each plaquette's two eigenvalue phases be
-    pulled out of its Givens network and emitted together for the whole section, where
-    equal-angle families on disjoint sites become Hamming-weight batches. Buried at
-    positions 6-7 of every 14-term plaquette they never could be, because batching needs
-    the equal-angle terms consecutive. These tests pin that the builder performs the
-    hoist, batches the freed phases, and that the reorder is an exact identity.
-    """
-
-    @staticmethod
-    def _hubbard(side, interaction=8.0):
-        """Jordan-Wigner image of a uniform ``side`` x ``side`` Fermi-Hubbard model."""
-        lattice = LatticeGraph.square(side, side, periodic_x=True, periodic_y=True)
-        return create("qubit_mapper").run(
-            create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=interaction),
-            mapping=MajoranaMapping.jordan_wigner(2 * side * side),
-        )
+                off_diagonal = {value for value in term.pauli_term.values() if value != "Z"}
+                assert off_diagonal in ({"X"}, {"Y"}, set()), f"unexpected batched factor {term.pauli_term}"
+                support = set(term.pauli_term)
+                assert not (support & seen), f"batch {batch} reuses a qubit"
+                seen |= support
 
     def test_the_freed_phases_are_batched(self):
         """Each section-A application hoists its plaquette phases into two disjoint batches.
@@ -1035,11 +907,7 @@ class TestPlaquettePhaseHoisting:
         and the step has four rather than six.
         """
         side = 4
-        container = (
-            PlaquetteTrotter(lattice_width=side, lattice_height=side, order=2, time=0.05, num_divisions=1)
-            .run(self._hubbard(side))
-            .get_container()
-        )
+        container = _plaquette_container(side)
         members: dict[int, list] = {}
         for term in container.step_terms:
             if term.batch:
@@ -1060,6 +928,57 @@ class TestPlaquettePhaseHoisting:
             axes = {frozenset(v for v in t.pauli_term.values() if v != "Z") for t in terms}
             assert axes in ({frozenset("X")}, {frozenset("Y")}), "a phase batch mixes axes"
             assert all(t.needs_control for t in terms), "a phase must be controlled, unlike the network"
+
+    def test_batching_reduces_the_controlled_rotation_count(self):
+        """The point of the whole exercise, measured rather than asserted."""
+        container = _plaquette_container(4)
+        plain_terms = [
+            ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=term.angle, needs_control=term.needs_control)
+            for term in container.step_terms
+        ]
+        plain = PauliProductFormulaContainer(
+            step_terms=plain_terms, step_reps=container.step_reps, num_qubits=container.num_qubits
+        )
+        counts = []
+        for candidate in (plain, container):
+            mapper = create(
+                "controlled_circuit_mapper",
+                "pauli_sequence",
+                control_indices=[0],
+                target_indices=list(range(1, container.num_qubits + 1)),
+            )
+            estimate = mapper.run(UnitaryRepresentation(candidate)).estimate()
+            counts.append(estimate["logicalCounts"]["rotationCount"])
+        assert counts[1] < counts[0]
+
+    def test_batched_and_loose_terms_agree_as_unitaries(self):
+        """A phased family and its loose terms represent the same unitary."""
+        raw = [ExponentiatedPauliTerm({i: "Z"}, 0.31) for i in range(MIN_USEFUL_BATCH)]
+        grouped = batch_equal_angles(raw)
+        assert any(term.batch for term in grouped)
+
+        def dicts(terms):
+            rows = []
+            for term in terms:
+                qubits = sorted(term.pauli_term)
+                rows.append(
+                    {
+                        "qubits": qubits,
+                        "axes": "".join(term.pauli_term[q] for q in qubits),
+                        "angle": term.angle,
+                        "batch": term.batch,
+                    }
+                )
+            return rows
+
+        width = MIN_USEFUL_BATCH
+        # A fresh context rather than the shared one: these are Q# source strings, and
+        # evaluating them into the process-wide context leaves definitions behind that
+        # break a later test file's compilation.
+        context = create_qsharp_context()
+        got = dense_matrix(_uncontrolled_source(dicts(grouped), batched=True), width, context)
+        want = dense_matrix(_uncontrolled_source(dicts(raw), batched=False), width, context)
+        assert np.max(np.abs(got - want)) < _TOL
 
     def test_hoisting_is_an_identity_even_when_the_strings_interleave(self):
         """Reordering the factors of two vertex-disjoint plaquettes cannot change the operator.
@@ -1125,16 +1044,6 @@ class TestPlaquettePhaseHoisting:
         operator = _hubbard_operator(side, side, interaction=0.0)
         labels, coefficients = zip(*operator.get_real_coefficients(tolerance=1e-14), strict=True)
         exact = scipy.linalg.expm(-1j * time * pauli_to_dense_matrix(list(labels), list(coefficients)))
-        container = (
-            PlaquetteTrotter(
-                lattice_width=side,
-                lattice_height=side,
-                order=2,
-                time=time,
-                num_divisions=1,
-            )
-            .run(operator)
-            .get_container()
-        )
+        container = _plaquette_builder(side, time=time).run(operator).get_container()
         got = _unitary_from_terms(container.step_terms, operator.num_qubits)
         assert np.allclose(got, exact, atol=1e-10)

@@ -29,7 +29,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -41,7 +40,6 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -75,12 +73,6 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
-
-
-@pytest.fixture(scope="module")
-def qs_context():
-    """An unrestricted Q# context, needed for integer output and dense simulation."""
-    return create_qsharp_context(TargetProfile.Unrestricted)
 
 
 @pytest.fixture
