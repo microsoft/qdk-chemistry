@@ -17,12 +17,18 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .base import CircuitMapper
 
 __all__: list[str] = [
+    "INNER_PREPARE_ALGORITHMS",
+    "SELECT_ALGORITHMS",
     "SOSSAMapper",
     "SOSSAMapperSettings",
 ]
 
-# Two SELECT calls, each conjugated by the inner PREPARE, so the alias table is read four times.
-_INNER_LOOKUPS_PER_BLOCK_ENCODING = 4
+
+INNER_PREPARE_ALGORITHMS = frozenset({"controlled_alias_sampling", "direct"})
+"""Inner PREPARE backends the mapper can emit."""
+
+SELECT_ALGORITHMS = frozenset({"qrom_phase_gradient", "direct"})
+"""SELECT backends the mapper can emit."""
 
 
 class SOSSAMapperSettings(Settings):
@@ -40,13 +46,13 @@ class SOSSAMapperSettings(Settings):
             "inner_prepare_algorithm",
             "string",
             "controlled_alias_sampling",
-            "Inner PREPARE algorithm: controlled_alias_sampling or direct.",
+            f"Inner PREPARE algorithm, one of {sorted(INNER_PREPARE_ALGORITHMS)}.",
         )
         self._set_default(
             "select_algorithm",
             "string",
             "qrom_phase_gradient",
-            "SELECT algorithm: qrom_phase_gradient or direct.",
+            f"SELECT algorithm, one of {sorted(SELECT_ALGORITHMS)}.",
         )
         self._set_default(
             "rotation_bit_precision",
@@ -122,19 +128,21 @@ class SOSSAMapper(CircuitMapper):
             return False
         layout = container.layout
         mu = int(self._settings.get("coefficient_bit_precision"))
+        # Two SELECT calls, each conjugated by the inner PREPARE, so the table is read four times.
+        inner_lookups_per_block_encoding = 4
         return QSHARP_UTILS.SOSSAWalk.SeparateWordLoadPays(
             container.inner_prepare.conditional_coefficients.shape[0],
             1 << layout.inner_prep_bits,
             mu + layout.inner_prep_bits + 2,
             layout.num_free_rider_bits,
-            _INNER_LOOKUPS_PER_BLOCK_ENCODING,
+            inner_lookups_per_block_encoding,
         )
 
     def _build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the Q# inner (controlled) PREPARE callable.
 
         Creates a superposition over bases :math:`b` conditioned on :math:`x_o`. The
-        free-rider word is loaded here only when :meth:`_hoist_free_rider` says otherwise.
+        free-rider word is loaded here only when ``_hoist_free_rider`` says otherwise.
 
         Algorithms:
             - ``"controlled_alias_sampling"``: 2D alias sampling.
@@ -338,12 +346,20 @@ class SOSSAMapper(CircuitMapper):
             phase gradient qubits its caller must prepare.
 
         Raises:
-            ValueError: If the container is not a :class:`SOSSAWalkContainer`.
+            ValueError: If the container is not a :class:`SOSSAWalkContainer`, or if either
+                backend setting names an algorithm this mapper cannot emit.
 
         """
         container = unitary.get_container()
         if not isinstance(container, SOSSAWalkContainer):
             raise ValueError(f"The {unitary.get_container_type()} container type is not supported.")
+        for setting, allowed in (
+            ("inner_prepare_algorithm", INNER_PREPARE_ALGORITHMS),
+            ("select_algorithm", SELECT_ALGORITHMS),
+        ):
+            value = self._settings.get(setting)
+            if value not in allowed:
+                raise ValueError(f"unknown {setting} {value!r}; expected one of {sorted(allowed)}")
         if container.power != 1:
             Logger.warn(f"The container's walk power {container.power} is ignored.")
 

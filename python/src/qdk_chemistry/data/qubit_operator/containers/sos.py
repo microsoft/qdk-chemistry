@@ -24,23 +24,54 @@ __all__ = ["FactorizedHamiltonianMetadata", "RotatedPaulis", "SOSContainer"]
 
 
 def _complex_block_to_json(coeffs: np.ndarray) -> dict[str, Any]:
-    """Serialize a complex coefficient array as split real/imaginary lists."""
+    """Serialize a complex coefficient array as split real/imaginary lists plus its shape.
+
+    The shape is carried because ``tolist`` flattens an empty block: a ``(0, B + 1)``
+    array and a ``(0, N - 1)`` one both write ``[]``, so without it an operator with no
+    generators reloads with rank-1 blocks that no longer satisfy the container's own
+    shape checks.
+    """
     arr = np.asarray(coeffs, dtype=complex)
-    return {"real": arr.real.tolist(), "imag": arr.imag.tolist()}
+    return {"real": arr.real.tolist(), "imag": arr.imag.tolist(), "shape": list(arr.shape)}
 
 
 def _complex_block_from_json(data: dict[str, Any]) -> np.ndarray:
     """Rebuild a complex coefficient array from split real/imaginary lists."""
-    return np.asarray(data["real"], dtype=float) + 1j * np.asarray(data["imag"], dtype=float)
+    block = np.asarray(data["real"], dtype=float) + 1j * np.asarray(data["imag"], dtype=float)
+    shape = data.get("shape")
+    return block.reshape(shape) if shape is not None else block
+
+
+def _real_block_to_json(values: np.ndarray) -> dict[str, Any]:
+    """Serialize a real array as nested lists plus its shape, for the same reason."""
+    arr = np.asarray(values, dtype=float)
+    return {"values": arr.tolist(), "shape": list(arr.shape)}
+
+
+def _real_block_from_json(data: Any) -> np.ndarray:
+    """Rebuild a real array written by ``_real_block_to_json`` or an older bare list."""
+    if isinstance(data, dict):
+        return np.asarray(data["values"], dtype=float).reshape(data["shape"])
+    return np.asarray(data, dtype=float)
 
 
 @dataclass(frozen=True, eq=False)
 class RotatedPaulis:
-    """A block of rotated-Pauli generators: Givens ``angles`` [M, N-1], LCU ``coeffs`` [M, T], and ``paulis``."""
+    r"""A block of ``M`` rotated-Pauli generators sharing one Pauli word set.
+
+    Each generator is a Givens rotation applied to a fixed Pauli word: row ``i`` of
+    :attr:`angles` rotates the single-particle basis, and row ``i`` of :attr:`coeffs`
+    weights the words in :attr:`paulis` within that rotated frame.
+    """
 
     angles: np.ndarray
+    r"""Givens rotation angles, shape ``[M, N - 1]``, one elimination per orbital pair."""
+
     coeffs: np.ndarray
+    r"""LCU coefficients, shape ``[M, T]``, aligned column-wise with :attr:`paulis`."""
+
     paulis: tuple[str, ...]
+    r"""The ``T`` single-mode Pauli labels the coefficients weight, e.g. ``("X", "Y")``."""
 
     def __post_init__(self) -> None:
         """Coerce inputs to arrays and a tuple."""
@@ -102,7 +133,7 @@ class SOSContainer(QubitOperatorContainer):
     """
 
     _data_type_name = "sos_container"
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.3.0"
 
     @staticmethod
     def data_type_name() -> str:
@@ -151,10 +182,10 @@ class SOSContainer(QubitOperatorContainer):
             {
                 "container_type": self.type,
                 "metadata": self.metadata.to_json(),
-                "one_body_angles": self.one_body.angles.tolist(),
+                "one_body_angles": _real_block_to_json(self.one_body.angles),
                 "one_body_coeffs": _complex_block_to_json(self.one_body.coeffs),
                 "one_body_paulis": list(self.one_body.paulis),
-                "two_body_angles": self.two_body.angles.tolist(),
+                "two_body_angles": _real_block_to_json(self.two_body.angles),
                 "two_body_coeffs": _complex_block_to_json(self.two_body.coeffs),
                 "two_body_paulis": list(self.two_body.paulis),
                 "encoding": self.encoding,
@@ -173,12 +204,12 @@ class SOSContainer(QubitOperatorContainer):
         """Create a sum-of-squares container from JSON."""
         cls._validate_json_version(cls._serialization_version, json_data)
         one_body = RotatedPaulis(
-            np.asarray(json_data["one_body_angles"], dtype=float),
+            _real_block_from_json(json_data["one_body_angles"]),
             _complex_block_from_json(json_data["one_body_coeffs"]),
             tuple(json_data.get("one_body_paulis", ("X", "Y"))),
         )
         two_body = RotatedPaulis(
-            np.asarray(json_data["two_body_angles"], dtype=float),
+            _real_block_from_json(json_data["two_body_angles"]),
             _complex_block_from_json(json_data["two_body_coeffs"]),
             tuple(json_data.get("two_body_paulis", ("Z",))),
         )

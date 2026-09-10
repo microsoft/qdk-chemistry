@@ -31,17 +31,6 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
 
 __all__: list[str] = ["SOSSABuilder", "SOSSASettings"]
 
-_SQRT_TWO = sqrt(2.0)
-_INV_SQRT_TWO = 1.0 / sqrt(2.0)
-
-
-def _row_l1_norms(coeffs: np.ndarray) -> np.ndarray:
-    """Return the per-row L1 norm of a ``[M, T]`` coefficient block (empty-safe)."""
-    magnitudes = np.abs(np.asarray(coeffs))
-    if magnitudes.ndim < 2:
-        return np.zeros(len(magnitudes))
-    return magnitudes.sum(axis=1)
-
 
 class SOSSASettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the SOSSA block encoding builder."""
@@ -54,8 +43,8 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
             energy_gap: Reference gap :math:`E_{\text{gap}}` above the sum-of-squares shift.
 
         Both default to NaN, meaning unset. They are alternative ways to state the same
-        reference point and are mutually exclusive; see
-        :func:`_resolve_lambda_eff`.
+        reference point and are mutually exclusive; ``_resolve_lambda_eff`` turns whichever
+        was supplied into ``lambda_eff``.
 
         """
         super().__init__()
@@ -262,8 +251,10 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         magnitudes are summed. The spin-free coefficients are the per-``(rank,
         copy)`` two-body row one-norms scaled by :math:`1/\sqrt{2}`.
         """
-        one_body = _SQRT_TWO * _row_l1_norms(sossa.one_body.coeffs)
-        spin_free = [_INV_SQRT_TWO * (abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) for row in sossa.two_body.coeffs]
+        magnitudes = np.abs(np.asarray(sossa.one_body.coeffs))
+        row_l1 = magnitudes.sum(axis=1) if magnitudes.ndim >= 2 else np.zeros(len(magnitudes))
+        one_body = sqrt(2.0) * row_l1
+        spin_free = [(abs(row[-1]) + float(np.sum(np.abs(row[:-1])))) / sqrt(2.0) for row in sossa.two_body.coeffs]
         return np.concatenate([one_body, np.asarray(spin_free, dtype=float)])
 
     @staticmethod

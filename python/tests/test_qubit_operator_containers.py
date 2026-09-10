@@ -12,7 +12,7 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
-from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
 from qdk_chemistry.data.qubit_operator.containers.sos import (
@@ -21,7 +21,7 @@ from qdk_chemistry.data.qubit_operator.containers.sos import (
     SOSContainer,
 )
 
-from .test_helpers import create_random_factorized_hamiltonian
+from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
 
 
 def test_qubit_operator_wraps_pauli_lcu_container() -> None:
@@ -134,6 +134,72 @@ def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
     np.testing.assert_allclose(restored.two_body.angles, container.two_body.angles)
     assert restored.metadata.num_positive_one_body_terms == 1
     assert restored.metadata.energy_shift == pytest.approx(-1.5)
+
+
+def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
+    """Build a small factorized Hamiltonian carrying a chosen one-body matrix."""
+    n = h1.shape[0]
+    rng = np.random.default_rng(1)
+    u = np.zeros(2 * n)
+    for b in range(2):
+        v = rng.standard_normal(n)
+        u[b * n : (b + 1) * n] = v / np.linalg.norm(v)
+    return FactorizedHamiltonianContainer(
+        one_body_integrals=h1,
+        u_matrices=u,
+        w_matrices=rng.standard_normal(2),
+        wb_matrix=rng.standard_normal((1, 1)),
+        orbitals=create_test_orbitals(n),
+        core_energy=0.0,
+        inactive_fock_matrix=np.zeros((n, n)),
+    )
+
+
+def _one_body_block(h1: np.ndarray):
+    """Map a one-body matrix through the SOS mapper and return the one-body generator block."""
+    n = h1.shape[0]
+    operator = SOSQubitMapper().run(Hamiltonian(_factorized_with_one_body(h1)), MajoranaMapping.jordan_wigner(2 * n))
+    return operator.get_container()
+
+
+def test_screened_one_body_modes_keep_their_outer_register_slot() -> None:
+    """A vanishing eigenvalue stays a generator carrying no amplitude.
+
+    The register layout reserves one outer slot per spatial orbital, so a dropped mode would
+    slide every spin-free index down and decode it as a one-body generator of the wrong rank.
+    """
+    n = 3
+    basis, _ = np.linalg.qr(np.random.default_rng(1).standard_normal((n, n)))
+    h1 = basis @ np.diag([1.5, -0.7, 0.3]) @ basis.T
+    h1 = 0.5 * (h1 + h1.T)
+
+    # h1' is h1 plus a two-body correction, so subtracting an eigenvalue of h1' drives that
+    # mode to zero without disturbing the others.
+    spectrum = np.linalg.eigvalsh(np.asarray(_factorized_with_one_body(h1).get_h1_prime(), dtype=float))
+    container = _one_body_block(h1 - spectrum[np.argmin(np.abs(spectrum))] * np.eye(n))
+
+    amplitudes = np.abs(container.one_body.coeffs).sum(axis=1)
+    assert container.one_body.angles.shape == (n, n - 1)
+    assert np.count_nonzero(amplitudes == 0.0) == 1
+    assert container.metadata.num_positive_one_body_terms == 2
+
+
+def test_nullspace_noise_does_not_become_a_generator() -> None:
+    """Eigensolver noise below the threshold carries no amplitude, so it cannot ride a random eigenvector.
+
+    A payload that is purely two-body leaves ``h1'`` at the level of rounding error, whose
+    eigenvectors are arbitrary. Screening keeps those modes at zero amplitude instead of
+    turning each into a generator with a meaningless Givens rotation.
+    """
+    n = 3
+    # h1' is h1 plus a two-body correction, so negating the correction leaves only rounding error.
+    correction = np.asarray(_factorized_with_one_body(np.zeros((n, n))).get_h1_prime(), dtype=float)
+    container = _one_body_block(-correction)
+
+    spectrum = np.linalg.eigvalsh(np.asarray(_factorized_with_one_body(-correction).get_h1_prime(), dtype=float))
+    assert np.abs(spectrum).max() < 1e-12, "fixture is meant to leave h1' at rounding error"
+    assert container.one_body.angles.shape == (n, n - 1)
+    np.testing.assert_array_equal(np.abs(container.one_body.coeffs).sum(axis=1), np.zeros(n))
 
 
 def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:

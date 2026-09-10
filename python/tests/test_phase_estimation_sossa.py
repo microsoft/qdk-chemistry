@@ -949,6 +949,13 @@ class TestSOSSAResourceEstimation:
         backwards then took it from 37,873,827 to 31,837,599, a 15.9% cut over the whole
         estimate. The qubit count is unchanged: the erasure's phase-fixup ancillas fit
         inside the peak the rest of the walk already sets.
+
+        The figure is asserted to 1% rather than exactly. It is a whole-walk total over
+        10,162 queries, so any costing change anywhere moves it -- it was re-pinned twice
+        while this branch was in review -- and an exact pin cannot tell a regression from
+        an improvement. A 1% band still catches swings of the size seen here (5.3% and
+        15.9%). The per-PREPARE pins in ``test_state_preparation_alias.py`` stay exact:
+        they snapshot one oracle, which is a far smaller and more stable surface.
         """
         circuit = _sossa_unary_qpe_circuit(
             10_162,
@@ -966,5 +973,7 @@ class TestSOSSAResourceEstimation:
 
         logical_counts = circuit.estimate().logical_counts
 
-        assert logical_counts["cczCount"] + logical_counts["ccixCount"] == 31_837_599
+        toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
+
+        assert toffoli_count == pytest.approx(31_837_599, rel=0.01)
         assert logical_counts["numQubits"] == 470

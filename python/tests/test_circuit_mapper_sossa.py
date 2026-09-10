@@ -142,6 +142,7 @@ class TestOuterPrep:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
+    @pytest.mark.slow
     def test_build_outer_prep_alias_sampling_marginal_probs(self):
         r"""Verify alias sampling prepares the SOS outer distribution, not its square root.
 
@@ -184,6 +185,7 @@ class TestOuterPrep:
 class TestInnerPrep:
     """Tests for SOSSAMapper._build_inner_prep."""
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
     def test_build_inner_prep_fidelity(self, algorithm):
         """Verify inner prep conditional marginals when combined with outer prep.
@@ -421,6 +423,7 @@ class TestSelectFullFidelity:
         ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, False)
         return np.array(ctx.dump_machine().as_dense_state())
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_givens_fidelity(self, N):  # noqa: N803
         """Verify SELECT with a DQ entry produces a non-trivial rotation."""
@@ -500,16 +503,12 @@ class TestSelectFullFidelity:
 
 
 class TestSOSSAWalkLogicalCounts:
-    """Verify logical resource counts of the SOSSA walk operator match paper formulas.
+    """Verify the qubit count of the SOSSA walk operator matches the paper's register layout.
 
     The walk operator W = Ref_{a,B} . U-adj . Ref_B . U (defined inline above Eq. (9)
-    of :cite:`Low2025`, derived in its Appendix A 2)
-    has resource costs that depend on the problem parameters (N, R, B, C) and the
-    chosen sub-algorithms. These tests verify that:
-
-    1. Qubit counts match: 2N + n_Xo + n_B' + 2(spin) + 1(control) + ancilla
-    2. Toffoli counts scale correctly with problem size
-    3. Walk power multiplies the Toffoli cost linearly
+    of :cite:`Low2025`, derived in its Appendix A 2) is built on
+    2N + n_Xo + n_B' + 2(spin) + 1(control) + ancilla qubits. Toffoli counts are pinned
+    separately, against whole-algorithm fixtures, in ``test_phase_estimation_sossa.py``.
 
     Reference: :cite:`Low2025`, Appendix B 7 b (Table III).
     """
