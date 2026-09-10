@@ -14,14 +14,6 @@ namespace QDKChemistry.Utils.CircuitComposition {
         Controlled op
     }
 
-    /// Adapts `op` for tests that represent one control followed by its target register.
-    internal function MakeControlledOnFirstQubitOp(
-        op : Qubit[] => Unit is Adj + Ctl
-    ) : (Qubit[] => Unit is Adj + Ctl) {
-        let controlledOp = MakeControlledOp(op);
-        (qs) => controlledOp([qs[0]], qs[1...])
-    }
-
     /// Applies `op` to `target` `power` times.
     operation ApplyRepeated<'T>(
         cacheName : String,

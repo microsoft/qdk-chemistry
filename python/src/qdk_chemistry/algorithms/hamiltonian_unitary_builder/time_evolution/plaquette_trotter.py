@@ -1,11 +1,12 @@
 r"""Second-order plaquette Trotterization for the uniform Fermi-Hubbard model.
 
 The builder reads a Jordan-Wigner encoded :class:`~qdk_chemistry.data.QubitOperator`
-and splits it into diagonal terms and two tilings of the hopping terms by disjoint
-four-site plaquettes. One step applies the symmetric product
+and follows Campbell's decomposition :math:`H=H_I+H_h^p+H_h^g`, where
+:math:`H_I` is the particle-hole-shifted onsite interaction and :math:`p` and
+:math:`g` denote the pink and gold hopping tilings. One step applies
 
 .. math::
-    e^{-isH_D/2} e^{-isH_A/2} e^{-isH_B} e^{-isH_A/2} e^{-isH_D/2}.
+    e^{-isH_I/2} e^{-isH_h^p/2} e^{-isH_h^g} e^{-isH_h^p/2} e^{-isH_I/2}.
 
 Each plaquette hopping evolution is exact. The builder diagonalizes its
 single-particle matrix, :math:`T = V \Lambda V^\dagger`, and applies
@@ -14,8 +15,8 @@ single-particle matrix, :math:`T = V \Lambda V^\dagger`, and applies
     e^{-isH_\square} = U_V e^{-is\sum_m \lambda_m n_m} U_V^\dagger.
 
 Thus the circuit switches to the plaquette momentum basis, applies two nonzero
-eigenvalue phases, and switches back. Trotter error comes only from splitting the
-three Hamiltonian layers. The lattice dimensions are supplied as settings; the
+eigenvalue phases, and switches back. Trotter error comes only from splitting
+:math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`. The lattice dimensions are supplied as settings; the
 builder derives the plaquettes from them and verifies that they match the input
 Hamiltonian.
 
@@ -41,7 +42,8 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    MIN_USEFUL_BATCH,
+    BatchedExponentiatedPauliTerm,
+    ConjugatedExponentiatedPauliTerm,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -59,10 +61,10 @@ __all__: list[str] = [
 class PlaquetteTrotter(Trotter):
     """Build a second-order product formula from exact plaquette evolutions.
 
-    The builder derives the hopping and diagonal layers from a normal
+    The builder derives :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g` from a normal
     :class:`~qdk_chemistry.data.QubitOperator`.
     The declared lattice is checked against the Hamiltonian before the
-    plaquette tilings are constructed.
+    pink and gold plaquette tilings are constructed.
 
     Note:
         This expects a Jordan-Wigner encoded, spin-blocked uniform Fermi-Hubbard
@@ -138,7 +140,8 @@ class PlaquetteTrotter(Trotter):
     ) -> UnitaryRepresentation:
         r"""Build Campbell's segmented plaquette product formula.
 
-        Campbell's Eqs. (E1)--(E2) rewrite repeated symmetric steps
+        Define :math:`D=e^{-isH_I}`, :math:`P=e^{-isH_h^p}`, and
+        :math:`G=e^{-isH_h^g}`. Campbell's Eqs. (E1)--(E2) rewrite repeated symmetric steps
         :math:`D^{1/2} P^{1/2} G P^{1/2} D^{1/2}` as
         :math:`D^{1/2}(P^{1/2} G P^{1/2} D)^rD^{-1/2}` after ``r`` repetitions.
         :meth:`_decompose_trotter_step` emits the four-factor repeated body; this
@@ -165,24 +168,6 @@ class PlaquetteTrotter(Trotter):
         _, diagonal, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
         diagonal = [term for term in diagonal if term.pauli_term]
         boundary = self._diagonal_layer(diagonal, delta * 0.5)
-        before_repeated = [
-            ExponentiatedPauliTerm(
-                pauli_term=dict(term.pauli_term),
-                angle=term.angle,
-                needs_control=False,
-                batch=term.batch,
-            )
-            for term in boundary
-        ]
-        after_repeated = [
-            ExponentiatedPauliTerm(
-                pauli_term=dict(term.pauli_term),
-                angle=-term.angle,
-                needs_control=False,
-                batch=term.batch,
-            )
-            for term in reversed(boundary)
-        ]
 
         return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
@@ -190,8 +175,7 @@ class PlaquetteTrotter(Trotter):
                 step_reps=num_divisions * power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
                 scale=time,
-                before_repeated_terms=before_repeated,
-                after_repeated_terms=after_repeated,
+                conjugating_terms=boundary,
             )
         )
 
@@ -237,7 +221,7 @@ class PlaquetteTrotter(Trotter):
                     interaction = abs(coeff) * 4.0
                     break
 
-        # R_p and R_g are the one-spin, unit-hopping matrices for the two tilings.
+        # R_p and R_g are the one-spin, unit-hopping matrices for the pink and gold tilings.
         # Evaluate their trace norms exactly through 1600 sites; beyond that use the
         # thermodynamic limits 16/pi^2 and 3.229 per site, respectively.
         if num_sites <= 1600:
@@ -283,12 +267,13 @@ class PlaquetteTrotter(Trotter):
         qubit_hamiltonian: QubitOperator,
         time: float,
         atol: float = 1e-12,
-    ) -> list[ExponentiatedPauliTerm]:
+    ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm]:
         r"""Return the repeated bulk body of Campbell's plaquette formula.
 
-        The returned terms implement
-        :math:`P^{1/2} G P^{1/2} D`: three hopping-tile layers followed by one
-        full interaction layer. :meth:`_trotter` supplies the one-time
+        With :math:`D=e^{-isH_I}`, :math:`P=e^{-isH_h^p}`, and
+        :math:`G=e^{-isH_h^g}`, the returned terms implement
+        :math:`P^{1/2} G P^{1/2} D`: two pink half-layers, one gold full layer,
+        and one full interaction layer. :meth:`_trotter` supplies the one-time
         :math:`D^{1/2}` and :math:`D^{-1/2}` boundary layers.
 
         Args:
@@ -348,50 +333,43 @@ class PlaquetteTrotter(Trotter):
                 f"{extra} operator bond(s) outside the lattice. Check the lattice dimensions, "
                 "the boundary conditions, and that sites are numbered row-major."
             )
-        # we use hwp to batch layers of L^2 or L^2/2 identical rotations.
-        batch = 1
         constant = [term for term in diagonal if not term.pauli_term]
         diagonal = [term for term in diagonal if term.pauli_term]
-        merged = (
+        identity_phase = (
             [ExponentiatedPauliTerm(pauli_term={}, angle=sum(term.angle for term in constant) * time)]
             if constant
             else []
         )
         # For each tile, we diagonalize R_plaq and realize the tile with 2 Z rotations and 4 F gates.
-        # Repeated body 1: half of hopping section A.
+        # Repeated body 1: P^(1/2), the first pink hopping half-layer.
         hop_a_open = self._hop_layer(
             section_a,
             num_sites=num_sites,
             hopping=hopping,
             time=time * 0.5,
-            first_batch=batch,
         )
-        batch = self._next_batch(hop_a_open, batch)
-        # Repeated body 2: all of hopping section B.
+        # Repeated body 2: G, the gold hopping layer.
         hop_b = self._hop_layer(
             section_b,
             num_sites=num_sites,
             hopping=hopping,
             time=time,
-            first_batch=batch,
         )
-        batch = self._next_batch(hop_b, batch)
-        # Repeated body 3: the remaining half of section A.
+        # Repeated body 3: P^(1/2), the second pink hopping half-layer.
         hop_a_close = self._hop_layer(
             section_a,
             num_sites=num_sites,
             hopping=hopping,
             time=time * 0.5,
-            first_batch=batch,
         )
-        batch = self._next_batch(hop_a_close, batch)
-        # Repeated body 4: one full interaction layer.
-        # for the interaction, after the chemical potential shift, each interaction corresponds to 1 rotation.
-        interaction = self._diagonal_layer(diagonal, time, first_batch=batch)
-        return hop_a_open + hop_b + hop_a_close + merged + interaction
+        # Repeated body 4: D, one full H_I layer. After the particle-hole shift,
+        # each onsite interaction contributes one rotation.
+        interaction = self._diagonal_layer(diagonal, time)
+        hopping_layers = [layer for layer in (hop_a_open, hop_b, hop_a_close) if layer is not None]
+        return hopping_layers + identity_phase + interaction
 
     def _split_hopping(self, qubit_hamiltonian, num_sites, atol):
-        """Separate the uniform hopping amplitude, the diagonal terms, and the bond graph.
+        """Separate uniform hopping, the :math:`H_I` terms, and the bond graph.
 
         Args:
             qubit_hamiltonian: The Hamiltonian to inspect.
@@ -400,7 +378,7 @@ class PlaquetteTrotter(Trotter):
 
         Returns:
             ``(hopping, diagonal, bonds)`` where *hopping* is the amplitude ``t``,
-            *diagonal* holds every non-hopping term as an
+            *diagonal* holds the mapped :math:`H_I` terms and scalar offsets as
             :class:`ExponentiatedPauliTerm` scaled to unit time, and *bonds* is the
             set of site pairs the hopping terms connect.
 
@@ -477,7 +455,7 @@ class PlaquetteTrotter(Trotter):
 
     @staticmethod
     def _plaquette_sections(width: int, height: int) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
-        """Tile a periodic square lattice with two sections of vertex-disjoint four-cycles."""
+        """Tile a periodic square lattice with Campbell's pink and gold four-cycles."""
         if width % 2 or height % 2:
             raise ValueError(f"Plaquette tiling requires even side lengths, got {width}x{height}.")
         if (width < 4 or height < 4) and (width, height) != (2, 2):
@@ -514,8 +492,7 @@ class PlaquetteTrotter(Trotter):
         num_sites: int,
         hopping: float,
         time: float,
-        first_batch: int,
-    ) -> list[ExponentiatedPauliTerm]:
+    ) -> ConjugatedExponentiatedPauliTerm | None:
         r"""Evolve every plaquette of *section* for both spin sectors.
 
         Each plaquette evolution is the conjugation :math:`U_V D U_V^\dagger`.
@@ -526,19 +503,17 @@ class PlaquetteTrotter(Trotter):
         equal-angle phase families can use Hamming-weight phasing.
 
         Args:
-            section: The section's four-cycles, or empty for the 2x2 lattice.
+            section: One pink or gold tiling's four-cycles, or empty for the 2x2 lattice.
             num_sites: Number of sites in one spin sector.
             hopping: Uniform hopping amplitude.
             time: Duration of this section evolution.
-            first_batch: First batch identifier free for this layer.
 
         Returns:
-            The section factors in hoisted order.
+            The hopping tiling as a structured basis-change conjugation, or ``None`` when empty.
 
         """
         heads: list[ExponentiatedPauliTerm] = []
         phases: list[ExponentiatedPauliTerm] = []
-        tails_per_plaquette: list[list[ExponentiatedPauliTerm]] = []
         for spin_offset in (0, num_sites):
             for cycle in section:
                 sites = tuple(site + spin_offset for site in cycle)
@@ -553,12 +528,8 @@ class PlaquetteTrotter(Trotter):
                     string = dict.fromkeys(range(low + 1, high), "Z")
                     half = math.pi / 8.0 if mode_i < mode_j else -math.pi / 8.0
                     head += [
-                        ExponentiatedPauliTerm(
-                            pauli_term={**string, low: "X", high: "Y"}, angle=-half, needs_control=False
-                        ),
-                        ExponentiatedPauliTerm(
-                            pauli_term={**string, low: "Y", high: "X"}, angle=half, needs_control=False
-                        ),
+                        ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "Y"}, angle=-half),
+                        ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "X"}, angle=half),
                     ]
 
                 # G_01^dagger exp(i alpha n_0) exp(-i alpha n_1) G_01 becomes
@@ -570,43 +541,33 @@ class PlaquetteTrotter(Trotter):
                     ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "X"}, angle=-kappa / 2.0),
                     ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "Y"}, angle=-kappa / 2.0),
                 ]
-                tail = [
-                    ExponentiatedPauliTerm(
-                        pauli_term=dict(term.pauli_term), angle=-term.angle, needs_control=term.needs_control
-                    )
-                    for term in reversed(head)
-                ]
                 heads += head
                 phases += middle
-                tails_per_plaquette.append(tail)
-
-        tails: list[ExponentiatedPauliTerm] = []
-        for tail in reversed(tails_per_plaquette):
-            tails += tail
-        phases = self._batch_equal_angles(phases, first_batch=first_batch)
-        return heads + phases + tails
+        if not heads:
+            return None
+        return ConjugatedExponentiatedPauliTerm(
+            within_terms=heads,
+            apply_terms=self._batch_equal_angles(phases),
+        )
 
     @classmethod
     def _diagonal_layer(
         cls,
         diagonal: list[ExponentiatedPauliTerm],
         fraction: float,
-        first_batch: int = 1,
-    ) -> list[ExponentiatedPauliTerm]:
-        """Rescale diagonal terms and mark equal-angle batches."""
+    ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]:
+        """Rescale mapped :math:`H_I` terms and group equal-angle rotations."""
         scaled = [
             ExponentiatedPauliTerm(pauli_term=dict(term.pauli_term), angle=term.angle * fraction) for term in diagonal
         ]
-        return cls._batch_equal_angles(scaled, first_batch=first_batch)
+        return cls._batch_equal_angles(scaled)
 
     @staticmethod
     def _batch_equal_angles(
         terms: list[ExponentiatedPauliTerm],
-        min_batch: int = MIN_USEFUL_BATCH,
         max_batch: int = 0,
-        first_batch: int = 1,
-    ) -> list[ExponentiatedPauliTerm]:
-        """Mark disjoint diagonal terms with equal angles as rotation batches."""
+    ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]:
+        """Group disjoint equal-angle terms for Hamming-weight phasing."""
         families: dict[tuple[float, int], list[ExponentiatedPauliTerm]] = {}
         loose: list[ExponentiatedPauliTerm] = []
         for term in terms:
@@ -616,8 +577,7 @@ class PlaquetteTrotter(Trotter):
             key = (round(term.angle, 12), len(term.pauli_term))
             families.setdefault(key, []).append(term)
 
-        batched: list[ExponentiatedPauliTerm] = []
-        next_batch = first_batch
+        batched: list[BatchedExponentiatedPauliTerm] = []
         for _, family in sorted(families.items()):
             groups: list[list[ExponentiatedPauliTerm]] = []
             supports: list[set[int]] = []
@@ -636,25 +596,16 @@ class PlaquetteTrotter(Trotter):
                 width = len(group) if max_batch <= 0 else min(max_batch, len(group))
                 for start in range(0, len(group), width):
                     chunk = group[start : start + width]
-                    if len(chunk) < min_batch:
+                    if len(chunk) < 2:
                         loose.extend(chunk)
                         continue
-                    batched.extend(
-                        ExponentiatedPauliTerm(
-                            pauli_term=term.pauli_term,
-                            angle=term.angle,
-                            needs_control=term.needs_control,
-                            batch=next_batch,
+                    batched.append(
+                        BatchedExponentiatedPauliTerm(
+                            pauli_terms=[term.pauli_term for term in chunk],
+                            angle=chunk[0].angle,
                         )
-                        for term in chunk
                     )
-                    next_batch += 1
         return batched + loose
-
-    @staticmethod
-    def _next_batch(terms: list[ExponentiatedPauliTerm], current: int) -> int:
-        """Return the first batch identifier free after emitting *terms*."""
-        return max((term.batch for term in terms if term.batch), default=current - 1) + 1
 
 
 class PlaquetteTrotterSettings(TrotterSettings):
