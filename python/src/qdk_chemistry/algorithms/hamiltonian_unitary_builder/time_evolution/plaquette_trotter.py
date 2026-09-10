@@ -599,13 +599,47 @@ class PlaquetteTrotter(Trotter):
         time: float,
         target_accuracy: float,
     ) -> int:
-        """Return the number of plaquette Trotter steps meeting *target_accuracy*."""
+        r"""Return the number of plaquette Trotter steps meeting *target_accuracy*.
+
+        ``target_accuracy`` is a ground-state ENERGY tolerance, so the step count comes
+        from Campbell's Eq. (F2) (arXiv:2012.09238v4, App. F): a step of duration
+        :math:`s` biases the energy by at most :math:`W s^2`. That bias does not
+        accumulate over the repetitions. Section V of the same paper gives the reason --
+        the repeated unitary is :math:`\exp(i H_\mathrm{eff} s)` for one fixed
+        :math:`H_\mathrm{eff}` with :math:`\|H - H_\mathrm{eff}\| \le W s^2`, and
+        phase estimation reads an eigenvalue of that :math:`H_\mathrm{eff}`. Kivlichan
+        et al. (arXiv:1902.10673v4, Eq. (8)) reach the same bound independently.
+
+        So :math:`W (t/r)^2 = \epsilon` gives :math:`r = t \sqrt{W / \epsilon}`.
+
+        The per-step *unitary* error is :math:`W s^3`, which would instead give
+        :math:`r = t^{3/2}\sqrt{W/\epsilon}`. That is the wrong quantity here, and
+        dimensionally so: with :math:`\hbar = 1`, :math:`[W] = E^3`, so :math:`W s^3`
+        is dimensionless while an energy tolerance is not. Converting the accumulated
+        norm error :math:`W t^3 / r^2` to an energy divides it by :math:`t`, which
+        returns :math:`W t^2 / r^2` and the same formula as above.
+
+        Args:
+            width: Lattice columns.
+            height: Lattice rows.
+            hopping: Uniform hopping amplitude.
+            interaction: On-site interaction strength.
+            time: Total evolution time.
+            target_accuracy: Ground-state energy tolerance.
+
+        Returns:
+            The number of steps, at least one.
+
+        Raises:
+            ValueError: If ``target_accuracy`` is not positive.
+
+        """
         if target_accuracy <= 0.0:
             raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
         constant = cls._plaquette_error_constant(width, height, hopping, interaction)
         if constant <= 0.0 or time == 0.0:
             return 1
-        return max(1, math.ceil(abs(time) ** 1.5 * math.sqrt(constant / target_accuracy)))
+        return max(1, math.ceil(abs(time) * math.sqrt(constant / target_accuracy)))
 
     @classmethod
     def _plaquette_error_constant(
@@ -619,8 +653,11 @@ class PlaquetteTrotter(Trotter):
     ) -> float:
         r"""Return Campbell's second-order error constant :math:`W_\mathrm{PLAQ}`.
 
-        For a step of duration :math:`s`, the error is at most
-        :math:`W_\mathrm{PLAQ}s^3`, where
+        For a step of duration :math:`s` the *unitary* error is at most
+        :math:`W_\mathrm{PLAQ}s^3` and the *energy* bias at most
+        :math:`W_\mathrm{PLAQ}s^2` (arXiv:2012.09238v4, Table I caption and Eq. (F2));
+        the latter is what sizes the step count, since phase estimation reads an
+        energy. Here
 
         .. math::
             W_\mathrm{PLAQ} \le W_\mathrm{SO2}

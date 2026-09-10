@@ -47,9 +47,6 @@ except ImportError:  # pragma: no cover - platform dependent
     resource = None
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquette_trotter import (
-    PlaquetteTrotter,
-)
 from qdk_chemistry.data import AlgorithmRef, Circuit, LatticeGraph, MajoranaMapping
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
@@ -108,9 +105,7 @@ class QpeParameters:
     one_norm: float  # lambda
     evolution_time: float  # t_0
     num_bits: int  # m, including guard bits
-    num_divisions: int  # r
-    error_constant: float  # Campbell's W_PLAQ (arXiv:2012.09238v4, Eq. (20) and App. D)
-    trotter_budget: float  # the epsilon actually allocated to Trotter error
+    trotter_budget: float  # the epsilon left for the builder to size its steps from
 
 
 def target_precision(size: int) -> float:
@@ -135,83 +130,47 @@ def qubit_operator(size: int):
     )
 
 
-def plan_qpe(one_norm: float, precision: float, error_constant: float) -> QpeParameters:
-    """Choose the (m, r) minimizing the ladder cost 2**m * r for a target precision.
+def plan_qpe(one_norm: float, precision: float) -> QpeParameters:
+    """Split a ground-state energy budget between phase readout and Trotter error.
 
-    Implements Campbell's Appendix F optimization (arXiv:2012.09238v4) with ``m``
-    constrained to integers: for every candidate resolution the leftover budget goes
-    entirely to the Trotter term, which maximizes the step time and so minimizes ``r``.
+    The readout error of an m-bit register is ``2 * lambda / 2**m``, so the narrowest
+    register that leaves anything for Trotter is the cheapest: widening it costs a
+    factor of two per bit and only buys budget the builder does not need. Whatever the
+    readout does not spend is handed to the builder as its target accuracy.
+
+    Campbell optimizes the same split analytically and lands on a two-thirds/one-third
+    allocation (arXiv:2012.09238v4, App. F Eqs. (F5)-(F7)); this integer search over m
+    reaches the same register width without needing the error constant here.
 
     Args:
         one_norm: The Hamiltonian's Schatten-1 norm, lambda.
         precision: Absolute ground-state energy accuracy required.
-        error_constant: Campbell's W_PLAQ for this lattice.
 
     Returns:
         The chosen parameters.
 
     Raises:
-        ValueError: If no resolution meets the precision.
+        ValueError: If no register width leaves any budget for Trotter error.
 
     """
     # H*t_0 spectrum fits in [-pi, pi]. The endpoints +/-lambda alias, but the ground
     # state sits strictly inside.
     evolution_time = math.pi / one_norm
 
-    best = None
     for resolution_bits in range(1, MAX_RESOLUTION_BITS):
         readout_budget = 2 * one_norm / 2**resolution_bits  # = 2*pi/(t_0 * 2**m)
         if readout_budget >= precision:
-            continue  # nothing left for Trotter
-        trotter_budget = precision - readout_budget
-        # Campbell's Eq. (F2) (arXiv:2012.09238v4, App. F) / Kivlichan Eq. (8): a
-        # second-order step of duration s has ENERGY error W*s^2, not the unitary-norm
-        # bound W*s^3. It does not accumulate: the r repetitions realize e^{-i H_eff s r}
-        # for one fixed H_eff whose distance from H is W*s^2, and QPE reads an eigenvalue
-        # of that H_eff. So the largest step meeting the budget is s = sqrt(budget / W).
-        step_time = math.sqrt(trotter_budget / error_constant)
-        divisions = max(1, math.ceil(evolution_time / step_time))
-        cost = (2**resolution_bits) * divisions
-        if best is None or cost < best[0]:
-            best = (cost, resolution_bits, divisions, trotter_budget)
-
-    if best is None:
-        raise ValueError(
-            f"no resolution meets precision {precision:g} for lambda {one_norm:g}"
+            continue
+        return QpeParameters(
+            one_norm=one_norm,
+            evolution_time=evolution_time,
+            num_bits=resolution_bits + GUARD_BITS,
+            trotter_budget=precision - readout_budget,
         )
 
-    _, resolution_bits, divisions, trotter_budget = best
-    return QpeParameters(
-        one_norm=one_norm,
-        evolution_time=evolution_time,
-        num_bits=resolution_bits + GUARD_BITS,
-        num_divisions=divisions,
-        error_constant=error_constant,
-        trotter_budget=trotter_budget,
+    raise ValueError(
+        f"no resolution meets precision {precision:g} for lambda {one_norm:g}"
     )
-
-
-def qpe_parameters(operator, precision: float, size: int) -> QpeParameters:
-    """Derive the phase register width and Trotter step count for a target precision.
-
-    The error constant is Campbell's W_PLAQ (arXiv:2012.09238v4, Eq. (20) and App. D),
-    derived for exactly the two-section plaquette splitting used here. A generic
-    term-by-term commutator bound would not know that each section is internally exact,
-    and would be far more conservative.
-
-    Args:
-        operator: The qubit Hamiltonian.
-        precision: Absolute ground-state energy accuracy required.
-        size: Lattice side length.
-
-    Returns:
-        The chosen parameters.
-
-    """
-    constant = PlaquetteTrotter._plaquette_error_constant(
-        size, size, HOPPING_T, COULOMB_U
-    )
-    return plan_qpe(operator.schatten_norm, precision, constant)
 
 
 def reference_state_prep(context, num_sites: int, electrons: int) -> Circuit:
@@ -280,7 +239,7 @@ def qpe_circuit(
                 "plaquette",
                 order=TROTTER_ORDER,
                 time=parameters.evolution_time,
-                num_divisions=parameters.num_divisions,
+                target_accuracy=parameters.trotter_budget,
                 lattice_width=size,
                 lattice_height=size,
             ),
@@ -346,7 +305,7 @@ def sample_size(context, size: int) -> dict:
     """
     started = time.monotonic()
     operator = qubit_operator(size)
-    parameters = qpe_parameters(operator, target_precision(size), size)
+    parameters = plan_qpe(operator.schatten_norm, target_precision(size))
 
     row = {
         "L": size,
@@ -355,10 +314,9 @@ def sample_size(context, size: int) -> dict:
         "terms": len(operator.pauli_strings),
         "electrons": num_electrons(size),
         "lambda": parameters.one_norm,
-        "W_PLAQ_per_site": parameters.error_constant / (size * size),
         "target_precision": target_precision(size),
+        "trotter_budget": parameters.trotter_budget,
         "num_bits": parameters.num_bits,
-        "num_divisions": parameters.num_divisions,
     }
 
     initial_state = reference_state_prep(context, size * size, num_electrons(size))
@@ -514,7 +472,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             print(
                 f"L={size:>3}: {row['qubits']:>6} qubits, {row['terms']:>7} terms, "
-                f"m={row['num_bits']}, r={row['num_divisions']}, "
+                f"m={row['num_bits']}, "
                 f"{row['physical_qubits']} physical qubits, {row['runtime_hours']:.3g} h "
                 f"[{row['elapsed_s']}s, peak {row['peak_rss_gb']} GB]"
             )

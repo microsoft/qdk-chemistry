@@ -613,11 +613,17 @@ class TestPlaquetteErrorConstant:
         assert tight > loose
         assert loose >= 1
 
-    def test_step_count_grows_as_time_to_the_three_halves(self):
-        """The second-order bound gives r proportional to t^{3/2}."""
+    def test_step_count_grows_linearly_with_time(self):
+        """The energy bound gives r proportional to t, not to t^{3/2}.
+
+        A step of duration s biases the energy by W s^2 and that bias does not
+        accumulate over the repetitions (arXiv:2012.09238v4, Eq. (F2) and Sec. V), so
+        r = t sqrt(W/epsilon). The t^{3/2} form belongs to the per-step *unitary* error
+        W s^3, which is a dimensionless quantity and not the one phase estimation reads.
+        """
         base = plaquette_trotter_steps(8, 8, 1.0, 4.0, time=1.0, target_accuracy=1e-3)
         quadrupled = plaquette_trotter_steps(8, 8, 1.0, 4.0, time=4.0, target_accuracy=1e-3)
-        assert quadrupled == pytest.approx(base * 8, rel=0.02)
+        assert quadrupled == pytest.approx(base * 4, rel=0.02)
 
     def test_rejects_a_non_positive_accuracy(self):
         """A zero or negative target has no meaningful step count."""
