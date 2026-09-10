@@ -24,7 +24,6 @@ class FactorizedHamiltonianTest : public ::testing::Test {
     B = 2;
     C = 1;
     core_energy = 1.5;
-    energy_gap = 0.0;
 
     one_body = Eigen::MatrixXd::Identity(N, N);
     one_body(0, 1) = 0.3;
@@ -48,11 +47,11 @@ class FactorizedHamiltonianTest : public ::testing::Test {
 
   std::unique_ptr<FactorizedHamiltonianContainer> make_container() const {
     return std::make_unique<FactorizedHamiltonianContainer>(
-        one_body, u, w, wb, orbitals, core_energy, inactive_fock, energy_gap);
+        one_body, u, w, wb, orbitals, core_energy, inactive_fock);
   }
 
   size_t N, R, B, C;
-  double core_energy, energy_gap;
+  double core_energy;
   Eigen::MatrixXd one_body;
   Eigen::VectorXd u, w;
   Eigen::MatrixXd wb;
@@ -116,16 +115,6 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   }
 
   EXPECT_NEAR(container->get_lambda(), 2.0800000000000001, 1e-12);
-  EXPECT_DOUBLE_EQ(container->get_lambda_eff(), 0.0);
-
-  FactorizedHamiltonianContainer gapped(one_body, u, w, wb, orbitals,
-                                        core_energy, inactive_fock, 0.5);
-  EXPECT_NEAR(gapped.get_lambda_eff(), 1.3527749258468684, 1e-12);
-
-  FactorizedHamiltonianContainer gap_at_upper_bound(
-      one_body, u, w, wb, orbitals, core_energy, inactive_fock,
-      2.0 * container->get_lambda());
-  EXPECT_DOUBLE_EQ(gap_at_upper_bound.get_lambda_eff(), 0.0);
 }
 
 TEST_F(FactorizedHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
@@ -146,8 +135,8 @@ TEST_F(FactorizedHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
   wb_multi << 0.2, -0.1, 0.05, 0.3;
 
   FactorizedHamiltonianContainer container(one_body, u_multi, w_multi, wb_multi,
-                                           orbitals, core_energy, inactive_fock,
-                                           energy_gap);
+                                           orbitals, core_energy,
+                                           inactive_fock);
 
   ASSERT_EQ(container.get_num_ranks(), ranks);
   ASSERT_EQ(container.get_num_bases(), bases);
@@ -230,8 +219,8 @@ TEST_F(FactorizedHamiltonianTest, ElementAgreesWithTheCachedTensor) {
   wb_multi << 0.2, -0.1, 0.05, 0.3;
 
   FactorizedHamiltonianContainer container(one_body, u_multi, w_multi, wb_multi,
-                                           orbitals, core_energy, inactive_fock,
-                                           energy_gap);
+                                           orbitals, core_energy,
+                                           inactive_fock);
 
   const size_t total = N * N * N * N;
   Eigen::VectorXd cold(static_cast<Eigen::Index>(total));
@@ -283,7 +272,7 @@ TEST_F(FactorizedHamiltonianTest, RejectsAnUnnormalizedBasisRow) {
   u_scaled *= 2.0;
   EXPECT_THROW(
       FactorizedHamiltonianContainer(one_body, u_scaled, w, wb, orbitals,
-                                     core_energy, inactive_fock, energy_gap),
+                                     core_energy, inactive_fock),
       std::invalid_argument);
 }
 
@@ -298,8 +287,7 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
     Eigen::MatrixXd wb_alt(R, C);
     wb_alt(0, 0) = wb_value;
     FactorizedHamiltonianContainer shifted(one_body, u, w, wb_alt, orbitals,
-                                           core_energy, inactive_fock,
-                                           energy_gap);
+                                           core_energy, inactive_fock);
 
     const Eigen::VectorXd h2_alt = shifted.reconstruct_two_body_integrals();
     ASSERT_EQ(h2_alt.size(), h2_ref.size());
@@ -333,8 +321,7 @@ TEST_F(FactorizedHamiltonianTest, H1PrimeMatchesClosedForm) {
     wb_alt(0, 0) = wb_value;
 
     FactorizedHamiltonianContainer container(one_body, u, w, wb_alt, orbitals,
-                                             core_energy, inactive_fock,
-                                             energy_gap);
+                                             core_energy, inactive_fock);
 
     Eigen::MatrixXd expected = one_body;
     expected -= 0.5 * (m * m);
@@ -356,10 +343,9 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
   Eigen::MatrixXd from_upper = asymmetric;
   from_upper(1, 0) = asymmetric(0, 1);
 
-  const double positive_gap = 0.1;
   auto lambda_of = [&](const Eigen::MatrixXd& h1) {
     return FactorizedHamiltonianContainer(h1, u, w, wb, orbitals, core_energy,
-                                          inactive_fock, positive_gap)
+                                          inactive_fock)
         .get_lambda();
   };
 
@@ -367,10 +353,9 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
       << "the two triangles must disagree, otherwise this input cannot "
          "demonstrate the ambiguity the guard exists to reject";
 
-  FactorizedHamiltonianContainer container(
-      asymmetric, u, w, wb, orbitals, core_energy, inactive_fock, positive_gap);
+  FactorizedHamiltonianContainer container(asymmetric, u, w, wb, orbitals,
+                                           core_energy, inactive_fock);
   EXPECT_THROW(container.get_lambda(), std::runtime_error);
-  EXPECT_THROW(container.get_lambda_eff(), std::runtime_error);
 }
 
 TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {

@@ -345,7 +345,6 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
 
   const Eigen::MatrixXd wb_matrix =
       Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(num_ranks), 1);
-  constexpr double energy_gap = 0.0;
 
   const Eigen::MatrixXd inactive_fock =
       hamiltonian->has_inactive_fock_matrix()
@@ -354,8 +353,7 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
       h_alpha, u_matrices, w_matrices, wb_matrix, hamiltonian->get_orbitals(),
-      hamiltonian->get_core_energy(), inactive_fock, energy_gap,
-      hamiltonian->get_type());
+      hamiltonian->get_core_energy(), inactive_fock, hamiltonian->get_type());
 
   return std::make_shared<data::Hamiltonian>(std::move(container));
 }

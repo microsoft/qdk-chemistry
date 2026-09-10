@@ -998,7 +998,7 @@ Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
       py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
                const Eigen::VectorXd&, const Eigen::MatrixXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
-               double, HamiltonianType>(),
+               HamiltonianType>(),
       R"(
 Constructor for a factorized Hamiltonian.
 
@@ -1010,7 +1010,6 @@ Args:
     orbitals (Orbitals): Restricted orbitals with N active spatial orbitals.
     core_energy (float): Nuclear and inactive-core energy.
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix over the full molecular-orbital space.
-    energy_gap (float, optional): Energy gap for SOS block encoding; defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type; defaults to Hermitian.
 
 Raises:
@@ -1019,7 +1018,6 @@ Raises:
       py::arg("one_body_integrals"), py::arg("u_matrices"),
       py::arg("w_matrices"), py::arg("wb_matrix"), py::arg("orbitals"),
       py::arg("core_energy"), py::arg("inactive_fock_matrix"),
-      py::arg("energy_gap") = 0.0,
       py::arg("type") = HamiltonianType::Hermitian);
 
   factorized_container.def("get_u_matrices",
@@ -1082,31 +1080,12 @@ Returns:
     int: Number of copies per rank.
 )");
 
-  factorized_container.def("get_energy_gap",
-                           &FactorizedHamiltonianContainer::get_energy_gap, R"(
-E_gap for SOS block encoding.
-
-Returns:
-    float: Energy gap used by the SOS block encoding.
-)");
-
   factorized_container.def("get_lambda",
                            &FactorizedHamiltonianContainer::get_lambda, R"(
 Compute the normalization from the adjusted one-body matrix and factors.
 
 Returns:
     float: Block-encoding normalization.
-
-Raises:
-    RuntimeError: If the adjusted one-body matrix cannot be diagonalized.
-)");
-
-  factorized_container.def("get_lambda_eff",
-                           &FactorizedHamiltonianContainer::get_lambda_eff, R"(
-Compute the effective SOS normalization.
-
-Returns:
-    float: ``sqrt(E_gap * (2 * Lambda - E_gap))``, or 0.0 if the gap is outside ``(0, 2 * Lambda)``.
 
 Raises:
     RuntimeError: If the adjusted one-body matrix cannot be diagonalized.

@@ -37,7 +37,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param core_energy Nuclear and inactive-core energy.
    * @param inactive_fock_matrix Inactive Fock matrix with full
    *        molecular-orbital dimensions.
-   * @param energy_gap Energy-gap metadata.
    * @param type Hamiltonian type.
    * @throws std::invalid_argument if dimensions or required data are invalid,
    *         or if a basis row of U is not normalized.
@@ -47,7 +46,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
       const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
       const Eigen::MatrixXd& wb_matrix, std::shared_ptr<Orbitals> orbitals,
       double core_energy, const Eigen::MatrixXd& inactive_fock_matrix,
-      double energy_gap = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /** @brief Destructor. */
@@ -135,9 +133,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   /** @return Number of copies C, inferred from the WB columns. */
   size_t get_num_copies() const;
 
-  /** @return Energy-gap metadata. */
-  double get_energy_gap() const;
-
   /**
    * @brief Compute the factorization normalization (Eq. 33).
    * Λ = Σ|eig(h1_prime)| + 1/4 Σ_{rc} (|WB^{rc}| + Σ_b |W^{rc}_b|)²
@@ -146,15 +141,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    *         symmetric.
    */
   double get_lambda() const;
-
-  /**
-   * @brief Compute the effective normalization (Eq. 11).
-   * λ_eff = √(E_gap · (2Λ - E_gap))
-   *
-   * @return The effective normalization, or 0.0 if E_gap is outside the open
-   *         interval (0, 2Λ).
-   */
-  double get_lambda_eff() const;
 
   /**
    * @brief Compute the adjusted one-body matrix h'(1) (Eq. 36).
@@ -195,8 +181,6 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
   Eigen::VectorXd _u;   ///< Flat U matrices [R*B*N]
   Eigen::VectorXd _w;   ///< Flat W matrices [R*B*C]
   Eigen::MatrixXd _wb;  ///< Identity weights [R,C]
-
-  double _energy_gap;  ///< Energy-gap metadata
 
   /// Lazily computed four-center integrals (shared for all channels,
   /// restricted)

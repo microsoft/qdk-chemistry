@@ -22,13 +22,12 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
     const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
     const Eigen::MatrixXd& wb_matrix, std::shared_ptr<Orbitals> orbitals,
     double core_energy, const Eigen::MatrixXd& inactive_fock_matrix,
-    double energy_gap, HamiltonianType type)
+    HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _u(u_matrices),
       _w(w_matrices),
-      _wb(wb_matrix),
-      _energy_gap(energy_gap) {
+      _wb(wb_matrix) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -78,8 +77,7 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     fock_alpha = fa;
   }
   return std::make_unique<FactorizedHamiltonianContainer>(
-      h1_alpha, _u, _w, _wb, _orbitals, _core_energy, fock_alpha, _energy_gap,
-      _type);
+      h1_alpha, _u, _w, _wb, _orbitals, _core_energy, fock_alpha, _type);
 }
 
 std::string FactorizedHamiltonianContainer::get_container_type() const {
@@ -254,32 +252,6 @@ size_t FactorizedHamiltonianContainer::get_num_copies() const {
   return static_cast<size_t>(_wb.cols());
 }
 
-double FactorizedHamiltonianContainer::get_energy_gap() const {
-  return _energy_gap;
-}
-
-double FactorizedHamiltonianContainer::get_lambda_eff() const {
-  // :cite:`Low2025` (Eq. 11): λ_eff = √(E_gap·(2Λ - E_gap)).
-  if (!(_energy_gap > 0.0)) {
-    QDK_LOGGER().warn(
-        "FactorizedHamiltonianContainer::get_lambda_eff: no positive energy "
-        "gap was supplied at construction, returning 0.");
-    return 0.0;
-  }
-
-  const double lambda = get_lambda();
-  if (!(_energy_gap < 2.0 * lambda)) {
-    QDK_LOGGER().warn(
-        "FactorizedHamiltonianContainer::get_lambda_eff: the energy gap "
-        "({:.6e}) is not below 2*lambda ({:.6e}), so the expression under the "
-        "square root is non-positive. Returning 0.",
-        _energy_gap, 2.0 * lambda);
-    return 0.0;
-  }
-
-  return std::sqrt(_energy_gap * (2.0 * lambda - _energy_gap));
-}
-
 Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
   // Adjusted one-body matrix h^(1)' :cite:`Low2025` (Eq. 36).
   // Writing the rank-r copy-c leaf as
@@ -381,7 +353,6 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   j["num_bases"] = get_num_bases();
   j["num_copies"] = get_num_copies();
   j["core_energy"] = _core_energy;
-  j["energy_gap"] = _energy_gap;
   j["type"] =
       (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
   j["is_restricted"] = is_restricted();
@@ -407,7 +378,6 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   auto w = json_to_vector(j.at("w_matrices"));
   auto wb = json_to_matrix(j.at("wb_matrix"));
   double core_energy = j.at("core_energy");
-  double energy_gap = j.at("energy_gap");
   const std::size_t num_ranks = j.at("num_ranks").get<std::size_t>();
   const std::size_t num_bases = j.at("num_bases").get<std::size_t>();
   const std::size_t num_copies = j.at("num_copies").get<std::size_t>();
@@ -426,7 +396,7 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      h1, u, w, wb, orbitals, core_energy, fock, energy_gap, type);
+      h1, u, w, wb, orbitals, core_energy, fock, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
@@ -459,10 +429,6 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
       .createAttribute("core_energy", H5::PredType::NATIVE_DOUBLE,
                        H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
-  metadata_group
-      .createAttribute("energy_gap", H5::PredType::NATIVE_DOUBLE,
-                       H5::DataSpace(H5S_SCALAR))
-      .write(H5::PredType::NATIVE_DOUBLE, &_energy_gap);
 
   hsize_t r_val = get_num_ranks(), b_val = get_num_bases(),
           c_val = get_num_copies();
@@ -518,12 +484,10 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   version_attr.read(string_type, version);
   validate_serialization_version(SERIALIZATION_VERSION, version);
 
-  double core_energy, energy_gap;
+  double core_energy;
   H5::Group metadata_group = group.openGroup("metadata");
   metadata_group.openAttribute("core_energy")
       .read(H5::PredType::NATIVE_DOUBLE, &core_energy);
-  metadata_group.openAttribute("energy_gap")
-      .read(H5::PredType::NATIVE_DOUBLE, &energy_gap);
 
   hsize_t num_ranks, num_bases, num_copies;
   metadata_group.openAttribute("num_ranks")
@@ -558,7 +522,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 
   auto container = std::make_unique<FactorizedHamiltonianContainer>(
-      h1, u, w, wb, orbitals, core_energy, fock, energy_gap, type);
+      h1, u, w, wb, orbitals, core_energy, fock, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
@@ -619,7 +583,6 @@ void FactorizedHamiltonianContainer::hash_update(
   hash_value(ctx, static_cast<int64_t>(get_num_ranks()));
   hash_value(ctx, static_cast<int64_t>(get_num_bases()));
   hash_value(ctx, static_cast<int64_t>(get_num_copies()));
-  hash_value(ctx, _energy_gap);
   hash_value(ctx, _u);
   hash_value(ctx, _w);
   hash_value(ctx, _wb);
