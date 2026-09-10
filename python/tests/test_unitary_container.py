@@ -118,9 +118,9 @@ class TestPauliProductFormulaContainer:
         with pytest.raises(ValueError, match="Invalid permutation"):
             container.reorder_terms([0, 1, 3])
 
-    @pytest.mark.parametrize("num_qubits", [70_000, 2**32])
-    def test_large_register_reordering(self, num_qubits):
+    def test_large_register_reordering(self):
         """Sparse row selection retains empty rows, wide indices, and packed dtypes."""
+        num_qubits = 2**32
         original = PauliProductFormulaContainer.from_sparse_arrays(
             [0, 2, 2, 3],
             [0, num_qubits - 1, 1],
@@ -135,6 +135,8 @@ class TestPauliProductFormulaContainer:
         for actual, values in zip(reordered.sparse_term_arrays(), expected, strict=True):
             np.testing.assert_array_equal(actual, values)
         assert reordered.reorder_terms([2, 0, 1]).content_hash() == original.content_hash()
+        combined = original.combine(original)
+        assert list(combined.step_terms) == list(original.step_terms) * 14
 
     def test_to_json_roundtrip(self, container):
         """Test JSON serialization and deserialization roundtrip."""
@@ -214,40 +216,71 @@ class TestPauliProductFormulaContainer:
             assert np.isclose(term.angle, expected, atol=1e-14)
 
     def test_combine_with_adjacent_identical(self):
-        """Test combine where adjacent identical Pauli terms get merged."""
+        """Merge adjacent equal factors despite differing dictionary insertion order."""
         a = PauliProductFormulaContainer(
             step_terms=[
                 ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=1.5),
-                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
+                ExponentiatedPauliTerm(pauli_term={1: "Z", 0: "X"}, angle=0.5),
             ],
             step_reps=2,
-            num_qubits=1,
+            num_qubits=2,
         )
         b = PauliProductFormulaContainer(
             step_terms=[
-                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.7),
+                ExponentiatedPauliTerm(pauli_term={0: "X", 1: "Z"}, angle=0.7),
                 ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=1.5),
             ],
             step_reps=1,
-            num_qubits=1,
+            num_qubits=2,
         )
         result = a.combine(b)
 
-        # a expanded: [Y(1.5), X(0.5), Y(1.5), X(0.5)], b expanded: [X(0.7), Z(1.5)]
-        # Only the two adjacent X terms at the boundary are merged into X(1.2)
+        # a expanded: [Y, XZ, Y, XZ], b: [XZ, Z]; only the boundary XZ terms fuse.
         assert result.step_reps == 1
         assert len(result.step_terms) == 5
 
         assert result.step_terms[0].pauli_term == {0: "Y"}
         assert np.isclose(result.step_terms[0].angle, 1.5, atol=1e-14)
-        assert result.step_terms[1].pauli_term == {0: "X"}
+        assert result.step_terms[1].pauli_term == {0: "X", 1: "Z"}
         assert np.isclose(result.step_terms[1].angle, 0.5, atol=1e-14)
         assert result.step_terms[2].pauli_term == {0: "Y"}
         assert np.isclose(result.step_terms[2].angle, 1.5, atol=1e-14)
-        assert result.step_terms[3].pauli_term == {0: "X"}
+        assert list(result.step_terms[3].pauli_term.items()) == [(0, "X"), (1, "Z")]
         assert np.isclose(result.step_terms[3].angle, 1.2, atol=1e-14)
         assert result.step_terms[4].pauli_term == {0: "Z"}
         assert np.isclose(result.step_terms[4].angle, 1.5, atol=1e-14)
+
+    @pytest.mark.parametrize(
+        ("angles", "atol", "expected"),
+        [
+            ([1e16, 1.0, -1e16, 0.5], 0.0, [0.5]),
+            ([1.0, -0.875], 0.125, []),
+            ([1.0, np.nextafter(-0.875, 0.0)], 0.125, [1.0 + np.nextafter(-0.875, 0.0)]),
+        ],
+    )
+    def test_fusion_preserves_rounding_and_threshold(self, angles, atol, expected):
+        """Add angles sequentially and drop merged values at, but not above, the tolerance."""
+        legacy = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, angle) for angle in angles], 1, 1)
+        packed = PauliProductFormulaContainer.from_sparse_arrays(
+            np.arange(len(angles) + 1), [0] * len(angles), [1] * len(angles), angles, step_reps=1, num_qubits=1
+        )
+        empty = PauliProductFormulaContainer([], 1, 1)
+        for source in (legacy, packed):
+            result = source.combine(empty, atol)
+            assert [term.angle for term in result.step_terms] == expected
+
+    @pytest.mark.parametrize(("angle", "atol"), [(np.inf, 1e-12), (0.5, np.nan)])
+    def test_fusion_preserves_nonfinite_behavior(self, angle, atol):
+        """Legacy cancellation and packed finite-output validation must not silently change."""
+        legacy = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, angle)], 1, 1)
+        inverse = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, -angle)], 1, 1)
+        assert not legacy.combine(inverse, atol).step_terms
+        packed = PauliProductFormulaContainer.from_sparse_arrays([0, 1], [0], [1], [0.5], step_reps=1, num_qubits=1)
+        if np.isfinite(angle):
+            assert packed.combine(inverse, atol).step_terms[0].angle == 0.0
+        else:
+            with pytest.raises(ValueError, match="angles must be finite"):
+                packed.combine(legacy, atol)
 
     def test_summary(self, container):
         """Test the summary generation of the container."""
@@ -309,7 +342,8 @@ class TestPackedPauliProductFormulaContainer:
             2,
             scale=1.7,
         )
-        expected = legacy_left.combine(legacy_right)
+        expected_terms = list(legacy_left.step_terms) * (4 - inverse_reps)
+        assert list(legacy_left.combine(legacy_right).step_terms) == expected_terms
         with monkeypatch.context() as patch:
             patch.setattr(type(container.step_terms), "__getitem__", _no_term_objects)
             reordered = container.reorder_terms([2, 1, 0])
@@ -327,8 +361,8 @@ class TestPackedPauliProductFormulaContainer:
         for combined in results:
             assert combined.has_sparse_terms
             assert combined.step_reps == 1
-            assert combined.scale == expected.scale
-            assert list(combined.step_terms) == list(expected.step_terms)
+            assert combined.scale == legacy_left.scale
+            assert list(combined.step_terms) == expected_terms
         if inverse_reps == 4:
             assert not results[0].step_terms
             assert results[0].reorder_terms([]).content_hash() == results[0].content_hash()

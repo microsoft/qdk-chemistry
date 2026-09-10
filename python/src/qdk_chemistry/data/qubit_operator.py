@@ -25,6 +25,7 @@ from qdk_chemistry.data._hashing import _hash_arg, _hash_array, _hash_optional, 
 from qdk_chemistry.data._sparse_pauli import (
     _PAULI_CHARS,
     _PAULI_CODES,
+    _iter_pauli_factors,
     _SparsePauliStrings,
     _validate_sparse_pauli_arrays,
 )
@@ -370,9 +371,7 @@ class QubitOperator(DataClass):
         if self.has_sparse_terms:
             for term_index, coefficient in enumerate(self.coefficients):
                 begin, end = int(self._term_offsets[term_index]), int(self._term_offsets[term_index + 1])
-                factors = tuple(
-                    (int(self._qubit_indices[i]), _PAULI_CHARS[int(self._pauli_codes[i])]) for i in range(begin, end)
-                )
+                factors = tuple(_iter_pauli_factors(self._qubit_indices[begin:end], self._pauli_codes[begin:end]))
                 yield factors, complex(coefficient)
         else:
             for label, coefficient in zip(self.pauli_strings, self.coefficients, strict=True):

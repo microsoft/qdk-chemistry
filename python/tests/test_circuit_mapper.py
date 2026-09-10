@@ -84,16 +84,19 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
-    def test_sparse_encoding_carries_only_non_identity_positions(self, simple_unitary):
-        """The Q# parameters must list Pauli positions, not one Pauli per system qubit."""
-        circuit = PauliSequenceMapper().run(simple_unitary)
+    def test_sparse_encoding_carries_only_non_identity_positions(self):
+        """The Q# adapter preserves caller factor order, skips explicit identities, and retains empty rows."""
+        container = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm({2: "I", 1: "Z", 0: "X"}, 0.5), ExponentiatedPauliTerm({0: "I"}, 0.25)], 2, 3
+        )
+        circuit = PauliSequenceMapper().run(UnitaryRepresentation(container))
         evo_params = circuit._qsharp_factory.parameter["evo_params"]
 
         assert "pauliExponents" not in evo_params
         assert "batchIds" not in evo_params
-        assert evo_params["termOffsets"] == [0, 1, 2]
-        assert evo_params["qubitIndices"] == [0, 1]
-        assert evo_params["pauliCodes"] == [1, 3]
+        assert evo_params["termOffsets"] == [0, 2, 2]
+        assert evo_params["qubitIndices"] == [1, 0]
+        assert evo_params["pauliCodes"] == [3, 1]
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):

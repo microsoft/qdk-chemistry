@@ -7,16 +7,16 @@
 
 import operator
 from array import array
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, overload
 
 import h5py
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, vstack
 
 from qdk_chemistry.data._hashing import _hash_array, _hash_float, _hash_int, _hash_str, _hash_uint
-from qdk_chemistry.data._sparse_pauli import _PAULI_CHARS, _validate_sparse_pauli_arrays
+from qdk_chemistry.data._sparse_pauli import _iter_pauli_factors, _pack_pauli_terms, _validate_sparse_pauli_arrays
 
 from .base import UnitaryContainer
 
@@ -67,9 +67,7 @@ class _PackedStepTerms(Sequence[ExponentiatedPauliTerm]):
             raise IndexError("Product-formula term index out of range")
         begin, end = int(self._term_offsets[index]), int(self._term_offsets[index + 1])
         return ExponentiatedPauliTerm(
-            pauli_term={
-                int(self._qubit_indices[i]): _PAULI_CHARS[int(self._pauli_codes[i])] for i in range(begin, end)
-            },
+            pauli_term=dict(_iter_pauli_factors(self._qubit_indices[begin:end], self._pauli_codes[begin:end])),
             angle=float(self._angles[index]),
         )
 
@@ -310,24 +308,17 @@ class PauliProductFormulaContainer(UnitaryContainer):
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
-        """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
+        """Compose two evolutions, fusing only adjacent equal Pauli factors.
 
-        The terms from ``self`` (repeated ``step_reps`` times) are followed by the
-        terms from ``other_container`` (also repeated according to its
-        ``step_reps``). When two consecutive terms act with the same Pauli operator
-        string (i.e., have identical ``pauli_term`` dictionaries), their rotation
-        angles are summed into a single ``ExponentiatedPauliTerm``. If the summed
-        angle has magnitude less than ``atol``, the resulting term is removed.
+        Each input's repetitions are consumed in order. Angles are added sequentially;
+        removing a cancelled pair can expose another matching pair on the stack.
 
         Args:
-            other_container: The second ``PauliProductFormulaContainer`` appended
-                after this container.
-            atol: Absolute tolerance used when deciding whether a merged term with
-                a small rotation angle should be dropped.
+            other_container: Evolution to append, with matching register width and scale.
+            atol: Drop a merged rotation when its absolute angle is at most this tolerance.
 
         Returns:
-            A single ``PauliProductFormulaContainer`` representing the combined
-            evolution with adjacent identical terms fused.
+            A formula with ``step_reps=1``, using packed storage if either input is packed.
 
         """
         if self.num_qubits != other_container.num_qubits:
@@ -342,82 +333,70 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
             )
 
-        if self.has_sparse_terms or other_container.has_sparse_terms:
-            return self._combine_packed(other_container, atol)
-
-        merged: list[ExponentiatedPauliTerm] = []
-        for step_terms, step_reps in (
-            (self.step_terms, self.step_reps),
-            (other_container.step_terms, other_container.step_reps),
-        ):
-            for _ in range(step_reps):
-                for term in step_terms:
-                    if merged and merged[-1].pauli_term == term.pauli_term:
-                        new_angle = merged[-1].angle + term.angle
-                        if abs(new_angle) > atol:
-                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
-                        else:
-                            merged.pop()
-                    else:
-                        merged.append(term)
-        return PauliProductFormulaContainer(
-            step_terms=merged,
-            step_reps=1,
-            num_qubits=self.num_qubits,
-            scale=self.scale,
-        )
-
-    def _combine_packed(self, other: "PauliProductFormulaContainer", atol: float) -> "PauliProductFormulaContainer":
-        """Fuse adjacent factors without materializing packed term dictionaries."""
-
-        def factors(container: "PauliProductFormulaContainer") -> Iterator[tuple[np.ndarray, np.ndarray, float]]:
-            if container.has_sparse_terms:
-                offsets, indices, codes, angles = container.sparse_term_arrays()
-                for term_index, angle in enumerate(angles):
-                    begin, end = int(offsets[term_index]), int(offsets[term_index + 1])
-                    yield indices[begin:end], codes[begin:end], float(angle)
-            else:
-                for term in container.step_terms:
-                    items = sorted(term.pauli_term.items())
-                    yield (
-                        np.asarray([index for index, _ in items], dtype=np.uint32),
-                        np.asarray([_PAULI_CHARS.index(axis) for _, axis in items], dtype=np.uint8),
-                        term.angle,
+        containers = (self, other_container)
+        packed = self.has_sparse_terms or other_container.has_sparse_terms
+        values: list[Sequence[float]] = []
+        if packed:
+            tables = []
+            for container in containers:
+                if container.has_sparse_terms:
+                    offsets, indices, codes, source_angles = container.sparse_term_arrays()
+                    values.append(memoryview(source_angles))
+                else:
+                    values.append([term.angle for term in container.step_terms])
+                    offsets, indices, codes = _pack_pauli_terms(
+                        sorted(term.pauli_term.items()) for term in container.step_terms
                     )
+                    indices, codes = np.asarray(indices, dtype=np.uint32), np.asarray(codes, dtype=np.uint8)
+                tables.append(csr_matrix((codes, indices, offsets), shape=(len(container.step_terms), self.num_qubits)))
+            factors = vstack(tables, format="csr")
+            offsets, indices, codes = (memoryview(values) for values in (factors.indptr, factors.indices, factors.data))
 
-        offsets = array("Q", [0])
-        indices = array("I")
-        codes = array("B")
-        angles = array("d")
-        for container in (self, other):
+        kept, angles = array("q"), array("d")
+        merged: list[ExponentiatedPauliTerm] = []
+        stack = kept if packed else merged
+        offset = 0
+        for side, container in enumerate(containers):
+            entries: Sequence[Any] = range(len(container.step_terms)) if packed else container.step_terms
             for _ in range(container.step_reps):
-                for term_indices, term_codes, angle in factors(container):
-                    start = offsets[-2] if angles else 0
-                    if (
-                        angles
-                        and np.array_equal(np.frombuffer(indices, dtype=np.uint32)[start:], term_indices)
-                        and np.array_equal(np.frombuffer(codes, dtype=np.uint8)[start:], term_codes)
-                    ):
-                        angles[-1] += angle
-                        if abs(angles[-1]) <= atol:
-                            angles.pop()
-                            offsets.pop()
-                            del indices[start:]
-                            del codes[start:]
+                for item in entries:
+                    if not packed:
+                        term = item
+                        if not merged or merged[-1].pauli_term != term.pauli_term:
+                            merged.append(term)
+                            continue
+                        angle, same = term.angle, True
                     else:
-                        indices.extend(term_indices)
-                        codes.extend(term_codes)
-                        offsets.append(len(indices))
+                        row, angle = offset + item, values[side][item]
+                        same = False
+                        if kept:
+                            previous = kept[-1]
+                            a = slice(offsets[previous], offsets[previous + 1])
+                            b = slice(offsets[row], offsets[row + 1])
+                            same = indices[a] == indices[b] and codes[a] == codes[b]
+                    if same:
+                        angle = (angles[-1] if packed else merged[-1].angle) + angle
+                        if packed:
+                            angles[-1] = angle
+                            angle = angles[-1]
+                        # Preserve the two formats' existing nonfinite cancellation behavior.
+                        cancelled = abs(angle) <= atol if packed else not abs(angle) > atol
+                        if cancelled:
+                            stack.pop()
+                            if packed:
+                                angles.pop()
+                        elif not packed:
+                            merged[-1] = ExponentiatedPauliTerm(term.pauli_term, angle)
+                    else:
+                        kept.append(row)
                         angles.append(angle)
-        return type(self).from_sparse_arrays(
-            np.frombuffer(offsets, dtype=np.uint64),
-            np.frombuffer(indices, dtype=np.uint32),
-            np.frombuffer(codes, dtype=np.uint8),
-            np.frombuffer(angles, dtype=np.float64),
-            step_reps=1,
-            num_qubits=self.num_qubits,
-            scale=self.scale,
-        )
+            offset += len(entries)
+
+        if packed:
+            result = factors[kept]
+            arrays = result.indptr, result.indices, result.data, np.asarray(angles)
+            return type(self).from_sparse_arrays(*arrays, step_reps=1, num_qubits=self.num_qubits, scale=self.scale)
+        return PauliProductFormulaContainer(merged, 1, self.num_qubits, self.scale)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.

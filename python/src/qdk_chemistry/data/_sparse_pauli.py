@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import operator
-from collections.abc import Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from typing import overload
 
 import numpy as np
@@ -17,6 +17,22 @@ from qdk_chemistry._core.data import sparse_pauli_word_to_label
 
 _PAULI_CODES = {"X": 1, "Y": 2, "Z": 3}
 _PAULI_CHARS = "IXYZ"
+
+
+def _iter_pauli_factors(indices: np.ndarray, codes: np.ndarray) -> Iterator[tuple[int, str]]:
+    """Decode validated factor slices without materializing full-width labels."""
+    return ((int(qubit), _PAULI_CHARS[int(code)]) for qubit, code in zip(indices, codes, strict=True))
+
+
+def _pack_pauli_terms(terms: Iterable[Iterable[tuple[int, str]]]) -> tuple[list[int], list[int], list[int]]:
+    """Pack ordered factor iterables; callers retain validation, sorting, and identity policy."""
+    offsets, indices, codes = [0], [], []
+    for term in terms:
+        for qubit, axis in term:
+            indices.append(qubit)
+            codes.append(_PAULI_CHARS.index(axis))
+        offsets.append(len(indices))
+    return offsets, indices, codes
 
 
 def _validate_sparse_pauli_arrays(

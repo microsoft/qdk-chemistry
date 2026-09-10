@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 import qdk
 from qdk import TargetProfile
 
-from qdk_chemistry.data._sparse_pauli import _PAULI_CHARS
+from qdk_chemistry.data._sparse_pauli import _pack_pauli_terms
 
 if TYPE_CHECKING:
     from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -82,14 +82,10 @@ def _pauli_evolution_parameters(container: "PauliProductFormulaContainer") -> di
         arrays = container.sparse_term_arrays()
         offsets, indices, codes, angles = (values.tolist() for values in arrays)
     else:
-        offsets, indices, codes, angles = [0], [], [], []
-        for term in container.step_terms:
-            for index, axis in term.pauli_term.items():
-                if axis != "I":
-                    indices.append(index)
-                    codes.append(_PAULI_CHARS.index(axis))
-            offsets.append(len(indices))
-            angles.append(term.angle)
+        offsets, indices, codes = _pack_pauli_terms(
+            ((index, axis) for index, axis in term.pauli_term.items() if axis != "I") for term in container.step_terms
+        )
+        angles = [term.angle for term in container.step_terms]
     return {
         "termOffsets": offsets,
         "qubitIndices": indices,
