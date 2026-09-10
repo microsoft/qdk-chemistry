@@ -117,11 +117,6 @@ Naive bound
 
 When both ``num_divisions`` and ``target_accuracy`` are specified, the builder uses whichever requires more Trotter steps.
 
-For packed :class:`~qdk_chemistry.data.QubitOperator` inputs, Trotter traverses partition indices directly and returns packed product-formula arrays instead of materializing subgroup labels or per-term dictionaries.
-Both regular and controlled Pauli-sequence mappers consume these arrays using only each term's non-identity support.
-Repetitions remain a count on the product formula; resource estimation uses ``RepeatEstimates`` rather than tracing each repetition.
-These sparse paths do not change the cost of automatic error-bound calculations or explicit matrix/circuit expansion.
-
 .. rubric:: Settings
 
 .. list-table::
