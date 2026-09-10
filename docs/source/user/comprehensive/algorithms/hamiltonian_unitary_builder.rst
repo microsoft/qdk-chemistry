@@ -117,6 +117,11 @@ Naive bound
 
 When both ``num_divisions`` and ``target_accuracy`` are specified, the builder uses whichever requires more Trotter steps.
 
+For packed :class:`~qdk_chemistry.data.QubitOperator` inputs, Trotter traverses partition indices directly and returns packed product-formula arrays instead of materializing subgroup labels or per-term dictionaries.
+Both regular and controlled Pauli-sequence mappers consume these arrays using only each term's non-identity support.
+Repetitions remain a count on the product formula; resource estimation uses ``RepeatEstimates`` rather than tracing each repetition.
+These sparse paths do not change the cost of automatic error-bound calculations or explicit matrix/circuit expansion.
+
 .. rubric:: Settings
 
 .. list-table::
@@ -141,87 +146,6 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
-
-
-.. _plaquette-builder:
-
-Plaquette Trotterization
-~~~~~~~~~~~~~~~~~~~~~~~~
-.. rubric:: Factory name: ``"plaquette"``
-
-For a uniform Fermi-Hubbard Hamiltonian, the builder writes
-
-.. math::
-
-   H = H_D + H_A + H_B,
-
-where :math:`H_D` contains the diagonal terms, including the on-site interaction,
-and :math:`H_A` and :math:`H_B` contain two tilings of the hopping terms by
-vertex-disjoint four-site plaquettes. Together the tilings cover every lattice bond
-once. One second-order step of duration :math:`s` is
-
-.. math::
-
-   S_2(s) = e^{-isH_D/2} e^{-isH_A/2} e^{-isH_B}
-            e^{-isH_A/2} e^{-isH_D/2}.
-
-Plaquettes within one tiling do not share sites, so their evolutions can be applied
-independently. For each plaquette, the builder diagonalizes the hopping matrix as
-:math:`T = V\Lambda V^\dagger` and applies
-
-.. math::
-
-   e^{-isH_\square} = U_V e^{-is\sum_m \lambda_m n_m} U_V^\dagger.
-
-In circuit order, this switches to the plaquette momentum basis, applies the
-diagonal phases, and switches back. A uniform four-site cycle has eigenvalues
-:math:`(-2\tau, 2\tau, 0, 0)`, so only two modes need variable-angle phase rotations;
-the basis switches use fixed-angle Givens rotations. Each plaquette evolution is
-exact. Trotter error comes only from combining the noncommuting :math:`H_D`,
-:math:`H_A`, and :math:`H_B` layers.
-
-For :math:`N_s` lattice sites, hopping magnitude :math:`\tau`, and interaction
-magnitude :math:`u`, the implemented Campbell bound (arXiv:2012.09238v4, Eq. (20),
-Sec. III; App. D Eqs. (D6)--(D10)) :cite:`Campbell2022` is
-
-.. math::
-
-   W_\mathrm{PLAQ} \leq
-   \frac{u\tau^2}{6}N_s(\sqrt{5}+8)
-   + \frac{u^2}{24}\lVert R\rVert_1
-   + \frac{3}{24}\lVert [[R_A,R_B],R_B]\rVert_1,
-
-where :math:`R_A` and :math:`R_B` are the single-particle hopping matrices of the two
-tilings and :math:`R=R_A+R_B`. For total evolution time :math:`t` and :math:`r`
-steps,
-
-.. math::
-
-   \lVert e^{-itH} - S_2(t/r)^r\rVert
-   \leq \frac{W_\mathrm{PLAQ}|t|^3}{r^2},
-   \qquad
-   r = \left\lceil |t|^{3/2}\sqrt{\frac{W_\mathrm{PLAQ}}{\epsilon}}\right\rceil.
-
-Equal-angle diagonal phases are marked as batches for mappers that support
-Hamming-weight phasing, reducing synthesized rotations at the cost of ancillas.
-
-.. note::
-   This implementation requires a Jordan-Wigner encoded, spin-blocked, uniform
-   Fermi-Hubbard model on a periodic square lattice. Both side lengths must be even,
-   and either both at least four or exactly ``2x2``. The 2x2 torus is a single
-   four-cycle, so it is tiled by one plaquette and its second section is empty.
-
-.. rubric:: Settings
-
-Uses the common :ref:`Trotter <trotter-builder>` settings, but ``order`` must be 2
-and automatic step sizing always uses the plaquette-specific bound above. It also
-adds:
-
-``lattice_width`` (int)
-    Number of lattice columns. Required.
-
-``lattice_height`` (int)
-    Number of lattice rows. Required.
 
 
 .. _zassenhaus-builder:
@@ -290,7 +214,8 @@ When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :a
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
 * :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
 
-In both cases the group order is preserved as given. It used to be sorted by ascending layer count, on the theory that putting the smallest groups outermost maximises merging at recursion boundaries, but that silently overrode any ordering a term grouper had chosen deliberately — and for a Strang splitting the group placed last runs at full time in the middle, so the choice changes which section is cheap and which nested commutators the error constant must bound. A grouper that cares about the ordering is now obeyed.
+In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
+This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
@@ -427,13 +352,23 @@ The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :
 
 .. rubric:: Example
 
-::
+.. tab:: Python API
 
-    from qdk_chemistry.algorithms import registry
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-run-lcu
+      :end-before: # end-cell-run-lcu
 
-    lcu = registry.create("hamiltonian_unitary_builder", "lcu")
-    lcu.settings().update({"quantum_walk": True})
-    unitary = lcu.run(qubit_hamiltonian)
+To use alias sampling for the PREPARE oracle, pass an
+:class:`~qdk_chemistry.data.AlgorithmRef` to the
+:class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`:
+
+.. tab:: Python API -- alias sampling PREPARE
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-lcu-prepare
+      :end-before: # end-cell-lcu-prepare
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
 
