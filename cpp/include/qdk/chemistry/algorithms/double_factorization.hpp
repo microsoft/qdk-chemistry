@@ -65,10 +65,11 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
  *   were built.
  *
  * A Cholesky decomposition exists only for a positive semi-definite
- * supermatrix. Exact two-electron integrals are positive semi-definite; a
- * tensor that is not — an approximate or synthetic one, or a shifted one such
- * as a BLISS-modified Hamiltonian — is rejected rather than silently
- * factorized into a different tensor.
+ * supermatrix, and guaranteeing that property is the caller's. Exact
+ * two-electron integrals have it by construction. Indefiniteness is rejected
+ * once it shows up in the residual diagonal, but a negative direction whose
+ * diagonal stays below the truncation threshold is truncated away undetected,
+ * so this is a diagnostic rather than a guarantee.
  *
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.

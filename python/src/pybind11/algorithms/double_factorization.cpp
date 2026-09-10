@@ -44,9 +44,12 @@ void bind_double_factorization(py::module &m) {
     truncated when they were built.
 
   A Cholesky decomposition exists only for a positive semi-definite
-  supermatrix. Exact two-electron integrals are positive semi-definite, but
-  approximate or synthetic ones need not be, and such an input raises
-  ``ValueError`` rather than being silently truncated.
+  supermatrix, and guaranteeing that property is the caller's. Exact
+  two-electron integrals have it by construction, but approximate or synthetic
+  ones need not. Indefiniteness raises ``ValueError`` once it shows up in the
+  residual diagonal; a negative direction whose diagonal stays below
+  ``truncation_threshold`` is truncated away undetected, so this is a
+  diagnostic rather than a guarantee.
 
 See Also:
     :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
