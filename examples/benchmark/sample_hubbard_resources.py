@@ -246,10 +246,10 @@ def run_sampling(context, size: int) -> dict:
     one_norm = operator.schatten_norm
     energy_budget = target_precision(size)
     qpe_budget = energy_budget / 2
-    trotter_budget = energy_budget / 2
-    evolution_time = math.pi / one_norm
-    resolution_bits = math.ceil(math.log2(2 * one_norm / qpe_budget)) + math.ceil(
-        math.log2(2 + 1 / (2 * QPE_FAILURE_PROBABILITY))
+    trotter_budget = energy_budget
+    base_time = math.pi / one_norm / 2
+    resolution_bits = math.ceil(
+        math.log2(2 * math.pi / qpe_budget / base_time)
     )
 
     row = {
@@ -268,7 +268,7 @@ def run_sampling(context, size: int) -> dict:
     circuit = qpe_circuit(
         context,
         operator,
-        evolution_time,
+        base_time,
         trotter_budget,
         initial_state,
         size,
