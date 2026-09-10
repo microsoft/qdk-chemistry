@@ -24,11 +24,11 @@ __all__: list[str] = [
 ]
 
 
+# Inner PREPARE backends the mapper can emit.
 INNER_PREPARE_ALGORITHMS = frozenset({"controlled_alias_sampling", "direct"})
-"""Inner PREPARE backends the mapper can emit."""
 
+# SELECT backends the mapper can emit.
 SELECT_ALGORITHMS = frozenset({"qrom_phase_gradient", "direct"})
-"""SELECT backends the mapper can emit."""
 
 
 class SOSSAMapperSettings(Settings):
