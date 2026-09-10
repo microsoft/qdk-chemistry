@@ -3,6 +3,7 @@ target_sources(chemistry PRIVATE
     algorithm_defaults.cpp
     finite_difference_nuclear_derivative.cpp
     hamiltonian.cpp
+    symmetry_shift.cpp
     localization.cpp
     mc.cpp
     nuclear_derivative.cpp

@@ -16,6 +16,7 @@
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 
 namespace qdk::chemistry::algorithms {
@@ -51,6 +52,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(NuclearDerivativeCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(SymmetryShifterFactory)
 
 #undef REGISTER_FACTORY_SETTINGS_INIT
 

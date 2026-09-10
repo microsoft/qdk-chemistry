@@ -8,9 +8,14 @@
 from qdk_chemistry._core.utils import (
     CubeGenerator,
     CubeGrid,
+    DoubleFactorizationMethod,
+    HamiltonianOneNorm,
     Logger,
+    TwoBodyFragment,
     compute_valence_space_parameters,
+    double_factorize,
     generate_orbital_cubes,
+    hamiltonian_one_norm,
     rotate_orbitals,
 )
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -21,9 +26,14 @@ __all__ = [
     "CaseInsensitiveStrEnum",
     "CubeGenerator",
     "CubeGrid",
+    "DoubleFactorizationMethod",
+    "HamiltonianOneNorm",
     "Logger",
+    "TwoBodyFragment",
     "compute_valence_space_parameters",
+    "double_factorize",
     "generate_orbital_cubes",
+    "hamiltonian_one_norm",
     "model_hamiltonians",
     "rotate_orbitals",
 ]
