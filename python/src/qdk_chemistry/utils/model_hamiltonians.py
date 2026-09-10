@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 from array import array
-from itertools import repeat
 
 import numpy as np
 import scipy.sparse
@@ -23,6 +22,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_site_param,
 )
 from qdk_chemistry.data import LatticeGraph, LayeredPartition, QubitOperator
+from qdk_chemistry.data._sparse_pauli import _PAULI_CODES
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -68,7 +68,6 @@ def _build_sparse_hamiltonian(
     qubits = array("I")
     paulis = array("B")
     coefficients = array("d")
-    pauli_code = {"X": 1, "Y": 2, "Z": 3}
     groups_layers: list[tuple[tuple[int, ...], ...]] = []
 
     def append_term(sites: tuple[int, ...], code: int, coefficient: float) -> int:
@@ -100,18 +99,14 @@ def _build_sparse_hamiltonian(
             pair_values = matrix[edges.row, edges.col]
         # Cast before multiplying, preserving Python-double arithmetic and its nonfinite behavior.
         with np.errstate(over="ignore", under="ignore", invalid="ignore"):
-            edge_couplings.append((pauli_code[axis], np.multiply(pair_values, edges.data, dtype=float)))
+            edge_couplings.append((_PAULI_CODES[axis], np.multiply(pair_values, edges.data, dtype=float)))
 
-    field_values: list[tuple[int, np.ndarray | float]] = []
+    field_values: list[tuple[int, np.ndarray]] = []
     for axis, field in fields:
-        values = (
-            float(field)
-            if isinstance(field, int | float | np.integer | np.floating)
-            else to_site_param(field, graph, f"h{axis.lower()}")
-        )
-        if isinstance(values, float) and values == 0.0:
+        value = float(field) if isinstance(field, int | float | np.integer | np.floating) else field
+        if isinstance(value, float) and value == 0.0:
             continue
-        field_values.append((pauli_code[axis], values))
+        field_values.append((_PAULI_CODES[axis], to_site_param(value, graph, f"h{axis.lower()}")))
 
     if coloring is None:
         for index, (i, j) in enumerate(zip(edges.row, edges.col, strict=True)):
@@ -122,15 +117,12 @@ def _build_sparse_hamiltonian(
                     append_term(edge, code, coefficient)
         for site in range(n):
             for code, field in field_values:
-                coefficient = field if isinstance(field, float) else float(field[site])
+                coefficient = float(field[site])
                 if coefficient != 0.0:
                     append_term((site,), code, coefficient)
     else:
         for code, field in field_values:
-            site_values = repeat(field, n) if isinstance(field, float) else field
-            layer = tuple(
-                append_term((site,), code, float(value)) for site, value in enumerate(site_values) if value != 0.0
-            )
+            layer = tuple(append_term((site,), code, float(value)) for site, value in enumerate(field) if value != 0.0)
             if layer:
                 groups_layers.append((layer,))
 

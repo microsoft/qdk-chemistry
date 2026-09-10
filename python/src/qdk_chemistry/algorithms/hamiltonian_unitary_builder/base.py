@@ -193,6 +193,11 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 fermion_mode_order=fmo,
             )
 
+        return [[_make(layer) for layer in group] for group in self._partition_indices(partition)]
+
+    @staticmethod
+    def _partition_indices(partition: TermPartition) -> list[list[tuple[int, ...]]]:
+        """Return nonempty index layers, stably ordered by the number of layers per group."""
         if isinstance(partition, LayeredPartition):
             layered_groups = partition.groups
         elif isinstance(partition, FlatPartition):
@@ -203,13 +208,8 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 "Expected FlatPartition or LayeredPartition."
             )
 
-        groups: list[list[QubitOperator]] = [
-            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
-        ]
-
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
+        groups = [[layer for layer in layers if layer] for layers in layered_groups]
+        return sorted((group for group in groups if group), key=len)
 
     def _exponentiate_commuting(
         self,

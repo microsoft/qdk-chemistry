@@ -38,7 +38,7 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
-from qdk_chemistry._core.data import TaperingSpecification
+from qdk_chemistry._core.data import TaperingSpecification, label_to_sparse_pauli_word
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
@@ -376,7 +376,7 @@ class QubitOperator(DataClass):
                 yield factors, complex(coefficient)
         else:
             for label, coefficient in zip(self.pauli_strings, self.coefficients, strict=True):
-                factors = tuple((qubit, pauli) for qubit, pauli in enumerate(reversed(label)) if pauli != "I")
+                factors = tuple((qubit, _PAULI_CHARS[code]) for qubit, code in label_to_sparse_pauli_word(label))
                 yield factors, complex(coefficient)
 
     @property
@@ -760,7 +760,7 @@ class QubitOperator(DataClass):
         if self.fermion_mode_order is not None:
             group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
         if self.term_partition is not None:
-            group.attrs["term_partition"] = json.dumps(self.term_partition.to_json())
+            self.term_partition.to_hdf5(group)
         if self.tapering is not None:
             group.attrs["tapering"] = json.dumps(self.tapering.to_json())
 
@@ -841,13 +841,7 @@ class QubitOperator(DataClass):
         fermion_mode_order = group.attrs.get("fermion_mode_order")
         if fermion_mode_order is not None and isinstance(fermion_mode_order, bytes):
             fermion_mode_order = fermion_mode_order.decode("utf-8")
-        partition_attr = group.attrs.get("term_partition")
-        if partition_attr is not None:
-            if isinstance(partition_attr, bytes):
-                partition_attr = partition_attr.decode("utf-8")
-            term_partition = TermPartition.from_json(json.loads(partition_attr))
-        else:
-            term_partition = None
+        term_partition = TermPartition.from_hdf5(group) if "term_partition" in group.attrs else None
         tapering_attr = group.attrs.get("tapering")
         if tapering_attr is not None:
             if isinstance(tapering_attr, bytes):

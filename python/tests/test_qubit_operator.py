@@ -852,6 +852,8 @@ class TestSparseQubitOperator:
         assert packed.num_terms == dense.num_terms == 5
         assert list(packed.iter_sparse_terms()) == list(dense.iter_sparse_terms())
         assert packed.pauli_strings == dense.pauli_strings
+        assert packed.pauli_strings[-1] == dense.pauli_strings[-1]
+        assert packed.pauli_strings[::-1] == dense.pauli_strings[::-1]
         combined = QubitOperator(["II", "ZX", "IY", "XI"], np.array([1.5, 0.5j, 0.125, -0.5]))
         assert packed.equiv(combined)
         assert combined.equiv(packed)

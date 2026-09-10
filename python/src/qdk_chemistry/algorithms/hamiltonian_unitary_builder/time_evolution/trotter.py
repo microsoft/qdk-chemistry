@@ -23,18 +23,14 @@ from __future__ import annotations
 from array import array
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import (
-    FlatPartition,
-    LayeredPartition,
-    QubitOperator,
-    UnitaryRepresentation,
-)
+from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -245,46 +241,36 @@ class Trotter(TimeEvolutionBuilder):
         # Match the legacy complex(c).real precision before applying the threshold.
         coefficients = np.asarray(hamiltonian.coefficients.real, dtype=np.float64)
         active = np.abs(coefficients) > threshold
-        groups: list[tuple[tuple[int, ...], ...]] = []
+        groups: list[list[tuple[int, ...]]] = []
         if np.any(active):
             partition = hamiltonian.term_partition
-            if isinstance(partition, LayeredPartition):
-                groups = [tuple(layer for layer in group if layer) for group in partition.groups]
-                groups = [group for group in groups if group]
-                # Match the dense path: sort by the number of nonempty layers, stably.
-                groups.sort(key=len)
-            elif isinstance(partition, FlatPartition):
-                groups = [(group,) for group in partition.groups if group]
-            elif partition is None:
-                groups = [((index,),) for index in range(hamiltonian.num_terms)]
-            else:
-                raise TypeError(
-                    f"Unsupported TermPartition subtype: {type(partition).__name__}. "
-                    "Expected FlatPartition or LayeredPartition."
-                )
+            groups = (
+                self._partition_indices(partition)
+                if partition is not None
+                else [[(index,)] for index in range(hamiltonian.num_terms)]
+            )
         else:
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
 
         source_offsets, source_indices, source_codes = hamiltonian.sparse_term_arrays()
-        offsets = array("Q", [0])
-        indices = array("I")
-        codes = array("B")
+        selected = array("q")
         angles = array("d")
         for fraction, group_index in self._trotter_schedule(len(groups)):
             for layer in groups[group_index]:
                 for term_index in layer:
                     if not active[term_index]:
                         continue
-                    begin, end = int(source_offsets[term_index]), int(source_offsets[term_index + 1])
-                    indices.frombytes(source_indices[begin:end].tobytes())
-                    codes.frombytes(source_codes[begin:end].tobytes())
-                    offsets.append(len(indices))
+                    selected.append(term_index)
                     angles.append(float(coefficients[term_index]) * time * fraction)
 
+        # Sparse row selection preserves repeated terms and empty identity rows.
+        terms = csr_matrix(
+            (source_codes, source_indices, source_offsets), shape=(hamiltonian.num_terms, hamiltonian.num_qubits)
+        )[np.frombuffer(selected, dtype=np.int64)]
         return PauliProductFormulaContainer.from_sparse_arrays(
-            np.frombuffer(offsets, dtype=np.uint64),
-            np.frombuffer(indices, dtype=np.uint32),
-            np.frombuffer(codes, dtype=np.uint8),
+            terms.indptr,
+            terms.indices,
+            terms.data,
             np.frombuffer(angles, dtype=np.float64),
             step_reps=step_reps,
             num_qubits=hamiltonian.num_qubits,

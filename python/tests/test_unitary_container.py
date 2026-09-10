@@ -118,6 +118,24 @@ class TestPauliProductFormulaContainer:
         with pytest.raises(ValueError, match="Invalid permutation"):
             container.reorder_terms([0, 1, 3])
 
+    @pytest.mark.parametrize("num_qubits", [70_000, 2**32])
+    def test_large_register_reordering(self, num_qubits):
+        """Sparse row selection retains empty rows, wide indices, and packed dtypes."""
+        original = PauliProductFormulaContainer.from_sparse_arrays(
+            [0, 2, 2, 3],
+            [0, num_qubits - 1, 1],
+            [1, 3, 2],
+            [0.1, 0.2, 0.3],
+            step_reps=7,
+            num_qubits=num_qubits,
+            scale=0.5,
+        )
+        reordered = original.reorder_terms([1, 2, 0])
+        expected = ([0, 0, 1, 3], [1, 0, num_qubits - 1], [2, 1, 3], [0.2, 0.3, 0.1])
+        for actual, values in zip(reordered.sparse_term_arrays(), expected, strict=True):
+            np.testing.assert_array_equal(actual, values)
+        assert reordered.reorder_terms([2, 0, 1]).content_hash() == original.content_hash()
+
     def test_to_json_roundtrip(self, container):
         """Test JSON serialization and deserialization roundtrip."""
         json_data = container.to_json()
@@ -313,6 +331,7 @@ class TestPackedPauliProductFormulaContainer:
             assert list(combined.step_terms) == list(expected.step_terms)
         if inverse_reps == 4:
             assert not results[0].step_terms
+            assert results[0].reorder_terms([]).content_hash() == results[0].content_hash()
             assert list(results[0].combine(container).step_terms) == list(legacy_left.step_terms) * 4
 
     @pytest.mark.parametrize(

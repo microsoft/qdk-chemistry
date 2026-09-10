@@ -13,6 +13,8 @@ from typing import overload
 
 import numpy as np
 
+from qdk_chemistry._core.data import sparse_pauli_word_to_label
+
 _PAULI_CODES = {"X": 1, "Y": 2, "Z": 3}
 _PAULI_CHARS = "IXYZ"
 
@@ -125,12 +127,9 @@ class _SparsePauliStrings(Sequence[str]):
             index += len(self)
         if not 0 <= index < len(self):
             raise IndexError("Pauli term index out of range")
-        label = ["I"] * self._num_qubits
         begin, end = int(self._term_offsets[index]), int(self._term_offsets[index + 1])
-        for position in range(begin, end):
-            qubit = int(self._qubit_indices[position])
-            label[self._num_qubits - 1 - qubit] = _PAULI_CHARS[int(self._pauli_codes[position])]
-        return "".join(label)
+        word = list(zip(self._qubit_indices[begin:end], self._pauli_codes[begin:end], strict=True))
+        return sparse_pauli_word_to_label(word, self._num_qubits)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Sequence):

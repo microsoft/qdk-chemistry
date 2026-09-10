@@ -298,7 +298,7 @@ class TestSparseSpinHamiltonians:
         assert actual.term_partition is None
         assert _get_terms_dict(actual) == pytest.approx({"IZZ": 3.0, "ZIZ": -2.0, "IIX": 0.25, "XII": -0.5})
 
-    @pytest.mark.parametrize("field", [0.0, -0.5])
+    @pytest.mark.parametrize("field", [0.0, -0.5, np.float32(0.1), np.int64(2)])
     def test_zero_weight_edges_and_onsite_weights(self, field: float) -> None:
         """Zero-weight edges and self-loops leave an exact zero or field-only operator."""
         graph = LatticeGraph({(0, 0): 7.0, (0, 1): 0.0, (1, 0): 0.0, (1, 1): -2.0}, num_sites=3)
@@ -367,7 +367,7 @@ class TestSparseSpinHamiltonians:
 
     @pytest.mark.parametrize("include_term_groups", [False, True])
     def test_large_square_never_materializes_dense_data(self, include_term_groups: bool) -> None:
-        """Build a 200-by-200 scalar model without dense adjacency, parameters, or labels."""
+        """Build a 200-by-200 model with at most linear-size fields and no dense pair matrices or labels."""
         side = 200
         graph = LatticeGraph.square(side, side, t=-0.5)
         num_edges = 2 * side * (side - 1)
@@ -382,7 +382,6 @@ class TestSparseSpinHamiltonians:
         with (
             patch.object(LatticeGraph, "adjacency_matrix", side_effect=AssertionError("Dense adjacency requested")),
             patch.object(model_hamiltonians, "to_pair_param", side_effect=AssertionError("Scalar matrix expanded")),
-            patch.object(model_hamiltonians, "to_site_param", side_effect=AssertionError("Scalar vector expanded")),
             patch.object(QubitOperator, "__getattribute__", new=reject_label_access),
         ):
             actual = create_heisenberg_hamiltonian(

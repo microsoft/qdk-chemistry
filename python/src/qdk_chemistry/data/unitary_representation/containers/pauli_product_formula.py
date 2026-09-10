@@ -13,9 +13,10 @@ from typing import Any, overload
 
 import h5py
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from qdk_chemistry.data._hashing import _hash_array, _hash_float, _hash_int, _hash_str, _hash_uint
-from qdk_chemistry.data._sparse_pauli import _validate_sparse_pauli_arrays
+from qdk_chemistry.data._sparse_pauli import _PAULI_CHARS, _validate_sparse_pauli_arrays
 
 from .base import UnitaryContainer
 
@@ -66,7 +67,9 @@ class _PackedStepTerms(Sequence[ExponentiatedPauliTerm]):
             raise IndexError("Product-formula term index out of range")
         begin, end = int(self._term_offsets[index]), int(self._term_offsets[index + 1])
         return ExponentiatedPauliTerm(
-            pauli_term={int(self._qubit_indices[i]): "IXYZ"[int(self._pauli_codes[i])] for i in range(begin, end)},
+            pauli_term={
+                int(self._qubit_indices[i]): _PAULI_CHARS[int(self._pauli_codes[i])] for i in range(begin, end)
+            },
             angle=float(self._angles[index]),
         )
 
@@ -280,20 +283,15 @@ class PauliProductFormulaContainer(UnitaryContainer):
             raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")
 
         if self.has_sparse_terms:
-            offsets = np.zeros_like(self._term_offsets)
-            indices = np.empty_like(self._qubit_indices)
-            codes = np.empty_like(self._pauli_codes)
-            for destination, source in enumerate(permutation):
-                begin, end = int(self._term_offsets[source]), int(self._term_offsets[source + 1])
-                start = int(offsets[destination])
-                stop = start + end - begin
-                indices[start:stop] = self._qubit_indices[begin:end]
-                codes[start:stop] = self._pauli_codes[begin:end]
-                offsets[destination + 1] = stop
+            permutation = [operator.index(index) for index in permutation]
+            terms = csr_matrix(
+                (self._pauli_codes, self._qubit_indices, self._term_offsets),
+                shape=(len(self._angles), self.num_qubits),
+            )[permutation]
             return type(self).from_sparse_arrays(
-                offsets,
-                indices,
-                codes,
+                terms.indptr,
+                terms.indices,
+                terms.data,
                 self._angles[permutation],
                 step_reps=self.step_reps,
                 num_qubits=self.num_qubits,
@@ -383,7 +381,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
                     items = sorted(term.pauli_term.items())
                     yield (
                         np.asarray([index for index, _ in items], dtype=np.uint32),
-                        np.asarray(["IXYZ".index(axis) for _, axis in items], dtype=np.uint8),
+                        np.asarray([_PAULI_CHARS.index(axis) for _, axis in items], dtype=np.uint8),
                         term.angle,
                     )
 
