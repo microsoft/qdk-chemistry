@@ -52,8 +52,10 @@ std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
 ///        residual diagonal falls to or below this value.
 /// @return norb^2 x naux matrix L with g_pqrs = sum_Q L_(pq),Q L_(rs),Q.
 /// @throws std::invalid_argument if `two_body_integrals` is not norb^4 long,
-///         contains a non-finite value, or is not positive semi-definite,
-///         since no Cholesky decomposition exists in that last case.
+///         contains a non-finite value, or is indefinite in a way pivoting
+///         exposes. Positive semi-definiteness is the caller's to guarantee:
+///         indefiniteness confined to directions whose residual diagonal sits
+///         below the truncation threshold is truncated away undetected.
 Eigen::MatrixXd cholesky_vectors_from_two_body(
     const Eigen::VectorXd& two_body_integrals, std::size_t norb,
     double truncation_threshold) {

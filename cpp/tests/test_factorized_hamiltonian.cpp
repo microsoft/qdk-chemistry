@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
@@ -274,6 +275,36 @@ TEST_F(FactorizedHamiltonianTest, RejectsAnUnnormalizedBasisRow) {
       FactorizedHamiltonianContainer(one_body, u_scaled, w, wb, orbitals,
                                      core_energy, inactive_fock),
       std::invalid_argument);
+}
+
+TEST_F(FactorizedHamiltonianTest, RejectsNonFiniteFactorEntries) {
+  // NaN compares false against the normalization tolerance, so it would pass
+  // that check unless the factors are rejected as non-finite first.
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+
+  Eigen::VectorXd u_nan = u;
+  u_nan(0) = nan;
+  EXPECT_THROW(FactorizedHamiltonianContainer(one_body, u_nan, w, wb, orbitals,
+                                              core_energy, inactive_fock),
+               std::invalid_argument);
+
+  // A NaN in W or wB never reaches the normalization check at all.
+  Eigen::VectorXd w_nan = w;
+  w_nan(0) = nan;
+  EXPECT_THROW(FactorizedHamiltonianContainer(one_body, u, w_nan, wb, orbitals,
+                                              core_energy, inactive_fock),
+               std::invalid_argument);
+
+  Eigen::MatrixXd wb_nan = wb;
+  wb_nan(0, 0) = nan;
+  EXPECT_THROW(FactorizedHamiltonianContainer(one_body, u, w, wb_nan, orbitals,
+                                              core_energy, inactive_fock),
+               std::invalid_argument);
+
+  // The fixture itself is finite, so the new guard cannot be what makes the
+  // cases above throw.
+  EXPECT_NO_THROW(FactorizedHamiltonianContainer(one_body, u, w, wb, orbitals,
+                                                 core_energy, inactive_fock));
 }
 
 TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {

@@ -38,6 +38,13 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
   // M^{rc} = sum_b W^{rc}_b u^r_b u^r_b^T, which is only true when each basis
   // row is a unit vector, so check here.
   if (has_two_body_integrals()) {
+    // Ahead of the norm check below: NaN compares false against its tolerance,
+    // so an unchecked NaN row would pass as normalized.
+    if (!_u.allFinite() || !_w.allFinite() || !_wb.allFinite()) {
+      throw std::invalid_argument(
+          "Factorized Hamiltonian factors contain a non-finite value.");
+    }
+
     const size_t norb = get_num_orbitals();
     const size_t R = get_num_ranks();
     const size_t B = get_num_bases();
