@@ -39,7 +39,7 @@ dependencies = [
   "matplotlib>=3.10.0",
   "argcomplete>=3.0.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter]>=1.30.0",
+  "qdk[jupyter]>=1.31.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0",
 ]
@@ -95,7 +95,7 @@ docs = [
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
-  "qdk[jupyter]>=1.30.0",
+  "qdk[jupyter]>=1.31.0",
 ]
 mcp = [
   "mcp>=2,<3"
@@ -122,7 +122,7 @@ qiskit-extras = [
   "requests>=2.33.0"
 ]
 qre = [
-  "qdk[qre,jupyter]>=1.30.0"
+  "qdk[qre,jupyter]>=1.31.0"
 ]
 test = [
   "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
