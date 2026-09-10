@@ -19,6 +19,7 @@ import os
 import runpy
 import sys
 from base64 import b64decode
+from binascii import Error as Base64DecodeError
 from contextlib import suppress
 from importlib.util import module_from_spec, spec_from_file_location
 from math import comb, log
@@ -125,6 +126,52 @@ def _assert_widget_view_outputs(
         model_id = payload.get("model_id")
         assert isinstance(model_id, str), f"{location}: widget-view model_id is not a string"
         assert model_id, f"{location}: widget-view payload has no model_id"
+
+
+def _assert_png_outputs(
+    notebook,
+    notebook_path: Path,
+    source_marker: str,
+    minimum_count: int,
+) -> None:
+    """Check PNG MIME payloads with notebook and cell context."""
+    payloads, location = _notebook_cell_mime_payloads(
+        notebook,
+        notebook_path,
+        source_marker,
+        "image/png",
+        minimum_count,
+    )
+    for payload in payloads:
+        assert isinstance(payload, str), f"{location}: image/png payload is not text"
+        try:
+            decoded_payload = b64decode(payload.encode("ascii"), validate=True)
+        except (UnicodeEncodeError, Base64DecodeError) as error:
+            raise AssertionError(f"{location}: image/png payload is not valid base64") from error
+        assert decoded_payload.startswith(b"\x89PNG\r\n\x1a\n"), (
+            f"{location}: decoded image/png payload does not have a PNG signature"
+        )
+
+
+@_requires_notebook_deps
+@pytest.mark.tutorial_baseline
+def test_png_output_error_includes_notebook_cell_context():
+    """Report the notebook and cell when PNG base64 is malformed."""
+    notebook = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_code_cell(
+                source="plot_result()",
+                id="png-cell",
+                outputs=[nbformat.v4.new_output("display_data", data={"image/png": "not base64!"})],
+            )
+        ]
+    )
+
+    with pytest.raises(
+        AssertionError,
+        match=r"sample.ipynb cell 'png-cell' \(index 0\): image/png payload is not valid base64",
+    ):
+        _assert_png_outputs(notebook, Path("sample.ipynb"), "plot_result()", 1)
 
 
 def _require_snapshot_version(
@@ -616,16 +663,12 @@ def test_tutorial_choose_active_space_notebook():
         },
     )
     _assert_widget_view_outputs(executed_notebook, notebook_path, "basis_function_cube_data =", 1)
-    entropy_payloads, entropy_location = _notebook_cell_mime_payloads(
+    _assert_png_outputs(
         executed_notebook,
         notebook_path,
         "plot_orbital_entropy_selection(result)",
-        "image/png",
         1,
     )
-    assert all(
-        isinstance(payload, str) and b64decode(payload).startswith(b"\x89PNG\r\n\x1a\n") for payload in entropy_payloads
-    ), f"{entropy_location}: image/png payload is not a valid PNG"
     _assert_widget_view_outputs(executed_notebook, notebook_path, "cube_data=cube_data", 1)
     _assert_notebook_library_logs_suppressed(executed_notebook)
 
