@@ -122,7 +122,7 @@ class SOSSAMapper(CircuitMapper):
             return False
         layout = container.layout
         mu = int(self._settings.get("coefficient_bit_precision"))
-        return QSHARP_UTILS.SelectSwap.SeparateWordLoadPays(
+        return QSHARP_UTILS.SOSSAWalk.SeparateWordLoadPays(
             container.inner_prepare.conditional_coefficients.shape[0],
             1 << layout.inner_prep_bits,
             mu + layout.inner_prep_bits + 2,

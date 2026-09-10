@@ -94,11 +94,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     /// # Description
     /// `prepareRegister` is everything PREPARE needs. SELECT controls on only its first
     /// `numSelectQubits` qubits, because a PREPARE oracle may need ancilla beyond the index
-    /// it produces — alias sampling, for instance, leaves `2μ + 1` qubits of garbage
-    /// entangled with a `numSelectQubits`-wide index. Handing that garbage to SELECT would
-    /// make it control on qubits that carry no index information.
-    /// Both the garbage ancillas and select ancillas are cleared by the `Adjoint prepareOp`,
-    /// which uncomputes the whole register back to |0⟩.
+    /// it produces.
     operation PrepSelPrep(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
