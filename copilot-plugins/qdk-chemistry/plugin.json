@@ -1,7 +1,7 @@
 {
   "name": "qdk-chemistry",
   "description": "Use QDK Chemistry through skills and MCP tools.",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "author": {
     "name": "Microsoft"
   },
