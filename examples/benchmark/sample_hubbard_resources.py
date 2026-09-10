@@ -6,9 +6,8 @@ to run them.
 
 For each ``L`` the script builds the periodic ``L x L`` Hubbard Hamiltonian under
 Jordan-Wigner, sizes an iterative phase estimation from a target ground-state energy
-accuracy, and reports what that costs. ``--physical`` additionally traces the circuit
-through the resource estimator for a qubit/runtime Pareto frontier, which is minutes
-per size rather than seconds.
+accuracy, and traces the resulting circuit through the resource estimator for a
+qubit/runtime Pareto frontier. Expect minutes per size, dominated by the trace.
 
 The sweep is bound by memory, not by the mapper's qubit ceiling. Measured
 Hamiltonian-build peak RSS grows roughly like ``L^3.7``: about 2 GB at ``L=60`` and
@@ -18,13 +17,13 @@ therefore run one at a time, each row is written as soon as it is known, and
 partway through keeps everything it had finished.
 
 Examples:
-    Algorithmic counts for a few small lattices::
+    A few small lattices::
 
         python sample_hubbard_resources.py --sizes 4,6,8,10 -o costs.csv
 
-    A full sweep with physical estimation, resumable::
+    A full sweep, resumable::
 
-        python sample_hubbard_resources.py --sizes 20:200:10 --physical --resume -o sweep.csv
+        python sample_hubbard_resources.py --sizes 20:200:10 --resume -o sweep.csv
 
 """
 
@@ -334,13 +333,12 @@ def peak_memory_gb() -> float:
     return peak / 1e6 if sys.platform != "darwin" else peak / 1e9
 
 
-def sample_size(context, size: int, *, physical: bool) -> dict:
+def sample_size(context, size: int) -> dict:
     """Measure one lattice size.
 
     Args:
         context: Q# context to build in.
         size: Lattice side length.
-        physical: Whether to run the physical resource estimate.
 
     Returns:
         One row of results.
@@ -361,17 +359,14 @@ def sample_size(context, size: int, *, physical: bool) -> dict:
         "target_precision": target_precision(size),
         "num_bits": parameters.num_bits,
         "num_divisions": parameters.num_divisions,
-        "physical_qubits": "",
-        "runtime_hours": "",
     }
 
-    if physical:
-        initial_state = reference_state_prep(context, size * size, num_electrons(size))
-        circuit = qpe_circuit(context, operator, parameters, initial_state, size)
-        table = estimate_physical(circuit, f"{size}x{size}")
-        fastest = min(table, key=lambda entry: entry.runtime)
-        row["physical_qubits"] = fastest.qubits
-        row["runtime_hours"] = fastest.runtime / 3.6e12
+    initial_state = reference_state_prep(context, size * size, num_electrons(size))
+    circuit = qpe_circuit(context, operator, parameters, initial_state, size)
+    table = estimate_physical(circuit, f"{size}x{size}")
+    fastest = min(table, key=lambda entry: entry.runtime)
+    row["physical_qubits"] = fastest.qubits
+    row["runtime_hours"] = fastest.runtime / 3.6e12
 
     row["elapsed_s"] = round(time.monotonic() - started, 1)
     row["peak_rss_gb"] = round(peak_memory_gb(), 2)
@@ -462,11 +457,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="CSV to write, one row per size, flushed as each size finishes (default: %(default)s)",
     )
     parser.add_argument(
-        "--physical",
-        action="store_true",
-        help="also trace the circuit for a physical qubit/runtime estimate; minutes per size",
-    )
-    parser.add_argument(
         "--resume",
         action="store_true",
         help="skip sizes already present in the output file",
@@ -494,7 +484,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"Hubbard U/T = {U_OVER_T:g}, filling {FILLING:g} e/site, target {TARGET_PRECISION_PER_SITE:g} T/site"
     )
     print(f"sizes: {pending}")
-    print(f"physical estimation: {'on' if args.physical else 'off'}")
 
     # QDK interpreters are thread-affine, so this context belongs to the calling thread.
     context = create_qsharp_context()
@@ -506,7 +495,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         writer = None
         for size in pending:
             try:
-                row = sample_size(context, size, physical=args.physical)
+                row = sample_size(context, size)
             except MemoryError:
                 print(
                     f"L={size}: out of memory, stopping. Completed sizes are in {args.output}."
@@ -523,14 +512,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             writer.writerow(row)
             handle.flush()
 
-            physical = (
-                f", {row['physical_qubits']} physical qubits, {row['runtime_hours']:.3g} h"
-                if args.physical and row["physical_qubits"] != ""
-                else ""
-            )
             print(
                 f"L={size:>3}: {row['qubits']:>6} qubits, {row['terms']:>7} terms, "
-                f"m={row['num_bits']}, r={row['num_divisions']}{physical} "
+                f"m={row['num_bits']}, r={row['num_divisions']}, "
+                f"{row['physical_qubits']} physical qubits, {row['runtime_hours']:.3g} h "
                 f"[{row['elapsed_s']}s, peak {row['peak_rss_gb']} GB]"
             )
 

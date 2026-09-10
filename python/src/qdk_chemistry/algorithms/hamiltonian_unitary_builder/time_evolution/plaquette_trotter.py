@@ -246,26 +246,13 @@ class PlaquetteTrotter(Trotter):
             )
 
         # Campbell's Eq. (D2) (arXiv:2012.09238v4, App. D) ordering: the interaction is
-        # halved at the two ends
-        # and the second hopping section runs at full time in the middle. The error
-        # constant below is derived for exactly that assignment of the three factors, so
-        # emitting a different symmetric ordering -- for instance the interaction in the
-        # middle, which would be one diagonal layer per step instead of two -- would be
-        # just as valid a second-order formula but would no longer be the one W_PLAQ
-        # bounds.
+        # halved at the two ends and the second hopping section runs at full time in
+        # the middle.
         #
-        # Batch identifiers must be unique across the whole step -- the container applies
-        # each as one block and reproduces the ordering only while a batch stays
-        # consecutive -- so they are threaded sequentially through every layer: the two
+        # Batch identifiers unique across the whole step: the two
         # diagonal half-layers and each of the three section applications hoist and batch
         # their own equal-angle families from a first identifier past all already issued.
         batch = 1
-        # The Jordan-Wigner constant is an identity factor, and identity commutes with
-        # every other factor of the step, so it need not be halved across the two ends
-        # with the rest of the interaction. Emitting it once at full time costs one
-        # rotation per step where splitting it costs two. It cannot simply be dropped:
-        # under a control it is a relative phase on the control qubit, which is exactly
-        # what phase estimation reads.
         constant = [term for term in diagonal if not term.pauli_term]
         diagonal = [term for term in diagonal if term.pauli_term]
         merged = (
