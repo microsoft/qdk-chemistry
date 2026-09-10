@@ -179,6 +179,53 @@ class TestSOSSAWalkContainer:
 
         assert container.num_qubits - num_system == expected_ancilla
 
+    def test_lambda_eff_raises_when_no_reference_energy_was_supplied(self):
+        """An unset ``lambda_eff`` must announce itself, not masquerade as a number.
+
+        The block encoding is fully buildable without a reference energy -- the circuit
+        never uses ``lambda_eff`` -- so the container has to represent "not supplied"
+        somehow. Returning ``0.0`` or ``Lambda`` would silently mis-size a query
+        schedule, which is the one thing this quantity exists to do correctly.
+        """
+        container = _make_sossa_unitary_representation().get_container()
+
+        assert container.has_lambda_eff is False
+        with pytest.raises(ValueError, match="lambda_eff is unset"):
+            _ = container.lambda_eff
+
+    def test_lambda_eff_round_trips_through_json_and_hdf5(self):
+        """A stored ``lambda_eff`` must survive serialization in both formats.
+
+        ``lambda_eff`` is derived from an input the factorization does not carry, so if
+        serialization dropped it a reloaded container would be indistinguishable from one
+        that was never given a reference energy -- and would raise instead of returning
+        the value the builder computed.
+        """
+        container = _make_sossa_unitary_representation().get_container()
+        rebuilt = SOSSAWalkContainer(
+            outer_prepare=container.outer_prepare,
+            inner_prepare=container.inner_prepare,
+            select=container.select,
+            metadata=container.metadata,
+            layout=container.layout,
+            normalization=container.normalization,
+            lambda_eff=0.75,
+        )
+
+        from_json = SOSSAWalkContainer.from_json(rebuilt.to_json())
+        assert from_json.lambda_eff == pytest.approx(0.75, abs=1e-12)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = Path(tmp_dir) / "walk.h5"
+            with h5py.File(path, "w") as handle:
+                rebuilt.to_hdf5(handle.create_group("walk"))
+            with h5py.File(path, "r") as handle:
+                from_hdf5 = SOSSAWalkContainer.from_hdf5(handle["walk"])
+        assert from_hdf5.lambda_eff == pytest.approx(0.75, abs=1e-12)
+
+        # Positive control: the unset case must round trip as unset, not as 0.0.
+        assert SOSSAWalkContainer.from_json(container.to_json()).has_lambda_eff is False
+
 
 class TestSOSSABuilder:
     """Tests for the SOSSA block encoding builder algorithm."""
@@ -277,3 +324,118 @@ class TestSOSSABuilder:
         free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
         rank_bits = free_rider[:, 2:]
         assert not rank_bits.any(), f"one-body free-rider rank bits are not all zero:\n{rank_bits}"
+
+    def test_lambda_eff_at_band_centre_equals_the_normalization(self):
+        r"""At the middle of the band, :math:`\lambda_{\text{eff}}` must collapse to :math:`\Lambda`.
+
+        ``sqrt(E_gap (2L - E_gap))`` is a semicircle over ``E_gap in [0, 2L]`` peaking at
+        ``E_gap = L``, where it equals ``L`` exactly. That single point pins the whole
+        closed form without diagonalizing anything: an implementation that dropped the
+        ``2`` would return ``0`` here, and the asymptotic ``sqrt(2 L E_gap)`` of the
+        paper's abstract would return ``sqrt(2) L``.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+        lam = SOSSABuilder().run(operator).get_container().normalization
+
+        container = SOSSABuilder(energy_gap=lam).run(operator).get_container()
+
+        assert container.lambda_eff == pytest.approx(lam, abs=1e-12)
+        # Discriminate against the two plausible wrong forms at the same point.
+        assert container.lambda_eff != pytest.approx(np.sqrt(2.0) * lam, abs=1e-6)
+
+    def test_lambda_eff_is_symmetric_about_the_band_centre(self):
+        """Gaps mirrored about ``Lambda`` must give the same value.
+
+        ``E_gap`` and ``2L - E_gap`` are interchangeable in ``E_gap (2L - E_gap)``, so a
+        term-ordering or sign slip that broke the symmetry would show up here even
+        though the band-centre pin above is blind to it.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+        lam = SOSSABuilder().run(operator).get_container().normalization
+
+        low = SOSSABuilder(energy_gap=0.25 * lam).run(operator).get_container().lambda_eff
+        high = SOSSABuilder(energy_gap=1.75 * lam).run(operator).get_container().lambda_eff
+
+        assert low == pytest.approx(high, abs=1e-12)
+        # Guard against the degenerate pass where both sides are the band-centre value.
+        assert low < lam
+
+    def test_ground_state_energy_and_energy_gap_agree_through_the_shift(self):
+        r"""The two settings must be the same statement of the same reference point.
+
+        ``energy_gap`` is :math:`E_{\text{gs}} - E_{\text{SOS}}`, so supplying either one
+        has to land on an identical :math:`\lambda_{\text{eff}}`. Only the builder knows
+        ``energy_shift``, which is why it offers both spellings rather than making every
+        caller do the subtraction. A sign slip in that conversion would pass a test that
+        used just one of the settings.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
+        probe = SOSSABuilder().run(operator).get_container()
+        shift = probe.metadata.energy_shift
+        gap = 0.4 * probe.normalization
+        assert shift != 0.0, "a zero shift would make this conversion check vacuous"
+
+        from_gap = SOSSABuilder(energy_gap=gap).run(operator).get_container().lambda_eff
+        from_energy = SOSSABuilder(ground_state_energy=shift + gap).run(operator).get_container().lambda_eff
+
+        assert from_energy == pytest.approx(from_gap, abs=1e-12)
+
+        # Positive control: forgetting to apply the shift must be detectable -- either it
+        # lands outside the window (rejected) or it lands on a different value. Passing a
+        # bare gap as if it were an absolute energy must never silently agree.
+        def lambda_eff_or_none(**settings):
+            try:
+                return SOSSABuilder(**settings).run(operator).get_container().lambda_eff
+            except ValueError:
+                return None
+
+        assert lambda_eff_or_none(ground_state_energy=gap) != from_gap
+
+    def test_supplying_both_reference_energies_is_rejected(self):
+        """``ground_state_energy`` and ``energy_gap`` are two spellings of one input.
+
+        Honouring one and ignoring the other would let a caller believe a reference energy
+        took effect when it silently did not.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+        lam = SOSSABuilder().run(operator).get_container().normalization
+
+        with pytest.raises(ValueError, match="not both"):
+            SOSSABuilder(ground_state_energy=0.0, energy_gap=lam).run(operator)
+
+    @pytest.mark.parametrize(
+        "gap_fraction",
+        [-0.5, 0.0, 2.0, 2.5],
+        ids=["below_shift", "at_lower_band_edge", "at_upper_band_edge", "above_upper_band_edge"],
+    )
+    def test_lambda_eff_rejects_gaps_outside_the_band(self, gap_fraction):
+        """A gap outside ``(0, 2 Lambda)`` is a caller error, not a value to be clamped.
+
+        ``H_SOS`` is positive semidefinite and block encoded with normalization
+        ``Lambda``, so its spectrum lies in ``[0, 2 Lambda]`` by construction
+        (:cite:`Low2025`, Sec. II). A reference energy that lands outside that window
+        belongs to a different operator, and returning ``0.0`` there would be
+        indistinguishable from the genuinely small ``lambda_eff`` of a near
+        frustration-free Hamiltonian -- the regime the quantity exists to report.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+        lam = SOSSABuilder().run(operator).get_container().normalization
+
+        with pytest.raises(ValueError, match="outside the representable window"):
+            SOSSABuilder(energy_gap=gap_fraction * lam).run(operator)
+
+    def test_omitting_the_reference_energy_still_builds_the_block_encoding(self):
+        """The circuit never consumes ``lambda_eff``, so it must not be required to build one.
+
+        ``lambda_eff`` sizes a query schedule; the SOSSA circuit mapper reads only the
+        PREPARE/SELECT data and the register layout. Making the reference energy mandatory
+        would block every circuit-only caller -- including a bare
+        ``AlgorithmRef("hamiltonian_unitary_builder", "sossa")`` nested inside a QPE
+        circuit builder, which has no way to pass one.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+
+        container = SOSSABuilder().run(operator).get_container()
+
+        assert container.normalization > 0
+        assert container.has_lambda_eff is False

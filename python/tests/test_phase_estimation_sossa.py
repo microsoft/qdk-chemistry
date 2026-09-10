@@ -792,6 +792,85 @@ class TestSOSSAQPEIntegration:
         exact_energy, _ = _get_ground_state_and_energy(h_physical, n_orb, nalpha=1, nbeta=1)
         assert recovered == pytest.approx(exact_energy, abs=1e-10)
 
+    def test_lambda_eff_is_the_slope_of_the_walk_energy_decoder(self):
+        r"""``lambda_eff`` must equal ``sqrt(E_gap (2L - E_gap))`` *and* the decoder slope.
+
+        Phase estimation on this walk resolves an energy to :math:`\sigma` using
+        :math:`\pi\lambda_{\text{eff}}/(2\sigma)` queries (:cite:`Low2025`, Eq. (11)), so
+        :math:`\lambda_{\text{eff}}` -- not :math:`\Lambda` -- is the quantity that sizes
+        a query schedule. It is checked here two independent ways:
+
+        1. Against the closed form evaluated on an ``E_gap`` obtained by diagonalizing
+           ``H_gap`` in NumPy, while the builder itself only ever sees the *physical*
+           ground-state energy and subtracts ``energy_shift``. The two routes to
+           ``E_gap`` share no code, so this simultaneously pins the shift convention:
+           ``ground_state_energy`` must be a total energy, core included.
+        2. Against the derivative of :meth:`SOSSAWalkContainer.eigenvalue_from_phase`,
+           which is what actually converts a phase estimate into an energy. Because
+           :math:`E(\varphi) = \Lambda(1 + \cos 2\pi\varphi) + E_{\text{SOS}}`,
+           :math:`|\mathrm{d}E/\mathrm{d}\varphi| = 2\pi\lambda_{\text{eff}}` at the
+           ground-state phase; the paper differentiates this same inverse in its
+           Appendix G. This control never evaluates the closed form, so it would catch a
+           formula that agreed with check 1 only because both were wrong the same way.
+
+        The asymptotic :math:`\sqrt{2\Lambda E_{\text{gap}}}` quoted in the paper's
+        abstract, and :math:`\Lambda` itself, are asserted *not* to match, so the pin is
+        not passing for want of discriminating power.
+        """
+        data = _build_h2_dfthc_data()
+        n_orb = data["N"]
+        # The shipped file's core energy is used rather than 0 so that the "total energy"
+        # half of the contract is actually under test: with a zero core, passing an
+        # active-space-only energy would be indistinguishable from passing a total one.
+        fh = FactorizedHamiltonianContainer(
+            one_body_integrals=data["h1"],
+            u_matrices=data["basis_vectors"].flatten(),
+            w_matrices=data["two_body_weights"].flatten(),
+            wb_matrix=data["identity_weight"],
+            orbitals=create_test_orbitals(n_orb),
+            core_energy=data["core_energy"],
+            inactive_fock_matrix=np.zeros((n_orb, n_orb)),
+        )
+        # ``to_sossa_operator`` consumes the container, so read the offset off ``fh`` first.
+        core_energy = fh.get_core_energy()
+        assert core_energy != 0.0, "a zero core energy would make the convention check below vacuous"
+
+        # The builder's only extra input: the physical ground-state energy, core included.
+        h_physical = _build_physical_hamiltonian_matrix(data["h1"], data["basis_vectors"], data["two_body_weights"])
+        physical_energy, _ = _get_ground_state_and_energy(h_physical, n_orb, nalpha=1, nbeta=1)
+        ground_state_energy = physical_energy + core_energy
+
+        operator = to_sossa_operator(fh)
+        container = SOSSABuilder(ground_state_energy=ground_state_energy).run(operator).get_container()
+        lambda_eff = container.lambda_eff
+
+        # (1) Reference from an independently diagonalized H_gap.
+        h_gap = _build_dfthc_hamiltonian_matrix(
+            data["h1"], data["basis_vectors"], data["two_body_weights"], data["identity_weight"]
+        )
+        energy_gap, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
+        two_lambda = 2.0 * container.normalization
+        expected = math.sqrt(energy_gap * (two_lambda - energy_gap))
+        assert lambda_eff == pytest.approx(expected, abs=1e-12)
+
+        # (2) Slope of the decoder, evaluated without the closed form.
+        phase = math.acos(np.clip(energy_gap / container.normalization - 1.0, -1.0, 1.0)) / (2 * math.pi)
+        step = 1e-6
+        slope = (container.eigenvalue_from_phase(phase + step) - container.eigenvalue_from_phase(phase - step)) / (
+            2 * step
+        )
+        assert abs(slope) == pytest.approx(2 * math.pi * lambda_eff, rel=1e-8)
+
+        # Discriminating power: the wrong-but-plausible forms are far outside the tolerance.
+        assert lambda_eff < container.normalization
+        assert lambda_eff != pytest.approx(math.sqrt(two_lambda * energy_gap), abs=1e-3)
+        assert lambda_eff != pytest.approx(container.normalization, abs=1e-3)
+
+        # The core-energy convention is load-bearing, not decorative: the active-space
+        # energy sits a full core below the shift, so it must be rejected outright.
+        with pytest.raises(ValueError, match="outside the representable window"):
+            SOSSABuilder(ground_state_energy=physical_energy).run(operator)
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Resource estimation

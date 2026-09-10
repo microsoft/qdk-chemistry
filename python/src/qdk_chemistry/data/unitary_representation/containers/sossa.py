@@ -161,7 +161,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     """
 
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     @staticmethod
     def data_type_name() -> str:
@@ -182,6 +182,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         layout: SOSSARegisterLayout,
         normalization: float,
         power: int = 1,
+        lambda_eff: float | None = None,
     ) -> None:
         r"""Initialize a SOSSAWalkContainer.
 
@@ -194,6 +195,8 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             layout: Ancilla register widths the builder derived from those dimensions.
             normalization: Block-encoding normalization :math:`\Lambda = \tfrac12\sum_\alpha c_\alpha^2`.
             power: Number of times to apply the walk operator.
+            lambda_eff: Effective (spectrally amplified) normalization, or ``None`` when the
+                builder was given no reference energy to derive it from. See :attr:`lambda_eff`.
 
         """
         self._power = power
@@ -203,6 +206,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         self.metadata = metadata
         self.layout = layout
         self.normalization = normalization
+        self._lambda_eff = None if lambda_eff is None else float(lambda_eff)
 
         super().__init__()
 
@@ -210,6 +214,54 @@ class SOSSAWalkContainer(QuantumWalkContainer):
     def power(self) -> int:
         """Number of times to apply the walk operator."""
         return self._power
+
+    @property
+    def lambda_eff(self) -> float:
+        r"""Effective (spectrally amplified) normalization :math:`\lambda_{\text{eff}}`.
+
+        Phase estimation on this walk resolves :math:`E_{\text{gap}}` to a standard
+        deviation :math:`\sigma` using :math:`\pi\lambda_{\text{eff}} / (2\sigma)`
+        queries (:cite:`Low2025`, Eq. (11)):
+
+        .. math::
+
+            E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}, \qquad
+            \lambda_{\text{eff}} = \sqrt{E_{\text{gap}}(2\Lambda - E_{\text{gap}})}
+
+        This is never larger than the raw normalization :math:`\Lambda` because the
+        walk encodes the energy as
+        :math:`2\pi\varphi = \arccos(E_{\text{gap}}/\Lambda - 1)`, whose slope near the
+        band edges magnifies the low-lying spectrum. Equivalently,
+        :math:`2\pi\lambda_{\text{eff}}` is exactly
+        :math:`|\mathrm{d}E/\mathrm{d}\varphi|` of :meth:`eigenvalue_from_phase` at the
+        phase encoding :math:`E_{\text{gs}}`, so it is the conversion factor between
+        phase resolution and energy resolution.
+
+        The value is computed once by the SOSSA block-encoding builder, which needs a
+        reference energy it cannot derive from the factorization itself. Supply one via
+        the builder's ``ground_state_energy`` or ``energy_gap`` setting.
+
+        Returns:
+            float: The effective normalization :math:`\lambda_{\text{eff}}`.
+
+        Raises:
+            ValueError: If the builder was given no reference energy, leaving
+                :math:`\lambda_{\text{eff}}` undefined for this container.
+
+        """
+        if self._lambda_eff is None:
+            raise ValueError(
+                "lambda_eff is unset for this SOSSA walk: it needs a reference energy that the "
+                "factorization does not carry. Rebuild the block encoding with the SOSSA builder's "
+                "'ground_state_energy' setting (a total energy, on the same convention as "
+                "metadata.energy_shift) or its 'energy_gap' setting."
+            )
+        return self._lambda_eff
+
+    @property
+    def has_lambda_eff(self) -> bool:
+        """Whether :attr:`lambda_eff` is available on this container."""
+        return self._lambda_eff is not None
 
     @property
     def num_qubits(self) -> int:
@@ -232,6 +284,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             "container_type": self.type,
             "power": self.power,
             "normalization": self.normalization,
+            "lambda_eff": self._lambda_eff,
             "metadata": self.metadata.to_json(),
             "layout": self.layout.to_json(),
             "outer_prepare": self.outer_prepare.to_json(),
@@ -246,6 +299,8 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
         group.attrs["normalization"] = self.normalization
+        if self._lambda_eff is not None:
+            group.attrs["lambda_eff"] = self._lambda_eff
         group.attrs["metadata"] = json.dumps(self.metadata.to_json())
         group.attrs["layout"] = json.dumps(self.layout.to_json())
         _wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
@@ -271,6 +326,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             layout=SOSSARegisterLayout.from_json(json_data["layout"]),
             normalization=float(json_data["normalization"]),
             power=json_data.get("power", 1),
+            lambda_eff=json_data.get("lambda_eff"),
         )
 
     @classmethod
@@ -287,6 +343,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             layout=SOSSARegisterLayout.from_json(json.loads(group.attrs["layout"])),
             normalization=float(group.attrs["normalization"]),
             power=int(group.attrs["power"]),
+            lambda_eff=group.attrs.get("lambda_eff"),
         )
 
     def get_summary(self) -> str:
@@ -295,11 +352,13 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         r = self.metadata.num_ranks
         b = self.metadata.num_bases
         c = self.metadata.num_copies
+        lambda_eff_line = "" if self._lambda_eff is None else f"  Effective normalization = {self._lambda_eff:.6f}\n"
         return (
             f"SOSSA Container (DFTHC block encoding):\n"
             f"  Power: {self.power}\n"
             f"  Orbitals N={n}, Ranks R={r}, Bases B={b}, Copies C={c}\n"
             f"  Normalization Lambda = {self.normalization:.6f}\n"
+            f"{lambda_eff_line}"
             f"  Outer PREPARE: {self.outer_prepare.get_orbitals().num_modes()} qubits\n"
             f"  Inner PREPARE: {self.layout.inner_prep_bits} qubits, {b + 1} basis entries\n"
             f"  System: {2 * n} spin-orbitals\n"
