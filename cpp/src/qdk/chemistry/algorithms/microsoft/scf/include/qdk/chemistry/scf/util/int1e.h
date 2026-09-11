@@ -183,6 +183,18 @@ class OneBodyIntegral {
    */
   void ecp_integral(double* res);
 
+  /**
+   * @brief Compute spin-free pVp integral matrix W[μν] = ⟨μ|p·V·p|ν⟩
+   *
+   * Evaluates the scalar (spin-free) component of the p·V·p operator
+   * needed for scalar-relativistic (X2C, DKH) Hamiltonians.
+   * Uses Libint2 Operator::opVop.
+   *
+   * @param[out] res Output buffer for pVp matrix (size: num_atomic_orbitals
+   * × num_atomic_orbitals)
+   */
+  void pvp_integral(double* res);
+
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   /**
    * @brief Compute point charge interaction integral matrix for QM/MM
@@ -277,11 +289,11 @@ class OneBodyIntegral {
    * Template method for evaluating integrals with different operators.
    * Loops over significant shell pairs and accumulates results.
    *
-   * @param nopers Number of operator components
+   * @param nresults Number of leading operator components to store
    * @param engine_fn Factory function to create integral engine
-   * @param[out] res Output matrices (one per operator component)
+   * @param[out] res Output matrices (one per requested component)
    */
-  void integral_(size_t nopers, EngineFactory engine_fn, RowMajorMatrix* res);
+  void integral_(size_t nresults, EngineFactory engine_fn, RowMajorMatrix* res);
 
   /**
    * @brief Generic integral derivative evaluation routine
