@@ -352,6 +352,15 @@ class Trotter(TimeEvolutionBuilder):
 
         return terms
 
+    def evolution_category(self) -> str:
+        """Identify the deterministic Trotter simulation family.
+
+        Returns:
+            ``"trotter"``.
+
+        """
+        return "trotter"
+
     def name(self) -> str:
         """Return the name of the unitary builder."""
         return "trotter"

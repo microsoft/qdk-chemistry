@@ -19,7 +19,18 @@ BI_DIRECTIONAL_2Q_GATES = frozenset(["swap"])
 UNI_DIRECTIONAL_2Q_CLIFFORD_GATES = frozenset(["cx", "cz"])
 DIAGONAL_Z_1Q_GATES = frozenset(["rz", "t", "tdg", "s", "sdg", "z", "id"])
 
+# Bounds for the deterministic/random accuracy split in the partially randomized
+# time-evolution builder. The split fraction s sets two error sub-budgets: the
+# Trotter step count grows like 1/sqrt(s) and the qDRIFT sample count like
+# 1/sqrt(1 - s), so s = 0 or s = 1 would diverge. Clamping s to
+# [ACCURACY_SPLIT_MIN, ACCURACY_SPLIT_MAX] keeps both counts finite (worst case
+# ~1000x the baseline cost).
+ACCURACY_SPLIT_MIN = 1e-6
+ACCURACY_SPLIT_MAX = 1.0 - 1e-6
+
 __all__ = [
+    "ACCURACY_SPLIT_MAX",
+    "ACCURACY_SPLIT_MIN",
     "BI_DIRECTIONAL_2Q_GATES",
     "DIAGONAL_Z_1Q_GATES",
     "NON_CLIFFORD_GATES",
