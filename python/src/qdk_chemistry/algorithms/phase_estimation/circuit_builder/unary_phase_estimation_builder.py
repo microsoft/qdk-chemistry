@@ -76,7 +76,7 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "compute_capacity",
             "int",
             -1,
-            "Maximum number of logical qubits kept in compute under least-recently-used memory placement. "
+            "For memory compute layout, maximum number of compute qubits. "
             "Set to -1 to keep all logical qubits in compute.",
         )
         self.set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True))
@@ -114,7 +114,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             num_queries: Number of queries to the block encoding. Default to -1; user needs to set a valid value.
             unitary_builder: Optional algorithm reference for the unitary builder.
             circuit_mapper: Optional algorithm reference for the block-encoding circuit mapper.
-            compute_capacity: Logical-qubit compute capacity for LRU memory placement; -1 disables placement.
+            compute_capacity: Number of compute qubits in memory compute layout; -1 disables placement.
 
         """
         Logger.trace_entering()

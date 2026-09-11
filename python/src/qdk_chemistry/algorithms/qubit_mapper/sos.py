@@ -77,12 +77,7 @@ class SOSQubitMapper(QubitMapper):
 
     @staticmethod
     def _validate_mapping(mapping: MajoranaMapping, num_orbitals: int) -> None:
-        """Reject a mapping this construction cannot honour, rather than silently substituting one.
-
-        The generators are rotated single-mode Paulis whose Jordan-Wigner strings the
-        SOSSA walk applies implicitly, so the construction is fixed to blocked
-        Jordan-Wigner over ``2 * num_orbitals`` modes. Anything else would produce an
-        operator that does not encode what the caller asked for.
+        """Reject mappings other than blocked Jordan-Wigner over ``2 * num_orbitals`` modes.
 
         Args:
             mapping: The mapping supplied by the caller.
@@ -93,12 +88,11 @@ class SOSQubitMapper(QubitMapper):
 
         """
         if mapping.name != "jordan-wigner":
-            raise ValueError(f"SOSQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}")
+            raise ValueError(f"SOSQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}.")
         num_modes = 2 * num_orbitals
         if mapping.num_modes != num_modes:
             raise ValueError(
-                f"SOSQubitMapper requires a mapping over the Hamiltonian's {num_modes} spin orbitals; "
-                f"got one over {mapping.num_modes}"
+                f"SOSQubitMapper requires a mapping over {num_modes} spin orbitals; got {mapping.num_modes}."
             )
         if mapping.tapering is not None:
             raise ValueError("SOSQubitMapper does not support tapered mappings")
@@ -112,11 +106,6 @@ class SOSQubitMapper(QubitMapper):
     ) -> QubitOperator:
         """Map a validated factorized container to a SOSSA qubit operator.
 
-        The container no longer carries per-rank signs to check: it stores the two-body
-        tensor as a plain sum of squares, so it is positive semi-definite by construction,
-        and ``DoubleFactorizer`` rejects a supermatrix that admits no Cholesky factor
-        before one can be built.
-
         Args:
             container: The factorized Hamiltonian to map.
             mapping: The single-mode Majorana mapping supplying the Pauli labels.
@@ -129,10 +118,6 @@ class SOSQubitMapper(QubitMapper):
             ValueError: If the threshold is negative or not a number.
 
         """
-        # A negative threshold makes the two masks overlap, so a mode in (threshold, -threshold)
-        # is emitted as both D1 and Q1: the generator count exceeds the N slots the register
-        # layout reserves, and the Q1 copy takes the square root of a positive eigenvalue's
-        # negation. NaN is rejected by the same comparison.
         if not threshold >= 0.0:
             raise ValueError(f"threshold must be non-negative; got {threshold!r}")
 
@@ -140,65 +125,19 @@ class SOSQubitMapper(QubitMapper):
         num_ranks = container.get_num_ranks()
         num_bases = container.get_num_bases()
         num_copies = container.get_num_copies()
-        u_matrices = np.asarray(container.get_u_matrices(), dtype=float)
-        weights = np.asarray(container.get_w_matrices(), dtype=float)
-        identity_weights = np.asarray(container.get_wb_matrix(), dtype=float)
-        eigenvalues, eigenvectors = np.linalg.eigh(np.asarray(container.get_h1_prime(), dtype=float))
 
-        x_pauli = sparse_pauli_word_to_label(mapping.majorana(0), 1)
-        y_pauli = sparse_pauli_word_to_label(mapping.majorana(1), 1)
-        sf_bilinear_coefficient, sf_word = mapping.bilinear(1, 0)
-        # The rotated number operator is n = (I - i gamma_1 gamma_0) / 2, so its non-identity
-        # part carries the opposite sign to the bilinear.
-        sf_coefficient = -float(sf_bilinear_coefficient.real)
-        sf_pauli = sparse_pauli_word_to_label(sf_word, 1)
-
-        # One-body generators: D1 (positive eigenvalues) first, then Q1 (negative). Each is the
-        # two-term LCU sqrt(|lambda|) * (X +/- iY)/2 on the single transformed spin orbital, sharing
-        # the generator's Givens rotation (length N-1). The +iY sign marks D1 and -iY marks Q1; the
-        # builder scales the one-norm by sqrt(2) for the two spin channels when forming outer coeffs.
-        pos_mask = eigenvalues > threshold
-        neg_mask = eigenvalues < -threshold
-        screened_mask = ~(pos_mask | neg_mask)
-        num_screened = int(screened_mask.sum())
-        one_body_vectors = np.concatenate(
-            [eigenvectors[:, pos_mask].T, eigenvectors[:, screened_mask].T, eigenvectors[:, neg_mask].T],
-            axis=0,
+        one_body, num_d1_terms, negative_eigenvalue_sum = cls._map_one_body_terms(
+            np.asarray(container.get_h1_prime(), dtype=float), mapping, threshold
         )
-        sqrt_lambdas = np.sqrt(np.concatenate([eigenvalues[pos_mask], np.zeros(num_screened), -eigenvalues[neg_mask]]))
-        num_positive = int(pos_mask.sum()) + num_screened
-        signs = np.concatenate([np.ones(num_positive), -np.ones(int(neg_mask.sum()))])
-        one_body_angles = (
-            cls._batch_vector_to_givens_angles(one_body_vectors)
-            if one_body_vectors.shape[0]
-            else np.empty((0, max(num_orbitals - 1, 0)))
-        )
-        one_body_coeffs = 0.5 * np.stack([sqrt_lambdas, 1j * signs * sqrt_lambdas], axis=1)
-
-        # Spin-free two-body generators: one rotated-Z per (rank, basis), rotations shared across
-        # copies. two_body_coeffs holds one row per (rank, copy) with the LCU coefficients of
-        # M^{rc} = sum_b (w_b^{rc} c_sf) L_b^{r} + w_B^{rc} I over [rotated-Z_0..Z_{B-1}, I], where
-        # w_B^{rc} is the stored identity weight. The paper's W^{rc} is a different quantity,
-        # derived below as w_rc, and only enters the energy shift.
-        weights_rbc = weights.reshape(num_ranks, num_bases, num_copies)
-        basis_vectors = u_matrices.reshape(num_ranks * num_bases, num_orbitals)
-        two_body_angles = (
-            cls._batch_vector_to_givens_angles(basis_vectors)
-            if basis_vectors.shape[0]
-            else np.empty((0, max(num_orbitals - 1, 0)))
-        )
-        sf_basis = np.transpose(weights_rbc, (0, 2, 1)).reshape(num_ranks * num_copies, num_bases) * sf_coefficient
-        two_body_coeffs = np.concatenate([sf_basis, identity_weights.reshape(-1, 1)], axis=1).astype(complex)
-
-        negative_sum = float(-np.sum(eigenvalues[neg_mask]))
-        w_rc = identity_weights - weights_rbc.sum(axis=1)
-        w_rc_square_sum = float(np.sum(w_rc**2))
-        energy_shift = container.get_core_energy() - 2.0 * negative_sum - 0.5 * w_rc_square_sum
+        two_body, rank_copy_weight_square_sum = cls._map_two_body_terms(container, mapping)
+        one_body_shift = 2.0 * negative_eigenvalue_sum
+        two_body_shift = 0.5 * rank_copy_weight_square_sum
+        energy_shift = container.get_core_energy() - one_body_shift - two_body_shift
 
         return QubitOperator(
             SOSContainer(
-                RotatedPaulis(one_body_angles, one_body_coeffs, (x_pauli, y_pauli)),
-                RotatedPaulis(two_body_angles, two_body_coeffs, (sf_pauli,)),
+                one_body,
+                two_body,
                 mapping.name,
                 "blocked",
                 FactorizedHamiltonianMetadata(
@@ -206,11 +145,79 @@ class SOSQubitMapper(QubitMapper):
                     num_ranks=num_ranks,
                     num_bases=num_bases,
                     num_copies=num_copies,
-                    num_positive_one_body_terms=num_positive,
+                    num_positive_one_body_terms=num_d1_terms,
                     energy_shift=energy_shift,
                 ),
             )
         )
+
+    @classmethod
+    def _map_one_body_terms(
+        cls, h1_prime: np.ndarray, mapping: MajoranaMapping, threshold: float
+    ) -> tuple[RotatedPaulis, int, float]:
+        """Build D1 and Q1 generators from the effective one-body matrix."""
+        eigenvalues, eigenvectors = np.linalg.eigh(h1_prime)
+
+        positive = eigenvalues > threshold
+        negative = eigenvalues < -threshold
+        screened = ~(positive | negative)
+        num_screened = int(screened.sum())
+        num_d1_terms = int(positive.sum()) + num_screened
+
+        # D1 rows occupy the positive side of the outer register. Screened modes stay
+        # in that partition with zero amplitude, followed by the Q1 rows.
+        ordered_vectors = np.concatenate(
+            [eigenvectors[:, positive].T, eigenvectors[:, screened].T, eigenvectors[:, negative].T]
+        )
+        magnitudes = np.concatenate([eigenvalues[positive], np.zeros(num_screened), -eigenvalues[negative]])
+        phase_signs = np.concatenate([np.ones(num_d1_terms), -np.ones(int(negative.sum()))])
+        amplitudes = np.sqrt(magnitudes)
+
+        angles = cls._batch_vector_to_givens_angles(ordered_vectors)
+        # The Y phase distinguishes D1 (+i) from Q1 (-i); the builder later adds
+        # the sqrt(2) factor for the two spin channels.
+        coeffs = 0.5 * np.stack([amplitudes, 1j * phase_signs * amplitudes], axis=1)
+        paulis = (
+            sparse_pauli_word_to_label(mapping.majorana(0), 1),
+            sparse_pauli_word_to_label(mapping.majorana(1), 1),
+        )
+        negative_eigenvalue_sum = float(-np.sum(eigenvalues[negative]))
+        return RotatedPaulis(angles, coeffs, paulis), num_d1_terms, negative_eigenvalue_sum
+
+    @classmethod
+    def _map_two_body_terms(
+        cls, container: FactorizedHamiltonianContainer, mapping: MajoranaMapping
+    ) -> tuple[RotatedPaulis, float]:
+        """Build spin-free generators and their contribution to the energy shift."""
+        num_orbitals = container.get_num_orbitals()
+        num_ranks = container.get_num_ranks()
+        num_bases = container.get_num_bases()
+        num_copies = container.get_num_copies()
+
+        weights_by_rank_basis_copy = np.asarray(container.get_w_matrices(), dtype=float).reshape(
+            num_ranks, num_bases, num_copies
+        )
+        basis_vectors = np.asarray(container.get_u_matrices(), dtype=float).reshape(num_ranks * num_bases, num_orbitals)
+        identity_weights = np.asarray(container.get_wb_matrix(), dtype=float)
+
+        bilinear_coefficient, bilinear_word = mapping.bilinear(1, 0)
+        # Since n = (I - i gamma_1 gamma_0) / 2, the rotated-Z term has the
+        # opposite sign from the Majorana bilinear.
+        spin_free_coefficient = -float(bilinear_coefficient.real)
+        spin_free_pauli = sparse_pauli_word_to_label(bilinear_word, 1)
+
+        angles = cls._batch_vector_to_givens_angles(basis_vectors)
+        # Each row represents (rank, copy), with one rotated-Z coefficient per basis.
+        basis_coeffs = (
+            np.transpose(weights_by_rank_basis_copy, (0, 2, 1)).reshape(num_ranks * num_copies, num_bases)
+            * spin_free_coefficient
+        )
+        coeffs = np.concatenate([basis_coeffs, identity_weights.reshape(-1, 1)], axis=1).astype(complex)
+
+        # These derived W^(r,c) values enter only the energy shift, not the LCU rows above.
+        rank_copy_weights = identity_weights - weights_by_rank_basis_copy.sum(axis=1)
+        rank_copy_weight_square_sum = float(np.sum(rank_copy_weights**2))
+        return RotatedPaulis(angles, coeffs, (spin_free_pauli,)), rank_copy_weight_square_sum
 
     @staticmethod
     def _batch_vector_to_givens_angles(vectors: np.ndarray) -> np.ndarray:

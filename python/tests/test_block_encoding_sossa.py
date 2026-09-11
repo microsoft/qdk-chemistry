@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import tempfile
+from math import ceil, log2
 from pathlib import Path
 
 import h5py
@@ -16,18 +17,19 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa i
 from qdk_chemistry.data import (
     Configuration,
     ModelOrbitals,
+    QubitOperator,
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata
+from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata, SOSContainer
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
+    SOSSARegisterLayout,
     SOSSASelect,
     SOSSAWalkContainer,
 )
 
-from .reference_tolerances import float_comparison_absolute_tolerance
 from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
 
 
@@ -58,7 +60,14 @@ def _make_sossa_unitary_representation():
     dq_rotation_angles = np.array([[0.3], [0.5]])
     sf_rotation_angles = np.array([[0.1], [0.2], [0.15], [0.25]])
 
-    layout = SOSSABuilder._sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)
+    outer_prep_dim = num_orbitals + num_ranks * num_copies
+    rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
+    layout = SOSSARegisterLayout(
+        outer_prep_bits=ceil(log2(outer_prep_dim)) if outer_prep_dim > 1 else 1,
+        inner_prep_bits=ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1,
+        rank_bits=rank_bits,
+        num_free_rider_bits=2 + rank_bits,
+    )
     num_outer_qubits = layout.outer_prep_bits
 
     # Build outer prepare Wavefunction
@@ -74,6 +83,14 @@ def _make_sossa_unitary_representation():
     outer_prepare = Wavefunction(sv_container)
     inner_prepare = SOSSAInnerPrepare(
         conditional_coefficients=inner_coefficients,
+        free_rider_data=np.array(
+            [
+                [False, False, False],  # D1, rank 0
+                [False, True, False],  # Q1, rank 0
+                [True, True, False],  # SF, rank 0
+                [True, True, True],  # SF, rank 1
+            ]
+        ),
     )
     select = SOSSASelect(
         one_body_rotation_angles=dq_rotation_angles,
@@ -105,6 +122,29 @@ def _make_sossa_unitary_representation():
     return UnitaryRepresentation(container=container)
 
 
+def _assert_sossa_containers_equal(actual: SOSSAWalkContainer, expected: SOSSAWalkContainer) -> None:
+    """Assert equality of every serialized SOSSA walk field."""
+    assert actual.type == expected.type
+    assert actual.power == expected.power
+    assert actual.normalization == pytest.approx(expected.normalization)
+    assert actual.has_lambda_eff == expected.has_lambda_eff
+    assert actual.metadata == expected.metadata
+    assert actual.layout == expected.layout
+
+    np.testing.assert_allclose(actual.outer_prepare.get_coefficients(), expected.outer_prepare.get_coefficients())
+    assert list(actual.outer_prepare.get_active_determinants()) == list(
+        expected.outer_prepare.get_active_determinants()
+    )
+    assert actual.outer_prepare.get_orbitals().num_modes() == expected.outer_prepare.get_orbitals().num_modes()
+    np.testing.assert_allclose(
+        actual.inner_prepare.conditional_coefficients,
+        expected.inner_prepare.conditional_coefficients,
+    )
+    np.testing.assert_array_equal(actual.inner_prepare.free_rider_data, expected.inner_prepare.free_rider_data)
+    np.testing.assert_allclose(actual.select.one_body_rotation_angles, expected.select.one_body_rotation_angles)
+    np.testing.assert_allclose(actual.select.two_body_rotation_angles, expected.select.two_body_rotation_angles)
+
+
 class TestSOSSAWalkContainer:
     """Tests for the SOSSA container serialization."""
 
@@ -116,24 +156,7 @@ class TestSOSSAWalkContainer:
         json_data = container.to_json()
         restored = SOSSAWalkContainer.from_json(json_data)
 
-        assert restored.type == container.type
-        assert restored.power == container.power
-        assert np.isclose(restored.normalization, container.normalization)
-        assert np.allclose(
-            restored.outer_prepare.get_coefficients(),
-            container.outer_prepare.get_coefficients(),
-            atol=float_comparison_absolute_tolerance,
-        )
-        assert np.allclose(
-            restored.inner_prepare.conditional_coefficients,
-            container.inner_prepare.conditional_coefficients,
-            atol=float_comparison_absolute_tolerance,
-        )
-        assert np.allclose(
-            restored.select.one_body_rotation_angles,
-            container.select.one_body_rotation_angles,
-            atol=float_comparison_absolute_tolerance,
-        )
+        _assert_sossa_containers_equal(restored, container)
 
     def test_hdf5_roundtrip(self):
         """Test HDF5 serialization/deserialization round-trip."""
@@ -147,11 +170,7 @@ class TestSOSSAWalkContainer:
             with h5py.File(filepath, "r") as f:
                 restored = SOSSAWalkContainer.from_hdf5(f)
 
-        assert restored.type == container.type
-        assert restored.power == container.power
-        assert np.isclose(restored.normalization, container.normalization)
-        assert np.allclose(restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients())
-        assert np.allclose(restored.select.two_body_rotation_angles, container.select.two_body_rotation_angles)
+        _assert_sossa_containers_equal(restored, container)
 
     def test_unitary_representation_json_dispatch(self):
         """Test that UnitaryRepresentation correctly dispatches SOSSA from JSON."""
@@ -164,20 +183,17 @@ class TestSOSSAWalkContainer:
         assert isinstance(restored.get_container(), SOSSAWalkContainer)
 
     def test_num_qubits_ancilla_excess_is_exactly_the_structural_widths(self):
-        """Pin the identity the generic ancilla fallback depends on."""
+        """Pin every register width for the fixed N=2, R=2, B=1, C=1 fixture."""
         container = _make_sossa_unitary_representation().get_container()
-        meta = container.metadata
-        expected = SOSSABuilder._sossa_register_bits(
-            meta.num_spatial_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies
+        expected_layout = SOSSARegisterLayout(
+            outer_prep_bits=2,
+            inner_prep_bits=1,
+            rank_bits=1,
+            num_free_rider_bits=3,
         )
 
-        # The stored layout is derived data, so pin it against the formula it came from.
-        assert container.layout == expected
-
-        num_system = 2 * meta.num_spatial_orbitals
-        expected_ancilla = expected.outer_prep_bits + expected.inner_prep_bits + expected.num_free_rider_bits + 2
-
-        assert container.num_qubits - num_system == expected_ancilla
+        assert container.layout == expected_layout
+        assert container.num_qubits == 12
 
     def test_lambda_eff_raises_when_no_reference_energy_was_supplied(self):
         """An unset ``lambda_eff`` must announce itself, not masquerade as a number.
@@ -258,14 +274,7 @@ class TestSOSSABuilder:
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
         assert container.normalization > 0
 
-    @pytest.mark.parametrize(
-        ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
-        [(2, 1, 1, 1), (3, 2, 2, 1)],
-        ids=["N2R1B1C1", "N3R2B2C1"],
-    )
-    def test_outer_prepare_amplitudes_encode_the_generator_one_norms(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
+    def test_outer_prepare_amplitudes_encode_hand_calculated_generator_weights(self):
         r"""The outer PREPARE holds :math:`c/\|c\|`, with the scale carried by :math:`\Lambda`.
 
         The SOS block encoding needs amplitudes proportional to the generator one-norms
@@ -274,23 +283,20 @@ class TestSOSSABuilder:
         :math:`\|c\|` survives only in :math:`\Lambda = \frac{1}{2}\sum_{x_o} c_{x_o}^2` --
         which is why the container carries that separately from the amplitudes.
         """
-        fh = create_random_factorized_hamiltonian(
-            num_orbitals=num_orbitals,
-            num_ranks=num_ranks,
-            num_bases=num_bases,
-            num_copies=num_copies,
-        )
-        container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 1, 1, 1))
+        sossa = operator.get_container()
+        sossa.one_body.coeffs[...] = np.array([[1.0, -2.0j], [-3.0, 4.0j]])
+        sossa.two_body.coeffs[...] = np.array([[-5.0, 6.0]])
+
+        container = SOSSABuilder().run(operator).get_container()
 
         amplitudes = np.asarray(container.outer_prepare.get_coefficients(), dtype=float)
+        expected_weights = np.array([3.0 * np.sqrt(2.0), 7.0 * np.sqrt(2.0), 11.0 / np.sqrt(2.0)])
+        expected_normalization = 0.5 * np.sum(expected_weights**2)
+        expected_amplitudes = expected_weights / np.linalg.norm(expected_weights)
 
-        assert np.isclose(np.linalg.norm(amplitudes), 1.0)
-        assert np.all(amplitudes >= 0.0)
-
-        # sum_xo c_xo^2 = 2 Lambda, so the unnormalized coefficients are recovered
-        # from the stored amplitudes by scaling with sqrt(2 Lambda).
-        unnormalized = amplitudes * np.sqrt(2.0 * container.normalization)
-        assert np.isclose(np.sum(unnormalized**2), 2.0 * container.normalization)
+        np.testing.assert_allclose(amplitudes, expected_amplitudes)
+        assert container.normalization == pytest.approx(expected_normalization)
 
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
@@ -324,6 +330,90 @@ class TestSOSSABuilder:
         free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
         rank_bits = free_rider[:, 2:]
         assert not rank_bits.any(), f"one-body free-rider rank bits are not all zero:\n{rank_bits}"
+
+    def test_free_rider_data_encodes_generator_flags_copies_and_nonzero_ranks(self):
+        """Pin D1/Q1/SF flags and little-endian ranks for multiple copies."""
+        source = to_sossa_operator(create_random_factorized_hamiltonian(3, 3, 1, 2)).get_container()
+        operator = QubitOperator(
+            SOSContainer(
+                source.one_body,
+                source.two_body,
+                source.encoding,
+                source.fermion_mode_order,
+                FactorizedHamiltonianMetadata(
+                    num_spatial_orbitals=3,
+                    num_ranks=3,
+                    num_bases=1,
+                    num_copies=2,
+                    num_positive_one_body_terms=1,
+                    energy_shift=source.metadata.energy_shift,
+                ),
+            )
+        )
+
+        container = SOSSABuilder().run(operator).get_container()
+        actual = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)
+        expected = np.array(
+            [
+                [False, False, False, False],  # D1, rank 0
+                [False, True, False, False],  # Q1, rank 0
+                [False, True, False, False],  # Q1, rank 0
+                [True, True, False, False],  # SF, rank 0, copy 0
+                [True, True, False, False],  # SF, rank 0, copy 1
+                [True, True, True, False],  # SF, rank 1, copy 0
+                [True, True, True, False],  # SF, rank 1, copy 1
+                [True, True, False, True],  # SF, rank 2, copy 0
+                [True, True, False, True],  # SF, rank 2, copy 1
+            ],
+            dtype=bool,
+        )
+
+        np.testing.assert_array_equal(actual, expected)
+
+    def test_inner_prepare_uses_signed_square_roots_of_all_spin_free_weights(self):
+        """Inner PREPARE must linearize every SF weight and preserve its SELECT sign."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
+        sossa = operator.get_container()
+        weights = np.array([[4.0, -9.0, 16.0], [-1.0, 0.0, -25.0]])
+        sossa.two_body.coeffs[...] = weights
+
+        container = SOSSABuilder().run(operator).get_container()
+        actual = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[-len(weights) :]
+        expected = np.sign(weights) * np.sqrt(np.abs(weights))
+
+        np.testing.assert_allclose(actual, expected)
+        probabilities = actual**2 / np.sum(actual**2, axis=1, keepdims=True)
+        expected_probabilities = np.abs(weights) / np.sum(np.abs(weights), axis=1, keepdims=True)
+        np.testing.assert_allclose(probabilities, expected_probabilities)
+
+    def test_two_body_rotation_angles_are_padded_in_basis_major_order(self):
+        """The QROM table must be basis-major with one trailing identity block."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
+        sossa = operator.get_container()
+        sf_angles = np.array(
+            [
+                [0.0, 0.1],  # rank 0, basis 0
+                [1.0, 1.1],  # rank 0, basis 1
+                [2.0, 2.1],  # rank 1, basis 0
+                [3.0, 3.1],  # rank 1, basis 1
+            ]
+        )
+        sossa.two_body.angles[...] = sf_angles
+
+        container = SOSSABuilder().run(operator).get_container()
+        actual = container.select.two_body_rotation_angles
+
+        expected = np.array(
+            [
+                [0.0, 0.1],
+                [2.0, 2.1],
+                [1.0, 1.1],
+                [3.0, 3.1],
+                [0.0, 0.0],
+                [0.0, 0.0],
+            ]
+        )
+        np.testing.assert_array_equal(actual, expected)
 
     def test_lambda_eff_at_band_centre_equals_the_normalization(self):
         r"""At the middle of the band, :math:`\lambda_{\text{eff}}` must collapse to :math:`\Lambda`.

@@ -151,26 +151,6 @@ class SOSSAMapper(CircuitMapper):
             QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp(free_rider_data),
         )
 
-    def _inner_sign_qubit_index(self, container: SOSSAWalkContainer) -> int:
-        r"""Index within ``innerReg`` of the qubit carrying the sign of the sampled ``(x_o, b)``.
-
-        SELECT applies :math:`(-1)^s` by phasing this qubit, so where it sits is a property
-        of the inner PREPARE backend: the alias-sampling oracle emits it as the last-but-one
-        word of its QROM output, and the direct oracle writes it just past the index register.
-
-        Args:
-            container: The SOSSA walk container describing the block encoding.
-
-        Returns:
-            The index into the inner register.
-
-        """
-        inner_prep_bits = container.layout.inner_prep_bits
-        if self._settings.get("inner_prepare_algorithm") == "controlled_alias_sampling":
-            mu = self._settings.get("coefficient_bit_precision")
-            return 2 * inner_prep_bits + 2 * mu + 1
-        return inner_prep_bits
-
     def _build_select(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the SELECT step.
 
@@ -186,6 +166,11 @@ class SOSSAMapper(CircuitMapper):
 
         meta = container.metadata
         num_free_rider_bits = container.layout.num_free_rider_bits
+        inner_prep_bits = container.layout.inner_prep_bits
+        if self._settings.get("inner_prepare_algorithm") == "controlled_alias_sampling":
+            sign_qubit_index = 2 * inner_prep_bits + 2 * self._settings.get("coefficient_bit_precision") + 1
+        else:
+            sign_qubit_index = inner_prep_bits
 
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
@@ -197,37 +182,11 @@ class SOSSAMapper(CircuitMapper):
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
             "numFreeRiderBits": num_free_rider_bits,
-            "signQubitIndex": self._inner_sign_qubit_index(container),
+            "signQubitIndex": sign_qubit_index,
         }
         if algorithm == "qrom_phase_gradient":
             return QSHARP_UTILS.SOSSAWalk.MakeSelectPhaseGradient(select_data)
         return QSHARP_UTILS.SOSSAWalk.MakeSelectDirectRotation(select_data)
-
-    @property
-    def _num_phase_gradient_qubits(self) -> int:
-        """Width of the persistent phase gradient register, zero when none is needed.
-
-        Raises:
-            ValueError: If the outer PREPARE and SELECT ask for different widths.
-
-        """
-        outer_ref: AlgorithmRef = self._settings.get("outer_prepare")
-        outer_bits = (
-            int(self._create_nested("outer_prepare").settings().get("rotation_bit_precision"))
-            if outer_ref.algorithm_name == "qrom"
-            else 0
-        )
-        select_bits = (
-            int(self._settings.get("rotation_bit_precision"))
-            if self._settings.get("select_algorithm") == "qrom_phase_gradient"
-            else 0
-        )
-        if outer_bits and select_bits and outer_bits != select_bits:
-            raise ValueError(
-                "The outer PREPARE and SELECT share one phase gradient register and must agree "
-                f"on its width. Now, the outer PREPARE: {outer_bits} and SELECT: {select_bits}."
-            )
-        return max(outer_bits, select_bits)
 
     def _compute_register_sizes(self, container: SOSSAWalkContainer) -> tuple[dict[str, int], Any]:
         """Compute the register widths and the Q# ``SOSSAWalkLayout`` describing them.
@@ -264,7 +223,22 @@ class SOSSAMapper(CircuitMapper):
             num_inner_qubits = inner_prep_bits + 1 + num_free_rider_bits
             num_reflect_inner = inner_prep_bits
 
-        num_phase_gradient_qubits = self._num_phase_gradient_qubits
+        outer_gradient_bits = (
+            int(self._create_nested("outer_prepare").settings().get("rotation_bit_precision"))
+            if outer_ref.algorithm_name == "qrom"
+            else 0
+        )
+        select_gradient_bits = (
+            int(self._settings.get("rotation_bit_precision"))
+            if self._settings.get("select_algorithm") == "qrom_phase_gradient"
+            else 0
+        )
+        if outer_gradient_bits and select_gradient_bits and outer_gradient_bits != select_gradient_bits:
+            raise ValueError(
+                "The outer PREPARE and SELECT share one phase gradient register and must agree "
+                f"on its width. Now, the outer PREPARE: {outer_gradient_bits} and SELECT: {select_gradient_bits}."
+            )
+        num_phase_gradient_qubits = max(outer_gradient_bits, select_gradient_bits)
         num_spin_qubits = 2  # spinDQ + spinSF, matches Q# SOSSAWalk.qs
 
         regs = {
@@ -290,42 +264,6 @@ class SOSSAMapper(CircuitMapper):
             numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
         )
         return regs, walk_layout
-
-    def _build_walk_oracles(self, container: SOSSAWalkContainer, regs: dict[str, int]) -> tuple[Any, Any, Any, Any]:
-        """Build the outer PREPARE, free-rider load, inner PREPARE and SELECT of the block encoding.
-
-        Raises:
-            ValueError: If the outer PREPARE circuit declares a different phase gradient
-                width than the walk layout reserves for it.
-
-        """
-        outer_prepare_op, outer_gradient_qubits = self._build_outer_prep(container)
-        reserved = regs["num_outer_prepare_gradient_qubits"]
-        if outer_gradient_qubits != reserved:
-            raise ValueError(
-                f"The outer PREPARE circuit declares {outer_gradient_qubits} phase gradient ancillas "
-                f"but the walk layout reserves {reserved} for it."
-            )
-        inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
-        return (
-            outer_prepare_op,
-            free_rider_op,
-            inner_prepare_op,
-            self._build_select(container),
-        )
-
-    def _num_ancilla_qubits(self, container: SOSSAWalkContainer) -> int:
-        """Ancilla qubits the block encoding acts on, past the system register.
-
-        Args:
-            container: The SOSSA walk container describing the block encoding.
-
-        Returns:
-            The width of the ancilla part of the ``[system | ancilla]`` register.
-
-        """
-        regs, _ = self._compute_register_sizes(container)
-        return regs["num_ancilla_qubits"]
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the SOSSA block encoding on the flat ``[system | ancilla]`` register.
@@ -356,7 +294,15 @@ class SOSSAMapper(CircuitMapper):
             Logger.warn(f"The container's walk power {container.power} is ignored.")
 
         regs, walk_layout = self._compute_register_sizes(container)
-        outer_prepare_op, free_rider_op, inner_prepare_op, select_op = self._build_walk_oracles(container, regs)
+        outer_prepare_op, outer_gradient_qubits = self._build_outer_prep(container)
+        reserved = regs["num_outer_prepare_gradient_qubits"]
+        if outer_gradient_qubits != reserved:
+            raise ValueError(
+                f"The outer PREPARE circuit declares {outer_gradient_qubits} phase gradient ancillas "
+                f"but the walk layout reserves {reserved} for it."
+            )
+        inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
+        select_op = self._build_select(container)
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingCircuit,
