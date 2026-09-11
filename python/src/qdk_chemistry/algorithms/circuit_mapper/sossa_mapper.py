@@ -111,7 +111,7 @@ class SOSSAMapper(CircuitMapper):
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op, circuit.metadata.num_phase_gradient_ancillas  # noqa: SLF001
 
-    def _hoist_free_rider(self, container: SOSSAWalkContainer) -> bool:
+    def _loads_free_rider_separately(self, container: SOSSAWalkContainer) -> bool:
         r"""Whether the free-rider word is loaded once per block encoding rather than per PREPARE.
 
         Args:
@@ -142,7 +142,7 @@ class SOSSAMapper(CircuitMapper):
         r"""Build the Q# inner (controlled) PREPARE callable.
 
         Creates a superposition over bases :math:`b` conditioned on :math:`x_o`. The
-        free-rider word is loaded here only when ``_hoist_free_rider`` says otherwise.
+        free-rider word is loaded here only when ``_loads_free_rider_separately`` says otherwise.
 
         Algorithms:
             - ``"controlled_alias_sampling"``: 2D alias sampling.
@@ -162,7 +162,7 @@ class SOSSAMapper(CircuitMapper):
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
-            inline = [] if self._hoist_free_rider(container) else free_rider_data
+            inline = [] if self._loads_free_rider_separately(container) else free_rider_data
             return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, inline, coeff_bits)
         return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data)
 
@@ -177,7 +177,7 @@ class SOSSAMapper(CircuitMapper):
             PREPARE carries the word itself.
 
         """
-        if not self._hoist_free_rider(container):
+        if not self._loads_free_rider_separately(container):
             return QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp([])
         free_rider_data = container.inner_prepare.free_rider_data
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []

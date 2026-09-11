@@ -39,8 +39,8 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
         r"""Initialize SOSSASettings with default values.
 
         Attributes:
-            ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`.
-            energy_gap: Reference gap :math:`E_{\text{gap}}` above the sum-of-squares shift.
+            reference_ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`.
+            reference_energy_gap: Reference gap :math:`E_{\text{gap}}` above the sum-of-squares shift.
 
         Both default to NaN, meaning unset. They are alternative ways to state the same
         reference point and are mutually exclusive; ``_resolve_lambda_eff`` turns whichever
@@ -49,28 +49,28 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
         """
         super().__init__()
         self._set_default(
-            "ground_state_energy",
+            "reference_ground_state_energy",
             "float",
             nan,
             "Reference total ground-state energy E_gs, including the core/nuclear contribution, "
             "on the same convention as the sum-of-squares shift. Used only to derive lambda_eff. "
-            "NaN leaves lambda_eff unset. Mutually exclusive with 'energy_gap'.",
+            "NaN leaves lambda_eff unset. Mutually exclusive with 'reference_energy_gap'.",
         )
         self._set_default(
-            "energy_gap",
+            "reference_energy_gap",
             "float",
             nan,
             "Reference energy gap E_gap = E_gs - E_SOS, the ground-state energy measured from the "
             "sum-of-squares shift. Used only to derive lambda_eff. NaN leaves lambda_eff unset. "
-            "Mutually exclusive with 'ground_state_energy'.",
+            "Mutually exclusive with 'reference_ground_state_energy'.",
         )
 
 
 def _resolve_lambda_eff(
     normalization: float,
     energy_shift: float,
-    ground_state_energy: float,
-    energy_gap: float,
+    reference_ground_state_energy: float,
+    reference_energy_gap: float,
 ) -> float | None:
     r"""Derive :math:`\lambda_{\text{eff}}` from whichever reference energy was supplied.
 
@@ -87,8 +87,8 @@ def _resolve_lambda_eff(
     Args:
         normalization: Block-encoding normalization :math:`\Lambda`.
         energy_shift: The sum-of-squares shift :math:`E_{\text{SOS}}` (includes core energy).
-        ground_state_energy: Total :math:`E_{\text{gs}}`, or NaN when unset.
-        energy_gap: :math:`E_{\text{gap}}`, or NaN when unset.
+        reference_ground_state_energy: Total :math:`E_{\text{gs}}`, or NaN when unset.
+        reference_energy_gap: :math:`E_{\text{gap}}`, or NaN when unset.
 
     Returns:
         The effective normalization, or ``None`` when neither reference energy was supplied.
@@ -99,23 +99,27 @@ def _resolve_lambda_eff(
             :math:`\lambda_{\text{eff}}` is undefined.
 
     """
-    has_energy = not isnan(ground_state_energy)
-    has_gap = not isnan(energy_gap)
+    has_energy = not isnan(reference_ground_state_energy)
+    has_gap = not isnan(reference_energy_gap)
     if has_energy and has_gap:
         raise ValueError(
-            f"the SOSSA builder accepts 'ground_state_energy' or 'energy_gap', not both; got "
-            f"ground_state_energy={ground_state_energy!r} and energy_gap={energy_gap!r}"
+            f"the SOSSA builder accepts 'reference_ground_state_energy' or 'reference_energy_gap', not both; got "
+            f"reference_ground_state_energy={reference_ground_state_energy!r} and "
+            f"reference_energy_gap={reference_energy_gap!r}"
         )
     if not has_energy and not has_gap:
         return None
 
-    gap = energy_gap if has_gap else ground_state_energy - energy_shift
+    gap = reference_energy_gap if has_gap else reference_ground_state_energy - energy_shift
     two_lambda = 2.0 * normalization
     if not 0.0 < gap < two_lambda:
         source = (
-            f"energy_gap {energy_gap!r}"
+            f"reference_energy_gap {reference_energy_gap!r}"
             if has_gap
-            else f"ground_state_energy {ground_state_energy!r} relative to the sum-of-squares shift {energy_shift!r}"
+            else (
+                f"reference_ground_state_energy {reference_ground_state_energy!r} relative to the "
+                f"sum-of-squares shift {energy_shift!r}"
+            )
         )
         raise ValueError(
             f"{source} gives an energy gap of {gap!r}, outside the representable window "
@@ -130,27 +134,27 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     def __init__(
         self,
         power: int = 1,
-        ground_state_energy: float = nan,
-        energy_gap: float = nan,
+        reference_ground_state_energy: float = nan,
+        reference_energy_gap: float = nan,
     ):
         r"""Initialize the SOSSA builder.
 
         Args:
             power: The power to raise the walk operator to. Defaults to 1.
-            ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`,
+            reference_ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`,
                 including the core/nuclear contribution, used to derive
                 :attr:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSAWalkContainer.lambda_eff`.
                 Defaults to NaN, which leaves ``lambda_eff`` unset. Mutually exclusive with
-                ``energy_gap``.
-            energy_gap: Reference gap :math:`E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}`,
-                an alternative to ``ground_state_energy`` for the same purpose. Defaults to NaN.
+                ``reference_energy_gap``.
+            reference_energy_gap: Reference gap :math:`E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}`,
+                an alternative to ``reference_ground_state_energy`` for the same purpose. Defaults to NaN.
 
         """
         super().__init__()
         self._settings = SOSSASettings()
         self._settings.set("power", power)
-        self._settings.set("ground_state_energy", ground_state_energy)
-        self._settings.set("energy_gap", energy_gap)
+        self._settings.set("reference_ground_state_energy", reference_ground_state_energy)
+        self._settings.set("reference_energy_gap", reference_energy_gap)
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Build the SOSSA block encoding from qubit operator.
@@ -179,8 +183,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         lambda_eff = _resolve_lambda_eff(
             normalization,
             meta.energy_shift,
-            self._settings.get("ground_state_energy"),
-            self._settings.get("energy_gap"),
+            self._settings.get("reference_ground_state_energy"),
+            self._settings.get("reference_energy_gap"),
         )
 
         one_body_rotation_angles = sossa.one_body.angles

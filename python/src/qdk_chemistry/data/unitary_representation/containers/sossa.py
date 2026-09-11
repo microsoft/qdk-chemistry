@@ -239,7 +239,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
         The value is computed once by the SOSSA block-encoding builder, which needs a
         reference energy it cannot derive from the factorization itself. Supply one via
-        the builder's ``ground_state_energy`` or ``energy_gap`` setting.
+        the builder's ``reference_ground_state_energy`` or ``reference_energy_gap`` setting.
 
         Returns:
             float: The effective normalization :math:`\lambda_{\text{eff}}`.
@@ -253,8 +253,8 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             raise ValueError(
                 "lambda_eff is unset for this SOSSA walk: it needs a reference energy that the "
                 "factorization does not carry. Rebuild the block encoding with the SOSSA builder's "
-                "'ground_state_energy' setting (a total energy, on the same convention as "
-                "metadata.energy_shift) or its 'energy_gap' setting."
+                "'reference_ground_state_energy' setting (a total energy, on the same convention as "
+                "metadata.energy_shift) or its 'reference_energy_gap' setting."
             )
         return self._lambda_eff
 

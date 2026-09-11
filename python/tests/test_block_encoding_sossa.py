@@ -337,7 +337,7 @@ class TestSOSSABuilder:
         operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
         lam = SOSSABuilder().run(operator).get_container().normalization
 
-        container = SOSSABuilder(energy_gap=lam).run(operator).get_container()
+        container = SOSSABuilder(reference_energy_gap=lam).run(operator).get_container()
 
         assert container.lambda_eff == pytest.approx(lam, abs=1e-12)
         # Discriminate against the two plausible wrong forms at the same point.
@@ -353,8 +353,8 @@ class TestSOSSABuilder:
         operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
         lam = SOSSABuilder().run(operator).get_container().normalization
 
-        low = SOSSABuilder(energy_gap=0.25 * lam).run(operator).get_container().lambda_eff
-        high = SOSSABuilder(energy_gap=1.75 * lam).run(operator).get_container().lambda_eff
+        low = SOSSABuilder(reference_energy_gap=0.25 * lam).run(operator).get_container().lambda_eff
+        high = SOSSABuilder(reference_energy_gap=1.75 * lam).run(operator).get_container().lambda_eff
 
         assert low == pytest.approx(high, abs=1e-12)
         # Guard against the degenerate pass where both sides are the band-centre value.
@@ -363,7 +363,7 @@ class TestSOSSABuilder:
     def test_ground_state_energy_and_energy_gap_agree_through_the_shift(self):
         r"""The two settings must be the same statement of the same reference point.
 
-        ``energy_gap`` is :math:`E_{\text{gs}} - E_{\text{SOS}}`, so supplying either one
+        ``reference_energy_gap`` is :math:`E_{\text{gs}} - E_{\text{SOS}}`, so supplying either one
         has to land on an identical :math:`\lambda_{\text{eff}}`. Only the builder knows
         ``energy_shift``, which is why it offers both spellings rather than making every
         caller do the subtraction. A sign slip in that conversion would pass a test that
@@ -375,8 +375,8 @@ class TestSOSSABuilder:
         gap = 0.4 * probe.normalization
         assert shift != 0.0, "a zero shift would make this conversion check vacuous"
 
-        from_gap = SOSSABuilder(energy_gap=gap).run(operator).get_container().lambda_eff
-        from_energy = SOSSABuilder(ground_state_energy=shift + gap).run(operator).get_container().lambda_eff
+        from_gap = SOSSABuilder(reference_energy_gap=gap).run(operator).get_container().lambda_eff
+        from_energy = SOSSABuilder(reference_ground_state_energy=shift + gap).run(operator).get_container().lambda_eff
 
         assert from_energy == pytest.approx(from_gap, abs=1e-12)
 
@@ -389,10 +389,10 @@ class TestSOSSABuilder:
             except ValueError:
                 return None
 
-        assert lambda_eff_or_none(ground_state_energy=gap) != from_gap
+        assert lambda_eff_or_none(reference_ground_state_energy=gap) != from_gap
 
     def test_supplying_both_reference_energies_is_rejected(self):
-        """``ground_state_energy`` and ``energy_gap`` are two spellings of one input.
+        """``reference_ground_state_energy`` and ``reference_energy_gap`` are two spellings of one input.
 
         Honouring one and ignoring the other would let a caller believe a reference energy
         took effect when it silently did not.
@@ -401,7 +401,7 @@ class TestSOSSABuilder:
         lam = SOSSABuilder().run(operator).get_container().normalization
 
         with pytest.raises(ValueError, match="not both"):
-            SOSSABuilder(ground_state_energy=0.0, energy_gap=lam).run(operator)
+            SOSSABuilder(reference_ground_state_energy=0.0, reference_energy_gap=lam).run(operator)
 
     @pytest.mark.parametrize(
         "gap_fraction",
@@ -422,7 +422,7 @@ class TestSOSSABuilder:
         lam = SOSSABuilder().run(operator).get_container().normalization
 
         with pytest.raises(ValueError, match="outside the representable window"):
-            SOSSABuilder(energy_gap=gap_fraction * lam).run(operator)
+            SOSSABuilder(reference_energy_gap=gap_fraction * lam).run(operator)
 
     def test_omitting_the_reference_energy_still_builds_the_block_encoding(self):
         """The circuit never consumes ``lambda_eff``, so it must not be required to build one.

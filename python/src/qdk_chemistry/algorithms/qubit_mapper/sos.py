@@ -15,7 +15,6 @@ from qdk_chemistry.data.qubit_operator.containers.sos import (
     RotatedPaulis,
     SOSContainer,
 )
-from qdk_chemistry.utils import Logger
 
 __all__ = ["SOSQubitMapper", "SOSQubitMapperSettings"]
 
@@ -48,8 +47,22 @@ class SOSQubitMapper(QubitMapper):
         """Return the algorithm variant name."""
         return "sos"
 
-    def _run_impl(self, hamiltonian: Hamiltonian, _mapping: MajoranaMapping) -> QubitOperator:
-        """Convert a factorized Hamiltonian to a structured SOS qubit operator."""
+    def _run_impl(self, hamiltonian: Hamiltonian, mapping: MajoranaMapping) -> QubitOperator:
+        """Convert a factorized Hamiltonian to a structured SOS qubit operator.
+
+        Args:
+            hamiltonian: The factorized Hamiltonian to map.
+            mapping: The Majorana mapping to encode under. Must be an untapered
+                Jordan-Wigner mapping over the Hamiltonian's spin orbitals.
+
+        Returns:
+            The sum-of-squares qubit operator.
+
+        Raises:
+            TypeError: If the Hamiltonian is not backed by a factorized container.
+            ValueError: If the mapping is not one this construction can honour.
+
+        """
         if not isinstance(hamiltonian, Hamiltonian):
             raise TypeError("SOSQubitMapper requires a Hamiltonian")
 
@@ -57,10 +70,38 @@ class SOSQubitMapper(QubitMapper):
         if not isinstance(container, FactorizedHamiltonianContainer):
             raise TypeError("SOSQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
 
-        Logger.warn("SOSQubitMapper ignores the provided mapping and uses a single-mode Jordan-Wigner encoding")
+        self._validate_mapping(mapping, container.get_num_orbitals())
         return self._map_factorized_container(
             container, MajoranaMapping.jordan_wigner(1), float(self._settings.get("threshold"))
         )
+
+    @staticmethod
+    def _validate_mapping(mapping: MajoranaMapping, num_orbitals: int) -> None:
+        """Reject a mapping this construction cannot honour, rather than silently substituting one.
+
+        The generators are rotated single-mode Paulis whose Jordan-Wigner strings the
+        SOSSA walk applies implicitly, so the construction is fixed to blocked
+        Jordan-Wigner over ``2 * num_orbitals`` modes. Anything else would produce an
+        operator that does not encode what the caller asked for.
+
+        Args:
+            mapping: The mapping supplied by the caller.
+            num_orbitals: Number of spatial orbitals in the Hamiltonian.
+
+        Raises:
+            ValueError: If the encoding, mode count, or tapering is unsupported.
+
+        """
+        if mapping.name != "jordan-wigner":
+            raise ValueError(f"SOSQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}")
+        num_modes = 2 * num_orbitals
+        if mapping.num_modes != num_modes:
+            raise ValueError(
+                f"SOSQubitMapper requires a mapping over the Hamiltonian's {num_modes} spin orbitals; "
+                f"got one over {mapping.num_modes}"
+            )
+        if mapping.tapering is not None:
+            raise ValueError("SOSQubitMapper does not support tapered mappings")
 
     @classmethod
     def _map_factorized_container(
@@ -104,12 +145,6 @@ class SOSQubitMapper(QubitMapper):
         # two-term LCU sqrt(|lambda|) * (X +/- iY)/2 on the single transformed spin orbital, sharing
         # the generator's Givens rotation (length N-1). The +iY sign marks D1 and -iY marks Q1; the
         # builder scales the one-norm by sqrt(2) for the two spin channels when forming outer coeffs.
-        #
-        # Every one of the N modes keeps a slot, screened ones included. The register layout
-        # reserves N one-body slots (``SOSSABuilder._sossa_register_bits``), so dropping a mode
-        # would slide every spin-free index down and decode it as a one-body generator of the
-        # wrong rank. A screened mode instead rides along with sqrt(lambda) = 0, which gives it
-        # zero amplitude in the outer PREPARE and so no effect on the block encoding.
         pos_mask = eigenvalues > threshold
         neg_mask = eigenvalues < -threshold
         screened_mask = ~(pos_mask | neg_mask)

@@ -163,11 +163,7 @@ def _one_body_block(h1: np.ndarray):
 
 
 def test_screened_one_body_modes_keep_their_outer_register_slot() -> None:
-    """A vanishing eigenvalue stays a generator carrying no amplitude.
-
-    The register layout reserves one outer slot per spatial orbital, so a dropped mode would
-    slide every spin-free index down and decode it as a one-body generator of the wrong rank.
-    """
+    """A vanishing eigenvalue stays a generator carrying no amplitude."""
     n = 3
     basis, _ = np.linalg.qr(np.random.default_rng(1).standard_normal((n, n)))
     h1 = basis @ np.diag([1.5, -0.7, 0.3]) @ basis.T
@@ -185,12 +181,7 @@ def test_screened_one_body_modes_keep_their_outer_register_slot() -> None:
 
 
 def test_nullspace_noise_does_not_become_a_generator() -> None:
-    """Eigensolver noise below the threshold carries no amplitude, so it cannot ride a random eigenvector.
-
-    A payload that is purely two-body leaves ``h1'`` at the level of rounding error, whose
-    eigenvectors are arbitrary. Screening keeps those modes at zero amplitude instead of
-    turning each into a generator with a meaningless Givens rotation.
-    """
+    """Eigensolver noise below the threshold carries no amplitude, so it cannot ride a random eigenvector."""
     n = 3
     # h1' is h1 plus a two-body correction, so negating the correction leaves only rounding error.
     correction = np.asarray(_factorized_with_one_body(np.zeros((n, n))).get_h1_prime(), dtype=float)
@@ -200,6 +191,23 @@ def test_nullspace_noise_does_not_become_a_generator() -> None:
     assert np.abs(spectrum).max() < 1e-12, "fixture is meant to leave h1' at rounding error"
     assert container.one_body.angles.shape == (n, n - 1)
     np.testing.assert_array_equal(np.abs(container.one_body.coeffs).sum(axis=1), np.zeros(n))
+
+
+@pytest.mark.parametrize(
+    ("mapping", "match"),
+    [
+        (MajoranaMapping.bravyi_kitaev(4), "jordan-wigner"),
+        (MajoranaMapping.parity(4), "jordan-wigner"),
+        (MajoranaMapping.jordan_wigner(2), "spin orbitals"),
+        (MajoranaMapping.jordan_wigner(8), "spin orbitals"),
+    ],
+)
+def test_rejects_a_mapping_it_cannot_honour(mapping, match) -> None:
+    """An unsupported encoding or mode count fails rather than being silently replaced."""
+    factorized = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1)
+
+    with pytest.raises(ValueError, match=match):
+        SOSQubitMapper().run(Hamiltonian(factorized), mapping)
 
 
 def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:

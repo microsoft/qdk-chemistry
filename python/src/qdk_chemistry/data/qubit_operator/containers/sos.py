@@ -24,13 +24,7 @@ __all__ = ["FactorizedHamiltonianMetadata", "RotatedPaulis", "SOSContainer"]
 
 
 def _complex_block_to_json(coeffs: np.ndarray) -> dict[str, Any]:
-    """Serialize a complex coefficient array as split real/imaginary lists plus its shape.
-
-    The shape is carried because ``tolist`` flattens an empty block: a ``(0, B + 1)``
-    array and a ``(0, N - 1)`` one both write ``[]``, so without it an operator with no
-    generators reloads with rank-1 blocks that no longer satisfy the container's own
-    shape checks.
-    """
+    """Serialize a complex coefficient array as split real/imaginary lists plus its shape."""
     arr = np.asarray(coeffs, dtype=complex)
     return {"real": arr.real.tolist(), "imag": arr.imag.tolist(), "shape": list(arr.shape)}
 
@@ -43,7 +37,7 @@ def _complex_block_from_json(data: dict[str, Any]) -> np.ndarray:
 
 
 def _real_block_to_json(values: np.ndarray) -> dict[str, Any]:
-    """Serialize a real array as nested lists plus its shape, for the same reason."""
+    """Serialize a real array as nested lists plus its shape."""
     arr = np.asarray(values, dtype=float)
     return {"values": arr.tolist(), "shape": list(arr.shape)}
 

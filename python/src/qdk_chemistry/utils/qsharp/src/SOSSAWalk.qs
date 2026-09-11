@@ -48,17 +48,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // Free-rider load costing
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Toffoli cost of a plain `Select` over `numData` entries plus its measurement erasure.
-    internal function SelectRoundTripCost(numData : Int) : Int {
-        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
-        (numData - 2) + 2^((addressBits + 1) / 2) + 2^(addressBits / 2) - (addressBits + 2)
-    }
-
     /// Whether a per-condition word is cheaper loaded on its own than carried in a 2D table.
     ///
     /// Carrying it widens the QROAM output, which the swap network is charged for on each of
     /// `numLoads` lookups; loading it separately costs one `Select` round trip over the
-    /// conditions but also frees the table to pick a different swap width. Neither dominates
+    /// conditions -- a one-entry-wide, one-bit 2D lookup, which is what the SelectSwapCost2D
+    /// call below costs -- but also frees the table to pick a different swap width. Neither dominates
     /// -- at small condition counts the separate load is not worth it -- so compare the totals
     /// rather than guessing from the swap width alone.
     function SeparateWordLoadPays(
@@ -78,7 +73,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             numInnerSlots,
             numWordBits,
             true
-        ) + SelectRoundTripCost(numConditions);
+        ) + SelectSwapCost2D(0, numConditions, 1, 1, true);
         separateCost < inlineCost
     }
 
@@ -148,13 +143,28 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         layout.numInnerQubits - layout.numReflectInner
     }
 
+    /// Index at which each register starts, followed by the end of the last one.
+    ///
+    /// The register order lives here alone: `SOSSAWalkAncillaCount` and
+    /// `SplitSOSSAWalkRegisters` both read it, so a change to the layout cannot leave the
+    /// count and the slicing disagreeing.
+    /// Returns `[outerStart, innerStart, spinStart, gradientStart, gradientEnd]`.
+    internal function SOSSAWalkRegisterBounds(layout : SOSSAWalkLayout) : Int[] {
+        let outerStart = layout.numSystemQubits;
+        let innerStart = outerStart + layout.numOuterQubits;
+        let spinStart = innerStart + layout.numReflectInner;
+        let gradientStart = spinStart + NumSOSSASpinQubits();
+        [outerStart, innerStart, spinStart, gradientStart, gradientStart + layout.numPhaseGradientQubits]
+    }
+
     /// Number of block-encoding ancillas (everything except the system register).
     ///
     /// The reflected ancillas come first and the persistent phase gradient last, so a caller
     /// reflects about `SOSSAWalkAncillaCount(layout) - layout.numPhaseGradientQubits` qubits
     /// starting at `layout.numSystemQubits`.
     function SOSSAWalkAncillaCount(layout : SOSSAWalkLayout) : Int {
-        layout.numOuterQubits + layout.numReflectInner + NumSOSSASpinQubits() + layout.numPhaseGradientQubits
+        let bounds = SOSSAWalkRegisterBounds(layout);
+        bounds[4] - bounds[0]
     }
 
     /// Slice a flat target register into the SOSSA block-encoding registers.
@@ -162,17 +172,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// `innerReg` is only the reflected prefix; `SOSSABlockEncodingOnRegister` appends the
     /// scratch it allocates before handing the register to the inner PREPARE and SELECT.
     function SplitSOSSAWalkRegisters(layout : SOSSAWalkLayout, allQubits : Qubit[]) : SOSSAWalkRegisters {
-        let outerStart = layout.numSystemQubits;
-        let innerStart = outerStart + layout.numOuterQubits;
-        let spinStart = innerStart + layout.numReflectInner;
-        let gradientStart = spinStart + NumSOSSASpinQubits();
+        let bounds = SOSSAWalkRegisterBounds(layout);
+        let outerStart = bounds[0];
+        let innerStart = bounds[1];
+        let spinStart = bounds[2];
+        let gradientStart = bounds[3];
         new SOSSAWalkRegisters {
             systemReg = allQubits[0..outerStart - 1],
             outerReg = allQubits[outerStart..innerStart - 1],
             innerReg = allQubits[innerStart..spinStart - 1],
             spinReg = allQubits[spinStart..gradientStart - 1],
-            phaseGradientReg = if layout.numPhaseGradientQubits > 0 {
-                allQubits[gradientStart..gradientStart + layout.numPhaseGradientQubits - 1]
+            phaseGradientReg = if bounds[4] > gradientStart {
+                allQubits[gradientStart..bounds[4] - 1]
             } else {
                 []
             }
@@ -781,7 +792,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build an inner PREPARE using direct controlled preparation.
     /// Prepares the b superposition via controlled PreparePureStateD. The free-rider word is
-    /// loaded by `MakeFreeRiderLoadOp`, hoisted out of the block encoding's inner loop.
+    /// loaded by `MakeFreeRiderLoadOp`, once per block encoding rather than on every inner
+    /// PREPARE call.
     function MakeInnerPrepareDirect(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][]

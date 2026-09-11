@@ -804,7 +804,7 @@ class TestSOSSAQPEIntegration:
            ``H_gap`` in NumPy, while the builder itself only ever sees the *physical*
            ground-state energy and subtracts ``energy_shift``. The two routes to
            ``E_gap`` share no code, so this simultaneously pins the shift convention:
-           ``ground_state_energy`` must be a total energy, core included.
+           ``reference_ground_state_energy`` must be a total energy, core included.
         2. Against the derivative of :meth:`SOSSAWalkContainer.eigenvalue_from_phase`,
            which is what actually converts a phase estimate into an energy. Because
            :math:`E(\varphi) = \Lambda(1 + \cos 2\pi\varphi) + E_{\text{SOS}}`,
@@ -838,10 +838,12 @@ class TestSOSSAQPEIntegration:
         # The builder's only extra input: the physical ground-state energy, core included.
         h_physical = _build_physical_hamiltonian_matrix(data["h1"], data["basis_vectors"], data["two_body_weights"])
         physical_energy, _ = _get_ground_state_and_energy(h_physical, n_orb, nalpha=1, nbeta=1)
-        ground_state_energy = physical_energy + core_energy
+        reference_ground_state_energy = physical_energy + core_energy
 
         operator = to_sossa_operator(fh)
-        container = SOSSABuilder(ground_state_energy=ground_state_energy).run(operator).get_container()
+        container = (
+            SOSSABuilder(reference_ground_state_energy=reference_ground_state_energy).run(operator).get_container()
+        )
         lambda_eff = container.lambda_eff
 
         # (1) Reference from an independently diagonalized H_gap.
@@ -869,7 +871,7 @@ class TestSOSSAQPEIntegration:
         # The core-energy convention is load-bearing, not decorative: the active-space
         # energy sits a full core below the shift, so it must be rejected outright.
         with pytest.raises(ValueError, match="outside the representable window"):
-            SOSSABuilder(ground_state_energy=physical_energy).run(operator)
+            SOSSABuilder(reference_ground_state_energy=physical_energy).run(operator)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -949,13 +951,6 @@ class TestSOSSAResourceEstimation:
         backwards then took it from 37,873,827 to 31,837,599, a 15.9% cut over the whole
         estimate. The qubit count is unchanged: the erasure's phase-fixup ancillas fit
         inside the peak the rest of the walk already sets.
-
-        The figure is asserted to 1% rather than exactly. It is a whole-walk total over
-        10,162 queries, so any costing change anywhere moves it -- it was re-pinned twice
-        while this branch was in review -- and an exact pin cannot tell a regression from
-        an improvement. A 1% band still catches swings of the size seen here (5.3% and
-        15.9%). The per-PREPARE pins in ``test_state_preparation_alias.py`` stay exact:
-        they snapshot one oracle, which is a far smaller and more stable surface.
         """
         circuit = _sossa_unary_qpe_circuit(
             10_162,
