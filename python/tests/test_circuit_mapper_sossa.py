@@ -25,6 +25,21 @@ def _reverse_bits(x: int, n: int) -> int:
     return int(format(x, f"0{n}b")[::-1], 2)
 
 
+def _block_encoding_action(circuit: Circuit, num_system_qubits: int, system_state: np.ndarray) -> np.ndarray:
+    r"""Apply a block encoding and project its ancillas back onto :math:`|0\rangle`."""
+    assert circuit.num_qubits is not None
+    assert circuit._qsharp_op is not None
+    num_qubits = circuit.num_qubits
+    stride = 2 ** (num_qubits - num_system_qubits)
+    dimension = 2**num_system_qubits
+    initial_state = [0.0] * ((dimension - 1) * stride + 1)
+    for index, amplitude in enumerate(system_state):
+        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
+
+    statevector = dump_operation_on_state(circuit._qsharp_op, num_qubits, initial_state, context=get_qsharp_context())
+    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
+
+
 def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
     """Tolerance on a marginal probability for an L-term, mu-bit alias table.
 
@@ -32,6 +47,20 @@ def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
     ``_alias_atol`` in ``test_state_preparation_alias.py``.
     """
     return 1.0 / (num_coefficients * 2**bits_precision)
+
+
+def _block_encoding_action(circuit: Circuit, num_system_qubits: int, system_amplitudes: np.ndarray) -> np.ndarray:
+    """Apply a block encoding and project its ancillas back onto zero."""
+    stride = 2 ** (circuit.num_qubits - num_system_qubits)
+    dimension = 2**num_system_qubits
+    initial_state = [0.0] * ((dimension - 1) * stride + 1)
+    for index, amplitude in enumerate(system_amplitudes):
+        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
+
+    statevector = dump_operation_on_state(
+        circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
+    )
+    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
 
 
 def _with_prepared_gradient(op, num_gradient: int):
@@ -273,6 +302,39 @@ class TestInnerPrep:
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
 
+    def test_signed_two_term_block_encoding_matches_hand_calculation(self):
+        r"""A signed SF row must encode :math:`M^2/(2\Lambda)-I`, including relative signs."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
+        sossa = operator.get_container()
+        sossa.one_body.coeffs[...] = 0.0
+        sossa.two_body.coeffs[...] = np.array([[-1.0, 2.0]])
+
+        unitary = SOSSABuilder().run(operator)
+        container = unitary.get_container()
+        mapper = _make_sossa_mapper(
+            outer_algorithm="dense_pure_state",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+        )
+        circuit = mapper.run(unitary)
+
+        system_state = np.array([1.0, 2.0, 3.0, 4.0])
+        system_state /= np.linalg.norm(system_state)
+        actual = _block_encoding_action(circuit, num_system_qubits=2, system_amplitudes=system_state)
+
+        identity = np.eye(4)
+        z_down = np.diag([1.0, -1.0, 1.0, -1.0])
+        z_up = np.diag([1.0, 1.0, -1.0, -1.0])
+        generator = 2.0 * identity - 0.5 * (z_down + z_up)
+        assert container.normalization == pytest.approx(9.0 / 4.0)
+        expected_block = generator @ generator / (2.0 * container.normalization) - identity
+        expected = expected_block @ system_state
+
+        reference_index = int(np.flatnonzero(np.abs(expected) > 1e-12)[0])
+        global_phase = actual[reference_index] / expected[reference_index]
+        assert abs(global_phase) == pytest.approx(1.0)
+        np.testing.assert_allclose(actual, global_phase * expected, atol=1e-12)
+
 
 class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
@@ -323,6 +385,43 @@ class TestSOSSAMapper:
         assert isinstance(circuit, Circuit)
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
+
+    def test_signed_two_term_block_encoding_matches_hand_calculation(self):
+        r"""A signed SF generator must encode :math:`H_\mathrm{gap}/\Lambda-I`.
+
+        With one spatial orbital and inner weights ``[1, -1/2]``, the only generator is
+        :math:`G=(Z_\downarrow+Z_\uparrow-I)/2`, so
+        :math:`H_\mathrm{gap}=G^2/2` and :math:`\Lambda=(3/2)^2/4=9/16`.
+        This checks the signed inner LCU amplitudes and their linear weights together;
+        marginal probabilities alone cannot distinguish the negative identity term.
+        """
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
+        sossa = operator.get_container()
+        sossa.one_body.coeffs[...] = 0.0
+        sossa.two_body.coeffs[...] = np.array([[1.0, -0.5]])
+        sossa.two_body.angles[...] = 0.0
+
+        unitary = SOSSABuilder().run(operator)
+        container = unitary.get_container()
+        circuit = _make_sossa_mapper(
+            outer_algorithm="dense_pure_state",
+            inner_algorithm="direct",
+            select_algorithm="direct",
+        ).run(unitary)
+
+        identity = np.eye(4)
+        spin_z_sum = np.kron(np.diag([1.0, -1.0]), np.eye(2)) + np.kron(np.eye(2), np.diag([1.0, -1.0]))
+        generator = 0.5 * (spin_z_sum - identity)
+        h_gap = 0.5 * generator @ generator
+        assert container.normalization == pytest.approx(9.0 / 16.0)
+        expected_block = h_gap / container.normalization - identity
+
+        system_state = np.array([1.0, 2.0, 3.0, 4.0]) / np.sqrt(30.0)
+        expected = expected_block @ system_state
+        actual = _block_encoding_action(circuit, num_system_qubits=2, system_state=system_state)
+        global_phase = np.vdot(expected, actual)
+        actual *= np.exp(-1j * np.angle(global_phase))
+        np.testing.assert_allclose(actual, expected, atol=1e-10)
 
     def test_declares_the_register_the_walk_reflects_about(self):
         """The block encoding reports a flat register the caller can size the reflection from.
@@ -440,28 +539,12 @@ class TestSelectFullFidelity:
         """
         return sv if num_gradient == 0 else sv[:: 1 << num_gradient]
 
-    @pytest.mark.slow
-    @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_givens_fidelity(self, N):  # noqa: N803
-        """Verify SELECT with a DQ entry produces a non-trivial rotation."""
-        select_data = self._select_data(N, rotation_bit_precision=10)
-
-        sv = self._run_select(select_data)
-
-        assert np.sum(np.abs(sv) ** 2) > 0.99, "State normalization check failed"
-
-        single_qubit_probs = np.abs(sv) ** 2
-        assert np.max(single_qubit_probs) < 0.99, (
-            "State is too concentrated; Givens rotation may not be applied correctly"
-        )
-
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_applies_the_analytic_rotated_majorana(self, N):  # noqa: N803
         r"""SELECT must satisfy Eq. 94: :math:`U^\dagger \gamma_{00x} U = \tilde\gamma_{u0x}`.
 
-        `test_select_dq_givens_fidelity` only asserts the state is neither unnormalized
-        nor fully concentrated, which a wrong rotation also satisfies. This one compares
-        against the closed form instead, which is what pins the Givens chain.
+        Comparing against the closed form pins the Givens chain; normalization or a
+        spread-out state alone would not distinguish the intended rotation from a wrong one.
 
         Acting on the single-electron state :math:`|d_0=1\rangle`, the rotated Majorana is
 
@@ -493,6 +576,7 @@ class TestSelectFullFidelity:
             "signQubitIndex": -1,
         }
         sv = self._run_select(select_data, xo_value=0, b_value=0)
+        assert np.linalg.norm(sv) == pytest.approx(1.0, abs=1e-10)
 
         total = round(math.log2(len(sv)))
         xo_bits = math.ceil(math.log2(N + 1)) if N + 1 > 1 else 1

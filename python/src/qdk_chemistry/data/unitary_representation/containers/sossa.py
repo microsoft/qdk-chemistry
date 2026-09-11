@@ -182,7 +182,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         select: SOSSASelect,
         metadata: FactorizedHamiltonianMetadata,
         layout: SOSSARegisterLayout,
-        normalization: float,
+        normalization: float = 0.0,
         power: int = 1,
         lambda_eff: float | None = None,
     ) -> None:
@@ -378,7 +378,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
         .. math::
 
-            E = \Lambda (1 + \cos 2\pi\varphi) + E_{\text{SOS}}
+                        \begin{aligned}
+                        E &= 2\Lambda \cos^2(\pi\varphi) + E_{\text{SOS}} \\
+                            &= \Lambda (1 + \cos 2\pi\varphi) + E_{\text{SOS}}.
+                        \end{aligned}
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.

@@ -296,7 +296,7 @@ def create_random_factorized_hamiltonian(
     h1 = rng.standard_normal((n, n))
     h1 = (h1 + h1.T) / 2
 
-    # Random orthogonal basis vectors (U), flattened [R*B*N]
+    # Random normalized basis vectors (U), flattened [R*B*N]
     u_matrices = np.zeros(r * b * n)
     for ri in range(r):
         for bi in range(b):
@@ -327,10 +327,6 @@ def create_random_factorized_hamiltonian(
 def to_sossa_operator(factorized_hamiltonian):
     """Map a factorized Hamiltonian to the SOSSA QubitOperator the SOSSA builder expects.
 
-    Wrapping the container in a :class:`Hamiltonian` transfers ownership to C++ and
-    disowns the Python handle, so callers must not touch ``factorized_hamiltonian``
-    afterwards.
-
     Args:
         factorized_hamiltonian: The FactorizedHamiltonianContainer to map.
 
@@ -341,7 +337,6 @@ def to_sossa_operator(factorized_hamiltonian):
     num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
     hamiltonian = Hamiltonian(factorized_hamiltonian)
     return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
-
 
 def create_random_bitstring_matrix(
     n_electrons: int,
