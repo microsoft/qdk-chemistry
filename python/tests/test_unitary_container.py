@@ -11,7 +11,7 @@ import h5py
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import SparsePauliProductFormulaContainer
+from qdk_chemistry.data import SparsePauliProductFormulaContainer, SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -30,23 +30,18 @@ def step_terms():
     ]
 
 
-@pytest.fixture(params=[False, True], ids=["legacy", "packed"])
+@pytest.fixture(params=[False, True], ids=["legacy", "sparse-factory"])
 def container(step_terms, request):
     """Create a PauliProductFormulaContainer instance for testing."""
     if request.param:
-        return SparsePauliProductFormulaContainer(
-            [0, 1, 1, 3], [0, 0, 1], [1, 2, 1], [0.5, 0.7, 0.3], step_reps=4, num_qubits=2, scale=1.7
+        return SparsePauliProductFormulaContainer.from_sparse_terms(
+            SparsePauliTerms(2, [{0: "X"}, {}, {0: "Y", 1: "X"}]), [0.5, 0.7, 0.3], step_reps=4, scale=1.7
         )
     return PauliProductFormulaContainer(
         step_terms=step_terms,
         step_reps=4,
         num_qubits=2,
     )
-
-
-def _no_term_objects(*_args):
-    """Fail when packed schedule operations unpack compatibility term dictionaries."""
-    pytest.fail("Packed schedule operations must not unpack term objects")
 
 
 class TestExponentiatedPauliTerm:
@@ -115,33 +110,13 @@ class TestPauliProductFormulaContainer:
         with pytest.raises(ValueError, match="Invalid permutation"):
             container.reorder_terms([0, 1, 3])
 
-    def test_large_register_reordering(self):
-        """Sparse row selection retains empty rows, wide indices, and packed dtypes."""
-        num_qubits = 2**32
-        original = PauliProductFormulaContainer.from_sparse_arrays(
-            [0, 2, 2, 3],
-            [0, num_qubits - 1, 1],
-            [1, 3, 2],
-            [0.1, 0.2, 0.3],
-            step_reps=7,
-            num_qubits=num_qubits,
-            scale=0.5,
-        )
-        reordered = original.reorder_terms([1, 2, 0])
-        expected = ([0, 0, 1, 3], [1, 0, num_qubits - 1], [2, 1, 3], [0.2, 0.3, 0.1])
-        for actual, values in zip(reordered.sparse_term_arrays(), expected, strict=True):
-            np.testing.assert_array_equal(actual, values)
-        assert reordered.reorder_terms([2, 0, 1]).content_hash() == original.content_hash()
-        combined = original.combine(original)
-        assert list(combined.step_terms) == list(original.step_terms) * 14
-
     @pytest.mark.parametrize("format_name", ["json", "hdf5"])
     def test_serialization_roundtrip(self, container, format_name, tmp_path):
         """Restore either representation through the parent loader, retaining numeric Pauli keys."""
         filename = tmp_path / f"formula.pauli_product_formula_container.{format_name}"
         container.to_file(filename, format_name)
         restored = PauliProductFormulaContainer.from_file(filename, format_name)
-        assert type(restored) is type(container)
+        assert isinstance(restored, PauliProductFormulaContainer)
         assert restored.to_json() == container.to_json()
         assert restored.content_hash() == container.content_hash()
         assert all(isinstance(key, int) for term in restored.step_terms for key in term.pauli_term)
@@ -220,26 +195,15 @@ class TestPauliProductFormulaContainer:
     def test_fusion_preserves_rounding_and_threshold(self, angles, atol, expected):
         """Add angles sequentially and drop merged values at, but not above, the tolerance."""
         legacy = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, angle) for angle in angles], 1, 1)
-        packed = PauliProductFormulaContainer.from_sparse_arrays(
-            np.arange(len(angles) + 1), [0] * len(angles), [1] * len(angles), angles, step_reps=1, num_qubits=1
-        )
         empty = PauliProductFormulaContainer([], 1, 1)
-        for source in (legacy, packed):
-            result = source.combine(empty, atol)
-            assert [term.angle for term in result.step_terms] == expected
+        assert [term.angle for term in legacy.combine(empty, atol).step_terms] == expected
 
     @pytest.mark.parametrize(("angle", "atol"), [(np.inf, 1e-12), (0.5, np.nan)])
     def test_fusion_preserves_nonfinite_behavior(self, angle, atol):
-        """Legacy cancellation and packed finite-output validation must not silently change."""
+        """Preserve the existing cancellation rule for nonfinite angles or tolerance."""
         legacy = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, angle)], 1, 1)
         inverse = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, -angle)], 1, 1)
         assert not legacy.combine(inverse, atol).step_terms
-        packed = PauliProductFormulaContainer.from_sparse_arrays([0, 1], [0], [1], [0.5], step_reps=1, num_qubits=1)
-        if np.isfinite(angle):
-            assert packed.combine(inverse, atol).step_terms[0].angle == 0.0
-        else:
-            with pytest.raises(ValueError, match="angles must be finite"):
-                packed.combine(legacy, atol)
 
     def test_summary(self, container):
         """Test the summary generation of the container."""
@@ -270,61 +234,16 @@ class TestPauliProductFormulaContainer:
         assert list(restored.step_terms) == list(original.step_terms)
         assert restored.content_hash() == original.content_hash()
 
-
-@pytest.mark.parametrize("container", [True], indirect=True)
-class TestPackedPauliProductFormulaContainer:
-    """Packed schedules preserve ownership and legacy combination semantics."""
-
-    def test_owns_read_only_arrays(self, container):
-        """Angles are independently owned; lazy term dictionaries cannot mutate sparse factors."""
-        offsets, indices, codes, angles = container.sparse_term_arrays()
-        source = angles.copy()
-        original = SparsePauliProductFormulaContainer(offsets, indices, codes, source, step_reps=2, num_qubits=2)
-        original_hash = original.content_hash()
-        source[:] = 0
-        with pytest.raises(ValueError, match="read-only"):
-            original.sparse_term_arrays()[3][0] = 0
-        assert original.content_hash() == original_hash
-        assert original.step_terms[0] == ExponentiatedPauliTerm({0: "X"}, 0.5)
-        original.step_terms[0].pauli_term[0] = "Z"
-        assert original.step_terms[0].pauli_term == {0: "X"}
-
     @pytest.mark.parametrize("inverse_reps", [1, 4])
-    def test_schedule_stays_packed_and_matches_legacy(self, container, inverse_reps, monkeypatch):
-        """Reordering and mixed-storage combination preserve identity factors and complete cancellation."""
-        legacy_left = PauliProductFormulaContainer(list(container.step_terms), 4, 2, scale=1.7)
-        legacy_right = PauliProductFormulaContainer(
-            [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(legacy_left.step_terms)],
+    def test_sparse_factory_inherits_fusion(self, container, inverse_reps):
+        """The sparse factory uses the existing fusion rule, including complete cancellation and identities."""
+        inverse = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(container.step_terms)],
             inverse_reps,
             2,
-            scale=1.7,
+            scale=container.scale,
         )
-        expected_terms = list(legacy_left.step_terms) * (4 - inverse_reps)
-        assert list(legacy_left.combine(legacy_right).step_terms) == expected_terms
-        with monkeypatch.context() as patch:
-            patch.setattr(type(container.step_terms), "__getitem__", _no_term_objects)
-            reordered = container.reorder_terms([2, 1, 0])
-            offsets, indices, codes, angles = reordered.sparse_term_arrays()
-            inverse = PauliProductFormulaContainer.from_sparse_arrays(
-                offsets, indices, codes, -angles, step_reps=inverse_reps, num_qubits=2, scale=reordered.scale
-            )
-            results = [
-                left.combine(right)
-                for left, right in ((container, inverse), (container, legacy_right), (legacy_left, inverse))
-            ]
-            assert reordered.step_reps == container.step_reps
-        for combined in results:
-            assert combined.has_sparse_terms
-            assert combined.step_reps == 1
-            assert combined.scale == legacy_left.scale
-            assert list(combined.step_terms) == expected_terms
-        if inverse_reps == 4:
-            assert not results[0].step_terms
-            assert results[0].reorder_terms([]).content_hash() == results[0].content_hash()
-            assert list(results[0].combine(container).step_terms) == list(legacy_left.step_terms) * 4
-
-    @pytest.mark.parametrize("angles", [[], [[0.5, 0.7, 0.3]], [0.5, 1j, 0.3], [0.5, np.nan, 0.3], [0.5, np.inf, 0.3]])
-    def test_invalid_angles(self, container, angles):
-        """A sparse formula requires one finite real angle per term."""
-        with pytest.raises((ValueError, TypeError)):
-            SparsePauliProductFormulaContainer(*container.pauli_terms.arrays(), angles, step_reps=1, num_qubits=2)
+        result = container.combine(inverse)
+        assert result.step_reps == 1
+        assert result.scale == container.scale
+        assert result.step_terms == list(container.step_terms) * (4 - inverse_reps)

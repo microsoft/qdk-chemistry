@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-from qdk import TargetProfile
+from qdk import TargetProfile, qsharp
 
 import qdk_chemistry.utils.qsharp as qsharp_package
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
@@ -196,9 +196,8 @@ class TestTargetProfiles:
 
         pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
         params = utils.PauliExp.SparseRepPauliExpParams(
-            termOffsets=[0, 2],
-            qubitIndices=[0, 1],
-            pauliCodes=[1, 3],
+            pauliIndices=[[0, 1]],
+            pauliOps=[[qsharp.Pauli.X, qsharp.Pauli.Z]],
             pauliCoefficients=[0.5],
             repetitions=2,
         )

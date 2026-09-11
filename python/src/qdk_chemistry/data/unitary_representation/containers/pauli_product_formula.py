@@ -63,7 +63,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
-    has_sparse_terms = False
 
     def __init__(
         self,
@@ -96,29 +95,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self._num_qubits = num_qubits
         self.scale = scale
         super().__init__()
-
-    @classmethod
-    def from_sparse_arrays(
-        cls,
-        term_offsets: np.ndarray,
-        qubit_indices: np.ndarray,
-        pauli_codes: np.ndarray,
-        angles: np.ndarray,
-        *,
-        step_reps: int,
-        num_qubits: int,
-        scale: float = 1.0,
-    ) -> "PauliProductFormulaContainer":
-        """Construct a :class:`~qdk_chemistry.data.SparsePauliProductFormulaContainer` from compact arrays."""
-        from .sparse_pauli_product_formula import SparsePauliProductFormulaContainer  # noqa: PLC0415
-
-        return SparsePauliProductFormulaContainer(
-            term_offsets, qubit_indices, pauli_codes, angles, step_reps=step_reps, num_qubits=num_qubits, scale=scale
-        )
-
-    def sparse_term_arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Reject array access for a legacy term-object container."""
-        raise RuntimeError("This product formula does not use packed sparse-term storage.")
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
@@ -188,19 +164,15 @@ class PauliProductFormulaContainer(UnitaryContainer):
             ``permutation = [2, 0, 1]`` yields ``new_terms = [old_terms[2], old_terms[0], old_terms[1]]``.
 
         """
-        self._validate_permutation(permutation)
-        return PauliProductFormulaContainer(
-            [self.step_terms[i] for i in permutation], self.step_reps, self.num_qubits, self.scale
-        )
-
-    def _validate_permutation(self, permutation: list[int]) -> None:
-        """Check complete term coverage before either storage representation is reordered."""
         if len(permutation) != len(self.step_terms):
             raise ValueError(
                 f"Permutation length ({len(permutation)}) must match the number of terms ({len(self.step_terms)})."
             )
         if set(permutation) != set(range(len(self.step_terms))):
             raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")
+        return PauliProductFormulaContainer(
+            [self.step_terms[i] for i in permutation], self.step_reps, self.num_qubits, self.scale
+        )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
         """Compose two evolutions, fusing only adjacent equal Pauli factors.
@@ -213,7 +185,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             atol: Drop a merged rotation when its absolute angle is at most this tolerance.
 
         Returns:
-            A formula with ``step_reps=1``, using packed storage if either input is packed.
+            A formula with ``step_reps=1``.
 
         """
         if self.num_qubits != other_container.num_qubits:
@@ -227,11 +199,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"Cannot combine PauliProductFormulaContainer instances with different "
                 f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
             )
-
-        if self.has_sparse_terms or other_container.has_sparse_terms:
-            from .sparse_pauli_product_formula import combine_sparse  # noqa: PLC0415
-
-            return combine_sparse(self, other_container, atol)
 
         merged: list[ExponentiatedPauliTerm] = []
         for container in (self, other_container):
@@ -296,11 +263,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        if "term_offsets" in json_data:
-            from .sparse_pauli_product_formula import SparsePauliProductFormulaContainer  # noqa: PLC0415
-
-            return SparsePauliProductFormulaContainer.from_json(json_data)
-
         cls._validate_json_version(cls._serialization_version, json_data)
         step_terms = []
         for i, term_data in enumerate(json_data["step_terms"]):
@@ -341,11 +303,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        if "term_offsets" in group:
-            from .sparse_pauli_product_formula import SparsePauliProductFormulaContainer  # noqa: PLC0415
-
-            return SparsePauliProductFormulaContainer.from_hdf5(group)
-
         cls._validate_hdf5_version(cls._serialization_version, group)
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]

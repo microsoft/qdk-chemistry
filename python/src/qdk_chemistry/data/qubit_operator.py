@@ -14,10 +14,10 @@ from __future__ import annotations
 import json
 import re
 import warnings
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
+import h5py
 import numpy as np
-from scipy.sparse import csr_matrix, vstack
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_array, _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
@@ -28,7 +28,6 @@ from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_spa
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Mapping, Sequence
 
-    import h5py
     import scipy
 
 from qdk_chemistry._core.data import TaperingSpecification, label_to_sparse_pauli_word
@@ -73,7 +72,7 @@ class QubitOperator(DataClass):
     """Data class representing an operator as a weighted sum of Pauli strings.
 
     Attributes:
-        pauli_strings (Sequence[str]): Dense labels or a lazy compatibility view of packed sparse terms.
+        pauli_strings (Sequence[str]): Dense labels or a lazy compatibility view of sparse terms.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this operator
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
@@ -93,10 +92,10 @@ class QubitOperator(DataClass):
     partitions; ``scalar * H`` scales coefficients and preserves the
     partition.
 
-    :meth:`from_sparse_arrays` and :meth:`from_sparse_terms` store only
-    non-identity factors. Indexing, slicing, or iterating :attr:`pauli_strings`
+    :meth:`from_sparse_terms` stores only non-identity factors.
+    Indexing, slicing, or iterating :attr:`pauli_strings`
     explicitly materializes full-width labels; :meth:`iter_sparse_terms` avoids
-    that cost. Dense and packed content hashes may differ for mathematically
+    that cost. Dense and sparse content hashes may differ for mathematically
     equivalent operators; use :meth:`equiv` to compare their Pauli expansions.
 
     """
@@ -113,7 +112,7 @@ class QubitOperator(DataClass):
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
-    _compact_serialization_version = "0.2.0"
+    _sparse_serialization_version = "0.2.0"
 
     def __init__(
         self,
@@ -145,8 +144,6 @@ class QubitOperator(DataClass):
                 raise ValueError("Sparse Pauli coefficients must be a one-dimensional numeric array.")
             if not len(coefficients):
                 raise ValueError("Sparse Pauli terms cannot be empty.")
-            if len(pauli_strings) != len(coefficients):
-                raise ValueError("Sparse Pauli terms and coefficients must have matching lengths.")
             coefficients.flags.writeable = False
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
@@ -161,7 +158,7 @@ class QubitOperator(DataClass):
         self.tapering: TaperingSpecification | None = tapering
 
         if isinstance(pauli_strings, SparsePauliTerms):
-            self._serialization_version = self._compact_serialization_version
+            self._serialization_version = self._sparse_serialization_version
         else:
             _validate_pauli_strings(pauli_strings)
 
@@ -169,28 +166,6 @@ class QubitOperator(DataClass):
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
-
-    @classmethod
-    def from_sparse_arrays(
-        cls,
-        num_qubits: int,
-        term_offsets: np.ndarray,
-        qubit_indices: np.ndarray,
-        pauli_codes: np.ndarray,
-        coefficients: np.ndarray,
-        *,
-        encoding: str | None = None,
-        fermion_mode_order: FermionModeOrder | str | None = None,
-        term_partition: TermPartition | None = None,
-        tapering: TaperingSpecification | None = None,
-    ) -> QubitOperator:
-        """Construct owned :class:`~qdk_chemistry.data.SparsePauliTerms` and matching numeric coefficients.
-
-        Equal offsets encode identity. Register width, indices, and Pauli codes follow
-        :class:`~qdk_chemistry.data.SparsePauliTerms`; metadata follows the regular constructor.
-        """
-        terms = SparsePauliTerms(num_qubits, term_offsets, qubit_indices, pauli_codes)
-        return cls(terms, coefficients, encoding, fermion_mode_order, term_partition, tapering)
 
     @classmethod
     def from_sparse_terms(
@@ -207,10 +182,10 @@ class QubitOperator(DataClass):
         """Construct sparse terms from mappings or iterables of ``(qubit, X/Y/Z)`` pairs.
 
         Empty terms encode identity. Factors are sorted; term order and duplicates
-        are retained. Coefficients and metadata follow :meth:`from_sparse_arrays`.
+        are retained. Coefficients are owned; metadata follows the regular constructor.
         """
         return cls(
-            SparsePauliTerms.from_terms(num_qubits, terms),
+            SparsePauliTerms(num_qubits, terms),
             coefficients,
             encoding,
             fermion_mode_order,
@@ -235,11 +210,10 @@ class QubitOperator(DataClass):
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "qubit_hamiltonian")
-        if self.has_sparse_terms:
+        if isinstance(self.pauli_strings, SparsePauliTerms):
             _hash_str(h, "sparse_pauli")
             _hash_uint(h, self.num_qubits)
-            for values in self.sparse_term_arrays():
-                _hash_array(h, values)
+            _hash_arg(h, self.pauli_strings.words)
         else:
             # Preserve the legacy dense hash byte-for-byte.
             _hash_uint(h, len(self.pauli_strings))
@@ -270,22 +244,8 @@ class QubitOperator(DataClass):
 
     @property
     def has_sparse_terms(self) -> bool:
-        """Return whether this operator uses packed non-identity factors."""
+        """Return whether this operator retains non-identity words instead of dense labels."""
         return isinstance(self.pauli_strings, SparsePauliTerms)
-
-    def sparse_term_arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Return read-only term offsets, qubit indices, and Pauli codes without copying.
-
-        Returns:
-            The packed uint64, uint32, and uint8 arrays; coefficients remain in :attr:`coefficients`.
-
-        Raises:
-            RuntimeError: If this operator uses the legacy dense-label storage.
-
-        """
-        if not self.has_sparse_terms:
-            raise RuntimeError("This QubitOperator does not use packed sparse-term storage.")
-        return cast("SparsePauliTerms", self.pauli_strings).arrays()
 
     def iter_sparse_terms(self) -> Iterator[tuple[tuple[tuple[int, str], ...], complex]]:
         """Iterate over sorted non-identity factors and coefficients without expanding sparse labels.
@@ -319,7 +279,7 @@ class QubitOperator(DataClass):
     def to_matrix(self, sparse: bool = False) -> np.ndarray | scipy.sparse.spmatrix:
         """Convert the qubit operator to its full matrix representation.
 
-        This explicitly materializes full-width Pauli labels for packed operators.
+        This explicitly materializes full-width Pauli labels for sparse operators.
 
         Args:
             sparse: If True, return a csr matrix.
@@ -389,8 +349,6 @@ class QubitOperator(DataClass):
             ``True`` if every coefficient has ``|imag| <= tolerance``.
 
         """
-        if self.has_sparse_terms:
-            return bool(np.all(np.abs(np.asarray(self.coefficients.imag, dtype=np.float64)) <= tolerance))
         return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
     def __add__(self, other: QubitOperator) -> QubitOperator:
@@ -439,18 +397,9 @@ class QubitOperator(DataClass):
 
         labels: list[str] | SparsePauliTerms
         if self.has_sparse_terms or other.has_sparse_terms:
-            rows = vstack(
-                [
-                    (
-                        op.pauli_strings
-                        if isinstance(op.pauli_strings, SparsePauliTerms)
-                        else SparsePauliTerms.from_terms(op.num_qubits, (term for term, _ in op.iter_sparse_terms()))
-                    ).to_csr()
-                    for op in (self, other)
-                ],
-                format="csr",
+            labels = SparsePauliTerms(
+                self.num_qubits, (word for op in (self, other) for word, _ in op.iter_sparse_terms())
             )
-            labels = SparsePauliTerms(self.num_qubits, rows.indptr, rows.indices, rows.data)
         else:
             labels = list(self.pauli_strings) + list(other.pauli_strings)
 
@@ -499,7 +448,7 @@ class QubitOperator(DataClass):
         included.  Callers should verify Hermiticity via
         :meth:`is_hermitian` before invoking this method; imaginary parts
         are silently discarded here. This explicitly materializes full-width
-        labels for retained terms of packed operators.
+        labels for retained terms of sparse operators.
 
         Args:
             tolerance: Threshold for filtering small real coefficients.
@@ -550,44 +499,25 @@ class QubitOperator(DataClass):
         if n_qubits != 2 * n_spatial:
             raise ValueError(f"Number of qubits ({n_qubits}) must be 2 * n_spatial ({2 * n_spatial}).")
 
+        # Remap alpha q -> 2*q and beta q -> 2*(q-n_spatial)+1.
+        reordered: list[str] | SparsePauliTerms
         if self.has_sparse_terms:
-            offsets, indices, codes = self.sparse_term_arrays()
-            indices = indices.astype(np.int64)
-            reordered_indices = np.where(indices < n_spatial, 2 * indices, 2 * (indices - n_spatial) + 1)
-            rows = csr_matrix((codes.copy(), reordered_indices, offsets), shape=(self.num_terms, n_qubits))
-            rows.sort_indices()
-            return QubitOperator.from_sparse_arrays(
+            reordered = SparsePauliTerms(
                 n_qubits,
-                rows.indptr,
-                rows.indices,
-                rows.data,
-                self.coefficients,
-                encoding=self.encoding,
-                fermion_mode_order=FermionModeOrder.INTERLEAVED,
-                tapering=self.tapering,
+                (
+                    ((2 * q if q < n_spatial else 2 * (q - n_spatial) + 1, axis) for q, axis in word)
+                    for word, _ in self.iter_sparse_terms()
+                ),
             )
-
-        # Build permutation: blocked -> interleaved
-        # Blocked ordering:      a0, a1, ..., a(n-1), b0, b1, ..., b(n-1)
-        # Interleaved ordering:  a0, b0, a1, b1, ..., a(n-1), b(n-1)
-        # Pauli strings are little-endian (rightmost char = qubit 0), so
-        # string position j corresponds to qubit (n_qubits - 1 - j).
-        # Qubit mapping: alpha (q < n_spatial) -> 2*q, beta -> 2*(q - n_spatial) + 1
-        permutation = [0] * n_qubits
-        for pos in range(n_qubits):
-            q_old = n_qubits - 1 - pos
-            q_new = 2 * q_old if q_old < n_spatial else 2 * (q_old - n_spatial) + 1
-            permutation[pos] = n_qubits - 1 - q_new
-
-        reordered_strings = []
-        for pauli_str in self.pauli_strings:
-            new_chars = ["I"] * n_qubits
-            for old_pos, char in enumerate(pauli_str):
-                new_chars[permutation[old_pos]] = char
-            reordered_strings.append("".join(new_chars))
+        else:
+            # Dense labels have qubit zero on the right; interleave beta/alpha characters from the left.
+            reordered = [
+                "".join(b + a for b, a in zip(label[:n_spatial], label[n_spatial:], strict=True))
+                for label in self.pauli_strings
+            ]
 
         return QubitOperator(
-            pauli_strings=reordered_strings,
+            pauli_strings=reordered,
             coefficients=self.coefficients.copy(),
             encoding=self.encoding,
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
@@ -626,12 +556,9 @@ class QubitOperator(DataClass):
             "real": coeffs.real.tolist(),
             "imag": coeffs.imag.tolist(),
         }
-        if self.has_sparse_terms:
+        if isinstance(self.pauli_strings, SparsePauliTerms):
             data["num_qubits"] = self.num_qubits
-            data.update(
-                (key, values.tolist())
-                for key, values in zip(SparsePauliTerms.array_names, self.sparse_term_arrays(), strict=True)
-            )
+            data["pauli_terms"] = [[list(factor) for factor in word] for word in self.pauli_strings.words]
         if self.encoding is not None:
             data["encoding"] = self.encoding
         if self.fermion_mode_order is not None:
@@ -650,10 +577,11 @@ class QubitOperator(DataClass):
 
         """
         self._add_hdf5_version(group)
-        if self.has_sparse_terms:
+        if isinstance(self.pauli_strings, SparsePauliTerms):
             group.attrs["num_qubits"] = self.num_qubits
-            for key, values in zip(SparsePauliTerms.array_names, self.sparse_term_arrays(), strict=True):
-                group.create_dataset(key, data=values)
+            group.create_dataset(
+                "pauli_terms", data=[json.dumps(word) for word in self.pauli_strings.words], dtype=h5py.string_dtype()
+            )
         else:
             group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
@@ -681,14 +609,14 @@ class QubitOperator(DataClass):
 
         """
         expected_version = (
-            cls._compact_serialization_version if "term_offsets" in json_data else cls._serialization_version
+            cls._sparse_serialization_version if "pauli_terms" in json_data else cls._serialization_version
         )
         cls._validate_json_version(expected_version, json_data)
         coeff_data = json_data["coefficients"]
         # Handle complex coefficients serialized as {"real": [...], "imag": [...]}
         if isinstance(coeff_data, dict) and "real" in coeff_data and "imag" in coeff_data:
             real, imag = np.array(coeff_data["real"]), np.array(coeff_data["imag"])
-            if "term_offsets" in json_data and real.shape != imag.shape:
+            if "pauli_terms" in json_data and real.shape != imag.shape:
                 raise ValueError("Sparse Pauli real and imaginary coefficient arrays must have matching shapes.")
             coefficients = real + 1j * imag
         else:
@@ -699,8 +627,8 @@ class QubitOperator(DataClass):
         tapering_data = json_data.get("tapering")
         tapering = TaperingSpecification.from_json(tapering_data) if tapering_data is not None else None
         terms = (
-            SparsePauliTerms(json_data["num_qubits"], *(json_data[key] for key in SparsePauliTerms.array_names))
-            if "term_offsets" in json_data
+            SparsePauliTerms(json_data["num_qubits"], json_data["pauli_terms"])
+            if "pauli_terms" in json_data
             else json_data["pauli_strings"]
         )
         return cls(
@@ -726,7 +654,7 @@ class QubitOperator(DataClass):
             RuntimeError: If version attribute is missing or incompatible.
 
         """
-        expected_version = cls._compact_serialization_version if "term_offsets" in group else cls._serialization_version
+        expected_version = cls._sparse_serialization_version if "pauli_terms" in group else cls._serialization_version
         cls._validate_hdf5_version(expected_version, group)
         coefficients = np.array(group["coefficients"])
         encoding = group.attrs.get("encoding")
@@ -745,11 +673,8 @@ class QubitOperator(DataClass):
         else:
             tapering = None
         terms = (
-            SparsePauliTerms(
-                group.attrs["num_qubits"],
-                *(np.asarray(group[key]) for key in SparsePauliTerms.array_names),
-            )
-            if "term_offsets" in group
+            SparsePauliTerms(group.attrs["num_qubits"], (json.loads(word) for word in group["pauli_terms"].asstr()))
+            if "pauli_terms" in group
             else [s.decode() for s in group["pauli_strings"][:]]
         )
         return cls(

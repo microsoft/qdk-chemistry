@@ -123,7 +123,7 @@ class TestModelHamiltonians:
 
     @pytest.mark.parametrize("include_term_groups", [False, True])
     def test_ising_chain(self, include_term_groups: bool) -> None:
-        """Check packed Ising coefficients with and without term grouping."""
+        """Check sparse Ising coefficients with and without term grouping."""
         n = 4
         lattice = LatticeGraph.chain(n)
         j = 1.0
@@ -187,7 +187,7 @@ class TestModelHamiltonians:
 
     @pytest.mark.parametrize("include_term_groups", [False, True])
     def test_heisenberg_chain(self, include_term_groups: bool) -> None:
-        """Check packed Heisenberg coefficients with and without term grouping."""
+        """Check sparse Heisenberg coefficients with and without term grouping."""
         n = 4
         lattice = LatticeGraph.chain(n)
         edges = [(0, 1), (1, 2), (2, 3)]

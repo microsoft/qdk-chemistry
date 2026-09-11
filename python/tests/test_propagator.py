@@ -54,7 +54,7 @@ class TestTimeAveragedPropagatorDriven:
         np.testing.assert_array_equal(result.coefficients, [1.0, 0.0])
 
     @pytest.mark.parametrize(("canceling_drive", "scale"), [(False, 0.0), (True, 0.0), (False, 1e-18)])
-    def test_only_exact_zero_average_reuses_packed_base(self, canceling_drive, scale):
+    def test_only_exact_zero_average_reuses_sparse_base(self, canceling_drive, scale):
         """Zero and canceling drives reuse H0; a tiny nonzero average must still contribute."""
         h0 = QubitOperator.from_sparse_terms(
             2, [{1: "Z"}], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),))

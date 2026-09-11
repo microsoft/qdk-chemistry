@@ -144,7 +144,7 @@ class TestDrivenQubitHamiltonianPartition:
     """Tests for partition preservation through evaluate()."""
 
     @pytest.mark.parametrize("scale", [0.0, 1e-18])
-    def test_only_exact_zero_drive_reuses_packed_base(self, scale):
+    def test_only_exact_zero_drive_reuses_sparse_base(self, scale):
         """A zero drive reuses the grouped object; even a tiny nonzero drive follows normal addition."""
         h0 = QubitOperator.from_sparse_terms(
             2, [{1: "Z"}], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),))

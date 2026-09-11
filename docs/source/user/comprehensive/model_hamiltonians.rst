@@ -296,12 +296,12 @@ Sparse storage
 
 Spin-model builders iterate sparse adjacency edges and retain scalar couplings without expanding them into dense pair matrices.
 The returned :class:`~qdk_chemistry.data.QubitOperator` uses :class:`~qdk_chemistry.data.SparsePauliTerms` to store only non-identity factors, for grouped and ungrouped construction alike.
-The :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` and :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_arrays` constructors also make this representation available for arbitrary operators.
-Use :meth:`~qdk_chemistry.data.QubitOperator.iter_sparse_terms` or :meth:`~qdk_chemistry.data.QubitOperator.sparse_term_arrays` to inspect it without constructing full-register labels.
+The :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` constructor accepts arbitrary non-identity Pauli words, retaining term order, duplicates, and empty identity words.
+Use :meth:`~qdk_chemistry.data.QubitOperator.iter_sparse_terms` to inspect these factors without constructing full-register labels.
 The ``pauli_strings`` compatibility view materializes labels on access; dense matrix conversion remains appropriate only for small systems.
 
-Packed operators and product formulas have compact JSON/HDF5 representations; existing dense payloads remain readable.
-Content hashes identify the stored representation, so equivalent dense and packed objects can have different hashes.
+Sparse operators serialize their non-identity words without expanding labels; product formulas use their existing JSON/HDF5 format.
+Operator content hashes identify the stored representation, so equivalent dense and sparse operators can have different hashes.
 
 Parameter flexibility
 ---------------------

@@ -86,17 +86,24 @@ class TestPauliSequenceMapperNonControlled:
 
     def test_sparse_encoding_carries_only_non_identity_positions(self):
         """The Q# adapter preserves caller factor order, skips explicit identities, and retains empty rows."""
+        word = {2: "I", 1: "Z", 0: "X"}
         container = PauliProductFormulaContainer(
-            [ExponentiatedPauliTerm({2: "I", 1: "Z", 0: "X"}, 0.5), ExponentiatedPauliTerm({0: "I"}, 0.25)], 2, 3
+            [
+                ExponentiatedPauliTerm(word, 0.5),
+                ExponentiatedPauliTerm({0: "I"}, 0.25),
+                ExponentiatedPauliTerm(word, -0.2),
+            ],
+            2,
+            3,
         )
         circuit = PauliSequenceMapper().run(UnitaryRepresentation(container))
         evo_params = circuit._qsharp_factory.parameter["evo_params"]
 
         assert "pauliExponents" not in evo_params
         assert "batchIds" not in evo_params
-        assert evo_params["termOffsets"] == [0, 2, 2]
-        assert evo_params["qubitIndices"] == [1, 0]
-        assert evo_params["pauliCodes"] == [3, 1]
+        assert evo_params["pauliIndices"] == [[1, 0], [], [1, 0]]
+        assert evo_params["pauliOps"] == [[qsharp.Pauli.Z, qsharp.Pauli.X], [], [qsharp.Pauli.Z, qsharp.Pauli.X]]
+        assert evo_params["pauliCoefficients"] == [0.5, 0.25, -0.2]
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
@@ -131,9 +138,8 @@ class TestPauliSequenceMapperNonControlled:
 def _sparse_op(terms, *, repetitions=1):
     """Build sparse evolution using typed Q# parameters."""
     params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
-        termOffsets=np.cumsum([0, *(len(term["qubits"]) for term in terms)]).tolist(),
-        qubitIndices=[index for term in terms for index in term["qubits"]],
-        pauliCodes=["IXYZ".index(axis) for term in terms for axis in term["axes"]],
+        pauliIndices=[term["qubits"] for term in terms],
+        pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
         pauliCoefficients=[term["angle"] for term in terms],
         repetitions=repetitions,
     )
@@ -208,19 +214,18 @@ class TestSparseUncontrolledEvolution:
         assert np.max(np.abs(got - want)) < _TOL
 
     @pytest.mark.parametrize(
-        ("offsets", "indices", "codes", "coefficients"),
+        ("indices", "ops", "coefficients"),
         [
-            pytest.param([0, 1], [0], [1], [], id="coefficients-shorter"),
-            pytest.param([0, 1], [], [1], [0.1], id="indices-shorter"),
-            pytest.param([0, 1], [0], [], [0.1], id="codes-shorter"),
+            pytest.param([[0]], [[qsharp.Pauli.X]], [], id="coefficients-shorter"),
+            pytest.param([], [[qsharp.Pauli.X]], [0.1], id="indices-shorter"),
+            pytest.param([[0]], [], [0.1], id="ops-shorter"),
         ],
     )
-    def test_rejects_mismatched_term_array_lengths(self, offsets, indices, codes, coefficients):
-        """Sparse evolution requires consistent factor arrays and term boundaries."""
+    def test_rejects_mismatched_term_array_lengths(self, indices, ops, coefficients):
+        """Sparse evolution requires one support, axis row and angle per term."""
         params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
-            termOffsets=offsets,
-            qubitIndices=indices,
-            pauliCodes=codes,
+            pauliIndices=indices,
+            pauliOps=ops,
             pauliCoefficients=coefficients,
             repetitions=1,
         )
@@ -238,22 +243,20 @@ class TestSparseUncontrolledEvolution:
 
 
 @pytest.fixture(params=[PauliSequenceMapper, ControlledPauliSequenceMapper], ids=["regular", "controlled"])
-def packed_mapper(request):
-    """Exercise both production mappers with the same packed cases."""
+def sparse_mapper(request):
+    """Exercise both production mappers with the same sparse cases."""
     return request.param()
 
 
-class TestPackedPauliMappers:
-    """Packed mapping preserves the unitary and stays compact in both control modes."""
+class TestSparsePauliMappers:
+    """The existing sparse payload stays independent of register width and repetitions."""
 
-    def test_resource_estimates_include_all_repetitions(self, packed_mapper):
+    def test_resource_estimates_include_all_repetitions(self, sparse_mapper):
         """Resource estimates count symbolic repetitions without adding qubits."""
         counts = []
         for repetitions in (1, 17):
-            container = PauliProductFormulaContainer.from_sparse_arrays(
-                [0, 2], [0, 1], [1, 3], [0.137], step_reps=repetitions, num_qubits=2
-            )
-            circuit = packed_mapper.run(UnitaryRepresentation(container))
+            container = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X", 1: "Z"}, 0.137)], repetitions, 2)
+            circuit = sparse_mapper.run(UnitaryRepresentation(container))
             counts.append(circuit.estimate()["logicalCounts"])
         assert counts[0]["rotationCount"] > 0
         assert counts[1]["rotationCount"] == 17 * counts[0]["rotationCount"]
@@ -261,46 +264,27 @@ class TestPackedPauliMappers:
         assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
         assert "define" in str(circuit.get_qir())
 
-    def test_payload_stays_flat_and_repetitions_stay_symbolic(self, packed_mapper, monkeypatch):
-        """Large registers and repetition counts must not expand term dictionaries or labels."""
-        container = PauliProductFormulaContainer.from_sparse_arrays(
-            [0, 1, 1, 3],
-            [0, 1, 80_799],
-            [2, 1, 3],
-            [0.2, 0.4, -0.7],
-            step_reps=1_000_000_000,
-            num_qubits=80_800,
+    def test_payload_stays_sparse_and_repetitions_stay_symbolic(self, sparse_mapper):
+        """Large registers retain only non-identity support and symbolic repetitions."""
+        container = PauliProductFormulaContainer(
+            [
+                ExponentiatedPauliTerm({0: "Y"}, 0.2),
+                ExponentiatedPauliTerm({}, 0.4),
+                ExponentiatedPauliTerm({1: "X", 80_799: "Z"}, -0.7),
+            ],
+            1_000_000_000,
+            80_800,
         )
-
-        def no_term_objects(*_args):
-            raise AssertionError("Packed mapping materialized term dictionaries")
-
-        monkeypatch.setattr(type(container.step_terms), "__getitem__", no_term_objects)
-        controlled = isinstance(packed_mapper, ControlledPauliSequenceMapper)
-        if controlled:
-            packed_mapper.settings().set("control_indices", [80_800])
-            packed_mapper.settings().set("target_indices", list(reversed(range(80_800))))
-        circuit = packed_mapper.run(UnitaryRepresentation(container))
+        circuit = sparse_mapper.run(UnitaryRepresentation(container))
         factory = circuit._qsharp_factory.parameter
-        params = vars(factory["params"]) if controlled else factory["evo_params"]
+        params = (
+            vars(factory["params"])
+            if isinstance(sparse_mapper, ControlledPauliSequenceMapper)
+            else factory["evo_params"]
+        )
         assert params == {
-            "termOffsets": [0, 1, 1, 3],
-            "qubitIndices": [0, 1, 80_799],
-            "pauliCodes": [2, 1, 3],
+            "pauliIndices": [[0], [], [1, 80_799]],
+            "pauliOps": [[qsharp.Pauli.Y], [], [qsharp.Pauli.X, qsharp.Pauli.Z]],
             "pauliCoefficients": [0.2, 0.4, -0.7],
             "repetitions": 1_000_000_000,
         }
-        if controlled:
-            assert factory["control"] == 80_800
-            assert factory["systems"] == list(reversed(range(80_800)))
-        else:
-            assert circuit.num_qubits == 80_800
-
-    def test_qsharp_rejects_malformed_packed_payload(self):
-        """The Q# entry point validates offsets even when Python construction is bypassed."""
-        params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
-            termOffsets=[0, 2, 1], qubitIndices=[0], pauliCodes=[1], pauliCoefficients=[0.2, 0.3], repetitions=1
-        )
-        op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
-        with pytest.raises(QSharpError, match="SparsePauliExp"):
-            dump_operation_on_state(op, 1, [1.0, 0.0], context=get_qsharp_context())

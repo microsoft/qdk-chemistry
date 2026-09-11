@@ -62,16 +62,16 @@ def test_measurement_data_serialization():
 def test_measurement_data_mixed_sparse_roundtrip(
     format_name: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Roundtrip dense and packed operators with partition metadata without expanding labels."""
+    """Roundtrip dense and sparse operators with partition metadata without expanding labels."""
     dense = QubitOperator(["ZX"], np.array([0.5]))
-    packed = QubitOperator.from_sparse_terms(
+    sparse = QubitOperator.from_sparse_terms(
         100_000,
         [{0: "X", 99_999: "Y"}, {}],
         np.array([1.25 + 0.25j, -0.5]),
         term_partition=LayeredPartition(strategy="test", groups=(((0,),), ((1,),))),
     )
-    original = MeasurementData([dense, packed], [{"00": 3}, None], [3, 0])
-    monkeypatch.setattr(type(packed.pauli_strings), "__getitem__", Mock(side_effect=AssertionError("Dense labels")))
+    original = MeasurementData([dense, sparse], [{"00": 3}, None], [3, 0])
+    monkeypatch.setattr(type(sparse.pauli_strings), "__getitem__", Mock(side_effect=AssertionError("Dense labels")))
     filename = tmp_path / f"mixed.measurement_data.{format_name}"
     original.to_file(filename, format_name)
     restored = MeasurementData.from_file(filename, format_name)
@@ -81,7 +81,7 @@ def test_measurement_data_mixed_sparse_roundtrip(
 
 @pytest.mark.parametrize("nested", [False, True])
 def test_measurement_data_sparse_version_validation(nested: bool) -> None:
-    """Reject an old schema version at either packed serialization boundary."""
+    """Reject an old schema version at either sparse serialization boundary."""
     original = MeasurementData([QubitOperator.from_sparse_terms(1, [{0: "Z"}], np.array([1.0]))])
     payload = original.to_json()
     versioned_data = payload["0"]["hamiltonian"] if nested else payload

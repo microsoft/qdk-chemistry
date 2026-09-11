@@ -5,7 +5,6 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
-    import Std.Arrays.Mapped;
     import Std.Arrays.Subarray;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
@@ -111,36 +110,27 @@ namespace QDKChemistry.Utils.PauliExp {
         RepPauliExp(params, _)
     }
 
-    /// Flat non-identity factors; codes 1, 2, and 3 denote X, Y, and Z.
-    /// Equal consecutive offsets encode an identity factor, not an omitted term.
+    /// Non-identity qubit positions and axes for each term; an empty row is identity.
     struct SparseRepPauliExpParams {
-        termOffsets : Int[],
-        qubitIndices : Int[],
-        pauliCodes : Int[],
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
         pauliCoefficients : Double[],
         repetitions : Int,
     }
 
     /// Applies one step, accessing only each term's non-identity support.
-    operation SparsePauliExp(params : SparseRepPauliExpParams, systems : Qubit[]) : Unit is Adj + Ctl {
-        if Length(params.termOffsets) != Length(params.pauliCoefficients) + 1 or Length(params.qubitIndices) != Length(params.pauliCodes) {
+    operation SparsePauliExp(
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
+        pauliCoefficients : Double[],
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        if Length(pauliIndices) != Length(pauliCoefficients) or Length(pauliOps) != Length(pauliCoefficients) {
             fail "SparsePauliExp: inconsistent array lengths.";
         }
-        if params.termOffsets[0] != 0 or params.termOffsets[Length(params.termOffsets) - 1] != Length(params.qubitIndices) {
-            fail "SparsePauliExp: offsets must span the support.";
-        }
-
-        let axes = [PauliX, PauliY, PauliZ];
-        for term in 0..Length(params.pauliCoefficients) - 1 {
-            let first = params.termOffsets[term];
-            let next = params.termOffsets[term + 1];
-            if first < 0 or next < first or next > Length(params.qubitIndices) {
-                fail "SparsePauliExp: offsets must be nondecreasing and within the support.";
-            }
-            let support = first..next - 1;
-            let paulis = Mapped(code -> axes[code - 1], params.pauliCodes[support]);
+        for term in 0..Length(pauliCoefficients) - 1 {
             // Exp uses the opposite sign; empty support retains the phase needed by controlled evolution.
-            Exp(paulis, -params.pauliCoefficients[term], Subarray(params.qubitIndices[support], systems));
+            Exp(pauliOps[term], -pauliCoefficients[term], Subarray(pauliIndices[term], systems));
         }
     }
 
@@ -150,11 +140,11 @@ namespace QDKChemistry.Utils.PauliExp {
             within {
                 RepeatEstimates(params.repetitions);
             } apply {
-                SparsePauliExp(params, systems);
+                SparsePauliExp(params.pauliIndices, params.pauliOps, params.pauliCoefficients, systems);
             }
         } else {
             for _ in 1..params.repetitions {
-                SparsePauliExp(params, systems);
+                SparsePauliExp(params.pauliIndices, params.pauliOps, params.pauliCoefficients, systems);
             }
         }
     }

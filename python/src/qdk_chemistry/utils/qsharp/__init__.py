@@ -12,12 +12,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import qdk
-from qdk import TargetProfile
-
-from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_formula import pack_pauli_terms
+from qdk import TargetProfile, qsharp
 
 if TYPE_CHECKING:
     from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -76,20 +74,25 @@ _shared = _SharedContext()
 _thread_local = threading.local()
 
 
-def _pauli_evolution_parameters(container: "PauliProductFormulaContainer") -> dict[str, list[int] | list[float] | int]:
-    """Prepare one flat Q# payload from packed storage or legacy term objects."""
-    if container.has_sparse_terms:
-        arrays = container.sparse_term_arrays()
-        offsets, indices, codes, angles = (values.tolist() for values in arrays)
-    else:
-        offsets, indices, codes = pack_pauli_terms(
-            ((index, axis) for index, axis in term.pauli_term.items() if axis != "I") for term in container.step_terms
-        )
-        angles = [term.angle for term in container.step_terms]
+def _pauli_evolution_parameters(container: "PauliProductFormulaContainer") -> dict[str, Any]:
+    """Prepare the existing sparse Q# payload, retaining empty identity terms and symbolic repetitions."""
+    # Higher-order formulas reuse words; convert each ordered support only once per call.
+    converted = {}
+    indices, ops, angles = [], [], []
+    for term in container.step_terms:
+        word = tuple(term.pauli_term.items())
+        if word not in converted:
+            converted[word] = (
+                [index for index, axis in word if axis != "I"],
+                [getattr(qsharp.Pauli, axis) for _, axis in word if axis != "I"],
+            )
+        sites, axes = converted[word]
+        indices.append(sites)
+        ops.append(axes)
+        angles.append(term.angle)
     return {
-        "termOffsets": offsets,
-        "qubitIndices": indices,
-        "pauliCodes": codes,
+        "pauliIndices": indices,
+        "pauliOps": ops,
         "pauliCoefficients": angles,
         "repetitions": container.step_reps,
     }

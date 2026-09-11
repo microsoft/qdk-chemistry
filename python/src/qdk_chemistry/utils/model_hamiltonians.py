@@ -49,7 +49,7 @@ def _build_sparse_hamiltonian(
     edge order of the geometry builder. Without a coloring, terms retain
     the expression builder's edge-major, then site-major order. Identical
     active coupling supports share one coloring; the full factory coloring
-    is reused unchanged. Packed assembly storage is linear in sites and edges,
+    is reused unchanged. Sparse assembly storage is linear in sites and edges,
     apart from any matrices supplied by the caller.
 
     Args:
@@ -59,20 +59,16 @@ def _build_sparse_hamiltonian(
         coloring: Factory edge coloring, or ``None`` to leave terms ungrouped.
 
     Returns:
-        QubitOperator: Packed operator with an optional :class:`~qdk_chemistry.data.LayeredPartition`.
+        QubitOperator: Sparse operator with an optional :class:`~qdk_chemistry.data.LayeredPartition`.
 
     """
     n = graph.num_sites
-    offsets = array("Q", [0])
-    qubits = array("I")
-    paulis = array("B")
+    words: list[tuple[tuple[int, str], ...]] = []
     coefficients = array("d")
     groups_layers: list[tuple[tuple[int, ...], ...]] = []
 
-    def append_term(sites: tuple[int, ...], code: int, coefficient: float) -> int:
-        qubits.extend(sites)
-        paulis.extend([code] * len(sites))
-        offsets.append(len(qubits))
+    def append_term(sites: tuple[int, ...], axis: str, coefficient: float) -> int:
+        words.append(tuple((site, axis) for site in sites))
         coefficients.append(coefficient)
         return len(coefficients) - 1
 
@@ -81,7 +77,7 @@ def _build_sparse_hamiltonian(
     adjacency.sort_indices()
     edges = adjacency.tocoo(copy=False)
 
-    edge_couplings: list[tuple[int, np.ndarray]] = []
+    edge_couplings: list[tuple[str, np.ndarray]] = []
     pair_values: np.ndarray | float
     for axis, coupling in couplings:
         if isinstance(coupling, int | float | np.integer | np.floating):
@@ -98,14 +94,14 @@ def _build_sparse_hamiltonian(
             pair_values = matrix[edges.row, edges.col]
         # Cast before multiplying, preserving Python-double arithmetic and its nonfinite behavior.
         with np.errstate(over="ignore", under="ignore", invalid="ignore"):
-            edge_couplings.append(("IXYZ".index(axis), np.multiply(pair_values, edges.data, dtype=float)))
+            edge_couplings.append((axis, np.multiply(pair_values, edges.data, dtype=float)))
 
-    field_values: list[tuple[int, np.ndarray]] = []
+    field_values: list[tuple[str, np.ndarray]] = []
     for axis, field in fields:
         value = float(field) if isinstance(field, int | float | np.integer | np.floating) else field
         if isinstance(value, float) and value == 0.0:
             continue
-        field_values.append(("IXYZ".index(axis), to_site_param(value, graph, f"h{axis.lower()}")))
+        field_values.append((axis, to_site_param(value, graph, f"h{axis.lower()}")))
 
     if coloring is None:
         for index, (i, j) in enumerate(zip(edges.row, edges.col, strict=True)):
@@ -146,20 +142,13 @@ def _build_sparse_hamiltonian(
             groups_layers.append(tuple(tuple(color_to_indices[color]) for color in sorted(color_to_indices)))
 
     if not coefficients:
-        append_term((), 0, 0.0)
+        append_term((), "I", 0.0)
         groups_layers = [((0,),)]
 
     partition = (
         LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers)) if coloring is not None else None
     )
-    return QubitOperator.from_sparse_arrays(
-        n,
-        np.frombuffer(offsets, dtype=np.uint64),
-        np.frombuffer(qubits, dtype=np.uint32),
-        np.frombuffer(paulis, dtype=np.uint8),
-        np.asarray(coefficients, dtype=complex),
-        term_partition=partition,
-    )
+    return QubitOperator.from_sparse_terms(n, words, np.asarray(coefficients, dtype=complex), term_partition=partition)
 
 
 def create_heisenberg_hamiltonian(

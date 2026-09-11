@@ -117,8 +117,8 @@ Naive bound
 
 When both ``num_divisions`` and ``target_accuracy`` are specified, the builder uses whichever requires more Trotter steps.
 
-For sparse :class:`~qdk_chemistry.data.QubitOperator` inputs, Trotter traverses partition indices directly and returns a :class:`~qdk_chemistry.data.SparsePauliProductFormulaContainer` instead of materializing subgroup labels or per-term dictionaries.
-Both regular and controlled Pauli-sequence mappers consume these arrays using only each term's non-identity support.
+Trotter traverses :class:`~qdk_chemistry.data.QubitOperator` partition indices directly, caching each active sparse Pauli map instead of materializing subgroup operators or labels.
+The :class:`~qdk_chemistry.data.SparsePauliProductFormulaContainer` construction extension uses the existing product-formula operations and serialization; both Pauli-sequence mappers consume only each term's non-identity support.
 Repetitions remain a count on the product formula; resource estimation uses ``RepeatEstimates`` rather than tracing each repetition.
 These sparse paths do not change the cost of automatic error-bound calculations or explicit matrix/circuit expansion.
 

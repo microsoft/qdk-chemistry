@@ -210,7 +210,7 @@ class MeasurementData(DataClass):
 
     # Dense-only measurements retain the legacy wire format.
     _serialization_version = "0.1.0"
-    _compact_serialization_version = "0.2.0"
+    _sparse_serialization_version = "0.2.0"
 
     def __init__(
         self,
@@ -231,7 +231,7 @@ class MeasurementData(DataClass):
         self.bitstring_counts = bitstring_counts if bitstring_counts is not None else []
         self.shots_list = shots_list if shots_list is not None else []
         if any(hamiltonian.has_sparse_terms for hamiltonian in hamiltonians):
-            self._serialization_version = self._compact_serialization_version
+            self._serialization_version = self._sparse_serialization_version
         super().__init__()
 
     def _hash_update(self, h) -> None:
@@ -341,8 +341,8 @@ class MeasurementData(DataClass):
             RuntimeError: If version field is missing or incompatible.
 
         """
-        packed = any("term_offsets" in item["hamiltonian"] for key, item in json_data.items() if key != "version")
-        expected_version = cls._compact_serialization_version if packed else cls._serialization_version
+        sparse = any("pauli_terms" in item["hamiltonian"] for key, item in json_data.items() if key != "version")
+        expected_version = cls._sparse_serialization_version if sparse else cls._serialization_version
         cls._validate_json_version(expected_version, json_data)
 
         hamiltonians: list[QubitOperator] = []
@@ -355,7 +355,7 @@ class MeasurementData(DataClass):
 
             # Reconstruct QubitOperator
             ham_data = item["hamiltonian"]
-            if "version" in ham_data or "term_offsets" in ham_data:
+            if "version" in ham_data or "pauli_terms" in ham_data:
                 hamiltonian = QubitOperator.from_json(ham_data)
             else:
                 hamiltonian = QubitOperator(
@@ -390,8 +390,8 @@ class MeasurementData(DataClass):
             RuntimeError: If version attribute is missing or incompatible.
 
         """
-        packed = any("term_offsets" in group[key] for key in group if key.startswith("hamiltonian_"))
-        expected_version = cls._compact_serialization_version if packed else cls._serialization_version
+        sparse = any("pauli_terms" in group[key] for key in group if key.startswith("hamiltonian_"))
+        expected_version = cls._sparse_serialization_version if sparse else cls._serialization_version
         cls._validate_hdf5_version(expected_version, group)
 
         num_hamiltonians = group.attrs["num_hamiltonians"]
@@ -404,7 +404,7 @@ class MeasurementData(DataClass):
             ham_group = group[f"hamiltonian_{i}"]
 
             # Load Hamiltonian data
-            if "version" in ham_group.attrs or "term_offsets" in ham_group:
+            if "version" in ham_group.attrs or "pauli_terms" in ham_group:
                 hamiltonian = QubitOperator.from_hdf5(ham_group)
             else:
                 pauli_strings = [s.decode() for s in ham_group["pauli_strings"][:]]

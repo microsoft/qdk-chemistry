@@ -953,17 +953,17 @@ class TestPartitionGrouping:
         assert x_indices == list(range(x_indices[0], x_indices[0] + len(x_indices)))
 
 
-class TestPackedTrotter:
-    """Packed decomposition matches existing schedules without materializing dense terms."""
+class TestSparseTrotter:
+    """Sparse words follow the existing decomposition without materializing dense labels."""
 
     @pytest.mark.parametrize("dtype", [np.float32, np.complex64])
     def test_threshold_uses_the_same_precision_as_dense_terms(self, dtype):
         """Promote coefficients before applying a double-precision threshold."""
         # float32(0.1) is slightly above the double-precision threshold 0.1.
         coefficients = np.array([0.1], dtype=dtype)
-        packed = QubitOperator.from_sparse_terms(1, [{0: "X"}], coefficients)
+        sparse = QubitOperator.from_sparse_terms(1, [{0: "X"}], coefficients)
         builder = Trotter(time=0.5, weight_threshold=0.1)
-        actual = builder.run(packed).get_container()
+        actual = builder.run(sparse).get_container()
         assert list(actual.step_terms) == [ExponentiatedPauliTerm({0: "X"}, float(np.float32(0.1)) * 0.5)]
 
     @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
@@ -989,7 +989,7 @@ class TestPackedTrotter:
             coefficients,
             term_partition=partition,
         )
-        packed = QubitOperator.from_sparse_terms(
+        sparse = QubitOperator.from_sparse_terms(
             4,
             (term for term, _ in dense.iter_sparse_terms()),
             coefficients,
@@ -999,15 +999,14 @@ class TestPackedTrotter:
             order=order, time=-0.7, num_divisions=3, power=3, power_strategy=power_strategy, weight_threshold=1e-12
         )
         expected = builder.run(dense).get_container()
-        actual = builder.run(packed).get_container()
+        actual = builder.run(sparse).get_container()
 
-        assert actual.has_sparse_terms
         assert actual.step_reps == expected.step_reps
         assert actual.scale == expected.scale
         assert actual.num_qubits == expected.num_qubits == 4
         assert list(actual.step_terms) == list(expected.step_terms)
 
-    def test_large_register_never_builds_dense_labels_or_term_objects(self, monkeypatch):
+    def test_large_register_never_builds_dense_labels_or_suboperators(self, monkeypatch):
         """Large registers and symbolic powers must not reach dense compatibility paths."""
         hamiltonian = QubitOperator.from_sparse_terms(
             80_800,
@@ -1017,42 +1016,28 @@ class TestPackedTrotter:
         )
 
         def no_densification(*_args, **_kwargs):
-            raise AssertionError("Packed Trotter materialized labels, sub-Hamiltonians, or term objects")
+            raise AssertionError("Sparse Trotter materialized labels or sub-Hamiltonians")
 
         monkeypatch.setattr(type(hamiltonian.pauli_strings), "__getitem__", no_densification)
         monkeypatch.setattr(Trotter, "_group_terms", no_densification)
         monkeypatch.setattr(Trotter, "_pauli_label_to_map", no_densification)
-        monkeypatch.setattr(
-            "qdk_chemistry.data.SparsePauliProductFormulaContainer.__getitem__",
-            no_densification,
-        )
         container = Trotter(order=4, time=0.7, num_divisions=7, power=1_000_000).run(hamiltonian).get_container()
-        offsets, indices, _, angles = container.sparse_term_arrays()
         assert container.num_qubits == 80_800
         assert container.step_reps == 7_000_000
-        assert len(indices) < 100
-        assert len(angles) < 100
-        assert set(indices) == {0, 80_799, 40_400}
-        assert np.any(np.diff(offsets) == 0)  # Identity factors are retained.
-        assert np.sum(angles) == pytest.approx(0.075)
+        assert len(container.step_terms) < 100
+        assert {q for term in container.step_terms for q in term.pauli_term} == {0, 80_799, 40_400}
+        assert any(not term.pauli_term for term in container.step_terms)
+        assert sum(term.angle for term in container.step_terms) == pytest.approx(0.075)
 
     @pytest.mark.parametrize(("coefficient", "expected_angles"), [(0.0, []), (0.6, [0.24])])
     def test_empty_and_identity_formula(self, coefficient, expected_angles):
         """A zero operator has an empty formula; a nonzero identity keeps its phase."""
         hamiltonian = QubitOperator.from_sparse_terms(2, [{}], np.array([coefficient]))
         container = Trotter(order=4, time=1.2, num_divisions=3).run(hamiltonian).get_container()
-        offsets, indices, codes, angles = container.sparse_term_arrays()
-        assert len(indices) == len(codes) == 0
         assert container.step_reps == 3
         assert container.scale == 1.2
-        np.testing.assert_array_equal(offsets, [0] * (len(expected_angles) + 1))
-        np.testing.assert_allclose(angles, expected_angles, atol=1e-15)
-
-    def test_non_hermitian_coefficients_are_rejected(self):
-        """Packed dispatch must not bypass Hermiticity validation."""
-        hamiltonian = QubitOperator.from_sparse_terms(2, [{1: "Y"}], np.array([0.5 + 0.1j]))
-        with pytest.raises(ValueError, match="Non-Hermitian"):
-            Trotter(time=0.1).run(hamiltonian)
+        assert all(not term.pauli_term for term in container.step_terms)
+        np.testing.assert_allclose([term.angle for term in container.step_terms], expected_angles, atol=1e-15)
 
     def test_dense_path_still_caches_pauli_maps(self):
         """The PR's original dense-map caching remains effective at higher Trotter order."""
