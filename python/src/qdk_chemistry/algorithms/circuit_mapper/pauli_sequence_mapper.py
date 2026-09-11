@@ -79,6 +79,36 @@ class PauliSequenceMapper(CircuitMapper):
                 "PauliSequenceMapper only supports PauliProductFormula containers."
             )
 
+        target_indices = list(range(unitary_container.num_qubits))
+        if unitary_container.has_sparse_terms:
+            offsets, indices, codes, angles = unitary_container.sparse_term_arrays()
+            pauli_values = (qsharp.Pauli.I, qsharp.Pauli.X, qsharp.Pauli.Y, qsharp.Pauli.Z)
+            term_offsets = [int(value) for value in offsets]
+            qubit_indices = [int(value) for value in indices]
+            paulis = [pauli_values[int(value)] for value in codes]
+            coefficients = angles.tolist()
+            repetitions = unitary_container.step_reps
+            program = QSHARP_UTILS.PauliExp.MakeRepSparsePauliExpCircuit
+            evolution_op = QSHARP_UTILS.PauliExp.MakeRepSparsePauliExpOp(
+                term_offsets, qubit_indices, paulis, coefficients, repetitions
+            )
+            factory = QsharpFactoryData(
+                program=program,
+                parameter={
+                    "termOffsets": term_offsets,
+                    "qubitIndices": qubit_indices,
+                    "paulis": paulis,
+                    "pauliCoefficients": coefficients,
+                    "repetitions": repetitions,
+                    "system": target_indices,
+                },
+            )
+            return Circuit(
+                qsharp_op=evolution_op,
+                qsharp_factory=factory,
+                num_qubits=unitary_container.num_qubits,
+            )
+
         pauli_terms: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
         for term in unitary_container.step_terms:
@@ -94,7 +124,6 @@ class PauliSequenceMapper(CircuitMapper):
             "repetitions": unitary_container.step_reps,
         }
 
-        target_indices = list(range(unitary_container.num_qubits))
         program = QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit
 
         evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)

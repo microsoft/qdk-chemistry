@@ -14,7 +14,9 @@ from __future__ import annotations
 import json
 import re
 import warnings
-from typing import TYPE_CHECKING, Any
+from array import array
+from collections.abc import Iterable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
@@ -32,6 +34,56 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
+
+_PAULI_CODES = {"X": 1, "Y": 2, "Z": 3}
+_PAULI_CHARS = "IXYZ"
+
+
+class _SparsePauliStrings(Sequence[str]):
+    """Lazy full-width labels backed by packed non-identity factors."""
+
+    def __init__(
+        self,
+        num_qubits: int,
+        term_offsets: np.ndarray,
+        qubit_indices: np.ndarray,
+        pauli_codes: np.ndarray,
+    ) -> None:
+        self.num_qubits = num_qubits
+        self.term_offsets = term_offsets
+        self.qubit_indices = qubit_indices
+        self.pauli_codes = pauli_codes
+
+    def __len__(self) -> int:
+        return len(self.term_offsets) - 1
+
+    @overload
+    def __getitem__(self, index: int) -> str: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[str]: ...
+
+    def __getitem__(self, index: int | slice) -> str | list[str]:
+        if isinstance(index, slice):
+            return [self[i] for i in range(*index.indices(len(self)))]
+        if index < 0:
+            index += len(self)
+        if index < 0 or index >= len(self):
+            raise IndexError("Pauli term index out of range")
+        label = ["I"] * self.num_qubits
+        begin = int(self.term_offsets[index])
+        end = int(self.term_offsets[index + 1])
+        for position in range(begin, end):
+            qubit = int(self.qubit_indices[position])
+            label[self.num_qubits - 1 - qubit] = _PAULI_CHARS[int(self.pauli_codes[position])]
+        return "".join(label)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, Sequence):
+            return False
+        return len(self) == len(other) and all(left == right for left, right in zip(self, other, strict=True))
+
+    __hash__ = None
 
 
 def _merge_term_partitions(p0: TermPartition, p1: TermPartition) -> TermPartition:
@@ -69,7 +121,7 @@ class QubitOperator(DataClass):
     """Data class representing an operator as a weighted sum of Pauli strings.
 
     Attributes:
-        pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
+        pauli_strings (Sequence[str]): Eager standard labels or lazy sparse-term labels.
         coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
         encoding (str | None): The fermion-to-qubit encoding used to create this operator
             (e.g., "jordan-wigner", "bravyi-kitaev", "parity"). If None, encoding is not specified.
@@ -103,6 +155,7 @@ class QubitOperator(DataClass):
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
+    _compact_serialization_version = "0.2.0"
 
     def __init__(
         self,
@@ -132,7 +185,7 @@ class QubitOperator(DataClass):
         if len(pauli_strings) != len(coefficients):
             raise ValueError("Mismatch between number of Pauli strings and coefficients.")
 
-        self.pauli_strings = pauli_strings
+        self.pauli_strings: Sequence[str] = pauli_strings
         self.coefficients = coefficients
         self.encoding = encoding
         self.fermion_mode_order: FermionModeOrder | None = (
@@ -144,27 +197,133 @@ class QubitOperator(DataClass):
         # Validate Pauli strings
         _validate_pauli_strings(pauli_strings)
 
-        # Validate partition coverage
-        if term_partition is not None:
-            indices = sorted(term_partition.all_indices())
-            expected = list(range(len(pauli_strings)))
-            if indices != expected:
-                missing = set(expected) - set(indices)
-                duped = {i for i in indices if indices.count(i) > 1}
-                raise ValueError(
-                    f"term_partition does not cover all {len(pauli_strings)} terms exactly once. "
-                    f"Missing: {missing or 'none'}, duplicated: {duped or 'none'}."
-                )
+        self._validate_partition()
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
 
+    @classmethod
+    def from_sparse_terms(
+        cls,
+        num_qubits: int,
+        terms: Iterable[Mapping[int, str] | Iterable[tuple[int, str]]],
+        coefficients: np.ndarray,
+        *,
+        encoding: str | None = None,
+        fermion_mode_order: FermionModeOrder | str | None = None,
+        term_partition: TermPartition | None = None,
+        tapering: TaperingSpecification | None = None,
+    ) -> QubitOperator:
+        """Construct an operator from non-identity Pauli factors."""
+        offsets = array("Q", [0])
+        indices = array("I")
+        codes = array("B")
+        for term in terms:
+            factors = term.items() if isinstance(term, Mapping) else term
+            previous = -1
+            for qubit, pauli in sorted(factors):
+                if qubit <= previous or qubit < 0 or qubit >= num_qubits:
+                    raise ValueError("Sparse Pauli qubit indices must be unique and in range.")
+                if pauli not in _PAULI_CODES:
+                    raise ValueError(f"Invalid sparse Pauli operator: {pauli!r}.")
+                indices.append(qubit)
+                codes.append(_PAULI_CODES[pauli])
+                previous = qubit
+            offsets.append(len(indices))
+
+        coefficient_array = np.asarray(coefficients)
+        if len(offsets) - 1 != len(coefficient_array):
+            raise ValueError("Mismatch between number of sparse Pauli terms and coefficients.")
+        return cls.from_sparse_arrays(
+            num_qubits,
+            np.frombuffer(offsets, dtype=np.uint64).copy(),
+            np.frombuffer(indices, dtype=np.uint32).copy(),
+            np.frombuffer(codes, dtype=np.uint8).copy(),
+            coefficient_array,
+            encoding=encoding,
+            fermion_mode_order=fermion_mode_order,
+            term_partition=term_partition,
+            tapering=tapering,
+        )
+
+    @classmethod
+    def from_sparse_arrays(
+        cls,
+        num_qubits: int,
+        term_offsets: np.ndarray,
+        qubit_indices: np.ndarray,
+        pauli_codes: np.ndarray,
+        coefficients: np.ndarray,
+        *,
+        encoding: str | None = None,
+        fermion_mode_order: FermionModeOrder | str | None = None,
+        term_partition: TermPartition | None = None,
+        tapering: TaperingSpecification | None = None,
+    ) -> QubitOperator:
+        """Construct an operator from packed sparse-term arrays."""
+        term_offsets = np.asarray(term_offsets, dtype=np.uint64)
+        qubit_indices = np.asarray(qubit_indices, dtype=np.uint32)
+        pauli_codes = np.asarray(pauli_codes, dtype=np.uint8)
+        coefficients = np.asarray(coefficients)
+        if any(array.ndim != 1 for array in (term_offsets, qubit_indices, pauli_codes, coefficients)):
+            raise ValueError("Packed sparse Pauli arrays must be one-dimensional.")
+        term_starts = np.zeros(len(qubit_indices), dtype=bool)
+        if len(qubit_indices):
+            valid_starts = term_offsets[:-1][term_offsets[:-1] < len(qubit_indices)]
+            term_starts[valid_starts] = True
+        duplicate_or_unsorted = len(qubit_indices) > 1 and np.any(
+            (qubit_indices[1:] <= qubit_indices[:-1]) & ~term_starts[1:]
+        )
+        if (
+            num_qubits < 1
+            or len(term_offsets) != len(coefficients) + 1
+            or len(coefficients) == 0
+            or len(qubit_indices) != len(pauli_codes)
+            or term_offsets[0] != 0
+            or term_offsets[-1] != len(qubit_indices)
+            or np.any(term_offsets > len(qubit_indices))
+            or np.any(term_offsets[1:] < term_offsets[:-1])
+            or np.any(qubit_indices >= num_qubits)
+            or np.any((pauli_codes < 1) | (pauli_codes > 3))
+            or duplicate_or_unsorted
+        ):
+            raise ValueError("Invalid packed sparse Pauli arrays.")
+        object_ = cls.__new__(cls)
+        object_.__dict__.update(
+            _num_qubits=num_qubits,
+            _term_offsets=term_offsets,
+            _qubit_indices=qubit_indices,
+            _pauli_codes=pauli_codes,
+        )
+        object_.pauli_strings = _SparsePauliStrings(num_qubits, term_offsets, qubit_indices, pauli_codes)
+        object_.coefficients = coefficients
+        object_.encoding = encoding
+        object_.fermion_mode_order = FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
+        object_.term_partition = term_partition
+        object_.tapering = tapering
+        QubitOperator._validate_partition(object_)
+        DataClass.__init__(object_)
+        return object_
+
+    def _validate_partition(self) -> None:
+        if self.term_partition is None:
+            return
+        indices = np.fromiter(self.term_partition.iter_indices(), dtype=np.int64)
+        if len(indices) != self.num_terms or not np.array_equal(np.sort(indices), np.arange(self.num_terms)):
+            raise ValueError("term_partition must cover every term exactly once.")
+
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "qubit_hamiltonian")
-        _hash_uint(h, len(self.pauli_strings))
-        for ps in self.pauli_strings:
-            _hash_str(h, ps)
+        if self.has_sparse_terms:
+            _hash_uint(h, self.num_qubits)
+            _hash_array(h, self._term_offsets)
+            _hash_array(h, self._qubit_indices)
+            _hash_array(h, self._pauli_codes)
+        else:
+            _hash_uint(h, len(self.pauli_strings))
+            for ps in self.pauli_strings:
+                _hash_str(h, ps)
         _hash_array(h, self.coefficients)
         _hash_optional(h, self.encoding, _hash_str)
         _hash_optional(h, self.fermion_mode_order, lambda h, mode: _hash_str(h, str(mode)))
@@ -179,7 +338,46 @@ class QubitOperator(DataClass):
             int: The number of qubits.
 
         """
+        if hasattr(self, "_num_qubits"):
+            return self._num_qubits
         return len(self.pauli_strings[0])
+
+    @property
+    def num_terms(self) -> int:
+        """Return the number of Pauli terms."""
+        return len(self.pauli_strings)
+
+    @property
+    def has_sparse_terms(self) -> bool:
+        """Return whether the operator uses packed sparse-term storage."""
+        return hasattr(self, "_term_offsets")
+
+    def sparse_term_arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return packed term offsets, qubit indices, and Pauli codes."""
+        if not self.has_sparse_terms:
+            raise RuntimeError("This QubitOperator does not use packed sparse-term storage.")
+        return self._term_offsets, self._qubit_indices, self._pauli_codes
+
+    def iter_sparse_terms(self) -> Iterable[tuple[tuple[tuple[int, str], ...], complex]]:
+        """Iterate over compact non-identity factors and coefficients."""
+        if hasattr(self, "_term_offsets"):
+            for term_index, coefficient in enumerate(self.coefficients):
+                begin = int(self._term_offsets[term_index])
+                end = int(self._term_offsets[term_index + 1])
+                factors = tuple(
+                    (int(self._qubit_indices[i]), _PAULI_CHARS[int(self._pauli_codes[i])]) for i in range(begin, end)
+                )
+                yield factors, complex(coefficient)
+            return
+        for label, coefficient in zip(self.pauli_strings, self.coefficients, strict=True):
+            yield (
+                tuple(
+                    sorted(
+                        (self.num_qubits - 1 - position, pauli) for position, pauli in enumerate(label) if pauli != "I"
+                    )
+                ),
+                complex(coefficient),
+            )
 
     @property
     def schatten_norm(self) -> float:
@@ -234,10 +432,10 @@ class QubitOperator(DataClass):
         if not isinstance(other, QubitOperator):
             return False
 
-        def _sum_terms(qh: QubitOperator) -> dict[str, complex]:
-            d: dict[str, complex] = {}
-            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
-                d[ps] = d.get(ps, 0) + c
+        def _sum_terms(qh: QubitOperator) -> dict[tuple[tuple[int, str], ...], complex]:
+            d: dict[tuple[tuple[int, str], ...], complex] = {}
+            for term, coefficient in qh.iter_sparse_terms():
+                d[term] = d.get(term, 0) + coefficient
             return d
 
         self_dict = _sum_terms(self)
@@ -297,13 +495,29 @@ class QubitOperator(DataClass):
         if self.tapering != other.tapering:
             raise ValueError(f"Cannot add operators with different tapering: {self.tapering!r} vs {other.tapering!r}.")
 
-        pauli_strings = list(self.pauli_strings) + list(other.pauli_strings)
         coefficients = np.concatenate([self.coefficients, other.coefficients])
 
         partition = None
         if self.term_partition is not None and other.term_partition is not None:
             partition = _merge_term_partitions(self.term_partition, other.term_partition)
 
+        if self.has_sparse_terms and other.has_sparse_terms:
+            self_offsets, self_indices, self_codes = self.sparse_term_arrays()
+            other_offsets, other_indices, other_codes = other.sparse_term_arrays()
+            offsets = np.concatenate([self_offsets, other_offsets[1:] + len(self_indices)])
+            return QubitOperator.from_sparse_arrays(
+                self.num_qubits,
+                offsets,
+                np.concatenate([self_indices, other_indices]),
+                np.concatenate([self_codes, other_codes]),
+                coefficients,
+                encoding=self.encoding,
+                fermion_mode_order=self.fermion_mode_order,
+                term_partition=partition,
+                tapering=self.tapering,
+            )
+
+        pauli_strings = list(self.pauli_strings) + list(other.pauli_strings)
         return QubitOperator(
             pauli_strings,
             coefficients,
@@ -327,6 +541,18 @@ class QubitOperator(DataClass):
         """
         if not isinstance(scalar, int | float | complex | np.number):
             return NotImplemented
+        if hasattr(self, "_term_offsets"):
+            return QubitOperator.from_sparse_arrays(
+                self.num_qubits,
+                self._term_offsets.copy(),
+                self._qubit_indices.copy(),
+                self._pauli_codes.copy(),
+                self.coefficients * scalar,
+                encoding=self.encoding,
+                fermion_mode_order=self.fermion_mode_order,
+                term_partition=self.term_partition,
+                tapering=self.tapering,
+            )
         return QubitOperator(
             list(self.pauli_strings),
             self.coefficients * scalar,
@@ -453,13 +679,23 @@ class QubitOperator(DataClass):
         # Serialize complex coefficients as {"real": [...], "imag": [...]}
         # This handles both real and complex coefficient arrays
         coeffs = self.coefficients
-        data = {
-            "pauli_strings": self.pauli_strings,
+        data: dict[str, Any] = {
             "coefficients": {
                 "real": coeffs.real.tolist(),
                 "imag": coeffs.imag.tolist(),
             },
         }
+        if hasattr(self, "_term_offsets"):
+            data.update(
+                {
+                    "num_qubits": self.num_qubits,
+                    "term_offsets": self._term_offsets.tolist(),
+                    "qubit_indices": self._qubit_indices.tolist(),
+                    "pauli_codes": self._pauli_codes.tolist(),
+                }
+            )
+        else:
+            data["pauli_strings"] = self.pauli_strings
         if self.encoding is not None:
             data["encoding"] = self.encoding
         if self.fermion_mode_order is not None:
@@ -468,7 +704,10 @@ class QubitOperator(DataClass):
             data["term_partition"] = self.term_partition.to_json()
         if self.tapering is not None:
             data["tapering"] = self.tapering.to_json()
-        return self._add_json_version(data)
+        result = self._add_json_version(data)
+        if hasattr(self, "_term_offsets"):
+            result["version"] = self._compact_serialization_version
+        return result
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the qubit operator to an HDF5 group.
@@ -478,7 +717,14 @@ class QubitOperator(DataClass):
 
         """
         self._add_hdf5_version(group)
-        group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
+        if hasattr(self, "_term_offsets"):
+            group.attrs["version"] = self._compact_serialization_version
+            group.attrs["num_qubits"] = self.num_qubits
+            group.create_dataset("term_offsets", data=self._term_offsets)
+            group.create_dataset("qubit_indices", data=self._qubit_indices)
+            group.create_dataset("pauli_codes", data=self._pauli_codes)
+        else:
+            group.create_dataset("pauli_strings", data=np.array(self.pauli_strings, dtype="S"))
         group.create_dataset("coefficients", data=self.coefficients)
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
@@ -503,7 +749,10 @@ class QubitOperator(DataClass):
             RuntimeError: If version field is missing or incompatible.
 
         """
-        cls._validate_json_version(cls._serialization_version, json_data)
+        expected_version = (
+            cls._compact_serialization_version if "term_offsets" in json_data else cls._serialization_version
+        )
+        cls._validate_json_version(expected_version, json_data)
         coeff_data = json_data["coefficients"]
         # Handle complex coefficients serialized as {"real": [...], "imag": [...]}
         if isinstance(coeff_data, dict) and "real" in coeff_data and "imag" in coeff_data:
@@ -515,14 +764,22 @@ class QubitOperator(DataClass):
         term_partition = TermPartition.from_json(partition_data) if partition_data is not None else None
         tapering_data = json_data.get("tapering")
         tapering = TaperingSpecification.from_json(tapering_data) if tapering_data is not None else None
-        return cls(
-            pauli_strings=json_data["pauli_strings"],
-            coefficients=coefficients,
-            encoding=json_data.get("encoding"),
-            fermion_mode_order=json_data.get("fermion_mode_order"),
-            term_partition=term_partition,
-            tapering=tapering,
-        )
+        metadata = {
+            "encoding": json_data.get("encoding"),
+            "fermion_mode_order": json_data.get("fermion_mode_order"),
+            "term_partition": term_partition,
+            "tapering": tapering,
+        }
+        if "term_offsets" in json_data:
+            return cls.from_sparse_arrays(
+                json_data["num_qubits"],
+                np.asarray(json_data["term_offsets"], dtype=np.uint64),
+                np.asarray(json_data["qubit_indices"], dtype=np.uint32),
+                np.asarray(json_data["pauli_codes"], dtype=np.uint8),
+                coefficients,
+                **metadata,
+            )
+        return cls(pauli_strings=json_data["pauli_strings"], coefficients=coefficients, **metadata)
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> QubitOperator:
@@ -538,8 +795,8 @@ class QubitOperator(DataClass):
             RuntimeError: If version attribute is missing or incompatible.
 
         """
-        cls._validate_hdf5_version(cls._serialization_version, group)
-        pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
+        expected_version = cls._compact_serialization_version if "term_offsets" in group else cls._serialization_version
+        cls._validate_hdf5_version(expected_version, group)
         coefficients = np.array(group["coefficients"])
         encoding = group.attrs.get("encoding")
         # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
@@ -562,14 +819,23 @@ class QubitOperator(DataClass):
             tapering = TaperingSpecification.from_json(json.loads(tapering_attr))
         else:
             tapering = None
-        return cls(
-            pauli_strings=pauli_strings,
-            coefficients=coefficients,
-            encoding=encoding,
-            fermion_mode_order=fermion_mode_order,
-            term_partition=term_partition,
-            tapering=tapering,
-        )
+        metadata = {
+            "encoding": encoding,
+            "fermion_mode_order": fermion_mode_order,
+            "term_partition": term_partition,
+            "tapering": tapering,
+        }
+        if "term_offsets" in group:
+            return cls.from_sparse_arrays(
+                int(group.attrs["num_qubits"]),
+                np.array(group["term_offsets"], dtype=np.uint64),
+                np.array(group["qubit_indices"], dtype=np.uint32),
+                np.array(group["pauli_codes"], dtype=np.uint8),
+                coefficients,
+                **metadata,
+            )
+        pauli_strings = [s.decode() for s in group["pauli_strings"][:]]
+        return cls(pauli_strings=pauli_strings, coefficients=coefficients, **metadata)
 
 
 def _validate_pauli_strings(pauli_strings: list[str]) -> None:

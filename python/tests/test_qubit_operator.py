@@ -68,6 +68,27 @@ class TestQubitHamiltonian:
         with pytest.raises(ValueError, match="empty"):
             QubitOperator(pauli_strings=[], coefficients=[])
 
+    def test_sparse_terms_match_dense_operator(self):
+        dense = QubitOperator(["IX", "YY", "ZI"], np.array([1.0, -0.5, 0.75]))
+        sparse = QubitOperator.from_sparse_terms(
+            2,
+            [((0, "X"),), ((0, "Y"), (1, "Y")), ((1, "Z"),)],
+            np.array([1.0, -0.5, 0.75]),
+        )
+
+        assert sparse.pauli_strings == dense.pauli_strings
+        assert sparse.num_qubits == 2
+        assert sparse.num_terms == 3
+        assert sparse.equiv(dense)
+        np.testing.assert_array_equal(sparse.to_matrix(), dense.to_matrix())
+        assert (2.0 * sparse).pauli_strings == dense.pauli_strings
+
+    def test_sparse_terms_validate_factors(self):
+        with pytest.raises(ValueError, match="unique and in range"):
+            QubitOperator.from_sparse_terms(2, [((2, "X"),)], np.array([1.0]))
+        with pytest.raises(ValueError, match="Invalid sparse Pauli"):
+            QubitOperator.from_sparse_terms(2, [((0, "A"),)], np.array([1.0]))
+
     def test_content_hash_includes_fermion_mode_order(self):
         """Content hash changes when fermion_mode_order changes."""
         blocked = QubitOperator(["IX", "ZI"], np.array([1.0, 0.5]), fermion_mode_order="blocked")
@@ -444,6 +465,22 @@ class TestQubitHamiltonianSerialization:
 
         assert reconstructed.pauli_strings == original.pauli_strings
         np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_sparse_roundtrip(self, tmp_path, file_format):
+        original = QubitOperator.from_sparse_terms(
+            4,
+            [((0, "X"), (3, "Z")), ((1, "Y"),)],
+            np.array([1.0, -0.5]),
+        )
+        filename = tmp_path / f"test.qubit_hamiltonian.{file_format}"
+        original.to_file(str(filename), file_format)
+        reconstructed = QubitOperator.from_file(str(filename), file_format)
+
+        if file_format == "json":
+            assert original.to_json()["version"] == "0.2.0"
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_equal(reconstructed.coefficients, original.coefficients)
 
     def test_json_file_roundtrip_complex_coefficients(self, tmp_path):
         """Test JSON file roundtrip with complex coefficients."""

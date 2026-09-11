@@ -40,6 +40,12 @@ print(f"Triangular: {triangular.num_sites} sites, {triangular.num_edges} edges")
 honeycomb = LatticeGraph.honeycomb(3, 2)
 print(f"Honeycomb: {honeycomb.num_sites} sites, {honeycomb.num_edges} edges")
 
+# Create one isolated six-site honeycomb plaquette
+hexagon = LatticeGraph.honeycomb_plaquettes(1, 1)
+print(f"Hexagon: {hexagon.num_sites} sites, {hexagon.num_edges} edges")
+print(f"Hexagon positions:\n{hexagon.positions}")
+print(f"Hexagon neighbor shells: {hexagon.nearest_neighbor_shells([1, 2, 3])}")
+
 # Create a 3x2 kagome lattice (3 sites per unit cell)
 kagome = LatticeGraph.kagome(3, 2)
 print(f"Kagome: {kagome.num_sites} sites, {kagome.num_edges} edges")

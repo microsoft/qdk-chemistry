@@ -71,6 +71,20 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
+    def test_run_builds_packed_term_circuit(self):
+        container = PauliProductFormulaContainer.from_sparse_arrays(
+            np.array([0, 1, 2], dtype=np.uint64),
+            np.array([0, 1], dtype=np.uint32),
+            np.array([1, 3], dtype=np.uint8),
+            np.array([0.5, 0.25]),
+            step_reps=2,
+            num_qubits=2,
+        )
+        circuit = PauliSequenceMapper().run(UnitaryRepresentation(container=container))
+
+        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
+        assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == 2
+
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
         """Test that the constructed unitary circuit has the expected matrix."""

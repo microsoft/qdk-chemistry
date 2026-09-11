@@ -104,6 +104,22 @@ class TestTrotter:
             rtol=float_comparison_relative_tolerance,
         )
 
+    def test_packed_terms_preserve_trotter_decomposition(self):
+        dense = QubitOperator(["IX", "ZZ"], np.array([2.0, 1.0]))
+        packed = QubitOperator.from_sparse_terms(
+            2,
+            [{0: "X"}, {0: "Z", 1: "Z"}],
+            np.array([2.0, 1.0]),
+        )
+        builder = Trotter(num_divisions=4, time=0.2)
+
+        dense_container = builder.run(dense).get_container()
+        packed_container = builder.run(packed).get_container()
+
+        assert packed_container.has_sparse_terms
+        assert packed_container.step_reps == 4
+        assert list(packed_container.step_terms) == list(dense_container.step_terms)
+
     def test_single_step_no_merge_without_partition(self):
         """Test that without term_partition, duplicate terms are not merged."""
         pauli_strings = ["XII", "IXI", "XII"]
