@@ -1,7 +1,8 @@
-"""Tests for the SOSSA controlled circuit mapper."""
-            )
+"""Tests for the SOSSA circuit mapper."""
 
-
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
 import math
@@ -286,6 +287,7 @@ class TestInnerPrep:
             np.testing.assert_allclose(
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
+
 
 class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
