@@ -1,0 +1,6 @@
+{% if docs_commit %}
+<p class="build-provenance">
+  Documentation revision
+  <a href="{{ repository_url }}/commit/{{ docs_commit }}" title="Documentation commit {{ docs_commit }}"><code>{{ docs_commit[:12] }}</code></a>.
+</p>
+{% endif %}
