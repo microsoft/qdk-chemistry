@@ -31,6 +31,12 @@ class TestWavefunctionBasedActiveSpaceSelector:
         selector_default = algorithms.create("active_space_selector", "qdk_autocas")
         assert selector_default is not None
 
+        qicas = algorithms.create("active_space_selector", "qdk_qicas")
+        assert isinstance(qicas, algorithms.QdkQICASActiveSpaceSelector)
+        assert "qdk_qicas" in available_selectors
+        assert qicas.settings().get("num_active_electrons") == -1
+        assert qicas.settings().get("num_active_orbitals") == -1
+
         # Test that nonexistent selector raises error
         with pytest.raises(KeyError):
             algorithms.create("active_space_selector", "nonexistent_selector")
