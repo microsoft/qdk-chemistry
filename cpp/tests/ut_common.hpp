@@ -424,4 +424,34 @@ inline std::shared_ptr<Structure> create_agh_structure() {
   return std::make_shared<Structure>(coords, elements);
 }
 
+/**
+ * @brief Creates an o-benzosemiquinone radical structure (issue #543)
+ *
+ * Planar aromatic doublet radical. With def2-tzvp this geometry produces
+ * a linearly dependent AO basis (n_MO < n_AO), exercising the rectangular
+ * ROHF back-transform path.
+ */
+inline std::shared_ptr<Structure> create_obenzosemiquinone_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {3.7321, 1.3450, 0.0000},  {2.0000, 0.3450, 0.0000},
+      {3.7321, 0.3450, 0.0000},  {2.8660, -0.1550, 0.0000},
+      {4.5981, -0.1550, 0.0000}, {2.8660, -1.1550, 0.0000},
+      {4.5981, -1.1550, 0.0000}, {3.7321, -1.6550, 0.0000},
+      {5.1350, 0.1550, 0.0000},  {2.3291, -1.4650, 0.0000},
+      {5.1350, -1.4650, 0.0000}, {3.7321, -2.2750, 0.0000},
+      {4.2690, 1.6550, 0.0000}};
+
+  // Convert to Bohr
+  for (auto& coord : coords) {
+    coord *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+
+  std::vector<Element> elements = {
+      Element::O, Element::O, Element::C, Element::C, Element::C,
+      Element::C, Element::C, Element::C, Element::H, Element::H,
+      Element::H, Element::H, Element::H};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
 }  // namespace testing
