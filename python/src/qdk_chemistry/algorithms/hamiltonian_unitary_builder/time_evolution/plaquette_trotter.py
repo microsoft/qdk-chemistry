@@ -80,6 +80,7 @@ class PlaquetteTrotter(Trotter):
         *,
         lattice_width: int = 0,
         lattice_height: int = 0,
+        max_batch: int = 0,
         time: float = 0.0,
         target_accuracy: float = 0.0,
         num_divisions: int = 0,
@@ -94,6 +95,7 @@ class PlaquetteTrotter(Trotter):
             order: Trotter-Suzuki order. Only 2 is supported.
             lattice_width: Number of lattice columns. Required at run time.
             lattice_height: Number of lattice rows. Required at run time.
+            max_batch: Largest Hamming-weight phasing batch, or 0 for unbounded.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto step computation. Use 0.0 to disable.
             num_divisions: Divisions per Trotter step. Max of this and the auto value is used.
@@ -129,6 +131,7 @@ class PlaquetteTrotter(Trotter):
         settings.set("weight_threshold", weight_threshold)
         settings.set("lattice_width", lattice_width)
         settings.set("lattice_height", lattice_height)
+        settings.set("max_batch", max_batch)
         self._settings = settings
 
     def name(self) -> str:
@@ -167,7 +170,7 @@ class PlaquetteTrotter(Trotter):
         num_sites = self._settings.get("lattice_width") * self._settings.get("lattice_height")
         _, diagonal, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
         diagonal = [term for term in diagonal if term.pauli_term]
-        boundary = self._diagonal_layer(diagonal, delta * 0.5, max_batch=num_sites // 2)
+        boundary = self._diagonal_layer(diagonal, delta * 0.5, max_batch=self._settings.get("max_batch"))
 
         return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
@@ -363,8 +366,11 @@ class PlaquetteTrotter(Trotter):
             time=time * 0.5,
         )
         # Repeated body 4: D, one full H_I layer. After the particle-hole shift,
-        # each onsite interaction contributes one rotation.
-        interaction = self._diagonal_layer(diagonal, time, max_batch=num_sites // 2)
+        # each onsite interaction contributes one rotation. Its equal-angle family is
+        # phased through a single Hamming weight register by default, which costs
+        # ceil(log2) rotations rather than one per chunk at the price of about one
+        # ancilla per member; see the max_batch setting to bound that width.
+        interaction = self._diagonal_layer(diagonal, time, max_batch=self._settings.get("max_batch"))
         hopping_layers = [layer for layer in (hop_a_open, hop_b, hop_a_close) if layer is not None]
         return hopping_layers + identity_phase + interaction
 
@@ -617,3 +623,13 @@ class PlaquetteTrotterSettings(TrotterSettings):
         super().__init__()
         self._set_default("lattice_width", "int", 0, "Number of lattice columns. Required.")
         self._set_default("lattice_height", "int", 0, "Number of lattice rows. Required.")
+        self._set_default(
+            "max_batch",
+            "int",
+            0,
+            "Largest Hamming-weight phasing batch, or 0 for unbounded. A batch of m "
+            "equal-angle terms on disjoint qubits costs ceil(log2(m+1)) rotations and "
+            "about m ancillas, so capping it trades rotations for width. Campbell's "
+            "Table II budgets L^2/2 ancillas (arXiv:2012.09238v4); pass that to "
+            "reproduce his qubit counts rather than the cheaper rotation count.",
+        )

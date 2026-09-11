@@ -53,14 +53,18 @@ class TestPlaquetteTrotterConfiguration:
     def test_explicit_num_divisions_is_used(self):
         """An explicit division count controls the repeated formula when auto sizing is disabled."""
         operator = _hubbard_operator(2, 2, interaction=4.0)
-        container = PlaquetteTrotter(
-            lattice_width=2,
-            lattice_height=2,
-            order=2,
-            time=0.2,
-            target_accuracy=0.0,
-            num_divisions=7,
-        ).run(operator).get_container()
+        container = (
+            PlaquetteTrotter(
+                lattice_width=2,
+                lattice_height=2,
+                order=2,
+                time=0.2,
+                target_accuracy=0.0,
+                num_divisions=7,
+            )
+            .run(operator)
+            .get_container()
+        )
 
         assert container.step_reps == 7
 
@@ -121,9 +125,7 @@ def _resolve_divisions(
             _pauli_label({num_sites: "Y", num_sites + 1: "Y"}, num_qubits),
             _pauli_label({0: "Z", num_sites: "Z"}, num_qubits),
         ],
-        coefficients=np.array(
-            [-hopping / 2.0, -hopping / 2.0, -hopping / 2.0, -hopping / 2.0, interaction / 4.0]
-        ),
+        coefficients=np.array([-hopping / 2.0, -hopping / 2.0, -hopping / 2.0, -hopping / 2.0, interaction / 4.0]),
     )
     return builder._resolve_num_divisions(operator, time)
 
@@ -232,9 +234,7 @@ class TestPlaquetteTrotterDecomposition:
         time = 0.37
         layer = PlaquetteTrotter()._hop_layer([sites], num_sites=num_modes, hopping=1.0, time=time)
         assert layer is not None
-        spin_up_terms = [
-            term for term in _expand_terms([layer]) if all(qubit < num_modes for qubit in term.pauli_term)
-        ]
+        spin_up_terms = [term for term in _expand_terms([layer]) if all(qubit < num_modes for qubit in term.pauli_term)]
 
         lower = np.array([[0, 1], [0, 0]], dtype=complex)
         modes = [
@@ -255,19 +255,34 @@ class TestPlaquetteTrotterDecomposition:
         assert np.allclose(actual, expected, atol=1e-10)
 
     def test_repeated_formula_has_boundary_and_four_factor_body(self):
-        """Campbell's rewrite emits one boundary layer around the repeated P-G-P-D body."""
+        """Campbell's rewrite emits one boundary layer around the repeated P-G-P-D body.
+
+        The D layer is the interaction, whose equal-angle families are phased through
+        Hamming weight registers: one batch per family, plus the identity factor
+        carrying the Jordan-Wigner constant. Bounding ``max_batch`` would split those
+        families into more batches without changing the three hopping conjugations.
+        """
         operator = _hubbard_operator(4, 4, interaction=4.0)
-        container = PlaquetteTrotter(
-            lattice_width=4,
-            lattice_height=4,
-            time=0.15,
-            num_divisions=3,
-        ).run(operator).get_container()
+        container = (
+            PlaquetteTrotter(
+                lattice_width=4,
+                lattice_height=4,
+                time=0.15,
+                num_divisions=3,
+            )
+            .run(operator)
+            .get_container()
+        )
 
         assert container.step_reps == 3
         assert container.conjugating_terms
-        assert len(container.step_terms) == 4
-        assert all(isinstance(term, ConjugatedExponentiatedPauliTerm) for term in container.step_terms[:3])
+        hopping = [term for term in container.step_terms if isinstance(term, ConjugatedExponentiatedPauliTerm)]
+        assert len(hopping) == 3
+        assert container.step_terms[:3] == hopping, "the hopping tilings must come first"
+        assert all(
+            isinstance(term, ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm)
+            for term in container.step_terms[3:]
+        ), "the interaction layer holds only plain and batched factors"
 
 
 PauliGroup = ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm
@@ -367,6 +382,38 @@ class TestHammingWeightPhasing:
 
         assert counts[0] < counts[1]
 
+    def test_unbounded_batches_merge_the_interaction_families(self):
+        """Without a cap each equal-angle family occupies one register, not several.
+
+        A batch of ``m`` disjoint equal-angle terms costs ``ceil(log2(m+1))`` rotations,
+        so splitting one family into ``k`` chunks pays that cost ``k`` times over. The
+        default is therefore unbounded. Campbell's Table II instead budgets ``L^2/2``
+        ancillas (arXiv:2012.09238v4), which is what ``max_batch`` reproduces: the same
+        operator, fewer qubits, more rotations.
+        """
+        side = 4
+        operator = _hubbard_operator(side, side, interaction=8.0)
+        shapes = {}
+        for cap in (0, side * side // 2):
+            container = (
+                PlaquetteTrotter(
+                    lattice_width=side,
+                    lattice_height=side,
+                    time=0.05,
+                    num_divisions=1,
+                    max_batch=cap,
+                )
+                .run(operator)
+                .get_container()
+            )
+            batches = [term for term in container.step_terms if isinstance(term, BatchedExponentiatedPauliTerm)]
+            shapes[cap] = sorted(len(term.pauli_terms) for term in batches)
+
+        unbounded, bounded = shapes[0], shapes[side * side // 2]
+        assert sum(unbounded) == sum(bounded), "capping must not drop or add factors"
+        assert len(unbounded) < len(bounded), "the unbounded form must use fewer registers"
+        assert max(bounded) <= side * side // 2, "a bounded batch must respect the cap"
+
 
 class TestPlaquetteTrotterBasisStates:
     """The emitted Q# plaquette step must reproduce exact basis-state evolution."""
@@ -376,12 +423,16 @@ class TestPlaquetteTrotterBasisStates:
         side = 2
         time = 0.29
         operator = _hubbard_operator(side, side, interaction=0.0)
-        container = PlaquetteTrotter(
-            lattice_width=side,
-            lattice_height=side,
-            time=time,
-            num_divisions=1,
-        ).run(operator).get_container()
+        container = (
+            PlaquetteTrotter(
+                lattice_width=side,
+                lattice_height=side,
+                time=time,
+                num_divisions=1,
+            )
+            .run(operator)
+            .get_container()
+        )
         labels, coefficients = zip(*operator.get_real_coefficients(tolerance=1e-14), strict=True)
         exact = scipy.linalg.expm(-1j * time * pauli_to_dense_matrix(list(labels), list(coefficients)))
         basis_states = [0, 1 << (operator.num_qubits - 1), (1 << (operator.num_qubits - 1)) | (1 << 3)]
