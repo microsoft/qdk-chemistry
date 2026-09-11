@@ -13,23 +13,37 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry import algorithms
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import (
+    AOType,
+    BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
+    OrbitalType,
+    Shell,
+    Structure,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    scf_energy_tolerance,
+)
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 
 class TestHamiltonian:
+    """Test canonical four-center Hamiltonian behavior and serialization."""
+
     def test_default_constructor(self):
+        """Verify the standard test helper creates a populated Hamiltonian."""
         h = create_test_hamiltonian(2)
         assert isinstance(h, Hamiltonian)
         assert h.has_one_body_integrals()
@@ -37,11 +51,13 @@ class TestHamiltonian:
         assert h.has_orbitals()
 
     def test_size_and_electron_counts(self):
+        """Verify orbital dimensions are retained by the Hamiltonian."""
         h = create_test_hamiltonian(3)
         assert isinstance(h, Hamiltonian)
         assert h.get_orbitals().get_num_molecular_orbitals() == 3
 
     def test_full_constructor(self):
+        """Verify construction with explicit one- and two-electron integrals."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(0)
         two_body = rng.random(2**4)
@@ -65,6 +81,7 @@ class TestHamiltonian:
         assert np.array_equal(bbbb, two_body)
 
     def test_one_body_integrals(self):
+        """Verify one-electron integral access."""
         one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
         two_body = np.zeros(2**4)
         orbitals = create_test_orbitals(2)
@@ -73,6 +90,7 @@ class TestHamiltonian:
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
 
     def test_two_body_integrals(self):
+        """Verify restricted two-electron spin blocks are expanded consistently."""
         one_body = np.eye(2)
         rng = np.random.default_rng(1)
         two_body = rng.random(2**4)
@@ -87,11 +105,13 @@ class TestHamiltonian:
         assert np.array_equal(bbbb, two_body)
 
     def test_two_body_element_access(self):
+        """Verify scalar access to a two-electron integral element."""
         h = create_test_hamiltonian(2)
         val = h.get_two_body_element(0, 1, 1, 0)
         assert isinstance(val, float)
 
     def test_active_space_management(self):
+        """Verify active-space construction preserves the core energy."""
         one_body = np.eye(3)
         two_body = np.zeros(3**4)
         orbitals = create_test_orbitals(3)
@@ -99,6 +119,7 @@ class TestHamiltonian:
         assert h.get_core_energy() == 2.5
 
     def test_json_serialization(self):
+        """Verify in-memory JSON serialization preserves Hamiltonian data."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -154,6 +175,7 @@ class TestHamiltonian:
         )
 
     def test_json_file_io(self):
+        """Verify Hamiltonians round-trip through JSON files."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -209,6 +231,7 @@ class TestHamiltonian:
             Path(filename).unlink(missing_ok=True)
 
     def test_hdf5_file_io(self):
+        """Verify Hamiltonians round-trip through HDF5 files."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -264,6 +287,7 @@ class TestHamiltonian:
             Path(filename).unlink(missing_ok=True)
 
     def test_generic_file_io(self):
+        """Verify generic file dispatch supports JSON and HDF5."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -316,6 +340,7 @@ class TestHamiltonian:
             Path(hdf5_filename).unlink(missing_ok=True)
 
     def test_file_io_validation(self):
+        """Verify invalid formats and missing files raise errors."""
         h = create_test_hamiltonian(2)
         with pytest.raises(RuntimeError, match="Unsupported file type"):
             h.to_file("test.txt", "txt")
@@ -327,6 +352,7 @@ class TestHamiltonian:
             Hamiltonian.from_hdf5_file("nonexistent.hamiltonian.h5")
 
     def test_minimal_hamiltonian_json_roundtrip(self):
+        """Verify a one-orbital Hamiltonian survives JSON serialization."""
         h = create_test_hamiltonian(1)
         data = json.loads(h.to_json())
         assert data["container"]["core_energy"] == 0.0
@@ -341,6 +367,7 @@ class TestHamiltonian:
         assert h2.has_orbitals()
 
     def test_static_methods_exist(self):
+        """Verify static HDF5 deserialization is available."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
         two_body = rng.random(2**4)
@@ -1140,3 +1167,219 @@ class TestCholeskyHamiltonian:
 def test_hamiltonian_data_type_name():
     """Test that Hamiltonian exposes its static wire-format identifier."""
     assert class_data_type_name(Hamiltonian) == "hamiltonian"
+
+
+def create_x2c_constructor(name="qdk", integral_dressing="x2c_1e"):
+    """Create a native Hamiltonian constructor configured for X2C-1e."""
+    return algorithms.create(
+        "hamiltonian_constructor",
+        name,
+        integral_dressing=integral_dressing,
+    )
+
+
+@pytest.fixture(scope="module")
+def x2c_hamiltonian():
+    """Run SCF and decontracted X2C-1e once for the module."""
+    mol = Structure(
+        ["O", "H", "H"],
+        np.array(
+            [
+                [0.0, -0.0758 * ANGSTROM_TO_BOHR, 0.0],
+                [0.8668 * ANGSTROM_TO_BOHR, 0.6013 * ANGSTROM_TO_BOHR, 0.0],
+                [-0.8668 * ANGSTROM_TO_BOHR, 0.6013 * ANGSTROM_TO_BOHR, 0.0],
+            ]
+        ),
+    )
+    scf_solver = algorithms.create("scf_solver", "qdk")
+    _, wfn = scf_solver.run(mol, 0, 1, "sto-3g")
+    orbitals = wfn.get_orbitals()
+
+    h_nr = algorithms.create("hamiltonian_constructor", "qdk").run(orbitals)
+    h_x2c = create_x2c_constructor().run(orbitals)
+    return h_nr, h_x2c
+
+
+@pytest.fixture(scope="module")
+def x2c_unrestricted_hamiltonian():
+    """Run QDK UHF and decontracted X2C-1e for triplet O2."""
+    bond_length_bohr = 2.3
+    molecule = Structure(["O", "O"], np.array([[0.0, 0.0, 0.0], [bond_length_bohr, 0.0, 0.0]]))
+    scf_solver = algorithms.create("scf_solver", "qdk")
+    scf_solver.settings().set("method", "hf")
+    scf_solver.settings().set("scf_type", "unrestricted")
+    _, wavefunction = scf_solver.run(molecule, 0, 3, "cc-pvdz")
+    return create_x2c_constructor().run(wavefunction.get_orbitals())
+
+
+@pytest.fixture(scope="module")
+def x2c_cholesky_hamiltonian(x2c_hamiltonian):
+    """Build X2C-1e with Cholesky storage from the shared water orbitals."""
+    _, canonical_x2c = x2c_hamiltonian
+    return create_x2c_constructor("qdk_cholesky").run(canonical_x2c.get_orbitals())
+
+
+class TestX2CHamiltonian:
+    """Test Hamiltonians produced by the X2C-1e integral dressing options."""
+
+    def test_shared_settings(self):
+        """Verify canonical and Cholesky constructors expose integral dressing."""
+        for name in ("qdk", "qdk_cholesky"):
+            constructor = algorithms.create("hamiltonian_constructor", name)
+            assert constructor.settings().get("integral_dressing") == ""
+            for integral_dressing in ("x2c_1e", "x2c_1e_contracted"):
+                constructor.settings().set("integral_dressing", integral_dressing)
+
+    def test_cholesky_storage(self, x2c_hamiltonian, x2c_cholesky_hamiltonian):
+        """Verify X2C-1e can be combined with Cholesky ERI storage."""
+        _, canonical_x2c = x2c_hamiltonian
+        assert x2c_cholesky_hamiltonian.get_container_type() == "cholesky"
+        canonical_one_body, _ = canonical_x2c.get_one_body_integrals()
+        cholesky_one_body, _ = x2c_cholesky_hamiltonian.get_one_body_integrals()
+        np.testing.assert_allclose(cholesky_one_body, canonical_one_body, atol=scf_energy_tolerance)
+
+    def test_cartesian_basis_rejected(self):
+        """Verify both X2C-1e modes reject Cartesian AOs before conversion."""
+        structure = Structure(["O"], np.zeros((1, 3)))
+        basis = BasisSet(
+            "cartesian-d",
+            [Shell(0, OrbitalType.D, np.array([1.0]), np.array([1.0]))],
+            structure,
+            AOType.Cartesian,
+        )
+        orbitals = Orbitals(np.eye(6), np.zeros(6), np.eye(6), basis)
+        for integral_dressing in ("x2c_1e", "x2c_1e_contracted"):
+            with pytest.raises(ValueError, match="X2C-1e currently supports spherical AOs only"):
+                create_x2c_constructor(integral_dressing=integral_dressing).run(orbitals)
+
+    def test_has_integrals(self, x2c_hamiltonian):
+        """Verify the X2C result contains orbitals and one- and two-body integrals."""
+        _, h = x2c_hamiltonian
+        assert h.has_one_body_integrals()
+        assert h.has_two_body_integrals()
+        assert h.has_orbitals()
+
+    def test_is_restricted(self, x2c_hamiltonian):
+        """Verify restricted input produces a restricted Hamiltonian."""
+        _, h = x2c_hamiltonian
+        assert h.is_restricted()
+        assert not h.is_unrestricted()
+
+    def test_unrestricted_reference(self, x2c_unrestricted_hamiltonian):
+        """Verify unrestricted X2C against exact-QDK-input PySCF references."""
+        hamiltonian = x2c_unrestricted_hamiltonian
+        assert hamiltonian.is_unrestricted()
+        one_body_alpha, one_body_beta = hamiltonian.get_one_body_integrals()
+        # Generated with exact QDK cc-pVDZ shells, QDK's speed of light, and
+        # QDK UHF coefficients. The integral_dressing="x2c_1e" path is used.
+        np.testing.assert_allclose(np.trace(one_body_alpha), -267.86977556398796, rtol=0.0, atol=scf_energy_tolerance)
+        np.testing.assert_allclose(np.trace(one_body_beta), -267.86977556398790, rtol=0.0, atol=scf_energy_tolerance)
+        assert np.linalg.norm(one_body_alpha - one_body_beta) > 1e-6
+
+    def test_core_energy_matches_nr(self, x2c_hamiltonian):
+        """Verify X2C leaves the nuclear and inactive-space core energy unchanged."""
+        h_nr, h_x2c = x2c_hamiltonian
+        assert h_nr.get_core_energy() == h_x2c.get_core_energy()
+
+    def test_one_body_differs_from_nr(self, x2c_hamiltonian):
+        """Verify X2C changes the one-electron integrals."""
+        h_nr, h_x2c = x2c_hamiltonian
+        h1_nr, _ = h_nr.get_one_body_integrals()
+        h1_x2c, _ = h_x2c.get_one_body_integrals()
+        assert not np.allclose(h1_nr, h1_x2c), "X2C one-body should differ from NR"
+
+    def test_one_body_symmetric(self, x2c_hamiltonian):
+        """Verify the X2C one-electron matrix is symmetric."""
+        _, h = x2c_hamiltonian
+        h1, _ = h.get_one_body_integrals()
+        np.testing.assert_allclose(h1, h1.T, atol=1e-12)
+
+    def test_two_body_unchanged_from_nr(self, x2c_hamiltonian):
+        """Verify the X2C-1e approximation leaves two-electron integrals unchanged."""
+        h_nr, h_x2c = x2c_hamiltonian
+        eri_nr, _, _ = h_nr.get_two_body_integrals()
+        eri_x2c, _, _ = h_x2c.get_two_body_integrals()
+        np.testing.assert_allclose(eri_x2c, eri_nr, atol=1e-12)
+
+    def test_two_body_element_access(self, x2c_hamiltonian):
+        """Verify element access works for the resulting two-electron tensor."""
+        _, h = x2c_hamiltonian
+        val = h.get_two_body_element(0, 1, 1, 0)
+        assert isinstance(val, float)
+
+    def test_orbital_count(self, x2c_hamiltonian):
+        """Verify Hamiltonian construction preserves the molecular-orbital count."""
+        _, h = x2c_hamiltonian
+        assert h.get_orbitals().get_num_molecular_orbitals() == 7  # STO-3G water
+
+    def test_json_roundtrip(self, x2c_hamiltonian):
+        """Verify JSON serialization preserves the X2C one-electron matrix."""
+        _, h = x2c_hamiltonian
+        h2 = Hamiltonian.from_json(h.to_json())
+        assert h2.get_core_energy() == h.get_core_energy()
+        assert h2.has_one_body_integrals()
+        assert h2.has_two_body_integrals()
+        h1_orig, _ = h.get_one_body_integrals()
+        h1_rt, _ = h2.get_one_body_integrals()
+        np.testing.assert_allclose(h1_orig, h1_rt, atol=float_comparison_absolute_tolerance)
+
+    def test_json_file_io(self, x2c_hamiltonian):
+        """Verify X2C Hamiltonians round-trip through JSON files."""
+        _, h = x2c_hamiltonian
+        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
+            filename = f.name
+        try:
+            h.to_json_file(filename)
+            h2 = Hamiltonian.from_json_file(filename)
+            h1_orig, _ = h.get_one_body_integrals()
+            h1_rt, _ = h2.get_one_body_integrals()
+            np.testing.assert_allclose(h1_orig, h1_rt, atol=float_comparison_absolute_tolerance)
+        finally:
+            Path(filename).unlink(missing_ok=True)
+
+    def test_hdf5_file_io(self, x2c_hamiltonian):
+        """Verify X2C Hamiltonians round-trip through HDF5 files."""
+        _, h = x2c_hamiltonian
+        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
+            filename = f.name
+        try:
+            h.to_hdf5_file(filename)
+            h2 = Hamiltonian.from_hdf5_file(filename)
+            h1_orig, _ = h.get_one_body_integrals()
+            h1_rt, _ = h2.get_one_body_integrals()
+            np.testing.assert_allclose(h1_orig, h1_rt, atol=float_comparison_absolute_tolerance)
+        finally:
+            Path(filename).unlink(missing_ok=True)
+
+    def test_pickling(self, x2c_hamiltonian):
+        """Verify pickling preserves X2C one- and two-electron integrals."""
+        _, h = x2c_hamiltonian
+        pickled = pickle.dumps(h)
+        h2 = pickle.loads(pickled)
+
+        assert h2.get_core_energy() == h.get_core_energy()
+        assert h2.has_one_body_integrals()
+        assert h2.has_two_body_integrals()
+
+        h1_orig, _ = h.get_one_body_integrals()
+        h1_rt, _ = h2.get_one_body_integrals()
+        np.testing.assert_array_equal(h1_orig, h1_rt)
+
+        eri_orig, _, _ = h.get_two_body_integrals()
+        eri_rt, _, _ = h2.get_two_body_integrals()
+        np.testing.assert_array_equal(eri_orig, eri_rt)
+
+    def test_repr(self, x2c_hamiltonian):
+        """Verify the X2C result uses the standard Hamiltonian representation."""
+        _, h = x2c_hamiltonian
+        assert "Hamiltonian" in repr(h)
+
+    def test_container_type(self, x2c_hamiltonian):
+        """Verify X2C uses the canonical four-center container."""
+        _, h = x2c_hamiltonian
+        assert h.get_container_type() == "canonical_four_center"
+
+    def test_data_type_name(self, x2c_hamiltonian):
+        """Verify X2C preserves the Hamiltonian data type name."""
+        _, h = x2c_hamiltonian
+        assert h.get_data_type_name() == "hamiltonian"
