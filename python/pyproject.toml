@@ -63,7 +63,7 @@ coverage = [
   "coverage",
   "pytest",
   "pytest-cov",
-  "gcovr"
+  "gcovr>=8.4"
 ]
 discovery = [
   # azure-identity (via msal) and azure-storage-blob both pull in cryptography, which publishes no win-arm64 wheel
@@ -131,6 +131,7 @@ test = [
   "nbformat",
   # pennylane also requires rustworkx (see qiskit-extras); the sample test skips when it is absent.
   "pennylane; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "pytest-env",
   # rdkit publishes no win-arm64 wheels; the sample test skips when it is absent.
   "rdkit; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "requests>=2.33.0",
