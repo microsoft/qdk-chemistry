@@ -1061,8 +1061,8 @@ class TestPlaquetteBatchEmission:
     @pytest.mark.parametrize(
         ("side", "expected_sizes"),
         [
-            (4, [4, 4, 4, 4, 8, 8, 8, 8, 16, 32]),
-            (6, [6, 6, 12, 12, 18, 18, 18, 18, 36, 72]),
+            (4, [4, 4, 4, 4] + [8] * 10),
+            (6, [6, 6, 12, 12] + [18] * 10),
         ],
     )
     def test_batches_the_hopping_and_interaction_families(self, side, expected_sizes):
