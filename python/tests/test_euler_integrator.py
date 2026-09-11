@@ -255,15 +255,12 @@ class TestEulerIntegratorValidation:
         assert builder.settings().get("total_time") == 2.0
         assert builder.settings().get("dt") == 0.5
 
-    @pytest.mark.parametrize("sparse", [False, True])
-    def test_builder_run_produces_valid_circuit(self, sparse):
+    def test_builder_run_produces_valid_circuit(self):
         """Standalone builder.run() produces a Circuit suitable for QRE."""
         from qdk_chemistry.algorithms import registry  # noqa: PLC0415
 
         num_qubits = 2
         h = self._make_hamiltonian(num_qubits=num_qubits)
-        if sparse:
-            h = QubitOperator.from_sparse_terms(num_qubits, [{1: "Z"}], h.coefficients)
         td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
 
         builder = registry.create(

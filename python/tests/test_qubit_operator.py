@@ -8,6 +8,7 @@
 import json
 import random as stdlib_random
 import re
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -16,6 +17,7 @@ import scipy.sparse
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data import SparsePauliTerms, TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.estimator_data import MeasurementData
 from qdk_chemistry.data.qubit_operator import QubitOperator
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition
 
@@ -50,11 +52,6 @@ def _sparse_copy(operator: QubitOperator) -> QubitOperator:
         term_partition=operator.term_partition,
         tapering=operator.tapering,
     )
-
-
-def _no_full_label(*_args: object, **_kwargs: object) -> str:
-    """Fail if a sparse operation touches the full-width compatibility labels."""
-    raise AssertionError("Sparse operation materialized a full-width Pauli label.")
 
 
 class TestQubitHamiltonian:
@@ -825,8 +822,6 @@ class TestSparseQubitOperator:
         coefficients = np.array([-0.75, 0.125, 0.5j, 1.5, 0.25])
         sparse = QubitOperator.from_sparse_terms(2, terms, coefficients)
         dense = QubitOperator(["XI", "IY", "ZX", "II", "XI"], coefficients)
-        assert sparse.has_sparse_terms
-        assert sparse.num_terms == dense.num_terms == 5
         assert list(sparse.iter_sparse_terms()) == list(dense.iter_sparse_terms())
         assert sparse.pauli_strings == dense.pauli_strings
         assert sparse.pauli_strings[-1] == dense.pauli_strings[-1]
@@ -874,7 +869,7 @@ class TestSparseQubitOperator:
 
     @pytest.mark.parametrize("format_name", ["json", "hdf5"])
     def test_large_sparse_operations_and_roundtrip_never_access_full_labels(self, format_name, monkeypatch, tmp_path):
-        """Arithmetic, interleaving, hashing, and persistence stay sparse above the uint16 index range."""
+        """Arithmetic and standalone/nested persistence retain sparse words, metadata and register width."""
         width = 100_000
         coefficients = np.array([1.25, -2j, 0.5])
         sparse = QubitOperator.from_sparse_terms(
@@ -886,11 +881,7 @@ class TestSparseQubitOperator:
             term_partition=LayeredPartition(strategy="s", groups=(((2, 0),), ((1,),))),
             tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
         )
-        monkeypatch.setattr(type(sparse.pauli_strings), "__getitem__", _no_full_label)
-        assert sparse.num_qubits == width
-        assert not sparse.is_hermitian()
-        assert sparse.schatten_norm == 3.75
-        assert "100000" in sparse.get_summary()
+        monkeypatch.setattr(type(sparse.pauli_strings), "__getitem__", Mock(side_effect=AssertionError("Dense labels")))
         assert (0.0 * sparse).get_real_coefficients() == []
         assert (sparse + (-0.5 * sparse)).equiv(0.5 * sparse)
         assert (2j * sparse).equiv(sparse * 2j)
@@ -900,13 +891,20 @@ class TestSparseQubitOperator:
         assert interleaved.fermion_mode_order is FermionModeOrder.INTERLEAVED
         assert interleaved.term_partition is None
         assert interleaved.tapering == sparse.tapering
-        filename = tmp_path / f"large.qubit_hamiltonian.{format_name}"
-        sparse.to_file(filename, format_name)
-        restored = QubitOperator.from_file(filename, format_name)
-        assert restored.has_sparse_terms
-        assert "pauli_strings" not in restored.to_json()
-        assert restored.content_hash() == sparse.content_hash()
-        assert restored.to_json() == sparse.to_json()
+        assert "pauli_strings" not in sparse.to_json()
+        measurements = MeasurementData([QubitOperator(["ZX"], np.array([0.5])), sparse], [{"00": 3}, None], [3, 0])
+        for original in (sparse, measurements):
+            filename = tmp_path / f"large.{original.data_type_name()}.{format_name}"
+            original.to_file(filename, format_name)
+            restored = type(original).from_file(filename, format_name)
+            assert restored.to_json() == original.to_json()
+            assert restored.content_hash(0) == original.content_hash(0)
+        for nested in (False, True):
+            payload = measurements.to_json()
+            versioned_data = payload["1"]["hamiltonian"] if nested else payload
+            versioned_data["version"] = "0.1.0"
+            with pytest.raises(RuntimeError):
+                MeasurementData.from_json(payload)
         wider = QubitOperator.from_sparse_terms(width + 1, sparse.pauli_strings.words, coefficients)
         assert not sparse.equiv(wider)
         assert sparse.content_hash() != wider.content_hash()

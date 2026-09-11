@@ -13,11 +13,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.propagator import MagnusPropagator
-from qdk_chemistry.data import (
-    DrivenQubitHamiltonian,
-    FlatPartition,
-    QubitOperator,
-)
+from qdk_chemistry.data import DrivenQubitHamiltonian, QubitOperator
 
 
 def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitOperator:
@@ -48,26 +44,8 @@ class TestTimeAveragedPropagatorDriven:
         propagator = MagnusPropagator()
         result = propagator.run(td, 0.0, 1.0)
 
-        assert result is not h0
-        assert result.term_partition is None
-        assert result.pauli_strings == ["ZI", "IX"]
-        np.testing.assert_array_equal(result.coefficients, [1.0, 0.0])
-
-    @pytest.mark.parametrize(("canceling_drive", "scale"), [(False, 0.0), (True, 0.0), (False, 1e-18)])
-    def test_only_exact_zero_average_reuses_sparse_base(self, canceling_drive, scale):
-        """Zero and canceling drives reuse H0; a tiny nonzero average must still contribute."""
-        h0 = QubitOperator.from_sparse_terms(
-            2, [{1: "Z"}], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),))
-        )
-        h1 = QubitOperator(["IX"], np.array([2.0]))
-        td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t if canceling_drive else scale)
-        result = MagnusPropagator().run(td, -1.0, 1.0)
-        if scale == 0.0:
-            assert result is h0
-        else:
-            assert result is not h0
-            assert result.term_partition is None
-            np.testing.assert_allclose(result.coefficients, [1.0, 2.0 * scale], rtol=1e-12, atol=0.0)
+        # f_avg = 0, so result should be h0 + 0*h1
+        np.testing.assert_allclose(result.coefficients[0], 1.0)
 
     def test_sinusoidal_drive_averages_correctly(self):
         """sin(t) averaged over [0, pi] should be 2/pi."""

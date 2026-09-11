@@ -84,26 +84,30 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
-    def test_sparse_encoding_carries_only_non_identity_positions(self):
-        """The Q# adapter preserves caller factor order, skips explicit identities, and retains empty rows."""
-        word = {2: "I", 1: "Z", 0: "X"}
+    def test_sparse_encoding_carries_only_non_identity_positions(self, sparse_mapper):
+        """Both mappers retain ordered supports, identity phases and symbolic repetitions on wide registers."""
+        word = {2: "I", 80_799: "Z", 0: "X"}
         container = PauliProductFormulaContainer(
             [
                 ExponentiatedPauliTerm(word, 0.5),
                 ExponentiatedPauliTerm({0: "I"}, 0.25),
                 ExponentiatedPauliTerm(word, -0.2),
             ],
-            2,
-            3,
+            1_000_000_000,
+            80_800,
         )
-        circuit = PauliSequenceMapper().run(UnitaryRepresentation(container))
-        evo_params = circuit._qsharp_factory.parameter["evo_params"]
-
-        assert "pauliExponents" not in evo_params
-        assert "batchIds" not in evo_params
-        assert evo_params["pauliIndices"] == [[1, 0], [], [1, 0]]
-        assert evo_params["pauliOps"] == [[qsharp.Pauli.Z, qsharp.Pauli.X], [], [qsharp.Pauli.Z, qsharp.Pauli.X]]
-        assert evo_params["pauliCoefficients"] == [0.5, 0.25, -0.2]
+        factory = sparse_mapper.run(UnitaryRepresentation(container))._qsharp_factory.parameter
+        params = (
+            vars(factory["params"])
+            if isinstance(sparse_mapper, ControlledPauliSequenceMapper)
+            else factory["evo_params"]
+        )
+        assert params == {
+            "pauliIndices": [[80_799, 0], [], [80_799, 0]],
+            "pauliOps": [[qsharp.Pauli.Z, qsharp.Pauli.X], [], [qsharp.Pauli.Z, qsharp.Pauli.X]],
+            "pauliCoefficients": [0.5, 0.25, -0.2],
+            "repetitions": 1_000_000_000,
+        }
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
@@ -263,28 +267,3 @@ class TestSparsePauliMappers:
         assert counts[1]["numQubits"] == counts[0]["numQubits"]
         assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
         assert "define" in str(circuit.get_qir())
-
-    def test_payload_stays_sparse_and_repetitions_stay_symbolic(self, sparse_mapper):
-        """Large registers retain only non-identity support and symbolic repetitions."""
-        container = PauliProductFormulaContainer(
-            [
-                ExponentiatedPauliTerm({0: "Y"}, 0.2),
-                ExponentiatedPauliTerm({}, 0.4),
-                ExponentiatedPauliTerm({1: "X", 80_799: "Z"}, -0.7),
-            ],
-            1_000_000_000,
-            80_800,
-        )
-        circuit = sparse_mapper.run(UnitaryRepresentation(container))
-        factory = circuit._qsharp_factory.parameter
-        params = (
-            vars(factory["params"])
-            if isinstance(sparse_mapper, ControlledPauliSequenceMapper)
-            else factory["evo_params"]
-        )
-        assert params == {
-            "pauliIndices": [[0], [], [1, 80_799]],
-            "pauliOps": [[qsharp.Pauli.Y], [], [qsharp.Pauli.X, qsharp.Pauli.Z]],
-            "pauliCoefficients": [0.2, 0.4, -0.7],
-            "repetitions": 1_000_000_000,
-        }

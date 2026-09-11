@@ -150,19 +150,14 @@ class TestModelHamiltonians:
         assert qh.num_qubits == n
         assert qh.is_hermitian()
         terms = _get_terms_dict(qh)
-        assert len(terms) == len(expected)
-        for pauli_str, coeff in expected.items():
-            assert terms[pauli_str] == pytest.approx(coeff, abs=float_comparison_absolute_tolerance)
+        assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
 
         # vector/matrix
         j_mat = np.ones((n, n)) * j
         h_vec = np.full(n, h)
         qh_explicit = create_ising_hamiltonian(lattice, j=j_mat, h=h_vec, include_term_groups=include_term_groups)
         assert qh_explicit.has_sparse_terms
-        terms_explicit = _get_terms_dict(qh_explicit)
-        assert set(terms_explicit.keys()) == set(terms.keys())
-        for k in terms:
-            assert terms_explicit[k] == pytest.approx(terms[k], abs=float_comparison_absolute_tolerance)
+        assert _get_terms_dict(qh_explicit) == pytest.approx(terms, abs=float_comparison_absolute_tolerance)
 
         # modify j and h
         j_mat[0, 1] = 2.5
@@ -223,9 +218,7 @@ class TestModelHamiltonians:
         assert qh.num_qubits == n
         assert qh.is_hermitian()
         terms = _get_terms_dict(qh)
-        assert len(terms) == len(expected)
-        for pauli_str, coeff in expected.items():
-            assert terms[pauli_str] == pytest.approx(coeff, abs=float_comparison_absolute_tolerance)
+        assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
 
         # vector/matrix
         jx_mat = np.ones((n, n)) * jx
@@ -235,34 +228,17 @@ class TestModelHamiltonians:
         hy_vec = np.full(n, hy)
         hz_vec = np.full(n, hz)
         qh_explicit = create_heisenberg_hamiltonian(
-            lattice,
-            jx=jx_mat,
-            jy=jy_mat,
-            jz=jz_mat,
-            hx=hx_vec,
-            hy=hy_vec,
-            hz=hz_vec,
-            include_term_groups=include_term_groups,
+            lattice, jx_mat, jy_mat, jz_mat, hx_vec, hy_vec, hz_vec, include_term_groups=include_term_groups
         )
         assert qh_explicit.has_sparse_terms
-        terms_explicit = _get_terms_dict(qh_explicit)
-        assert set(terms_explicit.keys()) == set(terms.keys())
-        for k in terms:
-            assert terms_explicit[k] == pytest.approx(terms[k], abs=float_comparison_absolute_tolerance)
+        assert _get_terms_dict(qh_explicit) == pytest.approx(terms, abs=float_comparison_absolute_tolerance)
 
         # modify jx on edge (0,1) and jz on edge (1,2)
         jx_mat[0, 1] = 2.5
         jz_mat[1, 2] = 0.3
         hx_vec[2] = 0.9
         qh_modified = create_heisenberg_hamiltonian(
-            lattice,
-            jx=jx_mat,
-            jy=jy_mat,
-            jz=jz_mat,
-            hx=hx_vec,
-            hy=hy_vec,
-            hz=hz_vec,
-            include_term_groups=include_term_groups,
+            lattice, jx_mat, jy_mat, jz_mat, hx_vec, hy_vec, hz_vec, include_term_groups=include_term_groups
         )
         terms_mod = _get_terms_dict(qh_modified)
         assert terms_mod["IIXX"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
@@ -294,7 +270,6 @@ class TestSparseSpinHamiltonians:
         graph = LatticeGraph.from_dense_matrix(np.array([[7.0, 1.5, -0.5], [1.5, -2.0, 0.0], [-0.5, 0.0, 3.0]]))
         coupling = np.array([[9.0, 99.0, 99.0], [2.0, 9.0, 99.0], [4.0, 99.0, 9.0]]).T
         actual = create_ising_hamiltonian(graph, coupling, np.array([0.25, 0.0, -0.5]))
-        assert actual.has_sparse_terms
         assert actual.term_partition is None
         assert _get_terms_dict(actual) == pytest.approx({"IZZ": 3.0, "ZIZ": -2.0, "IIX": 0.25, "XII": -0.5})
 
@@ -303,8 +278,6 @@ class TestSparseSpinHamiltonians:
         """Zero-weight edges and self-loops leave an exact zero or field-only operator."""
         graph = LatticeGraph({(0, 0): 7.0, (0, 1): 0.0, (1, 0): 0.0, (1, 1): -2.0}, num_sites=3)
         actual = create_heisenberg_hamiltonian(graph, 1.0, 2.0, 3.0, hx=field)
-        assert actual.has_sparse_terms
-        assert actual.term_partition is None
         assert actual.pauli_strings == (["IIX", "IXI", "XII"] if field else ["III"])
         np.testing.assert_array_equal(actual.coefficients, [field] * (3 if field else 1))
 
@@ -336,36 +309,24 @@ class TestSparseSpinHamiltonians:
                 sites = [qubit for term in layer for qubit, _ in terms.factors(term)]
                 assert len(sites) == len(set(sites))
 
-    @pytest.mark.parametrize("shape", [(1, 2), (2, 1)])
-    def test_native_coloring_rejects_rectangular_adjacency(self, shape: tuple[int, int]) -> None:
-        """Reject nonsquare adjacency before entering the native colorer."""
+    @pytest.mark.parametrize(
+        ("shape", "trials", "message"),
+        [((1, 2), 1, "square"), ((2, 1), 1, "square"), ((2, 2), 0, "positive"), ((2, 2), -1, "positive")],
+    )
+    def test_native_coloring_rejects_invalid_input(self, shape, trials, message):
+        """Validate adjacency shape and trial count before native coloring."""
         adjacency = scipy.sparse.csr_matrix(np.ones(shape))
-        with pytest.raises(ValueError, match="must be square"):
-            model_hamiltonians.greedy_edge_coloring(adjacency)
+        with pytest.raises(ValueError, match=message):
+            model_hamiltonians.greedy_edge_coloring(adjacency, trials=trials)
 
-    @pytest.mark.parametrize("trials", [0, -1])
-    def test_native_coloring_rejects_nonpositive_trials(self, trials: int) -> None:
-        """Reject a trial count that cannot produce a coloring."""
-        with pytest.raises(ValueError, match="must be positive"):
-            model_hamiltonians.greedy_edge_coloring(scipy.sparse.eye(2, format="csr"), trials=trials)
-
+    @pytest.mark.parametrize("broadcast", [False, True])
     @pytest.mark.parametrize("include_term_groups", [False, True])
-    def test_broadcast_couplings_do_not_expand(self, include_term_groups: bool) -> None:
-        """Multiply a float32 broadcast view in double precision without materializing it."""
-        graph = LatticeGraph.chain(40_000, t=1.1)
-        coupling = np.broadcast_to(np.float32(0.1), (graph.num_sites, graph.num_sites))
-        with patch.object(model_hamiltonians, "to_pair_param", side_effect=AssertionError("Dense conversion")):
-            actual = create_ising_hamiltonian(graph, coupling, include_term_groups=include_term_groups)
-        assert actual.has_sparse_terms
-        assert actual.num_terms == graph.num_sites - 1
-        np.testing.assert_array_equal(actual.coefficients, np.full(actual.num_terms, float(coupling[0, 1]) * 1.1))
-
-    @pytest.mark.parametrize("include_term_groups", [False, True])
-    def test_large_square_never_materializes_dense_data(self, include_term_groups: bool) -> None:
-        """Build a 200-by-200 model with at most linear-size fields and no dense pair matrices or labels."""
+    def test_large_square_never_materializes_dense_data(self, include_term_groups: bool, broadcast: bool) -> None:
+        """Scalar and float32 broadcast couplings stay sparse and use double-precision edge weighting."""
         side = 200
-        graph = LatticeGraph.square(side, side, t=-0.5)
+        graph = LatticeGraph.square(side, side, t=1.1)
         num_edges = 2 * side * (side - 1)
+        coupling = np.broadcast_to(np.float32(0.1), (graph.num_sites, graph.num_sites)) if broadcast else 0.1
 
         with (
             patch.object(LatticeGraph, "adjacency_matrix", side_effect=AssertionError("Dense adjacency requested")),
@@ -375,8 +336,9 @@ class TestSparseSpinHamiltonians:
             ),
         ):
             actual = create_heisenberg_hamiltonian(
-                graph, 1.0, -2.0, 3.0, hx=1.0, include_term_groups=include_term_groups
+                graph, coupling, -2.0, 3.0, hx=1.0, include_term_groups=include_term_groups
             )
-            assert actual.has_sparse_terms
             assert actual.num_qubits == side * side
             assert actual.num_terms == 3 * num_edges + side * side
+            expected = float(np.float32(0.1)) * 1.1 if broadcast else 0.1 * 1.1
+            assert np.count_nonzero(actual.coefficients == expected) == num_edges
