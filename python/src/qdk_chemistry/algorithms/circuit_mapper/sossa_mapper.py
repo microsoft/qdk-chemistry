@@ -74,6 +74,11 @@ class SOSSAMapper(CircuitMapper):
     Emits :math:`B = U^\dagger \cdot \mathrm{Ref}_B \cdot U` on the flat register
     ``[system | ancillas | phase gradient]``. The
     walk :math:`W = \mathrm{Ref}_{a,B} \cdot B` is left to the caller.
+
+    The block encoding is emitted uncontrolled, which is what ``qdk_unary`` needs: unary
+    iteration controls the walk through its own index register rather than through the
+    mapper. Iterative and standard QPE instead need a ``controlled_circuit_mapper``, and no
+    controlled SOSSA mapper exists, so SOSSA runs under unary QPE only.
     """
 
     def __init__(self):

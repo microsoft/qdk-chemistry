@@ -19,7 +19,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
@@ -949,6 +949,28 @@ def _sossa_unary_qpe_circuit(
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
     )
     return builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
+
+
+class TestSOSSAQPEScope:
+    """SOSSA is supported under unary QPE only."""
+
+    def test_no_controlled_mapper_accepts_the_sossa_walk(self):
+        """Iterative and standard QPE cannot drive the SOSSA walk.
+
+        Both build their circuits through a ``controlled_circuit_mapper``, so SOSSA would
+        need one that accepts ``SOSSAWalkContainer``. None is registered, which is what
+        confines SOSSA to ``qdk_unary``. If a controlled SOSSA mapper is ever added, this
+        test fails and the unary-only claim in the mapper and container docstrings should
+        be revisited alongside it.
+        """
+        factorized = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1)
+        unitary = SOSSABuilder().run(to_sossa_operator(factorized))
+
+        mappers = list(available("controlled_circuit_mapper"))
+        assert mappers, "expected at least one registered controlled circuit mapper"
+        for name in mappers:
+            with pytest.raises(ValueError, match="not supported"):
+                create("controlled_circuit_mapper", name).run(unitary)
 
 
 class TestSOSSAResourceEstimation:

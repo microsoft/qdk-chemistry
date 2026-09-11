@@ -161,6 +161,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     where :math:`U = \text{OuterPREP} \cdot \text{within\{InnerPREP\} apply\{SELECT\}}`.
 
+    Supported by the ``qdk_unary`` phase estimation builder only. Iterative and standard
+    QPE drive the walk through a ``controlled_circuit_mapper``, and none of the registered
+    ones accepts this container, so those builders cannot construct a SOSSA circuit.
+
     """
 
     _serialization_version = "0.2.0"
