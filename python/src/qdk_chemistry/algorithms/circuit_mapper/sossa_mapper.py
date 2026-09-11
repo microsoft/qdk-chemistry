@@ -38,7 +38,7 @@ class SOSSAMapperSettings(Settings):
         """Initialize settings for SOSSAMapper."""
         super().__init__()
         self._set_default(
-            "outer_prepare",
+            "outer_prepare_algorithm",
             "algorithm_ref",
             AlgorithmRef("state_prep", "alias_sampling"),
         )
@@ -58,13 +58,15 @@ class SOSSAMapperSettings(Settings):
             "rotation_bit_precision",
             "int",
             10,
-            "Number of bits for Givens rotation angle precision.",
+            "Number of bits for Givens rotation angle precision, from 1 to 30 inclusive.",
+            (1, 30),
         )
         self._set_default(
             "coefficient_bit_precision",
             "int",
             10,
-            "Number of bits for alias sampling coefficient precision.",
+            "Number of bits for alias sampling coefficient precision, from 1 to 30 inclusive.",
+            (1, 30),
         )
 
 
@@ -105,8 +107,8 @@ class SOSSAMapper(CircuitMapper):
             phase-gradient qubits it expects appended to the outer register.
 
         """
-        prepare_algorithm = self._create_nested("outer_prepare")
-        ref: AlgorithmRef = self._settings.get("outer_prepare")
+        prepare_algorithm = self._create_nested("outer_prepare_algorithm")
+        ref: AlgorithmRef = self._settings.get("outer_prepare_algorithm")
         if ref.algorithm_name == "alias_sampling":
             prepare_algorithm.settings().set("bits_precision", self._settings.get("coefficient_bit_precision"))
         elif ref.algorithm_name == "qrom":
@@ -206,7 +208,7 @@ class SOSSAMapper(CircuitMapper):
         inner_prep_bits = layout.inner_prep_bits
         num_free_rider_bits = layout.num_free_rider_bits
 
-        outer_ref: AlgorithmRef = self._settings.get("outer_prepare")
+        outer_ref: AlgorithmRef = self._settings.get("outer_prepare_algorithm")
         if outer_ref.algorithm_name == "alias_sampling":
             mu_outer = self._settings.get("coefficient_bit_precision")
             num_outer_qubits = 2 * outer_prep_bits + 2 * mu_outer + 1
@@ -218,13 +220,12 @@ class SOSSAMapper(CircuitMapper):
             num_inner_qubits = 2 * inner_prep_bits + 2 * mu_inner + 3 + num_free_rider_bits
             num_reflect_inner = inner_prep_bits + mu_inner + 1
         else:
-            # The extra qubit is the sign bit SELECT phases; the alias oracle already
-            # carries its own inside the QROM output counted above.
+            # The extra qubit is the sign bit SELECT phases
             num_inner_qubits = inner_prep_bits + 1 + num_free_rider_bits
             num_reflect_inner = inner_prep_bits
 
         outer_gradient_bits = (
-            int(self._create_nested("outer_prepare").settings().get("rotation_bit_precision"))
+            int(self._create_nested("outer_prepare_algorithm").settings().get("rotation_bit_precision"))
             if outer_ref.algorithm_name == "qrom"
             else 0
         )

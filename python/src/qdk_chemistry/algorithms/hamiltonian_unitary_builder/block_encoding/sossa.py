@@ -36,11 +36,11 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the SOSSA block encoding builder."""
 
     def __init__(self):
-        r"""Initialize SOSSASettings with default values.
+        """Initialize SOSSASettings with default values.
 
         Attributes:
-            reference_ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`.
-            reference_energy_gap: Reference gap :math:`E_{\text{gap}}` above the sum-of-squares shift.
+            reference_ground_state_energy: Reference total ground-state energy E_gs.
+            reference_energy_gap: Reference gap E_gap above the sum-of-squares shift.
 
         Both default to NaN, meaning unset. They are alternative ways to compute the `lambda_eff`
         and are mutually exclusive.
@@ -51,15 +51,14 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
             "reference_ground_state_energy",
             "float",
             nan,
-            "Reference total ground-state energy E_gs, including the core/nuclear contribution. "
+            "Reference total ground-state energy of the original hamiltonian, including the core/nuclear contribution. "
             "NaN leaves lambda_eff unset. Mutually exclusive with 'reference_energy_gap'.",
         )
         self._set_default(
             "reference_energy_gap",
             "float",
             nan,
-            "Reference energy gap E_gap = E_gs - E_SOS, the ground-state energy measured from the "
-            "sum-of-squares shift. Mutually exclusive with 'reference_ground_state_energy'.",
+            "Reference energy gap. Mutually exclusive with 'reference_ground_state_energy'.",
         )
 
 
@@ -72,17 +71,17 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         reference_ground_state_energy: float = nan,
         reference_energy_gap: float = nan,
     ):
-        r"""Initialize the SOSSA builder.
+        """Initialize the SOSSA builder.
 
         Args:
             power: The power to raise the walk operator to. Defaults to 1.
-            reference_ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`,
-                including the core/nuclear contribution, used to derive
+            reference_ground_state_energy: Reference total ground-state energy E_gs, including
+                the core/nuclear contribution, used to derive
                 :attr:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSAWalkContainer.lambda_eff`.
                 Defaults to NaN, which leaves ``lambda_eff`` unset. Mutually exclusive with
                 ``reference_energy_gap``.
-            reference_energy_gap: Reference gap :math:`E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}`,
-                an alternative to ``reference_ground_state_energy`` for the same purpose. Defaults to NaN.
+            reference_energy_gap: Reference gap E_gap = E_gs - E_SOS, an alternative to
+                ``reference_ground_state_energy`` for the same purpose. Defaults to NaN.
 
         """
         super().__init__()
@@ -162,12 +161,18 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
     @staticmethod
     def _outer_coefficients(sossa: SOSContainer) -> np.ndarray:
-        r"""Compute the outer PREPARE LCU coefficients from the container generators.
+        """Compute the outer PREPARE LCU coefficients from the container generators.
 
-        The one-body coefficients are :math:`\sqrt{2}` times the D1/Q1 generator
-        one-norms; each generator contributes two Pauli terms (X and Y) whose
-        magnitudes are summed. The spin-free coefficients are the per-``(rank,
-        copy)`` two-body row one-norms scaled by :math:`1/\sqrt{2}`.
+        The outer PREPARE is Eq. (B10) of :cite:`Low2025`::
+
+            PREP|0⟩ = ∑_(xₒ=0)^(Xₒ-1) λ^(G_(xₒ),r_(xₒ),c_(xₒ))/√(2Λ)
+                       |xₒ⟩|garbage_(xₒ)⟩.
+
+        The generator weights are::
+
+            λ_(SF,rc) = 1/√2 (|w_B^(rc)| + ∑_(b=0)^(B-1) |w_b^(rc)|),
+            λ_(D₁,r) = √(w₊^(r)),
+            λ_(Q₁,r) = √(w₋^(r)).
         """
         magnitudes = np.abs(np.asarray(sossa.one_body.coeffs))
         row_l1 = magnitudes.sum(axis=1) if magnitudes.ndim >= 2 else np.zeros(len(magnitudes))
@@ -177,12 +182,12 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
     @staticmethod
     def _inner_conditional_coefficients(sossa: SOSContainer, num_one_body: int) -> np.ndarray:
-        r"""Assemble the inner-PREPARE conditional amplitudes ``[Xo, B+1]``.
+        """Assemble the inner-PREPARE conditional amplitudes ``[Xo, B+1]``.
 
         One delta row (``b = 0``) per one-body generator, then one spin-free row
         per ``(rank, copy)``. The PREPARE backends square and normalize each row,
-        so every spin-free entry is :math:`\operatorname{sign}(w_b)\sqrt{|w_b|}`;
-        SELECT consumes that sign for both rotated-``Z`` and identity entries.
+        so every spin-free entry is sign(w_b)√|w_b|; SELECT consumes that sign
+        for both rotated-``Z`` and identity entries.
         """
         b_plus_1 = sossa.metadata.num_bases + 1
         delta = np.zeros((num_one_body, b_plus_1))
@@ -299,31 +304,28 @@ def _resolve_lambda_eff(
     reference_ground_state_energy: float,
     reference_energy_gap: float,
 ) -> float | None:
-    r"""Derive :math:`\lambda_{\text{eff}}` from whichever reference energy was supplied.
+    """Derive λ_eff from whichever reference energy was supplied.
 
     The sum-of-squares Hamiltonian is positive semidefinite and block encoded with
-    normalization :math:`\Lambda`, so its spectrum lies in :math:`[0, 2\Lambda]` once the
-    origin is moved to :math:`E_{\text{SOS}}`. The ground state sits at
-    :math:`E_{\text{gap}}` within that window, and (:cite:`Low2025`, Eq. (11))
+    normalization Λ, so its spectrum lies in [0, 2Λ] once the origin is moved to
+    E_SOS. The ground state sits at E_gap within that window, and
+    (:cite:`Low2025`, Eq. (11))::
 
-    .. math::
-
-        E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}, \qquad
-        \lambda_{\text{eff}} = \sqrt{E_{\text{gap}}(2\Lambda - E_{\text{gap}})}
+        E_gap = E_gs - E_SOS,
+        λ_eff = √(E_gap (2Λ - E_gap)).
 
     Args:
-        normalization: Block-encoding normalization :math:`\Lambda`.
-        energy_shift: The sum-of-squares shift :math:`E_{\text{SOS}}` (includes core energy).
-        reference_ground_state_energy: Total :math:`E_{\text{gs}}`, or NaN when unset.
-        reference_energy_gap: :math:`E_{\text{gap}}`, or NaN when unset.
+        normalization: Block-encoding normalization Λ.
+        energy_shift: The sum-of-squares shift E_SOS (includes core energy).
+        reference_ground_state_energy: Total E_gs, or NaN when unset.
+        reference_energy_gap: E_gap, or NaN when unset.
 
     Returns:
         The effective normalization, or ``None`` when neither reference energy was supplied.
 
     Raises:
         ValueError: If both reference energies are supplied, or if the resulting gap falls
-            outside the open interval :math:`(0, 2\Lambda)`, where
-            :math:`\lambda_{\text{eff}}` is undefined.
+            outside the open interval (0, 2Λ), where λ_eff is undefined.
 
     """
     has_energy = not isnan(reference_ground_state_energy)

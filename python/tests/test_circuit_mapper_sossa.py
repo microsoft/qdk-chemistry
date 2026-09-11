@@ -90,7 +90,7 @@ def _make_sossa_mapper(
 ) -> SOSSAMapper:
     """Create a SOSSAMapper with the given algorithm settings."""
     mapper = SOSSAMapper()
-    mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", outer_algorithm))
+    mapper.settings().set("outer_prepare_algorithm", AlgorithmRef("state_prep", outer_algorithm))
     mapper.settings().set("inner_prepare_algorithm", inner_algorithm)
     mapper.settings().set("select_algorithm", select_algorithm)
     mapper.settings().set("coefficient_bit_precision", coefficient_bit_precision)

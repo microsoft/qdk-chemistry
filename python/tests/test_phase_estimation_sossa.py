@@ -351,7 +351,7 @@ def _sossa_circuit_mapper_ref(
     return AlgorithmRef(
         "circuit_mapper",
         "sossa",
-        outer_prepare=AlgorithmRef("state_prep", ref_name),
+        outer_prepare_algorithm=AlgorithmRef("state_prep", ref_name),
         inner_prepare_algorithm=inner_prepare_algorithm,
         select_algorithm=select_algorithm,
         coefficient_bit_precision=coefficient_bit_precision,
@@ -611,7 +611,7 @@ class TestSOSSAQPEIntegration:
 
         # Step 2: SOSSAMapper → Circuit
         mapper = SOSSAMapper()
-        mapper.settings().set("outer_prepare", AlgorithmRef("state_prep", "dense_pure_state"))
+        mapper.settings().set("outer_prepare_algorithm", AlgorithmRef("state_prep", "dense_pure_state"))
         mapper.settings().set("inner_prepare_algorithm", "direct")
         mapper.settings().set("select_algorithm", "direct")
         circuit = mapper.run(unitary_rep)
@@ -935,7 +935,9 @@ def _sossa_unary_qpe_circuit(
     )
     num_modes = 2 * num_orbitals
     orbitals = create_test_orbitals(num_orbitals)
-    operator = create("qubit_mapper", "sos").run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes))
+    operator = create("qubit_mapper", "sum_of_squares").run(
+        Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes)
+    )
 
     num_electrons = num_electrons_per_spin or max(1, num_orbitals // 2)
     hf_config = Configuration.canonical_hf_configuration(num_electrons, num_electrons, num_orbitals)

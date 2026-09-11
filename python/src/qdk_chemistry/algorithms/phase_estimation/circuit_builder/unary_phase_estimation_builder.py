@@ -175,7 +175,10 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
         if not isinstance(container, QuantumWalkContainer):
-            raise ValueError(f"Requires a LCU or SOSSA walk unitary representation, got '{container.type}'.")
+            raise ValueError(
+                "Requires a LCU or SOSSA walk unitary representation because this circuit explicitly controls "
+                f"the block encoding's reflection, got '{container.type}'."
+            )
 
         nested = getattr(container, "block_encoding", None)
         container_power = getattr(container, "power", 1)
