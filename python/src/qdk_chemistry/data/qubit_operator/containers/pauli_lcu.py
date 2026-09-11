@@ -17,6 +17,7 @@ from qdk_chemistry.data._hashing import _hash_arg, _hash_array, _hash_optional, 
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
+from qdk_chemistry.utils.serialization import complex_array_from_json, complex_array_to_json
 
 if TYPE_CHECKING:
     import h5py
@@ -456,17 +457,10 @@ class PauliLCUContainer(QubitOperatorContainer):
             dict[str, Any]: Dictionary representation of the qubit operator.
 
         """
-        # Serialize complex coefficients as {"real": [...], "imag": [...]}
-        # This handles both real and complex coefficient arrays
-        coeffs = self.coefficients
         data = {
             "container_type": self.type,
             "pauli_strings": self.pauli_strings,
-            "coefficients": {
-                "real": coeffs.real.tolist(),
-                "imag": coeffs.imag.tolist(),
-                "dtype": str(coeffs.dtype),
-            },
+            "coefficients": complex_array_to_json(self.coefficients),
         }
         if self.encoding is not None:
             data["encoding"] = self.encoding
@@ -514,11 +508,8 @@ class PauliLCUContainer(QubitOperatorContainer):
         """
         cls._validate_json_version(cls._serialization_version, json_data)
         coeff_data = json_data["coefficients"]
-        # Handle complex coefficients serialized as {"real": [...], "imag": [...]}
         if isinstance(coeff_data, dict) and "real" in coeff_data and "imag" in coeff_data:
-            coefficients = np.array(coeff_data["real"]) + 1j * np.array(coeff_data["imag"])
-            if "dtype" in coeff_data:
-                coefficients = coefficients.astype(coeff_data["dtype"])
+            coefficients = complex_array_from_json(coeff_data)
         else:
             # Fallback for legacy format (simple list of real numbers)
             coefficients = np.array(coeff_data)

@@ -11,18 +11,17 @@
 /// Walk operator (Low et al., Phys. Rev. X 15 (2025), inline above Eq. (9); App. A 2):
 ///   W = Ref_{a,B} · B,  B = U† · Ref_B · U
 /// where U = OuterPREP · within{InnerPREP} apply{SELECT}.
-///
-/// Only B lives here. `Ref_{a,B}` is a plain reflection about the all-zero state of the
-/// leading `SOSSAWalkAncillaCount(layout) - layout.numPhaseGradientQubits` ancillas, so
-/// callers pair `MakeSOSSABlockEncodingOp` with the generic
-/// `QDKChemistry.Utils.PrepSelPrep.MakeAncillaReflectionOp`.
+
 namespace QDKChemistry.Utils.SOSSAWalk {
 
     import Std.Arrays.Padded;
     import Std.Arrays.Reversed;
     import Std.Arrays.Subarray;
+    import Std.Arrays.Zipped;
     import Std.Canon.ApplyControlledOnInt;
+    import Std.Canon.ApplyPauliFromBitString;
     import Std.Canon.ApplyToEachCA;
+    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
@@ -43,41 +42,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
 
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Free-rider load costing
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Whether a per-condition word is cheaper loaded on its own than carried in a 2D table.
-    ///
-    /// Carrying it widens the QROAM output, which the swap network is charged for on each of
-    /// `numLoads` lookups; loading it separately costs one `Select` round trip over the
-    /// conditions -- a one-entry-wide, one-bit 2D lookup, which is what the SelectSwapCost2D
-    /// call below costs -- but also frees the table to pick a different swap width. Neither dominates
-    /// -- at small condition counts the separate load is not worth it -- so compare the totals
-    /// rather than guessing from the swap width alone.
-    function SeparateWordLoadPays(
-        numConditions : Int,
-        numInnerSlots : Int,
-        numWordBits : Int,
-        numExtraBits : Int,
-        numLoads : Int,
-    ) : Bool {
-        let inlineBits = numWordBits + numExtraBits;
-        let inlineLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
-        let separateLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
-        let inlineCost = numLoads * SelectSwapCost2D(inlineLambda, numConditions, numInnerSlots, inlineBits, true);
-        let separateCost = numLoads * SelectSwapCost2D(
-            separateLambda,
-            numConditions,
-            numInnerSlots,
-            numWordBits,
-            true
-        ) + SelectSwapCost2D(0, numConditions, 1, 1, true);
-        separateCost < inlineCost
-    }
-
-
     // ═══════════════════════════════════════════════════════════════════════════
     // Parameters
     // ═══════════════════════════════════════════════════════════════════════════
@@ -96,6 +60,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         /// Layout: [sf_vs_dq(1), d_vs_q(1), r_bits(⌈log₂ R⌉)].
         /// When > 0, SelectImpl reads isSF and dvsq from innerReg instead of computing them.
         numFreeRiderBits : Int,
+        /// Index into innerReg of the qubit the inner PREPARE loads the sign of the sampled
+        /// (x_o, b) coefficient into, or -1 when the inner PREPARE supplies no sign bit.
+        signQubitIndex : Int,
     }
 
     /// Sizes of the registers packed into the target register handed to a walk callable.
@@ -138,56 +105,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         2
     }
 
-    /// Width of the inner-PREPARE scratch that is allocated rather than passed in.
-    function SOSSAInnerScratchCount(layout : SOSSAWalkLayout) : Int {
-        layout.numInnerQubits - layout.numReflectInner
-    }
-
     /// Index at which each register starts, followed by the end of the last one.
-    ///
-    /// The register order lives here alone: `SOSSAWalkAncillaCount` and
-    /// `SplitSOSSAWalkRegisters` both read it, so a change to the layout cannot leave the
-    /// count and the slicing disagreeing.
-    /// Returns `[outerStart, innerStart, spinStart, gradientStart, gradientEnd]`.
     internal function SOSSAWalkRegisterBounds(layout : SOSSAWalkLayout) : Int[] {
         let outerStart = layout.numSystemQubits;
         let innerStart = outerStart + layout.numOuterQubits;
         let spinStart = innerStart + layout.numReflectInner;
         let gradientStart = spinStart + NumSOSSASpinQubits();
         [outerStart, innerStart, spinStart, gradientStart, gradientStart + layout.numPhaseGradientQubits]
-    }
-
-    /// Number of block-encoding ancillas (everything except the system register).
-    ///
-    /// The reflected ancillas come first and the persistent phase gradient last, so a caller
-    /// reflects about `SOSSAWalkAncillaCount(layout) - layout.numPhaseGradientQubits` qubits
-    /// starting at `layout.numSystemQubits`.
-    function SOSSAWalkAncillaCount(layout : SOSSAWalkLayout) : Int {
-        let bounds = SOSSAWalkRegisterBounds(layout);
-        bounds[4] - bounds[0]
-    }
-
-    /// Slice a flat target register into the SOSSA block-encoding registers.
-    ///
-    /// `innerReg` is only the reflected prefix; `SOSSABlockEncodingOnRegister` appends the
-    /// scratch it allocates before handing the register to the inner PREPARE and SELECT.
-    function SplitSOSSAWalkRegisters(layout : SOSSAWalkLayout, allQubits : Qubit[]) : SOSSAWalkRegisters {
-        let bounds = SOSSAWalkRegisterBounds(layout);
-        let outerStart = bounds[0];
-        let innerStart = bounds[1];
-        let spinStart = bounds[2];
-        let gradientStart = bounds[3];
-        new SOSSAWalkRegisters {
-            systemReg = allQubits[0..outerStart - 1],
-            outerReg = allQubits[outerStart..innerStart - 1],
-            innerReg = allQubits[innerStart..spinStart - 1],
-            spinReg = allQubits[spinStart..gradientStart - 1],
-            phaseGradientReg = if bounds[4] > gradientStart {
-                allQubits[gradientStart..bounds[4] - 1]
-            } else {
-                []
-            }
-        }
     }
 
     /// Build DQ bulk rotation data: N entries, each containing all (N-1) quantized angles.
@@ -215,16 +139,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     }
 
     /// Whether the SF rotation table is cheaper addressed `rBits ++ bReg` than `bReg ++ rBits`.
-    ///
-    /// `Select`'s address is the integer value of the register, so the *low* register is padded
-    /// out to its full power of two while the high one is not: `b` low costs `R * 2^bBits`
-    /// entries and `r` low costs `(B+1) * 2^rankBits`. Neither dominates -- which is smaller
-    /// depends only on how close `R` and `B+1` sit to a power of two -- so take the smaller.
-    /// Both orderings put (b=0, r=0) at address 0, which the one-body cancellation relies on.
-    ///
-    /// Reaching the paper's `R*B` needs an address with a non-power-of-two stride, which
-    /// `Select` cannot express; it would take a nested unary iteration over b then r, whose
-    /// uncompute would no longer be the measurement-based unlookup.
     internal function SFTableRankAddressedFirst(
         numRanks : Int,
         numBases : Int,
@@ -236,10 +150,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build SF bulk rotation data: all (N-1) quantized angles per entry, plus a 1-bit bEqB
     /// flag indicating b == numBases.
-    ///
-    /// `rankFirst` selects the address layout, and must match the register order the caller
-    /// hands to `Select`: `addr = r + b * 2^rankBits` when true, `addr = b + r * 2^bBits`
-    /// otherwise. The table is sized to exactly cover the reachable addresses of that layout.
     internal function BuildSFBulkRotationData(
         params : SelectParams,
         R : Int,
@@ -275,19 +185,40 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         return table;
     }
 
+    /// One-bit sign table for the inner PREPARE, addressed by `bReg + outerReg`.
+    ///
+    /// Entry `b + x_o * 2^nIndexBits` is true when the `(x_o, b)` LCU coefficient is
+    /// negative. Padding entries are false, matching the zero amplitude they carry.
+    internal function BuildInnerSignTable(
+        innerCoefficients : Double[][],
+        nIndexBits : Int,
+    ) : Bool[][] {
+        let nCoeffs = Length(innerCoefficients[0]);
+        let nPadded = 1 <<< nIndexBits;
+        mutable table : Bool[][] = [];
+        for row in innerCoefficients {
+            for b in 0..nPadded - 1 {
+                set table += [[b < nCoeffs and row[b] < 0.0]];
+            }
+        }
+        return table;
+    }
+
     /// Quantize a Givens rotation angle for phase gradient application.
     ///
-    /// RyViaPhaseGradient applies Ry(4π·x/2^b). To achieve Ry(-2θ):
-    ///   4π·x/2^b = -2θ  →  x = -2^b · θ / (2π)  (mod 2^b)
-
+    /// RyViaPhaseGradient applies Ry(4π·x/2^b). The gated Givens rotation is built as the
+    /// controlled CRy(2θ) = Ry(θ)·CNOT·Ry(-θ)·CNOT from two uncontrolled Ry(θ), so each word
+    /// encodes the half-angle θ:
+    ///   4π·x/2^b = θ  →  x = 2^b · θ / (4π)  (mod 2^b)
     internal function QuantizeGivensAngle(angle : Double, bRot : Int) : Int {
+
         // Rejects NaN and ±∞ as well as absurd magnitudes: the comparison is false for
         // NaN, so this fails loudly instead of silently folding a non-finite angle into
         // an in-range bit pattern (NaN and +∞ both quantize to 2^bRot-1, -∞ to 0).
         // Givens angles come from Atan2/hypot and are in [-π, π].
         Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeGivensAngle: angle must be finite and within [-4π, 4π]");
         let scale = IntAsDouble(1 <<< bRot);
-        let raw = Round(-scale * angle / (2.0 * PI()));
+        let raw = Round(scale * angle / (4.0 * PI()));
         ((raw % (1 <<< bRot)) + (1 <<< bRot)) % (1 <<< bRot)
     }
 
@@ -300,7 +231,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Implements: within{SelectSpins} apply{ within{GivensRotations} apply{MajoranaOp} }
     ///
     /// isSF and dvsq are read from the free-rider register at the end of innerReg,
-    /// loaded by inner PREPARE's conditional alias sampling QROM.
     /// spinDQ and spinSF are initialized during outer and inner preparation steps.
     ///
     /// # Parameters
@@ -348,11 +278,17 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use spin = Qubit();
         use bEqBQubit = Qubit();
 
+        // LCU sign of the sampled (x_o, b) coefficient. The inner PREPARE already
+        // materializes it on a qubit it loaded from its own oracle, and the phase it
+        // applies there cancels against PREPARE† -- so applying Z once more here, between
+        // the two, is what leaves (-1)^s in the block encoding. One Clifford, no Toffolis
+        // (arXiv:2502.15882v1, Appendix B.5).
+        if params.signQubitIndex >= 0 {
+            Z(innerReg[params.signQubitIndex]);
+        }
+
         // The Majorana operator runs in the Givens-rotated basis, so it is passed into the
-        // rotation step instead of being wrapped around it. That lets the QROM path hold its
-        // angle word live across forward chain -> Majorana -> inverse chain and pay for the
-        // tables once per SELECT rather than twice. The direct-rotation path has no table to
-        // amortize, so it keeps the plain within/apply shape.
+        // rotation step instead of being wrapped around it.
         let majoranaStep : (Unit => Unit is Adj + Ctl) = () => {
             MajoranaOp(isSF, dvsq, bEqBQubit, spin, spinSF, sysRegDown[0]);
         };
@@ -401,10 +337,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             }
         }
     }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Walk step
-    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Apply the self-inverse block B = U† · Ref_B · U used by the SOSSA walk.
     ///
@@ -460,12 +392,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///
     /// Adapts `SOSSABlockEncoding` to the `Qubit[] => Unit is Adj` shape that the generic
     /// signed-power schedule consumes, by slicing the flat register with `layout`.
-    ///
     /// The inner PREPARE's QROM output and free-rider bits are allocated here rather than
-    /// taken from `allQubits`. Both are written and exactly uncompute inside this operation,
-    /// because SELECT only reads them, so they never carry the success flag. Keeping them
-    /// off the flat register is what makes the ancillas the caller reflects about a
-    /// contiguous block, so a SOSSA walk pairs with the generic `MakeAncillaReflectionOp`.
+    /// taken from `allQubits`. Both are written and exactly uncompute inside this operation.
     operation SOSSABlockEncodingOnRegister(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -474,8 +402,23 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         layout : SOSSAWalkLayout,
         allQubits : Qubit[],
     ) : Unit is Adj {
-        let regs = SplitSOSSAWalkRegisters(layout, allQubits);
-        use innerScratch = Qubit[SOSSAInnerScratchCount(layout)];
+        let bounds = SOSSAWalkRegisterBounds(layout);
+        let outerStart = bounds[0];
+        let innerStart = bounds[1];
+        let spinStart = bounds[2];
+        let gradientStart = bounds[3];
+        let regs = new SOSSAWalkRegisters {
+            systemReg = allQubits[0..outerStart - 1],
+            outerReg = allQubits[outerStart..innerStart - 1],
+            innerReg = allQubits[innerStart..spinStart - 1],
+            spinReg = allQubits[spinStart..gradientStart - 1],
+            phaseGradientReg = if bounds[4] > gradientStart {
+                allQubits[gradientStart..bounds[4] - 1]
+            } else {
+                []
+            }
+        };
+        use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
         SOSSABlockEncoding(
             outerPrepareOp,
             freeRiderOp,
@@ -512,24 +455,23 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // SF mode: copy spinSF to spin (fires when isSF=1)
         CCNOT(isSF, spinSF, spin);
         // SWAP up/down registers based on spin
-        for i in 0..Length(registerDown) - 1 {
-            Controlled SWAP([spin], (registerDown[i], registerUp[i]));
-        }
+        Controlled ApplyToEachCA([spin], (SWAP, Zipped(registerDown, registerUp)));
     }
 
     /// Givens rotation chain with CNOT sandwich (arXiv:2502.15882v1, Appendix B.5).
     ///
-    /// Each step G_{j,j+1}(θ) = CX(j→j+1) · Ry(-2θ, j) · CX(j→j+1) acts as a
+    /// Each step G_{j,j+1}(θ) = CX(j→j+1) · Ctrl_{j+1}[Ry(2θ, j)] · CX(j→j+1) acts as a
     /// 2×2 rotation in the single-excitation subspace {|01⟩,|10⟩} of (target[j], target[j+1]).
-    /// The full chain maps orbital content to qubit 0 for MajoranaOp.
+    /// The control on target[j+1] keeps the rotation out of the |00⟩/|11⟩ sector, so the chain
+    /// preserves particle number; it maps orbital content to qubit 0 for MajoranaOp.
     ///
     /// NOTE: This is the direct rotation (simulation) version. The production
     /// implementation should use QROM to load rotation angles into an ancilla
     /// register, then apply phase-gradient rotation (Rz via addition to a
     /// phase-gradient register). See MakeSelectPhaseGradient.
     ///
-    /// DQ rotations: controlled on xoReg ∈ [0, N), unconditional on b.
-    /// SF rotations: controlled on (xoReg, bReg) jointly.
+    /// DQ rotations: controlled on xoReg ∈ [0, N) and the neighbor target[j+1], unconditional on b.
+    /// SF rotations: controlled on (xoReg, bReg) and the neighbor target[j+1] jointly.
     operation ApplyMultiControlledRotations(
         params : SelectParams,
         N : Int,
@@ -547,9 +489,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             CNOT(sysRegDown[j], sysRegDown[j + 1]);
 
             // DQ rotations: x_o in [0, N)
-            // sysRegDown[j+1] joins the controls: inside the CNOT sandwich only the
-            // singly-occupied states carry it, so the rotation stays in the 1-excitation
-            // subspace. Ungated, the chain applies -2*theta instead of the theta of Eq. 93.
             for a in 0..N - 1 {
                 let angle = params.OneBodyRotationAngles[a][j];
                 ApplyControlledOnInt(
@@ -592,16 +531,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///   - SF: Select over min(R*2^bBits, (B+1)*2^rankBits) entries, uncontrolled
     ///   - DQ: Select(N entries) addressed by xoReg[0..⌈log₂N⌉-1], fires when isSF=0
     ///
-    /// `action` runs inside the table load rather than around this whole operation, so the
-    /// angle word stays live across the forward chain, `action`, and the inverse chain, and
-    /// the tables are paid for once per SELECT instead of twice. That is sound only because
-    /// `action` leaves the QROM address (`isSF`, `xoReg`, `bReg`, `rBits`) untouched, so the
-    /// unlookup addresses the same entry that was loaded.
-    ///
-    /// Cost: (L_SF - 2) + unlookup(L_SF) for SF, 2*(N-1) for DQ, and 2 × (N-1) × Adder(bRot)
-    /// for the rotations. The SF unlookup is measurement-based and costs O(sqrt(L)), which is
-    /// the paper's R + B phase fixup: at FeMoco-54 (N=54, R=10, B=27) it is 37 Toffolis
-    /// against the paper's R + B = 37.
+    /// Cost: (L_SF - 2) + unlookup(L_SF) for SF, 2*(N-1) for DQ, and 2*(N-1) uncontrolled
+    /// Adder(bRot) for the rotations -- each Givens rotation is the neighbor-gated CRy(2θ)
+    /// built as Ry(θ)·CNOT·Ry(-θ)·CNOT from two uncontrolled Ry(θ) sharing one angle word, so it
+    /// preserves particle number (matching the direct path) without a controlled adder. The SF
+    /// unlookup is measurement-based and costs O(sqrt(L)), which is the paper's R + B phase fixup.
     ///
     /// L_SF is above the paper's R*B because `Select` pads whichever register addresses the
     /// low bits out to a power of two; `SFTableRankAddressedFirst` picks the cheaper of the
@@ -634,7 +568,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
 
         // SF table: addressed by (bReg ++ rBits) or (rBits ++ bReg), whichever is smaller.
-        // Each entry is (N-1)*bRot rotation bits plus the bEqB flag (1 when b == B).
         let rankFirst = SFTableRankAddressedFirst(R, params.numBases, bBits, Length(rBits));
         let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits, Length(rBits), rankFirst);
         let sfAddress = if rankFirst { rBits + bReg } else { bReg + rBits };
@@ -643,46 +576,35 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use rotTarget = Qubit[nRotBits + 1];
 
         within {
-            // SF load: uncontrolled, addressed by `sfAddress`. Dropping the control is
-            // what makes the uncompute `Adjoint Select`, a measurement-based unlookup costing
-            // O(sqrt(L)) rather than the full L of a controlled adjoint -- this is the phase
-            // fixup of arXiv:2502.15882v1, Appendix B step 7.
-            // SF entries include the bEqB flag at position nRotBits.
+            // SF load: uncontrolled, addressed by `sfAddress`.
             Select(sfData, sfAddress, rotTarget);
 
-            // Uncontrolled means DQ entries also read the table. They address row 0, because
-            // the inner PREPARE gives every one-body generator b = 0 and r = 0 (see
-            // `_inner_conditional_coefficients` and `_compute_free_rider_data` in
-            // block_encoding/sossa.py). That row is classical, so removing it again costs
-            // CNOTs and no Toffolis.
             within { X(isSF); } apply {
-                for index in 0..Length(sfData[0]) - 1 {
-                    if sfData[0][index] {
-                        CNOT(isSF, rotTarget[index]);
-                    }
-                }
+                Controlled ApplyPauliFromBitString([isSF], (PauliX, true, sfData[0], rotTarget));
             }
 
             // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg.
-            // DQ entries have only rotation bits (no bEqB), so target excludes last qubit.
-            // This one stays controlled: SF values of x_o alias onto real DQ rows rather than
-            // onto a single constant, so the trick above does not apply, and giving the table
-            // its own isSF address bit doubles it -- which costs more than the cheaper
-            // unlookup saves at every size measured.
             within { X(isSF); } apply {
                 Controlled Select([isSF], (dqData, xoReg[0..nDQBits - 1], rotTarget[0..nRotBits - 1]));
             }
         } apply {
             within {
-                // Copy bEqB flag from QROM output to persistent qubit.
-                // Cost: 1 CNOT (vs ⌈log₂(B+1)⌉ Toffoli for ApplyControlledOnInt).
                 CNOT(rotTarget[nRotBits], bEqBQubit);
 
                 for j in numRotAngles - 1..-1..0 {
+                    let word = rotTarget[j * bRot..(j + 1) * bRot - 1];
                     within {
                         CNOT(sysRegDown[j], sysRegDown[j + 1]);
                     } apply {
-                        RyViaPhaseGradient(sysRegDown[j], rotTarget[j * bRot..(j + 1) * bRot - 1], phaseGradientReg);
+                        // Neighbor-gated CRy(2θ) as Ry(θ)·CNOT·Ry(-θ)·CNOT: two uncontrolled Ry(θ)
+                        // sharing `word`, so it matches the direct path's gated G(θ) with no
+                        // controlled adder (arXiv:2605.30455 Fig. C_RZ; caesura2025faster).
+                        within {
+                            CNOT(sysRegDown[j + 1], sysRegDown[j]);
+                        } apply {
+                            Adjoint RyViaPhaseGradient(sysRegDown[j], word, phaseGradientReg);
+                        }
+                        RyViaPhaseGradient(sysRegDown[j], word, phaseGradientReg);
                     }
                 }
             } apply {
@@ -790,17 +712,57 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
+    /// Build the inner alias-sampling PREPARE and its free-rider loader together.
+    ///
+    /// Carrying the free-rider word widens the QROAM output charged on each of the four
+    /// inner-table lookups in one block encoding. Loading it separately costs one `Select`
+    /// round trip over the outer conditions but lets the inner table use a narrower output
+    /// and potentially a different swap width.
+    function MakeInnerPrepareAliasSamplingOracles(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+    ) : (
+        ((Qubit[], Qubit[]) => Unit is Adj),
+        ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
+    ) {
+        let numConditions = Length(innerCoefficients);
+        let numInnerSlots = 1 <<< BitSizeI(Length(innerCoefficients[0]) - 1);
+        let numWordBits = coefficientBitPrecision + BitSizeI(numInnerSlots - 1) + 2;
+        let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        let inlineBits = numWordBits + numExtraBits;
+        let inlineLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
+        let separateLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
+        let inlineCost = 4 * SelectSwapCost2D(inlineLambda, numConditions, numInnerSlots, inlineBits, true);
+        let separateCost = 4 * SelectSwapCost2D(
+            separateLambda,
+            numConditions,
+            numInnerSlots,
+            numWordBits,
+            true
+        ) + SelectSwapCost2D(0, numConditions, 1, 1, true);
+        let loadSeparately = numExtraBits > 0 and separateCost < inlineCost;
+        let inlineData = if loadSeparately { [] } else { freeRiderData };
+        let separateData = if loadSeparately { freeRiderData } else { [] };
+
+        (
+            MakeInnerPrepareAliasSampling(innerCoefficients, inlineData, coefficientBitPrecision),
+            MakeFreeRiderLoadOp(separateData)
+        )
+    }
+
     /// Build an inner PREPARE using direct controlled preparation.
-    /// Prepares the b superposition via controlled PreparePureStateD. The free-rider word is
-    /// loaded by `MakeFreeRiderLoadOp`, once per block encoding rather than on every inner
-    /// PREPARE call.
+    ///
+    /// innerReg layout: bReg[nIndexBits] + signQubit[1] + freeRiderReg[nFR]. The sign qubit
+    /// mirrors the alias-sampling QROM's sign output, so SELECT finds the LCU sign of the
+    /// sampled `(x_o, b)` in the same kind of place whichever inner backend is in use.
     function MakeInnerPrepareDirect(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][]
     ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         let nCoeffs = Length(innerCoefficients[0]);
         let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
-        // innerReg layout: bReg[nIndexBits] + freeRiderReg[nFR]
+        let signData = BuildInnerSignTable(innerCoefficients, nIndexBits);
         (outerReg, innerReg) => {
             let bReg = innerReg[0..nIndexBits - 1];
 
@@ -815,13 +777,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     Reversed(bReg),
                 );
             }
+            Select(signData, bReg + outerReg, [innerReg[nIndexBits]]);
         }
     }
 
     /// Build a SELECT using QROM + phase gradient rotation.
-    ///
-    /// Givens rotations are applied via split OneBody/TwoBody Select QROM + RyViaPhaseGradient.
-    /// The phase gradient register is allocated and prepared externally by QPE.
     function MakeSelectPhaseGradient(
         params : SelectParams
     ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
@@ -831,10 +791,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     }
 
     /// Build a SELECT using direct rotation synthesis.
-    ///
-    /// Givens rotations are applied via multi-controlled Ry gates.
-    /// Useful for simulation and testing (no ancilla overhead).
-    /// The phaseGradientReg argument is accepted but ignored.
     function MakeSelectDirectRotation(
         params : SelectParams
     ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
@@ -845,7 +801,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// The SOSSA block encoding B as the `Qubit[] => Unit is Adj` callable QPE consumes.
     ///
-    /// The register it takes is `[systemReg | outerReg | innerReg | spinReg | phaseGradientReg]`;
+    /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
     /// the gradient tail is only present when `layout.numPhaseGradientQubits > 0`.
     function MakeSOSSABlockEncodingOp(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
@@ -866,7 +822,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
     ) : Unit {
-        use allQubits = Qubit[layout.numSystemQubits + SOSSAWalkAncillaCount(layout)];
+        let bounds = SOSSAWalkRegisterBounds(layout);
+        use allQubits = Qubit[layout.numSystemQubits + bounds[4] - bounds[0]];
         if layout.numPhaseGradientQubits > 0 {
             let gradientStart = Length(allQubits) - layout.numPhaseGradientQubits;
             PreparePhaseGradientState(allQubits[gradientStart...]);
@@ -881,10 +838,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Adapter: outer PREPARE then inner PREPARE, over one flat register.
-    ///
-    /// The two PREPAREs take separate registers, so they cannot be handed straight to a
-    /// harness that applies a single `Qubit[] => Unit`. This splits one register instead of
-    /// allocating its own, which lets the caller own the qubits and release them.
     function MakeOuterInnerPrepOp(
         outerOp : (Qubit[]) => Unit is Adj + Ctl,
         innerOp : (Qubit[], Qubit[]) => Unit is Adj,
@@ -899,18 +852,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
 
     /// Test the full SELECT on an entry with known angles.
-    ///
-    /// `usePhaseGradient` selects between the two rotation backends, which must agree: the
-    /// direct multi-controlled rotations and the QROM-plus-phase-gradient chain implement the
-    /// same Givens basis change, the latter to `rotationBitPrecision` accuracy. Running both
-    /// and comparing the resulting states is what makes the QROM path testable, since it has
-    /// no independent reference to be checked against.
-    ///
-    /// `bValue` addresses the SF angle table, and the rank is derived from `xoValue` exactly
-    /// as the inner PREPARE would emit it, so the two backends see a consistent (b, r). An
-    /// `xoValue >= numOrbitals` with a nonzero `bValue` is what exercises the SF table: at
-    /// b = r = 0 both address layouts of `BuildSFBulkRotationData` agree, so a mismatch
-    /// between the table build and the address concatenation would go unseen.
     operation TestSelectDQ(
         selectData : SelectParams,
         xoValue : Int,
@@ -944,18 +885,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let gradientReg = qs[total - nGradient...];
 
         let xoReg = outerReg[0..xoBits - 1];
-        for bit in 0..xoBits - 1 {
-            if (xoValue >>> bit) &&& 1 == 1 {
-                X(xoReg[bit]);
-            }
-        }
+        ApplyXorInPlace(xoValue, xoReg);
         H(spinReg[0]); // spinDQ
 
-        for bit in 0..bBits - 1 {
-            if (bValue >>> bit) &&& 1 == 1 {
-                X(innerReg[bit]);
-            }
-        }
+        ApplyXorInPlace(bValue, innerReg[0..bBits - 1]);
 
         let frStart = bBits;
         if xoValue >= N { X(innerReg[frStart]); }
@@ -963,11 +896,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         // Rank as the inner PREPARE's free-rider data would carry it: 0 for one-body.
         let rValue = if xoValue >= N { (xoValue - N) / selectData.numCopies } else { 0 };
-        for bit in 0..nFR - 3 {
-            if (rValue >>> bit) &&& 1 == 1 {
-                X(innerReg[frStart + 2 + bit]);
-            }
-        }
+        ApplyXorInPlace(rValue, innerReg[frStart + 2..frStart + nFR - 1]);
 
         X(systemReg[0]);
 

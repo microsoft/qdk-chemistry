@@ -263,21 +263,21 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
     @staticmethod
     def _inner_conditional_coefficients(sossa: SOSContainer, num_one_body: int) -> np.ndarray:
-        r"""Assemble the inner-PREPARE conditional distribution ``[Xo, B+1]``.
+        r"""Assemble the inner-PREPARE conditional amplitudes ``[Xo, B+1]``.
 
         One delta row (``b = 0``) per one-body generator, then one spin-free row
-        per ``(rank, copy)``: the rotated-``Z`` coefficients followed by the
-        absolute identity weight (the ``b == B`` free-rider magnitude).
+        per ``(rank, copy)``: the rotated-``Z`` weights followed by the identity
+        weight (the ``b == B`` entry).
         """
         b_plus_1 = sossa.metadata.num_bases + 1
         delta = np.zeros((num_one_body, b_plus_1))
         if num_one_body:
             delta[:, 0] = 1.0
         sf = np.asarray(sossa.two_body.coeffs)
-        sf_rows = np.zeros((sf.shape[0], b_plus_1))
+        sf_rows = np.zeros((sf.shape[0] if sf.ndim == 2 else 0, b_plus_1))
         if sf.size:
-            sf_rows[:, :-1] = sf[:, :-1].real
-            sf_rows[:, -1] = np.abs(sf[:, -1])
+            weights = sf.real
+            sf_rows = np.sign(weights) * np.sqrt(np.abs(weights))
         return np.concatenate([delta, sf_rows], axis=0)
 
     @staticmethod

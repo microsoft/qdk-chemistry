@@ -138,7 +138,9 @@ class SOSQubitMapper(QubitMapper):
         x_pauli = sparse_pauli_word_to_label(mapping.majorana(0), 1)
         y_pauli = sparse_pauli_word_to_label(mapping.majorana(1), 1)
         sf_bilinear_coefficient, sf_word = mapping.bilinear(1, 0)
-        sf_coefficient = float(sf_bilinear_coefficient.real)
+        # The rotated number operator is n = (I - i gamma_1 gamma_0) / 2, so its non-identity
+        # part carries the opposite sign to the bilinear.
+        sf_coefficient = -float(sf_bilinear_coefficient.real)
         sf_pauli = sparse_pauli_word_to_label(sf_word, 1)
 
         # One-body generators: D1 (positive eigenvalues) first, then Q1 (negative). Each is the

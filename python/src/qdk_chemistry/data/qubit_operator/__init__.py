@@ -56,7 +56,7 @@ class QubitOperator(DataClass):
     """
 
     _data_type_name = "qubit_hamiltonian"
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     @staticmethod
     def data_type_name() -> str:

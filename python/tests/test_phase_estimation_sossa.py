@@ -274,6 +274,7 @@ def _get_ground_state_and_energy(h_matrix, num_orbitals, nalpha=1, nbeta=1):
 
     # Permute from Python Kron convention to Q# convention
     perm = _python_to_qsharp_permutation(num_orbitals)
+    signs = _python_to_qsharp_sign(num_orbitals)
     gs_idx = sector_indices[0]
     gs_energy = eigenvalues[gs_idx]
     gs_vec = eigenvectors[:, gs_idx]
@@ -281,7 +282,7 @@ def _get_ground_state_and_energy(h_matrix, num_orbitals, nalpha=1, nbeta=1):
     # Apply permutation
     gs_vec_qs = np.zeros(dim)
     for i in range(dim):
-        gs_vec_qs[perm[i]] = gs_vec[i]
+        gs_vec_qs[perm[i]] = signs[i] * gs_vec[i]
 
     return gs_energy, gs_vec_qs
 
@@ -302,6 +303,26 @@ def _python_to_qsharp_permutation(num_orbitals):
         perm[i] = k
     return perm
 
+
+def _python_to_qsharp_sign(num_orbitals):
+    """Fermionic sign of the mode reordering ``_python_to_qsharp_permutation`` performs.
+
+    That permutation moves the interleaved ``(p, sigma)`` modes into spin-blocked order.
+    Reordering fermionic modes reorders the creation operators of a determinant, so each
+    basis state also picks up the parity of the permutation restricted to its occupied
+    modes -- which relabelling the index on its own does not carry. Omitting it leaves a
+    diagonal similarity transform between the two conventions: spectra agree, individual
+    eigenvectors and matrix elements do not.
+    """
+    n_qubits = 2 * num_orbitals
+    signs = np.ones(2**n_qubits)
+    for i in range(2**n_qubits):
+        modes = sorted(n_qubits - 1 - b for b in range(n_qubits) if (i >> b) & 1)
+        images = [(j % 2) * num_orbitals + j // 2 for j in modes]
+        signs[i] = (-1.0) ** sum(
+            1 for a in range(len(images)) for b in range(a + 1, len(images)) if images[a] > images[b]
+        )
+    return signs
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SOSSA QPE helper
@@ -911,10 +932,6 @@ def _sossa_unary_qpe_circuit(
         num_orbitals=num_orbitals, num_ranks=num_ranks, num_bases=num_bases, num_copies=num_copies
     )
     num_modes = 2 * num_orbitals
-    # Wrapping the container in a Hamiltonian hands ownership to C++ and disowns the
-    # Python handle, so the orbitals have to be built independently rather than read back
-    # off ``factorized``. ``create_random_factorized_hamiltonian`` builds its own the same
-    # way, so these are the container's orbitals.
     orbitals = create_test_orbitals(num_orbitals)
     operator = create("qubit_mapper", "sos").run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes))
 
@@ -937,21 +954,7 @@ class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
     def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
-
-        This used to assert 32,457,481, a figure produced by ``Legacy*ResourceEstimate``
-        branches that ``IsResourceEstimating()`` substituted for the real PREPAREs. Those
-        omitted the alias-sampling comparator and controlled index swap and used a 2D
-        unlookup that is not a valid circuit, so the number was never achievable. With the
-        branches deleted the estimate is the executable circuit throughout, and the honest
-        cost is higher: the PREPAREs alone went from 1,013 to 2,719 Toffolis per block
-        encoding. SELECT moved the other way.
-
-        Erasing the inner PREPARE's alias lookup by measurement rather than by running it
-        backwards then took it from 37,873,827 to 31,837,599, a 15.9% cut over the whole
-        estimate. The qubit count is unchanged: the erasure's phase-fixup ancillas fit
-        inside the peak the rest of the walk already sets.
-        """
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs."""
         circuit = _sossa_unary_qpe_circuit(
             10_162,
             num_orbitals=20,
@@ -970,5 +973,10 @@ class TestSOSSAResourceEstimation:
 
         toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
 
-        assert toffoli_count == pytest.approx(31_837_599, rel=0.01)
+        # 42_649_967 Toffolis = 4197/BE over 10_162 walk queries. Each neighbor-gated Givens
+        # rotation is the number-conserving CRy(2theta) built as Ry(theta).CNOT.Ry(-theta).CNOT
+        # from two uncontrolled Ry(theta) sharing one angle word, so both SELECT backends apply
+        # the same G(theta) without a controlled adder. This is ~1.8% below the earlier
+        # controlled-adder cost (43_422_279) and 4197/BE vs the paper's 3924/BE.
+        assert toffoli_count == pytest.approx(42_649_967, rel=0.01)
         assert logical_counts["numQubits"] == 470

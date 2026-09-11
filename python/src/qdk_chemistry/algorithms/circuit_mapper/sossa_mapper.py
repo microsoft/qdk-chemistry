@@ -111,38 +111,12 @@ class SOSSAMapper(CircuitMapper):
         circuit = prepare_algorithm.run(container.outer_prepare)
         return circuit._qsharp_op, circuit.metadata.num_phase_gradient_ancillas  # noqa: SLF001
 
-    def _loads_free_rider_separately(self, container: SOSSAWalkContainer) -> bool:
-        r"""Whether the free-rider word is loaded once per block encoding rather than per PREPARE.
-
-        Args:
-            container: The SOSSA walk container describing the block encoding.
-
-        Returns:
-            True when a separate load is the cheaper of the two.
-
-        """
-        if self._settings.get("inner_prepare_algorithm") != "controlled_alias_sampling":
-            return True
-        free_rider = container.inner_prepare.free_rider_data
-        if free_rider is None or free_rider.size == 0:
-            return False
-        layout = container.layout
-        mu = int(self._settings.get("coefficient_bit_precision"))
-        # Two SELECT calls, each conjugated by the inner PREPARE, so the table is read four times.
-        inner_lookups_per_block_encoding = 4
-        return QSHARP_UTILS.SOSSAWalk.SeparateWordLoadPays(
-            container.inner_prepare.conditional_coefficients.shape[0],
-            1 << layout.inner_prep_bits,
-            mu + layout.inner_prep_bits + 2,
-            layout.num_free_rider_bits,
-            inner_lookups_per_block_encoding,
-        )
-
-    def _build_inner_prep(self, container: SOSSAWalkContainer) -> Any:
-        r"""Build the Q# inner (controlled) PREPARE callable.
+    def _build_inner_oracles(self, container: SOSSAWalkContainer) -> tuple[Any, Any]:
+        r"""Build the Q# inner PREPARE and free-rider load callables.
 
         Creates a superposition over bases :math:`b` conditioned on :math:`x_o`. The
-        free-rider word is loaded here only when ``_loads_free_rider_separately`` says otherwise.
+        alias-sampling factory places the free-rider table in the cheaper of the inner
+        PREPARE and a separate load performed once per block encoding.
 
         Algorithms:
             - ``"controlled_alias_sampling"``: 2D alias sampling.
@@ -152,7 +126,7 @@ class SOSSAMapper(CircuitMapper):
             container: The SOSSA container with inner_prepare coefficients.
 
         Returns:
-            A Q# callable ``(Qubit[], Qubit[]) => Unit is Adj``.
+            The inner PREPARE and free-rider load callables.
 
         """
         algorithm = self._settings.get("inner_prepare_algorithm")
@@ -162,26 +136,35 @@ class SOSSAMapper(CircuitMapper):
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
-            inline = [] if self._loads_free_rider_separately(container) else free_rider_data
-            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(coefficients, inline, coeff_bits)
-        return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data)
+            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSamplingOracles(
+                coefficients,
+                free_rider_data,
+                coeff_bits,
+            )
+        return (
+            QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data),
+            QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp(free_rider_data),
+        )
 
-    def _build_free_rider_load(self, container: SOSSAWalkContainer) -> Any:
-        r"""Build the Q# callable that loads the free-rider word :math:`(G, r)` for one :math:`x_o`.
+    def _inner_sign_qubit_index(self, container: SOSSAWalkContainer) -> int:
+        r"""Index within ``innerReg`` of the qubit carrying the sign of the sampled ``(x_o, b)``.
+
+        SELECT applies :math:`(-1)^s` by phasing this qubit, so where it sits is a property
+        of the inner PREPARE backend: the alias-sampling oracle emits it as the last-but-one
+        word of its QROM output, and the direct oracle writes it just past the index register.
 
         Args:
-            container: The SOSSA container carrying the free-rider table.
+            container: The SOSSA walk container describing the block encoding.
 
         Returns:
-            A Q# callable ``(Qubit[], Qubit[]) => Unit is Adj + Ctl``, a no-op when the inner
-            PREPARE carries the word itself.
+            The index into the inner register.
 
         """
-        if not self._loads_free_rider_separately(container):
-            return QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp([])
-        free_rider_data = container.inner_prepare.free_rider_data
-        free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
-        return QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp(free_rider_data)
+        inner_prep_bits = container.layout.inner_prep_bits
+        if self._settings.get("inner_prepare_algorithm") == "controlled_alias_sampling":
+            mu = self._settings.get("coefficient_bit_precision")
+            return 2 * inner_prep_bits + 2 * mu + 1
+        return inner_prep_bits
 
     def _build_select(self, container: SOSSAWalkContainer) -> Any:
         r"""Build the SELECT step.
@@ -209,6 +192,7 @@ class SOSSAMapper(CircuitMapper):
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
             "numFreeRiderBits": num_free_rider_bits,
+            "signQubitIndex": self._inner_sign_qubit_index(container),
         }
         if algorithm == "qrom_phase_gradient":
             return QSHARP_UTILS.SOSSAWalk.MakeSelectPhaseGradient(select_data)
@@ -270,7 +254,9 @@ class SOSSAMapper(CircuitMapper):
             num_inner_qubits = 2 * inner_prep_bits + 2 * mu_inner + 3 + num_free_rider_bits
             num_reflect_inner = inner_prep_bits + mu_inner + 1
         else:
-            num_inner_qubits = inner_prep_bits + num_free_rider_bits
+            # The extra qubit is the sign bit SELECT phases; the alias oracle already
+            # carries its own inside the QROM output counted above.
+            num_inner_qubits = inner_prep_bits + 1 + num_free_rider_bits
             num_reflect_inner = inner_prep_bits
 
         num_phase_gradient_qubits = self._num_phase_gradient_qubits
@@ -315,10 +301,11 @@ class SOSSAMapper(CircuitMapper):
                 f"The outer PREPARE circuit declares {outer_gradient_qubits} phase gradient ancillas "
                 f"but the walk layout reserves {reserved} for it."
             )
+        inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         return (
             outer_prepare_op,
-            self._build_free_rider_load(container),
-            self._build_inner_prep(container),
+            free_rider_op,
+            inner_prepare_op,
             self._build_select(container),
         )
 

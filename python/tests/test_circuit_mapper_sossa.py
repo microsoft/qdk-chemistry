@@ -207,7 +207,7 @@ class TestInnerPrep:
         # Build inner prep
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
-        inner_op = inner_mapper._build_inner_prep(container)
+        inner_op, _ = inner_mapper._build_inner_oracles(container)
 
         # Compute register sizes
         outer_coeffs = np.asarray(container.outer_prepare.get_coefficients())
@@ -224,7 +224,7 @@ class TestInnerPrep:
         else:  # direct
             fr = container.inner_prepare.free_rider_data
             n_fr = fr.shape[1] if fr is not None and fr.size > 0 else 0
-            num_inner_qubits = n_index_bits + n_fr
+            num_inner_qubits = n_index_bits + 1 + n_fr  # + the sign qubit SELECT phases
 
         # Apply outer + inner prep
         full_sv = np.array(
@@ -406,22 +406,36 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
             "numFreeRiderBits": 2 + rank_bits,
+            "signQubitIndex": -1,
         }
 
     @staticmethod
-    def _run_select(select_data: dict, xo_value: int = 0, b_value: int = 0) -> np.ndarray:
-        """Run TestSelectDQ on the direct-rotation path and return the state vector.
+    def _run_select(
+        select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
+    ) -> np.ndarray:
+        """Run TestSelectDQ on the chosen backend and return the dense state vector.
 
         A fresh context per run is required: ``TestSelectDQ`` allocates through the QIR
         runtime without releasing, so a second run in the same context would report both
         runs' qubits.
 
-        Only the direct path is driven: its phase-gradient counterpart implements a
-        different rotation, so the two cannot be compared until that is reconciled.
+        The phase-gradient path allocates a gradient register (``rotationBitPrecision`` qubits,
+        appended last) that it conjugates back to ``|0...0>``; ``_gradient_subspace`` projects
+        the wider dump back onto the direct-path layout so the two backends can be compared.
         """
         ctx = create_qsharp_context()
-        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, False)
+        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
         return np.array(ctx.dump_machine().as_dense_state())
+
+    @staticmethod
+    def _gradient_subspace(sv: np.ndarray, num_gradient: int) -> np.ndarray:
+        """Restrict a phase-gradient dump to gradient=|0...0>, recovering the direct-path layout.
+
+        The gradient register is allocated last, so it occupies the low ``num_gradient`` bits of
+        the big-endian dump index; the conjugation returns it to ``|0...0>``, so the gradient=0
+        slice carries the full amplitude.
+        """
+        return sv if num_gradient == 0 else sv[:: 1 << num_gradient]
 
     @pytest.mark.slow
     @pytest.mark.parametrize("N", [2, 3])
@@ -473,6 +487,7 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
             "numFreeRiderBits": 2,
+            "signQubitIndex": -1,
         }
         sv = self._run_select(select_data, xo_value=0, b_value=0)
 
@@ -495,6 +510,48 @@ class TestSelectFullFidelity:
             f"the Givens chain is not the rotation U(u) of Eq. 93"
         )
         assert spin_dq < system0  # layout guard: spinDQ precedes the system register
+
+    @pytest.mark.slow
+    @pytest.mark.parametrize(
+        ("dims", "xo_value", "b_value", "bit_precision"),
+        [
+            ((2, 1, 1, 1), 0, 0, 10),
+            ((2, 2, 1, 1), 2, 0, 10),
+            ((3, 2, 2, 1), 0, 0, 7),
+        ],
+        ids=["N2_dq", "N2_sf", "N3_dq_chain"],
+    )
+    def test_phase_gradient_backend_matches_direct(
+        self,
+        dims: tuple[int, int, int, int],
+        xo_value: int,
+        b_value: int,
+        bit_precision: int,
+    ):
+        """The two production SELECT backends must implement the same Givens basis change."""
+        num_orbitals, num_ranks, num_bases, num_copies = dims
+        select_data = self._select_data(
+            num_orbitals,
+            rotation_bit_precision=bit_precision,
+            num_ranks=num_ranks,
+            num_bases=num_bases,
+            num_copies=num_copies,
+        )
+
+        direct = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False)
+        qrom = self._gradient_subspace(
+            self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True),
+            bit_precision,
+        )
+
+        # The gradient is conjugated back to |0...0>, so restricting to it keeps the full norm.
+        assert len(qrom) == len(direct)
+        assert np.linalg.norm(qrom) == pytest.approx(1.0, abs=1e-6)
+
+        fidelity = abs(np.vdot(direct, qrom)) / (np.linalg.norm(direct) * np.linalg.norm(qrom))
+        assert fidelity == pytest.approx(1.0, abs=3e-3), (
+            f"phase-gradient and direct SELECT backends disagree: fidelity={fidelity}"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

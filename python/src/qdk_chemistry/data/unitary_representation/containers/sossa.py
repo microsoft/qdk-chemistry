@@ -66,7 +66,9 @@ class SOSSAInnerPrepare:
     """
 
     conditional_coefficients: np.ndarray
-    r"""2D amplitude array, shape :math:`[X_o, B+1]`. Row :math:`x_o` gives the inner distribution."""
+    r"""2D amplitude array, shape :math:`[X_o, B+1]`. Row :math:`x_o` gives the inner
+    distribution as :math:`\mathrm{sign}(w_b)\sqrt{|w_b|}`: PREPARE's amplitude enters the
+    block encoding squared, and SELECT applies the sign."""
 
     free_rider_data: np.ndarray | None = None
     r"""Optional 2D boolean array, shape :math:`[X_o, n_{\text{fr}}]`."""

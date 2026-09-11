@@ -69,6 +69,34 @@ def test_qubit_operator_still_accepts_the_legacy_positional_constructor() -> Non
     np.testing.assert_allclose(operator.coefficients, np.array([0.5, -0.25]))
 
 
+def test_pauli_lcu_json_preserves_coefficient_shape_and_dtype() -> None:
+    """Pauli LCU and SOS coefficients use the same complex-array wire format."""
+    coefficients = np.array([0.5 + 0.25j, -0.25j], dtype=np.complex64)
+    container = PauliLCUContainer(["XI", "ZZ"], coefficients)
+
+    json_data = container.to_json()
+    restored = PauliLCUContainer.from_json(json_data)
+
+    assert json_data["coefficients"] == {
+        "real": [0.5, 0.0],
+        "imag": [0.25, -0.25],
+        "shape": [2],
+        "dtype": "complex64",
+    }
+    np.testing.assert_array_equal(restored.coefficients, coefficients)
+    assert restored.coefficients.dtype == coefficients.dtype
+
+
+def test_pauli_lcu_reads_complex_coefficients_without_shape() -> None:
+    """Read coefficient dictionaries written before the shared array codec added shape."""
+    json_data = PauliLCUContainer(["X"], np.array([0.5 + 0.25j])).to_json()
+    del json_data["coefficients"]["shape"]
+
+    restored = PauliLCUContainer.from_json(json_data)
+
+    np.testing.assert_array_equal(restored.coefficients, np.array([0.5 + 0.25j]))
+
+
 def test_qubit_operator_reads_documents_written_before_container_dispatch() -> None:
     """A document with no ``container_type`` loads as a Pauli LCU operator.
 
@@ -126,7 +154,12 @@ def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
         ),
     )
 
-    restored = QubitOperator.from_json(QubitOperator(container).to_json()).get_container()
+    json_data = QubitOperator(container).to_json()
+    assert json_data["one_body_coeffs"]["shape"] == [2, 2]
+    assert json_data["one_body_coeffs"]["dtype"] == "complex128"
+    del json_data["one_body_coeffs"]["dtype"]
+    del json_data["two_body_coeffs"]["dtype"]
+    restored = QubitOperator.from_json(json_data).get_container()
 
     np.testing.assert_allclose(restored.one_body.coeffs, one_body_coeffs)
     np.testing.assert_allclose(restored.one_body.angles, container.one_body.angles)

@@ -16,37 +16,17 @@ import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
+from qdk_chemistry.utils.serialization import (
+    complex_array_from_json,
+    complex_array_to_json,
+    real_array_from_json,
+    real_array_to_json,
+)
 
 if TYPE_CHECKING:
     import h5py
 
 __all__ = ["FactorizedHamiltonianMetadata", "RotatedPaulis", "SOSContainer"]
-
-
-def _complex_block_to_json(coeffs: np.ndarray) -> dict[str, Any]:
-    """Serialize a complex coefficient array as split real/imaginary lists plus its shape."""
-    arr = np.asarray(coeffs, dtype=complex)
-    return {"real": arr.real.tolist(), "imag": arr.imag.tolist(), "shape": list(arr.shape)}
-
-
-def _complex_block_from_json(data: dict[str, Any]) -> np.ndarray:
-    """Rebuild a complex coefficient array from split real/imaginary lists."""
-    block = np.asarray(data["real"], dtype=float) + 1j * np.asarray(data["imag"], dtype=float)
-    shape = data.get("shape")
-    return block.reshape(shape) if shape is not None else block
-
-
-def _real_block_to_json(values: np.ndarray) -> dict[str, Any]:
-    """Serialize a real array as nested lists plus its shape."""
-    arr = np.asarray(values, dtype=float)
-    return {"values": arr.tolist(), "shape": list(arr.shape)}
-
-
-def _real_block_from_json(data: Any) -> np.ndarray:
-    """Rebuild a real array written by ``_real_block_to_json`` or an older bare list."""
-    if isinstance(data, dict):
-        return np.asarray(data["values"], dtype=float).reshape(data["shape"])
-    return np.asarray(data, dtype=float)
 
 
 @dataclass(frozen=True, eq=False)
@@ -176,11 +156,11 @@ class SOSContainer(QubitOperatorContainer):
             {
                 "container_type": self.type,
                 "metadata": self.metadata.to_json(),
-                "one_body_angles": _real_block_to_json(self.one_body.angles),
-                "one_body_coeffs": _complex_block_to_json(self.one_body.coeffs),
+                "one_body_angles": real_array_to_json(self.one_body.angles),
+                "one_body_coeffs": complex_array_to_json(self.one_body.coeffs),
                 "one_body_paulis": list(self.one_body.paulis),
-                "two_body_angles": _real_block_to_json(self.two_body.angles),
-                "two_body_coeffs": _complex_block_to_json(self.two_body.coeffs),
+                "two_body_angles": real_array_to_json(self.two_body.angles),
+                "two_body_coeffs": complex_array_to_json(self.two_body.coeffs),
                 "two_body_paulis": list(self.two_body.paulis),
                 "encoding": self.encoding,
                 "fermion_mode_order": str(self.fermion_mode_order) if self.fermion_mode_order is not None else None,
@@ -198,13 +178,13 @@ class SOSContainer(QubitOperatorContainer):
         """Create a sum-of-squares container from JSON."""
         cls._validate_json_version(cls._serialization_version, json_data)
         one_body = RotatedPaulis(
-            _real_block_from_json(json_data["one_body_angles"]),
-            _complex_block_from_json(json_data["one_body_coeffs"]),
+            real_array_from_json(json_data["one_body_angles"]),
+            complex_array_from_json(json_data["one_body_coeffs"]),
             tuple(json_data.get("one_body_paulis", ("X", "Y"))),
         )
         two_body = RotatedPaulis(
-            _real_block_from_json(json_data["two_body_angles"]),
-            _complex_block_from_json(json_data["two_body_coeffs"]),
+            real_array_from_json(json_data["two_body_angles"]),
+            complex_array_from_json(json_data["two_body_coeffs"]),
             tuple(json_data.get("two_body_paulis", ("Z",))),
         )
         return cls(
