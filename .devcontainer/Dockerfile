@@ -59,6 +59,10 @@ RUN apt-get update && \
 COPY .devcontainer/scripts/parallelism.sh /usr/local/share/qdk/parallelism.sh
 
 # Install C++ dependencies
+# Keep the shared installers at the path used by the devcontainer script.
+COPY .pipelines/install-scripts/common.sh /.pipelines/install-scripts/common.sh
+COPY .pipelines/install-scripts/install-blaspp.sh /.pipelines/install-scripts/install-blaspp.sh
+COPY .pipelines/install-scripts/install-lapackpp.sh /.pipelines/install-scripts/install-lapackpp.sh
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
 COPY cpp/manifest/qdk-chemistry/cgmanifest.json /tmp/cpp_cgmanifest.json
 COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json

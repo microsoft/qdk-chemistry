@@ -116,11 +116,11 @@ New-Item -ItemType Directory -Force -Path $DepsInstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $buildDir       | Out-Null
 
 # ─── Memory-aware build parallelism ──────────────────────────────────────────
-# Cap by RAM (~3.5 GB/job) to avoid OOM on machines with many cores but limited
+# Cap by RAM (~8 GB/job) to avoid OOM on machines with many cores but limited
 # memory. On typical CI runners this equals NUMBER_OF_PROCESSORS.
 $cpu   = [int]$env:NUMBER_OF_PROCESSORS
 $ramGB = [math]::Floor((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-$jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 3.5)))
+$jobs  = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
 Write-Host "CPUs=$cpu  RAM=${ramGB}GB  -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
 $env:CMAKE_BUILD_PARALLEL_LEVEL = $jobs
 
@@ -145,6 +145,16 @@ function Get-ManifestUrl([string]$ManifestPath, [string]$Name) {
             Select-Object -First 1
     if (-not $reg) { throw "No '$Name' entry in $ManifestPath" }
     return $reg.component.other.downloadUrl
+}
+
+function Get-ManifestHash([string]$ManifestPath, [string]$Name) {
+    $data = Get-Content $ManifestPath -Raw | ConvertFrom-Json
+    $reg  = $data.registrations |
+            Where-Object { $_.component.type -eq 'other' -and
+                           $_.component.other.name -eq $Name } |
+            Select-Object -First 1
+    if (-not $reg) { throw "No '$Name' entry in $ManifestPath" }
+    return $reg.component.other.hash
 }
 
 $cppManifest  = "$SrcDir\cpp\manifest\qdk-chemistry\cgmanifest.json"
@@ -266,6 +276,36 @@ function Invoke-CMakeDep([string]$Name, [string]$SrcPath, [string[]]$ExtraArgs) 
     }
 }
 
+# Shallow-fetch a single pinned commit instead of a full clone. `git clone --branch` only resolves branch/tag
+# ref names, not an arbitrary commit SHA, so this is needed for our raw-commit pins; GitHub allows fetching any
+# reachable SHA this way. Mirrors .pipelines/install-scripts/common.sh's shallow_checkout for Linux/macOS.
+function Get-ShallowCheckout([string]$RepoUrl, [string]$Commit, [string]$Dest) {
+    New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+    git -C $Dest init -q
+    if ($LASTEXITCODE -ne 0) { throw "git init failed for $Dest" }
+    git -C $Dest remote add origin $RepoUrl
+    git -C $Dest fetch -q --depth 1 origin $Commit
+    if ($LASTEXITCODE -ne 0) { throw "git fetch failed for $RepoUrl @ $Commit" }
+    git -C $Dest checkout -q FETCH_HEAD
+    if ($LASTEXITCODE -ne 0) { throw "git checkout failed for $RepoUrl @ $Commit" }
+}
+
+# Download an "other" type cgmanifest component and verify its SHA-1 against the declared `hash`, so a
+# compromised or silently-changed upstream release asset is caught before it's extracted and built. Mirrors
+# .pipelines/install-scripts/common.sh's download_and_verify for Linux/macOS.
+function Get-DownloadAndVerify([string]$ManifestPath, [string]$Name, [string]$Dest) {
+    $url  = Get-ManifestUrl  $ManifestPath $Name
+    $hash = Get-ManifestHash $ManifestPath $Name
+    if (-not $hash) { throw "No hash declared for '$Name' in $ManifestPath -- cannot verify the download" }
+
+    Invoke-WebRequest $url -OutFile $Dest
+    $actual = (Get-FileHash $Dest -Algorithm SHA1).Hash
+    if ($actual -ine $hash) {
+        Remove-Item $Dest -Force -ErrorAction SilentlyContinue
+        throw "SHA-1 mismatch for '$Name' ($url): expected $hash, got $actual"
+    }
+}
+
 # ─── vcpkg install ────────────────────────────────────────────────────────────
 # Provides eigen3, openblas, hdf5, boost-headers, spdlog, nlohmann-json, etc.
 $vcpkgInstalled = "$SrcDir\vcpkg_installed"
@@ -285,7 +325,7 @@ if (-not (Test-DepInstalled 'libint2' $libintUrl 'libint2*')) {
     New-Item -ItemType Directory -Force -Path $libintExtract | Out-Null
 
     $tarball = Join-Path $libintExtract (Split-Path $libintUrl -Leaf)
-    Invoke-WebRequest $libintUrl -OutFile $tarball
+    Get-DownloadAndVerify $cppManifest 'Libint' $tarball
     tar xzf $tarball -C $libintExtract
     Remove-Item $tarball
 
@@ -326,8 +366,7 @@ if (-not (Test-DepInstalled 'libint2' $libintUrl 'libint2*')) {
 if (-not (Test-DepInstalled 'ecpint' $ecpintCommit 'ecpint*')) {
     Write-Host "=== Installing ecpint ==="
     $ecpintSrc = "$buildDir\ecpint-src"
-    git clone https://github.com/robashaw/libecpint $ecpintSrc
-    git -C $ecpintSrc checkout $ecpintCommit
+    Get-ShallowCheckout https://github.com/robashaw/libecpint $ecpintCommit $ecpintSrc
 
     if (-not $isClangCl) {
         Write-Host "Applying ecpint MSVC patches..."
@@ -347,8 +386,7 @@ if (-not (Test-DepInstalled 'ecpint' $ecpintCommit 'ecpint*')) {
 if (-not (Test-DepInstalled 'gauxc' $gauxcCommit 'gauxc*')) {
     Write-Host "=== Installing gauxc ==="
     $gauxcSrc = "$buildDir\gauxc-src"
-    git clone https://github.com/wavefunction91/gauxc.git $gauxcSrc
-    git -C $gauxcSrc checkout $gauxcCommit
+    Get-ShallowCheckout https://github.com/wavefunction91/gauxc.git $gauxcCommit $gauxcSrc
 
     if ($isClangCl) {
         Write-Host "Applying GauXC clang-cl compatibility patch..."

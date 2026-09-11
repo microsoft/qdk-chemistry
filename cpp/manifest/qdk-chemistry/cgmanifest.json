@@ -8,7 +8,8 @@
         "other": {
           "name": "Boost",
           "version": "1.86.0",
-          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2"
+          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2",
+          "hash": "fd0d26a7d5eadf454896942124544120e3b7a38f"
         }
       },
       "developmentDependency": false
@@ -85,8 +86,8 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/catchorg/Catch2",
-          "commitHash": "182c910b4b63ff587a3440e08f84f70497e49a81",
-          "tag": "v2.13.10"
+          "commitHash": "3f0283de7a9c43200033da996ff9093be3ac84dc",
+          "tag": "v3.3.2"
         }
       },
       "developmentDependency": true
@@ -178,11 +179,12 @@
     },
     {
       "component": {
-        "type": "git",
-        "git": {
-          "repositoryUrl": "https://github.com/HDFGroup/hdf5.git",
-          "commitHash": "34ae2775ac67f03f352a340352043e499e90141c",
-          "tag": "hdf5-1_13_0"
+        "type": "other",
+        "other": {
+          "name": "HDF5",
+          "version": "1.13.0",
+          "downloadUrl": "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.0/src/hdf5-1.13.0.tar.bz2",
+          "hash": "f47d88abcbdacbc05419be9b69d96da8c585ebe0"
         }
       },
       "developmentDependency": false
@@ -199,8 +201,8 @@
     },
     {
       "component": {
-        "type": "pypi",
-        "pypi": {
+        "type": "pip",
+        "pip": {
           "name": "azure-ai-discovery",
           "version": "1.0.0"
         }
@@ -209,8 +211,8 @@
     },
     {
       "component": {
-        "type": "pypi",
-        "pypi": {
+        "type": "pip",
+        "pip": {
           "name": "azure-identity",
           "version": "1.19.0"
         }
@@ -219,13 +221,53 @@
     },
     {
       "component": {
-        "type": "pypi",
-        "pypi": {
+        "type": "pip",
+        "pip": {
           "name": "azure-storage-blob",
           "version": "12.25.0"
         }
       },
       "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/GlobalArrays/ga.git",
+          "commitHash": "635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/NWChemEx/TAMM.git",
+          "commitHash": "63c274e37c102a316e844f954bb2387988b0256c"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/ExaChem/exachem.git",
+          "commitHash": "45c192e840fd1e0417871d926e9ab87748111e53"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/NWChemEx-Project/CMakeBuild.git",
+          "commitHash": "f5be7e2472e8ebb9bc51163d424da7c25716ce9a"
+        }
+      },
+      "developmentDependency": true
     }
   ]
 }

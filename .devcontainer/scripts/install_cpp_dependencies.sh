@@ -18,6 +18,10 @@ fi
 CGMANIFEST="$1"
 MACIS_CGMANIFEST="$2"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PIPELINE_INSTALL_SCRIPTS="$(cd "${SCRIPT_DIR}/../../.pipelines/install-scripts" && pwd)"
+source "${PIPELINE_INSTALL_SCRIPTS}/common.sh"
+
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"
     exit 1
@@ -37,7 +41,9 @@ BUILD_DIR="${BUILD_DIR:-/tmp/qdk_deps_build}"
 INSTALL_PREFIX="${INSTALL_PREFIX:-/usr/local}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 BUILD_SHARED_LIBS="${BUILD_SHARED_LIBS:-OFF}"  # Default to static
-
+MARCH="${MARCH:-native}"
+BLAS_VENDOR="${BLAS_VENDOR:-openblas}"  # matches the OpenBLAS the devcontainer installs via apt (see Dockerfile)
+LIBINT_JOBS=${LIBINT_JOBS:-4}  # Limit libint build jobs to 4 due to high memory usage
 KEEP_BUILD_DIR="${KEEP_BUILD_DIR:-0}"
 
 PARALLELISM_HELPER="/usr/local/share/qdk/parallelism.sh"
@@ -65,54 +71,6 @@ MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
 fi
-
-# Helper function to extract commit hash from cgmanifest by repository URL pattern
-get_commit_hash() {
-    local manifest="$1"
-    local repo_pattern="$2"
-    python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git']['commitHash'].strip())
-        break
-"
-}
-
-# Helper function to extract tag from cgmanifest by repository URL pattern
-get_tag() {
-    local manifest="$1"
-    local repo_pattern="$2"
-    python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'git' and '$repo_pattern' in comp['git'].get('repositoryUrl', ''):
-        print(comp['git'].get('tag', ''))
-        break
-"
-}
-
-# Helper function to get download URL for "other" type components
-get_download_url() {
-    local manifest="$1"
-    local name="$2"
-    python3 -c "
-import json
-with open('$manifest') as f:
-    data = json.load(f)
-for reg in data['registrations']:
-    comp = reg['component']
-    if comp['type'] == 'other' and comp['other'].get('name') == '$name':
-        print(comp['other']['downloadUrl'])
-        break
-"
-}
 
 # Read versions from cpp cgmanifest
 SPDLOG_COMMIT=$(get_commit_hash "$CGMANIFEST" "gabime/spdlog")
@@ -186,44 +144,16 @@ make install
 cd "$BUILD_DIR"
 rm -rf spdlog
 
-# Install blaspp
+# Install blaspp / lapackpp
 echo "=== Installing blaspp ==="
-git clone https://github.com/icl-utk-edu/blaspp.git blaspp
-cd blaspp
-git checkout "$BLASPP_COMMIT"
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF \
-         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-make -j"$JOBS"
-make install
-cd "$BUILD_DIR"
-rm -rf blaspp
+bash "${PIPELINE_INSTALL_SCRIPTS}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
 
-# Install lapackpp
 echo "=== Installing lapackpp ==="
-git clone https://github.com/icl-utk-edu/lapackpp.git lapackpp
-cd lapackpp
-git checkout "$LAPACKPP_COMMIT"
-mkdir -p build
-cd build
-cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
-         -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
-         -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-         -DBUILD_TESTING=OFF \
-         -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-make -j"$JOBS"
-make install
-cd "$BUILD_DIR"
-rm -rf lapackpp
+bash "${PIPELINE_INSTALL_SCRIPTS}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
 
 # Install libint2
 echo "=== Installing libint2 ==="
-LIBINT_TARBALL=$(basename "$LIBINT_URL")
-wget -q "$LIBINT_URL"
+LIBINT_TARBALL=$(download_and_verify "$CGMANIFEST" "Libint") || exit 1
 tar xzf "$LIBINT_TARBALL"
 # The tarball extracts to a single top-level libint-* directory; detect it dynamically.
 # Find the actual extracted directory (excluding macOS metadata files starting with ._)

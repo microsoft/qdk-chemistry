@@ -1,0 +1,129 @@
+# cmsb-fix-dependency-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Makes NWChemEx-Project/CMakeBuild (CMSB, TAMM/ExaChem's superbuild helper) reuse already-installed
+# dependencies -- BLAS, LAPACK, spdlog, EcpInt, nlohmann_json, numactl -- instead of always rebuilding its own
+# copies from source. Five independent fixes:
+#
+# 1. BLAS/LAPACK (DependencyMacros.cmake): add a plain find_package(BLAS/LAPACK QUIET) fallback so system
+#    OpenBLAS is found instead of rebuilt. NOT currently exercised by our own build (GlobalArrays/GauXC are
+#    reused directly instead, and MACIS is never requested) -- kept as a genuine, harmless upstream fix in case
+#    that changes; CI success does not validate this specific fix.
+#
+# 2. SPDLOG / EcpInt (CMSBTargetConfig.cmake.in, BuildCMSBModule.cmake): bake a *_ROOT hint into the generated
+#    tamm-config.cmake for these two, same as CMSB already does for LibInt2/HDF5/HPTT, so a later cmake
+#    invocation (e.g. ExaChem's own configure) can re-resolve spdlog::spdlog/ECPINT::ecpint reliably.
+#
+# 3. NJSON (nlohmann_json): same gap and fix as SPDLOG/EcpInt above. Point NJSON_ROOT at a build >= 3.12.0 --
+#    ExaChem uses a private nlohmann_json API only present from that version on.
+#
+# 4. numactl (Findnumactl.cmake): CMSB forwards a `numactl_ROOT` hint to nested sub-builds, but
+#    Findnumactl.cmake reads `NUMACTL_ROOT` -- a casing mismatch unique to numactl. Fix: add a default-path
+#    fallback search instead of plumbing the mismatched variable through every nested layer.
+#
+# 5. LAPACK_PREFERENCE_LIST not forwarded to consumer sub-builds (BuildCMSBModule.cmake): with
+#    LINALG_VENDOR=BLIS, LAPACK falls back to CMSB's bundled ReferenceLAPACK instead of libFLAME, and both end
+#    up statically linked into the same binary ("multiple definition of `dsytrd_'"). Fix: forward
+#    LAPACK_PREFERENCE_LIST via bundle_cmake_list() (bundle_cmake_strings() mis-escapes its semicolon-separated
+#    value).
+#
+# GlobalArrays is no longer built by CMSB at all (see install-exachem.sh): it's built+installed ourselves and
+# reused via a plain find_package(GlobalArrays QUIET), sidestepping the same LAPACK_PREFERENCE_LIST issue in
+# GA's own build separately (see globalarrays-fix-linalg-preference.patch).
+#
+# Applied via -DFETCHCONTENT_SOURCE_DIR_CMAKEBUILD against a pinned CMSB commit (see install-exachem.sh), not
+# vendored in this repo. Candidate for upstreaming: these are genuine CMSB gaps, not qdk-chemistry-specific.
+#
+# Apply: git -C <cmsb-src> apply cmsb-fix-dependency-reuse.patch
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/cmake/CMSBTargetConfig.cmake.in b/cmake/CMSBTargetConfig.cmake.in
+index a6437aa..d3f3235 100644
+--- a/cmake/CMSBTargetConfig.cmake.in
++++ b/cmake/CMSBTargetConfig.cmake.in
+@@ -165,6 +165,9 @@ set(__tip_stage_${__cmsb_libname} @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ set(LibInt2_ROOT @LibInt2_ROOT@)
+ set(HDF5_ROOT @HDF5_ROOT@)
+ set(HPTT_ROOT @HPTT_ROOT@)
++set(SPDLOG_ROOT @SPDLOG_ROOT@)
++set(EcpInt_ROOT @EcpInt_ROOT@)
++set(NJSON_ROOT @NJSON_ROOT@)
+ 
+ #list(PREPEND CMAKE_MODULE_PATH @STAGE_DIR@/@CMAKE_INSTALL_PREFIX@)
+ #list(PREPEND CMAKE_MODULE_PATH @CMAKE_INSTALL_PREFIX@)
+@@ -183,6 +186,7 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+       set(__depend_cfg "Microsoft.GSLConfig.cmake")
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES Microsoft.GSL::GSL)
+     elseif(${__depend_i} STREQUAL "NJSON")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__cur_dep "nlohmann_json")
+       set(__depend_cfg "nlohmann_jsonConfig.cmake")
+       set(CMAKE_FIND_PACKAGE_NAME nlohmann_json)
+@@ -209,9 +213,11 @@ foreach(__depend_i ${__depends_${__cmsb_libname}})
+       set(__depend_cfg macis-config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES macis::macis)
+     elseif(${__depend_i} STREQUAL "SPDLOG")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__depend_cfg ${__depend_lc}Config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES spdlog::spdlog)
+     elseif(${__depend_i} STREQUAL "EcpInt")
++      set(_dep_pp ${${__depend_i}_ROOT})
+       set(__depend_cfg ecpint-config.cmake)
+       list(APPEND ${__CMSB_LIBNAME}_LIBRARIES ECPINT::ecpint)
+     elseif(${__depend_i} STREQUAL "pybind11")
+diff --git a/cmake/find_external/Findnumactl.cmake b/cmake/find_external/Findnumactl.cmake
+index 6bc5269..7ae17d9 100644
+--- a/cmake/find_external/Findnumactl.cmake
++++ b/cmake/find_external/Findnumactl.cmake
+@@ -17,6 +17,11 @@ find_path(numactl_INCLUDE_DIR numa.h
+             PATH_SUFFIXES include
+             NO_DEFAULT_PATH
+           )
++# Fallback: reuse an OS/system-packaged numactl (e.g. installed under /usr) when
++# it has not been staged/built by CMSB and no NUMACTL_ROOT hint locates it. This
++# find_path is a no-op if numactl_INCLUDE_DIR was already resolved above, so
++# CMSB's own staged copy keeps priority; it only adds a default-path search.
++find_path(numactl_INCLUDE_DIR numa.h PATH_SUFFIXES include)
+ 
+ find_library(numactl_LIBRARY 
+              NAMES ${numactl_LIBRARY_NAME}
+@@ -25,6 +30,8 @@ find_library(numactl_LIBRARY
+              PATH_SUFFIXES lib lib32 lib64
+              NO_DEFAULT_PATH
+         )
++find_library(numactl_LIBRARY NAMES ${numactl_LIBRARY_NAME}
++             PATH_SUFFIXES lib lib32 lib64)
+ 
+ include(FindPackageHandleStandardArgs)
+ find_package_handle_standard_args(numactl 
+diff --git a/cmake/macros/BuildCMSBModule.cmake b/cmake/macros/BuildCMSBModule.cmake
+index 9d689b6..9b0d24d 100644
+--- a/cmake/macros/BuildCMSBModule.cmake
++++ b/cmake/macros/BuildCMSBModule.cmake
+@@ -242,7 +242,7 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+     bundle_cmake_args(CORE_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
+ 
+     bundle_cmake_list(CORE_CMAKE_LISTS CMAKE_PREFIX_PATH CMAKE_MODULE_PATH 
+-                      CMSB_LAM_PATH CMAKE_INSTALL_RPATH CMAKE_BUILD_WITH_INSTALL_RPATH)
++                      CMSB_LAM_PATH CMAKE_INSTALL_RPATH CMAKE_BUILD_WITH_INSTALL_RPATH LAPACK_PREFERENCE_LIST)
+ 
+     bundle_cmake_strings(CORE_CMAKE_STRINGS ${CMSB_C_FLAGS} ${CMSB_CXX_FLAGS} ${CMSB_Fortran_FLAGS})
+     # Some deps may need this even if overall build type is Release/Debug
+@@ -249,5 +249,5 @@ function(build_cmsb_module SUPER_PROJECT_ROOT)
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS ${CMSB_CORE_OPTIONS})
+ 
+     bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_INT4 LINALG_VENDOR LINALG_PREFIX ENABLE_COVERAGE USE_SCALAPACK USE_HDF5 USE_LIBNUMA USE_ONEMATH ONEMATH_PREFIX USE_NWQSIM)
+-    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT)
++    bundle_cmake_args(DEPENDENCY_CMAKE_OPTIONS BLAS_ARCH GCCROOT HDF5_ROOT HPTT_ROOT LibInt2_ROOT SPDLOG_ROOT EcpInt_ROOT NJSON_ROOT)
+ 
+diff --git a/cmake/macros/DependencyMacros.cmake b/cmake/macros/DependencyMacros.cmake
+index d70d56d..712dbc8 100644
+--- a/cmake/macros/DependencyMacros.cmake
++++ b/cmake/macros/DependencyMacros.cmake
+@@ -194,6 +194,8 @@ function(cmsb_find_dependency __name)
+                     endif()
+                   elseif(${__name} STREQUAL "numactl")
+                     find_package(numactl)
++                  elseif(${__name} STREQUAL "BLAS" OR ${__name} STREQUAL "LAPACK")
++                    find_package(${__name} QUIET)
+                   endif()
+                 endif()
+             else()
