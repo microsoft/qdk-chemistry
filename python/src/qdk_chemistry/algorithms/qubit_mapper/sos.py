@@ -31,7 +31,7 @@ class SOSQubitMapperSettings(QubitMapperSettings):
             1e-12,
             "Magnitude below which a one-body eigenvalue counts as zero. The mode keeps its outer "
             "register slot but carries no amplitude, so eigensolver noise in the nullspace cannot "
-            "become a generator.",
+            "become a generator. Must be non-negative.",
         )
 
 
@@ -125,7 +125,17 @@ class SOSQubitMapper(QubitMapper):
         Returns:
             The sum-of-squares qubit operator.
 
+        Raises:
+            ValueError: If the threshold is negative or not a number.
+
         """
+        # A negative threshold makes the two masks overlap, so a mode in (threshold, -threshold)
+        # is emitted as both D1 and Q1: the generator count exceeds the N slots the register
+        # layout reserves, and the Q1 copy takes the square root of a positive eigenvalue's
+        # negation. NaN is rejected by the same comparison.
+        if not threshold >= 0.0:
+            raise ValueError(f"threshold must be non-negative; got {threshold!r}")
+
         num_orbitals = container.get_num_orbitals()
         num_ranks = container.get_num_ranks()
         num_bases = container.get_num_bases()

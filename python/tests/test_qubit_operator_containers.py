@@ -213,6 +213,23 @@ def test_screened_one_body_modes_keep_their_outer_register_slot() -> None:
     assert container.metadata.num_positive_one_body_terms == 2
 
 
+@pytest.mark.parametrize("threshold", [-1e-12, -0.5, float("nan")])
+def test_rejects_a_threshold_that_is_not_non_negative(threshold) -> None:
+    """A negative threshold would emit the same mode as both D1 and Q1.
+
+    The two masks overlap once the threshold goes negative, so a mode in
+    ``(threshold, -threshold)`` is counted twice: the generator block outgrows the ``N``
+    slots the register layout reserves, and the Q1 copy takes the square root of a
+    positive eigenvalue's negation.
+    """
+    mapper = SOSQubitMapper()
+    mapper.settings().set("threshold", threshold)
+    factorized = create_random_factorized_hamiltonian(num_orbitals=3, num_ranks=1, num_bases=2, num_copies=1)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        mapper.run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(6))
+
+
 def test_nullspace_noise_does_not_become_a_generator() -> None:
     """Eigensolver noise below the threshold carries no amplitude, so it cannot ride a random eigenvector."""
     n = 3
