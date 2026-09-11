@@ -1,13 +1,9 @@
 """Sample a quantum resource estimate for the 2D Fermi-Hubbard model.
 
-Scripted form of ``examples/benchmark/fermi_hubbard.ipynb`` for running one lattice
-size unattended. The notebook is the place to read the derivations; this is the place
-to run the estimate.
-
 For the requested ``L``, the script builds the periodic ``L x L`` Hubbard Hamiltonian
 under Jordan-Wigner, sizes an iterative phase estimation from a target ground-state
 energy accuracy, and traces the resulting circuit through the resource estimator for
-a qubit/runtime Pareto frontier. Expect minutes, dominated by the trace.
+a qubit/runtime Pareto frontier.
 
 Large lattices are bound by memory. Measured Hamiltonian-build peak RSS is about 2 GB
 at ``L=60`` and 24 GB at ``L=120``.
@@ -24,7 +20,6 @@ Examples:
 # --------------------------------------------------------------------------------------------
 
 import argparse
-import csv
 import math
 import sys
 import time
@@ -36,6 +31,8 @@ try:  # Unix only; the sweep's memory reporting is best-effort on other platform
 except ImportError:  # pragma: no cover - platform dependent
     resource = None
 
+from qdk.qre import PSSPC, EstimationTable, LatticeSurgery, estimate
+from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Circuit, LatticeGraph, MajoranaMapping
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -78,8 +75,6 @@ MAJORANA_ERROR_RATE = 1e-5
 #: Largest relative error the resource estimator may report.
 MAX_ESTIMATE_ERROR = 0.01
 
-COULOMB_U = U_OVER_T * HOPPING_T
-
 
 def target_precision(size: int) -> float:
     """Return the absolute ground-state energy accuracy required of an L x L lattice."""
@@ -96,7 +91,7 @@ def qubit_operator(size: int):
     num_sites = size * size
     lattice = LatticeGraph.square(size, size, periodic_x=True, periodic_y=True)
     hamiltonian = create_hubbard_hamiltonian(
-        lattice, epsilon=0.0, t=HOPPING_T, U=COULOMB_U
+        lattice, epsilon=0.0, t=HOPPING_T, U=U_OVER_T * HOPPING_T
     )
     return create("qubit_mapper").run(
         hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites)
@@ -201,9 +196,6 @@ def estimate_physical(circuit: Circuit, name: str):
         The estimator's result table.
 
     """
-    from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
-    from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
-
     application = circuit.get_qre_application()
     trace_query = (
         application.q()
@@ -230,7 +222,7 @@ def peak_memory_gb() -> float:
     return peak / 1e6 if sys.platform != "darwin" else peak / 1e9
 
 
-def run_sampling(context, size: int) -> dict:
+def run_sampling(context, size: int) -> EstimationTable:
     """Measure one lattice size.
 
     Args:
@@ -238,7 +230,7 @@ def run_sampling(context, size: int) -> dict:
         size: Lattice side length.
 
     Returns:
-        One row of results.
+        The estimator's table, with this run's parameters attached as columns.
 
     """
     started = time.monotonic()
@@ -252,18 +244,6 @@ def run_sampling(context, size: int) -> dict:
         math.log2(2 * math.pi / qpe_budget / base_time)
     )
 
-    row = {
-        "L": size,
-        "sites": size * size,
-        "qubits": operator.num_qubits,
-        "terms": len(operator.pauli_strings),
-        "electrons": num_electrons(size),
-        "lambda": one_norm,
-        "target_precision": energy_budget,
-        "trotter_budget": trotter_budget,
-        "num_bits": resolution_bits,
-    }
-
     initial_state = reference_state_prep(context, size * size, num_electrons(size))
     circuit = qpe_circuit(
         context,
@@ -275,13 +255,26 @@ def run_sampling(context, size: int) -> dict:
         resolution_bits,
     )
     table = estimate_physical(circuit, f"{size}x{size}")
-    fastest = min(table, key=lambda entry: entry.runtime)
-    row["physical_qubits"] = fastest.qubits
-    row["runtime_hours"] = fastest.runtime / 3.6e12
+    table.add_qubit_partition_column()
+    table.add_factory_summary_column()
 
-    row["elapsed_s"] = round(time.monotonic() - started, 1)
-    row["peak_rss_gb"] = round(peak_memory_gb(), 2)
-    return row
+    # Constant per run, repeated on every row so each estimate is self-describing.
+    parameters = {
+        "L": size,
+        "sites": size * size,
+        "system_qubits": operator.num_qubits,
+        "terms": len(operator.pauli_strings),
+        "electrons": num_electrons(size),
+        "lambda": one_norm,
+        "target_precision": energy_budget,
+        "trotter_budget": trotter_budget,
+        "num_bits": resolution_bits,
+        "elapsed_s": round(time.monotonic() - started, 1),
+        "peak_rss_gb": round(peak_memory_gb(), 2),
+    }
+    for name, value in parameters.items():
+        table.add_column(name, lambda _entry, value=value: value)
+    return table
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -326,17 +319,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     # QDK interpreters are thread-affine, so this context belongs to the calling thread.
     context = create_qsharp_context()
 
-    row = run_sampling(context, args.size)
-    with args.output.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(row))
-        writer.writeheader()
-        writer.writerow(row)
+    frame = run_sampling(context, args.size).as_frame()
+    frame.to_csv(args.output, index=False)
 
+    first = frame.iloc[0]
     print(
-        f"L={args.size:>3}: {row['qubits']:>6} qubits, {row['terms']:>7} terms, "
-        f"m={row['num_bits']}, "
-        f"{row['physical_qubits']} physical qubits, {row['runtime_hours']:.3g} h "
-        f"[{row['elapsed_s']}s, peak {row['peak_rss_gb']} GB]"
+        f"L={args.size:>3}: {first['system_qubits']:>6} qubits, {first['terms']:>7} terms, "
+        f"m={first['num_bits']}, "
+        f"{len(frame)} physical estimates "
+        f"[{first['elapsed_s']}s, peak {first['peak_rss_gb']} GB]"
     )
 
     print(f"wrote {args.output}")

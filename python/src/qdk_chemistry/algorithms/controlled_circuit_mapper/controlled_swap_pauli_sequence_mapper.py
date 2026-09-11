@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from typing import cast
 
 from qdk import qsharp
 
@@ -24,6 +23,75 @@ __all__: list[str] = [
     "ControlledSwapPauliSequenceMapper",
     "ControlledSwapPauliSequenceMapperSettings",
 ]
+
+
+def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -> float | None:
+    r"""Return the phase an *ordered* product :math:`\prod_j e^{-i\theta_j P_j}` imprints on the vacuum.
+
+    That is :math:`\varphi_0` in
+    :math:`\prod_j e^{-i\theta_j P_j}|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle`.
+    The vacuum stays an eigenstate when the product splits into contiguous blocks of pairwise
+    commuting strings, so each block equals :math:`\exp(-i\sum_j \theta_j P_j)`, whose
+    generator maps the all-zero state onto a multiple of itself, i.e. amplitudes cancel for every
+    non-empty flipped-qubit set.  Exact cancellations close a block immediately; otherwise a block
+    closes at the first non-commuting boundary or at the end, where its residual is charged against
+    ``atol``.  The phase then comes from the diagonal (:math:`I`/:math:`Z`) terms alone.
+
+    Args:
+        terms: Ordered ``(pauli_map, angle)`` pairs, one per exponential factor.
+        atol: Absolute tolerance on the amplitude leaked out of the vacuum, aggregated over every
+            flipped-qubit set the product formula closes.
+
+    Returns:
+        The imprinted phase, or ``None`` when the vacuum is not an eigenstate of the product.
+
+    """
+    block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
+    contributions: dict[int, list[complex]] = {}
+    leaked: list[float] = []
+    diagonal: list[float] = []
+
+    def close_block() -> bool:
+        """Charge whatever the open block still leaves outstanding against the shared budget."""
+        for pending in contributions.values():
+            residual = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
+            leaked.append(abs(residual))
+        return math.fsum(leaked) <= atol
+
+    for pauli_map, angle in terms:
+        x_mask = z_mask = 0
+        for qubit, axis in pauli_map.items():
+            if axis in ("X", "Y"):
+                x_mask |= 1 << qubit
+            if axis in ("Y", "Z"):
+                z_mask |= 1 << qubit
+
+        # Two Pauli strings commute iff they anticommute on an even number of qubits.
+        if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
+            if not close_block():
+                return None
+            block.clear()
+            contributions.clear()
+        block.append((x_mask, z_mask))
+
+        if x_mask:
+            # P|0...0> = i^{n_Y}|b>, with b the bit pattern of the X/Y support.
+            pending = contributions.setdefault(x_mask, [])
+            pending.append(angle * 1j ** (x_mask & z_mask).bit_count())
+            residual = complex(math.fsum(c.real for c in pending), math.fsum(c.imag for c in pending))
+            # Tolerance is charged when the complete block closes, not at a prefix boundary.
+            if residual == 0.0:
+                del contributions[x_mask]
+        else:
+            # Diagonal strings act as +1 on |0...0>, so they contribute phase only.
+            diagonal.append(angle)
+
+        if not contributions:
+            block.clear()
+
+    if not close_block():
+        return None
+    return -math.fsum(diagonal)
 
 
 class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
@@ -106,87 +174,6 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         """Return controlled_circuit_mapper as the algorithm type name."""
         return "controlled_circuit_mapper"
 
-    @staticmethod
-    def _close_vacuum_block(
-        contributions: dict[int, list[complex]],
-        leaked: list[float],
-        atol: float,
-    ) -> bool:
-        """Charge an open commuting block's residual amplitude to the shared budget."""
-        for pending in contributions.values():
-            residual = complex(math.fsum(value.real for value in pending), math.fsum(value.imag for value in pending))
-            leaked.append(abs(residual))
-        return math.fsum(leaked) <= atol
-
-    @classmethod
-    def _vacuum_eigenphase(cls, terms: list[tuple[dict[int, str], float]], atol: float) -> float | None:
-        r"""Return the vacuum phase of an ordered product :math:`\prod_j e^{-i\theta_jP_j}`.
-
-        Contiguous commuting blocks preserve the vacuum when their amplitudes for
-        every nonempty flipped-qubit set cancel within ``atol``.
-
-        Args:
-            terms: Ordered ``(pauli_map, angle)`` pairs.
-            atol: Total tolerated leaked amplitude.
-
-        Returns:
-            The imprinted phase, or ``None`` when the vacuum is not an eigenstate.
-
-        """
-        block: list[tuple[int, int]] = []
-        contributions: dict[int, list[complex]] = {}
-        leaked: list[float] = []
-        diagonal: list[float] = []
-
-        for pauli_map, angle in terms:
-            x_mask = z_mask = 0
-            for qubit, axis in pauli_map.items():
-                if axis in ("X", "Y"):
-                    x_mask |= 1 << qubit
-                if axis in ("Y", "Z"):
-                    z_mask |= 1 << qubit
-
-            if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
-                if not cls._close_vacuum_block(contributions, leaked, atol):
-                    return None
-                block.clear()
-                contributions.clear()
-            block.append((x_mask, z_mask))
-
-            if x_mask:
-                pending = contributions.setdefault(x_mask, [])
-                pending.append(angle * 1j ** (x_mask & z_mask).bit_count())
-                residual = complex(
-                    math.fsum(value.real for value in pending), math.fsum(value.imag for value in pending)
-                )
-                if residual == 0.0:
-                    del contributions[x_mask]
-            else:
-                diagonal.append(angle)
-
-            if not contributions:
-                block.clear()
-
-        if not cls._close_vacuum_block(contributions, leaked, atol):
-            return None
-        return -math.fsum(diagonal)
-
-    @staticmethod
-    def _encode_terms(
-        terms: list[ExponentiatedPauliTerm],
-        num_qubits: int,
-    ) -> tuple[list[list[qsharp.Pauli]], list[float]]:
-        """Encode sparse terms as dense Pauli rows for the CSWAP operation."""
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        angles: list[float] = []
-        for term in terms:
-            base_terms: list[qsharp.Pauli] = [qsharp.Pauli.I] * num_qubits
-            for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
-            angles.append(term.angle)
-        return pauli_terms, angles
-
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled unitary.
 
@@ -200,6 +187,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         Raises:
             ValueError: If the unitary container type is not supported.
+            ValueError: If the product formula contains batched or conjugated terms.
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
 
@@ -226,8 +214,15 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         vacuum_phase = self._vacuum_phase(unitary_container)
 
-        terms = cast("list[ExponentiatedPauliTerm]", unitary_container.step_terms)
-        pauli_terms, angles = self._encode_terms(terms, unitary_container.num_qubits)
+        pauli_terms: list[list[qsharp.Pauli]] = []
+        angles: list[float] = []
+        for term in unitary_container.step_terms:
+            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
+            for index, pauli in term.pauli_term.items():
+                base_terms[index] = getattr(qsharp.Pauli, pauli)
+            pauli_terms.append(base_terms.copy())
+            angles.append(term.angle)
+
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
             pauliExponents=pauli_terms,
             pauliCoefficients=angles,
@@ -236,12 +231,15 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             control=control_indices[0],
             systems=target_indices,
         )
-        program = QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit,
+            parameter=vars(controlled_evo_params),
+        )
+
         controlled_unitary_op = QSHARP_UTILS.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpOp(
             controlled_evo_params
         )
-
-        qsharp_factory = QsharpFactoryData(program=program, parameter=vars(controlled_evo_params))
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
 
@@ -261,16 +259,17 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the vacuum is not an eigenstate of the product formula.
 
         """
+        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+        # A residual left by one step leaks again on every repetition, so the per-step budget shrinks.
         atol = self._settings.get("vacuum_preservation_tolerance") / container.step_reps
-        step_terms = cast("list[ExponentiatedPauliTerm]", container.step_terms)
-        terms = [(term.pauli_term, term.angle) for term in step_terms]
-        phase = self._vacuum_eigenphase(terms, atol)
+        phase = _vacuum_eigenphase(terms, atol)
         if phase is None:
             raise ValueError(
-                "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula; "
-                "its Pauli terms could not be split into contiguous, mutually commuting blocks that leave "
+                "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "
+                "Pauli terms could not be split into contiguous, mutually commuting blocks that leave "
                 "|0...0> invariant, so the CSWAP sandwich would leak the vacuum and decohere the control. "
-                "Group particle-conserving Hamiltonians with the 'vacuum_annihilating' term grouper before "
-                "building the unitary."
+                "The mapper applies to particle-conserving Hamiltonians; group such a Hamiltonian with "
+                "the 'vacuum_annihilating' term grouper before building the unitary, e.g. "
+                "registry.create('term_grouper', 'vacuum_annihilating').run(qubit_hamiltonian)."
             )
         return container.step_reps * phase
