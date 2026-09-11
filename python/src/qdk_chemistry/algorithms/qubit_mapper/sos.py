@@ -36,7 +36,19 @@ class SOSQubitMapperSettings(QubitMapperSettings):
 
 
 class SOSQubitMapper(QubitMapper):
-    """Map a factorized Hamiltonian to a SOSSA qubit operator."""
+    r"""Map a factorized Hamiltonian to a SOSSA qubit operator.
+
+    The mapper implements the sum-of-squares decomposition (:cite:`Low2025`,
+    Eq. (27))
+
+    .. math::
+
+            H \approx H_{\mathrm{DFTHC}}
+            = \sum_{G \in \{D_1,Q_1\}} \sum_r \sum_{\sigma \in \{0,1\}}
+                O_{G^\sigma,r}^\dagger O_{G^\sigma,r}
+            + \sum_{r \in [R],c \in [C]} O_{\mathrm{SF},rc}^\dagger
+                O_{\mathrm{SF},rc} + E_{\mathrm{SOS}},
+    """
 
     def __init__(self) -> None:
         """Initialize the mapper with its settings."""
@@ -45,7 +57,7 @@ class SOSQubitMapper(QubitMapper):
 
     def name(self) -> str:
         """Return the algorithm variant name."""
-        return "sos"
+        return "sum_of_squares"
 
     def _run_impl(self, hamiltonian: Hamiltonian, mapping: MajoranaMapping) -> QubitOperator:
         """Convert a factorized Hamiltonian to a structured SOS qubit operator.
@@ -104,7 +116,17 @@ class SOSQubitMapper(QubitMapper):
         mapping: MajoranaMapping,
         threshold: float = 1e-12,
     ) -> QubitOperator:
-        """Map a validated factorized container to a SOSSA qubit operator.
+        r"""Map a validated factorized container to a SOSSA qubit operator.
+
+        The metadata shift realizes :math:`E_{\mathrm{SOS}}` and includes the
+        container's core-energy constant:
+
+        .. math::
+
+                E_{\mathrm{shift}} = E_{\mathrm{core}}
+                - 2\sum_r w_-^{(r)}
+                - \frac{1}{2}\sum_{r,c}
+                    \left(w_B^{(rc)} - \sum_b w_b^{(rc)}\right)^2.
 
         Args:
             container: The factorized Hamiltonian to map.
@@ -155,7 +177,30 @@ class SOSQubitMapper(QubitMapper):
     def _map_one_body_terms(
         cls, h1_prime: np.ndarray, mapping: MajoranaMapping, threshold: float
     ) -> tuple[RotatedPaulis, int, float]:
-        """Build D1 and Q1 generators from the effective one-body matrix."""
+        r"""Build D1 and Q1 generators from the effective one-body matrix.
+
+        The positive- and negative-eigenvalue generators are Eqs. (B2)-(B3):
+
+        .. math::
+
+                O_{D_1^\sigma,r}
+                = \frac{\sqrt{w_+^{(r)}}}{2}
+                    \left(
+                    \widetilde{\gamma}_{\widetilde{u}_+^{(r)}\sigma 0}
+                    + i\widetilde{\gamma}_{\widetilde{u}_+^{(r)}\sigma 1}
+                    \right),
+                \qquad
+                O_{Q_1^\sigma,r}
+                = \frac{\sqrt{w_-^{(r)}}}{2}
+                    \left(
+                    \widetilde{\gamma}_{\widetilde{u}_-^{(r)}\sigma 0}
+                    - i\widetilde{\gamma}_{\widetilde{u}_-^{(r)}\sigma 1}
+                    \right).
+
+        Here :math:`(w_+^{(r)},\widetilde{u}_+^{(r)})` and
+        :math:`(-w_-^{(r)},\widetilde{u}_-^{(r)})` are eigenpairs of the corrected
+        one-body matrix. The coefficient rows store Eqs. (B2)-(B3) directly.
+        """
         eigenvalues, eigenvectors = np.linalg.eigh(h1_prime)
 
         positive = eigenvalues > threshold
@@ -188,7 +233,27 @@ class SOSQubitMapper(QubitMapper):
     def _map_two_body_terms(
         cls, container: FactorizedHamiltonianContainer, mapping: MajoranaMapping
     ) -> tuple[RotatedPaulis, float]:
-        """Build spin-free generators and their contribution to the energy shift."""
+        r"""Build spin-free generators and their contribution to the energy shift.
+
+        The spin-free generator is Eq. (B1):
+
+        .. math::
+
+                O_{\mathrm{SF},rc}
+                = w_B^{(rc)} I
+                + \frac{i}{2} \sum_{\sigma \in \{0,1\}} \sum_{b \in [B]}
+                    w_b^{(rc)}
+                    \widetilde{\gamma}_{\widetilde{u}_b^{(r)}\sigma 0}
+                    \widetilde{\gamma}_{\widetilde{u}_b^{(r)}\sigma 1},
+                \qquad
+                \widetilde{\gamma}_{\widetilde{u}\sigma x}
+                = \sum_p u_p \gamma_{p\sigma x}.
+
+        Under Jordan-Wigner, :math:`i\gamma_0\gamma_1=-Z`, so each row stores
+        :math:`(-w_b^{(rc)})_{b\in[B]}` followed by :math:`w_B^{(rc)}`.
+        Projection over the coherent spin selector supplies the explicit factor
+        of :math:`1/2` in Eq. (B1).
+        """
         num_orbitals = container.get_num_orbitals()
         num_ranks = container.get_num_ranks()
         num_bases = container.get_num_bases()

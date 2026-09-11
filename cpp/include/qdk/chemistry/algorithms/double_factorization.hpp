@@ -102,16 +102,16 @@ class DoubleFactorizer
   /**
    * @brief Access the algorithm's name.
    *
-   * @return "qdk".
+   * @return "double_factorization".
    */
-  std::string name() const override { return "qdk"; }
+  std::string name() const override { return "double_factorization"; }
 
   /**
    * @brief Access the algorithm's type name.
    *
-   * @return "double_factorizer".
+   * @return "hamiltonian_factorization".
    */
-  std::string type_name() const final { return "double_factorizer"; };
+  std::string type_name() const final { return "hamiltonian_factorization"; };
 
  protected:
   /**
@@ -132,9 +132,11 @@ class DoubleFactorizer
  */
 struct DoubleFactorizerFactory
     : public AlgorithmFactory<DoubleFactorizer, DoubleFactorizerFactory> {
-  static std::string algorithm_type_name() { return "double_factorizer"; }
+  static std::string algorithm_type_name() {
+    return "hamiltonian_factorization";
+  }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return "qdk"; }
+  static std::string default_algorithm_name() { return "double_factorization"; }
 };
 
 }  // namespace qdk::chemistry::algorithms

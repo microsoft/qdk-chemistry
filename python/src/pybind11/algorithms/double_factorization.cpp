@@ -84,7 +84,7 @@ Returns:
 Return the implementation name.
 
 Returns:
-  str: ``"qdk"``.
+  str: ``"double_factorization"``.
 )");
 
   double_factorizer.def("aliases", &DoubleFactorizer::aliases, R"(
@@ -98,7 +98,7 @@ Returns:
 Return the algorithm type name.
 
 Returns:
-  str: ``"double_factorizer"``.
+  str: ``"hamiltonian_factorization"``.
 )");
 
   double_factorizer.def("hash", &DoubleFactorizer::hash,

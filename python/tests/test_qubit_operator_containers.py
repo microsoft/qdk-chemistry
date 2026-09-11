@@ -281,4 +281,4 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
 
 def test_sos_qubit_mapper_is_reachable_through_the_registry() -> None:
     """``create`` is the supported entry point, so the mapper has to be registered under it."""
-    assert isinstance(create("qubit_mapper", "sos"), SOSQubitMapper)
+    assert isinstance(create("qubit_mapper", "sum_of_squares"), SOSQubitMapper)

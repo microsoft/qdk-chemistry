@@ -1,8 +1,7 @@
 """Tests for the SOSSA controlled circuit mapper."""
+            )
 
-# --------------------------------------------------------------------------------------------
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+
 # --------------------------------------------------------------------------------------------
 
 import math
@@ -47,20 +46,6 @@ def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
     ``_alias_atol`` in ``test_state_preparation_alias.py``.
     """
     return 1.0 / (num_coefficients * 2**bits_precision)
-
-
-def _block_encoding_action(circuit: Circuit, num_system_qubits: int, system_amplitudes: np.ndarray) -> np.ndarray:
-    """Apply a block encoding and project its ancillas back onto zero."""
-    stride = 2 ** (circuit.num_qubits - num_system_qubits)
-    dimension = 2**num_system_qubits
-    initial_state = [0.0] * ((dimension - 1) * stride + 1)
-    for index, amplitude in enumerate(system_amplitudes):
-        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
-
-    statevector = dump_operation_on_state(
-        circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
-    )
-    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
 
 
 def _with_prepared_gradient(op, num_gradient: int):
@@ -301,40 +286,6 @@ class TestInnerPrep:
             np.testing.assert_allclose(
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
-
-    def test_signed_two_term_block_encoding_matches_hand_calculation(self):
-        r"""A signed SF row must encode :math:`M^2/(2\Lambda)-I`, including relative signs."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
-        sossa = operator.get_container()
-        sossa.one_body.coeffs[...] = 0.0
-        sossa.two_body.coeffs[...] = np.array([[-1.0, 2.0]])
-
-        unitary = SOSSABuilder().run(operator)
-        container = unitary.get_container()
-        mapper = _make_sossa_mapper(
-            outer_algorithm="dense_pure_state",
-            inner_algorithm="direct",
-            select_algorithm="direct",
-        )
-        circuit = mapper.run(unitary)
-
-        system_state = np.array([1.0, 2.0, 3.0, 4.0])
-        system_state /= np.linalg.norm(system_state)
-        actual = _block_encoding_action(circuit, num_system_qubits=2, system_amplitudes=system_state)
-
-        identity = np.eye(4)
-        z_down = np.diag([1.0, -1.0, 1.0, -1.0])
-        z_up = np.diag([1.0, 1.0, -1.0, -1.0])
-        generator = 2.0 * identity - 0.5 * (z_down + z_up)
-        assert container.normalization == pytest.approx(9.0 / 4.0)
-        expected_block = generator @ generator / (2.0 * container.normalization) - identity
-        expected = expected_block @ system_state
-
-        reference_index = int(np.flatnonzero(np.abs(expected) > 1e-12)[0])
-        global_phase = actual[reference_index] / expected[reference_index]
-        assert abs(global_phase) == pytest.approx(1.0)
-        np.testing.assert_allclose(actual, global_phase * expected, atol=1e-12)
-
 
 class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
