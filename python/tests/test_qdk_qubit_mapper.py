@@ -17,6 +17,7 @@ from qdk_chemistry.data import (
     MajoranaMapping,
     Orbitals,
     QubitOperator,
+    SparseHamiltonianContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
@@ -89,6 +90,79 @@ class TestQdkQubitMapper:
         assert len(result.pauli_strings) > 0
         assert len(result.coefficients) == len(result.pauli_strings)
         assert result.coefficients.dtype == complex
+
+    def test_restricted_fourfold_two_body_dispatches_to_general_path(self) -> None:
+        """A tensor with only 4-fold symmetry maps instead of raising.
+
+        The coefficients are checked against a Fock-space reference in
+        cpp/tests/test_majorana_mapping.cpp; here it is dispatch and the
+        Hermiticity of the public result that matter.
+        """
+        n_orbitals = 2
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        two_body = np.zeros((n_orbitals,) * 4)
+        two_body[0, 1, 0, 1] = 0.7
+        two_body[1, 0, 1, 0] = 0.7
+        two_body[1, 0, 0, 1] = -0.2
+        two_body[0, 1, 1, 0] = -0.2
+
+        hamiltonian = _make_hamiltonian(one_body, two_body.ravel(), create_test_orbitals(n_orbitals))
+        mapper = create("qubit_mapper", "qdk")
+        result = mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals))
+
+        assert result.num_qubits == 2 * n_orbitals
+        for coefficient in result.coefficients:
+            assert abs(coefficient.imag) < 1e-12
+
+    def test_restricted_rejects_braket_asymmetric_storage(self) -> None:
+        """The swap leaves the operator alone, but the engine reads the stored tensor."""
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        two_body = np.zeros((2,) * 4)
+        two_body[0, 0, 1, 1] = 0.4
+        two_body[1, 1, 0, 0] = 0.9
+
+        hamiltonian = _make_hamiltonian(one_body, two_body.ravel(), create_test_orbitals(2))
+        mapper = create("qubit_mapper", "qdk")
+        with pytest.raises(ValueError, match="bra-ket average"):
+            mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=4))
+
+        # The remedy the message asks for is accepted.
+        averaged = 0.5 * (two_body + two_body.transpose(2, 3, 0, 1))
+        fixed = _make_hamiltonian(one_body, averaged.ravel(), create_test_orbitals(2))
+        assert mapper.run(fixed, MajoranaMapping.jordan_wigner(num_modes=4)).num_qubits == 4
+
+    def test_restricted_rejects_non_hermitian_two_body(self) -> None:
+        """No gauge freedom left, and (pq|rs) != (qp|sr): the operator is not Hermitian."""
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        two_body = np.zeros((2,) * 4)
+        two_body[0, 1, 0, 0] = two_body[0, 0, 0, 1] = 0.25
+        two_body[1, 0, 0, 0] = two_body[0, 0, 1, 0] = -0.25
+
+        hamiltonian = _make_hamiltonian(one_body, two_body.ravel(), create_test_orbitals(2))
+
+        mapper = create("qubit_mapper", "qdk")
+        with pytest.raises(ValueError, match="non-Hermitian"):
+            mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=4))
+
+    def test_sparse_container_rejects_disagreeing_permutation_class(self) -> None:
+        """Sparse storage keeps one representative per permutation class, so it cannot lose one."""
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        two_body = {(0, 1, 0, 1): 0.7, (1, 0, 0, 1): -0.2}
+        hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, two_body, 0.0))
+
+        mapper = create("qubit_mapper", "qdk")
+        with pytest.raises(ValueError, match="8-fold"):
+            mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=4))
+
+    def test_sparse_container_rejects_partially_stored_permutation_class(self) -> None:
+        """Unstored members mean zero, but symmetry expansion would overwrite them."""
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        two_body = {(0, 1, 0, 1): 0.7, (1, 0, 1, 0): 0.7}
+        hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, two_body, 0.0))
+
+        mapper = create("qubit_mapper", "qdk")
+        with pytest.raises(ValueError, match="permutation class"):
+            mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=4))
 
     def test_number_operator(self) -> None:
         """Test JW transform of number operator: a†a = (I - Z) / 2."""
