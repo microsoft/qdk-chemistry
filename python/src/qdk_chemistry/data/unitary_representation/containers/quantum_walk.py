@@ -64,9 +64,55 @@ class QuantumWalkContainer(UnitaryContainer):
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
+        Raises:
+            ValueError: If :math:`W^p` folds several eigenvalues onto the phase.
+
+        """
+        branches = self.eigenvalue_branches_from_phase(phase_fraction)
+        if len(branches) != 1:
+            raise ValueError(
+                f"Phase {phase_fraction} is ambiguous for a quantum walk with power {self.power}; "
+                "use eigenvalue_branches_from_phase() to obtain all candidate energies."
+            )
+        return branches[0]
+
+    def eigenvalue_branches_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
+        r"""Recover every eigenvalue consistent with a quantum-walk phase.
+
+        For a walk operator whose eigenvalues are
+        :math:`e^{\pm i \arccos(E_k / \lambda)}`, QPE applied to :math:`W^p`
+        measures :math:`\varphi` such that
+        :math:`\arccos(E / \lambda) = 2\pi(\varphi + k)/p` for some integer
+        :math:`k`, so the candidate eigenvalues are
+
+        .. math::
+
+            E_k = \lambda \cos\!\left(\frac{2\pi(\varphi + k)}{p}\right),
+            \qquad k = 0, \ldots, p - 1
+
+        Because :math:`\cos` is even, branches :math:`j` and :math:`k` coincide only when
+        :math:`j + k = p - 2\varphi` is an integer, which happens exactly at
+        :math:`\varphi = 0` (pairing :math:`k` with :math:`p - k`) and at
+        :math:`\varphi = 1/2` (pairing :math:`k` with :math:`p - 1 - k`). Enumerating the
+        distinct index range therefore needs no tolerance, and :math:`p = 1` reduces to the
+        single eigenvalue :math:`E = \lambda \cos(2\pi\varphi)`.
+
+        Args:
+            phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
+
+        Returns:
+            tuple[float, ...]: The candidate eigenvalues, sorted ascending.
+
         """
         phi = phase_fraction % 1.0
-        return float(self.scale * np.cos(2 * np.pi * phi))
+        power = self.power
+        if phi == 0.0:
+            num_distinct = power // 2 + 1
+        elif phi == 0.5:
+            num_distinct = (power - 1) // 2 + 1
+        else:
+            num_distinct = power
+        return tuple(sorted(float(self.scale * np.cos(2 * np.pi * (phi + k) / power)) for k in range(num_distinct)))
 
     @property
     @abstractmethod
@@ -111,9 +157,18 @@ class LCUWalkContainer(QuantumWalkContainer):
             power: Number of times to apply the walk operator (for :math:`W^k` in QPE).
             scale: The 1-norm used for eigenvalue-phase conversion.
 
+        Raises:
+            TypeError: If ``power`` is not an integer.
+            ValueError: If ``power`` is not positive.
+
         """
+        # bool is an int subclass, but True as a power is always a mistake.
+        if isinstance(power, bool) or not isinstance(power, int | np.integer):
+            raise TypeError(f"power must be an integer, got {type(power).__name__}.")
+        if power < 1:
+            raise ValueError(f"power must be a positive integer, got {power}.")
         self._block_encoding = block_encoding
-        self._power = power
+        self._power = int(power)
         self.scale = scale
         super().__init__()
 

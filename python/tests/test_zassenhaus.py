@@ -45,6 +45,25 @@ from .reference_tolerances import (
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
+@pytest.mark.parametrize("order", [1, 2])
+@pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+@pytest.mark.parametrize("energy", [-0.5, 0.5])
+def test_powered_phase_inversion_survives_serialization(order, power_strategy, energy):
+    """Both Zassenhaus paths preserve the powered evolution time through JSON."""
+    time = 0.7
+    power = 3
+    phase = (-energy * time * power / (2 * np.pi)) % 1.0
+    hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+    builder = Zassenhaus(order=order, time=time, power=power, power_strategy=power_strategy, num_divisions=2)
+    container = builder.run(hamiltonian).get_container()
+    restored = PauliProductFormulaContainer.from_json(container.to_json())
+
+    for candidate in (container, restored):
+        assert candidate.scale == pytest.approx(time * power)
+        assert candidate.eigenvalue_from_phase(phase) == pytest.approx(energy)
+        assert candidate.eigenvalue_branches_from_phase(phase) == pytest.approx((energy,))
+
+
 class TestZassenhausGeneration:
     """Tests for symbolic Zassenhaus generation utilities."""
 

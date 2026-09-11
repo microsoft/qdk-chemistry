@@ -248,7 +248,7 @@ class PartiallyRandomized(QDrift):
                     step_terms=[],
                     step_reps=1,
                     num_qubits=qubit_hamiltonian.num_qubits,
-                    scale=time,
+                    scale=time * power_repetitions,
                 )
             )
 
@@ -311,7 +311,7 @@ class PartiallyRandomized(QDrift):
                 step_terms=all_terms,
                 step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
-                scale=time,
+                scale=time * power_repetitions,
             )
         )
 

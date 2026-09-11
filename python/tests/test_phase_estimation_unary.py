@@ -34,6 +34,7 @@ from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
 def _address_qubits(num_actions: int) -> int:
@@ -199,12 +200,34 @@ class TestPhaseDecoding:
             assert 0.0 <= positive.canonical_phase_fraction <= 0.25
             assert positive.canonical_phase_fraction + negative.canonical_phase_fraction == pytest.approx(0.5)
             assert positive.raw_energy == pytest.approx(-negative.raw_energy)
+            # The flag names which of the two branches is resolved, not which magnitude is reported.
+            assert np.isclose(
+                positive.resolved_energy,
+                positive.raw_energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.isclose(
+                negative.resolved_energy,
+                negative.raw_energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.greater_equal(positive.raw_energy, -float_comparison_absolute_tolerance)
+            assert np.less_equal(negative.raw_energy, float_comparison_absolute_tolerance)
 
     def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
         """The half-way bin is the one that collapses, so pin it directly."""
         result = _decode({"10": 1}, 2, resolve_positive_branch=True)
         assert result.canonical_phase_fraction == pytest.approx(0.25)
         assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
+
+    def test_a_unitary_that_folds_several_energies_onto_a_phase_is_rejected(self):
+        """The sign flag names one energy per branch, so an ambiguous inverse has nothing to name."""
+        base = LCUBuilder(quantum_walk=True).run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0])).get_container()
+        container = LCUWalkContainer(base.block_encoding, power=2)
+        with pytest.raises(ValueError, match="ambiguous"):
+            _post_process_phase_estimation({"01": 1}, 2, "qdk_unary", True, container.eigenvalue_from_phase)
 
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     def test_tied_counts_decode_independently_of_shot_order(self, resolve_positive_branch):
