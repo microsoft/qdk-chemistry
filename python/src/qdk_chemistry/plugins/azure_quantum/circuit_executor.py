@@ -211,7 +211,7 @@ class AzureQuantumBackend(CircuitExecutor):
 
         timeout = self._settings.get("timeout_secs")
         raw_results = job.get_results_histogram(timeout_secs=timeout)
-        Logger.debug(f"Job completed: {raw_results}")
+        Logger.debug("Job completed")
 
         saved_attachments = self._save_attachments(job)
 
