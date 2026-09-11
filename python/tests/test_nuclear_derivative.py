@@ -58,8 +58,8 @@ def test_nuclear_derivative_factory_registered():
     """Create the default nuclear derivative calculator from the factory."""
     calculator = algorithms.create("nuclear_derivative_calculator")
 
-    assert isinstance(calculator, algorithms.NuclearDerivativeCalculator)
-    assert calculator.name() == "qdk_finite_difference"
+    assert isinstance(calculator, algorithms.QdkNuclearDerivativeCalculator)
+    assert calculator.name() == "qdk"
 
 
 def test_qdk_nuclear_derivative_factory_registered():
@@ -68,6 +68,14 @@ def test_qdk_nuclear_derivative_factory_registered():
 
     assert isinstance(calculator, algorithms.QdkNuclearDerivativeCalculator)
     assert calculator.name() == "qdk"
+
+
+def test_geometry_optimizer_factory_registered():
+    """The geometry optimizer algorithm type is registered in the core registry."""
+    assert algorithms.show_default("geometry_optimizer") == "geometric"
+    available = algorithms.available("geometry_optimizer")
+    assert isinstance(available, list)
+    assert not available or "geometric" in available
 
 
 def test_nuclear_derivative_data_roundtrip_json_file(tmp_path):
