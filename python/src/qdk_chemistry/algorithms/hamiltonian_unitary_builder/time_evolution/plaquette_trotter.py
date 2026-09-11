@@ -167,7 +167,7 @@ class PlaquetteTrotter(Trotter):
         num_sites = self._settings.get("lattice_width") * self._settings.get("lattice_height")
         _, diagonal, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
         diagonal = [term for term in diagonal if term.pauli_term]
-        boundary = self._diagonal_layer(diagonal, delta * 0.5)
+        boundary = self._diagonal_layer(diagonal, delta * 0.5, max_batch=num_sites // 2)
 
         return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
@@ -364,7 +364,7 @@ class PlaquetteTrotter(Trotter):
         )
         # Repeated body 4: D, one full H_I layer. After the particle-hole shift,
         # each onsite interaction contributes one rotation.
-        interaction = self._diagonal_layer(diagonal, time)
+        interaction = self._diagonal_layer(diagonal, time, max_batch=num_sites // 2)
         hopping_layers = [layer for layer in (hop_a_open, hop_b, hop_a_close) if layer is not None]
         return hopping_layers + identity_phase + interaction
 
@@ -555,12 +555,13 @@ class PlaquetteTrotter(Trotter):
         cls,
         diagonal: list[ExponentiatedPauliTerm],
         fraction: float,
+        max_batch: int = 0,
     ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]:
         """Rescale mapped :math:`H_I` terms and group equal-angle rotations."""
         scaled = [
             ExponentiatedPauliTerm(pauli_term=dict(term.pauli_term), angle=term.angle * fraction) for term in diagonal
         ]
-        return cls._batch_equal_angles(scaled)
+        return cls._batch_equal_angles(scaled, max_batch=max_batch)
 
     @staticmethod
     def _batch_equal_angles(

@@ -277,13 +277,12 @@ namespace QDKChemistry.Utils.PauliExp {
         CNOT(a, b);
     }
 
-    /// Computes a Hamming weight into a little-endian output register.
+    /// Computes a Hamming weight in place across `inputs + scratch`.
     internal operation ComputeHammingWeight(
         inputs : Qubit[],
-        scratch : Qubit[],
-        weight : Qubit[]
+        scratch : Qubit[]
     ) : Unit is Adj {
-        let (schedule, finalBits, _) = HammingWeightSchedule(Length(inputs));
+        let (schedule, _, _) = HammingWeightSchedule(Length(inputs));
         let work = inputs + scratch;
         for (a, b, c, carry) in schedule {
             if c < 0 {
@@ -292,27 +291,23 @@ namespace QDKChemistry.Utils.PauliExp {
                 FullAdderStep(work[a], work[b], work[c], work[carry]);
             }
         }
-        for k in 0..Length(finalBits) - 1 {
-            if finalBits[k] >= 0 {
-                CNOT(work[finalBits[k]], weight[k]);
-            }
-        }
     }
 
     /// Applies equal-angle Z phases using logarithmically many rotations.
     internal operation HammingWeightPhase(theta : Double, inputs : Qubit[]) : Unit is Adj + Ctl {
         let count = Length(inputs);
-        let bits = BitSizeI(count);
-        let (schedule, _, _) = HammingWeightSchedule(count);
+        let (schedule, finalBits, _) = HammingWeightSchedule(count);
         use scratch = Qubit[Length(schedule)];
-        use weight = Qubit[bits];
+        let work = inputs + scratch;
         within {
-            ComputeHammingWeight(inputs, scratch, weight);
+            ComputeHammingWeight(inputs, scratch);
         } apply {
-            for k in 0..bits - 1 {
-                let scale = IntAsDouble(1 <<< k);
-                Rz(2.0 * theta * scale, weight[k]);
-                R(PauliI, -2.0 * theta * scale, weight[k]);
+            for k in 0..Length(finalBits) - 1 {
+                if finalBits[k] >= 0 {
+                    let scale = IntAsDouble(1 <<< k);
+                    Rz(2.0 * theta * scale, work[finalBits[k]]);
+                    R(PauliI, -2.0 * theta * scale, work[finalBits[k]]);
+                }
             }
             R(PauliI, 2.0 * theta * IntAsDouble(count), inputs[0]);
         }
