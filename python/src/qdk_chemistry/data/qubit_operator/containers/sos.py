@@ -54,15 +54,15 @@ class RotatedPaulis:
     r"""A block of ``M`` rotated-Pauli generators sharing one Pauli word set.
 
     Each generator is a Givens rotation applied to a fixed Pauli word: row ``i`` of
-    :attr:`angles` rotates the single-particle basis, and row ``i`` of :attr:`coeffs`
-    weights the words in :attr:`paulis` within that rotated frame.
+    ``angles`` rotates the single-particle basis, and row ``i`` of ``coeffs``
+    weights the words in ``paulis`` within that rotated frame.
     """
 
     angles: np.ndarray
     r"""Givens rotation angles, shape ``[M, N - 1]``, one elimination per orbital pair."""
 
     coeffs: np.ndarray
-    r"""LCU coefficients, shape ``[M, T]``, aligned column-wise with :attr:`paulis`."""
+    r"""LCU coefficients, shape ``[M, T]``, aligned column-wise with ``paulis``."""
 
     paulis: tuple[str, ...]
     r"""The ``T`` single-mode Pauli labels the coefficients weight, e.g. ``("X", "Y")``."""
