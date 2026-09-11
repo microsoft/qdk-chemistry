@@ -338,6 +338,7 @@ def to_sossa_operator(factorized_hamiltonian):
     hamiltonian = Hamiltonian(factorized_hamiltonian)
     return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
+
 def create_random_bitstring_matrix(
     n_electrons: int,
     n_orbitals: int,

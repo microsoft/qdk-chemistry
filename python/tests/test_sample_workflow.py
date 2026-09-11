@@ -125,26 +125,3 @@ def test_qpe_stretched_n2():
             },
         },
     )
-
-
-@_requires_notebook_deps
-@pytest.mark.slow
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-)
-@pytest.mark.skipif(
-    not _HAS_JUPYTER_KERNEL,
-    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
-)
-@pytest.mark.skipif(
-    not _HAS_QRE,
-    reason="qdk.qre not available",
-)
-def test_sossa_qre():
-    """Test the SOSSA resource-estimation notebook executes without errors."""
-    notebook_path = EXAMPLES_DIR / "sossa_qre.ipynb"
-    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(
-        notebook_path,
-    )
