@@ -261,6 +261,18 @@ class SOSQubitMapper(QubitMapper):
     def _batch_vector_to_givens_angles(vectors: np.ndarray) -> np.ndarray:
         """Convert unit vectors to Givens rotation angles via batch bottom-up elimination.
 
+        Each input row ``u`` is represented by ``N - 1`` angles
+        ``theta = (theta_0, ..., theta_(N-2))`` such that ``u = f(theta)`` and
+        ``U(u)`` is the corresponding product of Givens rotations. The controlled
+        basis rotation is Eq. (B20) of :cite:`Low2025`::
+
+            U_Rot |theta⟩|state⟩ = |theta⟩ U(u(theta)) |state⟩.
+
+        Conjugating the fixed Majorana operator by this rotation gives Eq. (B21)::
+
+            U_Rot† gamma_(00x) U_Rot
+                = ∑_theta |theta⟩⟨theta| ⊗ gamma_tilde_(f(theta)0x).
+
         Args:
             vectors: Array of shape ``[M, N]``.
 
