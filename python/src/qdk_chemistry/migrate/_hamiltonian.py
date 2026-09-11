@@ -23,13 +23,19 @@ Two distinct ``cholesky`` container layouts both serialize at container version
 
 from __future__ import annotations
 
+import copy
+
 import h5py
 import numpy as np
+
+from qdk_chemistry.data import Orbitals
+from qdk_chemistry.data.symmetry import SymmetryBlockedTensorRank2, SymmetryBlockedTensorRank3
 
 from . import _io, _orbitals, _sbt, _sparse
 
 HAMILTONIAN_VERSION = "0.1.0"
-CONTAINER_VERSION = "0.2.0"
+V2_CONTAINER_VERSION = "0.2.0"
+THREE_CENTER_VERSION = "0.3.0"
 OLD_CONTAINER_VERSION = "0.1.0"
 
 _FOUR_CENTER = "canonical_four_center"
@@ -41,6 +47,15 @@ def from_json_doc(doc: dict) -> dict:
     """Normalize a parsed legacy Hamiltonian JSON object into a container old-doc."""
     container = doc["container"]
     container_type = container["container_type"]
+    source_version = str(container.get("version"))
+    if source_version == V2_CONTAINER_VERSION:
+        if container_type not in (_CHOLESKY, _THREE_CENTER):
+            return {"_source_version": f"{source_version}:{container_type}"}
+        normalized = copy.deepcopy(doc)
+        normalized["_source_version"] = source_version
+        return normalized
+    if source_version != OLD_CONTAINER_VERSION:
+        return {"_source_version": source_version}
     if container_type == "sparse":
         return _sparse.from_json_doc(container)
     if container_type == _CHOLESKY and "three_center_integrals" in container:
@@ -58,6 +73,13 @@ def from_hdf5_group(group) -> dict:
     """Normalize a legacy Hamiltonian HDF5 group (with a ``container`` subgroup)."""
     container = group["container"]
     container_type = _io.read_attr(container, "container_type")
+    source_version = str(_io.read_attr(container, "version"))
+    if source_version == V2_CONTAINER_VERSION:
+        if container_type not in (_CHOLESKY, _THREE_CENTER):
+            return {"_source_version": f"{source_version}:{container_type}"}
+        return _v2_three_center_from_hdf5(group)
+    if source_version != OLD_CONTAINER_VERSION:
+        return {"_source_version": source_version}
     if container_type == "sparse":
         return _sparse.from_hdf5_group(container)
     if container_type == _CHOLESKY and "three_center_integrals_aa" in container:
@@ -121,7 +143,7 @@ def _four_center_to_new_json(old: dict) -> dict:
     """Build the migrated four-center container JSON from an old-doc."""
     restricted = old["is_restricted"]
     container: dict = {
-        "version": CONTAINER_VERSION,
+        "version": V2_CONTAINER_VERSION,
         "container_type": _FOUR_CENTER,
         "core_energy": float(old["core_energy"]),
         "type": old["type"],
@@ -194,11 +216,11 @@ def _cholesky_from_hdf5(container: h5py.Group) -> dict:
 
 
 def _cholesky_to_new_json(old: dict) -> dict:
-    """Build the migrated three-center container JSON from an old Cholesky document."""
+    """Build the released v2 Cholesky container JSON from a v1 document."""
     restricted = old["is_restricted"]
     container: dict = {
-        "version": CONTAINER_VERSION,
-        "container_type": _THREE_CENTER,
+        "version": V2_CONTAINER_VERSION,
+        "container_type": _CHOLESKY,
         "core_energy": float(old["core_energy"]),
         "type": old["type"],
         "is_restricted": restricted,
@@ -216,12 +238,68 @@ def _cholesky_to_new_json(old: dict) -> dict:
         container["inactive_fock_matrix"] = _sbt.rank2_dict(old["fock_alpha"], beta)
 
     if old.get("ao_three_center_vectors") is not None:
-        container["ao_three_center_vectors"] = np.asarray(old["ao_three_center_vectors"], dtype=np.float64).tolist()
+        container["ao_cholesky_vectors"] = np.asarray(old["ao_three_center_vectors"], dtype=np.float64).tolist()
 
     return container
+
+
+def _three_center_to_v3_json(doc: dict) -> dict:
+    """Rename the released v2 Cholesky wire identity to three-center."""
+    migrated = copy.deepcopy(doc)
+    migrated.pop("_source_version", None)
+    container = migrated["container"]
+    if container.get("container_type") not in (_CHOLESKY, _THREE_CENTER):
+        return migrated
+    container["version"] = THREE_CENTER_VERSION
+    container["container_type"] = _THREE_CENTER
+    if container.get("is_restricted", True):
+        _sbt.add_restricted_three_center_partner_alias(container["three_center_integrals"])
+    if "ao_cholesky_vectors" in container:
+        container["ao_three_center_vectors"] = container.pop("ao_cholesky_vectors")
+    return migrated
+
+
+def _v2_three_center_from_hdf5(group: h5py.Group) -> dict:
+    """Read a released v2 Cholesky HDF5 payload for the v3 rename step."""
+    source = group["container"]
+    metadata = source["metadata"]
+    container: dict = {
+        "version": V2_CONTAINER_VERSION,
+        "container_type": _io.read_attr(source, "container_type"),
+        "core_energy": float(_io.read_attr(metadata, "core_energy", 0.0)),
+        "type": _io.read_attr(metadata, "type", "Hermitian"),
+        "is_restricted": bool(_io.read_attr(metadata, "is_restricted", True)),
+        "one_body_integrals": _io.subgroup_to_json(
+            source["one_body_integrals"], SymmetryBlockedTensorRank2, "symmetry_blocked_tensor_2", at_root=True
+        ),
+        "three_center_integrals": _io.subgroup_to_json(
+            source["three_center_integrals"], SymmetryBlockedTensorRank3, "symmetry_blocked_tensor_3", at_root=True
+        ),
+        "orbitals": _io.subgroup_to_json(source["orbitals"], Orbitals, "orbitals", at_root=True),
+    }
+    if "inactive_fock_matrix" in source:
+        container["inactive_fock_matrix"] = _io.subgroup_to_json(
+            source["inactive_fock_matrix"], SymmetryBlockedTensorRank2, "symmetry_blocked_tensor_2", at_root=True
+        )
+    if "ao_three_center_vectors" in source:
+        ao_vectors = _io.read_matrix(source, "ao_three_center_vectors")
+        if ao_vectors is not None:
+            container["ao_three_center_vectors"] = ao_vectors.tolist()
+    elif "ao_cholesky_vectors" in source:
+        ao_vectors = _io.read_matrix(source, "ao_cholesky_vectors")
+        if ao_vectors is not None:
+            container["ao_cholesky_vectors"] = ao_vectors.tolist()
+    return {
+        "_source_version": V2_CONTAINER_VERSION,
+        "version": str(_io.read_attr(group, "version", HAMILTONIAN_VERSION)),
+        "container": container,
+    }
 
 
 # The Hamiltonian envelope version is unchanged; the chain is keyed on the
 # container's serialization version (the legacy cholesky/sparse/four-center
 # containers all serialized version 0.1.0).
-STEPS = {OLD_CONTAINER_VERSION: (CONTAINER_VERSION, to_new_json)}
+STEPS = {
+    OLD_CONTAINER_VERSION: (V2_CONTAINER_VERSION, to_new_json),
+    V2_CONTAINER_VERSION: (THREE_CENTER_VERSION, _three_center_to_v3_json),
+}

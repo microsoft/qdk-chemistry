@@ -26,7 +26,7 @@ One-electron integrals
    Matrix of one-electron integrals (h₁)
 
 Two-electron integrals
-   Vector of two-electron integrals (h₂) in physicist notation :math:`\left\langle ij|kl \right\rangle`
+   Vector of two-electron integrals (h₂) in chemist notation :math:`(ij|kl)`
 
 Core energy
    Constant energy term combining nuclear repulsion and inactive orbital contributions
@@ -92,15 +92,16 @@ Two-electron integral storage and notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
-QDK/Chemistry uses the physicist notation by default, but it's important to understand the different conventions:
+QDK/Chemistry stores Hamiltonian two-electron integrals in chemist/Mulliken
+notation by default, but it is important to understand both conventions:
 
 Physicist/Dirac notation :math:`\left\langle ij|kl \right\rangle` or :math:`\left\langle ij|kl \right\rangle`
    Represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`k`, while electron 2 occupies orbitals :math:`j` and :math:`l`.
-   This is the default representation in QDK/Chemistry.
    In this notation, the first index of each pair :math:`(i,k)` refers to electron 1, and the second index of each pair :math:`(j,l)` refers to electron 2, following a (1,2,1,2) electron indexing pattern.
 
 Chemist/Mulliken notation :math:`(ij|kl)` or :math:`[ij|kl]`
    Represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`j`, while electron 2 occupies orbitals :math:`k` and :math:`l`.
+   This is the default representation in QDK/Chemistry Hamiltonian containers.
    In this notation, the first pair of indices :math:`(i,j)` refers to electron 1, and the second pair :math:`(k,l)` refers to electron 2, following a (1,1,2,2) electron indexing pattern.
    The symbols differ (parentheses vs square brackets), but the indexing convention is the same.
 
@@ -153,6 +154,8 @@ The storage size scales as :math:`O(N^4)` where :math:`N` is the number of molec
 - Methods that require explicit four-center integrals
 - Small to medium active spaces
 
+.. _hamiltonian-three-center-container:
+
 Three-center Hamiltonian container
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -164,62 +167,30 @@ A memory-efficient container that stores two-electron integrals using density fi
    ``ThreeCenterHamiltonianContainer`` for three-center integrals produced by
    either Cholesky decomposition or density fitting.
 
-Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set in case of density fitting or the Cholesky vectors in case of Cholesky decomposition.
-The four-center integrals are computed on-the-fly when needed via:
+Instead of storing four-center integrals directly, this container stores contractible factors :math:`B_{ij}^{Q}` in the molecular orbital basis.
+These may be Cholesky vectors or density-fitting factors with the auxiliary metric already folded in, not raw three-center integrals.
+The :ref:`density-fitting construction section <hamiltonian-constructor-density-fitted>` defines the factorization and its metric treatment.
 
-.. math::
+The ``three_center()`` accessor returns a rank-3 symmetry-blocked tensor with slots ``(MO row, MO column, auxiliary)``.
+Each spin block has shape ``[norb * norb, naux]``. In restricted calculations, the alpha and beta keys alias the same immutable matrix rather than storing duplicate values; unrestricted calculations store separate spin blocks.
 
-   (ij|kl) \approx \sum_P (ij|P)(P|kl)
-
-The storage size scales as :math:`O(N_{aux} \times N^2)` where :math:`N_{aux}` is the size of the auxiliary basis, typically yielding significant memory savings for larger systems.
+Storage scales as :math:`O(RN^2)`, where :math:`N` is the number of active orbitals and :math:`R` is the auxiliary-basis size or Cholesky rank.
+Requesting ``get_two_body_integrals()`` materializes and caches the four-center representation, requiring :math:`O(N^4)` storage.
 
 .. rubric:: When to use
 
 - Large active space calculations where memory is constrained
-- When using density-fitted orbitals from :term:`SCF` calculations
+- When constructing a Hamiltonian with a correlation-fitting auxiliary basis
 - Systems where the density fitting approximation is acceptable
 
 .. rubric:: Creating with the HamiltonianConstructor
 
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm can produce either container type depending on the implementation used.
 
-**Cholesky decomposition** — Use the ``qdk_cholesky`` implementation to create a ``ThreeCenterHamiltonianContainer`` from Cholesky-decomposed ERIs.
-This method does not require an auxiliary basis set; it decomposes the full ERI tensor directly.
+- :ref:`Cholesky construction <hamiltonian-constructor-cholesky>` uses ``qdk_cholesky`` without an auxiliary basis.
+- :ref:`Density-fitted construction <hamiltonian-constructor-density-fitted>` uses ``qdk_density_fitted_hamiltonian`` with an ``RIFIT`` auxiliary basis.
 
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      auto constructor = algorithms::HamiltonianConstructorFactory::create("qdk_cholesky");
-      // Optionally configure Cholesky tolerance
-      constructor->settings().set("cholesky_tolerance", 1e-8);
-      auto hamiltonian = constructor->run(orbitals);
-
-.. tab:: Python API
-
-   .. code-block:: python
-
-      constructor = algorithms.create("hamiltonian_constructor", "qdk_cholesky")
-      # Optionally configure Cholesky tolerance
-      constructor.settings().set("cholesky_tolerance", 1e-8)
-      hamiltonian = constructor.run(orbitals)
-
-**Density fitting** — Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``ThreeCenterHamiltonianContainer`` from density-fitted integrals.
-This method requires an auxiliary basis set.
-
-.. tab:: C++ API
-
-   .. code-block:: cpp
-
-      auto constructor = algorithms::HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
-      auto hamiltonian = constructor->run(orbitals);
-
-.. tab:: Python API
-
-   .. code-block:: python
-
-      constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
-      hamiltonian = constructor.run(orbitals)
+Both sections provide C++ and Python examples included from the corresponding example source files.
 
 Serialization
 -------------

@@ -33,8 +33,9 @@ namespace qdk::chemistry::data {
 class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for active space Hamiltonian with three center integrals
-   * (ij|P), such that (ij|kl) \approx \sum_P (ij|P)(P|kl)
+   * @brief Constructor for an active-space Hamiltonian with contractible
+   * three-center factors B, such that
+   * (ij|kl) \approx \sum_Q B_(ij,Q) B_(kl,Q)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param three_center_integrals Three-center two-electron integrals in MO
@@ -44,8 +45,6 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * energy)
    * @param inactive_fock_matrix Inactive Fock matrix for the selected active
    * space
-   * @param ao_three_center_vectors Optional AO three-center vectors for
-   * potential reuse (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
@@ -59,19 +58,12 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for active space Hamiltonian with three center integrals
-   * using separate spin components
+   * @brief Constructor for an active-space Hamiltonian with three-center
    *
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param three_center_integrals_aa Three-center two-electron alpha-alpha
-   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
-   * order
-   * @param three_center_integrals_bb Three-center two-electron beta-beta
-   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
-   * order
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
@@ -79,8 +71,6 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * the selected active space
    * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
    * selected active space
-   * @param ao_three_center_vectors Optional AO three-center vectors for
-   * potential reuse (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
@@ -97,15 +87,10 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief SymmetryBlockedTensor constructor for a three-center Hamiltonian.
    * @param one_body One-body integrals as rank-2 SymmetryBlockedTensor.
-   * @param three_center Three-center integrals as a rank-3
-   *   SymmetryBlockedTensor with slots @c [MO_row, MO_col, auxiliary]. Each
-   *   block is a dense @c [norb_row*norb_col, naux] @c MatrixXd.
    * @param orbitals Shared pointer to molecular orbital data.
    * @param core_energy Core energy.
    * @param inactive_fock Inactive Fock matrix as rank-2 SymmetryBlockedTensor.
-   * @param ao_three_center_vectors Optional AO three-center vectors.
    * @param type Hamiltonian type.
    */
   ThreeCenterHamiltonianContainer(
@@ -145,26 +130,30 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
   get_two_body_integrals() const override;
 
   /**
-   * @brief Get three-center integrals in MO basis for all spin channels
+   * @brief Get three-center factors in MO basis for all spin channels
    * @return Pair of dense @c [norb^2, naux] @c MatrixXd for (alpha, beta).
    */
+  [[deprecated("Use three_center() instead.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_three_center_integrals() const;
 
   /**
-   * @brief Three-center integrals as a rank-3 symmetry-blocked tensor.
+   * @brief Three-center factors as a rank-3 symmetry-blocked tensor.
    * Slots are @c [MO_row, MO_col, auxiliary]; each block is a dense
    * @c [norb_row*norb_col, naux] @c MatrixXd.
    */
   const SymmetryBlockedTensor<3>& three_center() const;
 
-  /**
-   * @brief Get the optional AO three-center vectors
-   * @return Const reference to the optional AO three-center vectors matrix
-   * [nao^2 x naux]. Contains std::nullopt if AO three-center vectors were not
-   * provided at construction.
-   */
+  /** @brief Optional AO three-center factors in dense [nao^2, naux] form. */
+  const std::optional<Eigen::MatrixXd>& ao_three_center_vectors() const;
+
+  /** @brief Deprecated get-prefixed alias for ao_three_center_vectors(). */
+  [[deprecated("Use ao_three_center_vectors() instead.")]]
   const std::optional<Eigen::MatrixXd>& get_ao_three_center_vectors() const;
+
+  /** @brief Deprecated Cholesky-specific alias retained for compatibility. */
+  [[deprecated("Use ao_three_center_vectors() instead.")]]
+  const std::optional<Eigen::MatrixXd>& get_ao_cholesky_vectors() const;
 
   /**
    * @brief Get specific four-center two-electron integral element
@@ -235,7 +224,7 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
-  /// Three-center integrals (rank-3, slots @c [MO_row, MO_col, auxiliary];
+  /// Three-center factors (rank-3, slots @c [MO_row, MO_col, auxiliary];
   /// blocks are dense @c [orb_pair, naux] @c MatrixXd).
   std::shared_ptr<const SymmetryBlockedTensor<3>> _three_center;
 
@@ -256,11 +245,11 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  /** Optional AO three-center vectors for potential reuse */
+  /** Optional AO three-center factors for potential reuse */
   const std::optional<Eigen::MatrixXd> _ao_three_center_vectors;
 
   /** Serialization version */
-  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.3.0";
 };
 
 using CholeskyHamiltonianContainer

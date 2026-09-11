@@ -5,20 +5,14 @@
 #include <algorithm>
 #include <blas.hh>
 #include <cstddef>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <macis/util/fcidump.hpp>
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <sstream>
 #include <stdexcept>
+#include <utility>
 
-#include "../filename_utils.hpp"
 #include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
 
@@ -29,6 +23,14 @@ namespace qdk::chemistry::data {
 static std::shared_ptr<const SymmetryBlockedTensor<3>> make_three_center_sbt(
     const Eigen::MatrixXd& aa, const Eigen::MatrixXd& bb,
     const Orbitals& orbitals);
+
+static const Orbitals& require_orbitals(
+    const std::shared_ptr<Orbitals>& orbitals) {
+  if (!orbitals) {
+    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
+  }
+  return *orbitals;
+}
 
 ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
@@ -41,7 +43,7 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
           make_spin_diagonal_rank2_sbt(one_body_integrals, one_body_integrals,
                                        /*restricted=*/true),
           *make_three_center_sbt(three_center_integrals, Eigen::MatrixXd{},
-                                 *orbitals),
+                                 require_orbitals(orbitals)),
           orbitals, core_energy,
           make_spin_diagonal_rank2_sbt(inactive_fock_matrix, Eigen::MatrixXd{}),
           std::move(ao_three_center_vectors), type) {
@@ -63,7 +65,8 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
                                        one_body_integrals_beta,
                                        /*restricted=*/false),
           *make_three_center_sbt(three_center_integrals_aa,
-                                 three_center_integrals_bb, *orbitals),
+                                 three_center_integrals_bb,
+                                 require_orbitals(orbitals)),
           orbitals, core_energy,
           make_spin_diagonal_rank2_sbt(inactive_fock_matrix_alpha,
                                        inactive_fock_matrix_beta),
@@ -143,6 +146,12 @@ void ThreeCenterHamiltonianContainer::_build_four_center_cache() const {
   auto build_four_center = [&](const Eigen::MatrixXd& three_left,
                                const Eigen::MatrixXd& three_right)
       -> std::shared_ptr<Eigen::VectorXd> {
+    if (static_cast<size_t>(three_left.rows()) != norb2 ||
+        static_cast<size_t>(three_right.rows()) != norb2 ||
+        three_left.cols() != three_right.cols()) {
+      throw std::invalid_argument(
+          "Three-center blocks must have compatible [norb^2, naux] shapes");
+    }
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
     size_t naux = three_left.cols();
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
@@ -188,9 +197,19 @@ ThreeCenterHamiltonianContainer::get_three_center_integrals() const {
 }
 
 const std::optional<Eigen::MatrixXd>&
-ThreeCenterHamiltonianContainer::get_ao_three_center_vectors() const {
+ThreeCenterHamiltonianContainer::ao_three_center_vectors() const {
   QDK_LOG_TRACE_ENTERING();
   return _ao_three_center_vectors;
+}
+
+const std::optional<Eigen::MatrixXd>&
+ThreeCenterHamiltonianContainer::get_ao_three_center_vectors() const {
+  return ao_three_center_vectors();
+}
+
+const std::optional<Eigen::MatrixXd>&
+ThreeCenterHamiltonianContainer::get_ao_cholesky_vectors() const {
+  return ao_three_center_vectors();
 }
 
 double ThreeCenterHamiltonianContainer::get_two_body_element(
@@ -280,27 +299,64 @@ void ThreeCenterHamiltonianContainer::validate_integral_dimensions() const {
 
   auto norb_alpha = _one_body->block({axes::alpha(), axes::alpha()}).rows();
   auto naux = _three_center->extents()[2].at(SymmetryLabel{});
-  auto expected_size = static_cast<size_t>(norb_alpha * norb_alpha) * naux;
-
-  const auto& aa =
-      _three_center->block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
-  if (static_cast<size_t>(aa.size()) != expected_size) {
-    throw std::invalid_argument("Alpha-alpha three-center integrals size (" +
-                                std::to_string(aa.size()) +
-                                ") does not match expected norb^2 * naux (" +
-                                std::to_string(expected_size) + " for " +
-                                std::to_string(norb_alpha) + " orbitals and " +
-                                std::to_string(naux) + " auxiliaries)");
+  const auto expected_alpha_rows = norb_alpha * norb_alpha;
+  const auto alpha_key = SymmetryBlockedTensor<3>::Labels{
+      axes::alpha(), axes::alpha(), SymmetryLabel{}};
+  const auto beta_key = SymmetryBlockedTensor<3>::Labels{
+      axes::beta(), axes::beta(), SymmetryLabel{}};
+  if (!_three_center->has_block(alpha_key)) {
+    throw std::invalid_argument(
+        "Three-center container requires an explicit alpha block");
+  }
+  if (!_three_center->has_block(beta_key)) {
+    throw std::invalid_argument(
+        "Three-center container requires an explicit beta block or alias");
   }
 
-  if (!_three_center->all_aliased(
-          {{{axes::alpha(), axes::alpha(), SymmetryLabel{}},
-            {axes::beta(), axes::beta(), SymmetryLabel{}}}})) {
-    const auto& bb =
-        _three_center->block({axes::beta(), axes::beta(), SymmetryLabel{}});
-    if (static_cast<size_t>(bb.size()) != expected_size) {
+  const auto n_active_alpha =
+      spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
+  const auto n_active_beta =
+      spin_channel_indices(_orbitals->active_indices(), axes::beta()).size();
+  if (_three_center->extents()[0].at(axes::alpha()) != n_active_alpha ||
+      _three_center->extents()[1].at(axes::alpha()) != n_active_alpha ||
+      _three_center->extents()[0].at(axes::beta()) != n_active_beta ||
+      _three_center->extents()[1].at(axes::beta()) != n_active_beta) {
+    throw std::invalid_argument(
+        "Three-center orbital-slot extents must match the active spaces");
+  }
+
+  const auto& aa = _three_center->block(alpha_key);
+  if (aa.rows() != expected_alpha_rows ||
+      static_cast<size_t>(aa.cols()) != naux) {
+    throw std::invalid_argument(
+        "Alpha three-center block must have shape [norb^2, naux] = [" +
+        std::to_string(expected_alpha_rows) + ", " + std::to_string(naux) +
+        "], but has [" + std::to_string(aa.rows()) + ", " +
+        std::to_string(aa.cols()) + "]");
+  }
+
+  const auto& bb = _three_center->block(beta_key);
+  const auto expected_beta_rows = n_active_beta * n_active_beta;
+  if (static_cast<size_t>(bb.rows()) != expected_beta_rows ||
+      static_cast<size_t>(bb.cols()) != naux) {
+    throw std::invalid_argument(
+        "Beta three-center block must have shape [norb_beta^2, naux]");
+  }
+
+  if (_ao_three_center_vectors) {
+    if (_ao_three_center_vectors->size() == 0 ||
+        !_ao_three_center_vectors->allFinite()) {
       throw std::invalid_argument(
-          "Beta three-center integrals size does not match Alpha");
+          "AO three-center factors must be non-empty and finite");
+    }
+    if (static_cast<size_t>(_ao_three_center_vectors->cols()) != naux) {
+      throw std::invalid_argument(
+          "AO and MO three-center factors must use the same auxiliary rank");
+    }
+    const auto nao = _orbitals->get_num_atomic_orbitals();
+    if (static_cast<size_t>(_ao_three_center_vectors->rows()) != nao * nao) {
+      throw std::invalid_argument(
+          "AO three-center factors must have shape [nao^2, naux]");
     }
   }
 }
@@ -309,14 +365,15 @@ void ThreeCenterHamiltonianContainer::validate_integral_dimensions() const {
 
 // Build the canonical rank-3 three-center SBT from dense alpha (and optional
 // beta) blocks, sharing MO symmetry/extents with @p orbitals' active space.
-// Returns @c nullptr when @p aa is empty (no data supplied). When @p bb is
-// empty the spin axis is restricted and the alpha block is aliased into the
-// beta slot via partner-block aliasing in @ref SymmetryBlockedTensor.
+// Rejects an empty @p aa block. When @p bb is empty, the beta key is
+// explicitly aliased to alpha because the auxiliary
+// slot carries a distinct trivial symmetry and therefore prevents automatic
+// spin-partner aliasing.
 static std::shared_ptr<const SymmetryBlockedTensor<3>> make_three_center_sbt(
     const Eigen::MatrixXd& aa, const Eigen::MatrixXd& bb,
     const Orbitals& orbitals) {
   if (aa.size() == 0) {
-    return nullptr;
+    throw std::invalid_argument("Alpha three-center factors cannot be empty");
   }
   auto mo_sym = orbitals.symmetries();
   const auto active_ai = orbitals.active_indices();
@@ -361,6 +418,8 @@ static std::shared_ptr<const SymmetryBlockedTensor<3>> make_three_center_sbt(
     }
     auto bb_block = std::make_shared<const Eigen::MatrixXd>(bb);
     blocks[{axes::beta(), axes::beta(), SymmetryLabel{}}] = bb_block;
+  } else {
+    blocks[{axes::beta(), axes::beta(), SymmetryLabel{}}] = aa_block;
   }
 
   return std::make_shared<const SymmetryBlockedTensor<3>>(
@@ -497,6 +556,13 @@ ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
           j[ao_vectors_field].get<std::vector<std::vector<double>>>();
       int rows = matrix_vec.size();
       int cols = rows > 0 ? matrix_vec[0].size() : 0;
+      if (std::any_of(matrix_vec.begin(), matrix_vec.end(),
+                      [cols](const auto& row) {
+                        return static_cast<int>(row.size()) != cols;
+                      })) {
+        throw std::runtime_error(
+            "AO three-center vector rows must have equal lengths");
+      }
       Eigen::MatrixXd matrix(rows, cols);
       for (int i = 0; i < rows; ++i) {
         for (int jj = 0; jj < cols; ++jj) {

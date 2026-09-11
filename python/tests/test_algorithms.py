@@ -27,6 +27,7 @@ from qdk_chemistry.data import (
     AmplitudeContainer,
     AmplitudeType,
     Ansatz,
+    AuxiliaryBasisCollection,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
@@ -151,7 +152,7 @@ class MockHamiltonianConstructor(HamiltonianConstructor):
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
-    def _run_impl(self, orbitals):
+    def _run_impl(self, orbitals, auxiliary_bases):  # noqa: ARG002
         """A simple test implementation of the construct method."""
         # Simple test implementation - create basic Hamiltonian
 
@@ -511,10 +512,22 @@ class TestAlgorithmClasses:
         energies = np.array([0.0, 1.0])
         orbitals = Orbitals(coeffs, energies, None, create_test_basis_set(2))
 
-        result = ham_constructor.run(orbitals)
-        assert isinstance(result, Hamiltonian)
-        # For legacy constructor, check that it has one-body integrals set
-        assert result.has_one_body_integrals()
+        assert ham_constructor.hash(orbitals) == ham_constructor.hash(orbitals, None)
+        auxiliary_bases = AuxiliaryBasisCollection()
+        assert ham_constructor.hash(orbitals) != ham_constructor.hash(orbitals, auxiliary_bases)
+
+        for args in [(orbitals,), (orbitals, None), (orbitals, auxiliary_bases)]:
+            result = ham_constructor.run(*args)
+            assert isinstance(result, Hamiltonian)
+            assert result.has_one_body_integrals()
+
+    def test_cholesky_hamiltonian_constructor_export(self):
+        """The concrete Cholesky constructor is available from the public package."""
+        from qdk_chemistry.algorithms import (  # noqa: PLC0415
+            QdkCholeskyHamiltonianConstructor,
+        )
+
+        assert QdkCholeskyHamiltonianConstructor().name() == "qdk_cholesky"
 
     def test_scf_solver_inheritance(self):
         """Test that ScfSolver can be inherited from Python."""

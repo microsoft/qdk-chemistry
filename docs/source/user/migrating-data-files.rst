@@ -5,14 +5,14 @@ Each QDK/Chemistry data class versions its on-disk serialization schema
 independently. Deserializers for :class:`~qdk_chemistry.data.Orbitals`,
 :class:`~qdk_chemistry.data.Hamiltonian`,
 :class:`~qdk_chemistry.data.Wavefunction`, and
-:class:`~qdk_chemistry.data.QpeResult` accept **only** the serialization version
-the installed library was built against. Loading a file written against an older
-version of that class's schema raises an error that points back here.
+:class:`~qdk_chemistry.data.QpeResult` require matching major and minor
+serialization versions; patch-level differences are compatible. Loading an
+older schema raises an error with instructions to use the converter below.
 
 The ``qdk_chemistry.migrate`` converter upgrades such a file to the serialization
 version the installed library accepts. It migrates each data class point-for-point
-along that class's own chain of serialization versions, and lives outside the core
-data classes so that no legacy-schema knowledge leaks into the serialization code.
+along that class's own chain of serialization versions. Legacy-schema
+transformations live outside the core data classes.
 
 Command line
 ------------
@@ -98,6 +98,17 @@ container is migrated to a
 :class:`~qdk_chemistry.data.ThreeCenterHamiltonianContainer`, with the vectors
 re-expressed as a symmetry-blocked tensor. The two layouts are detected
 automatically.
+
+Three-center container schema ``0.3.0`` also renames the released ``0.2.0``
+``"cholesky"`` discriminator and ``ao_cholesky_vectors`` field to
+``"three_center"`` and ``ao_three_center_vectors``. The converter preserves the
+stored factors while applying those wire-format renames and restoring any
+omitted restricted-spin aliases.
+
+Cholesky files follow the same version policy as other containers: old schemas
+must be migrated before loading. The old ``"cholesky"`` tag logs a deprecation
+warning, but does not bypass version validation. New three-center files use
+schema ``0.3.0`` and the ``"three_center"`` tag.
 
 Supported formats
 -----------------

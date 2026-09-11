@@ -9,6 +9,7 @@
 
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/algorithms/microsoft/density_fitted_hamiltonian.hpp>
+#include <utility>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"
@@ -39,16 +40,11 @@ class HamiltonianConstructorBase
 
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
-      std::shared_ptr<Orbitals> orbitals) const override {
-    py::gil_scoped_acquire gil;
-    py::function override = py::get_override(
-        static_cast<const HamiltonianConstructor *>(this), "_run_impl");
-    if (override) {
-      return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
-    }
-    py::pybind11_fail(
-        "Tried to call pure virtual function "
-        "\"HamiltonianConstructor::_run_impl\"");
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<AuxiliaryBasisCollection> auxiliary_bases)
+      const override {
+    PYBIND11_OVERRIDE_PURE(std::shared_ptr<Hamiltonian>, HamiltonianConstructor,
+                           _run_impl, orbitals, auxiliary_bases);
   }
 };
 
@@ -60,7 +56,8 @@ void bind_hamiltonian_constructor(py::module &m) {
 Abstract base class for Hamiltonian constructors.
 
 This class defines the interface for constructing Hamiltonian matrices from orbital data.
-Concrete implementations should inherit from this class and implement the construct method.
+Concrete implementations must implement _run_impl(self, orbitals, auxiliary_bases).
+When run() omits auxiliary_bases, the hook receives None.
 
 Examples:
     To create a custom Hamiltonian constructor, inherit from this class::
@@ -71,7 +68,7 @@ Examples:
         ...     def __init__(self):
         ...         super().__init__()  # Call the base class constructor
         ...     # Implement the _run_impl method
-        ...     def _run_impl(self, orbitals: data.Orbitals) -> data.Hamiltonian:
+        ...     def _run_impl(self, orbitals, auxiliary_bases):
         ...         # Custom Hamiltonian construction implementation
         ...         return hamiltonian
 
@@ -92,11 +89,8 @@ Examples:
 
 )");
 
-  hamiltonian_constructor.def(
-      "run",
-      static_cast<std::shared_ptr<Hamiltonian> (HamiltonianConstructor::*)(
-          std::shared_ptr<Orbitals>) const>(&HamiltonianConstructor::run),
-      R"(
+  hamiltonian_constructor.def("run", &HamiltonianConstructor::run,
+                              R"(
 Construct a Hamiltonian from the given orbitals.
 
 This method automatically locks settings before execution to prevent
@@ -104,6 +98,9 @@ modifications during construction.
 
 Args:
     orbitals (qdk_chemistry.data.Orbitals): The orbital data to construct the Hamiltonian from
+    auxiliary_bases (qdk_chemistry.data.AuxiliaryBasisCollection | None):
+        Optional role-keyed auxiliary bases. The density-fitted implementation
+        requires an RIFIT entry.
 
 Returns:
     qdk_chemistry.data.Hamiltonian: The constructed Hamiltonian matrix
@@ -112,7 +109,8 @@ Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
 
 )",
-      py::arg("orbitals"));
+                              py::arg("orbitals"),
+                              py::arg("auxiliary_bases") = py::none());
 
   hamiltonian_constructor.def("settings", &HamiltonianConstructor::settings,
                               R"(
@@ -168,7 +166,8 @@ Returns:
 )");
 
   hamiltonian_constructor.def("hash", &HamiltonianConstructor::hash,
-                              py::arg("orbitals"));
+                              py::arg("orbitals"),
+                              py::arg("auxiliary_bases") = py::none());
 
   // Factory class binding - creates HamiltonianConstructorFactory class with
   // static methods
@@ -239,11 +238,14 @@ Typical usage:
     import qdk_chemistry.algorithms as alg
     import qdk_chemistry.data as data
 
-    # Assuming you have orbitals from an SCF calculation
+    # Assuming you have orbitals and an RIFIT auxiliary basis
     constructor = alg.QdkDensityFittedHamiltonianConstructor()
 
     # Construct Hamiltonian using density fitting
-    hamiltonian = constructor.run(orbitals)
+    auxiliary_bases = data.AuxiliaryBasisCollection(
+      {data.AuxiliaryBasisRole.RIFIT: rifit_basis}
+    )
+    hamiltonian = constructor.run(orbitals, auxiliary_bases)
 
 See Also:
     :class:`HamiltonianConstructor`

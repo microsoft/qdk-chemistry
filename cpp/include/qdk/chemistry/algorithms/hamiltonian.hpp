@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
@@ -31,7 +32,8 @@ namespace qdk::chemistry::algorithms {
 class HamiltonianConstructor
     : public Algorithm<HamiltonianConstructor,
                        std::shared_ptr<data::Hamiltonian>,
-                       std::shared_ptr<data::Orbitals>> {
+                       std::shared_ptr<data::Orbitals>,
+                       std::shared_ptr<data::AuxiliaryBasisCollection>> {
  public:
   /**
    * @brief Default constructor
@@ -53,14 +55,13 @@ class HamiltonianConstructor
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The orbital data from which to construct the Hamiltonian
+   * @param auxiliary_bases Optional role-keyed auxiliary bases
    * \endcond
    * @return The constructed Hamiltonian operator ready for use in quantum
    *         chemistry calculations
    *
    * @throw std::runtime_error if Hamiltonian construction fails
    * @throw std::invalid_argument if orbital data is incomplete or invalid
-   * @throws qdk::chemistry::data::SettingsAreLocked if attempting to modify
-   * settings after run) is called
    *
    * @note Settings are automatically locked when this method is called and
    * cannot be modified during or after execution.
@@ -68,7 +69,21 @@ class HamiltonianConstructor
    * @see data::Orbitals
    * @see data::Hamiltonian
    */
-  using Algorithm::run;
+  std::shared_ptr<data::Hamiltonian> run(
+      std::shared_ptr<data::Orbitals> orbitals,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases =
+          nullptr) const override;
+
+  /**
+   * @brief Hash a Hamiltonian-constructor run, including auxiliary bases.
+   * @param orbitals Orbital data that would be passed to run()
+   * @param auxiliary_bases Optional auxiliary bases that would be passed to
+   * run()
+   * @return Deterministic run hash
+   */
+  std::string hash(std::shared_ptr<data::Orbitals> orbitals,
+                   std::shared_ptr<data::AuxiliaryBasisCollection>
+                       auxiliary_bases = nullptr) const override;
 
   /**
    * @brief Access the algorithm's name
@@ -88,14 +103,16 @@ class HamiltonianConstructor
   /**
    * @brief Implementation of Hamiltonian construction
    *
-   * This method contains the actual construction logic. It is automatically
-   * called by run() after settings have been locked.
+   * Called by run() with both inputs after settings have been locked.
    *
    * @param orbitals The orbital data from which to construct the Hamiltonian
+   * @param auxiliary_bases Role-keyed auxiliary bases, or @c nullptr if omitted
    * @return The constructed Hamiltonian operator
    */
-  virtual std::shared_ptr<data::Hamiltonian> _run_impl(
-      std::shared_ptr<data::Orbitals> orbitals) const = 0;
+  std::shared_ptr<data::Hamiltonian> _run_impl(
+      std::shared_ptr<data::Orbitals> orbitals,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases)
+      const override = 0;
 };
 
 /**

@@ -84,7 +84,7 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
 }
 
 Eigen::MatrixXd transform_three_center_ao_to_mo(
-    const Eigen::MatrixXd& ao_three_center_vectors,
+    Eigen::Ref<const Eigen::MatrixXd> ao_three_center_vectors,
     const Eigen::MatrixXd& mo_coeffs) {
   size_t n_ao = mo_coeffs.rows();
   size_t n_mo = mo_coeffs.cols();
@@ -106,7 +106,9 @@ Eigen::MatrixXd transform_three_center_ao_to_mo(
                                    Eigen::RowMajor>>
         V_ao(ao_three_center_vectors.col(k).data(), n_ao, n_ao);
 
-    Eigen::Map<Eigen::MatrixXd> V_mo_map(mo_vectors.col(k).data(), n_mo, n_mo);
+    Eigen::Map<
+        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>
+        V_mo_map(mo_vectors.col(k).data(), n_mo, n_mo);
     V_mo_map.noalias() = mo_coeffs.transpose() * V_ao * mo_coeffs;
   }
 
@@ -114,7 +116,7 @@ Eigen::MatrixXd transform_three_center_ao_to_mo(
 }
 
 Eigen::MatrixXd build_J_from_three_center(
-    const Eigen::MatrixXd& ao_three_center_vectors,
+    Eigen::Ref<const Eigen::MatrixXd> ao_three_center_vectors,
     const Eigen::MatrixXd& density) {
   size_t n_ao = density.rows();
   size_t rank = ao_three_center_vectors.cols();
@@ -128,8 +130,10 @@ Eigen::MatrixXd build_J_from_three_center(
         "ao_three_center_vectors dimensions do not match density matrix");
   }
 
-  // Flatten density matrix
-  Eigen::Map<const Eigen::VectorXd> density_vec(density.data(), n_ao * n_ao);
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
+      density_row_major = density;
+  Eigen::Map<const Eigen::VectorXd> density_vec(density_row_major.data(),
+                                                n_ao * n_ao);
 
   // Compute all inner products at once: V_k = sum_{mu,nu} L^k_{mu,nu} *
   // P_{mu,nu} V = L^T * vec(P)
@@ -146,7 +150,7 @@ Eigen::MatrixXd build_J_from_three_center(
 }
 
 Eigen::MatrixXd build_K_from_three_center(
-    const Eigen::MatrixXd& ao_three_center_vectors,
+    Eigen::Ref<const Eigen::MatrixXd> ao_three_center_vectors,
     const Eigen::MatrixXd& coeffs, const std::vector<size_t>& occ_orb_ind) {
   size_t n_ao = coeffs.rows();
   size_t n_occ = occ_orb_ind.size();

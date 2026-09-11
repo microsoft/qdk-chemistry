@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -15,6 +16,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/auxiliary_basis.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
@@ -28,7 +30,10 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/hamiltonian_util.hpp"
 #include "../src/qdk/chemistry/algorithms/microsoft/mp2.hpp"
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
@@ -254,11 +259,13 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
  public:
   std::string name() const override { return "test-hamiltonian_constructor"; }
   std::shared_ptr<Hamiltonian> _run_impl(
-      std::shared_ptr<Orbitals> orbitals) const override {
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<AuxiliaryBasisCollection> /*auxiliary_bases*/)
+      const override {
     orbitals = std::make_shared<ModelOrbitals>(
         2, model_spin_symmetry(true));  // 2 orbitals, restricted
-    Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(3, 3);
-    Eigen::VectorXd two_body = Eigen::VectorXd::Random(81);
+    Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
+    Eigen::VectorXd two_body = Eigen::VectorXd::Random(16);
     Eigen::MatrixXd f_inact = Eigen::MatrixXd::Identity(0, 0);
     return std::make_shared<Hamiltonian>(
         std::make_unique<CanonicalFourCenterHamiltonianContainer>(
@@ -545,9 +552,12 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     EXPECT_DOUBLE_EQ(h.get_one_body_element(1, 1), 1.0);
 
     // Test three center integral
-    auto [three_c_aa, three_c_bb] =
-        h.get_container<ThreeCenterHamiltonianContainer>()
-            .get_three_center_integrals();
+    const auto& three_center =
+        h.get_container<ThreeCenterHamiltonianContainer>().three_center();
+    const auto& three_c_aa =
+        three_center.block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
+    const auto& three_c_bb =
+        three_center.block({axes::beta(), axes::beta(), SymmetryLabel{}});
 
     EXPECT_TRUE(three_c_aa.isApprox(test_three_center));
     EXPECT_TRUE(three_c_bb.isApprox(test_three_center));
@@ -1367,11 +1377,13 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
 
-  std::shared_ptr<BasisSet> basis = nullptr;
+  auto basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+  std::shared_ptr<AuxiliaryBasisCollection> auxiliary_bases;
   if (factory_name == "qdk_density_fitted_hamiltonian") {
-    basis = BasisSet::from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2_structure);
-  } else {
-    basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+    auto rifit = AuxiliaryBasis::from_basis_name(
+        "cc-pvdz-rifit", std::make_shared<Structure>(o2_structure));
+    auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+        AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::RIFit, rifit}});
   }
 
   auto [rhf_energy, rhf_wavefunction] =
@@ -1384,7 +1396,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
     ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
-  auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
+  auto rhf_hamiltonian = ham_factory->run(rhf_orbitals, auxiliary_bases);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian, rhf_wavefunction);
 };
@@ -1402,11 +1414,13 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
 
-  std::shared_ptr<BasisSet> basis = nullptr;
+  auto basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+  std::shared_ptr<AuxiliaryBasisCollection> auxiliary_bases;
   if (factory_name == "qdk_density_fitted_hamiltonian") {
-    basis = BasisSet::from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2_structure);
-  } else {
-    basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+    auto rifit = AuxiliaryBasis::from_basis_name(
+        "cc-pvdz-rifit", std::make_shared<Structure>(o2_structure));
+    auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+        AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::RIFit, rifit}});
   }
 
   auto [uhf_energy, uhf_wavefunction] =
@@ -1418,7 +1432,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
     ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
-  auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
+  auto uhf_hamiltonian = ham_factory->run(uhf_orbitals, auxiliary_bases);
 
   return std::make_tuple(uhf_energy, uhf_hamiltonian);
 };
@@ -1434,15 +1448,16 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
   scf_factory->settings().set("eri_method", "incore");
-  scf_factory->settings().set("integral_type", "four_center");
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
 
-  std::shared_ptr<BasisSet> basis = nullptr;
+  auto basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+  std::shared_ptr<AuxiliaryBasisCollection> auxiliary_bases;
   if (factory_name == "qdk_density_fitted_hamiltonian") {
-    basis = BasisSet::from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2_structure);
-  } else {
-    basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+    auto rifit = AuxiliaryBasis::from_basis_name(
+        "cc-pvdz-rifit", std::make_shared<Structure>(o2_structure));
+    auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+        AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::RIFit, rifit}});
   }
 
   auto [rhf_energy, rhf_wavefunction] =
@@ -1464,7 +1479,7 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
 
   auto orbitals = wfn_active->get_orbitals();
 
-  auto rhf_hamiltonian = ham_factory->run(orbitals);
+  auto rhf_hamiltonian = ham_factory->run(orbitals, auxiliary_bases);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian, wfn_active);
 };
@@ -1485,6 +1500,13 @@ TEST_F(HamiltonianConstructorTest, Factory) {
                std::runtime_error);
   auto test_scf =
       HamiltonianConstructorFactory::create("test-hamiltonian_constructor");
+  auto test_orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>();
+  EXPECT_NO_THROW(test_scf->run(test_orbitals));
+  EXPECT_NO_THROW(test_scf->run(test_orbitals, auxiliary_bases));
+  EXPECT_EQ(test_scf->hash(test_orbitals),
+            test_scf->hash(test_orbitals, nullptr));
 
   // Test unregister_instance
   // First test unregistering a non-existent key (should return false)
@@ -1854,16 +1876,107 @@ TEST_F(HamiltonianConstructorTest, EcpCoreEnergyUsesEffectiveNuclearRepulsion) {
   EXPECT_GT(std::abs(structure_nuclear_repulsion - expected_core_energy),
             testing::numerical_zero_tolerance);
 
-  for (const auto* constructor_name : {"qdk", "qdk_cholesky"}) {
+  std::vector<Shell> rifit_shells;
+  rifit_shells.emplace_back(0, OrbitalType::S, std::vector{1.0},
+                            std::vector{1.0});
+  rifit_shells.emplace_back(1, OrbitalType::S, std::vector{1.0},
+                            std::vector{1.0});
+  auto rifit = std::make_shared<AuxiliaryBasis>(
+      "ecp-test-rifit", std::move(rifit_shells), structure);
+  auto auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::RIFit, rifit}});
+  std::optional<Eigen::MatrixXd> expected_one_body;
+
+  for (const auto* constructor_name :
+       {"qdk", "qdk_cholesky", "qdk_density_fitted_hamiltonian"}) {
     SCOPED_TRACE(constructor_name);
     auto constructor = HamiltonianConstructorFactory::create(constructor_name);
-    auto hamiltonian = constructor->run(orbitals);
+    std::shared_ptr<AuxiliaryBasisCollection> constructor_auxiliary_bases;
+    if (std::string(constructor_name) == "qdk_density_fitted_hamiltonian") {
+      constructor_auxiliary_bases = auxiliary_bases;
+    }
+    auto hamiltonian = constructor->run(orbitals, constructor_auxiliary_bases);
     EXPECT_NEAR(hamiltonian->get_core_energy(), expected_core_energy,
                 testing::numerical_zero_tolerance);
     EXPECT_GT(
         std::abs(hamiltonian->get_core_energy() - structure_nuclear_repulsion),
         testing::numerical_zero_tolerance);
+    const auto& one_body = std::get<0>(hamiltonian->get_one_body_integrals());
+    if (!expected_one_body) {
+      expected_one_body = one_body;
+    } else {
+      EXPECT_TRUE(
+          one_body.isApprox(*expected_one_body, testing::integral_tolerance));
+    }
   }
+}
+
+TEST_F(HamiltonianConstructorTest, DensityFittedRejectsSingularMetric) {
+  auto structure = testing::create_hydrogen_structure();
+  auto basis = BasisSet::from_basis_name("sto-3g", structure);
+  const auto nao = basis->get_num_atomic_orbitals();
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(nao, nao), Eigen::VectorXd::Zero(nao),
+      std::nullopt, basis);
+
+  std::vector<Shell> duplicate_shells;
+  duplicate_shells.emplace_back(0, OrbitalType::S, std::vector{1.0},
+                                std::vector{1.0});
+  duplicate_shells.emplace_back(0, OrbitalType::S, std::vector{1.0},
+                                std::vector{1.0});
+  auto rifit = std::make_shared<AuxiliaryBasis>("singular-rifit",
+                                                duplicate_shells, structure);
+  auto auxiliary_bases = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::RIFit, rifit}});
+
+  auto constructor =
+      HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
+  try {
+    constructor->run(orbitals, auxiliary_bases);
+    FAIL() << "Expected the singular density-fitting metric to be rejected";
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what()).find("not positive definite"),
+              std::string::npos);
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, ThreeCenterUtilitiesUseRowMajorPairs) {
+  Eigen::MatrixXd ao_factors(4, 1);
+  ao_factors << 1.0, 2.0, 3.0, 4.0;
+  const auto transformed = qdk::chemistry::algorithms::microsoft::detail::
+      transform_three_center_ao_to_mo(ao_factors,
+                                      Eigen::MatrixXd::Identity(2, 2));
+  EXPECT_TRUE(transformed.isApprox(ao_factors));
+
+  Eigen::MatrixXd density(2, 2);
+  density << 1.0, 2.0, 3.0, 4.0;
+  const auto coulomb =
+      qdk::chemistry::algorithms::microsoft::detail::build_J_from_three_center(
+          ao_factors, density);
+  Eigen::MatrixXd expected(2, 2);
+  expected << 30.0, 60.0, 90.0, 120.0;
+  EXPECT_TRUE(coulomb.isApprox(expected));
+}
+
+TEST_F(HamiltonianConstructorTest, DensityFittedRequiresRIFitRole) {
+  auto structure = testing::create_hydrogen_structure();
+  auto basis = BasisSet::from_basis_name("sto-3g", structure);
+  const auto nao = basis->get_num_atomic_orbitals();
+  auto orbitals = std::make_shared<Orbitals>(
+      Eigen::MatrixXd::Identity(nao, nao), Eigen::VectorXd::Zero(nao),
+      std::nullopt, basis);
+  auto auxiliary = std::make_shared<AuxiliaryBasis>(
+      "jfit-only",
+      std::vector<Shell>{
+          Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0})},
+      structure);
+  auto jfit_only = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::JFit, auxiliary}});
+  auto constructor =
+      HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
+
+  EXPECT_THROW(constructor->run(orbitals), std::runtime_error);
+  EXPECT_THROW(constructor->run(orbitals, jfit_only), std::runtime_error);
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
@@ -2049,6 +2162,7 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerJSONSerialization) {
   // Test JSON conversion
   nlohmann::json j = h.to_json();
 
+  EXPECT_EQ(j["container"]["version"], "0.3.0");
   EXPECT_EQ(j["container"]["container_type"], "three_center");
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
   EXPECT_TRUE(j["container"].contains("one_body_integrals"));
@@ -2111,6 +2225,85 @@ TEST_F(HamiltonianContainerTest, CholeskyContainerClone) {
   auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
   EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
+}
+
+TEST_F(HamiltonianContainerTest, ThreeCenterRejectsIncorrectBlockShape) {
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto one_body = make_spin_diagonal_rank2_sbt(
+      Eigen::MatrixXd::Identity(2, 2), Eigen::MatrixXd::Identity(2, 2), true);
+
+  auto spin = orbitals->symmetries();
+  auto auxiliary =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> mo_extents{{axes::alpha(), 2},
+                                                            {axes::beta(), 2}};
+  std::unordered_map<SymmetryLabel, std::size_t> auxiliary_extents{
+      {SymmetryLabel{}, 3}};
+  auto malformed =
+      std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Ones(2, 6));
+  SymmetryBlockedTensor<3>::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha(), SymmetryLabel{}}] = malformed;
+  blocks[{axes::beta(), axes::beta(), SymmetryLabel{}}] = malformed;
+  SymmetryBlockedTensor<3> three_center(
+      {spin, spin, auxiliary}, {mo_extents, mo_extents, auxiliary_extents},
+      std::move(blocks));
+
+  EXPECT_THROW(
+      ThreeCenterHamiltonianContainer(
+          std::move(one_body), std::move(three_center), orbitals, 0.0, nullptr),
+      std::invalid_argument);
+}
+
+TEST_F(HamiltonianContainerTest, ThreeCenterRejectsMissingUnrestrictedBeta) {
+  auto orbitals =
+      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
+  auto one_body = make_spin_diagonal_rank2_sbt(
+      Eigen::MatrixXd::Identity(2, 2), Eigen::MatrixXd::Identity(2, 2), false);
+  auto spin = orbitals->symmetries();
+  auto auxiliary =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> mo_extents{{axes::alpha(), 2},
+                                                            {axes::beta(), 2}};
+  std::unordered_map<SymmetryLabel, std::size_t> auxiliary_extents{
+      {SymmetryLabel{}, 3}};
+  SymmetryBlockedTensor<3>::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha(), SymmetryLabel{}}] =
+      std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Ones(4, 3));
+  SymmetryBlockedTensor<3> three_center(
+      {spin, spin, auxiliary}, {mo_extents, mo_extents, auxiliary_extents},
+      std::move(blocks));
+
+  EXPECT_THROW(
+      ThreeCenterHamiltonianContainer(
+          std::move(one_body), std::move(three_center), orbitals, 0.0, nullptr),
+      std::invalid_argument);
+}
+
+TEST_F(HamiltonianContainerTest, ThreeCenterRejectsMissingRequiredInputs) {
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  const auto one_body = Eigen::MatrixXd::Identity(2, 2);
+  const auto three_center = Eigen::MatrixXd::Ones(4, 3);
+  const auto inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  EXPECT_THROW(ThreeCenterHamiltonianContainer(one_body, three_center,
+                                               std::shared_ptr<Orbitals>{}, 0.0,
+                                               inactive_fock),
+               std::invalid_argument);
+  EXPECT_THROW(ThreeCenterHamiltonianContainer(one_body, Eigen::MatrixXd{},
+                                               orbitals, 0.0, inactive_fock),
+               std::invalid_argument);
+}
+
+TEST_F(HamiltonianContainerTest, ThreeCenterRejectsInconsistentAoFactors) {
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  const auto one_body = Eigen::MatrixXd::Identity(2, 2);
+  const auto three_center = Eigen::MatrixXd::Ones(4, 3);
+  const auto inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  EXPECT_THROW(ThreeCenterHamiltonianContainer(one_body, three_center, orbitals,
+                                               0.0, inactive_fock,
+                                               Eigen::MatrixXd::Ones(4, 2)),
+               std::invalid_argument);
 }
 
 TEST_F(HamiltonianContainerTest, SparseContainerConstructionWithTwoBody) {

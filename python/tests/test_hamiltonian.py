@@ -32,7 +32,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data._type_name import class_data_type_name
-from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+from qdk_chemistry.data.symmetry import SymmetryLabel, SymmetryProduct, axes
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -83,29 +83,38 @@ def create_non_zero_hamiltonian(container_type):
 
 
 @pytest.mark.parametrize("fmt", ["json", "hdf5"])
-def test_legacy_cholesky_container_tag_warns(tmp_path, capfd, fmt):
-    """Legacy Cholesky tags load as three-center containers with a warning."""
+@pytest.mark.parametrize("version", ["0.1.0", "0.2.0"])
+def test_legacy_cholesky_schema_requires_migration(tmp_path, capfd, fmt, version):
+    """Legacy tags warn, but old schemas require the standalone converter."""
     hamiltonian = create_non_zero_hamiltonian("three_center")
 
     if fmt == "json":
         data = json.loads(hamiltonian.to_json())
+        data["container"]["version"] = version
         data["container"]["container_type"] = "cholesky"
+        reader = Hamiltonian.from_json
+        serialized = json.dumps(data)
     else:
         path = tmp_path / "legacy.hamiltonian.h5"
         hamiltonian.to_hdf5_file(str(path))
         with h5py.File(path, "r+") as handle:
-            handle["container"].attrs.modify("container_type", "cholesky")
+            container = handle["container"]
+            container.attrs.modify("version", version)
+            container.attrs.modify("container_type", "cholesky")
+        reader = Hamiltonian.from_hdf5_file
+        serialized = str(path)
 
     previous_level = Logger.get_global_level()
     Logger.set_global_level("warn")
     capfd.readouterr()
     try:
-        restored = Hamiltonian.from_json(json.dumps(data)) if fmt == "json" else Hamiltonian.from_hdf5_file(str(path))
+        with pytest.raises(RuntimeError, match="version minor mismatch") as error:
+            reader(serialized)
         warning_output = capfd.readouterr().out
     finally:
         Logger.set_global_level(previous_level)
 
-    assert restored.get_container_type() == "three_center"
+    assert "python -m qdk_chemistry.migrate" in str(error.value)
     assert "container tag 'cholesky' is deprecated" in warning_output
 
 
@@ -199,6 +208,9 @@ class TestHamiltonian:
         # For restricted case, all should be the same
         assert np.array_equal(aabb, aaaa)
         assert np.array_equal(bbbb, aaaa)
+        assert np.shares_memory(aaaa, aabb)
+        assert np.shares_memory(aaaa, bbbb)
+        assert not aaaa.flags.writeable
 
     @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
     def test_two_body_element_access(self, container_type):
@@ -835,9 +847,25 @@ class TestThreeCenterSpecific:
         container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
 
         # Verify three-center storage (returns pair for aa, bb; restricted shares same data)
-        tc_aa, tc_bb = container.get_three_center_integrals()
+        with pytest.warns(DeprecationWarning, match="get_three_center_integrals"):
+            tc_aa, tc_bb = container.get_three_center_integrals()
         assert np.allclose(tc_aa, three_center)
         assert np.allclose(tc_bb, three_center)  # Restricted: aa == bb
+        assert np.shares_memory(tc_aa, tc_bb)
+        assert not tc_aa.flags.writeable
+        assert not tc_bb.flags.writeable
+
+        tensor = container.three_center()
+        alpha = SymmetryLabel([axes.alpha()])
+        beta = SymmetryLabel([axes.beta()])
+        auxiliary = SymmetryLabel([])
+        assert tensor.has_block((alpha, alpha, auxiliary))
+        assert tensor.has_block((beta, beta, auxiliary))
+        assert np.shares_memory(tc_aa, tensor.block((alpha, alpha, auxiliary)))
+        assert np.allclose(
+            tensor.block((alpha, alpha, auxiliary)),
+            tensor.block((beta, beta, auxiliary)),
+        )
 
     def test_two_body_from_three_center_contraction(self):
         """Test two-body integrals computed from three-center contraction.
@@ -903,9 +931,25 @@ class TestThreeCenterSpecific:
         )
 
         # Verify three-center retrieval for unrestricted
-        tc_aa, tc_bb = container.get_three_center_integrals()
+        with pytest.warns(DeprecationWarning, match="get_three_center_integrals"):
+            tc_aa, tc_bb = container.get_three_center_integrals()
         assert np.allclose(tc_aa, three_center_aa)
         assert np.allclose(tc_bb, three_center_bb)
+        assert not np.shares_memory(tc_aa, tc_bb)
+        assert not tc_aa.flags.writeable
+        assert not tc_bb.flags.writeable
+
+    @pytest.mark.filterwarnings("error::DeprecationWarning")
+    @pytest.mark.parametrize(
+        "getter_name",
+        ["get_three_center_integrals", "get_ao_three_center_vectors", "get_ao_cholesky_vectors"],
+    )
+    def test_deprecated_getters_respect_warning_errors(self, getter_name):
+        """Deprecated bindings propagate warnings promoted to exceptions."""
+        container = ThreeCenterHamiltonianContainer(_one_body, _three_center, _orbitals, 1.5, np.array([]))
+        getter = getattr(container, getter_name)
+        with pytest.raises(DeprecationWarning, match="deprecated; use"):
+            getter()
 
     def test_ao_three_center_vectors_absent_by_default(self):
         """Test that AO three-center vectors are None when not provided."""
@@ -915,23 +959,52 @@ class TestThreeCenterSpecific:
         orbitals = create_test_orbitals(2)
 
         container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
-        assert container.get_ao_three_center_vectors() is None
+        assert container.ao_three_center_vectors() is None
+        with pytest.warns(DeprecationWarning, match="get_ao_three_center_vectors"):
+            assert container.get_ao_three_center_vectors() is None
+        with pytest.warns(DeprecationWarning, match="get_ao_cholesky_vectors"):
+            assert container.get_ao_cholesky_vectors() is None
 
     def test_ao_three_center_vectors_present(self):
         """Test construction with AO three-center vectors and retrieval."""
         one_body = np.eye(2)
         rng = np.random.default_rng(21)
         three_center = rng.random((4, 10))
-        ao_vecs = rng.random((9, 5))  # e.g. 3^2 AOs, 5 Cholesky vectors
+        ao_vecs = rng.random((4, 10))
         orbitals = create_test_orbitals(2)
         container = ThreeCenterHamiltonianContainer(
             one_body, three_center, orbitals, 1.0, np.array([]), ao_three_center_vectors=ao_vecs
         )
-        result = container.get_ao_three_center_vectors()
+        result = container.ao_three_center_vectors()
         assert result is not None
         np.testing.assert_array_almost_equal(result, ao_vecs)
+        assert not result.flags.writeable
+        assert np.shares_memory(result, container.ao_three_center_vectors())
+
+        with pytest.warns(DeprecationWarning, match="get_ao_three_center_vectors"):
+            legacy_three_center = container.get_ao_three_center_vectors()
+        np.testing.assert_array_equal(legacy_three_center, ao_vecs)
+        assert np.shares_memory(result, legacy_three_center)
+        assert not legacy_three_center.flags.writeable
+        with pytest.warns(DeprecationWarning, match="get_ao_cholesky_vectors"):
+            legacy_cholesky = container.get_ao_cholesky_vectors()
+        np.testing.assert_array_equal(legacy_cholesky, ao_vecs)
+        assert np.shares_memory(result, legacy_cholesky)
+        assert not legacy_cholesky.flags.writeable
+
+        with pytest.warns(DeprecationWarning, match="ao_cholesky_vectors"):
+            legacy_keyword_container = ThreeCenterHamiltonianContainer(
+                one_body,
+                three_center,
+                orbitals,
+                1.5,
+                np.array([]),
+                ao_cholesky_vectors=ao_vecs,
+            )
+        np.testing.assert_array_equal(legacy_keyword_container.ao_three_center_vectors(), ao_vecs)
 
         data = json.loads(Hamiltonian(container).to_json())
+        assert data["container"]["version"] == "0.3.0"
         assert "ao_three_center_vectors" in data["container"]
         assert "ao_cholesky_vectors" not in data["container"]
 

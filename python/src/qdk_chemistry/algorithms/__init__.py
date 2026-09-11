@@ -33,6 +33,7 @@ from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, Ge
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
+    QdkCholeskyHamiltonianConstructor,
     QdkDensityFittedHamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
@@ -98,6 +99,7 @@ __all__ = [
     "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkCholeskyHamiltonianConstructor",
     "QdkDensityFittedHamiltonianConstructor",
     "QdkExpectationEstimator",
     "QdkGaugeFixingLocalizer",

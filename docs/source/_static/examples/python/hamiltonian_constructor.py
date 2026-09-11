@@ -67,6 +67,38 @@ print(hamiltonian.get_summary())
 from qdk_chemistry.algorithms import registry
 
 print(registry.available("hamiltonian_constructor"))
-# ['qdk']
 # end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-cholesky
+# Reuse the SCF orbitals; Cholesky needs no auxiliary basis.
+cholesky_constructor = create("hamiltonian_constructor", "qdk_cholesky")
+cholesky_constructor.settings().set("cholesky_tolerance", 1e-8)
+cholesky_hamiltonian = cholesky_constructor.run(orbitals)
+print(f"Cholesky container: {cholesky_hamiltonian.get_container_type()}")
+# end-cell-cholesky
+################################################################################
+
+################################################################################
+# start-cell-density-fitted
+from qdk_chemistry.data import (
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
+    BasisSet,
+)
+
+# SCF supplies MOs in the primary basis; RIFIT is used for the Hamiltonian.
+df_basis = BasisSet.from_basis_name("cc-pvdz", structure)
+df_scf_solver = create("scf_solver", "qdk")
+_, df_wavefunction = df_scf_solver.run(structure, 0, 1, df_basis)
+df_orbitals = df_wavefunction.get_orbitals()
+
+rifit = AuxiliaryBasis.from_basis_name("cc-pvdz-rifit", structure)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.RIFIT: rifit})
+df_constructor = create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+df_hamiltonian = df_constructor.run(df_orbitals, auxiliary_bases)
+print(f"Density-fitted container: {df_hamiltonian.get_container_type()}")
+# end-cell-density-fitted
 ################################################################################

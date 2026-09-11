@@ -25,9 +25,12 @@ The ``HamiltonianConstructor`` requires the following input:
 Orbitals
    An :doc:`Orbitals <../data/orbitals>` instance describing the single orbital basis in which to express the many-body Hamiltonian. This object contains information about the molecular structure, basis set, and orbital coefficients.
 
+Auxiliary bases (optional)
+   A separate :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`. The density-fitted implementation requires an ``RIFIT`` entry; the canonical and Cholesky implementations do not require auxiliary bases.
+
 .. note::
 
-   The Orbitals object carries all the information needed for integral transformation, including the basis set and molecular structure. Active space indices, if present, determine which orbitals are included in the output Hamiltonian.
+   The Orbitals object supplies the primary basis, molecular structure, and MO coefficients. Active space indices determine which orbitals are included in the output Hamiltonian; auxiliary fitting bases are supplied separately.
 
 .. rubric:: Creating a constructor
 
@@ -124,6 +127,8 @@ This implementation produces a ``CanonicalFourCenterHamiltonianContainer`` with 
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
 
+.. _hamiltonian-constructor-cholesky:
+
 QDK Cholesky
 ~~~~~~~~~~~~
 
@@ -133,7 +138,7 @@ A Cholesky decomposition-based implementation for Hamiltonian construction.
 This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
 The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are transformed to the MO basis.
 The output Hamiltonian stores the MO three-center integrals directly in a ``ThreeCenterHamiltonianContainer``, avoiding expansion to the full four-center representation.
-Additionally, the original AO three-center vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_three_center_vectors()``.
+Additionally, the original AO three-center vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``ao_three_center_vectors()``.
 Four-center integrals are lazily computed from the three-center integrals on demand.
 
 .. rubric:: Settings
@@ -155,26 +160,51 @@ Four-center integrals are lazily computed from the three-center integrals on dem
      - bool
      - Whether to store the AO three-center integrals in a ``ThreeCenterHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
 
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-cholesky
+      :end-before: # end-cell-cholesky
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-cholesky
+      :end-before: // end-cell-cholesky
+
+.. _hamiltonian-constructor-density-fitted:
+
 QDK Density-Fitted
 ~~~~~~~~~~~~~~~~~~
 
 .. rubric:: Factory name: ``"qdk_density_fitted_hamiltonian"``
 
 A memory-efficient implementation that uses density fitting (also known as the resolution-of-the-identity, RI) to approximate the two-electron integrals.
-The four-center electron repulsion integrals (ERIs) are factorized through an auxiliary basis as
+For raw three-center integrals :math:`E_{ij,P}=(ij|P)` and auxiliary Coulomb metric :math:`M_{PQ}=(P|Q)`, the constructor computes a Cholesky factor :math:`M=LL^T` and stores the metric-orthonormalized factors
 
 .. math::
 
-    (ij|kl) \approx \sum_P (ij|P)(P|kl)
+   B_{ij}^{Q} = \sum_P (ij|P)\left(L^{-T}\right)_{PQ}.
 
-where :math:`P` index an auxiliary (fitting) basis and :math:`(ij|P)` is the three-center integrals.
-The constructor transforms :math:`(ij|P)` from the AO to the MO basis using the active orbital coefficients and stores the result in a ``ThreeCenterHamiltonianContainer``, reducing the storage from :math:`O(N^4)` to :math:`O(N_{\text{aux}} N^2)`.
-Four-center integrals are reconstructed on the fly when consumers request them.
+The resulting approximation is
+
+.. math::
+
+   (ij|kl) \approx
+   \sum_{P,Q} (ij|P)\left(M^{-1}\right)_{PQ}(Q|kl)
+   = \sum_Q B_{ij}^{Q} B_{kl}^{Q}.
+
+The constructor forms these factors in the AO basis, transforms them to the active MO basis, and stores them in a :ref:`three-center Hamiltonian container <hamiltonian-three-center-container>`.
+Raw three-center integrals cannot be contracted directly without the inverse metric. Four-center integrals are materialized lazily when consumers request them.
 
 .. rubric:: Requirements
 
-- The input :doc:`Orbitals <../data/orbitals>` must reference a :doc:`BasisSet <../data/basis_set>` that carries an auxiliary basis. Auxiliary shells are attached when the basis set is constructed (e.g. via ``BasisSet::from_basis_name(basis_name, aux_basis_name, structure)``); ``run()`` throws ``std::runtime_error`` if ``has_aux_basis()`` is ``false``.
+- The input :doc:`Orbitals <../data/orbitals>` must reference the primary :doc:`BasisSet <../data/basis_set>`.
+- Pass an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` containing an exact ``RIFIT`` association as the second argument to ``run()``. The auxiliary and primary bases must describe the same molecular structure.
 - An active space must be defined on the orbitals. For unrestricted orbitals, the alpha and beta active spaces must contain the same number of orbitals.
+- The auxiliary Coulomb metric must be positive definite. A failed Cholesky factorization, including exact linear dependence in the auxiliary basis, is rejected.
 
 .. note::
 
@@ -186,41 +216,19 @@ Four-center integrals are reconstructed on the fly when consumers request them.
 - Large active space calculations where memory is a concern
 - Systems where the density fitting approximation provides acceptable accuracy
 
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-density-fitted
+      :end-before: # end-cell-density-fitted
 
 .. tab:: C++ API
 
-   .. code-block:: cpp
-
-      // Build a basis set that includes an auxiliary fitting basis.
-      auto basis = data::BasisSet::from_basis_name("cc-pVDZ", "cc-pVDZ-RIFIT", *structure);
-
-      // ... run SCF / orbital localization / active-space selection on `orbitals`
-      // such that orbitals->get_basis_set() == basis and an active space is set.
-
-      // Create the density-fitted Hamiltonian constructor.
-      auto constructor =
-          algorithms::HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
-
-      // Build the active-space, density-fitted Hamiltonian.
-      auto hamiltonian = constructor->run(orbitals);
-
-.. tab:: Python API
-
-   .. code-block:: python
-
-      # Build a basis set that includes an auxiliary fitting basis.
-      basis = data.BasisSet.from_basis_name("cc-pVDZ", "cc-pVDZ-RIFIT", structure)
-
-      # ... run SCF / orbital localization / active-space selection on `orbitals`
-      # such that orbitals.get_basis_set() is `basis` and an active space is set.
-
-      # Create the density-fitted Hamiltonian constructor.
-      constructor = algorithms.create(
-          "hamiltonian_constructor", "qdk_density_fitted_hamiltonian"
-      )
-
-      # Build the active-space, density-fitted Hamiltonian.
-      hamiltonian = constructor.run(orbitals)
+   .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-density-fitted
+      :end-before: // end-cell-density-fitted
 
 See ``examples/language/sample_mp2_reference_energy.py`` for an end-to-end example combining a four-center SCF, active-space selection, ``"qdk_density_fitted_hamiltonian"``, and density-fitted MP2.
 

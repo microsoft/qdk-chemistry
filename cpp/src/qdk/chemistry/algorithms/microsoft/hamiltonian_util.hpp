@@ -40,7 +40,7 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
  * @return The MO 3-center vectors (rows = N_mo*N_mo, cols = N_vectors).
  */
 Eigen::MatrixXd transform_three_center_ao_to_mo(
-    const Eigen::MatrixXd& ao_three_center_vectors,
+    Eigen::Ref<const Eigen::MatrixXd> ao_three_center_vectors,
     const Eigen::MatrixXd& mo_coeffs);
 
 /**
@@ -52,7 +52,7 @@ Eigen::MatrixXd transform_three_center_ao_to_mo(
  * @return The Coulomb (J) matrix.
  */
 Eigen::MatrixXd build_J_from_three_center(
-    const Eigen::MatrixXd& ao_three_center_vectors,
+    Eigen::Ref<const Eigen::MatrixXd> ao_three_center_vectors,
     const Eigen::MatrixXd& density);
 
 /**
@@ -65,7 +65,7 @@ Eigen::MatrixXd build_J_from_three_center(
  * @return The Exchange (K) matrix.
  */
 Eigen::MatrixXd build_K_from_three_center(
-    const Eigen::MatrixXd& ao_three_center_vectors,
+    Eigen::Ref<const Eigen::MatrixXd> ao_three_center_vectors,
     const Eigen::MatrixXd& coeffs, const std::vector<size_t>& occ_orb_ind);
 
 /**

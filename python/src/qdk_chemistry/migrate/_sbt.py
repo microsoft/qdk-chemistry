@@ -149,7 +149,25 @@ def rank3_three_center_dict(aa, bb: np.ndarray | None = None) -> dict:
     blocks = [((_ALPHA, _ALPHA, _AUX), a)]
     if not restricted:
         blocks.append(((_BETA, _BETA, _AUX), _as_2d(bb)))
-    return _serialize(_sym.SymmetryBlockedTensorRank3(syms, extents, blocks))
+    result = _serialize(_sym.SymmetryBlockedTensorRank3(syms, extents, blocks))
+    if restricted:
+        add_restricted_three_center_partner_alias(result)
+    return result
+
+
+def add_restricted_three_center_partner_alias(document: dict) -> None:
+    """Alias the opposite-spin key to a restricted three-center block in place."""
+    for block_group in document.get("blocks", []):
+        keys = block_group.get("keys", [])
+        if not keys:
+            continue
+        partner = json.loads(json.dumps(keys[0]))
+        for label in partner[:2]:
+            for value in label.get("values", []):
+                if value.get("kind") == "spin":
+                    value["two_ms"] = -int(value["two_ms"])
+        if partner not in keys:
+            keys.append(partner)
 
 
 def sparse_rank4_dict(entries, norb: int) -> dict:

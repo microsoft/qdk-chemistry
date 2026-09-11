@@ -127,9 +127,10 @@ def test_get_inactive_space_indices_warns_and_matches_v2():
 )
 def test_deprecated_data_aliases_resolve_to_v2(name, replacement):
     """Deprecated container/unitary names warn and resolve to their v2 class."""
-    with pytest.warns(DeprecationWarning, match=name):
+    with pytest.warns(DeprecationWarning, match=name) as caught:
         obj = getattr(qcd, name)
     assert obj is replacement
+    assert f"use '{replacement.__name__}' instead" in str(caught[0].message)
 
 
 def test_deprecated_encoding_helpers_resolve():

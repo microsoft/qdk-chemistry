@@ -8,11 +8,24 @@
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <utility>
 
 #include "microsoft/cholesky_hamiltonian.hpp"
 #include "microsoft/density_fitted_hamiltonian.hpp"
 
 namespace qdk::chemistry::algorithms {
+
+std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::run(
+    std::shared_ptr<data::Orbitals> orbitals,
+    std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases) const {
+  return Algorithm::run(std::move(orbitals), std::move(auxiliary_bases));
+}
+
+std::string HamiltonianConstructor::hash(
+    std::shared_ptr<data::Orbitals> orbitals,
+    std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases) const {
+  return Algorithm::hash(std::move(orbitals), std::move(auxiliary_bases));
+}
 
 std::unique_ptr<HamiltonianConstructor> make_microsoft_cholesky_hamiltonian() {
   QDK_LOG_TRACE_ENTERING();

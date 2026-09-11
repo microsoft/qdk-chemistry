@@ -4,7 +4,6 @@
 
 #include <pybind11/complex.h>
 #include <pybind11/eigen.h>
-#include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -14,6 +13,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
+#include <utility>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -63,6 +63,12 @@ void hamiltonian_to_fcidump_file_wrapper(
     size_t nalpha, size_t nbeta) {
   self.to_fcidump_file(qdk::chemistry::python::utils::to_string_path(filename),
                        nalpha, nbeta);
+}
+
+void warn_hamiltonian_deprecated(const char* message) {
+  if (PyErr_WarnEx(PyExc_DeprecationWarning, message, 1) < 0) {
+    throw py::error_already_set();
+  }
 }
 
 }  // namespace
@@ -294,12 +300,13 @@ Returns:
   py::class_<ThreeCenterHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
       three_center_container(data, "ThreeCenterHamiltonianContainer", R"(
-Represents a molecular Hamiltonian using three-center integrals.
+Represents a molecular Hamiltonian using contractible three-center factors.
 This class stores molecular Hamiltonian data for quantum chemistry calculations,
 specifically designed for active space methods. It contains:
 
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
-* Three-center two-electron integrals (ij|Q) in MO representation
+* Three-center factors B[ij,Q] in MO representation, with the auxiliary metric
+    already folded in for density-fitting data
 * Molecular orbital information for the active space
 * A constant (zero-body) energy term
 
@@ -324,15 +331,17 @@ Examples:
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
                std::optional<Eigen::MatrixXd>, HamiltonianType>(),
       R"(
-Constructor for restricted active space Hamiltonian with three-center integrals.
+Constructor for a restricted active-space Hamiltonian with contractible
+three-center factors.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    three_center_integrals (numpy.ndarray): Three-center two-electron integrals
-        in MO basis [(norb*norb) x naux]
+    three_center_integrals (numpy.ndarray): Factors B in MO basis
+        [(norb*norb) x naux], satisfying (ij|kl) ≈ sum_Q B[ij,Q] B[kl,Q]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Constant (zero-body) energy term
-    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix in the full MO
+        basis [nmo x nmo], or an empty matrix when there is no inactive space
     ao_three_center_vectors (numpy.ndarray or None, optional): AO three-center vectors
         for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
@@ -352,6 +361,27 @@ Examples:
       py::arg("ao_three_center_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
+  three_center_container.def(
+      py::init([](const Eigen::MatrixXd& one_body_integrals,
+                  const Eigen::MatrixXd& three_center_integrals,
+                  std::shared_ptr<Orbitals> orbitals, double core_energy,
+                  const Eigen::MatrixXd& inactive_fock_matrix,
+                  std::optional<Eigen::MatrixXd> ao_cholesky_vectors,
+                  HamiltonianType type) {
+        warn_hamiltonian_deprecated(
+            "The ao_cholesky_vectors constructor keyword is deprecated; use "
+            "ao_three_center_vectors instead.");
+        return std::make_unique<ThreeCenterHamiltonianContainer>(
+            one_body_integrals, three_center_integrals, std::move(orbitals),
+            core_energy, inactive_fock_matrix, std::move(ao_cholesky_vectors),
+            type);
+      }),
+      "Deprecated compatibility overload for ao_cholesky_vectors.",
+      py::arg("one_body_integrals"), py::arg("three_center_integrals"),
+      py::arg("orbitals"), py::arg("core_energy"),
+      py::arg("inactive_fock_matrix"), py::arg("ao_cholesky_vectors"),
+      py::arg("type") = HamiltonianType::Hermitian);
+
   // Unrestricted constructor
   three_center_container.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
@@ -360,19 +390,22 @@ Examples:
                const Eigen::MatrixXd&, std::optional<Eigen::MatrixXd>,
                HamiltonianType>(),
       R"(
-Constructor for unrestricted active space Hamiltonian with three-center integrals.
+Constructor for an unrestricted active-space Hamiltonian with contractible
+three-center factors.
 
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    three_center_integrals_aa (numpy.ndarray): Alpha-alpha three-center integrals
+    three_center_integrals_aa (numpy.ndarray): Alpha three-center factors
         [(norb*norb) x naux], orbital pair index in row-major order
-    three_center_integrals_bb (numpy.ndarray): Beta-beta three-center integrals
+    three_center_integrals_bb (numpy.ndarray): Beta three-center factors
         [(norb*norb) x naux], orbital pair index in row-major order
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Constant (zero-body) energy term
-    inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
-    inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
+    inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix in
+        the full MO basis [nmo x nmo]
+    inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix in
+        the full MO basis [nmo x nmo]
     ao_three_center_vectors (numpy.ndarray or None, optional): AO three-center vectors
         for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
@@ -399,59 +432,105 @@ Examples:
       py::arg("ao_three_center_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
-  // Three-center integral access
+  three_center_container.def(
+      py::init([](const Eigen::MatrixXd& one_body_integrals_alpha,
+                  const Eigen::MatrixXd& one_body_integrals_beta,
+                  const Eigen::MatrixXd& three_center_integrals_aa,
+                  const Eigen::MatrixXd& three_center_integrals_bb,
+                  std::shared_ptr<Orbitals> orbitals, double core_energy,
+                  const Eigen::MatrixXd& inactive_fock_matrix_alpha,
+                  const Eigen::MatrixXd& inactive_fock_matrix_beta,
+                  std::optional<Eigen::MatrixXd> ao_cholesky_vectors,
+                  HamiltonianType type) {
+        warn_hamiltonian_deprecated(
+            "The ao_cholesky_vectors constructor keyword is deprecated; use "
+            "ao_three_center_vectors instead.");
+        return std::make_unique<ThreeCenterHamiltonianContainer>(
+            one_body_integrals_alpha, one_body_integrals_beta,
+            three_center_integrals_aa, three_center_integrals_bb,
+            std::move(orbitals), core_energy, inactive_fock_matrix_alpha,
+            inactive_fock_matrix_beta, std::move(ao_cholesky_vectors), type);
+      }),
+      "Deprecated compatibility overload for ao_cholesky_vectors.",
+      py::arg("one_body_integrals_alpha"), py::arg("one_body_integrals_beta"),
+      py::arg("three_center_integrals_aa"),
+      py::arg("three_center_integrals_bb"), py::arg("orbitals"),
+      py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
+      py::arg("inactive_fock_matrix_beta"), py::arg("ao_cholesky_vectors"),
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // This compatibility binding intentionally calls the deprecated C++ getter.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   three_center_container.def(
       "get_three_center_integrals",
-      &ThreeCenterHamiltonianContainer::get_three_center_integrals,
+      [](const ThreeCenterHamiltonianContainer& self) {
+        warn_hamiltonian_deprecated(
+            "ThreeCenterHamiltonianContainer.get_three_center_integrals() is "
+            "deprecated; use three_center() instead.");
+        return self.get_three_center_integrals();
+      },
       py::return_value_policy::reference_internal,
       R"(
 Deprecated: use three_center() instead.
 
 Returns:
-    tuple[numpy.ndarray, numpy.ndarray]: Pair of (aa, bb) three-center
-    two-electron integral matrices, each of dimension [(norb*norb) x naux]
+    tuple[numpy.ndarray, numpy.ndarray]: Pair of (aa, bb) three-center factor
+    matrices, each of dimension [(norb*norb) x naux]
     with the orbital pair index stored in row-major order.
 
 Raises:
     RuntimeError: If three-center integrals are not set
 )");
+#pragma GCC diagnostic pop
 
-  // AO three-center vectors access
+  // AO three-center factors access
   three_center_container.def(
-      "get_ao_three_center_vectors",
-      [](const ThreeCenterHamiltonianContainer& self) -> py::object {
-        const auto& opt = self.get_ao_three_center_vectors();
-        if (!opt) return py::none();
-        const Eigen::MatrixXd& mat = *opt;
-        // Return a zero-copy view. We tie lifetime to self via
-        // py::return_value_policy semantics by passing a capsule that
-        // prevents GC.  The reference is valid as long as the container
-        // (and thus `self`) is alive; pybind11's prevent-gc mechanism
-        // handles that through the `self` capture in the keep-alive.
-        return py::array_t<double>(
-            {mat.rows(), mat.cols()},  // shape
-            {static_cast<py::ssize_t>(sizeof(double)),
-             static_cast<py::ssize_t>(mat.rows()) *
-                 static_cast<py::ssize_t>(sizeof(double))},  // strides
-                                                             // (col-major)
-            mat.data(),                                      // data pointer
-            py::cast(self));  // prevent GC of self while array is alive
-      },
+      "ao_three_center_vectors",
+      &ThreeCenterHamiltonianContainer::ao_three_center_vectors,
+      py::return_value_policy::reference_internal,
       R"(
-Get the optional AO three-center vectors (zero-copy view).
+Return the optional AO three-center factors as a read-only, zero-copy view.
 
 Returns:
-    numpy.ndarray or None: AO three-center vectors matrix [nao^2 x nchol],
-    or None if not stored. The returned array shares memory with the
-    internal storage and should not be modified.
+    numpy.ndarray or None: AO three-center factor matrix [nao² x naux],
+    or None if not stored. The returned array shares the internal storage
+    and keeps its owning container alive.
 )");
+
+  three_center_container.def(
+      "get_ao_three_center_vectors",
+      [](const ThreeCenterHamiltonianContainer& self)
+          -> const std::optional<Eigen::MatrixXd>& {
+        warn_hamiltonian_deprecated(
+            "ThreeCenterHamiltonianContainer.get_ao_three_center_vectors() "
+            "is deprecated; use ao_three_center_vectors() instead.");
+        return self.ao_three_center_vectors();
+      },
+      py::return_value_policy::reference_internal,
+      "Deprecated: use ao_three_center_vectors() instead.");
+
+  three_center_container.def(
+      "get_ao_cholesky_vectors",
+      [](const ThreeCenterHamiltonianContainer& self)
+          -> const std::optional<Eigen::MatrixXd>& {
+        warn_hamiltonian_deprecated(
+            "ThreeCenterHamiltonianContainer.get_ao_cholesky_vectors() is "
+            "deprecated; use ao_three_center_vectors() instead.");
+        return self.ao_three_center_vectors();
+      },
+      py::return_value_policy::reference_internal,
+      "Deprecated: use ao_three_center_vectors() instead.");
 
   // Two-body integral access (lazily computed from three-center integrals)
   three_center_container.def(
       "get_two_body_integrals",
       &ThreeCenterHamiltonianContainer::get_two_body_integrals,
       py::return_value_policy::reference_internal, R"(
-Deprecated: use three_center() instead.
+Materialize four-center two-electron integrals from the stored factors.
+
+For memory-efficient access to the factorized representation, use
+``three_center()`` instead. It does not return the same representation.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
@@ -459,7 +538,7 @@ Returns:
 
 Notes:
     Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    where indices are ordered as i*norb^3 + j*norb^2 + k*norb + l
 )");
 
   three_center_container.def(
@@ -502,13 +581,13 @@ Returns:
                              &ThreeCenterHamiltonianContainer::three_center,
                              py::return_value_policy::reference_internal,
                              R"(
-Three-center integrals as a rank-2 symmetry-blocked tensor.
+Three-center factors as a rank-3 symmetry-blocked tensor.
 
-Row axis keyed by MO spin symmetries (extent = norb^2 per spin),
-column axis has no symmetry (extent = naux).
+The slots are ``(MO row, MO column, auxiliary)``. Each dense block is packed
+as ``[norb_row * norb_column, naux]``.
 
 Returns:
-    qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2: The three-center SBT.
+    qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank3: The three-center SBT.
 )");
 
   three_center_container.def("is_valid",
@@ -665,7 +744,7 @@ Returns:
 
 Notes:
     Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    where indices are ordered as i*norb^3 + j*norb^2 + k*norb + l
 )");
 
   canonical_four_center.def(

@@ -484,7 +484,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 }  // namespace detail
 
 std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals) const {
+    std::shared_ptr<data::Orbitals> orbitals,
+    std::shared_ptr<data::AuxiliaryBasisCollection> /*auxiliary_bases*/) const {
   QDK_LOG_TRACE_ENTERING();
 
   // Initialize the backend if not already done

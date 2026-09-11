@@ -34,7 +34,9 @@ class HamiltonianConstructor
 
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
-      std::shared_ptr<data::Orbitals> orbitals) const override;
+      std::shared_ptr<data::Orbitals> orbitals,
+      std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases)
+      const override;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

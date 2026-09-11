@@ -1108,9 +1108,13 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
   if (hamiltonian.has_container_type<ThreeCenterHamiltonianContainer>()) {
     const auto& container =
         hamiltonian.get_container<ThreeCenterHamiltonianContainer>();
-    const auto three_center = container.get_three_center_integrals();
-    const Eigen::MatrixXd& three_center_aa = three_center.first;
-    const Eigen::MatrixXd& three_center_bb = three_center.second;
+    const auto& three_center = container.three_center();
+    const auto& three_center_aa =
+        three_center.block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
+    const auto& three_center_bb =
+        three_center.has_block({axes::beta(), axes::beta(), SymmetryLabel{}})
+            ? three_center.block({axes::beta(), axes::beta(), SymmetryLabel{}})
+            : three_center_aa;
     const std::size_t naux = static_cast<std::size_t>(three_center_aa.cols());
     return majorana_map_hamiltonian_cholesky(
         mapping, core_energy, h1a_flat.data(), h1b_ptr, three_center_aa.data(),

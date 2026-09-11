@@ -32,7 +32,8 @@ namespace qdk::chemistry::algorithms::microsoft {
 namespace qcs = qdk::chemistry::scf;
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals) const {
+    std::shared_ptr<data::Orbitals> orbitals,
+    std::shared_ptr<data::AuxiliaryBasisCollection> /*auxiliary_bases*/) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();

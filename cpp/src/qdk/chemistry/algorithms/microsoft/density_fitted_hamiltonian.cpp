@@ -7,8 +7,11 @@
 #include "hamiltonian_util.hpp"
 
 // STL Headers
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 
 // QDK/Chemistry SCF headers
 #include <qdk/chemistry/scf/core/moeri.h>
@@ -23,6 +26,7 @@
 #include <blas.hh>
 #include <lapack.hh>
 #include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "utils.hpp"
@@ -33,52 +37,85 @@ namespace qcs = qdk::chemistry::scf;
 
 namespace detail_df {
 
-// Helper function that takes in DF integrals (ij|P) and metric integral (P|Q),
-// fold (P|Q)^(-1/2) into (ij|P), such that the resulting integrals (ij|P), also
-// written as B^Q_ij, can be used directly in the DF expression for four-center
-// integrals: (ij|kl) ≈ Σ_Q B^Q_ij B^Q_kl. This assumes everything is in the
-// atomic orbital basis. The variable df_eri is over-written upon output.
+// Fold the Coulomb metric into raw three-center integrals E. For M = L L^T,
+// the right-side solve B L^T = E produces B = E L^{-T}, so
+// B B^T = E M^{-1} E^T. The resulting metric-orthonormalized factors B can be
+// contracted directly over one auxiliary index. Both E and B use the dense
+// [nao^2, naux] layout; df_eri is overwritten with B.
 void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
                                  std::unique_ptr<double[]>& df_eri,
                                  std::unique_ptr<double[]>& df_metric) {
-  size_t nao = num_atomic_orbitals;
+  const auto nao = num_atomic_orbitals;
+  const auto nao2 = nao * nao;
 
-  size_t nao2 = nao * nao;
+  // Factor the auxiliary Coulomb metric M = L L^T.
+  const auto info =
+      lapack::potrf(lapack::Uplo::Lower, naux, df_metric.get(), naux);
+  if (info != 0) {
+    throw std::runtime_error(
+        info > 0 ? "Density-fitting metric is not positive definite; remove "
+                   "linearly dependent auxiliary functions"
+                 : "Density-fitting metric factorization received an invalid "
+                   "argument");
+  }
 
-  // 1. Use cholesky factorization on metric:  df_metric = L L^{T}
-  lapack::potrf(lapack::Uplo::Lower, naux, df_metric.get(), naux);
-
-  // 2. Solve L B = eri_df  => B = L^{-1} eri_df = (metric)^(-1/2) eri_df
-  // save result in df_eri.
+  // Solve B L^T = E in place.
   blas::trsm(blas::Layout::ColMajor, blas::Side::Right, blas::Uplo::Lower,
              blas::Op::Trans, blas::Diag::NonUnit, nao2, naux, 1.0,
              df_metric.get(), naux, df_eri.get(), nao2);
+  if (!std::all_of(df_eri.get(), df_eri.get() + nao2 * naux,
+                   [](double value) { return std::isfinite(value); })) {
+    throw std::runtime_error(
+        "Density-fitting metric solve produced non-finite factors");
+  }
 }
 }  // namespace detail_df
 
 std::shared_ptr<data::Hamiltonian>
 DensityFittedHamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals) const {
+    std::shared_ptr<data::Orbitals> orbitals,
+    std::shared_ptr<data::AuxiliaryBasisCollection> auxiliary_bases) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
-  if (!basis_set->has_aux_basis()) {
+  if (!auxiliary_bases ||
+      !auxiliary_bases->has_auxiliary_basis(data::AuxiliaryBasisRole::RIFit)) {
     throw std::runtime_error(
-        "An auxiliary basis set must be provided for density-fitted "
-        "Hamiltonian construction.");
+        "Density-fitted Hamiltonian construction requires an auxiliary basis "
+        "with the RIFit role.");
   }
 
-  const auto& [Ca, Cb] = orbitals->get_coefficients();
+  auto auxiliary_basis =
+      auxiliary_bases->get_auxiliary_basis(data::AuxiliaryBasisRole::RIFit);
+  if (auxiliary_basis->get_structure()->content_hash() !=
+      basis_set->get_structure()->content_hash()) {
+    throw std::invalid_argument(
+        "The RIFit auxiliary basis must describe the Hamiltonian's molecular "
+        "structure.");
+  }
+
+  const auto& Ca = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& Cb =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  const size_t num_auxiliary_orbitals = basis_set->get_num_auxiliary_orbitals();
+  const size_t num_auxiliary_orbitals =
+      auxiliary_basis->get_num_auxiliary_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  if (static_cast<size_t>(Ca.rows()) != num_atomic_orbitals ||
+      static_cast<size_t>(Cb.rows()) != num_atomic_orbitals) {
+    throw std::invalid_argument(
+        "Orbital coefficient row count must match the primary basis AO count");
+  }
 
   // Get alpha and beta active space indices
-  auto active_space_indices = orbitals->get_active_space_indices();
-  auto active_indices_alpha = active_space_indices.first;
-  auto active_indices_beta = active_space_indices.second;
+  const auto active_ai = orbitals->active_indices();
+  auto active_indices_alpha =
+      data::spin_channel_indices(active_ai, data::axes::alpha());
+  auto active_indices_beta =
+      data::spin_channel_indices(active_ai, data::axes::beta());
 
   if (orbitals->is_restricted() && active_indices_alpha.empty()) {
     throw std::runtime_error("Need to specify an active space.");
@@ -114,18 +151,18 @@ DensityFittedHamiltonianConstructor::_run_impl(
         ", Beta: " + std::to_string(nactive_beta));
   }
 
-  // Create internal Molecule
-  auto structure = basis_set->get_structure();
-  auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
+  const double effective_nuclear_repulsion =
+      basis_set->calculate_effective_nuclear_repulsion_energy();
 
-  // Create internal BasisSet
+  // Create internal primary and auxiliary basis sets.
   auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   auto internal_aux_basis_set =
-      utils::microsoft::convert_aux_basis_set_from_qdk(*basis_set);
+      utils::microsoft::convert_auxiliary_basis_from_qdk(*auxiliary_basis);
 
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), mol.get(), qcs::mpi_default_input());
+      internal_basis_set.get(), internal_basis_set->mol.get(),
+      qcs::mpi_default_input());
 
   // Compute Core Hamiltonian in AO basis
   Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
@@ -133,6 +170,13 @@ DensityFittedHamiltonianConstructor::_run_impl(
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
+
+  if (!internal_basis_set->ecp_shells.empty()) {
+    Eigen::MatrixXd ecp_full =
+        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    int1e->ecp_integral(ecp_full.data());
+    H_full += ecp_full;
+  }
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
@@ -194,8 +238,11 @@ DensityFittedHamiltonianConstructor::_run_impl(
   }
 
   // Get inactive space indices for both alpha and beta
-  auto [inactive_indices_alpha, inactive_indices_beta] =
-      orbitals->get_inactive_space_indices();
+  const auto inactive_ai = orbitals->inactive_indices();
+  auto inactive_indices_alpha =
+      data::spin_channel_indices(inactive_ai, data::axes::alpha());
+  auto inactive_indices_beta =
+      data::spin_channel_indices(inactive_ai, data::axes::beta());
 
   // For restricted calculations, alpha and beta inactive spaces should be
   // identical
@@ -215,8 +262,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_inactive_fock = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::ThreeCenterHamiltonianContainer>(
-              H_active, dfmoeri_aa, orbitals,
-              structure->calculate_nuclear_repulsion_energy(),
+              H_active, dfmoeri_aa, orbitals, effective_nuclear_repulsion,
               dummy_inactive_fock));
     } else {
       // Use unrestricted constructor
@@ -229,8 +275,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, dfmoeri_aa, dfmoeri_bb, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
-              dummy_fock_beta));
+              effective_nuclear_repulsion, dummy_fock_alpha, dummy_fock_beta));
     }
   }
 
@@ -253,7 +298,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::ThreeCenterHamiltonianContainer>(
             result.H_active, dfmoeri_aa, orbitals,
-            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + effective_nuclear_repulsion,
             result.F_inactive));
 
   } else {
@@ -282,8 +327,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::ThreeCenterHamiltonianContainer>(
             result.H_active_alpha, result.H_active_beta, dfmoeri_aa, dfmoeri_bb,
-            orbitals,
-            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            orbitals, result.E_inactive + effective_nuclear_repulsion,
             result.F_inactive_alpha, result.F_inactive_beta));
   }
 }

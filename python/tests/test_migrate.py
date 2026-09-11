@@ -1,4 +1,4 @@
-"""Tests for the v1 -> v2 migration utilities (``qdk_chemistry.migrate``).
+"""Tests for versioned migration utilities (``qdk_chemistry.migrate``).
 
 Old-schema fixtures are written by hand to mirror exactly what qdk-chemistry
 <= 1.1.0 produced (matrix = list-of-rows in JSON; Eigen column-major matrices in
@@ -20,10 +20,20 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import migrate
-from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, QpeResult, Wavefunction
+from qdk_chemistry.data import (
+    Ansatz,
+    Configuration,
+    Hamiltonian,
+    Orbitals,
+    QpeResult,
+    ThreeCenterHamiltonianContainer,
+    Wavefunction,
+)
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.migrate import _orbitals, _wavefunction
+
+from .test_helpers import create_test_orbitals
 
 RNG = np.random.default_rng(20240101)
 
@@ -109,6 +119,11 @@ def _write_matrix(group, name, matrix):
 
 def _write_vector(group, name, vector):
     group.create_dataset(name, data=np.asarray(vector, dtype=np.float64).ravel())
+
+
+def _drop_restricted_three_center_partner(document):
+    for block_group in document["blocks"]:
+        block_group["keys"] = block_group["keys"][:1]
 
 
 def _write_old_orbitals_h5(group, nao, nmo, restricted, coeff, energies=None, active=None, ao_overlap=None):
@@ -394,6 +409,75 @@ def test_cholesky_three_center_preserved(tmp_path, fmt, restricted):
     assert np.allclose(np.asarray(aaaa).ravel(), (la @ la.T).ravel())
     assert np.allclose(np.asarray(aabb).ravel(), (la @ lb.T).ravel())
     assert np.allclose(np.asarray(bbbb).ravel(), (lb @ lb.T).ravel())
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+@pytest.mark.parametrize(
+    ("container_type", "ao_vectors_field"),
+    [
+        ("cholesky", "ao_cholesky_vectors"),
+        ("three_center", "ao_three_center_vectors"),
+    ],
+)
+def test_v2_three_center_schema_migrates_to_v3(tmp_path, fmt, container_type, ao_vectors_field):
+    """Accepted v2 wire-name variants preserve all factors in schema v3."""
+    one_body = np.eye(2)
+    factors = RNG.standard_normal((4, 3))
+    ao_vectors = RNG.standard_normal((4, 3))
+    hamiltonian = Hamiltonian(
+        ThreeCenterHamiltonianContainer(
+            one_body,
+            factors,
+            create_test_orbitals(2),
+            0.5,
+            np.empty((0, 0)),
+            ao_three_center_vectors=ao_vectors,
+        )
+    )
+    suffix = "json" if fmt == "json" else "h5"
+    source = tmp_path / f"v2.hamiltonian.{suffix}"
+    destination = tmp_path / f"v3.hamiltonian.{suffix}"
+
+    if fmt == "json":
+        payload = json.loads(hamiltonian.to_json())
+        container = payload["container"]
+        container["version"] = "0.2.0"
+        container["container_type"] = container_type
+        _drop_restricted_three_center_partner(container["three_center_integrals"])
+        if ao_vectors_field == "ao_cholesky_vectors":
+            container[ao_vectors_field] = container.pop("ao_three_center_vectors")
+        source.write_text(json.dumps(payload), encoding="utf-8")
+    else:
+        hamiltonian.to_hdf5_file(str(source))
+        with h5py.File(source, "r+") as handle:
+            container = handle["container"]
+            container.attrs.modify("version", "0.2.0")
+            container.attrs.modify("container_type", container_type)
+            metadata_dataset = container["three_center_integrals"]["symmetry_blocked_tensor_metadata"]
+            raw_metadata = metadata_dataset[()]
+            if isinstance(raw_metadata, bytes | np.bytes_):
+                raw_metadata = raw_metadata.decode("utf-8")
+            metadata = json.loads(str(raw_metadata))
+            _drop_restricted_three_center_partner(metadata)
+            metadata_dataset[()] = json.dumps(metadata)
+            if ao_vectors_field == "ao_cholesky_vectors":
+                container.move("ao_three_center_vectors", ao_vectors_field)
+
+    with pytest.raises(RuntimeError, match="version minor mismatch"):
+        Hamiltonian.from_file(str(source), fmt)
+
+    migrate.convert_file(source, destination)
+    restored = Hamiltonian.from_file(str(destination), fmt)
+    migrated = json.loads(restored.to_json())["container"]
+    assert migrated["version"] == "0.3.0"
+    assert migrated["container_type"] == "three_center"
+    assert "ao_cholesky_vectors" not in migrated
+    assert np.allclose(migrated["ao_three_center_vectors"], ao_vectors)
+    assert any(len(block_group["keys"]) >= 2 for block_group in migrated["three_center_integrals"]["blocks"])
+    np.testing.assert_array_equal(restored.get_one_body_integrals()[0], one_body)
+    expected_two_body = factors @ factors.T
+    for two_body in restored.get_two_body_integrals():
+        np.testing.assert_allclose(np.asarray(two_body).reshape(4, 4), expected_two_body)
 
 
 # --------------------------------------------------------------------------- #
