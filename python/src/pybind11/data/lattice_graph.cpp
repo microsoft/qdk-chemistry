@@ -57,6 +57,37 @@ void bind_lattice_graph(pybind11::module &m) {
 
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
+  m.def(
+      "greedy_edge_coloring",
+      [](const Eigen::SparseMatrix<double> &adj, int seed, int trials) {
+        if (adj.rows() != adj.cols()) {
+          throw std::invalid_argument("Adjacency matrix must be square.");
+        }
+        if (trials < 1) {
+          throw std::invalid_argument("Coloring trials must be positive.");
+        }
+        return greedy_edge_coloring(adj, seed, trials);
+      },
+      R"(
+Greedy randomized edge coloring of an arbitrary graph.
+
+Returns the coloring with the fewest colors found across the requested
+trials. Edges with the same color have disjoint vertex sets.
+
+Args:
+    adj (scipy.sparse matrix): Square sparse adjacency matrix of the graph.
+    seed (int): Random seed. Defaults to 0.
+    trials (int): Number of edge-order trials. Defaults to 1.
+
+Returns:
+    dict[tuple[int, int], int]: Mapping of canonical edges (i < j) to color labels.
+
+Raises:
+    ValueError: If the adjacency is not square or the trial count is not positive.
+)",
+      py::arg("adj"), py::arg("seed") = 0, py::arg("trials") = 1,
+      py::call_guard<py::gil_scoped_release>());
+
   // Module-level free function: trivial_edge_coloring
   m.def(
       "trivial_edge_coloring",

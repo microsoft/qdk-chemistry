@@ -344,7 +344,7 @@ During an actual IQPE run, each iteration circuit is rebuilt using the accumulat
 
 The lower wires, :math:`\lvert\psi_1\rangle` through :math:`\lvert\psi_{12}\rangle`, are compute-register qubits q1--q12.
 The ``StatePreparation`` blocks load the four-determinant trial state on the subsets of compute wires that require preparation operations; blank wires remain part of the compute register.
-The ``RepControlledPauliExp`` block is the power-one controlled first-order Trotter evolution.
+The controlled ``SparseRepPauliExp`` block is the power-one first-order Trotter evolution.
 The ancilla controls this block, and the resulting phase kickback places the Hamiltonian eigenphase on the ancilla's relative phase.
 The final H gate converts that relative phase into measurement probabilities, the measurement produces one shot outcome, and the blue reset operations return the allocated qubits to :math:`\lvert0\rangle`.
 
