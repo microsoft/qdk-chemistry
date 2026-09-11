@@ -619,7 +619,8 @@ class TestSOSSAQPEIntegration:
         # Verify circuit has all required components
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
-        assert circuit.num_qubits == 2 * n_orb + mapper._num_ancilla_qubits(container)
+        expected_num_qubits = 2 * n_orb + container.layout.outer_prep_bits + container.layout.inner_prep_bits + 2
+        assert circuit.num_qubits == expected_num_qubits
         assert circuit.metadata.num_phase_gradient_ancillas == 0
 
         # Step 3: Verify the normalization is accessible and numerically right.

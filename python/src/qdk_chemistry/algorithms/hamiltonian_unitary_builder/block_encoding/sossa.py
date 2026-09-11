@@ -42,9 +42,8 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
             reference_ground_state_energy: Reference total ground-state energy :math:`E_{\text{gs}}`.
             reference_energy_gap: Reference gap :math:`E_{\text{gap}}` above the sum-of-squares shift.
 
-        Both default to NaN, meaning unset. They are alternative ways to state the same
-        reference point and are mutually exclusive; ``_resolve_lambda_eff`` turns whichever
-        was supplied into ``lambda_eff``.
+        Both default to NaN, meaning unset. They are alternative ways to compute the `lambda_eff`
+        and are mutually exclusive.
 
         """
         super().__init__()
@@ -52,8 +51,7 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
             "reference_ground_state_energy",
             "float",
             nan,
-            "Reference total ground-state energy E_gs, including the core/nuclear contribution, "
-            "on the same convention as the sum-of-squares shift. Used only to derive lambda_eff. "
+            "Reference total ground-state energy E_gs, including the core/nuclear contribution. "
             "NaN leaves lambda_eff unset. Mutually exclusive with 'reference_energy_gap'.",
         )
         self._set_default(
@@ -61,71 +59,8 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
             "float",
             nan,
             "Reference energy gap E_gap = E_gs - E_SOS, the ground-state energy measured from the "
-            "sum-of-squares shift. Used only to derive lambda_eff. NaN leaves lambda_eff unset. "
-            "Mutually exclusive with 'reference_ground_state_energy'.",
+            "sum-of-squares shift. Mutually exclusive with 'reference_ground_state_energy'.",
         )
-
-
-def _resolve_lambda_eff(
-    normalization: float,
-    energy_shift: float,
-    reference_ground_state_energy: float,
-    reference_energy_gap: float,
-) -> float | None:
-    r"""Derive :math:`\lambda_{\text{eff}}` from whichever reference energy was supplied.
-
-    The sum-of-squares Hamiltonian is positive semidefinite and block encoded with
-    normalization :math:`\Lambda`, so its spectrum lies in :math:`[0, 2\Lambda]` once the
-    origin is moved to :math:`E_{\text{SOS}}`. The ground state sits at
-    :math:`E_{\text{gap}}` within that window, and (:cite:`Low2025`, Eq. (11))
-
-    .. math::
-
-        E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}, \qquad
-        \lambda_{\text{eff}} = \sqrt{E_{\text{gap}}(2\Lambda - E_{\text{gap}})}
-
-    Args:
-        normalization: Block-encoding normalization :math:`\Lambda`.
-        energy_shift: The sum-of-squares shift :math:`E_{\text{SOS}}` (includes core energy).
-        reference_ground_state_energy: Total :math:`E_{\text{gs}}`, or NaN when unset.
-        reference_energy_gap: :math:`E_{\text{gap}}`, or NaN when unset.
-
-    Returns:
-        The effective normalization, or ``None`` when neither reference energy was supplied.
-
-    Raises:
-        ValueError: If both reference energies are supplied, or if the resulting gap falls
-            outside the open interval :math:`(0, 2\Lambda)`, where
-            :math:`\lambda_{\text{eff}}` is undefined.
-
-    """
-    has_energy = not isnan(reference_ground_state_energy)
-    has_gap = not isnan(reference_energy_gap)
-    if has_energy and has_gap:
-        raise ValueError(
-            f"the SOSSA builder accepts 'reference_ground_state_energy' or 'reference_energy_gap', not both; got "
-            f"reference_ground_state_energy={reference_ground_state_energy!r} and "
-            f"reference_energy_gap={reference_energy_gap!r}"
-        )
-    if not has_energy and not has_gap:
-        return None
-
-    gap = reference_energy_gap if has_gap else reference_ground_state_energy - energy_shift
-    two_lambda = 2.0 * normalization
-    if not 0.0 < gap < two_lambda:
-        source = (
-            f"reference_energy_gap {reference_energy_gap!r}"
-            if has_gap
-            else (
-                f"reference_ground_state_energy {reference_ground_state_energy!r} relative to the "
-                f"sum-of-squares shift {energy_shift!r}"
-            )
-        )
-        raise ValueError(
-            f"{source} gives an energy gap of {gap!r}, outside the representable window "
-            f"(0, {two_lambda!r}); lambda_eff is undefined there"
-        )
-    return float(sqrt(gap * (two_lambda - gap)))
 
 
 class SOSSABuilder(HamiltonianUnitaryBuilder):
@@ -192,7 +127,14 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             sossa.two_body.angles, meta.num_ranks, meta.num_bases, n_orbitals
         )
 
-        reg_bits = self._sossa_register_bits(n_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
+        outer_prep_dim = n_orbitals + meta.num_ranks * meta.num_copies
+        rank_bits = ceil(log2(meta.num_ranks)) if meta.num_ranks > 1 else 0
+        reg_bits = SOSSARegisterLayout(
+            outer_prep_bits=ceil(log2(outer_prep_dim)) if outer_prep_dim > 1 else 1,
+            inner_prep_bits=ceil(log2(meta.num_bases + 1)) if meta.num_bases + 1 > 1 else 1,
+            rank_bits=rank_bits,
+            num_free_rider_bits=2 + rank_bits,
+        )
         num_outer_qubits = reg_bits.outer_prep_bits
 
         free_rider = self._compute_free_rider_data(
@@ -219,34 +161,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _sossa_register_bits(
-        num_orbitals: int,
-        num_ranks: int,
-        num_bases: int,
-        num_copies: int,
-    ) -> SOSSARegisterLayout:
-        r"""Derive the structural ancilla register widths implied by ``(N, R, B, C)``.
-
-        Args:
-            num_orbitals: Number of spatial orbitals ``N``.
-            num_ranks: Number of DFTHC ranks ``R``.
-            num_bases: Number of bases ``B`` (``B + 1`` inner entries including the identity term).
-            num_copies: Number of copies ``C``.
-
-        Returns:
-            SOSSARegisterLayout: The widths the walk container carries for its consumers.
-
-        """
-        outer_prep_dim = num_orbitals + num_ranks * num_copies
-        rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
-        return SOSSARegisterLayout(
-            outer_prep_bits=ceil(log2(outer_prep_dim)) if outer_prep_dim > 1 else 1,
-            inner_prep_bits=ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1,
-            rank_bits=rank_bits,
-            num_free_rider_bits=2 + rank_bits,
-        )
-
-    @staticmethod
     def _outer_coefficients(sossa: SOSContainer) -> np.ndarray:
         r"""Compute the outer PREPARE LCU coefficients from the container generators.
 
@@ -266,8 +180,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         r"""Assemble the inner-PREPARE conditional amplitudes ``[Xo, B+1]``.
 
         One delta row (``b = 0``) per one-body generator, then one spin-free row
-        per ``(rank, copy)``: the rotated-``Z`` weights followed by the identity
-        weight (the ``b == B`` entry).
+        per ``(rank, copy)``. The PREPARE backends square and normalize each row,
+        so every spin-free entry is :math:`\operatorname{sign}(w_b)\sqrt{|w_b|}`;
+        SELECT consumes that sign for both rotated-``Z`` and identity entries.
         """
         b_plus_1 = sossa.metadata.num_bases + 1
         delta = np.zeros((num_one_body, b_plus_1))
@@ -276,7 +191,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         sf = np.asarray(sossa.two_body.coeffs)
         sf_rows = np.zeros((sf.shape[0] if sf.ndim == 2 else 0, b_plus_1))
         if sf.size:
-            weights = sf.real
+            weights = np.real(sf)
             sf_rows = np.sign(weights) * np.sqrt(np.abs(weights))
         return np.concatenate([delta, sf_rows], axis=0)
 
@@ -289,17 +204,15 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     ) -> np.ndarray:
         r"""Assemble the spin-free SELECT angles ``[R (B+1), N-1]`` from per-``(rank, basis)`` angles.
 
-        Each rank block holds its ``B`` basis Givens angle vectors followed by a
-        zero ``b == B`` (identity) row; the blocks are reordered to basis-major,
-        rank-minor addressing for the Q# QROM, which recomputes the ``b == B`` flag.
+        Rows use basis-major, rank-minor addressing for the Q# QROM. The final
+        basis block is zero because ``b == B`` selects the identity term.
         """
         n_bp1 = num_bases + 1
         angles = np.zeros((num_ranks * n_bp1, num_orbitals - 1))
-        for rank in range(num_ranks):
-            for basis in range(num_bases):
-                angles[rank * n_bp1 + basis] = sf_angles[rank * num_bases + basis]
-        order = [rank * n_bp1 + basis for basis in range(n_bp1) for rank in range(num_ranks)]
-        return angles[order]
+        for basis in range(num_bases):
+            for rank in range(num_ranks):
+                angles[basis * num_ranks + rank] = sf_angles[rank * num_bases + basis]
+        return angles
 
     @staticmethod
     def _build_outer_prepare(statevector: np.ndarray, num_qubits: int) -> Wavefunction:
@@ -378,3 +291,63 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
     def type_name(self) -> str:
         """Return the algorithm type name."""
         return "hamiltonian_unitary_builder"
+
+
+def _resolve_lambda_eff(
+    normalization: float,
+    energy_shift: float,
+    reference_ground_state_energy: float,
+    reference_energy_gap: float,
+) -> float | None:
+    r"""Derive :math:`\lambda_{\text{eff}}` from whichever reference energy was supplied.
+
+    The sum-of-squares Hamiltonian is positive semidefinite and block encoded with
+    normalization :math:`\Lambda`, so its spectrum lies in :math:`[0, 2\Lambda]` once the
+    origin is moved to :math:`E_{\text{SOS}}`. The ground state sits at
+    :math:`E_{\text{gap}}` within that window, and (:cite:`Low2025`, Eq. (11))
+
+    .. math::
+
+        E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}, \qquad
+        \lambda_{\text{eff}} = \sqrt{E_{\text{gap}}(2\Lambda - E_{\text{gap}})}
+
+    Args:
+        normalization: Block-encoding normalization :math:`\Lambda`.
+        energy_shift: The sum-of-squares shift :math:`E_{\text{SOS}}` (includes core energy).
+        reference_ground_state_energy: Total :math:`E_{\text{gs}}`, or NaN when unset.
+        reference_energy_gap: :math:`E_{\text{gap}}`, or NaN when unset.
+
+    Returns:
+        The effective normalization, or ``None`` when neither reference energy was supplied.
+
+    Raises:
+        ValueError: If both reference energies are supplied, or if the resulting gap falls
+            outside the open interval :math:`(0, 2\Lambda)`, where
+            :math:`\lambda_{\text{eff}}` is undefined.
+
+    """
+    has_energy = not isnan(reference_ground_state_energy)
+    has_gap = not isnan(reference_energy_gap)
+    if has_energy and has_gap:
+        raise ValueError(
+            "The SOSSA builder accepts 'reference_ground_state_energy' or 'reference_energy_gap', not both."
+        )
+    if not has_energy and not has_gap:
+        return None
+
+    gap = reference_energy_gap if has_gap else reference_ground_state_energy - energy_shift
+    two_lambda = 2.0 * normalization
+    if not 0.0 < gap < two_lambda:
+        source = (
+            f"reference_energy_gap {reference_energy_gap!r}"
+            if has_gap
+            else (
+                f"reference_ground_state_energy {reference_ground_state_energy!r} relative to the "
+                f"sum-of-squares shift {energy_shift!r}"
+            )
+        )
+        raise ValueError(
+            f"{source} gives an energy gap of {gap!r}, outside the representable window "
+            f"(0, {two_lambda!r}); lambda_eff is undefined."
+        )
+    return float(sqrt(gap * (two_lambda - gap)))

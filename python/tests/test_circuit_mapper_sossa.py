@@ -338,8 +338,11 @@ class TestSOSSAMapper:
 
         num_system_qubits = 2 * container.metadata.num_spatial_orbitals
         num_gradient = circuit.metadata.num_phase_gradient_ancillas
-        assert num_gradient == mapper._num_phase_gradient_qubits
-        assert circuit.num_qubits == num_system_qubits + mapper._num_ancilla_qubits(container)
+        coefficient_precision = mapper.settings().get("coefficient_bit_precision")
+        num_outer_qubits = 2 * container.layout.outer_prep_bits + 2 * coefficient_precision + 1
+        num_reflect_inner = container.layout.inner_prep_bits + coefficient_precision + 1
+        assert num_gradient == mapper.settings().get("rotation_bit_precision")
+        assert circuit.num_qubits == num_system_qubits + num_outer_qubits + num_reflect_inner + 2 + num_gradient
         assert circuit.num_qubits - num_system_qubits - num_gradient > 0
 
     @pytest.mark.parametrize(

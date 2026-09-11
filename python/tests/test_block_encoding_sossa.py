@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import tempfile
+from math import ceil, log2
 from pathlib import Path
 
 import h5py
@@ -23,6 +24,7 @@ from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltoni
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
+    SOSSARegisterLayout,
     SOSSASelect,
     SOSSAWalkContainer,
 )
@@ -58,7 +60,14 @@ def _make_sossa_unitary_representation():
     dq_rotation_angles = np.array([[0.3], [0.5]])
     sf_rotation_angles = np.array([[0.1], [0.2], [0.15], [0.25]])
 
-    layout = SOSSABuilder._sossa_register_bits(num_orbitals, num_ranks, num_bases, num_copies)
+    outer_prep_dim = num_orbitals + num_ranks * num_copies
+    rank_bits = ceil(log2(num_ranks)) if num_ranks > 1 else 0
+    layout = SOSSARegisterLayout(
+        outer_prep_bits=ceil(log2(outer_prep_dim)) if outer_prep_dim > 1 else 1,
+        inner_prep_bits=ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1,
+        rank_bits=rank_bits,
+        num_free_rider_bits=2 + rank_bits,
+    )
     num_outer_qubits = layout.outer_prep_bits
 
     # Build outer prepare Wavefunction
@@ -167,8 +176,13 @@ class TestSOSSAWalkContainer:
         """Pin the identity the generic ancilla fallback depends on."""
         container = _make_sossa_unitary_representation().get_container()
         meta = container.metadata
-        expected = SOSSABuilder._sossa_register_bits(
-            meta.num_spatial_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies
+        outer_prep_dim = meta.num_spatial_orbitals + meta.num_ranks * meta.num_copies
+        rank_bits = ceil(log2(meta.num_ranks)) if meta.num_ranks > 1 else 0
+        expected = SOSSARegisterLayout(
+            outer_prep_bits=ceil(log2(outer_prep_dim)) if outer_prep_dim > 1 else 1,
+            inner_prep_bits=ceil(log2(meta.num_bases + 1)) if meta.num_bases + 1 > 1 else 1,
+            rank_bits=rank_bits,
+            num_free_rider_bits=2 + rank_bits,
         )
 
         # The stored layout is derived data, so pin it against the formula it came from.
@@ -324,6 +338,51 @@ class TestSOSSABuilder:
         free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
         rank_bits = free_rider[:, 2:]
         assert not rank_bits.any(), f"one-body free-rider rank bits are not all zero:\n{rank_bits}"
+
+    def test_inner_prepare_uses_signed_square_roots_of_all_spin_free_weights(self):
+        """Inner PREPARE must linearize every SF weight and preserve its SELECT sign."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
+        sossa = operator.get_container()
+        weights = np.array([[4.0, -9.0, 16.0], [-1.0, 0.0, -25.0]])
+        sossa.two_body.coeffs[...] = weights
+
+        container = SOSSABuilder().run(operator).get_container()
+        actual = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[-len(weights) :]
+        expected = np.sign(weights) * np.sqrt(np.abs(weights))
+
+        np.testing.assert_allclose(actual, expected)
+        probabilities = actual**2 / np.sum(actual**2, axis=1, keepdims=True)
+        expected_probabilities = np.abs(weights) / np.sum(np.abs(weights), axis=1, keepdims=True)
+        np.testing.assert_allclose(probabilities, expected_probabilities)
+
+    def test_two_body_rotation_angles_are_padded_in_basis_major_order(self):
+        """The QROM table must be basis-major with one trailing identity block."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
+        sossa = operator.get_container()
+        sf_angles = np.array(
+            [
+                [0.0, 0.1],  # rank 0, basis 0
+                [1.0, 1.1],  # rank 0, basis 1
+                [2.0, 2.1],  # rank 1, basis 0
+                [3.0, 3.1],  # rank 1, basis 1
+            ]
+        )
+        sossa.two_body.angles[...] = sf_angles
+
+        container = SOSSABuilder().run(operator).get_container()
+        actual = container.select.two_body_rotation_angles
+
+        expected = np.array(
+            [
+                [0.0, 0.1],
+                [2.0, 2.1],
+                [1.0, 1.1],
+                [3.0, 3.1],
+                [0.0, 0.0],
+                [0.0, 0.0],
+            ]
+        )
+        np.testing.assert_array_equal(actual, expected)
 
     def test_lambda_eff_at_band_centre_equals_the_normalization(self):
         r"""At the middle of the band, :math:`\lambda_{\text{eff}}` must collapse to :math:`\Lambda`.

@@ -77,12 +77,7 @@ class SOSQubitMapper(QubitMapper):
 
     @staticmethod
     def _validate_mapping(mapping: MajoranaMapping, num_orbitals: int) -> None:
-        """Reject a mapping this construction cannot honour, rather than silently substituting one.
-
-        The generators are rotated single-mode Paulis whose Jordan-Wigner strings the
-        SOSSA walk applies implicitly, so the construction is fixed to blocked
-        Jordan-Wigner over ``2 * num_orbitals`` modes. Anything else would produce an
-        operator that does not encode what the caller asked for.
+        """Reject mappings other than blocked Jordan-Wigner over ``2 * num_orbitals`` modes.
 
         Args:
             mapping: The mapping supplied by the caller.
@@ -93,12 +88,11 @@ class SOSQubitMapper(QubitMapper):
 
         """
         if mapping.name != "jordan-wigner":
-            raise ValueError(f"SOSQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}")
+            raise ValueError(f"SOSQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}.")
         num_modes = 2 * num_orbitals
         if mapping.num_modes != num_modes:
             raise ValueError(
-                f"SOSQubitMapper requires a mapping over the Hamiltonian's {num_modes} spin orbitals; "
-                f"got one over {mapping.num_modes}"
+                f"SOSQubitMapper requires a mapping over {num_modes} spin orbitals; got {mapping.num_modes}."
             )
         if mapping.tapering is not None:
             raise ValueError("SOSQubitMapper does not support tapered mappings")
@@ -112,11 +106,6 @@ class SOSQubitMapper(QubitMapper):
     ) -> QubitOperator:
         """Map a validated factorized container to a SOSSA qubit operator.
 
-        The container no longer carries per-rank signs to check: it stores the two-body
-        tensor as a plain sum of squares, so it is positive semi-definite by construction,
-        and ``DoubleFactorizer`` rejects a supermatrix that admits no Cholesky factor
-        before one can be built.
-
         Args:
             container: The factorized Hamiltonian to map.
             mapping: The single-mode Majorana mapping supplying the Pauli labels.
@@ -129,10 +118,6 @@ class SOSQubitMapper(QubitMapper):
             ValueError: If the threshold is negative or not a number.
 
         """
-        # A negative threshold makes the two masks overlap, so a mode in (threshold, -threshold)
-        # is emitted as both D1 and Q1: the generator count exceeds the N slots the register
-        # layout reserves, and the Q1 copy takes the square root of a positive eigenvalue's
-        # negation. NaN is rejected by the same comparison.
         if not threshold >= 0.0:
             raise ValueError(f"threshold must be non-negative; got {threshold!r}")
 
