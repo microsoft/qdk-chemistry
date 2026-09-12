@@ -56,11 +56,12 @@ class QubitOperator(DataClass):
     """
 
     _data_type_name = "qubit_hamiltonian"
-    # Serialization is delegated to the wrapped container, which owns the on-disk schema
-    # version (pauli_lcu writes 0.1.0, sos writes 0.3.0); to_json/to_hdf5 forward to it and
-    # never emit a version of the wrapper's own. Declaring one here would falsely imply that
-    # documents carry it -- pre-container Pauli LCU documents are version 0.1.0, not this.
-    _serialization_version = None
+    # Nominal wrapper version kept only to mirror the sibling DataClass convention
+    # (UnitaryRepresentation likewise carries "0.2.0"). It is never written to disk:
+    # to_json/to_hdf5 forward to the wrapped container, which owns the on-disk schema
+    # version (pauli_lcu writes 0.1.0, sos writes 0.3.0). Do not read it as the version of
+    # any document -- pre-container Pauli LCU documents are 0.1.0, not this.
+    _serialization_version = "0.2.0"
 
     @staticmethod
     def data_type_name() -> str:
