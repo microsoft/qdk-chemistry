@@ -694,3 +694,22 @@ TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
 
   EXPECT_EQ(blas_get_num_threads(), original);
 }
+
+TEST(BlasThreadsTest, SetRoundTrips) {
+  using namespace qdk::chemistry::scf::util;
+
+  const int original = blas_get_num_threads();
+  if (original == 0) {
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+
+  blas_set_num_threads(1);
+  EXPECT_EQ(blas_get_num_threads(), 1);
+
+  // Nonsense counts are ignored rather than passed to the backend.
+  blas_set_num_threads(0);
+  EXPECT_EQ(blas_get_num_threads(), 1);
+
+  blas_set_num_threads(original);
+  EXPECT_EQ(blas_get_num_threads(), original);
+}

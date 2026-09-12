@@ -102,45 +102,11 @@ install(
   COMPONENT qdk_chemistry_resources
 )
 
-# BLAS thread control (see util/blas_threads.cpp). OpenBLAS, Intel MKL and BLIS
-# each spell the thread-count API differently, so only the vendor is passed
-# down; blas_threads.cpp names the functions. Any other vendor -- Accelerate on
-# macOS, reference BLAS, or none reported at all -- exposes no such API, and
-# ScopedBlasThreads compiles to a no-op.
-#
-# The vendor travels as QDK_CHEMISTRY_BLAS_VENDOR=QDK_CHEMISTRY_BLAS_VENDOR_<vendor>:
-# the value is the *name* of a macro blas_threads.cpp defines as a small
-# integer, since the preprocessor cannot compare strings. The match below keeps
-# the pasted name an identifier; one that slipped through would reach an #error
-# there rather than silently disable thread control.
-#
-# BLAS_VENDOR is the knob for the one case the search cannot answer -- passing
-# BLAS_LIBRARIES directly skips the vendor search (FindBLAS.cmake), leaving
-# BLAS_VENDOR empty, and -DBLAS_VENDOR=<vendor> supplies the missing label.
-if(BLAS_VENDOR MATCHES "^(OpenBLAS|IntelMKL|BLIS)$")
-  target_compile_definitions(chemistry PRIVATE
-      QDK_CHEMISTRY_BLAS_VENDOR=QDK_CHEMISTRY_BLAS_VENDOR_${BLAS_VENDOR})
-  # BLAS is already linked transitively through GauXC; name it here for the
-  # vendor symbols we call ourselves. The include directories come with it --
-  # the BLIS path needs blis.h for dim_t, whose width is a BLIS build option.
-  if(TARGET BLAS::BLAS)
-    target_link_libraries(chemistry PRIVATE BLAS::BLAS)
-  else()
-    target_link_libraries(chemistry PRIVATE ${BLAS_LIBRARIES})
-    target_include_directories(chemistry PRIVATE ${BLAS_INCLUDE_DIRS})
-  endif()
-  # The installed archive references vendor-specific symbols while the exported
-  # dependency is the vendor-agnostic BLAS::BLAS, so cmake/qdkConfig.cmake.in
-  # steers the consumer's BLAS search to the same provider. A cache variable
-  # because this is a subdirectory scope.
-  set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${BLAS_VENDOR}" CACHE INTERNAL
-      "BLAS vendor whose thread-control symbols are bound into the library")
-  message(STATUS "QDK Chemistry BLAS vendor: '${BLAS_VENDOR}', thread control: enabled")
-else()
-  set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "" CACHE INTERNAL
-      "BLAS vendor whose thread-control symbols are bound into the library")
-  message(STATUS "QDK Chemistry BLAS vendor: '${BLAS_VENDOR}', thread control: disabled")
-endif()
+# BLAS thread control (see cmake/qdk-blas-threads.cmake).
+qdk_select_blas_thread_backend(${CMAKE_CURRENT_LIST_DIR}/util _qdk_blas_backend_src)
+target_sources(chemistry PRIVATE ${_qdk_blas_backend_src})
+target_link_libraries(chemistry PRIVATE ${QDK_CHEMISTRY_BLAS_LINK})
+target_include_directories(chemistry PRIVATE ${BLAS_INCLUDE_DIRS})
 
 # Generate Config Header
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${PROJECT_BINARY_DIR}/include/qdk/chemistry/scf/config.h)
