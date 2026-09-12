@@ -1,8 +1,4 @@
 """Tests for the SOSSA controlled circuit mapper."""
-            )
-
-
-# --------------------------------------------------------------------------------------------
 
 import math
 
@@ -17,48 +13,6 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
-
-
-def _reverse_bits(x: int, n: int) -> int:
-    """Reverse the bit order of *x* within an *n*-bit field."""
-    return int(format(x, f"0{n}b")[::-1], 2)
-
-
-def _block_encoding_action(circuit: Circuit, num_system_qubits: int, system_state: np.ndarray) -> np.ndarray:
-    r"""Apply a block encoding and project its ancillas back onto :math:`|0\rangle`."""
-    assert circuit.num_qubits is not None
-    assert circuit._qsharp_op is not None
-    num_qubits = circuit.num_qubits
-    stride = 2 ** (num_qubits - num_system_qubits)
-    dimension = 2**num_system_qubits
-    initial_state = [0.0] * ((dimension - 1) * stride + 1)
-    for index, amplitude in enumerate(system_state):
-        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
-
-    statevector = dump_operation_on_state(circuit._qsharp_op, num_qubits, initial_state, context=get_qsharp_context())
-    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
-
-
-def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
-    """Tolerance on a marginal probability for an L-term, mu-bit alias table.
-
-    Same bound the dedicated alias-sampling tests assert against; see
-    ``_alias_atol`` in ``test_state_preparation_alias.py``.
-    """
-    return 1.0 / (num_coefficients * 2**bits_precision)
-
-
-def _with_prepared_gradient(op, num_gradient: int):
-    """Wrap an outer PREPARE so it prepares and restores the gradient it reads.
-
-    The walk hands the outer PREPARE a slice of the persistent gradient register that
-    phase estimation prepares once; a standalone simulation has to supply it.
-    """
-    if not num_gradient:
-        return op
-    return QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
-        op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_gradient
-    )
 
 
 def _build_sossa_unitary(
@@ -98,6 +52,23 @@ def _make_sossa_mapper(
     return mapper
 
 
+def _with_prepared_gradient(op, num_gradient: int):
+    if not num_gradient:
+        return op
+    return QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
+        op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_gradient
+    )
+
+
+def _reverse_bits(x: int, n: int) -> int:
+    """Reverse the bit order of *x* within an *n*-bit field."""
+    return int(format(x, f"0{n}b")[::-1], 2)
+
+
+def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
+    return 1.0 / (num_coefficients * 2**bits_precision)
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Sub-operation builder tests
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -118,17 +89,6 @@ class TestOuterPrep:
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
     def test_build_outer_prep_fidelity(self, algorithm):
-        """Verify _build_outer_prep's callable prepares the correct statevector.
-
-        Simulates the Q# callable in the global Q# session and checks fidelity
-        against the expected normalized state:
-          |ψ⟩ = Σ_j (a_j / ||a||) |j⟩
-
-        Every backend writes the outer index register little-endian, which is how SELECT
-        reads it back, so the backend a caller picks cannot change which generator an
-        amplitude belongs to. ``DumpRegister`` reports big-endian, so coefficient ``j``
-        is expected at the bit-reversed dump index for all of them.
-        """
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
@@ -158,16 +118,6 @@ class TestOuterPrep:
 
     @pytest.mark.slow
     def test_build_outer_prep_alias_sampling_marginal_probs(self):
-        r"""Verify alias sampling prepares the SOS outer distribution, not its square root.
-
-        The SOS block encoding needs amplitudes proportional to the generator one-norms
-        :math:`c_l` (Eqs. (7) and (9) of Low et al. 2025), because the normalization
-        :math:`\Lambda = \frac{1}{2}\sum_l c_l^2` and the energy decoding
-        :math:`E = \Lambda(1 + \cos 2\pi\varphi)` are both read off those amplitudes.
-        One-dimensional alias sampling discretizes its input as a *probability*
-        distribution, so the marginal on the index register must come out as
-        :math:`p(l) = c_l^2 / \sum_j c_j^2` rather than :math:`|c_l| / \sum_j |c_j|`.
-        """
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
         bit_precision = 10
@@ -202,14 +152,6 @@ class TestInnerPrep:
     @pytest.mark.slow
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
     def test_build_inner_prep_fidelity(self, algorithm):
-        """Verify inner prep conditional marginals when combined with outer prep.
-
-        Applies outer prep (dense_pure, exact) then inner prep on the combined
-        register.  For each outer index l with non-negligible amplitude, checks
-        that the conditional marginal probabilities on the inner index register
-        match:
-            P(b|l) ≈ |c_{l,b}|² / Σ_j |c_{l,j}|²
-        """
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         sossa_unitary = _build_sossa_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
         container = sossa_unitary.get_container()
@@ -287,6 +229,54 @@ class TestInnerPrep:
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
 
+    @pytest.mark.slow
+    def test_controlled_alias_sampling_accepts_unreachable_zero_row(self):
+        """Every conditional row must define a distribution, even at zero outer amplitude."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
+        sossa = operator.get_container()
+        sossa.two_body.coeffs[...] = np.array([[0.0, 0.0, 0.0], [4.0, -9.0, 16.0]])
+
+        container = SOSSABuilder().run(operator).get_container()
+        outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
+        outer_op, _ = outer_mapper._build_outer_prep(container)
+
+        bit_precision = 6
+        inner_mapper = _make_sossa_mapper(
+            inner_algorithm="controlled_alias_sampling", coefficient_bit_precision=bit_precision
+        )
+        inner_op, _ = inner_mapper._build_inner_oracles(container)
+
+        num_outer_qubits = container.layout.outer_prep_bits
+        inner_coeffs = container.inner_prepare.conditional_coefficients
+        n_index_bits = math.ceil(math.log2(inner_coeffs.shape[1]))
+        free_rider = container.inner_prepare.free_rider_data
+        num_free_rider = free_rider.shape[1] if free_rider is not None and free_rider.size > 0 else 0
+        num_inner_qubits = 2 * n_index_bits + 2 * bit_precision + 3 + num_free_rider
+
+        statevector = dump_operation_on_state(
+            QSHARP_UTILS.SOSSAWalk.MakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
+            num_outer_qubits + num_inner_qubits,
+            context=get_qsharp_context(),
+        )
+
+        assert np.linalg.norm(statevector) == pytest.approx(1.0)
+
+
+def _block_encoding_action(circuit: Circuit, num_system_qubits: int, system_state: np.ndarray) -> np.ndarray:
+    r"""Apply a block encoding and project its ancillas back onto :math:`|0\rangle`."""
+    assert circuit.num_qubits is not None
+    assert circuit._qsharp_op is not None
+    num_qubits = circuit.num_qubits
+    stride = 2 ** (num_qubits - num_system_qubits)
+    dimension = 2**num_system_qubits
+    initial_state = [0.0] * ((dimension - 1) * stride + 1)
+    for index, amplitude in enumerate(system_state):
+        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
+
+    statevector = dump_operation_on_state(circuit._qsharp_op, num_qubits, initial_state, context=get_qsharp_context())
+    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
+
+
 class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
 
@@ -338,14 +328,6 @@ class TestSOSSAMapper:
         assert circuit._qsharp_factory is not None
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
-        r"""A signed SF generator must encode :math:`H_\mathrm{gap}/\Lambda-I`.
-
-        With one spatial orbital and inner weights ``[1, -1/2]``, the only generator is
-        :math:`G=(Z_\downarrow+Z_\uparrow-I)/2`, so
-        :math:`H_\mathrm{gap}=G^2/2` and :math:`\Lambda=(3/2)^2/4=9/16`.
-        This checks the signed inner LCU amplitudes and their linear weights together;
-        marginal probabilities alone cannot distinguish the negative identity term.
-        """
         operator = to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
         sossa = operator.get_container()
         sossa.one_body.coeffs[...] = 0.0
@@ -375,12 +357,6 @@ class TestSOSSAMapper:
         np.testing.assert_allclose(actual, expected, atol=1e-10)
 
     def test_declares_the_register_the_walk_reflects_about(self):
-        """The block encoding reports a flat register the caller can size the reflection from.
-
-        Unary QPE reads the reflected width off ``num_qubits`` minus the system register and
-        the gradient tail, so those three have to be consistent for the reflection it builds
-        with ``MakeAncillaReflectionOp`` to cover exactly the flagging ancillas.
-        """
         unitary = _build_sossa_unitary()
         container = unitary.get_container()
         mapper = _make_sossa_mapper()
@@ -466,48 +442,24 @@ class TestSelectFullFidelity:
     def _run_select(
         select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
     ) -> np.ndarray:
-        """Run TestSelectDQ on the chosen backend and return the dense state vector.
-
-        A fresh context per run is required: ``TestSelectDQ`` allocates through the QIR
-        runtime without releasing, so a second run in the same context would report both
-        runs' qubits.
-
-        The phase-gradient path allocates a gradient register (``rotationBitPrecision`` qubits,
-        appended last) that it conjugates back to ``|0...0>``; ``_gradient_subspace`` projects
-        the wider dump back onto the direct-path layout so the two backends can be compared.
-        """
         ctx = create_qsharp_context()
         ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
         return np.array(ctx.dump_machine().as_dense_state())
 
     @staticmethod
     def _gradient_subspace(sv: np.ndarray, num_gradient: int) -> np.ndarray:
-        """Restrict a phase-gradient dump to gradient=|0...0>, recovering the direct-path layout.
-
-        The gradient register is allocated last, so it occupies the low ``num_gradient`` bits of
-        the big-endian dump index; the conjugation returns it to ``|0...0>``, so the gradient=0
-        slice carries the full amplitude.
-        """
         return sv if num_gradient == 0 else sv[:: 1 << num_gradient]
+
+    @pytest.mark.parametrize("num_free_rider_bits", [0, 1])
+    def test_select_rejects_missing_generator_bits(self, num_free_rider_bits):
+        select_data = self._select_data(2, rotation_bit_precision=10)
+        select_data["numFreeRiderBits"] = num_free_rider_bits
+
+        with pytest.raises(Exception, match="SelectImpl requires numFreeRiderBits >= 2"):
+            self._run_select(select_data)
 
     @pytest.mark.parametrize("N", [2, 3])
     def test_select_dq_applies_the_analytic_rotated_majorana(self, N):  # noqa: N803
-        r"""SELECT must satisfy Eq. 94: :math:`U^\dagger \gamma_{00x} U = \tilde\gamma_{u0x}`.
-
-        Comparing against the closed form pins the Givens chain; normalization or a
-        spread-out state alone would not distinguish the intended rotation from a wrong one.
-
-        Acting on the single-electron state :math:`|d_0=1\rangle`, the rotated Majorana is
-
-            gamma_u |d_0=1> = u_0 |vac> - sum_{p>0} u_p |d_0=1, d_p=1>
-
-        the minus sign coming from the Jordan-Wigner string ``Z_0`` on qubit 0. Reading the
-        ratios off the dump therefore recovers ``u`` directly.
-
-        Without the control on ``sysRegDown[j+1]`` the chain rotates by ``-2*theta`` instead
-        of ``theta``, so this reports a ratio of ``tan(2*theta)/tan(theta)`` -- almost exactly
-        double -- with the wrong sign.
-        """
         rng = np.random.default_rng(2024)
         u = rng.standard_normal(N)
         u /= np.linalg.norm(u)
@@ -598,16 +550,6 @@ class TestSelectFullFidelity:
 
 
 class TestSOSSAWalkLogicalCounts:
-    """Verify the qubit count of the SOSSA walk operator matches the paper's register layout.
-
-    The walk operator W = Ref_{a,B} . U-adj . Ref_B . U (defined inline above Eq. (9)
-    of :cite:`Low2025`, derived in its Appendix A 2) is built on
-    2N + n_Xo + n_B' + 2(spin) + 1(control) + ancilla qubits. Toffoli counts are pinned
-    separately, against whole-algorithm fixtures, in ``test_phase_estimation_sossa.py``.
-
-    Reference: :cite:`Low2025`, Appendix B 7 b (Table III).
-    """
-
     @pytest.mark.parametrize(
         ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
         [

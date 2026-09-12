@@ -130,8 +130,8 @@ class DoubleFactorizer
  *
  * @see DoubleFactorizer
  */
-struct DoubleFactorizerFactory
-    : public AlgorithmFactory<DoubleFactorizer, DoubleFactorizerFactory> {
+struct HamiltonianFactorizationFactory
+    : public AlgorithmFactory<DoubleFactorizer, HamiltonianFactorizationFactory> {
   static std::string algorithm_type_name() {
     return "hamiltonian_factorization";
   }

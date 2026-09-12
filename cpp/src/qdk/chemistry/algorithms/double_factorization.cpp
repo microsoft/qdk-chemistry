@@ -360,10 +360,10 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
   return std::make_shared<data::Hamiltonian>(std::move(container));
 }
 
-void DoubleFactorizerFactory::register_default_instances() {
+void HamiltonianFactorizationFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
-  DoubleFactorizerFactory::register_instance(&make_double_factorizer);
+  HamiltonianFactorizationFactory::register_instance(&make_double_factorizer);
 }
 
 }  // namespace qdk::chemistry::algorithms

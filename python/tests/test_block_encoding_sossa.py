@@ -195,6 +195,36 @@ class TestSOSSAWalkContainer:
         assert container.layout == expected_layout
         assert container.num_qubits == 12
 
+    def test_a_layout_reserving_free_rider_bits_requires_a_matching_table(self):
+        """SELECT reads those bits whether or not anything wrote them.
+
+        ``MakeFreeRiderLoadOp([])`` is a no-op and the alias PREPARE skips the word when the
+        table is empty, so an absent table leaves ``isSF`` at zero and routes every spin-free
+        term as DQ -- a wrong operator that still builds, simulates and resource-estimates.
+        A table of the wrong width misaligns ``isSF``/``dvsq`` the same way.
+        """
+        container = _make_sossa_unitary_representation().get_container()
+        coefficients = container.inner_prepare.conditional_coefficients
+        table = container.inner_prepare.free_rider_data
+        assert container.layout.num_free_rider_bits > 0, "fixture must reserve the bits under test"
+
+        def rebuild(inner_prepare):
+            return SOSSAWalkContainer(
+                outer_prepare=container.outer_prepare,
+                inner_prepare=inner_prepare,
+                select=container.select,
+                metadata=container.metadata,
+                layout=container.layout,
+                normalization=container.normalization,
+            )
+
+        with pytest.raises(ValueError, match="no free_rider_data"):
+            rebuild(SOSSAInnerPrepare(coefficients))
+        with pytest.raises(ValueError, match="must have shape"):
+            rebuild(SOSSAInnerPrepare(coefficients, table[:, :-1]))
+        with pytest.raises(ValueError, match="must have shape"):
+            rebuild(SOSSAInnerPrepare(coefficients, table[:-1]))
+
     def test_lambda_eff_raises_when_no_reference_energy_was_supplied(self):
         """An unset ``lambda_eff`` must announce itself, not masquerade as a number.
 
@@ -385,6 +415,17 @@ class TestSOSSABuilder:
         probabilities = actual**2 / np.sum(actual**2, axis=1, keepdims=True)
         expected_probabilities = np.abs(weights) / np.sum(np.abs(weights), axis=1, keepdims=True)
         np.testing.assert_allclose(probabilities, expected_probabilities)
+
+    def test_inner_prepare_pads_zero_spin_free_rows_with_identity(self):
+        """Unreachable SF rows must still define a valid conditional distribution."""
+        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
+        sossa = operator.get_container()
+        sossa.two_body.coeffs[...] = np.array([[0.0, 0.0, 0.0], [4.0, -9.0, 16.0]])
+
+        container = SOSSABuilder().run(operator).get_container()
+        actual = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[-2:]
+
+        np.testing.assert_allclose(actual, np.array([[0.0, 0.0, 1.0], [2.0, -3.0, 4.0]]))
 
     def test_two_body_rotation_angles_are_padded_in_basis_major_order(self):
         """The QROM table must be basis-major with one trailing identity block."""

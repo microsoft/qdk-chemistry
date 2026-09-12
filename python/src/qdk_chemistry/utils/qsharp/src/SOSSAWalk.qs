@@ -57,8 +57,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         TwoBodyRotationAngles : Double[][],
         rotationBitPrecision : Int,
         /// Number of free-rider bits at the end of innerReg loaded by inner PREPARE QROM.
+        /// Must be at least 2.
         /// Layout: [sf_vs_dq(1), d_vs_q(1), r_bits(⌈log₂ R⌉)].
-        /// When > 0, SelectImpl reads isSF and dvsq from innerReg instead of computing them.
+        /// SelectImpl reads isSF and dvsq from the first two bits.
         numFreeRiderBits : Int,
         /// Index into innerReg of the qubit the inner PREPARE loads the sign of the sampled
         /// (x_o, b) coefficient into, or -1 when the inner PREPARE supplies no sign bit.
@@ -100,17 +101,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // Classical helpers
     // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Number of spin qubits in the block encoding: spinReg = [spinDQ, spinSF].
-    function NumSOSSASpinQubits() : Int {
-        2
-    }
-
     /// Index at which each register starts, followed by the end of the last one.
     internal function SOSSAWalkRegisterBounds(layout : SOSSAWalkLayout) : Int[] {
         let outerStart = layout.numSystemQubits;
         let innerStart = outerStart + layout.numOuterQubits;
         let spinStart = innerStart + layout.numReflectInner;
-        let gradientStart = spinStart + NumSOSSASpinQubits();
+        let gradientStart = spinStart + 2;
         [outerStart, innerStart, spinStart, gradientStart, gradientStart + layout.numPhaseGradientQubits]
     }
 
@@ -272,6 +268,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // Free-rider data from inner PREPARE QROM: [sf_vs_dq(1), d_vs_q(1), r_bits...]
         let nInner = Length(innerReg);
         let nFR = params.numFreeRiderBits;
+        Fact(nFR >= 2, "SelectImpl requires numFreeRiderBits >= 2");
         let isSF = innerReg[nInner - nFR];       // sf_vs_dq
         let dvsq = innerReg[nInner - nFR + 1];   // d_vs_q
 
@@ -891,12 +888,14 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         ApplyXorInPlace(bValue, innerReg[0..bBits - 1]);
 
         let frStart = bBits;
-        if xoValue >= N { X(innerReg[frStart]); }
-        if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
+        if nFR >= 2 {
+            if xoValue >= N { X(innerReg[frStart]); }
+            if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
 
-        // Rank as the inner PREPARE's free-rider data would carry it: 0 for one-body.
-        let rValue = if xoValue >= N { (xoValue - N) / selectData.numCopies } else { 0 };
-        ApplyXorInPlace(rValue, innerReg[frStart + 2..frStart + nFR - 1]);
+            // Rank as the inner PREPARE's free-rider data would carry it: 0 for one-body.
+            let rValue = if xoValue >= N { (xoValue - N) / selectData.numCopies } else { 0 };
+            ApplyXorInPlace(rValue, innerReg[frStart + 2..frStart + nFR - 1]);
+        }
 
         X(systemReg[0]);
 

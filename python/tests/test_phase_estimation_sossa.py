@@ -392,7 +392,7 @@ def _energy_to_qpe_phase(energy_gap, lambda_sos):
     cos_val = energy_gap / lambda_sos - 1.0
     if not -1.0 - 1e-9 <= cos_val <= 1.0 + 1e-9:
         raise ValueError(
-            f"Energy gap {energy_gap!r} is outside the SOS walk band [0, {2 * lambda_sos!r}]: "
+            f"Energy gap {energy_gap!r} is outside the SOSSA walk band [0, {2 * lambda_sos!r}]: "
             f"cos(2*pi*phi) would have to be {cos_val!r}."
         )
     return math.acos(max(-1.0, min(1.0, cos_val))) / (2 * math.pi)

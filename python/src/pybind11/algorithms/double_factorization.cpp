@@ -104,8 +104,8 @@ Returns:
   double_factorizer.def("hash", &DoubleFactorizer::hash,
                         py::arg("hamiltonian"));
 
-  bind_algorithm_factory<DoubleFactorizerFactory, DoubleFactorizer>(
-      m, "DoubleFactorizerFactory");
+  bind_algorithm_factory<HamiltonianFactorizationFactory, DoubleFactorizer>(
+      m, "HamiltonianFactorizationFactory");
 
   double_factorizer.def("__repr__", [](const DoubleFactorizer &) {
     return "<qdk_chemistry.algorithms.DoubleFactorizer>";

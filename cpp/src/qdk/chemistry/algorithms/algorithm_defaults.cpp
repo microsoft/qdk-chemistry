@@ -52,7 +52,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(NuclearDerivativeCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
-  REGISTER_FACTORY_SETTINGS_INIT(DoubleFactorizerFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(HamiltonianFactorizationFactory)
 
 #undef REGISTER_FACTORY_SETTINGS_INIT
 

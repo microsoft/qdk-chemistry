@@ -71,7 +71,8 @@ class SOSSAInnerPrepare:
     block encoding squared, and SELECT applies the sign."""
 
     free_rider_data: np.ndarray | None = None
-    r"""Optional 2D boolean array, shape :math:`[X_o, n_{\text{fr}}]`."""
+    r"""2D boolean array, shape :math:`[X_o, n_{\text{fr}}]`. Required whenever the walk's
+    layout reserves free-rider bits, since SELECT reads them unconditionally."""
 
     def to_json(self) -> dict[str, Any]:
         """Save to a JSON-serializable dictionary."""
@@ -204,7 +205,26 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             lambda_eff: Effective (spectrally amplified) normalization, or ``None`` when the
                 builder was given no reference energy to derive it from. See :attr:`lambda_eff`.
 
+        Raises:
+            ValueError: If the layout reserves free-rider bits that ``inner_prepare`` does not
+                supply a matching table for.
+
         """
+        num_free_rider_bits = layout.num_free_rider_bits
+        free_rider_data = inner_prepare.free_rider_data
+        if num_free_rider_bits > 0:
+            outer_dim = metadata.num_spatial_orbitals + metadata.num_ranks * metadata.num_copies
+            if free_rider_data is None:
+                raise ValueError(
+                    f"the register layout reserves {num_free_rider_bits} free-rider bits but "
+                    "inner_prepare carries no free_rider_data to write them"
+                )
+            if free_rider_data.shape != (outer_dim, num_free_rider_bits):
+                raise ValueError(
+                    f"free_rider_data must have shape {(outer_dim, num_free_rider_bits)} to cover "
+                    f"every outer index, got {free_rider_data.shape}"
+                )
+
         self._power = power
         self.outer_prepare = outer_prepare
         self.inner_prepare = inner_prepare

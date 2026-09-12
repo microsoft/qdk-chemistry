@@ -316,6 +316,19 @@ def _run_conditional_alias_and_dump(
 class TestConditionalAliasSampling:
     """Tests for conditional alias sampling without free-rider data."""
 
+    def test_non_power_of_two_prepare_can_be_adjointed_after_a_phase(self):
+        coefficients = [[0.2, 0.3, 0.5], [0.4, 0.1, 0.5]]
+        bits_precision = 4
+        n_cond_bits = 1
+        n_index_bits = 2
+        n_qrom_output = bits_precision + n_index_bits + 2
+        total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
+        op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPhaseTestOp(coefficients, bits_precision, 1, 0)
+
+        state = dump_operation_on_state(op, total_qubits, context=get_qsharp_context())
+
+        assert np.linalg.norm(state) == pytest.approx(1.0)
+
     @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
     @pytest.mark.parametrize("condition_value", [0, 1])
     def test_marginal_probs(self, condition_value, num_swap_bits):
