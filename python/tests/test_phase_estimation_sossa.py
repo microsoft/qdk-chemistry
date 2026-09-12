@@ -46,7 +46,7 @@ from .test_helpers import (
 
 
 #: The factorized H2 shipped with the examples, which the SOSSA notebook also loads.
-H2_DFTHC_EXAMPLE = Path(__file__).resolve().parent / "test_data" / "h2_dfthc_r2_b2_c1.hamiltonian.json"
+H2_DFTHC_EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "data" / "h2_dfthc_r2_b2_c1.hamiltonian.json"
 
 
 def _build_h2_dfthc_data():
