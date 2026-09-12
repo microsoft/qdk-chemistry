@@ -999,10 +999,13 @@ class TestSOSSAResourceEstimation:
 
         toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
 
-        # 42_649_967 Toffolis = 4197/BE over 10_162 walk queries. Each neighbor-gated Givens
+        # 46_755_415 Toffolis = 4601/BE over 10_162 walk queries. Each neighbor-gated Givens
         # rotation is the number-conserving CRy(2theta) built as Ry(theta).CNOT.Ry(-theta).CNOT
         # from two uncontrolled Ry(theta) sharing one angle word, so both SELECT backends apply
-        # the same G(theta) without a controlled adder. This is ~1.8% below the earlier
-        # controlled-adder cost (43_422_279) and 4197/BE vs the paper's 3924/BE.
-        assert toffoli_count == pytest.approx(42_649_967, rel=0.01)
-        assert logical_counts["numQubits"] == 470
+        # the same G(theta) without a controlled adder. The SF rotation-table load is controlled
+        # on the spin-free branch flag so the one-body (DQ) branch keeps a clear rotation target
+        # and needs no separate unload; that control raises the earlier fixed-XOR cost
+        # (42_649_967, 4197/BE) by ~9.6% but is what lets the DQ branch address the correct SF
+        # row for a non-zero b value. 4601/BE vs the paper's 3924/BE.
+        assert toffoli_count == pytest.approx(46_755_415, rel=0.01)
+        assert logical_counts["numQubits"] == 463
