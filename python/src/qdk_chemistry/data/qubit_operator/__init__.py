@@ -15,8 +15,8 @@ import numpy as np
 from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
-from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.sos import SumOfSquaresContainer
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresContainer
 
 if TYPE_CHECKING:
     import h5py
@@ -34,19 +34,14 @@ __all__ = [
 class QubitOperator(DataClass):
     """Data class wrapping a concrete qubit operator container.
 
-    For backward compatibility, Pauli-LCU operators may also be initialized
+    For backward compatibility, Pauli decomposition operators may also be initialized
     directly from Pauli strings and coefficients.
 
     Attribute access is forwarded to the wrapped container by ``__getattr__``, so the
-    available attributes depend on the representation. The two below are documented here
-    because they are part of the long-standing public surface; they resolve only when the
-    operator wraps a :class:`~qdk_chemistry.data.qubit_operator.containers.pauli_lcu.PauliLCUContainer`,
+    available attributes depend on the representation. The attributes below resolve only
+    when the operator wraps a
+    :class:`~qdk_chemistry.data.qubit_operator.containers.pauli_decomposition.PauliDecompositionContainer`,
     and raise :exc:`AttributeError` otherwise.
-
-    Operations taking another operator -- :meth:`equiv` and the arithmetic operators -- are
-    defined here rather than forwarded, because the container's versions are typed
-    container-to-container. They unwrap the operand and rewrap the result, so an operator
-    stays an operator across arithmetic.
 
     Attributes:
         pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
@@ -56,8 +51,6 @@ class QubitOperator(DataClass):
     """
 
     _data_type_name = "qubit_hamiltonian"
-    # Nominal wrapper version: to_json/to_hdf5 forward to the wrapped container,
-    # which owns the on-disk schema version.
     _serialization_version = "0.1.0"
 
     @staticmethod
@@ -96,7 +89,7 @@ class QubitOperator(DataClass):
                 value is not None
                 for value in (coefficients, encoding, fermion_mode_order, term_partition, tapering, pauli_strings)
             ):
-                raise TypeError("QubitOperator container construction does not accept Pauli-LCU arguments")
+                raise TypeError("QubitOperator container construction does not accept Pauli decomposition arguments")
             resolved_container = container
         else:
             if container is not None and pauli_strings is not None:
@@ -104,7 +97,7 @@ class QubitOperator(DataClass):
             resolved_pauli_strings = pauli_strings if pauli_strings is not None else container
             if resolved_pauli_strings is None or coefficients is None:
                 raise TypeError("QubitOperator requires a QubitOperatorContainer or Pauli strings and coefficients")
-            resolved_container = PauliLCUContainer(
+            resolved_container = PauliDecompositionContainer(
                 resolved_pauli_strings,
                 np.asarray(coefficients),
                 encoding,
@@ -149,13 +142,7 @@ class QubitOperator(DataClass):
             ) from None
 
     def _forward(self, name: str) -> Any:
-        """Return a container method, or raise the same error ``__getattr__`` would.
-
-        Binary operations cannot go through ``__getattr__``: Python looks special methods up
-        on the type, and forwarding one unchanged would hand the container a ``QubitOperator``
-        where its signature says container. Each operation below therefore unwraps its operand
-        and rewraps the result, and uses this to reach the container method.
-        """
+        """Return a container method, or raise the same error ``__getattr__`` would."""
         try:
             return getattr(self._container, name)
         except AttributeError:
@@ -166,6 +153,9 @@ class QubitOperator(DataClass):
 
     def equiv(self, other: Any, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another qubit operator.
+
+        The container's ``equiv`` is typed container-to-container, so this unwraps the
+        operand rather than forwarding it untouched.
 
         Args:
             other: The operator to compare against, wrapped or as a bare container.
@@ -183,11 +173,6 @@ class QubitOperator(DataClass):
     def to_interleaved(self, n_spatial: int) -> QubitOperator:
         """Return the operator reindexed from blocked to interleaved spin-orbital order.
 
-        ``__getattr__`` already reaches the container's implementation, but it hands back a
-        bare container rather than a wrapped operator, and a dynamically forwarded method is
-        invisible to Sphinx -- which is what the ``:meth:`` cross-references in
-        :mod:`~qdk_chemistry.data.term_partition` and the data guide resolve against.
-
         Args:
             n_spatial: Number of spatial orbitals.
 
@@ -201,7 +186,11 @@ class QubitOperator(DataClass):
         return QubitOperator(self._forward("to_interleaved")(n_spatial))
 
     def __add__(self, other: Any) -> QubitOperator:
-        """Return the sum of two qubit operators, rewrapped."""
+        """Return the sum of two qubit operators, rewrapped.
+
+        The container's ``__add__`` is typed container-to-container, so the operand is
+        unwrapped and the result rewrapped, keeping an operator an operator across arithmetic.
+        """
         if not isinstance(other, QubitOperator):
             return NotImplemented
         return QubitOperator(self._forward("__add__")(other.get_container()))
@@ -241,13 +230,13 @@ class QubitOperator(DataClass):
         """Create a qubit operator from a JSON dictionary.
 
         Documents written before this class delegated to a container carry no
-        ``container_type``; they are all Pauli LCU operators serialized at version
-        ``0.1.0``, so a missing key defaults to ``pauli_lcu`` and the container's own
-        version guard accepts them unchanged.
+        ``container_type``; they are all Pauli decomposition operators serialized at
+        version ``0.1.0``, so a missing key defaults to ``pauli_decomposition`` and the
+        container's own version guard accepts them unchanged.
         """
-        container_type = json_data.get("container_type", "pauli_lcu")
-        if container_type == "pauli_lcu":
-            container = PauliLCUContainer.from_json(json_data)
+        container_type = json_data.get("container_type", "pauli_decomposition")
+        if container_type == "pauli_decomposition":
+            container = PauliDecompositionContainer.from_json(json_data)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_json(json_data)
         else:
@@ -259,11 +248,11 @@ class QubitOperator(DataClass):
         """Create a qubit operator from an HDF5 group.
 
         A group without a ``container_type`` attribute predates container delegation and
-        holds a Pauli LCU operator; see :meth:`from_json`.
+        holds a Pauli decomposition operator; see :meth:`from_json`.
         """
-        container_type = group.attrs.get("container_type", "pauli_lcu")
-        if container_type == "pauli_lcu":
-            container = PauliLCUContainer.from_hdf5(group)
+        container_type = group.attrs.get("container_type", "pauli_decomposition")
+        if container_type == "pauli_decomposition":
+            container = PauliDecompositionContainer.from_hdf5(group)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_hdf5(group)
         else:

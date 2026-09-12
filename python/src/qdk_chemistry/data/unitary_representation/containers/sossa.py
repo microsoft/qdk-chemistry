@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
-from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresMetadata
 
 from .block_encoding import _wavefunction_from_hdf5, _wavefunction_to_hdf5
 from .quantum_walk import QuantumWalkContainer
@@ -188,7 +188,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         outer_prepare: Wavefunction,
         inner_prepare: SOSSAInnerPrepare,
         select: SOSSASelect,
-        metadata: FactorizedHamiltonianMetadata,
+        metadata: SumOfSquaresMetadata,
         layout: SOSSARegisterLayout,
         normalization: float = 0.0,
         power: int = 1,
@@ -258,17 +258,11 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         """
         if self._lambda_eff is None:
             raise ValueError(
-                "lambda_eff is unset for this SOSSA walk: it needs a reference energy that the "
-                "factorization does not carry. Rebuild the block encoding with the SOSSA builder's "
-                "'reference_ground_state_energy' setting (a total energy, on the same convention as "
-                "metadata.energy_shift) or its 'reference_energy_gap' setting."
+                "lambda_eff is unset for this SOSSA walk. Rebuild the block encoding with the "
+                "SOSSA builder's 'reference_ground_state_energy' setting or its "
+                "'reference_energy_gap' setting."
             )
         return self._lambda_eff
-
-    @property
-    def has_lambda_eff(self) -> bool:
-        """Whether :attr:`lambda_eff` is available on this container."""
-        return self._lambda_eff is not None
 
     @property
     def num_qubits(self) -> int:
@@ -329,7 +323,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
             select=select,
-            metadata=FactorizedHamiltonianMetadata.from_json(json_data["metadata"]),
+            metadata=SumOfSquaresMetadata.from_json(json_data["metadata"]),
             layout=SOSSARegisterLayout.from_json(json_data["layout"]),
             normalization=float(json_data["normalization"]),
             power=json_data.get("power", 1),
@@ -347,7 +341,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             outer_prepare=outer_prepare,
             inner_prepare=inner_prepare,
             select=select,
-            metadata=FactorizedHamiltonianMetadata.from_json(json.loads(group.attrs["metadata"])),
+            metadata=SumOfSquaresMetadata.from_json(json.loads(group.attrs["metadata"])),
             layout=SOSSARegisterLayout.from_json(json.loads(group.attrs["layout"])),
             normalization=float(group.attrs["normalization"]),
             power=int(group.attrs["power"]),

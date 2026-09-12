@@ -9,7 +9,7 @@ import math
 
 import numpy as np
 
-from qdk_chemistry.algorithms.qubit_mapper.sos import SumOfSquaresQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,

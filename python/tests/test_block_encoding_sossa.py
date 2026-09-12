@@ -21,7 +21,10 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata, SumOfSquaresContainer
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
+    SumOfSquaresContainer,
+    SumOfSquaresMetadata,
+)
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
@@ -106,7 +109,7 @@ def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | No
         outer_prepare=outer_prepare,
         inner_prepare=inner_prepare,
         select=select,
-        metadata=FactorizedHamiltonianMetadata(
+        metadata=SumOfSquaresMetadata(
             num_spatial_orbitals=num_orbitals,
             num_ranks=num_ranks,
             num_bases=num_bases,
@@ -128,8 +131,8 @@ def _assert_sossa_containers_equal(actual: SOSSAWalkContainer, expected: SOSSAWa
     assert actual.type == expected.type
     assert actual.power == expected.power
     assert actual.normalization == pytest.approx(expected.normalization)
-    assert actual.has_lambda_eff == expected.has_lambda_eff
-    if expected.has_lambda_eff:
+    assert (actual._lambda_eff is None) == (expected._lambda_eff is None)
+    if expected._lambda_eff is not None:
         assert actual.lambda_eff == pytest.approx(expected.lambda_eff)
     assert actual.metadata == expected.metadata
     assert actual.layout == expected.layout
@@ -155,7 +158,7 @@ class TestSOSSAWalkContainer:
     """Tests for the SOSSA container serialization."""
 
     def test_json_roundtrip(self):
-        """Test JSON serialization/deserialization round-trip."""
+        """Test JSON serialization/deserialization round-trip and wrapper dispatch."""
         result = _make_sossa_unitary_representation(power=3, lambda_eff=0.75)
         container = result.get_container()
 
@@ -163,6 +166,12 @@ class TestSOSSAWalkContainer:
         restored = SOSSAWalkContainer.from_json(json_data)
 
         _assert_sossa_containers_equal(restored, container)
+
+        json_data = result.to_json()
+        restored = UnitaryRepresentation.from_json(json_data)
+
+        assert restored.get_container_type() == "sossa_walk"
+        assert isinstance(restored.get_container(), SOSSAWalkContainer)
 
     def test_hdf5_roundtrip(self):
         """Test HDF5 serialization/deserialization round-trip."""
@@ -177,16 +186,6 @@ class TestSOSSAWalkContainer:
                 restored = SOSSAWalkContainer.from_hdf5(f)
 
         _assert_sossa_containers_equal(restored, container)
-
-    def test_unitary_representation_json_dispatch(self):
-        """Test that UnitaryRepresentation correctly dispatches SOSSA from JSON."""
-        result = _make_sossa_unitary_representation()
-
-        json_data = result.to_json()
-        restored = UnitaryRepresentation.from_json(json_data)
-
-        assert restored.get_container_type() == "sossa_walk"
-        assert isinstance(restored.get_container(), SOSSAWalkContainer)
 
     def test_num_qubits_ancilla_excess_is_exactly_the_structural_widths(self):
         """Pin every register width for the fixed N=2, R=2, B=1, C=1 fixture."""
@@ -235,7 +234,6 @@ class TestSOSSAWalkContainer:
         """An unset ``lambda_eff`` must announce itself, not masquerade as a number."""
         container = _make_sossa_unitary_representation().get_container()
 
-        assert container.has_lambda_eff is False
         with pytest.raises(ValueError, match="lambda_eff is unset"):
             _ = container.lambda_eff
 
@@ -271,7 +269,7 @@ class TestSOSSABuilder:
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
         assert container.normalization > 0
 
-    def test_outer_prepare_amplitudes_encode_hand_calculated_generator_weights(self):
+    def test_outer_prepare_weights_and_one_body_addressing(self):
         r"""The outer PREPARE holds :math:`c/\|c\|`, with the scale carried by :math:`\Lambda`."""
         operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 1, 1, 1))
         sossa = operator.get_container()
@@ -288,31 +286,30 @@ class TestSOSSABuilder:
         np.testing.assert_allclose(amplitudes, expected_amplitudes)
         assert container.normalization == pytest.approx(expected_normalization)
 
-    @pytest.mark.parametrize(
-        ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
-        [(2, 1, 1, 1), (3, 2, 2, 1), (4, 3, 2, 2), (6, 3, 3, 2)],
-        ids=["N2R1B1C1", "N3R2B2C1", "N4R3B2C2", "N6R3B3C2"],
-    )
-    def test_one_body_generators_address_the_first_sf_rotation_row(
-        self, num_orbitals, num_ranks, num_bases, num_copies
-    ):
-        """Every one-body generator must yield ``b = 0`` and ``r = 0``."""
-        fh = create_random_factorized_hamiltonian(
-            num_orbitals=num_orbitals,
-            num_ranks=num_ranks,
-            num_bases=num_bases,
-            num_copies=num_copies,
-        )
-        container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
+        for case_id, num_orbitals, num_ranks, num_bases, num_copies in [
+            ("N2R1B1C1", 2, 1, 1, 1),
+            ("N3R2B2C1", 3, 2, 2, 1),
+            ("N4R3B2C2", 4, 3, 2, 2),
+            ("N6R3B3C2", 6, 3, 3, 2),
+        ]:
+            fh = create_random_factorized_hamiltonian(
+                num_orbitals=num_orbitals,
+                num_ranks=num_ranks,
+                num_bases=num_bases,
+                num_copies=num_copies,
+            )
+            container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
 
-        one_body = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[:num_orbitals]
-        expected = np.zeros_like(one_body)
-        expected[:, 0] = 1.0
-        assert np.array_equal(one_body, expected), f"one-body inner-PREPARE rows are not a delta at b=0:\n{one_body}"
+            one_body = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[:num_orbitals]
+            expected = np.zeros_like(one_body)
+            expected[:, 0] = 1.0
+            assert np.array_equal(one_body, expected), (
+                f"{case_id}: one-body inner-PREPARE rows are not a delta at b=0:\n{one_body}"
+            )
 
-        free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
-        rank_bits = free_rider[:, 2:]
-        assert not rank_bits.any(), f"one-body free-rider rank bits are not all zero:\n{rank_bits}"
+            free_rider = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)[:num_orbitals]
+            rank_bits = free_rider[:, 2:]
+            assert not rank_bits.any(), f"{case_id}: one-body free-rider rank bits are not all zero:\n{rank_bits}"
 
     def test_free_rider_data_encodes_generator_flags_copies_and_nonzero_ranks(self):
         """Pin D1/Q1/SF flags and little-endian ranks for multiple copies."""
@@ -323,7 +320,7 @@ class TestSOSSABuilder:
                 source.two_body,
                 source.encoding,
                 source.fermion_mode_order,
-                FactorizedHamiltonianMetadata(
+                SumOfSquaresMetadata(
                     num_spatial_orbitals=3,
                     num_ranks=3,
                     num_bases=1,
@@ -353,7 +350,7 @@ class TestSOSSABuilder:
 
         np.testing.assert_array_equal(actual, expected)
 
-    def test_inner_prepare_uses_signed_square_roots_of_all_spin_free_weights(self):
+    def test_inner_prepare_weights_and_zero_row_padding(self):
         """Inner PREPARE must linearize every SF weight and preserve its SELECT sign."""
         operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
         sossa = operator.get_container()
@@ -369,8 +366,6 @@ class TestSOSSABuilder:
         expected_probabilities = np.abs(weights) / np.sum(np.abs(weights), axis=1, keepdims=True)
         np.testing.assert_allclose(probabilities, expected_probabilities)
 
-    def test_inner_prepare_pads_zero_spin_free_rows_with_identity(self):
-        """Unreachable SF rows must still define a valid conditional distribution."""
         operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
         sossa = operator.get_container()
         sossa.two_body.coeffs[...] = np.array([[0.0, 0.0, 0.0], [4.0, -9.0, 16.0]])
@@ -380,7 +375,7 @@ class TestSOSSABuilder:
 
         np.testing.assert_allclose(actual, np.array([[0.0, 0.0, 1.0], [2.0, -3.0, 4.0]]))
 
-    def test_ground_state_energy_and_energy_gap_agree_through_the_shift(self):
+    def test_lambda_eff_reference_paths_and_validation(self):
         r"""The two settings must be the same statement of the same reference point."""
         operator = to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
         probe = SOSSABuilder().run(operator).get_container()
@@ -404,23 +399,12 @@ class TestSOSSABuilder:
 
         assert lambda_eff_or_none(reference_ground_state_energy=gap) != from_gap
 
-    def test_supplying_both_reference_energies_is_rejected(self):
-        """``reference_ground_state_energy`` and ``reference_energy_gap`` are two spellings of one input."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
-        lam = SOSSABuilder().run(operator).get_container().normalization
+        band_operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+        lam = SOSSABuilder().run(band_operator).get_container().normalization
 
         with pytest.raises(ValueError, match="not both"):
-            SOSSABuilder(reference_ground_state_energy=0.0, reference_energy_gap=lam).run(operator)
+            SOSSABuilder(reference_ground_state_energy=0.0, reference_energy_gap=lam).run(band_operator)
 
-    @pytest.mark.parametrize(
-        "gap_fraction",
-        [-0.5, 0.0, 2.0, 2.5],
-        ids=["below_shift", "at_lower_band_edge", "at_upper_band_edge", "above_upper_band_edge"],
-    )
-    def test_lambda_eff_rejects_gaps_outside_the_band(self, gap_fraction):
-        """A gap outside ``(0, 2 Lambda)`` is a caller error, not a value to be clamped."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
-        lam = SOSSABuilder().run(operator).get_container().normalization
-
-        with pytest.raises(ValueError, match="outside the representable window"):
-            SOSSABuilder(reference_energy_gap=gap_fraction * lam).run(operator)
+        for gap_fraction in [-0.5, 0.0, 2.0, 2.5]:
+            with pytest.raises(ValueError, match="outside the representable window"):
+                SOSSABuilder(reference_energy_gap=gap_fraction * lam).run(band_operator)

@@ -1,4 +1,4 @@
-"""Pauli-LCU qubit operator container."""
+"""Pauli decomposition qubit operator container."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -30,7 +30,7 @@ from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
-__all__ = ["PauliLCUContainer"]
+__all__ = ["PauliDecompositionContainer"]
 
 
 def _merge_term_partitions(p0: TermPartition, p1: TermPartition) -> TermPartition:
@@ -64,7 +64,7 @@ def _hash_tapering(h, tapering: TaperingSpecification) -> None:
     _hash_arg(h, tapering.to_json())
 
 
-class PauliLCUContainer(QubitOperatorContainer):
+class PauliDecompositionContainer(QubitOperatorContainer):
     """Container representing an operator as a weighted sum of Pauli strings.
 
     Attributes:
@@ -93,17 +93,17 @@ class PauliLCUContainer(QubitOperatorContainer):
     """
 
     # Class attribute for filename validation
-    _data_type_name = "pauli_lcu_container"
+    _data_type_name = "pauli_decomposition_container"
 
     @staticmethod
     def data_type_name() -> str:
-        """Return the wire-format identifier for Pauli-LCU containers.
+        """Return the wire-format identifier for Pauli decomposition containers.
 
         Returns:
-            ``"pauli_lcu_container"``.
+            ``"pauli_decomposition_container"``.
 
         """
-        return "pauli_lcu_container"
+        return "pauli_decomposition_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -117,7 +117,7 @@ class PauliLCUContainer(QubitOperatorContainer):
         term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> None:
-        """Initialize a PauliLCUContainer.
+        """Initialize a PauliDecompositionContainer.
 
         Args:
             pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
@@ -164,7 +164,7 @@ class PauliLCUContainer(QubitOperatorContainer):
     @property
     def type(self) -> str:
         """Return the container type."""
-        return "pauli_lcu"
+        return "pauli_decomposition"
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -217,7 +217,7 @@ class PauliLCUContainer(QubitOperatorContainer):
             return pauli_to_sparse_matrix(self.pauli_strings, self.coefficients)
         return np.asarray(pauli_to_dense_matrix(self.pauli_strings, self.coefficients))
 
-    def equiv(self, other: PauliLCUContainer, atol: float = 1e-12) -> bool:
+    def equiv(self, other: PauliDecompositionContainer, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitOperator.
 
         Two operators are equivalent if they contain the same Pauli
@@ -232,16 +232,16 @@ class PauliLCUContainer(QubitOperatorContainer):
             ``True`` if the two operators are mathematically equivalent.
 
         Examples:
-            >>> qh1 = PauliLCUContainer(["XI", "ZZ"], np.array([0.5, 0.3]))
-            >>> qh2 = PauliLCUContainer(["ZZ", "XI"], np.array([0.3, 0.5]))
+            >>> qh1 = PauliDecompositionContainer(["XI", "ZZ"], np.array([0.5, 0.3]))
+            >>> qh2 = PauliDecompositionContainer(["ZZ", "XI"], np.array([0.3, 0.5]))
             >>> qh1.equiv(qh2)
             True
 
         """
-        if not isinstance(other, PauliLCUContainer):
+        if not isinstance(other, PauliDecompositionContainer):
             return False
 
-        def _sum_terms(qh: PauliLCUContainer) -> dict[str, complex]:
+        def _sum_terms(qh: PauliDecompositionContainer) -> dict[str, complex]:
             d: dict[str, complex] = {}
             for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
                 d[ps] = d.get(ps, 0) + c
@@ -269,7 +269,7 @@ class PauliLCUContainer(QubitOperatorContainer):
         """
         return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
 
-    def __add__(self, other: PauliLCUContainer) -> PauliLCUContainer:
+    def __add__(self, other: PauliDecompositionContainer) -> PauliDecompositionContainer:
         """Return the sum of two qubit operators.
 
         Pauli strings and coefficients are concatenated.  The ``encoding``,
@@ -290,8 +290,8 @@ class PauliLCUContainer(QubitOperatorContainer):
             ValueError: If the two operators have different qubit counts, encodings, or modes.
 
         """
-        if not isinstance(other, PauliLCUContainer):
-            raise TypeError(f"Cannot add PauliLCUContainer with {type(other).__name__}.")
+        if not isinstance(other, PauliDecompositionContainer):
+            raise TypeError(f"Cannot add PauliDecompositionContainer with {type(other).__name__}.")
         if self.num_qubits != other.num_qubits:
             raise ValueError(f"Cannot add operators with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:
@@ -311,7 +311,7 @@ class PauliLCUContainer(QubitOperatorContainer):
         if self.term_partition is not None and other.term_partition is not None:
             partition = _merge_term_partitions(self.term_partition, other.term_partition)
 
-        return PauliLCUContainer(
+        return PauliDecompositionContainer(
             pauli_strings,
             coefficients,
             encoding=self.encoding,
@@ -320,7 +320,7 @@ class PauliLCUContainer(QubitOperatorContainer):
             tapering=self.tapering,
         )
 
-    def __mul__(self, scalar) -> PauliLCUContainer:
+    def __mul__(self, scalar) -> PauliDecompositionContainer:
         """Return the operator with all coefficients scaled by *scalar*.
 
         The :attr:`term_partition` is preserved since term indices are unchanged.
@@ -334,7 +334,7 @@ class PauliLCUContainer(QubitOperatorContainer):
         """
         if not isinstance(scalar, int | float | complex | np.number):
             return NotImplemented
-        return PauliLCUContainer(
+        return PauliDecompositionContainer(
             list(self.pauli_strings),
             self.coefficients * scalar,
             encoding=self.encoding,
@@ -343,7 +343,7 @@ class PauliLCUContainer(QubitOperatorContainer):
             tapering=self.tapering,
         )
 
-    def __rmul__(self, scalar: float) -> PauliLCUContainer:
+    def __rmul__(self, scalar: float) -> PauliDecompositionContainer:
         """Support ``scalar * operator``."""
         return self.__mul__(scalar)
 
@@ -376,7 +376,7 @@ class PauliLCUContainer(QubitOperatorContainer):
             terms.sort(key=lambda t: abs(t[1]), reverse=True)
         return terms
 
-    def to_interleaved(self, n_spatial: int) -> PauliLCUContainer:
+    def to_interleaved(self, n_spatial: int) -> PauliDecompositionContainer:
         """Convert from blocked to interleaved spin-orbital ordering.
 
         Converts a qubit operator from blocked ordering (alpha orbitals first,
@@ -425,7 +425,7 @@ class PauliLCUContainer(QubitOperatorContainer):
                 new_chars[permutation[old_pos]] = char
             reordered_strings.append("".join(new_chars))
 
-        return PauliLCUContainer(
+        return PauliDecompositionContainer(
             pauli_strings=reordered_strings,
             coefficients=self.coefficients.copy(),
             encoding=self.encoding,
@@ -493,7 +493,7 @@ class PauliLCUContainer(QubitOperatorContainer):
             group.attrs["tapering"] = json.dumps(self.tapering.to_json())
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> PauliLCUContainer:
+    def from_json(cls, json_data: dict[str, Any]) -> PauliDecompositionContainer:
         """Create a QubitOperator from a JSON dictionary.
 
         Args:
@@ -527,7 +527,7 @@ class PauliLCUContainer(QubitOperatorContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> PauliLCUContainer:
+    def from_hdf5(cls, group: h5py.Group) -> PauliDecompositionContainer:
         """Load a QubitOperator from an HDF5 group.
 
         Args:

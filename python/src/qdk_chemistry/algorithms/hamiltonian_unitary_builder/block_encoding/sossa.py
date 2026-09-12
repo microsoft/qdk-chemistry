@@ -21,7 +21,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sos import SumOfSquaresContainer
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSARegisterLayout,

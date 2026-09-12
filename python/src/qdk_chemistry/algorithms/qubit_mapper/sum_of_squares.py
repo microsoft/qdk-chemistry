@@ -10,10 +10,10 @@ import numpy as np
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
-from qdk_chemistry.data.qubit_operator.containers.sos import (
-    FactorizedHamiltonianMetadata,
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     RotatedPaulis,
     SumOfSquaresContainer,
+    SumOfSquaresMetadata,
 )
 
 __all__ = ["SumOfSquaresQubitMapper", "SumOfSquaresQubitMapperSettings"]
@@ -154,7 +154,7 @@ class SumOfSquaresQubitMapper(QubitMapper):
                 two_body,
                 mapping.name,
                 "blocked",
-                FactorizedHamiltonianMetadata(
+                SumOfSquaresMetadata(
                     num_spatial_orbitals=num_orbitals,
                     num_ranks=num_ranks,
                     num_bases=num_bases,
@@ -179,7 +179,7 @@ class SumOfSquaresQubitMapper(QubitMapper):
                 (gamma_tilde_(ũ₋^(r)spin0) - i gamma_tilde_(ũ₋^(r)spin1)).
 
         Here (w₊^(r), ũ₊^(r)) and (-w₋^(r), ũ₋^(r)) are eigenpairs of the
-        corrected one-body matrix. The coefficient rows store Eqs. (B2)-(B3)
+        shifted one-body matrix. The coefficient rows store Eqs. (B2)-(B3)
         directly.
         """
         eigenvalues, eigenvectors = np.linalg.eigh(h1_prime)

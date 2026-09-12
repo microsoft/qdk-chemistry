@@ -206,11 +206,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// encodes the half-angle θ:
     ///   4π·x/2^b = θ  →  x = 2^b · θ / (4π)  (mod 2^b)
     internal function QuantizeGivensAngle(angle : Double, bRot : Int) : Int {
-
-        // Rejects NaN and ±∞ as well as absurd magnitudes: the comparison is false for
-        // NaN, so this fails loudly instead of silently folding a non-finite angle into
-        // an in-range bit pattern (NaN and +∞ both quantize to 2^bRot-1, -∞ to 0).
-        // Givens angles come from Atan2/hypot and are in [-π, π].
         Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeGivensAngle: angle must be finite and within [-4π, 4π]");
         let scale = IntAsDouble(1 <<< bRot);
         let raw = Round(scale * angle / (4.0 * PI()));
@@ -276,11 +271,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use spin = Qubit();
         use bEqBQubit = Qubit();
 
-        // LCU sign of the sampled (x_o, b) coefficient. The inner PREPARE already
-        // materializes it on a qubit it loaded from its own oracle, and the phase it
-        // applies there cancels against PREPARE† -- so applying Z once more here, between
-        // the two, is what leaves (-1)^s in the block encoding. One Clifford, no Toffolis
-        // (arXiv:2502.15882v1, Appendix B.5).
+        // sign of the sampled (x_o, b) coefficient.
         if params.signQubitIndex >= 0 {
             Z(innerReg[params.signQubitIndex]);
         }
@@ -593,9 +584,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     within {
                         CNOT(sysRegDown[j], sysRegDown[j + 1]);
                     } apply {
-                        // Neighbor-gated CRy(2θ) as Ry(θ)·CNOT·Ry(-θ)·CNOT: two uncontrolled Ry(θ)
-                        // sharing `word`, so it matches the direct path's gated G(θ) with no
-                        // controlled adder (arXiv:2605.30455 Fig. C_RZ; caesura2025faster).
+                        // arXiv:2605.30455 FIG. 40. Implementation of a controlled RZ(2θ)
+                        // gate using two parallel RZ(θ) gates without controls.
                         within {
                             CNOT(sysRegDown[j + 1], sysRegDown[j]);
                         } apply {

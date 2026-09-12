@@ -11,27 +11,27 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.qubit_mapper.sos import SumOfSquaresQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
-from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.sos import (
-    FactorizedHamiltonianMetadata,
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     RotatedPaulis,
     SumOfSquaresContainer,
+    SumOfSquaresMetadata,
 )
 
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
 
 
-def test_qubit_operator_wraps_pauli_lcu_container() -> None:
+def test_qubit_operator_wraps_pauli_decomposition_container() -> None:
     """Shared metadata and the compatibility Pauli API delegate to the container."""
-    container = PauliLCUContainer(["XI", "ZZ"], np.array([0.5, -0.25]), "jordan-wigner", "blocked")
+    container = PauliDecompositionContainer(["XI", "ZZ"], np.array([0.5, -0.25]), "jordan-wigner", "blocked")
     operator = QubitOperator(container)
 
     assert isinstance(container, QubitOperatorContainer)
     assert operator.get_container() is container
-    assert operator.get_container_type() == "pauli_lcu"
+    assert operator.get_container_type() == "pauli_decomposition"
     assert operator.num_qubits == 2
     assert operator.encoding == "jordan-wigner"
     assert operator.fermion_mode_order == "blocked"
@@ -40,7 +40,7 @@ def test_qubit_operator_wraps_pauli_lcu_container() -> None:
     assert operator.schatten_norm == container.schatten_norm
     np.testing.assert_allclose(operator.to_matrix(), container.to_matrix())
     assert operator.is_hermitian()
-    assert operator.equiv(QubitOperator(PauliLCUContainer(["ZZ", "XI"], np.array([-0.25, 0.5]))))
+    assert operator.equiv(QubitOperator(PauliDecompositionContainer(["ZZ", "XI"], np.array([-0.25, 0.5]))))
 
     scaled = 2 * operator
     added = operator + operator
@@ -50,7 +50,7 @@ def test_qubit_operator_wraps_pauli_lcu_container() -> None:
     assert added.pauli_strings == ["XI", "ZZ", "XI", "ZZ"]
 
     restored = QubitOperator.from_json(operator.to_json())
-    assert restored.get_container_type() == "pauli_lcu"
+    assert restored.get_container_type() == "pauli_decomposition"
     assert restored.content_hash() == operator.content_hash()
 
 
@@ -64,18 +64,18 @@ def test_qubit_operator_still_accepts_the_legacy_positional_constructor() -> Non
     """``QubitOperator(pauli_strings, coefficients)`` is a shipped signature and still works."""
     operator = QubitOperator(["XI", "ZZ"], np.array([0.5, -0.25]))
 
-    assert operator.get_container_type() == "pauli_lcu"
+    assert operator.get_container_type() == "pauli_decomposition"
     assert operator.pauli_strings == ["XI", "ZZ"]
     np.testing.assert_allclose(operator.coefficients, np.array([0.5, -0.25]))
 
 
-def test_pauli_lcu_json_preserves_coefficient_shape_and_dtype() -> None:
-    """Pauli LCU and SOS coefficients use the same complex-array wire format."""
+def test_pauli_decomposition_json_preserves_coefficient_shape_and_dtype() -> None:
+    """Pauli decomposition and SOS coefficients use the same complex-array wire format."""
     coefficients = np.array([0.5 + 0.25j, -0.25j], dtype=np.complex64)
-    container = PauliLCUContainer(["XI", "ZZ"], coefficients)
+    container = PauliDecompositionContainer(["XI", "ZZ"], coefficients)
 
     json_data = container.to_json()
-    restored = PauliLCUContainer.from_json(json_data)
+    restored = PauliDecompositionContainer.from_json(json_data)
 
     assert json_data["coefficients"] == {
         "real": [0.5, 0.0],
@@ -87,24 +87,24 @@ def test_pauli_lcu_json_preserves_coefficient_shape_and_dtype() -> None:
     assert restored.coefficients.dtype == coefficients.dtype
 
 
-def test_pauli_lcu_reads_complex_coefficients_without_shape() -> None:
+def test_pauli_decomposition_reads_complex_coefficients_without_shape() -> None:
     """Read coefficient dictionaries written before the shared array codec added shape."""
-    json_data = PauliLCUContainer(["X"], np.array([0.5 + 0.25j])).to_json()
+    json_data = PauliDecompositionContainer(["X"], np.array([0.5 + 0.25j])).to_json()
     del json_data["coefficients"]["shape"]
 
-    restored = PauliLCUContainer.from_json(json_data)
+    restored = PauliDecompositionContainer.from_json(json_data)
 
     np.testing.assert_array_equal(restored.coefficients, np.array([0.5 + 0.25j]))
 
 
 def test_qubit_operator_reads_documents_written_before_container_dispatch() -> None:
-    """A hand-authored pre-container document loads as a Pauli LCU operator.
+    """A hand-authored pre-container document loads as a Pauli decomposition operator.
 
     Pre-container releases wrote ``pauli_strings``/``coefficients`` at version ``0.1.0``
     with no ``container_type`` and no ``shape``/``dtype`` on the coefficient dict. The
-    missing key must default to ``pauli_lcu`` and the container's ``0.1.0`` guard must
-    accept the document unchanged; a fixture (not a stripped round-trip of current output)
-    is what pins that legacy schema.
+    missing key must default to ``pauli_decomposition`` and the container's ``0.1.0``
+    guard must accept the document unchanged; a fixture (not a stripped round-trip of
+    current output) is what pins that legacy schema.
     """
     legacy = {
         "pauli_strings": ["XI", "ZZ"],
@@ -115,7 +115,7 @@ def test_qubit_operator_reads_documents_written_before_container_dispatch() -> N
 
     restored = QubitOperator.from_json(legacy)
 
-    assert restored.get_container_type() == "pauli_lcu"
+    assert restored.get_container_type() == "pauli_decomposition"
     assert restored.pauli_strings == ["XI", "ZZ"]
     np.testing.assert_allclose(restored.coefficients, np.array([0.5, -0.25]))
     assert restored.encoding == "jordan-wigner"
@@ -134,26 +134,20 @@ def test_qubit_operator_reads_hdf5_groups_written_before_container_dispatch(tmp_
     with h5py.File(path, "r") as handle:
         restored = QubitOperator.from_hdf5(handle["operator"])
 
-    assert restored.get_container_type() == "pauli_lcu"
+    assert restored.get_container_type() == "pauli_decomposition"
     assert restored.pauli_strings == ["XI", "ZZ"]
     np.testing.assert_allclose(restored.coefficients, np.array([0.5, -0.25]))
     assert restored.encoding == "jordan-wigner"
 
 
-def test_sum_of_squares_container_json_roundtrip_preserves_complex_coefficients() -> None:
-    """Complex LCU coefficients and Givens angles survive a JSON round-trip.
-
-    The SOS generators carry the D1/Q1 ``+/-i`` sign in the imaginary part, so a
-    serializer that silently drops it would still produce a well-formed container
-    while flipping particle generators into hole generators.
-    """
-    one_body_coeffs = np.array([[0.2, 0.2j], [0.3, -0.3j]])
-    container = SumOfSquaresContainer(
-        one_body=RotatedPaulis(np.array([[0.1], [0.2]]), one_body_coeffs, ("X", "Y")),
+def _sum_of_squares_container() -> SumOfSquaresContainer:
+    """Build a small SOS container whose one-body block carries D1/Q1 ``+/-i`` phases."""
+    return SumOfSquaresContainer(
+        one_body=RotatedPaulis(np.array([[0.1], [0.2]]), np.array([[0.2, 0.2j], [0.3, -0.3j]]), ("X", "Y")),
         two_body=RotatedPaulis(np.array([[0.3]]), np.array([[0.3, 0.7]]), ("Z",)),
         encoding="jordan-wigner",
         fermion_mode_order="blocked",
-        metadata=FactorizedHamiltonianMetadata(
+        metadata=SumOfSquaresMetadata(
             num_spatial_orbitals=2,
             num_ranks=1,
             num_bases=1,
@@ -163,19 +157,148 @@ def test_sum_of_squares_container_json_roundtrip_preserves_complex_coefficients(
         ),
     )
 
+
+def _assert_sum_of_squares_containers_match(restored, container) -> None:
+    """Compare every field a serializer could silently drop or reorder."""
+    np.testing.assert_allclose(restored.one_body.angles, container.one_body.angles)
+    np.testing.assert_allclose(restored.one_body.coeffs, container.one_body.coeffs)
+    assert restored.one_body.paulis == container.one_body.paulis
+    np.testing.assert_allclose(restored.two_body.angles, container.two_body.angles)
+    np.testing.assert_allclose(restored.two_body.coeffs, container.two_body.coeffs)
+    assert restored.two_body.paulis == container.two_body.paulis
+    assert restored.metadata == container.metadata
+    assert restored.encoding == container.encoding
+    assert restored.fermion_mode_order == container.fermion_mode_order
+
+
+def test_sum_of_squares_metadata_rejects_negative_dimensions() -> None:
+    """Negative R/B/C survive the ``.size``-guarded shape checks, so metadata rejects them itself."""
+    for dimensions in ((-1, 1, 1), (1, -1, 1), (1, 1, -1)):
+        num_ranks, num_bases, num_copies = dimensions
+        with pytest.raises(ValueError, match="must not be negative"):
+            SumOfSquaresMetadata(
+                num_spatial_orbitals=2,
+                num_ranks=num_ranks,
+                num_bases=num_bases,
+                num_copies=num_copies,
+                num_positive_one_body_terms=0,
+                energy_shift=0.0,
+            )
+
+
+def test_rotated_paulis_rejects_blocks_that_are_not_internally_consistent() -> None:
+    """A block owns the shape facts every block shares, before any metadata is known."""
+    with pytest.raises(ValueError, match="2-D"):
+        RotatedPaulis(np.array([0.1, 0.2]), np.array([0.3, 0.4]), ("X",))
+
+    with pytest.raises(ValueError, match="at least one Pauli word"):
+        RotatedPaulis(np.array([[0.1]]), np.array([[0.3]]), ())
+
+
+def test_sum_of_squares_container_rejects_blocks_that_contradict_its_metadata() -> None:
+    """Row alignment and agreement with the dimensions are the container's invariants."""
+    metadata = SumOfSquaresMetadata(
+        num_spatial_orbitals=3,
+        num_ranks=1,
+        num_bases=1,
+        num_copies=1,
+        num_positive_one_body_terms=1,
+        energy_shift=0.0,
+    )
+    two_body = RotatedPaulis(np.array([[0.3, 0.4]]), np.array([[0.3, 0.7]]), ("Z",))
+
+    with pytest.raises(ValueError, match="matching generator counts"):
+        SumOfSquaresContainer(
+            RotatedPaulis(np.array([[0.1, 0.2], [0.3, 0.4]]), np.array([[0.2, 0.2j]]), ("X", "Y")),
+            two_body,
+            None,
+            None,
+            metadata,
+        )
+
+    with pytest.raises(ValueError, match="one column per Pauli label"):
+        SumOfSquaresContainer(
+            RotatedPaulis(np.array([[0.1, 0.2]]), np.array([[0.2, 0.2j, 0.1]]), ("X", "Y")),
+            two_body,
+            None,
+            None,
+            metadata,
+        )
+
+    with pytest.raises(ValueError, match="num_spatial_orbitals - 1 columns"):
+        SumOfSquaresContainer(
+            RotatedPaulis(np.array([[0.1]]), np.array([[0.2, 0.2j]]), ("X", "Y")),
+            two_body,
+            None,
+            None,
+            metadata,
+        )
+
+
+def test_sum_of_squares_container_accepts_a_two_body_block_with_unequal_row_counts() -> None:
+    """Two-body angles are per ``(rank, basis)`` and coefficients per ``(rank, copy)``.
+
+    Whenever ``num_bases != num_copies`` the two blocks legitimately disagree on row
+    count, so row alignment cannot be a shared invariant of every rotated-Pauli block.
+    """
+    metadata = SumOfSquaresMetadata(
+        num_spatial_orbitals=3,
+        num_ranks=1,
+        num_bases=2,
+        num_copies=1,
+        num_positive_one_body_terms=1,
+        energy_shift=0.0,
+    )
+    two_body = RotatedPaulis(np.zeros((2, 2)), np.zeros((1, 3)), ("Z",))
+
+    container = SumOfSquaresContainer(
+        RotatedPaulis(np.array([[0.1, 0.2]]), np.array([[0.2, 0.2j]]), ("X", "Y")),
+        two_body,
+        None,
+        None,
+        metadata,
+    )
+
+    assert container.two_body.angles.shape != container.two_body.coeffs.shape
+
+
+def test_sum_of_squares_container_json_roundtrip_preserves_complex_coefficients() -> None:
+    """Complex LCU coefficients and Givens angles survive a JSON round-trip.
+
+    The SOS generators carry the D1/Q1 ``+/-i`` sign in the imaginary part, so a
+    serializer that silently drops it would still produce a well-formed container
+    while flipping particle generators into hole generators.
+    """
+    container = _sum_of_squares_container()
+
     json_data = QubitOperator(container).to_json()
-    assert json_data["one_body_coeffs"]["shape"] == [2, 2]
-    assert json_data["one_body_coeffs"]["dtype"] == "complex128"
-    del json_data["one_body_coeffs"]["dtype"]
-    del json_data["two_body_coeffs"]["dtype"]
+    assert json_data["one_body"]["coeffs"]["shape"] == [2, 2]
+    assert json_data["one_body"]["coeffs"]["dtype"] == "complex128"
+    assert json_data["one_body"]["paulis"] == ["X", "Y"]
+    del json_data["one_body"]["coeffs"]["dtype"]
+    del json_data["two_body"]["coeffs"]["dtype"]
     restored = QubitOperator.from_json(json_data).get_container()
 
-    np.testing.assert_allclose(restored.one_body.coeffs, one_body_coeffs)
-    np.testing.assert_allclose(restored.one_body.angles, container.one_body.angles)
-    np.testing.assert_allclose(restored.two_body.coeffs, container.two_body.coeffs)
-    np.testing.assert_allclose(restored.two_body.angles, container.two_body.angles)
-    assert restored.metadata.num_positive_one_body_terms == 1
+    _assert_sum_of_squares_containers_match(restored, container)
     assert restored.metadata.energy_shift == pytest.approx(-1.5)
+
+
+def test_sum_of_squares_container_hdf5_roundtrip(tmp_path) -> None:
+    """The container reloads from HDF5 through the qubit operator's container dispatch."""
+    container = _sum_of_squares_container()
+    path = tmp_path / "sos.h5"
+
+    with h5py.File(path, "w") as handle:
+        QubitOperator(container).to_hdf5(handle.create_group("operator"))
+
+    with h5py.File(path, "r") as handle:
+        assert handle["operator"].attrs["container_type"] == "sum_of_squares"
+        operator = QubitOperator.from_hdf5(handle["operator"])
+
+    restored = operator.get_container()
+    assert isinstance(restored, SumOfSquaresContainer)
+    _assert_sum_of_squares_containers_match(restored, container)
+    assert operator.content_hash() == QubitOperator(container).content_hash()
 
 
 def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
