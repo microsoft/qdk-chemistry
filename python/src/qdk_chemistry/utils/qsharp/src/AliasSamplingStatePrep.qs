@@ -11,12 +11,12 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Arrays.Reversed;
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Convert.BoolArrayAsInt;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsD;
+    import Std.Math.BitSizeI;
     import Std.Math.Ceiling;
     import Std.Math.Floor;
     import Std.Math.IsInfinite;
@@ -24,7 +24,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Lg;
     import Std.Math.MinI;
     import Std.Math.Sqrt;
-    import Std.StatePreparation.PrepareUniformSuperposition;
+    import Std.StatePreparation.PreparePureStateD;
     import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
     import Std.Arrays.Sorted;
@@ -190,6 +190,36 @@ namespace QDKChemistry.Utils.AliasSampling {
         return result;
     }
 
+    /// Prepare a uniform superposition over |0⟩ .. |nStates - 1⟩ without ancillas.
+    ///
+    /// `Std.StatePreparation.PrepareUniformSuperposition` allocates an ancilla that is
+    /// only guaranteed to return to |0⟩ when the register still holds the exact state it
+    /// prepared. PREPARE† in a qubitized walk is applied after SELECT has imprinted a
+    /// phase, so that guarantee does not hold and the ancilla is released dirty. This
+    /// variant is ancilla-free, so its adjoint is exact for any intervening phase.
+    ///
+    /// A power-of-two `nStates` keeps the plain Hadamard preparation; other counts use a
+    /// multiplexed rotation over the padded index space.
+    internal operation PreparePhaseSafeUniformSuperposition(
+        nStates : Int,
+        register : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let nQubits = Length(register);
+        Fact(nStates > 0, "nStates must be positive.");
+        Fact(nStates <= 1 <<< nQubits, "register is too small to hold nStates.");
+
+        if (nStates &&& (nStates - 1)) == 0 {
+            ApplyToEachCA(H, register[0..BitSizeI(nStates - 1) - 1]);
+        } else {
+            let amplitude = 1.0 / Sqrt(IntAsDouble(nStates));
+            let coefficients = MappedOverRange(
+                idx -> if idx < nStates { amplitude } else { 0.0 },
+                0..(1 <<< nQubits) - 1
+            );
+            PreparePureStateD(coefficients, Reversed(register));
+        }
+    }
+
     /// Alias sampling state preparation.
     ///
     /// Prepares: |0⟩ → Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩
@@ -236,7 +266,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         );
 
         // Step 1: Uniform superposition over L terms
-        PrepareUniformSuperposition(nCoeffs, indexRegister);
+        PreparePhaseSafeUniformSuperposition(nCoeffs, indexRegister);
 
         // Step 2: H⊗μ on comparison register
         ApplyToEachCA(H, uniformRegister);
@@ -326,7 +356,7 @@ namespace QDKChemistry.Utils.AliasSampling {
             nIndexBits
         );
 
-        PrepareUniformSuperposition(nCoeffs, indexRegister);
+        PreparePhaseSafeUniformSuperposition(nCoeffs, indexRegister);
         ApplyToEachCA(H, uniformRegister);
 
         // 2D QROM load — outer=conditionalRegister, inner=indexRegister.
