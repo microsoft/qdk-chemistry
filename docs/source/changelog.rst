@@ -4,6 +4,11 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.3.0
+=============
+
+Unreleased.
+
 Version 2.2.1
 =============
 

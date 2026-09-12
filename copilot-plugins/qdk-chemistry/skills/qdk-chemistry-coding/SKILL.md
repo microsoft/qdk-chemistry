@@ -1,6 +1,6 @@
 ---
 name: qdk-chemistry-coding
-version: 'v2.2.1'
+version: 'v2.3.0'
 description: 'Describes the Python API for discovering, configuring, and executing QDK Chemistry algorithms.'
 ---
 
