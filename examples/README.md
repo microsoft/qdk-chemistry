@@ -27,7 +27,6 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
 | `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
-| `benchmark/fermi_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `benchmark/sample_hubbard_resources.py` | `pip install 'qdk-chemistry[qre]'` |
 | `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
 | `factory_list.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins]'` |
@@ -74,8 +73,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
 - `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
-- `benchmark/fermi_hubbard.ipynb`: Jupyter notebook benchmarking fault-tolerant quantum resource estimation for ground-state quantum phase estimation of the 2D Fermi-Hubbard model across a sweep of lattice sizes.
-- `benchmark/sample_hubbard_resources.py`: command-line form of that benchmark for estimating one lattice size unattended and writing the result to CSV.
+- `benchmark/sample_hubbard_resources.py`: sweeps fault-tolerant resource estimates for ground-state quantum phase estimation of the 2D Fermi-Hubbard model across lattice sizes, writing one CSV row per size as it finishes so a long run can be resumed. The builder's costs are checked against Campbell's published tables in `python/tests/test_plaquette_campbell_benchmark.py`.
 
 ## Companion datasets and assets
 

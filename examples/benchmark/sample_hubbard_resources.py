@@ -8,6 +8,9 @@ a qubit/runtime Pareto frontier.
 Large lattices are bound by memory. Measured Hamiltonian-build peak RSS is about 2 GB
 at ``L=60`` and 24 GB at ``L=120``.
 
+The builder's logical costs are checked against Campbell's published tables
+(arXiv:2012.09238v4) in ``python/tests/test_plaquette_campbell_benchmark.py``.
+
 Examples:
     Sample a 50 x 50 lattice::
 
@@ -240,9 +243,7 @@ def run_sampling(context, size: int) -> EstimationTable:
     qpe_budget = energy_budget / 2
     trotter_budget = energy_budget
     base_time = math.pi / one_norm / 2
-    resolution_bits = math.ceil(
-        math.log2(2 * math.pi / qpe_budget / base_time)
-    )
+    resolution_bits = math.ceil(math.log2(2 * math.pi / qpe_budget / base_time))
 
     initial_state = reference_state_prep(context, size * size, num_electrons(size))
     circuit = qpe_circuit(
