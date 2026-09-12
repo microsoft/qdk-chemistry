@@ -21,7 +21,11 @@ def load():
         return
     _loaded = True
 
-    if importlib.util.find_spec("azure.quantum") is not None and importlib.util.find_spec("azure.identity") is not None:
+    if (
+        importlib.util.find_spec("azure") is not None
+        and importlib.util.find_spec("azure.quantum") is not None
+        and importlib.util.find_spec("azure.identity") is not None
+    ):
         QDK_CHEMISTRY_HAS_AZURE_QUANTUM = True
 
     if QDK_CHEMISTRY_HAS_AZURE_QUANTUM:
