@@ -98,6 +98,41 @@ def simulation_qubit_estimate(walk_container, num_queries: int) -> int:
     return walk_container.num_qubits + int(num_queries).bit_length()
 
 
+def effective_normalization(
+    walk_container, override: float | None = None
+) -> tuple[float, str]:
+    """Return the normalization that sets the query count, and where it came from.
+
+    Prefers, in order: a published value supplied by the caller, the container's
+    spectrally amplified ``lambda_eff``, and finally the raw ``Lambda``.
+
+    ``lambda_eff`` is defined only when the block encoding was built with a
+    classical reference energy, and the container raises rather than guessing one
+    when it was not. No predicate is exposed to probe that, so the unset case is
+    caught here. Falling back to ``Lambda`` over-estimates the query count, which
+    is the safe direction: it forfeits the amplification saving rather than
+    reporting a cost that cannot be achieved.
+
+    Args:
+        walk_container: SOSSA walk container from :func:`require_sossa_walk`.
+        override: Published ``lambda_eff`` to use instead of the container's, or
+            ``None`` to derive it.
+
+    Returns:
+        A tuple of the normalization, in Hartree, and a description of its origin.
+
+    """
+    if override is not None:
+        return float(override), "published value for this system"
+    try:
+        return walk_container.lambda_eff, "derived from the classical reference energy"
+    except ValueError:
+        return (
+            walk_container.normalization,
+            "no reference energy available, falling back to the conservative Lambda",
+        )
+
+
 def make_fake_hamiltonian(
     n: int,
     r: int,
