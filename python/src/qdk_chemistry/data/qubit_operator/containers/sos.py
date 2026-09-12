@@ -107,7 +107,7 @@ class SOSContainer(QubitOperatorContainer):
     """
 
     _data_type_name = "sos_container"
-    _serialization_version = "0.3.0"
+    _serialization_version = "0.1.0"
 
     @staticmethod
     def data_type_name() -> str:

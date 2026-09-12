@@ -168,7 +168,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     """
 
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.1.0"
 
     @staticmethod
     def data_type_name() -> str:

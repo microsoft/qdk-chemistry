@@ -13,11 +13,16 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit
+from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
-from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
+from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
+from .test_phase_estimation_sossa import (
+    _build_dfthc_hamiltonian_matrix,
+    _python_to_qsharp_permutation,
+    _python_to_qsharp_sign,
+)
 
 
 def _build_sossa_unitary(
@@ -68,6 +73,78 @@ def _with_prepared_gradient(op, num_gradient: int):
 def _reverse_bits(x: int, n: int) -> int:
     """Reverse the bit order of *x* within an *n*-bit field."""
     return int(format(x, f"0{n}b")[::-1], 2)
+
+
+def _block_encoding_action(circuit, num_system_qubits: int, system_state: np.ndarray) -> np.ndarray:
+    r"""Apply ``circuit`` to :math:`|\psi\rangle|0\rangle_\mathrm{anc}` and project on ancilla zero.
+
+    Returns :math:`(\langle 0|_\mathrm{anc} \otimes I) B (|0\rangle_\mathrm{anc} \otimes I) |\psi\rangle`,
+    i.e. the top-left block of the encoding applied to ``system_state``. The mapper lays the
+    register out as ``[system | ancilla]`` while :func:`dump_operation_on_state` numbers basis
+    states big-endian, so the system register takes the high bits and its index runs the other
+    way -- hence the bit reversal on both ends.
+    """
+    stride = 2 ** (circuit.num_qubits - num_system_qubits)
+    dimension = 2**num_system_qubits
+
+    initial_state = [0.0] * ((dimension - 1) * stride + 1)
+    for index, amplitude in enumerate(system_state):
+        initial_state[_reverse_bits(index, num_system_qubits) * stride] = float(amplitude)
+
+    statevector = dump_operation_on_state(
+        circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
+    )
+    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
+
+
+def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, seed=0, atol=1e-9):
+    r"""Assert the simulated SOSSA block equals ``H_gap/\Lambda - I`` on a full fixture.
+
+    The block is compared against the gap Hamiltonian element by element -- not just via a
+    decoded eigenphase, which is blind to any similarity transform. Because the Q# walk works
+    in spin-blocked order while :func:`_build_dfthc_hamiltonian_matrix` builds ``H_gap`` in the
+    interleaved ``(p, sigma)`` order, the oracle is carried across with the *fermionic* reorder
+    (:func:`_python_to_qsharp_sign`), whose signs relabelling the basis on its own drops. That
+    sign is what makes the many-body (multi-particle) sectors agree.
+    """
+    num_orbitals = h1.shape[0]
+    num_system_qubits = 2 * num_orbitals
+    dimension = 2**num_system_qubits
+
+    container = FactorizedHamiltonianContainer(
+        one_body_integrals=h1,
+        u_matrices=u_matrices.reshape(-1),
+        w_matrices=w_matrices.reshape(-1),
+        wb_matrix=wb_matrix,
+        orbitals=create_test_orbitals(num_orbitals),
+        core_energy=0.0,
+        inactive_fock_matrix=np.zeros((num_orbitals, num_orbitals)),
+    )
+    unitary = SOSSABuilder().run(to_sossa_operator(container))
+    normalization = unitary.get_container().normalization
+    circuit = _make_sossa_mapper(
+        outer_algorithm="dense_pure_state",
+        inner_algorithm="direct",
+        select_algorithm="direct",
+        coefficient_bit_precision=16,
+        rotation_bit_precision=16,
+    ).run(unitary)
+
+    permutation = _python_to_qsharp_permutation(num_orbitals)
+    signs = _python_to_qsharp_sign(num_orbitals)
+    reorder = np.zeros((dimension, dimension))
+    for index in range(dimension):
+        reorder[permutation[index], index] = signs[index]
+    h_gap = _build_dfthc_hamiltonian_matrix(h1, u_matrices, w_matrices, wb_matrix)
+    expected_block = reorder @ h_gap @ reorder.T / normalization - np.eye(dimension)
+
+    rng = np.random.default_rng(seed)
+    system_state = rng.standard_normal(dimension)
+    system_state /= np.linalg.norm(system_state)
+    expected = expected_block @ system_state
+    actual = _block_encoding_action(circuit, num_system_qubits=num_system_qubits, system_state=system_state)
+    actual *= np.exp(-1j * np.angle(np.vdot(expected, actual)))
+    np.testing.assert_allclose(actual, expected, atol=atol)
 
 
 def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
@@ -314,6 +391,38 @@ class TestSOSSAMapper:
         actual *= np.exp(-1j * np.angle(global_phase))
         np.testing.assert_allclose(actual, expected, atol=1e-10)
 
+    def test_full_block_matches_hgap_on_two_orbital_general_angle_fixture(self):
+        """The 16-dimensional block equals ``H_gap/Lambda - I`` when Givens rotations are active.
+
+        Two spatial orbitals with an off-diagonal one-body term (a general ``D1``/``Q1`` angle)
+        and a non-axis-aligned basis vector (a general ``SF`` angle) exercise the neighbour
+        rotations that the one-orbital hand calculation cannot reach.
+        """
+        h1 = np.array([[0.5, 0.3], [0.3, -0.2]])
+        u_matrices = np.array([[[0.6, 0.8]]])  # (R=1, B=1, N=2), general angle
+        w_matrices = np.array([[[0.7]]])  # (R=1, B=1, C=1)
+        wb_matrix = np.array([[0.3]])  # (R=1, C=1)
+        _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix)
+
+    def test_full_block_matches_hgap_with_multiple_ranks_copies_mixed_signs(self):
+        """The block matches ``H_gap/Lambda - I`` for R>1, C>1, mixed-sign ``w_b`` and ``w_B>0``.
+
+        This is the stress fixture: two ranks, two bases, two copies, mixed-sign two-body
+        weights and strictly positive identity weights, so every branch of ``SELECT`` and the
+        squared ``SF`` generators contribute.
+        """
+        rng = np.random.default_rng(11)
+        u_matrices = np.zeros((2, 2, 2))
+        for r in range(2):
+            for b in range(2):
+                v = rng.standard_normal(2)
+                u_matrices[r, b] = v / np.linalg.norm(v)
+        w_matrices = np.array([[[0.5, 0.3], [-0.4, 0.2]], [[0.6, -0.1], [0.25, 0.35]]])  # mixed sign
+        wb_matrix = np.array([[0.4, 0.2], [0.3, 0.5]])  # w_B > 0
+        h1 = rng.standard_normal((2, 2))
+        h1 = 0.3 * (h1 + h1.T)
+        _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix)
+
     def test_declares_the_register_the_walk_reflects_about(self):
         unitary = _build_sossa_unitary()
         container = unitary.get_container()
@@ -413,7 +522,7 @@ class TestSelectFullFidelity:
         select_data = self._select_data(2, rotation_bit_precision=10)
         select_data["numFreeRiderBits"] = num_free_rider_bits
 
-        with pytest.raises(Exception, match="SelectImpl requires numFreeRiderBits >= 2"):
+        with pytest.raises(Exception, match="SelectImpl requires at least two free-rider bits"):
             self._run_select(select_data)
 
     @pytest.mark.parametrize("N", [2, 3])
