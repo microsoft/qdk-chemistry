@@ -272,9 +272,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             - Q1 (hole):     ``[False, True]``
             - SF (two-body): ``[True,  True]``
 
-        The D/Q/SF generator taxonomy is Eqs. (28)-(32) of :cite:`Low2025`; the
-        two-bit packing above is this implementation's own layout choice.
-
         """
         xo_dim = n_orbitals + n_ranks * n_copies
 
