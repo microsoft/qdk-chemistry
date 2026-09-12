@@ -18,8 +18,7 @@ using namespace qdk::chemistry::python;
 
 void bind_double_factorization(py::module &m) {
   py::class_<DoubleFactorization, HamiltonianFactorization, py::smart_holder>
-      double_factorization(
-      m, "DoubleFactorization", R"(
+      double_factorization(m, "DoubleFactorization", R"(
   Double-factorize a restricted Hamiltonian into low-rank two-electron fragments.
 
   The result is backed by a
@@ -71,7 +70,7 @@ Raises:
   ValueError: If the input or its two-electron integrals are invalid, or no fragment survives truncation.
   RuntimeError: If an eigendecomposition fails.
 )",
-                        py::arg("hamiltonian"));
+                           py::arg("hamiltonian"));
 
   double_factorization.def("settings", &DoubleFactorization::settings, R"(
 Return this factorizer's settings.
@@ -79,7 +78,7 @@ Return this factorizer's settings.
 Returns:
   qdk_chemistry.data.Settings: Mutable settings, locked after the first call to :meth:`run`.
 )",
-                        py::return_value_policy::reference_internal);
+                           py::return_value_policy::reference_internal);
 
   double_factorization.def("name", &DoubleFactorization::name, R"(
 Return the implementation name.

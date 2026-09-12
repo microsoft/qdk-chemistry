@@ -172,7 +172,8 @@ std::shared_ptr<const SymmetryBlockedIndexSet> trivial_index_set(
 }  // namespace
 
 TEST(DoubleFactorizationTest, MetadataAndFactoryRegistration) {
-  auto factorizer = HamiltonianFactorizationFactory::create("double_factorization");
+  auto factorizer =
+      HamiltonianFactorizationFactory::create("double_factorization");
   ASSERT_NE(factorizer, nullptr);
   EXPECT_EQ(factorizer->type_name(), "hamiltonian_factorization");
   EXPECT_EQ(factorizer->name(), "double_factorization");
@@ -195,7 +196,8 @@ TEST(DoubleFactorizationTest, MetadataAndFactoryRegistration) {
 TEST(DoubleFactorizationTest, RejectsInvalidInput) {
   constexpr std::size_t norb = 4;
   auto hamiltonian = make_hamiltonian(norb, make_two_body(norb, {1.0}, 31));
-  auto factorizer = HamiltonianFactorizationFactory::create("double_factorization");
+  auto factorizer =
+      HamiltonianFactorizationFactory::create("double_factorization");
 
   EXPECT_THROW(factorizer->settings().set("truncation_threshold", -1.0),
                std::exception);
@@ -215,7 +217,8 @@ TEST(DoubleFactorizationTest, RejectsInvalidInput) {
   EXPECT_THROW(factorizer->run(make_hamiltonian(norb, with_inf)),
                std::invalid_argument);
 
-  auto truncating = HamiltonianFactorizationFactory::create("double_factorization");
+  auto truncating =
+      HamiltonianFactorizationFactory::create("double_factorization");
   truncating->settings().set("truncation_threshold", 1e6);
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
 }
@@ -228,7 +231,8 @@ TEST(DoubleFactorizationTest, PreservesOneBodyTermAndCoreEnergy) {
 
   auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
   auto factorized =
-      HamiltonianFactorizationFactory::create("double_factorization")->run(hamiltonian);
+      HamiltonianFactorizationFactory::create("double_factorization")
+          ->run(hamiltonian);
 
   auto [factorized_h_alpha, factorized_h_beta] =
       factorized->get_one_body_integrals();
@@ -266,7 +270,8 @@ TEST(DoubleFactorizationTest, PreservesInactiveFockAcrossASmallerActiveSpace) {
   ASSERT_TRUE(hamiltonian->has_inactive_fock_matrix());
 
   auto factorized =
-      HamiltonianFactorizationFactory::create("double_factorization")->run(hamiltonian);
+      HamiltonianFactorizationFactory::create("double_factorization")
+          ->run(hamiltonian);
 
   EXPECT_DOUBLE_EQ(factorized->get_core_energy(), core_energy);
   EXPECT_EQ(as_factorized(factorized).get_num_orbitals(), nact);
@@ -296,7 +301,8 @@ TEST(DoubleFactorizationTest, TruncationDiscardsSmallFragments) {
   const auto num_ranks_exact =
       as_factorized(exact->run(hamiltonian)).get_num_ranks();
 
-  auto truncated = HamiltonianFactorizationFactory::create("double_factorization");
+  auto truncated =
+      HamiltonianFactorizationFactory::create("double_factorization");
   truncated->settings().set("truncation_threshold", 1e-2);
   auto truncated_hamiltonian = truncated->run(hamiltonian);
   const auto& truncated_container = as_factorized(truncated_hamiltonian);
@@ -317,7 +323,8 @@ TEST(DoubleFactorizationTest, RunProducesEquivalentFactorizedContainer) {
   auto hamiltonian = make_hamiltonian(norb, two_body, core_energy);
 
   auto factorized =
-      HamiltonianFactorizationFactory::create("double_factorization")->run(hamiltonian);
+      HamiltonianFactorizationFactory::create("double_factorization")
+          ->run(hamiltonian);
   ASSERT_NE(factorized, nullptr);
   EXPECT_EQ(factorized->get_container_type(), "factorized");
 
@@ -341,7 +348,8 @@ TEST(DoubleFactorizationTest, ReusesStoredThreeCenterIntegrals) {
   auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
 
   auto factorized =
-      HamiltonianFactorizationFactory::create("double_factorization")->run(hamiltonian);
+      HamiltonianFactorizationFactory::create("double_factorization")
+          ->run(hamiltonian);
   const auto& container = as_factorized(factorized);
   EXPECT_EQ(container.get_num_ranks(), 5u);
 
@@ -360,7 +368,8 @@ TEST(DoubleFactorizationTest, IgnoresTruncationThresholdForStoredVectors) {
   const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 5, 23);
   auto hamiltonian = make_cholesky_hamiltonian(norb, vectors);
 
-  auto factorizer = HamiltonianFactorizationFactory::create("double_factorization");
+  auto factorizer =
+      HamiltonianFactorizationFactory::create("double_factorization");
   factorizer->settings().set("truncation_threshold", 1e6);
   auto factorized = factorizer->run(hamiltonian);
 
@@ -386,9 +395,11 @@ TEST(DoubleFactorizationTest, StoredVectorsMatchDenseDecomposition) {
   auto dense = make_hamiltonian(norb, dense_tensor);
 
   auto from_stored =
-      HamiltonianFactorizationFactory::create("double_factorization")->run(stored);
+      HamiltonianFactorizationFactory::create("double_factorization")
+          ->run(stored);
   auto from_dense =
-      HamiltonianFactorizationFactory::create("double_factorization")->run(dense);
+      HamiltonianFactorizationFactory::create("double_factorization")
+          ->run(dense);
 
   EXPECT_EQ(as_factorized(from_stored).get_num_ranks(),
             as_factorized(from_dense).get_num_ranks());

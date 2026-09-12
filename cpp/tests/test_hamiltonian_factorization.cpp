@@ -51,8 +51,7 @@ TEST(HamiltonianFactorizationTest, MetadataAndRunContract) {
 
   std::shared_ptr<Hamiltonian> hamiltonian;
   EXPECT_EQ(factorization.run(hamiltonian), hamiltonian);
-  EXPECT_THROW(
-      factorization.settings().set("test_setting", std::int64_t{2}),
+  EXPECT_THROW(factorization.settings().set("test_setting", std::int64_t{2}),
                SettingsAreLocked);
 }
 
@@ -63,9 +62,9 @@ TEST(HamiltonianFactorizationTest, Factory) {
             "double_factorization");
 
   const auto available = HamiltonianFactorizationFactory::available();
-  EXPECT_NE(std::find(available.begin(), available.end(),
-                      "double_factorization"),
-            available.end());
+  EXPECT_NE(
+      std::find(available.begin(), available.end(), "double_factorization"),
+      available.end());
   EXPECT_EQ(HamiltonianFactorizationFactory::create()->name(),
             "double_factorization");
   EXPECT_THROW(
@@ -76,12 +75,11 @@ TEST(HamiltonianFactorizationTest, Factory) {
       []() -> HamiltonianFactorizationFactory::return_type {
         return std::make_unique<TestHamiltonianFactorization>();
       }));
-  EXPECT_THROW(
-      HamiltonianFactorizationFactory::register_instance(
-          []() -> HamiltonianFactorizationFactory::return_type {
-            return std::make_unique<TestHamiltonianFactorization>();
-          }),
-      std::runtime_error);
+  EXPECT_THROW(HamiltonianFactorizationFactory::register_instance(
+                   []() -> HamiltonianFactorizationFactory::return_type {
+                     return std::make_unique<TestHamiltonianFactorization>();
+                   }),
+               std::runtime_error);
 
   auto test_factorization = HamiltonianFactorizationFactory::create(
       "_test_hamiltonian_factorization");

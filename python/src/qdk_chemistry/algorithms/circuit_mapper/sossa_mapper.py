@@ -17,18 +17,9 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .base import CircuitMapper
 
 __all__: list[str] = [
-    "INNER_PREPARE_ALGORITHMS",
-    "SELECT_ALGORITHMS",
     "SOSSAMapper",
     "SOSSAMapperSettings",
 ]
-
-
-# Inner PREPARE backends the mapper can emit.
-INNER_PREPARE_ALGORITHMS = frozenset({"controlled_alias_sampling", "direct"})
-
-# SELECT backends the mapper can emit.
-SELECT_ALGORITHMS = frozenset({"qrom_phase_gradient", "direct"})
 
 
 class SOSSAMapperSettings(Settings):
@@ -46,13 +37,15 @@ class SOSSAMapperSettings(Settings):
             "inner_prepare_algorithm",
             "string",
             "controlled_alias_sampling",
-            f"Inner PREPARE algorithm, one of {sorted(INNER_PREPARE_ALGORITHMS)}.",
+            "Inner PREPARE algorithm ('controlled_alias_sampling' or 'direct').",
+            ["controlled_alias_sampling", "direct"],
         )
         self._set_default(
             "select_algorithm",
             "string",
             "qrom_phase_gradient",
-            f"SELECT algorithm, one of {sorted(SELECT_ALGORITHMS)}.",
+            "SELECT algorithm ('qrom_phase_gradient' or 'direct').",
+            ["qrom_phase_gradient", "direct"],
         )
         self._set_default(
             "rotation_bit_precision",
@@ -277,20 +270,12 @@ class SOSSAMapper(CircuitMapper):
             phase gradient qubits its caller must prepare.
 
         Raises:
-            ValueError: If the container is not a :class:`SOSSAWalkContainer`, or if either
-                backend setting names an algorithm this mapper cannot emit.
+            ValueError: If the container is not a :class:`SOSSAWalkContainer`.
 
         """
         container = unitary.get_container()
         if not isinstance(container, SOSSAWalkContainer):
             raise ValueError(f"The {unitary.get_container_type()} container type is not supported.")
-        for setting, allowed in (
-            ("inner_prepare_algorithm", INNER_PREPARE_ALGORITHMS),
-            ("select_algorithm", SELECT_ALGORITHMS),
-        ):
-            value = self._settings.get(setting)
-            if value not in allowed:
-                raise ValueError(f"unknown {setting} {value!r}; expected one of {sorted(allowed)}")
         free_rider = container.inner_prepare.free_rider_data
         if container.layout.num_free_rider_bits and (free_rider is None or free_rider.size == 0):
             raise ValueError(

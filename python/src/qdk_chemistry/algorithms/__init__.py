@@ -32,11 +32,11 @@ from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
-from qdk_chemistry.algorithms.hamiltonian_factorization import HamiltonianFactorization
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_factorization import HamiltonianFactorization
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
