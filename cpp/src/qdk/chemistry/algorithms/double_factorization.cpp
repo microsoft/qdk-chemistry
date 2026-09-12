@@ -298,15 +298,13 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorization::_run_impl(
     if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
       QDK_LOGGER().debug(
           "double_factorization: using the stored three-center integrals as "
-          "the "
-          "first factorization; truncation_threshold={:.3e} is ignored.",
+          "the first factorization; truncation_threshold={:.3e} is ignored.",
           truncation_threshold);
       cholesky_vectors = &three_center;
     } else {
       QDK_LOGGER().debug(
           "double_factorization: stored three-center integrals have {} rows "
-          "but "
-          "num_orbitals={} implies {}, decomposing the dense tensor instead.",
+          "but num_orbitals={} implies {}, decomposing the dense tensor.",
           three_center.rows(), norb, norb * norb);
     }
   }
