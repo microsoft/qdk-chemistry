@@ -23,6 +23,9 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
+    import qdk_chemistry.data.enums.fermion_mode_order
+    import qdk_chemistry.data.term_partition
+
 from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
@@ -110,8 +113,8 @@ class PauliLCUContainer(QubitOperatorContainer):
         pauli_strings: list[str],
         coefficients: np.ndarray,
         encoding: str | None = None,
-        fermion_mode_order: FermionModeOrder | str | None = None,
-        term_partition: TermPartition | None = None,
+        fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
+        term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> None:
         """Initialize a PauliLCUContainer.
