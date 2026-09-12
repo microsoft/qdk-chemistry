@@ -19,9 +19,9 @@ import uuid
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from qdk_chemistry.plugins._azure_auth import create_credential
 from qdk_chemistry.plugins.discovery._sdk import (
     _OperationIdPolling,
-    create_credential,
     create_workspace_client,
     response_mapping,
 )
