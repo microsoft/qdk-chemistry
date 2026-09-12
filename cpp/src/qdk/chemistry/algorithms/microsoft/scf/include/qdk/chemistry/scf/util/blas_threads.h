@@ -4,31 +4,15 @@
 
 #pragma once
 
-#include <qdk/chemistry/scf/config.h>
-
 namespace qdk::chemistry::scf::util {
 
-/// @brief BLAS backends whose threading can be controlled at runtime.
-/// Enumerators come from QDK_CHEMISTRY_BLAS_BACKEND_TABLE in scf/config.h.
-enum class BlasVendor {
-  Unknown,
-#define QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR(token, vendor, label, set_fn, \
-                                             get_fn, type)                 \
-  vendor,
-  QDK_CHEMISTRY_BLAS_BACKEND_TABLE(QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR)
-#undef QDK_CHEMISTRY_BLAS_VENDOR_ENUMERATOR
-};
+/// @brief Current BLAS thread count, or 0 if this build binds no thread-control
+/// API. For diagnostics and tests; prefer ScopedBlasThreads.
+int blas_get_num_threads();
 
-/// @brief Human readable name of a BLAS vendor.
-const char* to_string(BlasVendor vendor);
-
-/// @brief BLAS backend whose thread count this build controls, bound at link
-/// time by CMake. Unknown means ScopedBlasThreads is a no-op.
-BlasVendor detected_blas_vendor();
-
-/// @brief Current BLAS thread count, or 0 if the backend cannot report it.
-/// For diagnostics and tests; production code should use ScopedBlasThreads.
-int get_blas_num_threads();
+/// @brief Request `n` BLAS threads process-wide; ignored if `n < 1`. For
+/// diagnostics and tests; prefer ScopedBlasThreads.
+void blas_set_num_threads(int n);
 
 /**
  * @brief RAII guard that pins BLAS to a single thread while active and
@@ -38,13 +22,10 @@ int get_blas_num_threads();
  * BLAS is also multi-threaded those threads collide inside its shared worker
  * pool, oversubscribing the machine and, for some backends, corrupting results.
  *
- * The count is process-global, so nesting is tracked by a shared,
- * mutex-protected depth: the first guard pins, the last restores. That is also
- * why the count is not configurable -- a nested guard could not be honored
- * without overriding the count an enclosing one relies on.
- *
- * A no-op if the backend exposes no thread-control API (warned once) or cannot
- * report its current count.
+ * The count is process-global, so nesting is tracked by a mutex-protected
+ * depth: the first guard pins, the last restores. That is also why the count
+ * is not configurable -- a nested guard could not be honored without
+ * overriding the count an enclosing one relies on.
  */
 class ScopedBlasThreads {
  public:
@@ -56,7 +37,8 @@ class ScopedBlasThreads {
   ScopedBlasThreads(ScopedBlasThreads&&) = delete;
   ScopedBlasThreads& operator=(ScopedBlasThreads&&) = delete;
 
-  /// @brief Whether this guard actually changed/holds the BLAS thread count.
+  /// @brief Whether this guard holds the BLAS thread count. False when no
+  /// thread-control API is bound, or the backend cannot report a count.
   bool active() const { return active_; }
 
  private:
