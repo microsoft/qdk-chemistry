@@ -24,6 +24,7 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | Example | Install command |
 |---------|----------------|
 | `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
+| `sossa_qre.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
 | `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
@@ -72,6 +73,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
 - `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
+- `sossa_qre.ipynb`: Jupyter notebook estimating the cost of unary-iteration quantum phase estimation on a Hamiltonian block-encoded with SOSSA (sum-of-squares spectral amplification)
 
 ## Companion datasets and assets
 
