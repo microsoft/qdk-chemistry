@@ -259,28 +259,76 @@ class TestCampbellCostModel:
 class TestPlaquetteAgainstTableII:
     """What the builder actually emits, measured against the published totals."""
 
-    @pytest.mark.parametrize("size", [8, 16])
+    #: Sizes spanning Table II. Each builds one aggregate circuit, so keep the list short.
+    _SIZES = (8, 12, 20, 32)
+
+    @pytest.mark.parametrize("size", _SIZES)
+    def test_qubit_count_differs_from_the_paper_by_a_known_constant(self, size):
+        """The two qubit conventions differ by exactly ``w(m) + 1``, with nothing left over.
+
+        Table II charges ``2L^2 + alpha + 2`` with ``alpha = L^2/2`` Hamming weight
+        ancillas. We allocate Gidney's exact adder workspace ``m - w(m)`` instead of the
+        looser ``m``, which saves ``w(m)``, and one repeat-until-success herald rather
+        than two spare qubits, which saves one more. The herald is a constant and not a
+        per-rotation cost: each rotation measures and releases the same qubit in turn,
+        so charging one per rotation would bill depth as width.
+
+        This is asserted as an identity rather than a tolerance because every term in it
+        is known; an unexplained qubit would mean one of those two conventions is wrong.
+        """
+        batch = size * size // 2
+        counts = _logical_counts(size, max_batch=batch)
+        paper = 2 * size * size + batch + 2
+
+        assert paper - counts["numQubits"] == batch.bit_count() + 1
+
+    @pytest.mark.parametrize("size", _SIZES)
     def test_toffoli_count_matches_the_paper(self, size):
         """Toffolis come from the Hamming weight arithmetic, which we implement as published.
 
         Agreement here is the evidence that the Trotter step and the phase-estimation
         schedule are both right: a wrong step count or a wrong tiling would move this.
+        The residual few percent is the exact batch decomposition against Table II's
+        two-significant-figure entries, plus the one-time boundary layer that a closed
+        formula in ``N_PE`` does not carry. Measured at 0.0-6.9% across these sizes.
         """
         counts = _logical_counts(size, max_batch=size * size // 2)
-        assert counts["cczCount"] == pytest.approx(_TABLE_II_U8[size][0], rel=0.15)
 
-    @pytest.mark.parametrize("size", [8, 16])
-    def test_qubit_count_matches_the_paper(self, size):
-        """Table II charges 2L^2 + alpha + 2 with alpha = L^2/2 Hamming weight ancillas.
+        assert counts["cczCount"] == pytest.approx(_TABLE_II_U8[size][0], rel=0.10)
 
-        We allocate the exact Gidney workspace ``m - w(m)`` instead of the looser
-        ``m``, and one repeat-until-success herald rather than two spare qubits, so the
-        two conventions differ by a known constant rather than arbitrarily.
+    @pytest.mark.parametrize("size", _SIZES)
+    def test_synthesized_t_count_approaches_the_paper_as_the_lattice_grows(self, size):
+        """Our T total sits above Campbell's, by a factor that falls from 3.3x to 1.2x.
+
+        The gap is rotation count, not step count: Campbell's directional-control
+        costing emits fewer controlled rotations than a conventional controlled mapper,
+        and each surviving rotation is then synthesized at his own ``N_HT``. Because the
+        excess is a fixed number of rotations per step while his total grows with
+        ``N_PE``, the ratio shrinks with the lattice. Asserted as a decreasing bound
+        rather than one tolerance, since no single budget is honest across the range.
         """
+        schedule = campbell_schedule(size)
         counts = _logical_counts(size, max_batch=size * size // 2)
-        paper = 2 * size * size + size * size // 2 + 2
-        assert counts["numQubits"] <= paper
-        assert counts["numQubits"] >= 2 * size * size
+        synthesized = counts["tCount"] + counts["rotationCount"] * schedule["synthesis_t"]
+
+        ratio = synthesized / _TABLE_II_U8[size][1]
+        assert 1.0 < ratio <= 3.4, f"T ratio {ratio:.2f}x outside the measured band"
+
+    def test_the_t_gap_narrows_with_the_lattice(self):
+        """The rotation excess is per step, so it is amortized as N_PE grows.
+
+        This is the claim the per-size bound above cannot make: if the gap were a
+        mis-sized schedule rather than a control-lowering difference, it would not
+        shrink monotonically.
+        """
+        ratios = []
+        for size in self._SIZES:
+            schedule = campbell_schedule(size)
+            counts = _logical_counts(size, max_batch=size * size // 2)
+            synthesized = counts["tCount"] + counts["rotationCount"] * schedule["synthesis_t"]
+            ratios.append(synthesized / _TABLE_II_U8[size][1])
+
+        assert ratios == sorted(ratios, reverse=True)
 
     @pytest.mark.parametrize("size", [8, 16])
     def test_unbounded_batches_trade_qubits_for_rotations(self, size):
