@@ -33,7 +33,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
 from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
 
 
-def _make_sossa_unitary_representation():
+def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | None = None):
     """Build a UnitaryRepresentation with SOSSAWalkContainer."""
     num_orbitals = 2
     num_ranks = 2
@@ -116,7 +116,8 @@ def _make_sossa_unitary_representation():
         ),
         layout=layout,
         normalization=normalization,
-        power=1,
+        power=power,
+        lambda_eff=lambda_eff,
     )
 
     return UnitaryRepresentation(container=container)
@@ -128,9 +129,13 @@ def _assert_sossa_containers_equal(actual: SOSSAWalkContainer, expected: SOSSAWa
     assert actual.power == expected.power
     assert actual.normalization == pytest.approx(expected.normalization)
     assert actual.has_lambda_eff == expected.has_lambda_eff
+    if expected.has_lambda_eff:
+        assert actual.lambda_eff == pytest.approx(expected.lambda_eff)
     assert actual.metadata == expected.metadata
     assert actual.layout == expected.layout
 
+    assert actual.outer_prepare.get_container_type() == expected.outer_prepare.get_container_type()
+    assert actual.outer_prepare.to_json() == expected.outer_prepare.to_json()
     np.testing.assert_allclose(actual.outer_prepare.get_coefficients(), expected.outer_prepare.get_coefficients())
     assert list(actual.outer_prepare.get_active_determinants()) == list(
         expected.outer_prepare.get_active_determinants()
@@ -143,6 +148,7 @@ def _assert_sossa_containers_equal(actual: SOSSAWalkContainer, expected: SOSSAWa
     np.testing.assert_array_equal(actual.inner_prepare.free_rider_data, expected.inner_prepare.free_rider_data)
     np.testing.assert_allclose(actual.select.one_body_rotation_angles, expected.select.one_body_rotation_angles)
     np.testing.assert_allclose(actual.select.two_body_rotation_angles, expected.select.two_body_rotation_angles)
+    assert actual.to_json() == expected.to_json()
 
 
 class TestSOSSAWalkContainer:
@@ -150,7 +156,7 @@ class TestSOSSAWalkContainer:
 
     def test_json_roundtrip(self):
         """Test JSON serialization/deserialization round-trip."""
-        result = _make_sossa_unitary_representation()
+        result = _make_sossa_unitary_representation(power=3, lambda_eff=0.75)
         container = result.get_container()
 
         json_data = container.to_json()
@@ -160,7 +166,7 @@ class TestSOSSAWalkContainer:
 
     def test_hdf5_roundtrip(self):
         """Test HDF5 serialization/deserialization round-trip."""
-        result = _make_sossa_unitary_representation()
+        result = _make_sossa_unitary_representation(power=3, lambda_eff=0.75)
         container = result.get_container()
 
         with tempfile.TemporaryDirectory() as tmpdir:

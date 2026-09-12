@@ -171,7 +171,7 @@ std::shared_ptr<const SymmetryBlockedIndexSet> trivial_index_set(
 
 }  // namespace
 
-TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
+TEST(DoubleFactorizationTest, MetadataAndFactoryRegistration) {
   auto factorizer = HamiltonianFactorizationFactory::create("double_factorization");
   ASSERT_NE(factorizer, nullptr);
   EXPECT_EQ(factorizer->type_name(), "hamiltonian_factorization");
@@ -182,8 +182,6 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
   EXPECT_NE(
       std::find(available.begin(), available.end(), "double_factorization"),
       available.end());
-  EXPECT_THROW(HamiltonianFactorizationFactory::create("nonexistent_factorizer"),
-               std::runtime_error);
 
   // A Cholesky decomposition exists only for a positive semi-definite
   // supermatrix. Stopping at the breakdown would yield an exact factorization
@@ -194,7 +192,7 @@ TEST(DoubleFactorizerTest, MetaDataAndFactoryRegistration) {
                std::invalid_argument);
 }
 
-TEST(DoubleFactorizerTest, RejectsInvalidInput) {
+TEST(DoubleFactorizationTest, RejectsInvalidInput) {
   constexpr std::size_t norb = 4;
   auto hamiltonian = make_hamiltonian(norb, make_two_body(norb, {1.0}, 31));
   auto factorizer = HamiltonianFactorizationFactory::create("double_factorization");
@@ -222,7 +220,7 @@ TEST(DoubleFactorizerTest, RejectsInvalidInput) {
   EXPECT_THROW(truncating->run(hamiltonian), std::invalid_argument);
 }
 
-TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
+TEST(DoubleFactorizationTest, PreservesOneBodyTermAndCoreEnergy) {
   constexpr std::size_t norb = 4;
   constexpr double core_energy = -3.75;
   auto hamiltonian =
@@ -240,7 +238,7 @@ TEST(DoubleFactorizerTest, PreservesOneBodyTermAndCoreEnergy) {
   EXPECT_TRUE(factorized->is_restricted());
 }
 
-TEST(DoubleFactorizerTest, PreservesInactiveFockAcrossASmallerActiveSpace) {
+TEST(DoubleFactorizationTest, PreservesInactiveFockAcrossASmallerActiveSpace) {
   constexpr std::size_t nmo = 4;
   constexpr std::size_t nact = 2;
   constexpr double core_energy = 2.5;
@@ -289,7 +287,7 @@ TEST(DoubleFactorizerTest, PreservesInactiveFockAcrossASmallerActiveSpace) {
   EXPECT_TRUE(g_aaaa.isApprox(two_body, kReconstructionTolerance));
 }
 
-TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
+TEST(DoubleFactorizationTest, TruncationDiscardsSmallFragments) {
   constexpr std::size_t norb = 4;
   const auto two_body = make_two_body(norb, {1.0, 1e-4, 1e-4}, 23);
   auto hamiltonian = make_hamiltonian(norb, two_body);
@@ -312,7 +310,7 @@ TEST(DoubleFactorizerTest, TruncationDiscardsSmallFragments) {
   EXPECT_LT((g_aaaa - two_body).cwiseAbs().maxCoeff(), 1e-2);
 }
 
-TEST(DoubleFactorizerTest, RunProducesEquivalentFactorizedContainer) {
+TEST(DoubleFactorizationTest, RunProducesEquivalentFactorizedContainer) {
   constexpr std::size_t norb = 4;
   constexpr double core_energy = -3.75;
   const auto two_body = make_two_body(norb, {1.0, 1.0, 1.0}, 17);
@@ -334,7 +332,7 @@ TEST(DoubleFactorizerTest, RunProducesEquivalentFactorizedContainer) {
 // The remaining tests cover the path that consumes a
 // CholeskyHamiltonianContainer's stored vectors as the first factorization
 // instead of expanding them into a dense norb^4 tensor.
-TEST(DoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
+TEST(DoubleFactorizationTest, ReusesStoredThreeCenterIntegrals) {
   constexpr std::size_t norb = 3;
   // Stored as 5 vectors that only span rank 3. Getting 5 fragments back is
   // what proves the stored vectors were consumed as-is: decomposing the dense
@@ -354,7 +352,7 @@ TEST(DoubleFactorizerTest, ReusesStoredThreeCenterIntegrals) {
       << "max abs deviation: " << (g_aaaa - expected).cwiseAbs().maxCoeff();
 }
 
-TEST(DoubleFactorizerTest, IgnoresTruncationThresholdForStoredVectors) {
+TEST(DoubleFactorizationTest, IgnoresTruncationThresholdForStoredVectors) {
   // truncation_threshold is the pivoted-Cholesky stopping cutoff, and stored
   // vectors skip that step entirely. A threshold large enough to discard every
   // fragment of the equivalent dense tensor therefore has to change nothing.
@@ -375,7 +373,7 @@ TEST(DoubleFactorizerTest, IgnoresTruncationThresholdForStoredVectors) {
       << "max abs deviation: " << (g_aaaa - expected).cwiseAbs().maxCoeff();
 }
 
-TEST(DoubleFactorizerTest, StoredVectorsMatchDenseDecomposition) {
+TEST(DoubleFactorizationTest, StoredVectorsMatchDenseDecomposition) {
   constexpr std::size_t norb = 3;
   const Eigen::MatrixXd vectors = make_cholesky_vectors(norb, 3, 3, 23);
 

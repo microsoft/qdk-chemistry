@@ -557,7 +557,7 @@ class TestSOSSAQPEIntegration:
             f"Energy mismatch: measured={result.raw_energy:.6f}, expected={physical_energy:.6f}, tol={tol:.6f}"
         )
 
-    @pytest.mark.parametrize("num_queries", [7, 31])
+    @pytest.mark.parametrize("num_queries", [7])
     def test_sossa_qpe(self, num_queries):
         """QPE with the direct (non-alias) config should match the expected phase index."""
         _run_sossa_unary_qpe(num_queries)

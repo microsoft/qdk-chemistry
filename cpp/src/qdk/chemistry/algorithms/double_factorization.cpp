@@ -27,12 +27,6 @@ namespace {
 using RowMajorMatrix =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
-  QDK_LOG_TRACE_ENTERING();
-
-  return std::make_unique<DoubleFactorizer>();
-}
-
 /// First factorization: pivoted Cholesky decomposition of the two-electron
 /// supermatrix.
 ///
@@ -249,7 +243,7 @@ std::size_t fragments_from_cholesky_vectors(
 
 }  // namespace
 
-std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
+std::shared_ptr<data::Hamiltonian> DoubleFactorization::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -358,12 +352,6 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
       hamiltonian->get_core_energy(), inactive_fock, hamiltonian->get_type());
 
   return std::make_shared<data::Hamiltonian>(std::move(container));
-}
-
-void HamiltonianFactorizationFactory::register_default_instances() {
-  QDK_LOG_TRACE_ENTERING();
-
-  HamiltonianFactorizationFactory::register_instance(&make_double_factorizer);
 }
 
 }  // namespace qdk::chemistry::algorithms

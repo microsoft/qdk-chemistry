@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import DoubleFactorizer, create
+from qdk_chemistry.algorithms import DoubleFactorization, HamiltonianFactorization, create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     FactorizedHamiltonianContainer,
@@ -51,9 +51,10 @@ def factorizer():
     return create("hamiltonian_factorization", "double_factorization")
 
 
-class TestDoubleFactorizer:
+class TestDoubleFactorization:
     def test_metadata(self, factorizer):
-        assert isinstance(factorizer, DoubleFactorizer)
+        assert isinstance(factorizer, DoubleFactorization)
+        assert isinstance(factorizer, HamiltonianFactorization)
         assert factorizer.type_name() == "hamiltonian_factorization"
         assert factorizer.name() == "double_factorization"
         assert factorizer.name() in factorizer.aliases()

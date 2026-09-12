@@ -5,7 +5,7 @@
 #pragma once
 #include <limits>
 #include <memory>
-#include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian_factorization.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
@@ -13,17 +13,17 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @class DoubleFactorizerSettings
- * @brief Settings container for DoubleFactorizer.
+ * @class DoubleFactorizationSettings
+ * @brief Settings container for DoubleFactorization.
  *
- * @see DoubleFactorizer
+ * @see DoubleFactorization
  */
-class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
+class DoubleFactorizationSettings : public qdk::chemistry::data::Settings {
  public:
   /**
    * @brief Constructor that initializes the default settings.
    */
-  DoubleFactorizerSettings() {
+  DoubleFactorizationSettings() {
     set_default<double>(
         "truncation_threshold", 1e-12,
         "Cutoff for the pivoted Cholesky decomposition of the two-electron "
@@ -34,11 +34,11 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
         qdk::chemistry::data::BoundConstraint<double>{
             0.0, std::numeric_limits<double>::max()});
   }
-  ~DoubleFactorizerSettings() override = default;
+  ~DoubleFactorizationSettings() override = default;
 };
 
 /**
- * @class DoubleFactorizer
+ * @class DoubleFactorization
  * @brief Exact double factorization of a Hamiltonian's two-electron integrals
  *        :cite:`vonBurg2021`.
  *
@@ -70,21 +70,19 @@ class DoubleFactorizerSettings : public qdk::chemistry::data::Settings {
  * The one-electron integrals, core energy, orbitals, inactive Fock matrix and
  * Hamiltonian type are carried over unchanged.
  */
-class DoubleFactorizer
-    : public Algorithm<DoubleFactorizer, std::shared_ptr<data::Hamiltonian>,
-                       std::shared_ptr<data::Hamiltonian>> {
+class DoubleFactorization : public HamiltonianFactorization {
  public:
   /**
-   * @brief Default constructor. Uses default DoubleFactorizerSettings.
+   * @brief Default constructor. Uses default DoubleFactorizationSettings.
    */
-  DoubleFactorizer() {
-    _settings = std::make_unique<DoubleFactorizerSettings>();
+  DoubleFactorization() {
+    _settings = std::make_unique<DoubleFactorizationSettings>();
   }
 
   /**
    * @brief Virtual destructor.
    */
-  ~DoubleFactorizer() override = default;
+  ~DoubleFactorization() override = default;
 
   /**
    * @brief Double-factorize a Hamiltonian.
@@ -97,7 +95,7 @@ class DoubleFactorizer
    *
    * @note Settings are automatically locked when this method is called.
    */
-  using Algorithm::run;
+  using HamiltonianFactorization::run;
 
   /**
    * @brief Access the algorithm's name.
@@ -105,13 +103,6 @@ class DoubleFactorizer
    * @return "double_factorization".
    */
   std::string name() const override { return "double_factorization"; }
-
-  /**
-   * @brief Access the algorithm's type name.
-   *
-   * @return "hamiltonian_factorization".
-   */
-  std::string type_name() const final { return "hamiltonian_factorization"; };
 
  protected:
   /**
@@ -123,20 +114,6 @@ class DoubleFactorizer
    */
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian) const override;
-};
-
-/**
- * @brief Factory class for creating double factorizer instances.
- *
- * @see DoubleFactorizer
- */
-struct HamiltonianFactorizationFactory
-    : public AlgorithmFactory<DoubleFactorizer, HamiltonianFactorizationFactory> {
-  static std::string algorithm_type_name() {
-    return "hamiltonian_factorization";
-  }
-  static void register_default_instances();
-  static std::string default_algorithm_name() { return "double_factorization"; }
 };
 
 }  // namespace qdk::chemistry::algorithms
