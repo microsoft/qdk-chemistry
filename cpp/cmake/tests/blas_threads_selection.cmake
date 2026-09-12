@@ -7,10 +7,13 @@
 
 set(util "${QDK_SOURCE_DIR}/src/qdk/chemistry/algorithms/microsoft/scf/src/util")
 
+# CMAKE_CONFIGURATION_TYPES pins multi-config generators (the default on
+# Windows) to the one configuration CMAKE_BUILD_TYPE selects for single-config
+# ones, so both kinds of generator build and probe exactly Release here.
 function(run_cmake dir)
   execute_process(
     COMMAND ${CMAKE_COMMAND} -S "${QDK_WORK_DIR}/${dir}" -B "${QDK_WORK_DIR}/${dir}/build"
-            -DCMAKE_BUILD_TYPE=Release ${ARGN}
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_CONFIGURATION_TYPES=Release ${ARGN}
     OUTPUT_VARIABLE out ERROR_VARIABLE out RESULT_VARIABLE code)
   if(NOT code EQUAL 0)
     message(FATAL_ERROR "configure of ${dir} failed:\n${out}")
@@ -35,7 +38,10 @@ cmake_minimum_required(VERSION 3.15)
 project(qdk_fake_blas CXX)
 foreach(lib with_symbols without_symbols)
   add_library(${lib} STATIC ${lib}.cpp)
-  file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/${lib}.path CONTENT $<TARGET_FILE:${lib}>)
+  # Per-config output name: $<TARGET_FILE:> differs between configurations, and
+  # a single output would then have to be written more than once.
+  file(GENERATE OUTPUT ${CMAKE_BINARY_DIR}/${lib}-$<CONFIG>.path
+       CONTENT $<TARGET_FILE:${lib}>)
 endforeach()
 ]==])
 
@@ -48,8 +54,8 @@ execute_process(
 if(NOT code EQUAL 0)
   message(FATAL_ERROR "build of fake BLAS failed:\n${out}")
 endif()
-file(READ "${QDK_WORK_DIR}/fake/build/with_symbols.path" with_symbols)
-file(READ "${QDK_WORK_DIR}/fake/build/without_symbols.path" without_symbols)
+file(READ "${QDK_WORK_DIR}/fake/build/with_symbols-Release.path" with_symbols)
+file(READ "${QDK_WORK_DIR}/fake/build/without_symbols-Release.path" without_symbols)
 
 file(WRITE "${QDK_WORK_DIR}/select/CMakeLists.txt" [==[
 cmake_minimum_required(VERSION 3.15)
