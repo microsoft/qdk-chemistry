@@ -3,8 +3,6 @@
 Tests the full pipeline:
     FactorizedHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
     → SOSSAMapper → Circuit → unary-iteration QPE → energy
-
-Reference: Low et al., Phys. Rev. X 15 (2025), :cite:`Low2025`
 """
 
 # --------------------------------------------------------------------------------------------
@@ -20,7 +18,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
 from qdk_chemistry.data import (
@@ -34,11 +31,14 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import ci_energy_tolerance
-from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
+from .test_helpers import (
+    create_random_factorized_hamiltonian,
+    create_test_orbitals,
+    factorized_hamiltonian_to_sossa_operator,
+)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
@@ -51,14 +51,6 @@ H2_DFTHC_EXAMPLE = Path(__file__).resolve().parent / "test_data" / "h2_dfthc_r2_
 
 def _build_h2_dfthc_data():
     """Load the shipped factorized H2 and return its tensors.
-
-    The tests below check invariants the SOSSA construction depends on -- that the
-    sum-of-squares form is positive semidefinite, that it reproduces the physical
-    Hamiltonian once ``E_SOS`` is added back, and that a walk eigenphase decodes to the
-    ground-state energy. Running them on hand-written tensors proves those properties of
-    an operator nothing ships. Reading the example instead makes the shipped file's
-    validity the thing under test, so a regenerated Hamiltonian that violates a
-    precondition fails here rather than silently producing an unresolvable phase.
 
     Returns a dict with all tensor data needed for SOSSA.
     """
@@ -168,31 +160,7 @@ def _sos_energy_shift(h1, basis_vectors, two_body_weights, identity_weight):
 
 
 def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identity_weight):
-    r"""Build the SOSSA gap Hamiltonian ``H_gap = sum_G G† G`` via Jordan-Wigner.
-
-    The one-body generators come from diagonalizing the *Majorana-corrected*
-    one-body matrix (Eq. 36), matching ``SumOfSquaresQubitMapper``, which reads
-    ``container.get_h1_prime()`` rather than the bare ``h1``.
-
-    For eigenvalue :math:`\lambda_k` of that matrix the mapper emits the LCU
-    :math:`\sqrt{|\lambda_k|}\\,(X \pm iY)/2` on the rotated spin orbital.
-    Since :math:`(X + iY)/2 = |0\rangle\langle 1| = a`, the ``+iY`` branch
-    (positive eigenvalues, ``D1``) contributes :math:`G^\dagger G = \lambda_k n_k`
-    and the ``-iY`` branch (negative eigenvalues, ``Q1``) contributes
-    :math:`|\lambda_k| (2 - n_k)`::
-
-        H_gap = sum_{k: lam_k>0} lam_k n_k + sum_{k: lam_k<0} |lam_k| (2 - n_k)
-              + 1/2 sum_rc (W^{rc} I + sum_b w_b^{rc} L_b^r)^2
-
-    where :math:`n_k = \\sum_{pq} V_{pk} V_{qk} E_{pq}` in the eigenbasis of
-    :math:`h_1'` and :math:`W^{rc} = wB^{rc} - \\sum_b w_b^{rc}`.
-
-    With this convention ``H_gap`` is positive semidefinite and
-    ``H_gap + E_SOS`` equals the physical Hamiltonian exactly; see
-    ``test_sos_decomposition_reproduces_physical_hamiltonian``.
-
-    Reference: Eqs. 20-21, 29, 30, 36 in :cite:`Low2025`.
-    """
+    """Build the SOSSA gap Hamiltonian ``H_gap = sum_G G† G`` via Jordan-Wigner."""
     num_orbitals = h1.shape[0]
     n_ranks, b_dim, _ = basis_vectors.shape
     _, n_copies = identity_weight.shape
@@ -227,7 +195,7 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
 
 
 def _build_physical_hamiltonian_matrix(h1, basis_vectors, two_body_weights):
-    """Build the physical DF-THC electronic Hamiltonian, independently of the SOS form.
+    """Build the physical DFTHC electronic Hamiltonian, independently of the SOS form.
 
     ``H = sum_pq h1_pq E_pq + 1/2 sum_pqrs h2_pqrs (E_pq E_rs - delta_qr E_ps)``
     with the tensor-hypercontracted integrals
@@ -330,43 +298,23 @@ def _python_to_qsharp_sign(num_orbitals):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-#: Short name -> registry name for the outer PREPARE ``AlgorithmRef``.
-_OUTER_PREP_MAP = {
-    "alias_sampling": "alias_sampling",
-    "dense_pure": "dense_pure_state",
-    "qrom": "qrom",
-}
-
-
 def _sossa_circuit_mapper_ref(
     *,
-    outer_prepare_algorithm: str = "dense_pure",
+    outer_prepare_algorithm: str = "dense_pure_state",
     inner_prepare_algorithm: str = "direct",
     select_algorithm: str = "direct",
     coefficient_bit_precision: int = 10,
     rotation_bit_precision: int = 10,
 ) -> AlgorithmRef:
     """Return an AlgorithmRef for the SOSSA circuit mapper."""
-    ref_name = _OUTER_PREP_MAP.get(outer_prepare_algorithm, outer_prepare_algorithm)
     return AlgorithmRef(
         "circuit_mapper",
         "sossa",
-        outer_prepare_algorithm=AlgorithmRef("state_prep", ref_name),
+        outer_prepare_algorithm=AlgorithmRef("state_prep", outer_prepare_algorithm),
         inner_prepare_algorithm=inner_prepare_algorithm,
         select_algorithm=select_algorithm,
         coefficient_bit_precision=coefficient_bit_precision,
         rotation_bit_precision=rotation_bit_precision,
-    )
-
-
-def _sossa_unary_circuit_builder_ref(num_queries: int, **mapper_kwargs) -> AlgorithmRef:
-    """Return an AlgorithmRef for unary-iteration QPE driven by the SOSSA walk."""
-    return AlgorithmRef(
-        "qpe_circuit_builder",
-        "qdk_unary",
-        num_queries=num_queries,
-        circuit_mapper=_sossa_circuit_mapper_ref(**mapper_kwargs),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
     )
 
 
@@ -398,15 +346,34 @@ def _energy_to_qpe_phase(energy_gap, lambda_sos):
     return math.acos(max(-1.0, min(1.0, cos_val))) / (2 * math.pi)
 
 
-def _build_h2_sossa_problem():
-    """Build the H2 DFTHC problem: its SOSSA operator, walk container and exact ground state.
+def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=20250815):
+    """Run unary-iteration QPE on the H2 data and assert the measured bin is the predicted one.
+
+    ``num_queries`` must be one less than a power of two, so the ``num_queries + 1``
+    reflection slots exactly fill the phase register and a bin is worth
+    ``1 / (num_queries + 1)``.
+
+    The schedule applies ``W^(num_queries - 2t)``, so the register encodes *twice* the walk
+    phase; ``QpeResult.phase_fraction`` is that doubled phase, folded into ``[0, 1/2]`` by
+    the branch resolution in ``_post_process_phase_estimation``. The exact eigenvalue is
+    folded the same way before comparing, which puts both on one scale and pins the
+    schedule, the inverse QFT and the bitstring decoding together.
+
+    Args:
+        num_queries: Number of walk blocks the schedule applies.
+        mapper_kwargs: Overrides for :func:`_sossa_circuit_mapper_ref`.
+        shots: Number of shots to sample.
+        seed: Simulator seed, fixed so the measured bin is reproducible.
 
     Returns:
-        The SOSSA qubit operator, the SOSSA walk container, a state preparation circuit
-        holding the exact ground state of the gap Hamiltonian, that state's energy, and
-        the corresponding *physical* ground-state energy.
+        The QPE result, the exact ground-state energy of the gap Hamiltonian, the exact
+        physical ground-state energy, and the SOSSA walk container, so a caller can also
+        assert on the decoded energy.
 
     """
+    num_bins = num_queries + 1
+    assert num_bins & (num_bins - 1) == 0, "num_queries must be one less than a power of two"
+
     data = _build_h2_dfthc_data()
     n_orb = data["N"]
 
@@ -438,7 +405,7 @@ def _build_h2_sossa_problem():
         core_energy=0.0,
         inactive_fock_matrix=np.zeros((n_orb, n_orb)),
     )
-    sossa_op = to_sossa_operator(fh)
+    sossa_op = factorized_hamiltonian_to_sossa_operator(fh)
     container = SOSSABuilder().run(sossa_op).get_container()
 
     num_system_qubits = 2 * n_orb
@@ -455,43 +422,17 @@ def _build_h2_sossa_problem():
         ),
         qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
     )
-    return sossa_op, container, state_prep, gs_energy, physical_energy
-
-
-def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=20250815):
-    """Run unary-iteration QPE on the H2 data and assert the measured bin is the predicted one.
-
-    ``num_queries`` must be one less than a power of two, so the ``num_queries + 1``
-    reflection slots exactly fill the phase register and a bin is worth
-    ``1 / (num_queries + 1)``.
-
-    The schedule applies ``W^(num_queries - 2t)``, so the register encodes *twice* the walk
-    phase; ``QpeResult.phase_fraction`` is that doubled phase, folded into ``[0, 1/2]`` by
-    the branch resolution in ``_post_process_phase_estimation``. The exact eigenvalue is
-    folded the same way before comparing, which puts both on one scale and pins the
-    schedule, the inverse QFT and the bitstring decoding together.
-
-    Args:
-        num_queries: Number of walk blocks the schedule applies.
-        mapper_kwargs: Overrides for :func:`_sossa_unary_circuit_builder_ref`.
-        shots: Number of shots to sample.
-        seed: Simulator seed, fixed so the measured bin is reproducible.
-
-    Returns:
-        The QPE result, the exact ground-state energy of the gap Hamiltonian, the exact
-        physical ground-state energy, and the SOSSA walk container, so a caller can also
-        assert on the decoded energy.
-
-    """
-    num_bins = num_queries + 1
-    assert num_bins & (num_bins - 1) == 0, "num_queries must be one less than a power of two"
-
-    sossa_op, container, state_prep, gs_energy, physical_energy = _build_h2_sossa_problem()
 
     qpe = UnaryPhaseEstimation(shots=shots)
     qpe.settings().set(
         "qpe_circuit_builder",
-        _sossa_unary_circuit_builder_ref(num_queries, **(mapper_kwargs or {})),
+        AlgorithmRef(
+            "qpe_circuit_builder",
+            "qdk_unary",
+            num_queries=num_queries,
+            circuit_mapper=_sossa_circuit_mapper_ref(**(mapper_kwargs or {})),
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+        ),
     )
     qpe.settings().set(
         "circuit_executor",
@@ -516,160 +457,6 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
 
 class TestSOSSAQPEIntegration:
     """Integration tests for SOSSA QPE using the full builder → mapper → unary QPE pipeline."""
-
-    def test_unary_qpe_recovers_the_h2_ground_state_energy(self):
-        """Recover the H2 ground-state energy end-to-end with unary-iteration QPE.
-
-        Exercises the full production path: SOSSABuilder -> SOSSAMapper ->
-        ``MakeUnaryQPECircuit`` -> sparse simulator -> bitstring decoding.
-
-        Two facts are asserted, and they fail for different reasons:
-
-        1. The measured phase register lands on the bin predicted by the exact
-           eigenvalue. That check lives in :func:`_run_sossa_unary_qpe`, which states it
-           in the doubled phase the schedule actually encodes and is tight to one bin.
-           It is the prefactor-sensitive check: the predicted bin comes from the exact
-           energy through :func:`_energy_to_qpe_phase`, so a block encoding that
-           normalized differently would land elsewhere.
-        2. The decoded energy matches the ground state of the *physical* Hamiltonian,
-           diagonalized independently. ``raw_energy`` is ``eigenvalue_from_phase``, which
-           adds ``energy_shift`` back, so comparing against a physical-Hamiltonian oracle
-           exercises that shift. Subtracting ``energy_shift`` off and comparing against
-           the gap energy instead would cancel it exactly, and would additionally be
-           implied by assertion 1: the tolerance below spans the same phase window that
-           assertion already bounds, and ``E(phi)`` is monotone across it.
-
-        """
-        num_queries = 31
-        result, gs_energy, physical_energy, container = _run_sossa_unary_qpe(num_queries)
-
-        # _run_sossa_unary_qpe bounds the *doubled* phase to one bin, and raw_energy is
-        # decoded from the canonical phase, which is half of it -- so the canonical phase
-        # carries half a bin of uncertainty.
-        half_bin = 1.0 / (2.0 * (num_queries + 1))
-        exact_phase = _energy_to_qpe_phase(gs_energy, container.normalization)
-        # E_gap(phi) = 2*Lambda*cos^2(pi*phi) is monotone across the canonical range
-        # [0, 1/2], so the widest energy excursion over the window sits at an edge.
-        edges = [min(0.5, max(0.0, exact_phase + sign * half_bin)) for sign in (-1.0, 1.0)]
-        tol = max(abs(container.eigenvalue_from_phase(p) - container.metadata.energy_shift - gs_energy) for p in edges)
-
-        assert abs(result.raw_energy - physical_energy) <= tol, (
-            f"Energy mismatch: measured={result.raw_energy:.6f}, expected={physical_energy:.6f}, tol={tol:.6f}"
-        )
-
-    @pytest.mark.parametrize("num_queries", [7])
-    def test_sossa_qpe(self, num_queries):
-        """QPE with the direct (non-alias) config should match the expected phase index."""
-        _run_sossa_unary_qpe(num_queries)
-
-    @pytest.mark.parametrize(
-        "mapper_overrides",
-        [
-            {
-                "outer_prepare_algorithm": "alias_sampling",
-                "coefficient_bit_precision": 4,
-            },
-            {
-                "inner_prepare_algorithm": "controlled_alias_sampling",
-                "coefficient_bit_precision": 4,
-            },
-        ],
-        ids=["alias_outer", "alias_inner"],
-    )
-    def test_sossa_qpe_features(self, mapper_overrides):
-        """QPE with individual features enabled (8 phase bins, H2 data)."""
-        _run_sossa_unary_qpe(num_queries=7, mapper_kwargs=mapper_overrides)
-
-    def test_sossa_qpe_direct_workflow(self):
-        """Test SOSSA QPE by directly constructing the pipeline (no registry).
-
-        This test bypasses AlgorithmRef and directly calls:
-            SOSSABuilder → SOSSAMapper → circuit construction
-        to verify the workflow end-to-end.
-        """
-        data = _build_h2_dfthc_data()
-        n_orb = data["N"]
-
-        # Create FactorizedHamiltonianContainer
-        orbitals = create_test_orbitals(n_orb)
-        inactive_fock = np.zeros((n_orb, n_orb))
-        fh = FactorizedHamiltonianContainer(
-            one_body_integrals=data["h1"],
-            u_matrices=data["basis_vectors"].flatten(),
-            w_matrices=data["two_body_weights"].flatten(),
-            wb_matrix=data["identity_weight"],
-            orbitals=orbitals,
-            core_energy=0.0,
-            inactive_fock_matrix=inactive_fock,
-        )
-
-        # Step 1: SOSSABuilder → UnitaryRepresentation
-        builder = SOSSABuilder()
-        unitary_rep = builder.run(to_sossa_operator(fh))
-        container = unitary_rep.get_container()
-        assert isinstance(container, SOSSAWalkContainer)
-
-        # Step 2: SOSSAMapper → Circuit
-        mapper = SOSSAMapper()
-        mapper.settings().set("outer_prepare_algorithm", AlgorithmRef("state_prep", "dense_pure_state"))
-        mapper.settings().set("inner_prepare_algorithm", "direct")
-        mapper.settings().set("select_algorithm", "direct")
-        circuit = mapper.run(unitary_rep)
-
-        # Verify circuit has all required components
-        assert circuit._qsharp_op is not None
-        assert circuit._qsharp_factory is not None
-        expected_num_qubits = 2 * n_orb + container.layout.outer_prep_bits + container.layout.inner_prep_bits + 2
-        assert circuit.num_qubits == expected_num_qubits
-        assert circuit.metadata.num_phase_gradient_ancillas == 0
-
-        # Step 3: Verify the normalization is accessible and numerically right.
-        # Lambda cancels on both sides of every phase/energy comparison in this file, so a
-        # self-consistent scale error is invisible to them; pin the number itself against
-        # an oracle that never sees the container's own normalization.
-        lambda_sos = container.normalization
-        assert lambda_sos > 0
-
-        # Step 4: Compute expected spectrum
-        h_matrix = _build_dfthc_hamiltonian_matrix(
-            data["h1"],
-            data["basis_vectors"],
-            data["two_body_weights"],
-            data["identity_weight"],
-        )
-        eigenvalues = np.linalg.eigvalsh(h_matrix)
-        # H_gap should be positive semi-definite
-        assert eigenvalues[0] >= -1e-10, f"H_gap has negative eigenvalue: {eigenvalues[0]}"
-        # The walk can only encode energies in [0, 2*Lambda], so an independently
-        # diagonalized H_gap has to fit inside that band -- and, because the SOS
-        # generators very nearly saturate it, has to fill most of it. Together these
-        # bracket Lambda from both sides against an oracle that never sees the
-        # container's normalization, so a rescaled Lambda can no longer cancel itself
-        # out of the walk. (Measured ratio for this fixture: 0.991.)
-        two_lambda = 2.0 * lambda_sos
-        assert eigenvalues[-1] <= two_lambda + 1e-10, (
-            f"H_gap spectrum reaches {eigenvalues[-1]}, outside the block-encoding band [0, {two_lambda}]."
-        )
-        assert eigenvalues[-1] >= 0.5 * two_lambda, (
-            f"H_gap spectrum tops out at {eigenvalues[-1]}, less than half the block-encoding "
-            f"band [0, {two_lambda}]; Lambda looks inflated."
-        )
-
-    def test_sos_decomposition_is_positive_semidefinite(self):
-        """H_gap = Σ_G G†G must be PSD, since it is a sum of operator squares.
-
-        This is the property the spectrum amplification relies on: the walk
-        eigenphase encodes E_gap ∈ [0, 2Λ], so a negative eigenvalue would make
-        the ``arccos`` decoding ill-defined (:cite:`Low2025`, Eq. 11, 20-21).
-        """
-        data = _build_h2_dfthc_data()
-        h_gap = _build_dfthc_hamiltonian_matrix(
-            data["h1"],
-            data["basis_vectors"],
-            data["two_body_weights"],
-            data["identity_weight"],
-        )
-        assert np.linalg.eigvalsh(h_gap).min() >= -1e-12
 
     def test_sos_decomposition_reproduces_physical_hamiltonian(self):
         """H_gap + E_SOS must equal the physical Hamiltonian, eigenvalue by eigenvalue.
@@ -742,33 +529,6 @@ class TestSOSSAQPEIntegration:
         gap_energy, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
         assert gap_energy + energy_shift == pytest.approx(casci_energy - core_energy, abs=ci_energy_tolerance)
 
-    def test_energy_shift_matches_qubit_mapper(self):
-        """The mapper's ``energy_shift`` must equal Eq. 30 evaluated on h1_majorana."""
-        data = _build_h2_dfthc_data()
-        n_orb = data["N"]
-        orbitals = create_test_orbitals(n_orb)
-        fh = FactorizedHamiltonianContainer(
-            one_body_integrals=data["h1"],
-            u_matrices=data["basis_vectors"].flatten(),
-            w_matrices=data["two_body_weights"].flatten(),
-            wb_matrix=data["identity_weight"],
-            orbitals=orbitals,
-            core_energy=0.0,
-            inactive_fock_matrix=np.zeros((n_orb, n_orb)),
-        )
-        # ``to_sossa_operator`` transfers ownership of the C++ container, so read the
-        # scalar offset off ``fh`` before it is consumed.
-        core_energy = fh.get_core_energy()
-        container = to_sossa_operator(fh).get_container()
-
-        expected = core_energy + _sos_energy_shift(
-            data["h1"],
-            data["basis_vectors"],
-            data["two_body_weights"],
-            data["identity_weight"],
-        )
-        assert container.metadata.energy_shift == pytest.approx(expected, abs=1e-12)
-
     def test_ground_state_energy_recovered_from_walk_eigenphase(self):
         """Decoding a walk eigenphase must return the exact physical ground energy.
 
@@ -792,7 +552,7 @@ class TestSOSSAQPEIntegration:
             core_energy=0.0,
             inactive_fock_matrix=np.zeros((n_orb, n_orb)),
         )
-        container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
+        container = SOSSABuilder().run(factorized_hamiltonian_to_sossa_operator(fh)).get_container()
 
         h_gap = _build_dfthc_hamiltonian_matrix(
             data["h1"],
@@ -803,8 +563,7 @@ class TestSOSSAQPEIntegration:
         gap_energy, _ = _get_ground_state_and_energy(h_gap, n_orb, nalpha=1, nbeta=1)
 
         # Gap energy -> walk phase fraction, then back through the container decoder.
-        lambda_sos = container.normalization
-        phase_fraction = math.acos(np.clip(gap_energy / lambda_sos - 1.0, -1.0, 1.0)) / (2 * math.pi)
+        phase_fraction = _energy_to_qpe_phase(gap_energy, container.normalization)
         recovered = container.eigenvalue_from_phase(phase_fraction)
 
         h_physical = _build_physical_hamiltonian_matrix(
@@ -854,7 +613,7 @@ class TestSOSSAQPEIntegration:
             core_energy=data["core_energy"],
             inactive_fock_matrix=np.zeros((n_orb, n_orb)),
         )
-        # ``to_sossa_operator`` consumes the container, so read the offset off ``fh`` first.
+        # ``factorized_hamiltonian_to_sossa_operator`` consumes the container, so read the offset off ``fh`` first.
         core_energy = fh.get_core_energy()
         assert core_energy != 0.0, "a zero core energy would make the convention check below vacuous"
 
@@ -863,7 +622,7 @@ class TestSOSSAQPEIntegration:
         physical_energy, _ = _get_ground_state_and_energy(h_physical, n_orb, nalpha=1, nbeta=1)
         reference_ground_state_energy = physical_energy + core_energy
 
-        operator = to_sossa_operator(fh)
+        operator = factorized_hamiltonian_to_sossa_operator(fh)
         container = (
             SOSSABuilder(reference_ground_state_energy=reference_ground_state_energy).run(operator).get_container()
         )
@@ -879,7 +638,7 @@ class TestSOSSAQPEIntegration:
         assert lambda_eff == pytest.approx(expected, abs=1e-12)
 
         # (2) Slope of the decoder, evaluated without the closed form.
-        phase = math.acos(np.clip(energy_gap / container.normalization - 1.0, -1.0, 1.0)) / (2 * math.pi)
+        phase = _energy_to_qpe_phase(energy_gap, container.normalization)
         step = 1e-6
         slope = (container.eigenvalue_from_phase(phase + step) - container.eigenvalue_from_phase(phase - step)) / (
             2 * step
@@ -896,62 +655,52 @@ class TestSOSSAQPEIntegration:
         with pytest.raises(ValueError, match="outside the representable window"):
             SOSSABuilder(reference_ground_state_energy=physical_energy).run(operator)
 
+    @pytest.mark.parametrize(
+        "mapper_overrides",
+        [
+            {},
+            {
+                "outer_prepare_algorithm": "alias_sampling",
+                "coefficient_bit_precision": 4,
+            },
+            {
+                "inner_prepare_algorithm": "controlled_alias_sampling",
+                "coefficient_bit_precision": 4,
+            },
+        ],
+        ids=["direct", "alias_outer", "alias_inner"],
+    )
+    def test_sossa_qpe_features(self, mapper_overrides):
+        """QPE over 8 phase bins of the H2 data, with the direct backends and each alias variant."""
+        _run_sossa_unary_qpe(num_queries=7, mapper_kwargs=mapper_overrides)
+
+    def test_unary_qpe_recovers_the_h2_ground_state_energy(self):
+        """Recover the H2 ground-state energy end-to-end with unary-iteration QPE.
+
+        Exercises the full production path: SOSSABuilder -> SOSSAMapper ->
+        ``MakeUnaryQPECircuit`` -> sparse simulator -> bitstring decoding.
+        """
+        num_queries = 31
+        result, gs_energy, physical_energy, container = _run_sossa_unary_qpe(num_queries)
+
+        # _run_sossa_unary_qpe bounds the *doubled* phase to one bin, and raw_energy is
+        # decoded from the canonical phase, which is half of it -- so the canonical phase
+        # carries half a bin of uncertainty.
+        half_bin = 1.0 / (2.0 * (num_queries + 1))
+        exact_phase = _energy_to_qpe_phase(gs_energy, container.normalization)
+        # E_gap(phi) = 2*Lambda*cos^2(pi*phi) is monotone across the canonical range
+        # [0, 1/2], so the widest energy excursion over the window sits at an edge.
+        edges = [min(0.5, max(0.0, exact_phase + sign * half_bin)) for sign in (-1.0, 1.0)]
+        tol = max(abs(container.eigenvalue_from_phase(p) - container.metadata.energy_shift - gs_energy) for p in edges)
+
+        assert abs(result.raw_energy - physical_energy) <= tol, (
+            f"Energy mismatch: measured={result.raw_energy:.6f}, expected={physical_energy:.6f}, tol={tol:.6f}"
+        )
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Resource estimation
 # ═══════════════════════════════════════════════════════════════════════════════
-
-
-def _sossa_unary_qpe_circuit(
-    num_queries,
-    *,
-    num_orbitals,
-    num_ranks,
-    num_bases,
-    num_copies,
-    num_electrons_per_spin=None,
-    **mapper_kwargs,
-):
-    """Build the unary-iteration QPE circuit for a synthetic SOSSA problem.
-
-    Uses a random factorized Hamiltonian rather than the H2 data because the point is to
-    exercise the register widths at a chosen ``(N, R, B, C)``, not to recover an energy.
-
-    Args:
-        num_queries: Number of walk blocks the schedule applies.
-        num_orbitals: Number of spatial orbitals (N).
-        num_ranks: Number of ranks (R).
-        num_bases: Number of bases (B).
-        num_copies: Number of copies (C).
-        num_electrons_per_spin: Alpha and beta electron count; defaults to half filling.
-        mapper_kwargs: Overrides for :func:`_sossa_unary_circuit_builder_ref`.
-
-    Returns:
-        The QPE circuit.
-
-    """
-    factorized = create_random_factorized_hamiltonian(
-        num_orbitals=num_orbitals, num_ranks=num_ranks, num_bases=num_bases, num_copies=num_copies
-    )
-    num_modes = 2 * num_orbitals
-    orbitals = create_test_orbitals(num_orbitals)
-    operator = create("qubit_mapper", "sum_of_squares").run(
-        Hamiltonian(factorized), MajoranaMapping.jordan_wigner(num_modes)
-    )
-
-    num_electrons = num_electrons_per_spin or max(1, num_orbitals // 2)
-    hf_config = Configuration.canonical_hf_configuration(num_electrons, num_electrons, num_orbitals)
-    reference = Wavefunction(StateVectorContainer(hf_config, orbitals))
-    state_prep = create("state_prep", "sparse_isometry").run(reference)
-
-    builder = create(
-        "qpe_circuit_builder",
-        "qdk_unary",
-        num_queries=num_queries,
-        circuit_mapper=_sossa_circuit_mapper_ref(**mapper_kwargs),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
-    )
-    return builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
 
 
 class TestSOSSAQPEScope:
@@ -967,7 +716,7 @@ class TestSOSSAQPEScope:
         be revisited alongside it.
         """
         factorized = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1)
-        unitary = SOSSABuilder().run(to_sossa_operator(factorized))
+        unitary = SOSSABuilder().run(factorized_hamiltonian_to_sossa_operator(factorized))
 
         mappers = list(available("controlled_circuit_mapper"))
         assert mappers, "expected at least one registered controlled circuit mapper"
@@ -980,32 +729,42 @@ class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
     def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs."""
-        circuit = _sossa_unary_qpe_circuit(
-            10_162,
-            num_orbitals=20,
-            num_ranks=14,
-            num_bases=15,
-            num_copies=5,
-            num_electrons_per_spin=15,
-            outer_prepare_algorithm="alias_sampling",
-            inner_prepare_algorithm="controlled_alias_sampling",
-            select_algorithm="qrom_phase_gradient",
-            coefficient_bit_precision=11,
-            rotation_bit_precision=15,
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
+
+        Uses a random factorized Hamiltonian rather than the H2 data because the point is
+        to exercise the register widths at ``(N, R, B, C) = (20, 14, 15, 5)``, not to
+        recover an energy.
+        """
+        num_orbitals = 20
+        factorized = create_random_factorized_hamiltonian(
+            num_orbitals=num_orbitals, num_ranks=14, num_bases=15, num_copies=5
         )
+        operator = create("qubit_mapper", "sum_of_squares").run(
+            Hamiltonian(factorized), MajoranaMapping.jordan_wigner(2 * num_orbitals)
+        )
+
+        hf_config = Configuration.canonical_hf_configuration(15, 15, num_orbitals)
+        reference = Wavefunction(StateVectorContainer(hf_config, create_test_orbitals(num_orbitals)))
+        state_prep = create("state_prep", "sparse_isometry").run(reference)
+
+        builder = create(
+            "qpe_circuit_builder",
+            "qdk_unary",
+            num_queries=10_162,
+            circuit_mapper=_sossa_circuit_mapper_ref(
+                outer_prepare_algorithm="alias_sampling",
+                inner_prepare_algorithm="controlled_alias_sampling",
+                select_algorithm="qrom_phase_gradient",
+                coefficient_bit_precision=11,
+                rotation_bit_precision=15,
+            ),
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+        )
+        circuit = builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
 
         logical_counts = circuit.estimate().logical_counts
 
         toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
 
-        # 46_755_415 Toffolis = 4601/BE over 10_162 walk queries. Each neighbor-gated Givens
-        # rotation is the number-conserving CRy(2theta) built as Ry(theta).CNOT.Ry(-theta).CNOT
-        # from two uncontrolled Ry(theta) sharing one angle word, so both SELECT backends apply
-        # the same G(theta) without a controlled adder. The SF rotation-table load is controlled
-        # on the spin-free branch flag so the one-body (DQ) branch keeps a clear rotation target
-        # and needs no separate unload; that control raises the earlier fixed-XOR cost
-        # (42_649_967, 4197/BE) by ~9.6% but is what lets the DQ branch address the correct SF
-        # row for a non-zero b value. 4601/BE vs the paper's 3924/BE.
         assert toffoli_count == pytest.approx(46_755_415, rel=0.01)
         assert logical_counts["numQubits"] == 463

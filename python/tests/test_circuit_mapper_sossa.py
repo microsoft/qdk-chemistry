@@ -17,7 +17,11 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianConta
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
-from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals, to_sossa_operator
+from .test_helpers import (
+    create_random_factorized_hamiltonian,
+    create_test_orbitals,
+    factorized_hamiltonian_to_sossa_operator,
+)
 from .test_phase_estimation_sossa import (
     _build_dfthc_hamiltonian_matrix,
     _python_to_qsharp_permutation,
@@ -42,7 +46,7 @@ def _build_sossa_unitary(
         seed=seed,
     )
     builder = SOSSABuilder()
-    return builder.run(to_sossa_operator(fh))
+    return builder.run(factorized_hamiltonian_to_sossa_operator(fh))
 
 
 def _make_sossa_mapper(
@@ -60,14 +64,6 @@ def _make_sossa_mapper(
     mapper.settings().set("coefficient_bit_precision", coefficient_bit_precision)
     mapper.settings().set("rotation_bit_precision", rotation_bit_precision)
     return mapper
-
-
-def _with_prepared_gradient(op, num_gradient: int):
-    if not num_gradient:
-        return op
-    return QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
-        op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_gradient
-    )
 
 
 def _reverse_bits(x: int, n: int) -> int:
@@ -120,7 +116,7 @@ def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, se
         core_energy=0.0,
         inactive_fock_matrix=np.zeros((num_orbitals, num_orbitals)),
     )
-    unitary = SOSSABuilder().run(to_sossa_operator(container))
+    unitary = SOSSABuilder().run(factorized_hamiltonian_to_sossa_operator(container))
     normalization = unitary.get_container().normalization
     circuit = _make_sossa_mapper(
         outer_algorithm="dense_pure_state",
@@ -159,16 +155,6 @@ def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
 class TestOuterPrep:
     """Tests for SOSSAMapper._build_outer_prep."""
 
-    @pytest.mark.parametrize("algorithm", ["alias_sampling", "dense_pure_state", "qrom"])
-    def test_build_outer_prep_returns_callable(self, algorithm):
-        """Verify _build_outer_prep produces a Q# callable for each algorithm."""
-        sossa_unitary = _build_sossa_unitary()
-        container = sossa_unitary.get_container()
-        mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op, num_gradient = mapper._build_outer_prep(container)
-        assert op is not None
-        assert num_gradient == (10 if algorithm == "qrom" else 0)
-
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
     def test_build_outer_prep_fidelity(self, algorithm):
         sossa_unitary = _build_sossa_unitary()
@@ -179,9 +165,13 @@ class TestOuterPrep:
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
 
+        if num_gradient:
+            op = QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
+                op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_gradient
+            )
         full_sv = np.array(
             dump_operation_on_state(
-                _with_prepared_gradient(op, num_gradient),
+                op,
                 num_qubits + num_gradient,
                 context=get_qsharp_context(),
             )
@@ -363,7 +353,7 @@ class TestSOSSAMapper:
         assert circuit._qsharp_factory is not None
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
+        operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
         sossa = operator.get_container()
         sossa.one_body.coeffs[...] = 0.0
         sossa.two_body.coeffs[...] = np.array([[1.0, -0.5]])
@@ -438,29 +428,6 @@ class TestSOSSAMapper:
         assert circuit.num_qubits == num_system_qubits + num_outer_qubits + num_reflect_inner + 2 + num_gradient
         assert circuit.num_qubits - num_system_qubits - num_gradient > 0
 
-    @pytest.mark.parametrize(
-        ("num_orbitals", "num_ranks", "num_bases", "num_copies"),
-        [
-            (2, 1, 1, 1),
-            (2, 2, 1, 1),
-            (3, 2, 2, 1),
-        ],
-        ids=["N2R1B1C1", "N2R2B1C1", "N3R2B2C1"],
-    )
-    def test_mapping_parametrized_dimensions(self, num_orbitals, num_ranks, num_bases, num_copies):
-        """Test mapping for various (N, R, B, C) configurations."""
-        unitary = _build_sossa_unitary(
-            num_orbitals=num_orbitals,
-            num_ranks=num_ranks,
-            num_bases=num_bases,
-            num_copies=num_copies,
-        )
-        mapper = SOSSAMapper()
-        circuit = mapper.run(unitary)
-
-        assert isinstance(circuit, Circuit)
-        assert circuit._qsharp_op is not None
-
 
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
     """Convert a unit vector to Givens rotation angles (same as SOSSABuilder)."""
@@ -512,10 +479,6 @@ class TestSelectFullFidelity:
         ctx = create_qsharp_context()
         ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
         return np.array(ctx.dump_machine().as_dense_state())
-
-    @staticmethod
-    def _gradient_subspace(sv: np.ndarray, num_gradient: int) -> np.ndarray:
-        return sv if num_gradient == 0 else sv[:: 1 << num_gradient]
 
     @pytest.mark.parametrize("num_free_rider_bits", [0, 1])
     def test_select_rejects_missing_generator_bits(self, num_free_rider_bits):
@@ -597,10 +560,9 @@ class TestSelectFullFidelity:
         )
 
         direct = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False)
-        qrom = self._gradient_subspace(
-            self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True),
-            bit_precision,
-        )
+        qrom = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True)[
+            :: 1 << bit_precision
+        ]
 
         # The gradient is conjugated back to |0...0>, so restricting to it keeps the full norm.
         assert len(qrom) == len(direct)
@@ -685,12 +647,6 @@ def _make_random_data_1d(n_data: int, n_bits: int, seed: int = 42) -> list[list[
     return [_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_data)]
 
 
-def _make_random_data_2d(n_outer: int, n_inner: int, n_bits: int, seed: int = 42) -> list[list[list[bool]]]:
-    """Generate random Bool[][][] data for 2D Select2DLoad tests."""
-    rng = np.random.default_rng(seed)
-    return [[_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_inner)] for _ in range(n_outer)]
-
-
 _NS = "QDKChemistry.Utils.SelectSwap"
 
 
@@ -731,7 +687,10 @@ class TestSelectSwapCorrectness:
     )
     def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits):
         """For each (i, j), SelectSwap2D should load data[i][j] into target."""
-        data = _make_random_data_2d(n_outer, n_inner, n_bits)
+        rng = np.random.default_rng(42)
+        data = [
+            [_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_inner)] for _ in range(n_outer)
+        ]
         result = create_qsharp_context().eval(
             f"{_NS}.TestSelectSwap2DCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)"
         )

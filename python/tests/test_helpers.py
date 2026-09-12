@@ -324,7 +324,7 @@ def create_random_factorized_hamiltonian(
     )
 
 
-def to_sossa_operator(factorized_hamiltonian):
+def factorized_hamiltonian_to_sossa_operator(factorized_hamiltonian):
     """Map a factorized Hamiltonian to the SOSSA QubitOperator the SOSSA builder expects.
 
     Args:

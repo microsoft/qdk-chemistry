@@ -33,7 +33,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAWalkContainer,
 )
 
-from .test_helpers import create_random_factorized_hamiltonian, to_sossa_operator
+from .test_helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
 
 
 def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | None = None):
@@ -260,7 +260,7 @@ class TestSOSSABuilder:
             num_copies=num_copies,
         )
         builder = SOSSABuilder()
-        result = builder.run(to_sossa_operator(fh))
+        result = builder.run(factorized_hamiltonian_to_sossa_operator(fh))
         container = result.get_container()
 
         assert isinstance(container, SOSSAWalkContainer)
@@ -271,7 +271,7 @@ class TestSOSSABuilder:
 
     def test_outer_prepare_weights_and_one_body_addressing(self):
         r"""The outer PREPARE holds :math:`c/\|c\|`, with the scale carried by :math:`\Lambda`."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 1, 1, 1))
+        operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(2, 1, 1, 1))
         sossa = operator.get_container()
         sossa.one_body.coeffs[...] = np.array([[1.0, -2.0j], [-3.0, 4.0j]])
         sossa.two_body.coeffs[...] = np.array([[-5.0, 6.0]])
@@ -298,7 +298,7 @@ class TestSOSSABuilder:
                 num_bases=num_bases,
                 num_copies=num_copies,
             )
-            container = SOSSABuilder().run(to_sossa_operator(fh)).get_container()
+            container = SOSSABuilder().run(factorized_hamiltonian_to_sossa_operator(fh)).get_container()
 
             one_body = np.asarray(container.inner_prepare.conditional_coefficients, dtype=float)[:num_orbitals]
             expected = np.zeros_like(one_body)
@@ -313,7 +313,9 @@ class TestSOSSABuilder:
 
     def test_free_rider_data_encodes_generator_flags_copies_and_nonzero_ranks(self):
         """Pin D1/Q1/SF flags and little-endian ranks for multiple copies."""
-        source = to_sossa_operator(create_random_factorized_hamiltonian(3, 3, 1, 2)).get_container()
+        source = factorized_hamiltonian_to_sossa_operator(
+            create_random_factorized_hamiltonian(3, 3, 1, 2)
+        ).get_container()
         operator = QubitOperator(
             SumOfSquaresContainer(
                 source.one_body,
@@ -352,7 +354,7 @@ class TestSOSSABuilder:
 
     def test_inner_prepare_weights_and_zero_row_padding(self):
         """Inner PREPARE must linearize every SF weight and preserve its SELECT sign."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
+        operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
         sossa = operator.get_container()
         weights = np.array([[4.0, -9.0, 16.0], [-1.0, 0.0, -25.0]])
         sossa.two_body.coeffs[...] = weights
@@ -366,7 +368,7 @@ class TestSOSSABuilder:
         expected_probabilities = np.abs(weights) / np.sum(np.abs(weights), axis=1, keepdims=True)
         np.testing.assert_allclose(probabilities, expected_probabilities)
 
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
+        operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
         sossa = operator.get_container()
         sossa.two_body.coeffs[...] = np.array([[0.0, 0.0, 0.0], [4.0, -9.0, 16.0]])
 
@@ -377,7 +379,7 @@ class TestSOSSABuilder:
 
     def test_lambda_eff_reference_paths_and_validation(self):
         r"""The two settings must be the same statement of the same reference point."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
+        operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
         probe = SOSSABuilder().run(operator).get_container()
         shift = probe.metadata.energy_shift
         gap = 0.4 * probe.normalization
@@ -399,7 +401,7 @@ class TestSOSSABuilder:
 
         assert lambda_eff_or_none(reference_ground_state_energy=gap) != from_gap
 
-        band_operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
+        band_operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
         lam = SOSSABuilder().run(band_operator).get_container().normalization
 
         with pytest.raises(ValueError, match="not both"):
