@@ -575,8 +575,9 @@ class TestSelectFullFidelity:
             ((2, 1, 1, 1), 0, 0, 10),
             ((2, 2, 1, 1), 2, 0, 10),
             ((3, 2, 2, 1), 0, 0, 7),
+            ((3, 2, 2, 1), 0, 1, 7),
         ],
-        ids=["N2_dq", "N2_sf", "N3_dq_chain"],
+        ids=["N2_dq", "N2_sf", "N3_dq_chain", "N3_dq_nonzero_b"],
     )
     def test_phase_gradient_backend_matches_direct(
         self,

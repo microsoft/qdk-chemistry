@@ -9,7 +9,7 @@ import math
 
 import numpy as np
 
-from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sos import SumOfSquaresQubitMapper
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
@@ -336,7 +336,7 @@ def to_sossa_operator(factorized_hamiltonian):
     """
     num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
     hamiltonian = Hamiltonian(factorized_hamiltonian)
-    return SOSQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+    return SumOfSquaresQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
 
 
 def create_random_bitstring_matrix(

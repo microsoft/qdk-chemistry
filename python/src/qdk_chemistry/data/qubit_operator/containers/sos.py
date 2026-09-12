@@ -26,7 +26,7 @@ from qdk_chemistry.utils.serialization import (
 if TYPE_CHECKING:
     import h5py
 
-__all__ = ["FactorizedHamiltonianMetadata", "RotatedPaulis", "SOSContainer"]
+__all__ = ["FactorizedHamiltonianMetadata", "RotatedPaulis", "SumOfSquaresContainer"]
 
 
 @dataclass(frozen=True, eq=False)
@@ -92,7 +92,7 @@ class FactorizedHamiltonianMetadata:
         return cls(**data)
 
 
-class SOSContainer(QubitOperatorContainer):
+class SumOfSquaresContainer(QubitOperatorContainer):
     """Container for a sum-of-squares qubit operator.
 
     The one-body and two-body generators are each a
@@ -106,13 +106,13 @@ class SOSContainer(QubitOperatorContainer):
     the outer coefficients from these blocks, and the block-encoding normalization from those.
     """
 
-    _data_type_name = "sos_container"
+    _data_type_name = "sum_of_squares_container"
     _serialization_version = "0.1.0"
 
     @staticmethod
     def data_type_name() -> str:
         """Return the wire-format identifier for SOS containers."""
-        return "sos_container"
+        return "sum_of_squares_container"
 
     def __init__(
         self,
@@ -128,17 +128,25 @@ class SOSContainer(QubitOperatorContainer):
         self.metadata = metadata
         if len(self.one_body.angles) != len(self.one_body.coeffs):
             raise ValueError("one-body angles and coefficients must have matching generator counts")
+        if self.one_body.coeffs.size:
+            if self.one_body.coeffs.ndim != 2 or self.one_body.coeffs.shape[1] != len(self.one_body.paulis):
+                raise ValueError("one-body coefficients must be a 2-D [M, T] array with one column per Pauli label")
+            if self.one_body.angles.ndim != 2 or self.one_body.angles.shape[1] != metadata.num_spatial_orbitals - 1:
+                raise ValueError("one-body angles must be a 2-D [M, num_spatial_orbitals - 1] array")
         if not 0 <= metadata.num_positive_one_body_terms <= len(self.one_body.angles):
             raise ValueError("num_positive_one_body_terms must be between 0 and the one-body generator count")
         expected_two_body = (metadata.num_ranks * metadata.num_copies, metadata.num_bases + 1)
         if self.two_body.coeffs.size and self.two_body.coeffs.shape != expected_two_body:
             raise ValueError("two_body_coeffs must have shape [num_ranks * num_copies, num_bases + 1]")
+        expected_two_body_angles = (metadata.num_ranks * metadata.num_bases, metadata.num_spatial_orbitals - 1)
+        if self.two_body.angles.size and self.two_body.angles.shape != expected_two_body_angles:
+            raise ValueError("two_body angles must have shape [num_ranks * num_bases, num_spatial_orbitals - 1]")
         super().__init__(encoding, fermion_mode_order)
 
     @property
     def type(self) -> str:
         """Return the container type."""
-        return "sos"
+        return "sum_of_squares"
 
     @property
     def num_qubits(self) -> int:
@@ -174,7 +182,7 @@ class SOSContainer(QubitOperatorContainer):
         group.attrs["payload"] = json.dumps(self.to_json())
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> SOSContainer:
+    def from_json(cls, json_data: dict[str, Any]) -> SumOfSquaresContainer:
         """Create a sum-of-squares container from JSON."""
         cls._validate_json_version(cls._serialization_version, json_data)
         one_body = RotatedPaulis(
@@ -196,7 +204,7 @@ class SOSContainer(QubitOperatorContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> SOSContainer:
+    def from_hdf5(cls, group: h5py.Group) -> SumOfSquaresContainer:
         """Create a sum-of-squares container from HDF5."""
         cls._validate_hdf5_version(cls._serialization_version, group)
         return cls.from_json(json.loads(group.attrs["payload"]))
@@ -207,6 +215,6 @@ class SOSContainer(QubitOperatorContainer):
         num_q1 = len(self.one_body.angles) - num_d1
         num_sf = len(self.two_body.angles)
         return (
-            f"SOS Qubit Operator\n  Number of qubits: {self.num_qubits}\n"
+            f"Sum-of-Squares Qubit Operator\n  Number of qubits: {self.num_qubits}\n"
             f"  D1/Q1/SF generators: {num_d1}/{num_q1}/{num_sf}\n"
         )

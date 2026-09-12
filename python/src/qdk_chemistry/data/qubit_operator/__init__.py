@@ -16,7 +16,7 @@ from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
-from qdk_chemistry.data.qubit_operator.containers.sos import SOSContainer
+from qdk_chemistry.data.qubit_operator.containers.sos import SumOfSquaresContainer
 
 if TYPE_CHECKING:
     import h5py
@@ -56,12 +56,9 @@ class QubitOperator(DataClass):
     """
 
     _data_type_name = "qubit_hamiltonian"
-    # Nominal wrapper version kept only to mirror the sibling DataClass convention
-    # (UnitaryRepresentation likewise carries "0.2.0"). It is never written to disk:
-    # to_json/to_hdf5 forward to the wrapped container, which owns the on-disk schema
-    # version (pauli_lcu writes 0.1.0, sos writes 0.3.0). Do not read it as the version of
-    # any document -- pre-container Pauli LCU documents are 0.1.0, not this.
-    _serialization_version = "0.2.0"
+    # Nominal wrapper version: to_json/to_hdf5 forward to the wrapped container,
+    # which owns the on-disk schema version.
+    _serialization_version = "0.1.0"
 
     @staticmethod
     def data_type_name() -> str:
@@ -251,8 +248,8 @@ class QubitOperator(DataClass):
         container_type = json_data.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_json(json_data)
-        elif container_type == "sos":
-            container = SOSContainer.from_json(json_data)
+        elif container_type == "sum_of_squares":
+            container = SumOfSquaresContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container)
@@ -267,8 +264,8 @@ class QubitOperator(DataClass):
         container_type = group.attrs.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":
             container = PauliLCUContainer.from_hdf5(group)
-        elif container_type == "sos":
-            container = SOSContainer.from_hdf5(group)
+        elif container_type == "sum_of_squares":
+            container = SumOfSquaresContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container)

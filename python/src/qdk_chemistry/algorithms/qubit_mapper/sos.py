@@ -1,4 +1,4 @@
-"""SOSSA qubit mapper for factorized SOS Hamiltonians."""
+"""Sum-of-squares (SOS) qubit mapper for factorized Hamiltonians."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,14 +13,14 @@ from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, Majo
 from qdk_chemistry.data.qubit_operator.containers.sos import (
     FactorizedHamiltonianMetadata,
     RotatedPaulis,
-    SOSContainer,
+    SumOfSquaresContainer,
 )
 
-__all__ = ["SOSQubitMapper", "SOSQubitMapperSettings"]
+__all__ = ["SumOfSquaresQubitMapper", "SumOfSquaresQubitMapperSettings"]
 
 
-class SOSQubitMapperSettings(QubitMapperSettings):
-    """Settings for the SOS qubit mapper."""
+class SumOfSquaresQubitMapperSettings(QubitMapperSettings):
+    """Settings for the sum-of-squares qubit mapper."""
 
     def __init__(self) -> None:
         """Initialize the settings with the package-wide screening default."""
@@ -35,8 +35,8 @@ class SOSQubitMapperSettings(QubitMapperSettings):
         )
 
 
-class SOSQubitMapper(QubitMapper):
-    """Map a factorized Hamiltonian to a SOSSA qubit operator.
+class SumOfSquaresQubitMapper(QubitMapper):
+    """Map a factorized Hamiltonian to a sum-of-squares qubit operator.
 
     The mapper implements the sum-of-squares decomposition (:cite:`Low2025`,
     Eq. (27))::
@@ -49,7 +49,7 @@ class SOSQubitMapper(QubitMapper):
     def __init__(self) -> None:
         """Initialize the mapper with its settings."""
         super().__init__()
-        self._settings = SOSQubitMapperSettings()
+        self._settings = SumOfSquaresQubitMapperSettings()
 
     def name(self) -> str:
         """Return the algorithm variant name."""
@@ -72,11 +72,11 @@ class SOSQubitMapper(QubitMapper):
 
         """
         if not isinstance(hamiltonian, Hamiltonian):
-            raise TypeError("SOSQubitMapper requires a Hamiltonian")
+            raise TypeError("SumOfSquaresQubitMapper requires a Hamiltonian")
 
         container = hamiltonian.get_container()
         if not isinstance(container, FactorizedHamiltonianContainer):
-            raise TypeError("SOSQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
+            raise TypeError("SumOfSquaresQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
 
         self._validate_mapping(mapping, container.get_num_orbitals())
         return self._map_factorized_container(
@@ -96,14 +96,14 @@ class SOSQubitMapper(QubitMapper):
 
         """
         if mapping.name != "jordan-wigner":
-            raise ValueError(f"SOSQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}.")
+            raise ValueError(f"SumOfSquaresQubitMapper supports the jordan-wigner encoding only; got {mapping.name!r}.")
         num_modes = 2 * num_orbitals
         if mapping.num_modes != num_modes:
             raise ValueError(
-                f"SOSQubitMapper requires a mapping over {num_modes} spin orbitals; got {mapping.num_modes}."
+                f"SumOfSquaresQubitMapper requires a mapping over {num_modes} spin orbitals; got {mapping.num_modes}."
             )
         if mapping.tapering is not None:
-            raise ValueError("SOSQubitMapper does not support tapered mappings")
+            raise ValueError("SumOfSquaresQubitMapper does not support tapered mappings")
 
     @classmethod
     def _map_factorized_container(
@@ -112,7 +112,7 @@ class SOSQubitMapper(QubitMapper):
         mapping: MajoranaMapping,
         threshold: float = 1e-12,
     ) -> QubitOperator:
-        """Map a validated factorized container to a SOSSA qubit operator.
+        """Map a validated factorized container to a sum-of-squares qubit operator.
 
         The metadata shift realizes E_SOS and includes the container's
         core-energy constant::
@@ -149,7 +149,7 @@ class SOSQubitMapper(QubitMapper):
         energy_shift = container.get_core_energy() - one_body_shift - two_body_shift
 
         return QubitOperator(
-            SOSContainer(
+            SumOfSquaresContainer(
                 one_body,
                 two_body,
                 mapping.name,

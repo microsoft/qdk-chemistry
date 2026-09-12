@@ -11,11 +11,12 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 import json
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
-import h5py
 import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
@@ -25,6 +26,8 @@ from .block_encoding import _wavefunction_from_hdf5, _wavefunction_to_hdf5
 from .quantum_walk import QuantumWalkContainer
 
 if TYPE_CHECKING:
+    import h5py
+
     from qdk_chemistry.data import Wavefunction
 
 __all__ = ["SOSSAInnerPrepare", "SOSSARegisterLayout", "SOSSASelect", "SOSSAWalkContainer"]
@@ -51,7 +54,7 @@ class SOSSARegisterLayout:
         return asdict(self)
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> "SOSSARegisterLayout":
+    def from_json(cls, data: dict[str, Any]) -> SOSSARegisterLayout:
         """Create a layout from a JSON dictionary."""
         return cls(**data)
 
@@ -82,7 +85,7 @@ class SOSSAInnerPrepare:
         return data
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> "SOSSAInnerPrepare":
+    def from_json(cls, data: dict[str, Any]) -> SOSSAInnerPrepare:
         """Load from a JSON dictionary."""
         fr_data = np.array(data["free_rider_data"], dtype=bool) if "free_rider_data" in data else None
         return cls(
@@ -97,7 +100,7 @@ class SOSSAInnerPrepare:
             group.create_dataset("free_rider_data", data=self.free_rider_data)
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "SOSSAInnerPrepare":
+    def from_hdf5(cls, group: h5py.Group) -> SOSSAInnerPrepare:
         """Load from HDF5."""
         free_rider = np.array(group["free_rider_data"]) if "free_rider_data" in group else None
         return cls(
@@ -129,7 +132,7 @@ class SOSSASelect:
         }
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> "SOSSASelect":
+    def from_json(cls, data: dict[str, Any]) -> SOSSASelect:
         """Load from a JSON dictionary."""
         return cls(
             one_body_rotation_angles=np.array(data["one_body_rotation_angles"], dtype=float),
@@ -142,7 +145,7 @@ class SOSSASelect:
         group.create_dataset("two_body_rotation_angles", data=self.two_body_rotation_angles)
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "SOSSASelect":
+    def from_hdf5(cls, group: h5py.Group) -> SOSSASelect:
         """Load from HDF5."""
         return cls(
             one_body_rotation_angles=np.array(group["one_body_rotation_angles"]),
@@ -182,7 +185,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     def __init__(
         self,
-        outer_prepare: "Wavefunction",
+        outer_prepare: Wavefunction,
         inner_prepare: SOSSAInnerPrepare,
         select: SOSSASelect,
         metadata: FactorizedHamiltonianMetadata,
@@ -312,7 +315,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "SOSSAWalkContainer":
+    def from_json(cls, json_data: dict[str, Any]) -> SOSSAWalkContainer:
         """Create a SOSSAWalkContainer from a JSON dictionary."""
         cls._validate_json_version(cls._serialization_version, json_data)
 
@@ -334,7 +337,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "SOSSAWalkContainer":
+    def from_hdf5(cls, group: h5py.Group) -> SOSSAWalkContainer:
         """Load a SOSSAWalkContainer from an HDF5 group."""
         cls._validate_hdf5_version(cls._serialization_version, group)
         outer_prepare = _wavefunction_from_hdf5(group["outer_prepare"])
@@ -396,7 +399,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         phi = phase_fraction % 1.0
         return float(2.0 * self.normalization * np.cos(np.pi * phi) ** 2 + self.metadata.energy_shift)
 
-    def combine(self, other: "SOSSAWalkContainer") -> "SOSSAWalkContainer":  # type: ignore[override]
+    def combine(self, other: SOSSAWalkContainer) -> SOSSAWalkContainer:  # type: ignore[override]
         """Not supported for SOSSA containers.
 
         Raises:

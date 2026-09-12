@@ -11,14 +11,14 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.qubit_mapper.sos import SOSQubitMapper
+from qdk_chemistry.algorithms.qubit_mapper.sos import SumOfSquaresQubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_lcu import PauliLCUContainer
 from qdk_chemistry.data.qubit_operator.containers.sos import (
     FactorizedHamiltonianMetadata,
     RotatedPaulis,
-    SOSContainer,
+    SumOfSquaresContainer,
 )
 
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
@@ -140,7 +140,7 @@ def test_qubit_operator_reads_hdf5_groups_written_before_container_dispatch(tmp_
     assert restored.encoding == "jordan-wigner"
 
 
-def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
+def test_sum_of_squares_container_json_roundtrip_preserves_complex_coefficients() -> None:
     """Complex LCU coefficients and Givens angles survive a JSON round-trip.
 
     The SOS generators carry the D1/Q1 ``+/-i`` sign in the imaginary part, so a
@@ -148,7 +148,7 @@ def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
     while flipping particle generators into hole generators.
     """
     one_body_coeffs = np.array([[0.2, 0.2j], [0.3, -0.3j]])
-    container = SOSContainer(
+    container = SumOfSquaresContainer(
         one_body=RotatedPaulis(np.array([[0.1], [0.2]]), one_body_coeffs, ("X", "Y")),
         two_body=RotatedPaulis(np.array([[0.3]]), np.array([[0.3, 0.7]]), ("Z",)),
         encoding="jordan-wigner",
@@ -200,7 +200,9 @@ def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
 def _one_body_block(h1: np.ndarray):
     """Map a one-body matrix through the SOS mapper and return the one-body generator block."""
     n = h1.shape[0]
-    operator = SOSQubitMapper().run(Hamiltonian(_factorized_with_one_body(h1)), MajoranaMapping.jordan_wigner(2 * n))
+    operator = SumOfSquaresQubitMapper().run(
+        Hamiltonian(_factorized_with_one_body(h1)), MajoranaMapping.jordan_wigner(2 * n)
+    )
     return operator.get_container()
 
 
@@ -231,7 +233,7 @@ def test_rejects_a_threshold_that_is_not_non_negative(threshold) -> None:
     slots the register layout reserves, and the Q1 copy takes the square root of a
     positive eigenvalue's negation.
     """
-    mapper = SOSQubitMapper()
+    mapper = SumOfSquaresQubitMapper()
     mapper.settings().set("threshold", threshold)
     factorized = create_random_factorized_hamiltonian(num_orbitals=3, num_ranks=1, num_bases=2, num_copies=1)
 
@@ -266,7 +268,7 @@ def test_rejects_a_mapping_it_cannot_honour(mapping, match) -> None:
     factorized = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1)
 
     with pytest.raises(ValueError, match=match):
-        SOSQubitMapper().run(Hamiltonian(factorized), mapping)
+        SumOfSquaresQubitMapper().run(Hamiltonian(factorized), mapping)
 
 
 def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
@@ -274,12 +276,12 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
     factorized = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1)
     expected_normalization = factorized.get_lambda()
 
-    result = SOSQubitMapper().run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(4))
+    result = SumOfSquaresQubitMapper().run(Hamiltonian(factorized), MajoranaMapping.jordan_wigner(4))
 
     assert isinstance(result, QubitOperator)
     container = result.get_container()
-    assert isinstance(container, SOSContainer)
-    assert result.get_container_type() == "sos"
+    assert isinstance(container, SumOfSquaresContainer)
+    assert result.get_container_type() == "sum_of_squares"
     meta = container.metadata
     assert container.one_body.angles.shape[1] == meta.num_spatial_orbitals - 1
     assert container.two_body.coeffs.shape == (meta.num_ranks * meta.num_copies, meta.num_bases + 1)
@@ -290,4 +292,4 @@ def test_maps_factorized_hamiltonian_to_sos_qubit_operator() -> None:
 
 def test_sos_qubit_mapper_is_reachable_through_the_registry() -> None:
     """``create`` is the supported entry point, so the mapper has to be registered under it."""
-    assert isinstance(create("qubit_mapper", "sum_of_squares"), SOSQubitMapper)
+    assert isinstance(create("qubit_mapper", "sum_of_squares"), SumOfSquaresQubitMapper)

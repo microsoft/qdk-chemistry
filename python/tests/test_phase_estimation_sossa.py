@@ -157,7 +157,7 @@ def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
 
 
 def _sos_energy_shift(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``SOSQubitMapper`` ``energy_shift`` (Eq. 30), with zero core/BLISS.
+    """Replicate ``SumOfSquaresQubitMapper`` ``energy_shift`` (Eq. 30), with zero core/BLISS.
 
     ``E_SOS = -2 sum_r w_-^{(r)} - 1/2 sum_rc |W^{(rc)}|^2``.
     """
@@ -171,7 +171,7 @@ def _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identit
     r"""Build the SOSSA gap Hamiltonian ``H_gap = sum_G G† G`` via Jordan-Wigner.
 
     The one-body generators come from diagonalizing the *Majorana-corrected*
-    one-body matrix (Eq. 36), matching ``SOSQubitMapper``, which reads
+    one-body matrix (Eq. 36), matching ``SumOfSquaresQubitMapper``, which reads
     ``container.get_h1_prime()`` rather than the bare ``h1``.
 
     For eigenvalue :math:`\lambda_k` of that matrix the mapper emits the LCU

@@ -21,7 +21,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata, SOSContainer
+from qdk_chemistry.data.qubit_operator.containers.sos import FactorizedHamiltonianMetadata, SumOfSquaresContainer
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
@@ -318,7 +318,7 @@ class TestSOSSABuilder:
         """Pin D1/Q1/SF flags and little-endian ranks for multiple copies."""
         source = to_sossa_operator(create_random_factorized_hamiltonian(3, 3, 1, 2)).get_container()
         operator = QubitOperator(
-            SOSContainer(
+            SumOfSquaresContainer(
                 source.one_body,
                 source.two_body,
                 source.encoding,

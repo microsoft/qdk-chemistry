@@ -21,7 +21,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
-from qdk_chemistry.data.qubit_operator.containers.sos import SOSContainer
+from qdk_chemistry.data.qubit_operator.containers.sos import SumOfSquaresContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAInnerPrepare,
     SOSSARegisterLayout,
@@ -42,8 +42,9 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
             reference_ground_state_energy: Reference total ground-state energy E_gs.
             reference_energy_gap: Reference gap E_gap above the sum-of-squares shift.
 
-        Both default to NaN, meaning unset. They are alternative ways to compute the `lambda_eff`
-        and are mutually exclusive.
+        Both settings are optional and mutually exclusive: each defaults to NaN, meaning unset,
+        and they are alternative ways to compute the `lambda_eff`. Leaving both unset leaves
+        `lambda_eff` unset.
 
         """
         super().__init__()
@@ -94,17 +95,17 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         """Build the SOSSA block encoding from qubit operator.
 
         Args:
-            qubit_hamiltonian: Qubit operator with SOSContainer.
+            qubit_hamiltonian: Qubit operator with SumOfSquaresContainer.
 
         Returns:
             UnitaryRepresentation wrapping the SOSSAWalkContainer.
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
-            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
+            raise TypeError("SOSSABuilder requires a QubitOperator containing a SumOfSquaresContainer")
         sossa = qubit_hamiltonian.get_container()
-        if not isinstance(sossa, SOSContainer):
-            raise TypeError("SOSSABuilder requires a QubitOperator containing an SOSContainer")
+        if not isinstance(sossa, SumOfSquaresContainer):
+            raise TypeError("SOSSABuilder requires a QubitOperator containing a SumOfSquaresContainer")
         if sossa.encoding != "jordan-wigner" or sossa.fermion_mode_order != "blocked":
             raise ValueError("the SOSSA circuit builder currently supports blocked Jordan-Wigner operators only")
 
@@ -160,7 +161,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _outer_coefficients(sossa: SOSContainer) -> np.ndarray:
+    def _outer_coefficients(sossa: SumOfSquaresContainer) -> np.ndarray:
         """Compute the outer PREPARE LCU coefficients from the container generators.
 
         The outer PREPARE is Eq. (B10) of :cite:`Low2025`::
@@ -181,7 +182,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         return np.concatenate([one_body, np.asarray(spin_free, dtype=float)])
 
     @staticmethod
-    def _inner_conditional_coefficients(sossa: SOSContainer, num_one_body: int) -> np.ndarray:
+    def _inner_conditional_coefficients(sossa: SumOfSquaresContainer, num_one_body: int) -> np.ndarray:
         """Assemble the inner-PREPARE conditional amplitudes ``[Xo, B+1]``.
 
         One delta row (``b = 0``) per one-body generator, then one spin-free row

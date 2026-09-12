@@ -19,7 +19,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Arrays.Subarray;
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyControlledOnInt;
-    import Std.Canon.ApplyPauliFromBitString;
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
@@ -132,6 +131,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             set table += [bits];
         }
         return table;
+    }
+
+    /// Zero-pads a `Bool[][]` lookup table out to the full `2^nAddressQubits` address space, so
+    /// `Std.TableLookup.Select` always sees a table covering every address. The SF/DQ/sign/
+    /// free-rider tables are sized by `R`, `B + 1`, or the number of outer conditions, none of
+    /// which need be a power of two, so the raw table can be shorter than its address register
+    /// (arXiv:2502.15882 App. B.5); `SelectSwap.qs` pads the same way.
+    internal function PadBoolTableToAddress(data : Bool[][], nAddressQubits : Int) : Bool[][] {
+        Padded(-(1 <<< nAddressQubits), [false, size = Length(data[0])], data)
     }
 
     /// Whether the SF rotation table is cheaper addressed `rBits ++ bReg` than `bReg ++ rBits`.
@@ -571,20 +579,27 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits, Length(rBits), rankFirst);
         let sfAddress = if rankFirst { rBits + bReg } else { bReg + rBits };
 
+        // Pad both tables to their full 2^(address qubits) address space, since Select
+        // requires it and R or B+1 need not be powers of two (arXiv:2502.15882 App. B.5).
+        let sfDataPadded = PadBoolTableToAddress(sfData, Length(sfAddress));
+        let dqDataPadded = PadBoolTableToAddress(dqData, nDQBits);
+
         // Allocate rotation target register: (N-1)*bRot rotation bits + 1 bEqB flag bit.
         use rotTarget = Qubit[nRotBits + 1];
 
         within {
             // SF load: uncontrolled, addressed by `sfAddress`.
-            Select(sfData, sfAddress, rotTarget);
+            Select(sfDataPadded, sfAddress, rotTarget);
 
+            // On the DQ branch, XOR the same loaded SF row back out by reselecting `sfAddress`
+            // (not row zero), so `rotTarget` is clear before the DQ load.
             within { X(isSF); } apply {
-                Controlled ApplyPauliFromBitString([isSF], (PauliX, true, sfData[0], rotTarget));
+                Controlled Select([isSF], (sfDataPadded, sfAddress, rotTarget));
             }
 
             // DQ load: fires when isSF=0, addressed by first ⌈log₂N⌉ bits of xoReg.
             within { X(isSF); } apply {
-                Controlled Select([isSF], (dqData, xoReg[0..nDQBits - 1], rotTarget[0..nRotBits - 1]));
+                Controlled Select([isSF], (dqDataPadded, xoReg[0..nDQBits - 1], rotTarget[0..nRotBits - 1]));
             }
         } apply {
             within {
@@ -709,7 +724,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         (outerReg, freeRiderReg) => {
             if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
-                Select(freeRiderData, outerReg, freeRiderReg);
+                Select(PadBoolTableToAddress(freeRiderData, Length(outerReg)), outerReg, freeRiderReg);
             }
         }
     }
@@ -779,7 +794,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     Reversed(bReg),
                 );
             }
-            Select(signData, bReg + outerReg, [innerReg[nIndexBits]]);
+            Select(PadBoolTableToAddress(signData, nIndexBits + Length(outerReg)), bReg + outerReg, [innerReg[nIndexBits]]);
         }
     }
 
