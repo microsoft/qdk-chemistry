@@ -56,9 +56,9 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         num_bits: int = -1,
         phase_correction: float = 0.0,
         num_iteration: int = -1,
-        combine_iterations: bool = False,
         unitary_builder: AlgorithmRef | None = None,
         controlled_circuit_mapper: AlgorithmRef | None = None,
+        combine_iterations: bool = False,
     ):
         """Initialize the IterativeQpeCircuitBuilder.
 
@@ -66,9 +66,9 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             phase_correction: The accumulated phase feedback from prior iterations. Default to 0.0.
             num_iteration: The specific iteration to build. Default to -1 (build all iterations).
-            combine_iterations: Build the full IQPE as one circuit with in-circuit classical feedback. Default to False.
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            combine_iterations: Build the full IQPE as one circuit with in-circuit classical feedback. Default to False.
 
         """
         Logger.trace_entering()
@@ -77,11 +77,11 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)
         self._settings.set("num_iteration", num_iteration)
-        self._settings.set("combine_iterations", combine_iterations)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if controlled_circuit_mapper is not None:
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
+        self._settings.set("combine_iterations", combine_iterations)
 
     def _run_impl(
         self,
