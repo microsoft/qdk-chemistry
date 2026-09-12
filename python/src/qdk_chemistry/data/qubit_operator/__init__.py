@@ -56,7 +56,11 @@ class QubitOperator(DataClass):
     """
 
     _data_type_name = "qubit_hamiltonian"
-    _serialization_version = "0.2.0"
+    # Serialization is delegated to the wrapped container, which owns the on-disk schema
+    # version (pauli_lcu writes 0.1.0, sos writes 0.3.0); to_json/to_hdf5 forward to it and
+    # never emit a version of the wrapper's own. Declaring one here would falsely imply that
+    # documents carry it -- pre-container Pauli LCU documents are version 0.1.0, not this.
+    _serialization_version = None
 
     @staticmethod
     def data_type_name() -> str:
@@ -239,9 +243,9 @@ class QubitOperator(DataClass):
         """Create a qubit operator from a JSON dictionary.
 
         Documents written before this class delegated to a container carry no
-        ``container_type``; they are all Pauli LCU operators, so a missing key reads as
-        one rather than failing. ``_serialization_version`` did not change when the key
-        was added, so the version guard cannot distinguish them.
+        ``container_type``; they are all Pauli LCU operators serialized at version
+        ``0.1.0``, so a missing key defaults to ``pauli_lcu`` and the container's own
+        version guard accepts them unchanged.
         """
         container_type = json_data.get("container_type", "pauli_lcu")
         if container_type == "pauli_lcu":

@@ -98,37 +98,46 @@ def test_pauli_lcu_reads_complex_coefficients_without_shape() -> None:
 
 
 def test_qubit_operator_reads_documents_written_before_container_dispatch() -> None:
-    """A document with no ``container_type`` loads as a Pauli LCU operator.
+    """A hand-authored pre-container document loads as a Pauli LCU operator.
 
-    Releases through 2.1.0 wrote no ``container_type`` and this PR did not bump
-    ``_serialization_version``, so the version guard cannot tell those documents apart
-    from current ones. Defaulting the missing key is what keeps them readable.
+    Pre-container releases wrote ``pauli_strings``/``coefficients`` at version ``0.1.0``
+    with no ``container_type`` and no ``shape``/``dtype`` on the coefficient dict. The
+    missing key must default to ``pauli_lcu`` and the container's ``0.1.0`` guard must
+    accept the document unchanged; a fixture (not a stripped round-trip of current output)
+    is what pins that legacy schema.
     """
-    current = QubitOperator(PauliLCUContainer(["XI", "ZZ"], np.array([0.5, -0.25]), "jordan-wigner")).to_json()
-    legacy = {key: value for key, value in current.items() if key != "container_type"}
-    assert "container_type" not in legacy
+    legacy = {
+        "pauli_strings": ["XI", "ZZ"],
+        "coefficients": {"real": [0.5, -0.25], "imag": [0.0, 0.0]},
+        "encoding": "jordan-wigner",
+        "version": "0.1.0",
+    }
 
     restored = QubitOperator.from_json(legacy)
 
     assert restored.get_container_type() == "pauli_lcu"
     assert restored.pauli_strings == ["XI", "ZZ"]
     np.testing.assert_allclose(restored.coefficients, np.array([0.5, -0.25]))
+    assert restored.encoding == "jordan-wigner"
 
 
 def test_qubit_operator_reads_hdf5_groups_written_before_container_dispatch(tmp_path) -> None:
-    """The same missing-``container_type`` default applies to HDF5 groups."""
-    operator = QubitOperator(PauliLCUContainer(["XI", "ZZ"], np.array([0.5, -0.25]), "jordan-wigner"))
+    """A hand-authored pre-container HDF5 group loads with the same missing-key default."""
     path = tmp_path / "legacy.h5"
     with h5py.File(path, "w") as handle:
         group = handle.create_group("operator")
-        operator.to_hdf5(group)
-        del group.attrs["container_type"]
+        group.attrs["version"] = "0.1.0"
+        group.attrs["encoding"] = "jordan-wigner"
+        group.create_dataset("pauli_strings", data=np.array(["XI", "ZZ"], dtype="S"))
+        group.create_dataset("coefficients", data=np.array([0.5, -0.25], dtype=complex))
 
     with h5py.File(path, "r") as handle:
         restored = QubitOperator.from_hdf5(handle["operator"])
 
     assert restored.get_container_type() == "pauli_lcu"
     assert restored.pauli_strings == ["XI", "ZZ"]
+    np.testing.assert_allclose(restored.coefficients, np.array([0.5, -0.25]))
+    assert restored.encoding == "jordan-wigner"
 
 
 def test_sos_container_json_roundtrip_preserves_complex_coefficients() -> None:
