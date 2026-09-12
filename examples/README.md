@@ -73,7 +73,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
 - `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
-- `sossa_qre.ipynb`: Jupyter notebook estimating the cost of unary-iteration quantum phase estimation on a Hamiltonian block-encoded with SOSSA (sum-of-squares spectral amplification)
+- `sossa_qre.ipynb`: Jupyter notebook explaining how DFTHC puts a chemistry Hamiltonian into sum-of-squares form, how SOSSA (sum-of-squares spectral amplification) exploits that to cut the block-encoding 1-norm, and what the resulting unary-iteration phase-estimation circuit costs. Selectable run modes cover a stored DFTHC Hamiltonian, double factorization from scratch, and synthetic Hamiltonians for trade-off exploration.
 
 ## Companion datasets and assets
 
