@@ -245,28 +245,6 @@ class SOSSAWalkContainer(QuantumWalkContainer):
     def lambda_eff(self) -> float:
         r"""Effective (spectrally amplified) normalization :math:`\lambda_{\text{eff}}`.
 
-        Phase estimation on this walk resolves :math:`E_{\text{gap}}` to a standard
-        deviation :math:`\sigma` using :math:`\pi\lambda_{\text{eff}} / (2\sigma)`
-        queries (:cite:`Low2025`, Eq. (11)):
-
-        .. math::
-
-            E_{\text{gap}} = E_{\text{gs}} - E_{\text{SOS}}, \qquad
-            \lambda_{\text{eff}} = \sqrt{E_{\text{gap}}(2\Lambda - E_{\text{gap}})}
-
-        This is never larger than the raw normalization :math:`\Lambda` because the
-        walk encodes the energy as
-        :math:`2\pi\varphi = \arccos(E_{\text{gap}}/\Lambda - 1)`, whose slope near the
-        band edges magnifies the low-lying spectrum. Equivalently,
-        :math:`2\pi\lambda_{\text{eff}}` is exactly
-        :math:`|\mathrm{d}E/\mathrm{d}\varphi|` of :meth:`eigenvalue_from_phase` at the
-        phase encoding :math:`E_{\text{gs}}`, so it is the conversion factor between
-        phase resolution and energy resolution.
-
-        The value is computed once by the SOSSA block-encoding builder, which needs a
-        reference energy it cannot derive from the factorization itself. Supply one via
-        the builder's ``reference_ground_state_energy`` or ``reference_energy_gap`` setting.
-
         Returns:
             float: The effective normalization :math:`\lambda_{\text{eff}}`.
 
@@ -358,6 +336,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "SOSSAWalkContainer":
         """Load a SOSSAWalkContainer from an HDF5 group."""
+        cls._validate_hdf5_version(cls._serialization_version, group)
         outer_prepare = _wavefunction_from_hdf5(group["outer_prepare"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
         select = SOSSASelect.from_hdf5(group["select"])
@@ -402,10 +381,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
         .. math::
 
-                        \begin{aligned}
-                        E &= 2\Lambda \cos^2(\pi\varphi) + E_{\text{SOS}} \\
-                            &= \Lambda (1 + \cos 2\pi\varphi) + E_{\text{SOS}}.
-                        \end{aligned}
+            \begin{aligned}
+            E &= 2\Lambda \cos^2(\pi\varphi) + E_{\text{SOS}} \\
+              &= \Lambda (1 + \cos 2\pi\varphi) + E_{\text{SOS}}.
+            \end{aligned}
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.

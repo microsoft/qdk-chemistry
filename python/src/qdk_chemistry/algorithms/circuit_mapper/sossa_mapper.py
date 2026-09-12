@@ -291,6 +291,12 @@ class SOSSAMapper(CircuitMapper):
             value = self._settings.get(setting)
             if value not in allowed:
                 raise ValueError(f"unknown {setting} {value!r}; expected one of {sorted(allowed)}")
+        free_rider = container.inner_prepare.free_rider_data
+        if container.layout.num_free_rider_bits and (free_rider is None or free_rider.size == 0):
+            raise ValueError(
+                f"The walk layout reserves {container.layout.num_free_rider_bits} free-rider bits "
+                "but the container carries no free-rider table."
+            )
         if container.power != 1:
             Logger.warn(f"The container's walk power {container.power} is ignored.")
 

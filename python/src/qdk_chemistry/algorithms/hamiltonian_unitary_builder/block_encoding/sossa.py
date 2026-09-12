@@ -196,6 +196,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         sf = np.asarray(sossa.two_body.coeffs)
         sf_rows = np.zeros((sf.shape[0] if sf.ndim == 2 else 0, b_plus_1))
         if sf.size:
+            if not np.allclose(sf.imag, 0.0):
+                raise ValueError("SOSSA requires real two-body coefficients; got a complex-valued block")
             weights = np.real(sf)
             sf_rows = np.sign(weights) * np.sqrt(np.abs(weights))
         return np.concatenate([delta, sf_rows], axis=0)

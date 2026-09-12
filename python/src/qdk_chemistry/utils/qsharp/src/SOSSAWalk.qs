@@ -265,10 +265,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let sysRegDown = systemReg[0..N - 1];
         let sysRegUp = systemReg[N..2 * N - 1];
 
-        // Free-rider data from inner PREPARE QROM: [sf_vs_dq(1), d_vs_q(1), r_bits...]
+        // Free-rider data from inner PREPARE QROM: [sf_vs_dq(1), d_vs_q(1), r_bits...].
+        // The two leading bits are read unconditionally below, so they are required rather
+        // than optional: with nFR = 0 the reads below would run off the end of innerReg.
         let nInner = Length(innerReg);
         let nFR = params.numFreeRiderBits;
-        Fact(nFR >= 2, "SelectImpl requires numFreeRiderBits >= 2");
+        Fact(nFR >= 2, "SelectImpl requires at least two free-rider bits (sf_vs_dq and d_vs_q)");
         let isSF = innerReg[nInner - nFR];       // sf_vs_dq
         let dvsq = innerReg[nInner - nFR + 1];   // d_vs_q
 
@@ -668,7 +670,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         coefficientBitPrecision : Int,
     ) : (Qubit[], Qubit[]) => Unit is Adj {
         let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = BitSizeI(nCoeffs - 1);
+        // A single inner entry still gets a one-qubit b register, matching MakeInnerPrepareDirect
+        // and the Python layout. Letting this fall to zero would leave the alias PREPARE treating
+        // innerReg[0] as its uniform register while SELECT treats it as b.
+        let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
         let mu = coefficientBitPrecision;
         let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let qromEnd = 2 * nIndexBits + 2 * mu + 2;

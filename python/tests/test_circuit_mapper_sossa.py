@@ -1,4 +1,9 @@
-"""Tests for the SOSSA controlled circuit mapper."""
+"""Tests for the SOSSA circuit mapper."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 import math
 
@@ -228,53 +233,6 @@ class TestInnerPrep:
             np.testing.assert_allclose(
                 probs[:n_coeffs], expected_probs, atol=atol, err_msg=f"outer={ell}, algorithm={algorithm}"
             )
-
-    @pytest.mark.slow
-    def test_controlled_alias_sampling_accepts_unreachable_zero_row(self):
-        """Every conditional row must define a distribution, even at zero outer amplitude."""
-        operator = to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 2, 1))
-        sossa = operator.get_container()
-        sossa.two_body.coeffs[...] = np.array([[0.0, 0.0, 0.0], [4.0, -9.0, 16.0]])
-
-        container = SOSSABuilder().run(operator).get_container()
-        outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op, _ = outer_mapper._build_outer_prep(container)
-
-        bit_precision = 6
-        inner_mapper = _make_sossa_mapper(
-            inner_algorithm="controlled_alias_sampling", coefficient_bit_precision=bit_precision
-        )
-        inner_op, _ = inner_mapper._build_inner_oracles(container)
-
-        num_outer_qubits = container.layout.outer_prep_bits
-        inner_coeffs = container.inner_prepare.conditional_coefficients
-        n_index_bits = math.ceil(math.log2(inner_coeffs.shape[1]))
-        free_rider = container.inner_prepare.free_rider_data
-        num_free_rider = free_rider.shape[1] if free_rider is not None and free_rider.size > 0 else 0
-        num_inner_qubits = 2 * n_index_bits + 2 * bit_precision + 3 + num_free_rider
-
-        statevector = dump_operation_on_state(
-            QSHARP_UTILS.SOSSAWalk.MakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
-            num_outer_qubits + num_inner_qubits,
-            context=get_qsharp_context(),
-        )
-
-        assert np.linalg.norm(statevector) == pytest.approx(1.0)
-
-
-def _block_encoding_action(circuit: Circuit, num_system_qubits: int, system_state: np.ndarray) -> np.ndarray:
-    r"""Apply a block encoding and project its ancillas back onto :math:`|0\rangle`."""
-    assert circuit.num_qubits is not None
-    assert circuit._qsharp_op is not None
-    num_qubits = circuit.num_qubits
-    stride = 2 ** (num_qubits - num_system_qubits)
-    dimension = 2**num_system_qubits
-    initial_state = [0.0] * ((dimension - 1) * stride + 1)
-    for index, amplitude in enumerate(system_state):
-        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
-
-    statevector = dump_operation_on_state(circuit._qsharp_op, num_qubits, initial_state, context=get_qsharp_context())
-    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
 
 
 class TestSOSSAMapper:

@@ -22,6 +22,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Lg;
     import Std.Math.MinI;
     import Std.StatePreparation.PrepareUniformSuperposition;
+    import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
     import Std.Arrays.Sorted;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
@@ -161,7 +162,13 @@ namespace QDKChemistry.Utils.AliasSampling {
         mutable result : Bool[][][] = [];
         for c in 0..nCond - 1 {
             let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
-            let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
+            let rowTotal = Fold((acc, x) -> acc + x, 0.0, squaredCoeffs);
+            let safeCoeffs = if rowTotal > 0.0 {
+                squaredCoeffs
+            } else {
+                MappedOverRange(i -> if i == 0 { 1.0 } else { 0.0 }, 0..nCoeffs - 1)
+            };
+            let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, safeCoeffs);
             mutable innerData : Bool[][] = [];
             for b in 0..nPaddedIdx - 1 {
                 if b < nCoeffs {
