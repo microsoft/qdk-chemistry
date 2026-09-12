@@ -150,12 +150,18 @@ def compiled_circuit_mapper(
     """Return the SOSSA circuit mapper used for resource estimation.
 
     Alias sampling and QROM-with-phase-gradient are the compilations a
-    fault-tolerant cost model should see. They are too wide for a state-vector
-    simulator, which is why the notebook validates with the ``direct`` oracles
-    instead.
+    fault-tolerant cost model should see: they are the ones whose Toffoli counts
+    and ancilla footprints the published DFTHC estimates are built from.
+
+    They are also why the resulting circuit cannot be simulated. Alias sampling
+    adds ``2 * coefficient_bit_precision + 1`` ancillas to each PREPARE, and the
+    QROM SELECT allocates a ``rotation_bit_precision``-wide phase gradient
+    register on top. Use :func:`direct_circuit_mapper` to build the same walk in
+    a form a state-vector simulator can execute.
 
     Args:
         rotation_bit_precision: Bits used to discretize Givens rotation angles.
+            Also sets the width of the shared phase gradient register.
         coefficient_bit_precision: Bits used to discretize PREPARE amplitudes.
 
     Returns:
@@ -170,6 +176,43 @@ def compiled_circuit_mapper(
         select_algorithm="qrom_phase_gradient",
         rotation_bit_precision=rotation_bit_precision,
         coefficient_bit_precision=coefficient_bit_precision,
+    )
+
+
+def direct_circuit_mapper(rotation_bit_precision: int = 15) -> AlgorithmRef:
+    """Return the SOSSA circuit mapper used for state-vector validation.
+
+    These are textbook oracles: a dense state preparation for the outer PREPARE,
+    and direct table lookups for the inner PREPARE and SELECT. They realize the
+    *same* walk operator as :func:`compiled_circuit_mapper`, so the eigenphases
+    QPE measures are identical, but they allocate no alias-sampling scratch and
+    no phase gradient register, which keeps the circuit narrow enough to
+    simulate.
+
+    They are correspondingly useless as a cost model. A dense state preparation
+    is not a fault-tolerant primitive, so resource-estimating this mapper would
+    report a circuit nobody can build.
+
+    ``coefficient_bit_precision`` is deliberately not exposed: the SOSSA mapper
+    consults it only for the alias-sampling backends, so it has no effect here.
+    ``rotation_bit_precision`` still applies, because SELECT discretizes the
+    Givens angles either way. Passing the same value used for resource
+    estimation keeps the two mappers differing only in oracle compilation.
+
+    Args:
+        rotation_bit_precision: Bits used to discretize Givens rotation angles.
+
+    Returns:
+        An ``AlgorithmRef`` for the SOSSA circuit mapper.
+
+    """
+    return AlgorithmRef(
+        "circuit_mapper",
+        "sossa",
+        outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
+        inner_prepare_algorithm="direct",
+        select_algorithm="direct",
+        rotation_bit_precision=rotation_bit_precision,
     )
 
 
