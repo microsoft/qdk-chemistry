@@ -1,0 +1,228 @@
+"""Sum-of-squares (SOS) qubit operator container."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from math import isfinite
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+from qdk_chemistry.data._hashing import _hash_arg, _hash_str
+from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
+from qdk_chemistry.utils.serialization import (
+    complex_array_from_json,
+    complex_array_to_json,
+    real_array_from_json,
+    real_array_to_json,
+)
+
+if TYPE_CHECKING:
+    import h5py
+
+__all__ = ["RotatedPaulis", "SumOfSquaresContainer", "SumOfSquaresMetadata"]
+
+
+@dataclass(frozen=True, eq=False)
+class RotatedPaulis:
+    r"""A block of rotated-Pauli generators sharing one Pauli word set.
+
+    Rows of ``angles`` are Givens rotations of the single-particle basis and rows of
+    ``coeffs`` weight ``paulis`` in a rotated frame. The owning container fixes how the
+    two line up, so only the shape facts common to every block are checked here.
+    """
+
+    angles: np.ndarray
+    r"""Givens rotation angles, one row per rotated frame and one elimination per column."""
+
+    coeffs: np.ndarray
+    r"""LCU coefficients, one row per generator; the owning container maps columns to ``paulis``."""
+
+    paulis: tuple[str, ...]
+    r"""The single-mode Pauli labels the coefficients weight, e.g. ``("X", "Y")``."""
+
+    def __post_init__(self) -> None:
+        """Coerce inputs to arrays and a tuple, then check the block is internally consistent."""
+        object.__setattr__(self, "angles", np.asarray(self.angles, dtype=float))
+        object.__setattr__(self, "coeffs", np.asarray(self.coeffs, dtype=complex))
+        object.__setattr__(self, "paulis", tuple(self.paulis))
+        if self.angles.ndim != 2 or self.coeffs.ndim != 2:
+            raise ValueError("angles and coefficients must both be 2-D arrays")
+        if not self.paulis:
+            raise ValueError("a block must name at least one Pauli word")
+
+    def to_json(self) -> dict[str, Any]:
+        """Convert the block to a JSON dictionary."""
+        return {
+            "angles": real_array_to_json(self.angles),
+            "coeffs": complex_array_to_json(self.coeffs),
+            "paulis": list(self.paulis),
+        }
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> RotatedPaulis:
+        """Create a block from a JSON dictionary."""
+        return cls(
+            real_array_from_json(data["angles"]),
+            complex_array_from_json(data["coeffs"]),
+            tuple(data["paulis"]),
+        )
+
+
+@dataclass(frozen=True)
+class SumOfSquaresMetadata:
+    r"""Dimensions and scalar constants of a factorized Hamiltonian's sum-of-squares form."""
+
+    num_spatial_orbitals: int
+    r"""Number of spatial orbitals :math:`N`."""
+
+    num_ranks: int
+    r"""Number of DFTHC ranks :math:`R`."""
+
+    num_bases: int
+    r"""Number of bases :math:`B` (``B + 1`` inner entries including the identity)."""
+
+    num_copies: int
+    r"""Number of copies :math:`C`."""
+
+    num_positive_one_body_terms: int
+    """Number of D1 (particle) one-body generators."""
+
+    energy_shift: float
+    r"""Constant offset :math:`E_{\text{SOS}} + E_{\text{nuc}}`."""
+
+    def __post_init__(self) -> None:
+        """Coerce the shift and reject dimensions no register width can be built from."""
+        object.__setattr__(self, "energy_shift", float(self.energy_shift))
+        if self.num_spatial_orbitals <= 0 or not isfinite(self.energy_shift):
+            raise ValueError("invalid sum-of-squares metadata")
+        if min(self.num_ranks, self.num_bases, self.num_copies) < 0:
+            raise ValueError("num_ranks, num_bases, and num_copies must not be negative")
+
+    def to_json(self) -> dict[str, Any]:
+        """Convert the metadata to a JSON dictionary."""
+        return asdict(self)
+
+    @classmethod
+    def from_json(cls, data: dict[str, Any]) -> SumOfSquaresMetadata:
+        """Create metadata from a JSON dictionary."""
+        return cls(**data)
+
+
+class SumOfSquaresContainer(QubitOperatorContainer):
+    """Container for a sum-of-squares qubit operator.
+
+    The one-body and two-body generators are each a
+    :class:`~qdk_chemistry.data.qubit_operator.containers.sum_of_squares.RotatedPaulis` block
+    (``angles``, ``coeffs``, ``paulis``). ``one_body`` uses ``(X +/- iY) / 2``
+    with the first ``metadata.num_positive_one_body_terms`` rows the D1 (particle)
+    generators and the rest Q1 (hole); ``two_body`` uses ``Z`` with one
+    ``[R * C, B + 1]`` coefficient row per ``(rank, copy)`` (columns ``0..B-1``
+    rotated-``Z``, column ``B`` identity). Dimensions and scalar constants live in
+    :class:`SumOfSquaresMetadata`.
+    """
+
+    _data_type_name = "sum_of_squares_container"
+    _serialization_version = "0.1.0"
+
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for SOS containers."""
+        return "sum_of_squares_container"
+
+    def __init__(
+        self,
+        one_body: RotatedPaulis,
+        two_body: RotatedPaulis,
+        encoding: str | None,
+        fermion_mode_order: str | None,
+        metadata: SumOfSquaresMetadata,
+    ) -> None:
+        """Initialize a sum-of-squares container."""
+        self.one_body = one_body
+        self.two_body = two_body
+        self.metadata = metadata
+        num_angle_columns = metadata.num_spatial_orbitals - 1
+        if len(self.one_body.angles) != len(self.one_body.coeffs):
+            raise ValueError("one-body angles and coefficients must have matching generator counts")
+        if self.one_body.coeffs.shape[1] != len(self.one_body.paulis):
+            raise ValueError("one-body coefficients must have one column per Pauli label")
+        if self.one_body.angles.size and self.one_body.angles.shape[1] != num_angle_columns:
+            raise ValueError("one-body angles must have num_spatial_orbitals - 1 columns")
+        if not 0 <= metadata.num_positive_one_body_terms <= len(self.one_body.angles):
+            raise ValueError("num_positive_one_body_terms must be between 0 and the one-body generator count")
+        expected_two_body = (metadata.num_ranks * metadata.num_copies, metadata.num_bases + 1)
+        if self.two_body.coeffs.size and self.two_body.coeffs.shape != expected_two_body:
+            raise ValueError("two_body_coeffs must have shape [num_ranks * num_copies, num_bases + 1]")
+        expected_two_body_angles = (metadata.num_ranks * metadata.num_bases, num_angle_columns)
+        if self.two_body.angles.size and self.two_body.angles.shape != expected_two_body_angles:
+            raise ValueError("two_body angles must have shape [num_ranks * num_bases, num_spatial_orbitals - 1]")
+        super().__init__(encoding, fermion_mode_order)
+
+    @property
+    def type(self) -> str:
+        """Return the container type."""
+        return "sum_of_squares"
+
+    @property
+    def num_qubits(self) -> int:
+        """Return the number of qubits (two spin-orbitals per spatial orbital)."""
+        return 2 * self.metadata.num_spatial_orbitals
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, self.type)
+        _hash_arg(h, self.to_json())
+
+    def to_json(self) -> dict[str, Any]:
+        """Convert the container to a JSON dictionary."""
+        return self._add_json_version(
+            {
+                "container_type": self.type,
+                "metadata": self.metadata.to_json(),
+                "one_body": self.one_body.to_json(),
+                "two_body": self.two_body.to_json(),
+                "encoding": self.encoding,
+                "fermion_mode_order": str(self.fermion_mode_order) if self.fermion_mode_order is not None else None,
+            }
+        )
+
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Write the container to an HDF5 group."""
+        self._add_hdf5_version(group)
+        group.attrs["container_type"] = self.type
+        group.attrs["payload"] = json.dumps(self.to_json())
+
+    @classmethod
+    def from_json(cls, json_data: dict[str, Any]) -> SumOfSquaresContainer:
+        """Create a sum-of-squares container from JSON."""
+        cls._validate_json_version(cls._serialization_version, json_data)
+        return cls(
+            RotatedPaulis.from_json(json_data["one_body"]),
+            RotatedPaulis.from_json(json_data["two_body"]),
+            json_data.get("encoding"),
+            json_data.get("fermion_mode_order"),
+            SumOfSquaresMetadata.from_json(json_data["metadata"]),
+        )
+
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> SumOfSquaresContainer:
+        """Create a sum-of-squares container from HDF5."""
+        cls._validate_hdf5_version(cls._serialization_version, group)
+        return cls.from_json(json.loads(group.attrs["payload"]))
+
+    def get_summary(self) -> str:
+        """Return a summary of the sum-of-squares container."""
+        num_d1 = self.metadata.num_positive_one_body_terms
+        num_q1 = len(self.one_body.angles) - num_d1
+        num_sf = len(self.two_body.angles)
+        return (
+            f"Sum-of-Squares Qubit Operator\n  Number of qubits: {self.num_qubits}\n"
+            f"  D1/Q1/SF generators: {num_d1}/{num_q1}/{num_sf}\n"
+        )

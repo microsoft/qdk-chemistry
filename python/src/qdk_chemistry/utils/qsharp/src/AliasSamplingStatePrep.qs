@@ -8,6 +8,7 @@ namespace QDKChemistry.Utils.AliasSampling {
 
     import Std.Arithmetic.ApplyIfGreaterLE;
     import Std.Arrays.MappedOverRange;
+    import Std.Arrays.Reversed;
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
@@ -15,13 +16,16 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsD;
+    import Std.Math.BitSizeI;
     import Std.Math.Ceiling;
     import Std.Math.Floor;
     import Std.Math.IsInfinite;
     import Std.Math.IsNaN;
     import Std.Math.Lg;
     import Std.Math.MinI;
-    import Std.StatePreparation.PrepareUniformSuperposition;
+    import Std.Math.Sqrt;
+    import Std.StatePreparation.PreparePureStateD;
+    import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
     import Std.Arrays.Sorted;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
@@ -87,8 +91,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         let residual = MinI(targetTotal - scaledTotal, nCoeffs);
         let finalRemainders = remainders;
         let byRemainder = Sorted(
-            (i, j) -> finalRemainders[i] > finalRemainders[j]
-                or (finalRemainders[i] == finalRemainders[j] and i <= j),
+            (i, j) -> finalRemainders[i] > finalRemainders[j] or (finalRemainders[i] == finalRemainders[j] and i <= j),
             MappedOverRange(i -> i, 0..nCoeffs - 1)
         );
         for k in 0..residual - 1 {
@@ -161,7 +164,13 @@ namespace QDKChemistry.Utils.AliasSampling {
         mutable result : Bool[][][] = [];
         for c in 0..nCond - 1 {
             let squaredCoeffs = Mapped(x -> x * x, coefficients[c]);
-            let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, squaredCoeffs);
+            let rowTotal = Fold((acc, x) -> acc + x, 0.0, squaredCoeffs);
+            let safeCoeffs = if rowTotal > 0.0 {
+                squaredCoeffs
+            } else {
+                MappedOverRange(i -> if i == 0 { 1.0 } else { 0.0 }, 0..nCoeffs - 1)
+            };
+            let (keepCoeff, altIndex) = DiscretizedProbabilityDistribution(bitsPrecision, safeCoeffs);
             mutable innerData : Bool[][] = [];
             for b in 0..nPaddedIdx - 1 {
                 if b < nCoeffs {
@@ -179,6 +188,36 @@ namespace QDKChemistry.Utils.AliasSampling {
             set result += [innerData];
         }
         return result;
+    }
+
+    /// Prepare a uniform superposition over |0⟩ .. |nStates - 1⟩ without ancillas.
+    ///
+    /// `Std.StatePreparation.PrepareUniformSuperposition` allocates an ancilla that is
+    /// only guaranteed to return to |0⟩ when the register still holds the exact state it
+    /// prepared. PREPARE† in a qubitized walk is applied after SELECT has imprinted a
+    /// phase, so that guarantee does not hold and the ancilla is released dirty. This
+    /// variant is ancilla-free, so its adjoint is exact for any intervening phase.
+    ///
+    /// A power-of-two `nStates` keeps the plain Hadamard preparation; other counts use a
+    /// multiplexed rotation over the padded index space.
+    internal operation PreparePhaseSafeUniformSuperposition(
+        nStates : Int,
+        register : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let nQubits = Length(register);
+        Fact(nStates > 0, "nStates must be positive.");
+        Fact(nStates <= 1 <<< nQubits, "register is too small to hold nStates.");
+
+        if (nStates &&& (nStates - 1)) == 0 {
+            ApplyToEachCA(H, register[0..BitSizeI(nStates - 1) - 1]);
+        } else {
+            let amplitude = 1.0 / Sqrt(IntAsDouble(nStates));
+            let coefficients = MappedOverRange(
+                idx -> if idx < nStates { amplitude } else { 0.0 },
+                0..(1 <<< nQubits) - 1
+            );
+            PreparePureStateD(coefficients, Reversed(register));
+        }
     }
 
     /// Alias sampling state preparation.
@@ -227,7 +266,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         );
 
         // Step 1: Uniform superposition over L terms
-        PrepareUniformSuperposition(nCoeffs, indexRegister);
+        PreparePhaseSafeUniformSuperposition(nCoeffs, indexRegister);
 
         // Step 2: H⊗μ on comparison register
         ApplyToEachCA(H, uniformRegister);
@@ -287,7 +326,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     /// (not on the sampled index), appended to every QROM row for that condition.
     ///
     /// Circuit (arXiv:2502.15882v1, Table A):
-    ///   1. PrepareUniformSuperposition on indexRegister
+    ///   1. PreparePhaseSafeUniformSuperposition on indexRegister
     ///   2. H⊗μ on uniformRegister
     ///   3. SelectSwap2D: (cond, idx) → (keep, alt, signOrig, signAlt, freeRider)
     ///   4. Compare σ ≥ keep → set flag
@@ -317,7 +356,7 @@ namespace QDKChemistry.Utils.AliasSampling {
             nIndexBits
         );
 
-        PrepareUniformSuperposition(nCoeffs, indexRegister);
+        PreparePhaseSafeUniformSuperposition(nCoeffs, indexRegister);
         ApplyToEachCA(H, uniformRegister);
 
         // 2D QROM load — outer=conditionalRegister, inner=indexRegister.
@@ -409,6 +448,46 @@ namespace QDKChemistry.Utils.AliasSampling {
                 qromOut,
                 numSwapBits
             );
+        }
+    }
+
+    /// Test wrapper: prepare conditional alias sampling, apply an index phase,
+    /// and unprepare to exercise the adjoint on a non-power-of-two table.
+    internal function MakeConditionalAliasSamplingPhaseTestOp(
+        coefficients : Double[][],
+        bitsPrecision : Int,
+        conditionValue : Int,
+        numSwapBits : Int,
+    ) : Qubit[] => Unit {
+        (qs) => {
+            let nCond = Length(coefficients);
+            let nCoeffs = Length(coefficients[0]);
+            let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
+            let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
+            let nQromOutput = bitsPrecision + nIndexBits + 2;
+
+            let conditionalReg = qs[0..nCondBits - 1];
+            let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
+            let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
+            let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
+            let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
+
+            ApplyXorInPlace(conditionValue, conditionalReg);
+
+            within {
+                ConditionalAliasSamplingPrepare(
+                    coefficients,
+                    bitsPrecision,
+                    conditionalReg,
+                    indexReg,
+                    uniformReg,
+                    flagQubit,
+                    qromOut,
+                    numSwapBits
+                );
+            } apply {
+                Z(indexReg[0]);
+            }
         }
     }
 
