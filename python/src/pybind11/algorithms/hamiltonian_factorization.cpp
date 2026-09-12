@@ -47,7 +47,7 @@ void bind_hamiltonian_factorization(py::module& m) {
 Abstract base class for Hamiltonian factorization algorithms.
 
 Concrete implementations transform a Hamiltonian into a factorized
-representation while preserving the physical operator.
+representation.
 )");
 
   factorization.def(py::init<>());

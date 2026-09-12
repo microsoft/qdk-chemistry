@@ -15,8 +15,7 @@ namespace qdk::chemistry::algorithms {
  * @class HamiltonianFactorization
  * @brief Abstract base class for Hamiltonian factorization algorithms.
  *
- * Implementations transform a Hamiltonian into a factorized representation
- * while preserving the physical operator.
+ * Implementations transform a Hamiltonian into a factorized representation.
  */
 class HamiltonianFactorization
     : public Algorithm<HamiltonianFactorization,
