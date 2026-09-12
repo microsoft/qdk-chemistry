@@ -273,14 +273,14 @@ class TestAzureQuantumBackendSubmission:
             location="location",
             target_name="fake.emulator",
             output_dir=str(tmp_path),
-            attachments=["rawOutputData"],
+            attachments=["output"],
         )
 
         result = executor.run(test_circuit_1, shots=10)
 
-        assert fake_workspace.last.target.job.requested_attachments == ["rawOutputData"]
-        assert result.get_executor_metadata()["saved_attachments"] == [str(tmp_path / "rawOutputData")]
-        assert (tmp_path / "rawOutputData").read_bytes() == b"contents of rawOutputData"
+        assert fake_workspace.last.target.job.requested_attachments == ["output"]
+        assert result.get_executor_metadata()["saved_attachments"] == [str(tmp_path / "output")]
+        assert (tmp_path / "output").read_bytes() == b"contents of output"
 
     def test_attachment_name_cannot_escape_output_dir(self, fake_workspace, test_circuit_1: Circuit, tmp_path):
         """A traversing attachment name is written inside output_dir, not above it."""
