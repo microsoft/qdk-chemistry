@@ -584,7 +584,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     within {
                         CNOT(sysRegDown[j], sysRegDown[j + 1]);
                     } apply {
-                        // arXiv:2605.30455 FIG. 40. Implementation of a controlled RZ(2θ)
+                        // :cite:`Low2026` FIG. 40. Implementation of a controlled RZ(2θ)
                         // gate using two parallel RZ(θ) gates without controls.
                         within {
                             CNOT(sysRegDown[j + 1], sysRegDown[j]);
