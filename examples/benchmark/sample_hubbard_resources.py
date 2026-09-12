@@ -1,20 +1,14 @@
 """Sample a quantum resource estimate for the 2D Fermi-Hubbard model.
 
-For the requested ``L``, the script builds the periodic ``L x L`` Hubbard Hamiltonian
+For each requested ``L``, the script builds the periodic ``L x L`` Hubbard Hamiltonian
 under Jordan-Wigner, sizes an iterative phase estimation from a target ground-state
 energy accuracy, and traces the resulting circuit through the resource estimator for
 a qubit/runtime Pareto frontier.
 
-Large lattices are bound by memory. Measured Hamiltonian-build peak RSS is about 2 GB
-at ``L=60`` and 24 GB at ``L=120``.
-
-The builder's logical costs are checked against Campbell's published tables
-(arXiv:2012.09238v4) in ``python/tests/test_plaquette_campbell_benchmark.py``.
-
 Examples:
-    Sample a 50 x 50 lattice::
+    Sample 10 x 10, 20 x 20, and 50 x 50 lattices into one CSV::
 
-        python sample_hubbard_resources.py --size 50 -o cost.csv
+        python sample_hubbard_resources.py --size 10 20 50 -o cost.csv
 """
 
 # --------------------------------------------------------------------------------------------
@@ -29,9 +23,9 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
-try:  # Unix only; the sweep's memory reporting is best-effort on other platforms.
+try:
     import resource
-except ImportError:  # pragma: no cover - platform dependent
+except ImportError:
     resource = None
 
 from qdk.qre import PSSPC, EstimationTable, LatticeSurgery, estimate
@@ -47,58 +41,34 @@ from qdk_chemistry.utils.qsharp import (
     use_qsharp_context,
 )
 
-#: Hopping amplitude. Energies are quoted in units of this.
+#: U = 8t for the strong-coupling regime
 HOPPING_T = 1.0
-
-#: Interaction strength as a multiple of the hopping. U = 8t is the strong-coupling
-#: regime of the LANL Fermi-Hubbard chapter (arXiv:2406.06625 Ch. 4) and of Campbell's
-#: Table II (arXiv:2012.09238v4).
 U_OVER_T = 8.0
 
-#: Electrons per SITE, not per orbital. n = 1 is half filling
-#: (Kivlichan arXiv:1902.10673 Sec. 3.2).
+#: Electrons per SITE
 FILLING = 0.875
 
-#: Per-site ground-state energy accuracy, in units of T. Chosen for this benchmark;
-#: the LANL appendix instead specifies accuracy on the order parameter.
+#: Per-site ground-state energy accuracy.
 TARGET_PRECISION_PER_SITE = 0.0051
 
-#: Suzuki-Trotter product-formula order. The plaquette builder implements order 2 only.
+#: The plaquette trotter is second order only.
 TROTTER_ORDER = 2
 
-#: One minus the confidence that a readout meets the target precision.
-QPE_FAILURE_PROBABILITY = 0.1
-
-#: Iteration 0 carries the largest power, 2**(m-1), so it is the expensive one.
-IQPE_ITERATION = 0
-
-#: Majorana architecture physical error rate, for the physical estimate.
+#: Majorana architecture physical error rate.
 MAJORANA_ERROR_RATE = 1e-5
 
-#: Largest relative error the resource estimator may report.
+#: Error budget for the resource estimator.
 MAX_ESTIMATE_ERROR = 0.01
 
 
 def target_precision(size: int) -> float:
-    """Return the absolute ground-state energy accuracy required of an L x L lattice."""
+    """Return the ground-state energy accuracy required of an L x L lattice."""
     return TARGET_PRECISION_PER_SITE * size * size
 
 
 def num_electrons(size: int) -> int:
     """Return the electron count nearest the requested per-site filling."""
     return round(FILLING * size * size)
-
-
-def qubit_operator(size: int):
-    """Return the Jordan-Wigner qubit Hamiltonian of the periodic size x size lattice."""
-    num_sites = size * size
-    lattice = LatticeGraph.square(size, size, periodic_x=True, periodic_y=True)
-    hamiltonian = create_hubbard_hamiltonian(
-        lattice, epsilon=0.0, t=HOPPING_T, U=U_OVER_T * HOPPING_T
-    )
-    return create("qubit_mapper").run(
-        hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites)
-    )
 
 
 def reference_state_prep(context, num_sites: int, electrons: int) -> Circuit:
@@ -139,11 +109,33 @@ def reference_state_prep(context, num_sites: int, electrons: int) -> Circuit:
         )
 
 
+def qpe_parameters(
+    one_norm: float,
+    energy_budget: float,
+) -> tuple[float, int, dict[str, float | int]]:
+    """Size QPE and choose the plaquette builder's Trotter setting.
+
+    Args:
+        one_norm: Hamiltonian coefficient one-norm.
+        energy_budget: Ground-state energy accuracy used for QPE resolution.
+
+    Returns:
+        Base evolution time, resolution bits, and builder settings containing
+        either target_accuracy or num_divisions. Currently uses target_accuracy.
+
+    """
+    qpe_budget = energy_budget
+    trotter_budget = energy_budget
+    base_time = math.pi / one_norm / 2
+    resolution_bits = math.ceil(math.log2(2 * math.pi / qpe_budget / base_time))
+    return base_time, resolution_bits, {"target_accuracy": trotter_budget}
+
+
 def qpe_circuit(
     context,
     operator,
     evolution_time: float,
-    trotter_budget: float,
+    trotter_settings: dict[str, float | int],
     initial_state: Circuit,
     size: int,
     num_bits: int,
@@ -157,7 +149,7 @@ def qpe_circuit(
         context: Q# context to build in.
         operator: The qubit Hamiltonian.
         evolution_time: Base Hamiltonian evolution time.
-        trotter_budget: Accuracy allocated to Trotter error.
+        trotter_settings: Builder settings containing target_accuracy or num_divisions.
         initial_state: The reference state circuit.
         size: Lattice side length.
         num_bits: Number of QPE resolution bits, including guard bits.
@@ -175,15 +167,14 @@ def qpe_circuit(
                 "plaquette",
                 order=TROTTER_ORDER,
                 time=evolution_time,
-                target_accuracy=trotter_budget,
                 lattice_width=size,
                 lattice_height=size,
+                **trotter_settings,
             ),
             controlled_circuit_mapper=AlgorithmRef(
                 "controlled_circuit_mapper", "pauli_sequence"
             ),
             num_bits=num_bits,
-            num_iteration=IQPE_ITERATION,
         )
         return builder.run(initial_state, operator)[0]
 
@@ -237,20 +228,26 @@ def run_sampling(context, size: int) -> EstimationTable:
 
     """
     started = time.monotonic()
-    operator = qubit_operator(size)
+    num_sites = size * size
+    lattice = LatticeGraph.square(size, size, periodic_x=True, periodic_y=True)
+    hamiltonian = create_hubbard_hamiltonian(
+        lattice, epsilon=0.0, t=HOPPING_T, U=U_OVER_T * HOPPING_T
+    )
+    operator = create("qubit_mapper").run(
+        hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites)
+    )
     one_norm = operator.schatten_norm
     energy_budget = target_precision(size)
-    qpe_budget = energy_budget / 2
-    trotter_budget = energy_budget
-    base_time = math.pi / one_norm / 2
-    resolution_bits = math.ceil(math.log2(2 * math.pi / qpe_budget / base_time))
+    base_time, resolution_bits, trotter_settings = qpe_parameters(
+        one_norm, energy_budget
+    )
 
     initial_state = reference_state_prep(context, size * size, num_electrons(size))
     circuit = qpe_circuit(
         context,
         operator,
         base_time,
-        trotter_budget,
+        trotter_settings,
         initial_state,
         size,
         resolution_bits,
@@ -268,7 +265,8 @@ def run_sampling(context, size: int) -> EstimationTable:
         "electrons": num_electrons(size),
         "lambda": one_norm,
         "target_precision": energy_budget,
-        "trotter_budget": trotter_budget,
+        "trotter_budget": trotter_settings.get("target_accuracy", 0.0),
+        "num_divisions": trotter_settings.get("num_divisions", 0),
         "num_bits": resolution_bits,
         "elapsed_s": round(time.monotonic() - started, 1),
         "peak_rss_gb": round(peak_memory_gb(), 2),
@@ -295,8 +293,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--size",
         type=int,
+        nargs="+",
         required=True,
-        help="even lattice side length of at least 4",
+        help="one or more even lattice side lengths of at least 4",
     )
     parser.add_argument(
         "-o",
@@ -309,29 +308,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Logger.set_global_level(Logger.LogLevel.off)
 
-    if args.size < 4 or args.size % 2:
-        parser.error("--size must be an even integer of at least 4")
-
-    print(
-        f"Hubbard U/T = {U_OVER_T:g}, filling {FILLING:g} e/site, target {TARGET_PRECISION_PER_SITE:g} T/site"
-    )
-    print(f"size: {args.size}")
+    if any(size < 4 or size % 2 for size in args.size):
+        parser.error("each --size must be an even integer of at least 4")
 
     # QDK interpreters are thread-affine, so this context belongs to the calling thread.
     context = create_qsharp_context()
 
-    frame = run_sampling(context, args.size).as_frame()
-    frame.to_csv(args.output, index=False)
+    for index, size in enumerate(args.size):
+        frame = run_sampling(context, size).as_frame()
+        frame.to_csv(
+            args.output, index=False, mode="w" if index == 0 else "a", header=index == 0
+        )
 
-    first = frame.iloc[0]
-    print(
-        f"L={args.size:>3}: {first['system_qubits']:>6} qubits, {first['terms']:>7} terms, "
-        f"m={first['num_bits']}, "
-        f"{len(frame)} physical estimates "
-        f"[{first['elapsed_s']}s, peak {first['peak_rss_gb']} GB]"
-    )
-
-    print(f"wrote {args.output}")
     return 0
 
 
