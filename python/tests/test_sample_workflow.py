@@ -46,6 +46,10 @@ except ImportError:
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
+#: Index of the configuration cell in ``examples/sossa_qre.ipynb``, which holds both
+#: ``RUN_MODE`` and ``SIMULATION_SHOTS``.
+_SOSSA_CONFIG_CELL = 4
+
 
 @_requires_notebook_deps
 @pytest.mark.skipif(
@@ -122,6 +126,62 @@ def test_qpe_stretched_n2():
         cell_patches={
             34: {
                 "NUM_TRIALS = 20": "NUM_TRIALS = 3",
+            },
+        },
+    )
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+@pytest.mark.parametrize(
+    "run_mode",
+    [
+        "stored",
+        pytest.param(
+            "double_factorization",
+            marks=pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available"),
+        ),
+        "synthetic",
+    ],
+)
+def test_sossa_qre(run_mode):
+    """Test every run mode of the SOSSA notebook executes without errors.
+
+    The notebook is one pass through the SOSSA pipeline, selected by ``RUN_MODE``
+    in its configuration cell. Each mode reaches the shared steps by a different
+    route, so each is executed: ``"stored"`` is the only one that validates
+    against a simulation, ``"double_factorization"`` is the only one that needs
+    PySCF, and ``"synthetic"`` is the only one that runs the trade-off sweep.
+
+    The shot patch cuts sampling breadth rather than the science: the shot count
+    only sharpens the phase histogram, which nothing downstream reads. Narrowing
+    the PSSPC, lattice-surgery or molecule sweeps instead would risk leaving the
+    estimator with no feasible point.
+
+    Both patches target the configuration cell, so this test fails loudly if that
+    cell moves: ``_execute_notebook_skip_visualizations`` asserts the index is a
+    code cell containing the text being replaced.
+    """
+    notebook_path = EXAMPLES_DIR / "sossa_qre.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        cell_patches={
+            _SOSSA_CONFIG_CELL: {
+                "SIMULATION_SHOTS = 50": "SIMULATION_SHOTS = 16",
+                'RUN_MODE = "stored"': f'RUN_MODE = "{run_mode}"',
             },
         },
     )
