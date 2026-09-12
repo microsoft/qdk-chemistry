@@ -24,7 +24,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Lg;
     import Std.Math.MinI;
     import Std.Math.Sqrt;
-    import Std.StatePreparation.PreparePureStateD;
+    import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
     import Std.Arrays.Sorted;
