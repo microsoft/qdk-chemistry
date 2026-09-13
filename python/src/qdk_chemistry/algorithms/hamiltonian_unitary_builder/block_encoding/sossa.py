@@ -206,6 +206,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         """Validate spin-free rows before they are packed into the fixed outer layout."""
         angles = np.asarray(sossa.two_body.angles)
         coeffs = np.asarray(sossa.two_body.coeffs, dtype=complex)
+        if sossa.two_body.paulis != ("Z",):
+            raise ValueError(f"SOSSA two-body generators must use Pauli label ('Z',); got {sossa.two_body.paulis!r}.")
         if angles.shape[0] != num_ranks * num_bases or (angles.shape[0] and angles.shape[1] != num_orbitals - 1):
             raise ValueError(
                 f"SOSSA requires two-body angles of shape {(num_ranks * num_bases, num_orbitals - 1)}; "

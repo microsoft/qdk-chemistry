@@ -214,7 +214,11 @@ class TestSOSSABlockEncodingContainer:
         _assert_sossa_containers_equal(restored, container)
 
     def test_num_qubits_ancilla_excess_is_exactly_the_structural_widths(self):
-        """Pin every register width for the fixed N=2, R=2, B=1, C=1 fixture."""
+        """Pin every register width for the fixed N=2, R=2, B=1, C=1 fixture.
+
+        The layout's free-rider bits are scratch the walk allocates itself, so they are
+        reserved in the layout but absent from the caller-visible width.
+        """
         container = _make_sossa_unitary_representation().get_container()
         expected_layout = SOSSARegisterLayout(
             outer_prep_bits=2,
@@ -224,7 +228,7 @@ class TestSOSSABlockEncodingContainer:
         )
 
         assert container.layout == expected_layout
-        assert container.num_qubits == 12
+        assert container.num_qubits == 9
 
     def test_a_layout_reserving_free_rider_bits_requires_a_matching_table(self):
         """SELECT reads those bits whether or not anything wrote them.
@@ -351,33 +355,45 @@ class TestSOSSABuilder:
             SOSSABuilder().run(operator)
 
     @pytest.mark.parametrize(
-        ("truncate_angle_rows", "drop_coeff_column", "complex_coeffs", "match"),
+        ("empty_angle_table", "empty_coeff_table", "complex_coeffs", "paulis", "match"),
         [
-            (True, False, False, "two-body angles of shape"),
-            (False, True, False, "two-body coefficients of shape"),
-            (False, False, True, "real two-body coefficients"),
+            (True, False, False, None, "two-body angles of shape"),
+            (False, True, False, None, "two-body coefficients of shape"),
+            (False, False, True, None, "real two-body coefficients"),
+            (False, False, False, ("X",), "must use Pauli label"),
         ],
-        ids=["short-angle-table", "short-coefficient-row", "complex-coefficients"],
+        ids=[
+            "empty-angle-table",
+            "empty-coefficient-table",
+            "complex-coefficients",
+            "unencodable-pauli",
+        ],
     )
     def test_two_body_generators_must_fill_the_spin_free_select_table(
-        self, truncate_angle_rows, drop_coeff_column, complex_coeffs, match
+        self, empty_angle_table, empty_coeff_table, complex_coeffs, paulis, match
     ):
         """SELECT reads one Givens angle set per (rank, basis) and one weight row per (rank, copy).
 
-        A short angle table mis-addresses the QROM rather than failing, and a short or
-        complex-valued weight row carries no real rotated-Z amplitude for SELECT to emit.
+        `SumOfSquaresContainer` checks these shapes only when the table is non-empty, so an
+        empty table is what reaches the builder; a complex-valued weight row carries no real
+        rotated-Z amplitude for SELECT to emit, and only a Z label is the rotated-Z weight
+        the fixed construction encodes.
         """
         source = factorized_hamiltonian_to_sossa_operator(
             create_random_factorized_hamiltonian(2, 2, 2, 1)
         ).get_container()
-        angles = source.two_body.angles[:-1] if truncate_angle_rows else source.two_body.angles
-        coeffs = source.two_body.coeffs[:, :-1] if drop_coeff_column else source.two_body.coeffs.copy()
+        angles = source.two_body.angles
+        coeffs = source.two_body.coeffs.copy()
+        if empty_angle_table:
+            angles = np.empty((0, angles.shape[1]), dtype=angles.dtype)
+        if empty_coeff_table:
+            coeffs = np.empty((0, coeffs.shape[1]), dtype=coeffs.dtype)
         if complex_coeffs:
             coeffs[0, 0] += 1j
         operator = QubitOperator(
             container=SumOfSquaresContainer(
                 source.one_body,
-                RotatedPaulis(angles, coeffs, source.two_body.paulis),
+                RotatedPaulis(angles, coeffs, paulis or source.two_body.paulis),
                 source.encoding,
                 source.fermion_mode_order,
                 source.metadata,
