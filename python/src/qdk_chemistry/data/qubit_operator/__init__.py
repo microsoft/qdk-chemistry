@@ -256,6 +256,8 @@ class QubitOperator(DataClass):
         holds a Pauli decomposition operator; see :meth:`from_json`.
         """
         container_type = group.attrs.get("container_type", "pauli_decomposition")
+        if isinstance(container_type, bytes):
+            container_type = container_type.decode("utf-8")
         if container_type == "pauli_decomposition":
             container = PauliDecompositionContainer.from_hdf5(group)
         elif container_type == "sum_of_squares":

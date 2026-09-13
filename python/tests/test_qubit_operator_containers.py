@@ -216,6 +216,23 @@ class TestSumOfSquaresContainer:
         _assert_sum_of_squares_containers_match(restored, container)
         assert operator.content_hash() == QubitOperator(container=container).content_hash()
 
+    def test_hdf5_dispatch_accepts_a_byte_valued_container_type(self, tmp_path) -> None:
+        """h5py hands back fixed-length string attributes as bytes, which must still dispatch."""
+        container = _sum_of_squares_container()
+        path = tmp_path / "sos_bytes.h5"
+
+        with h5py.File(path, "w") as handle:
+            group = handle.create_group("operator")
+            QubitOperator(container=container).to_hdf5(group)
+            group.attrs["container_type"] = np.bytes_(b"sum_of_squares")
+
+        with h5py.File(path, "r") as handle:
+            assert isinstance(handle["operator"].attrs["container_type"], bytes)
+            restored = QubitOperator.from_hdf5(handle["operator"]).get_container()
+
+        assert isinstance(restored, SumOfSquaresContainer)
+        _assert_sum_of_squares_containers_match(restored, container)
+
     def test_rejects_inputs_that_are_not_internally_consistent(self) -> None:
         """A block owns the shape facts every block shares; the container owns metadata agreement."""
         with pytest.raises(TypeError, match="QubitOperator requires a QubitOperatorContainer"):

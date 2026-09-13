@@ -146,6 +146,8 @@ class UnitaryRepresentation(DataClass):
 
         """
         container_type = group.attrs.get("container_type")
+        if isinstance(container_type, bytes):
+            container_type = container_type.decode("utf-8")
         if container_type == "pauli_product_formula":
             container = PauliProductFormulaContainer.from_hdf5(group)
         elif container_type == "lcu":
