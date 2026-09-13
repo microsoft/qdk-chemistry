@@ -57,7 +57,9 @@ ShellCoupling: TypeAlias = float | np.ndarray | Mapping[int, float | np.ndarray]
 DEFAULT_HEISENBERG_COUPLINGS = {1: 1.0, 2: 0.5}
 
 
-def create_lattice(nx: int = 200, ny: int | None = None, *, shells: Sequence[int] = (1, 2)) -> LatticeGraph:
+def create_lattice(
+    nx: int = 200, ny: int | None = None, *, shells: Sequence[int] = (1, 2)
+) -> LatticeGraph:
     """Create an open nx-by-ny square graph with selected shells; ny defaults to nx.
 
     The default selection supports the J1-J2 model. Pass the union of active
@@ -95,8 +97,13 @@ def create_hamiltonian(
     isotropic = DEFAULT_HEISENBERG_COUPLINGS if j is None else j
     couplings = [isotropic if value is None else value for value in (jx, jy, jz)]
     # Shell maps select sparse construction even for nearest-neighbor scalars.
-    shells = [value if isinstance(value, Mapping) else {1: value} for value in couplings]
-    pauli_couplings = [{shell: coefficient / 4.0 for shell, coefficient in values.items()} for values in shells]
+    shells = [
+        value if isinstance(value, Mapping) else {1: value} for value in couplings
+    ]
+    pauli_couplings = [
+        {shell: coefficient / 4.0 for shell, coefficient in values.items()}
+        for values in shells
+    ]
     return create_heisenberg_hamiltonian(
         graph,
         jx=pauli_couplings[0],
@@ -125,7 +132,12 @@ def build_qpe_circuit(
     repeats that same step. Identity preparation and phase measurements
     match the notebook; no dense state vector or QIR export is needed.
     """
-    if not math.isfinite(dt) or dt <= 0 or not math.isfinite(base_time) or base_time <= 0:
+    if (
+        not math.isfinite(dt)
+        or dt <= 0
+        or not math.isfinite(base_time)
+        or base_time <= 0
+    ):
         raise ValueError("dt and base_time must be finite and positive.")
     if not math.isfinite(base_time / dt):
         raise ValueError("base_time / dt must be finite.")
@@ -149,7 +161,9 @@ def build_qpe_circuit(
             weight_threshold=weight_threshold,
             power_strategy="repeat",
         ),
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "batched_pauli_sequence"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "batched_pauli_sequence"
+        ),
     )
     return circuit_builder.run(
         state_preparation=identity_state_prep(num_qubits=hamiltonian.num_qubits),
@@ -173,7 +187,9 @@ def estimate_physical(circuit: Circuit, name: str) -> EstimationTable:
         * LatticeSurgery.q(slow_down_factor=[1.0 * j for j in range(1, 20)])
     )
     isa_query = ThreeAux.q() * RoundBasedFactory.q(code_query=ThreeAux.q())
-    results = estimate(application, architecture, isa_query, trace_query, max_error=0.01, name=name)
+    results = estimate(
+        application, architecture, isa_query, trace_query, max_error=0.01, name=name
+    )
     results.add_qubit_partition_column()
     results.add_factory_summary_column()
     return results
@@ -216,7 +232,9 @@ def _parse_couplings(text: str) -> dict[int, float | np.ndarray]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse lattice, Hamiltonian, and standard-QPE inputs."""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument("--nx", type=int, default=200, help="Sites along x.")
     parser.add_argument("--ny", type=int, help="Sites along y; defaults to nx.")
     parser.add_argument(
@@ -245,7 +263,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=1000.0,
         help="Longest powered time; base_time = longest_time / 2**(num_bits - 1).",
     )
-    parser.add_argument("--num-bits", type=int, default=10, help="Number of standard-QPE phase qubits.")
+    parser.add_argument(
+        "--num-bits", type=int, default=10, help="Number of standard-QPE phase qubits."
+    )
     parser.add_argument(
         "--dt",
         "--trotter-step",
@@ -253,7 +273,9 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=0.1,
         help="Maximum Trotter step; base divisions = ceil(base_time / dt).",
     )
-    parser.add_argument("--trotter-order", type=int, default=4, help="1 or any positive even order.")
+    parser.add_argument(
+        "--trotter-order", type=int, default=4, help="1 or any positive even order."
+    )
     parser.add_argument(
         "--weight-threshold",
         type=float,
@@ -271,8 +293,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         parser.error("longest_time must be finite and positive.")
     if not math.isfinite(args.dt) or args.dt <= 0:
         parser.error("dt must be finite and positive.")
-    couplings = [args.j if value is None else value for value in (args.jx, args.jy, args.jz)]
-    args.shells = sorted({shell for coupling in couplings for shell, value in coupling.items() if np.any(value != 0.0)})
+    couplings = [
+        args.j if value is None else value for value in (args.jx, args.jy, args.jz)
+    ]
+    args.shells = sorted(
+        {
+            shell
+            for coupling in couplings
+            for shell, value in coupling.items()
+            if np.any(value != 0.0)
+        }
+    )
     return args
 
 
