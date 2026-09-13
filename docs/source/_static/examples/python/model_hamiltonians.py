@@ -6,8 +6,8 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-import qdk_chemistry.algorithms as algorithms
-from qdk_chemistry.data import LatticeGraph
+from qdk_chemistry import algorithms
+from qdk_chemistry.data import LatticeGeometry, LatticeGraph
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_hubbard_hamiltonian,
@@ -15,6 +15,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_ising_hamiltonian,
     create_kitaev_hamiltonian,
     create_ppp_hamiltonian,
+    kitaev_honeycomb_bond_flavors,
     mataga_nishimoto_potential,
     ohno_potential,
     pairwise_potential,
@@ -22,8 +23,9 @@ from qdk_chemistry.utils.model_hamiltonians import (
 
 ################################################################################
 # start-cell-create-huckel
-# Create a 6-site chain for the Hückel model
-lattice = LatticeGraph.chain(6)
+# Select nearest-neighbor hopping on a 6-site chain.
+geometry = LatticeGeometry.chain(6)
+lattice = LatticeGraph.from_geometry(geometry, shells=[1])
 
 # Uniform parameters: all sites have the same on-site energy and hopping
 hamiltonian = create_huckel_hamiltonian(lattice, epsilon=0.0, t=1.0)
@@ -114,9 +116,24 @@ print(f"  Is Hermitian: {qubit_hamiltonian.is_hermitian()}")
 ################################################################################
 
 ################################################################################
+# start-cell-create-heisenberg-shells
+geometry = LatticeGeometry.square(3, 3)
+lattice = LatticeGraph.from_geometry(geometry, shells=[1, 2])
+# Physical-spin J1=1 and J2=0.5 become Pauli coefficients J/4.
+pauli_couplings = {1: 1.0 / 4.0, 2: 0.5 / 4.0}
+qubit_hamiltonian = create_heisenberg_hamiltonian(
+    lattice, jx=pauli_couplings, jy=pauli_couplings, jz=pauli_couplings
+)
+# end-cell-create-heisenberg-shells
+################################################################################
+
+################################################################################
 # start-cell-create-kitaev
 # Honeycomb X/Y/Z flavor classes are defined for geometric shells 1, 2, and 3.
-lattice = LatticeGraph.honeycomb(4, 4, periodic_x=True, periodic_y=True)
+geometry = LatticeGeometry.honeycomb(4, 4, periodic_x=True, periodic_y=True)
+lattice = LatticeGraph.from_geometry(
+    geometry, shells=[1, 2, 3], bond_flavors=kitaev_honeycomb_bond_flavors()
+)
 honeycomb_crystallographic_transform = np.array(
     [
         [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],

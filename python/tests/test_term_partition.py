@@ -13,9 +13,12 @@ import pytest
 from qdk_chemistry._core.data import greedy_edge_coloring
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data import (
+    BondClass,
     FlatPartition,
+    LatticeGeometry,
     LatticeGraph,
     LayeredPartition,
+    NeighborConnection,
     QubitOperator,
     TaperingSpecification,
     TermPartition,
@@ -23,8 +26,10 @@ from qdk_chemistry.data import (
 from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 from qdk_chemistry.remote.serialization import deserialize_outputs, serialize_outputs
 from qdk_chemistry.utils.model_hamiltonians import (
+    KitaevBondFlavor,
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
+    create_kitaev_hamiltonian,
 )
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
@@ -34,6 +39,8 @@ from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pa
 
 
 class TestFlatPartition:
+    """Check flat-group normalization, counts, and ordered index traversal."""
+
     def test_construction_normalises_to_tuples_of_ints(self):
         """Construction normalises to tuples of ints."""
         p = FlatPartition(strategy="commuting", groups=[[0, 1, 2], [3, 4]])
@@ -58,6 +65,8 @@ class TestFlatPartition:
 
 
 class TestLayeredPartition:
+    """Check nested tuple normalization and group, layer, and index access."""
+
     def test_construction(self):
         """Construction."""
         p = LayeredPartition(
@@ -106,6 +115,8 @@ def test_remote_round_trip_restores_partition_subtype(tmp_path, partition):
 
 
 class TestQubitHamiltonianTermPartition:
+    """Check optional partition attachment and invalidation after fermion-mode reordering."""
+
     def test_default_is_none(self):
         """Default is none."""
         qh = QubitOperator(["XX", "ZZ"], np.array([0.1, 0.2]))
@@ -141,6 +152,8 @@ class TestQubitHamiltonianTermPartition:
 
 
 class TestTermGrouperRegistry:
+    """Check registered grouping strategies, term coverage, commutation, and metadata preservation."""
+
     def test_available_strategies(self):
         """Available strategies."""
         names = registry.available("term_grouper")
@@ -469,6 +482,8 @@ class TestNxTermGroupers:
 
 
 class TestLatticeEdgeColoring:
+    """Check deterministic disjoint edge coloring and validation of explicit support."""
+
     def test_greedy_edge_coloring_binding(self):
         """The bound C++ colorer returns deterministic disjoint edge layers."""
         lattice = LatticeGraph.chain(6, periodic=True)
@@ -496,13 +511,81 @@ class TestLatticeEdgeColoring:
         coloring = lat.edge_coloring
         assert isinstance(coloring, dict)
 
+    @pytest.mark.parametrize("weight", [-2.0, 0.0])
+    def test_color_edges_uses_only_supplied_support(self, weight: float) -> None:
+        """Explicit support determines coloring independently of graph weights, without mutating the graph."""
+        graph = LatticeGraph.square(3, 3, t=weight)
+        active_pairs = [(0, 1), (1, 4), (3, 4), (4, 5), (5, 8)]
+        adjacency = np.zeros((9, 9))
+        for site_i, site_j in active_pairs:
+            adjacency[site_i, site_j] = adjacency[site_j, site_i] = 1.0
+        support = LatticeGraph.from_dense_matrix(adjacency)
+        original_coloring = graph.edge_coloring
+        original_adjacency = graph.adjacency_matrix()
+
+        coloring = graph.color_edges(active_pairs)
+
+        assert set(coloring) == set(active_pairs)
+        assert coloring == greedy_edge_coloring(support.sparse_adjacency_matrix(), seed=0, trials=32)
+        assert coloring == graph.color_edges(list(reversed(active_pairs)) + active_pairs)
+        assert graph.color_edges(active_pairs, seed=17, trials=7) == greedy_edge_coloring(
+            support.sparse_adjacency_matrix(), seed=17, trials=7
+        )
+        sites_by_color: dict[int, set[int]] = {}
+        for edge, color in coloring.items():
+            sites = sites_by_color.setdefault(color, set())
+            assert sites.isdisjoint(edge)
+            sites.update(edge)
+        assert graph.edge_coloring == original_coloring
+        np.testing.assert_array_equal(graph.adjacency_matrix(), original_adjacency)
+
+    @pytest.mark.parametrize("pair", [(1, 1), (2, 1), (0, 4)])
+    def test_color_edges_rejects_invalid_pairs(self, pair: tuple[int, int]) -> None:
+        """Edge coloring rejects self-pairs, reversed pairs, and out-of-range sites."""
+        graph = LatticeGraph.chain(4)
+        with pytest.raises(ValueError, match="i < j < num_sites"):
+            graph.color_edges([pair])
+
+    def test_color_edges_empty_support(self) -> None:
+        """Empty support or zero trials produces an empty edge coloring."""
+        graph = LatticeGraph.chain(4)
+        assert graph.color_edges([]) == {}
+        assert graph.color_edges([(0, 1)], trials=0) == {}
+
 
 # ---------------------------------------------------------------------------
 # create_*_hamiltonian populates term_partition
 # ---------------------------------------------------------------------------
 
 
+def _assert_family_colorings(
+    hamiltonian: QubitOperator, graph: LatticeGraph, supports: dict[str, list[tuple[int, int]]]
+) -> None:
+    """Compare emitted family layers with coloring each nonzero support independently."""
+    partition = hamiltonian.term_partition
+    assert isinstance(partition, LayeredPartition)
+    assert partition.strategy == "geometry_coloring"
+    assert sorted(partition.all_indices()) == list(range(len(hamiltonian.pauli_strings)))
+    assert len(partition.groups) == len(supports)
+    for (family, pairs), group in zip(supports.items(), partition.groups, strict=True):
+        actual: dict[tuple[int, int], int] = {}
+        for color, layer in enumerate(group):
+            used: set[int] = set()
+            for index in layer:
+                label = hamiltonian.pauli_strings[index]
+                assert label.replace("I", "") == family
+                sites = [site for site, pauli in enumerate(reversed(label)) if pauli != "I"]
+                assert len(sites) == 2
+                assert used.isdisjoint(sites)
+                used.update(sites)
+                actual[sites[0], sites[1]] = color
+        assert len(actual) == sum(len(layer) for layer in group)
+        assert actual == graph.color_edges(pairs, seed=0, trials=32)
+
+
 class TestModelHamiltonianTermPartition:
+    """Check model-generated partitions use nonzero Pauli-family support for disjoint layers."""
+
     def test_heisenberg_populates_layered_partition(self):
         """Heisenberg populates layered partition."""
         lat = LatticeGraph.chain(4, periodic=True)
@@ -525,6 +608,73 @@ class TestModelHamiltonianTermPartition:
         ham = create_heisenberg_hamiltonian(lat, jx=1.0, jy=1.0, jz=1.0, include_term_groups=False)
         assert ham.term_partition is None
 
+    def test_heisenberg_colors_differing_nonzero_family_supports(self) -> None:
+        """Each Heisenberg Pauli family is colored on its own nonzero exchange support."""
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(5), [1, 2])
+        # These disjoint end bonds have opposite colors in the full four-edge path.
+        xx_pairs = [(0, 1), (3, 4)]
+        yy_pairs = [(0, 1), (1, 2), (2, 3), (3, 4)]
+        jx = np.zeros((5, 5))
+        jy = np.zeros((5, 5))
+        for pair in xx_pairs:
+            jx[pair] = 2.0
+        for pair in yy_pairs:
+            jy[pair] = 3.0
+
+        hamiltonian = create_heisenberg_hamiltonian(graph, {1: jx}, {1: jy}, {2: np.zeros((5, 5))})
+
+        assert dict(hamiltonian.get_real_coefficients()) == {
+            "IIIXX": 2.0,
+            "XXIII": 2.0,
+            "IIIYY": 3.0,
+            "IIYYI": 3.0,
+            "IYYII": 3.0,
+            "YYIII": 3.0,
+        }
+        _assert_family_colorings(hamiltonian, graph, {"XX": xx_pairs, "YY": yy_pairs})
+
+    def test_kitaev_colors_support_after_exchange_cancellation(self) -> None:
+        """Canceled Kitaev and Heisenberg contributions are excluded from each family's coloring support."""
+        geometry = LatticeGeometry.chain(5)
+        xx_pairs = [(0, 1), (3, 4)]
+        connections = [
+            NeighborConnection(
+                connection.site_i,
+                connection.site_j,
+                connection.bond_class,
+                connection.displacement,
+                connection.image_shift,
+                flavor=KitaevBondFlavor.Z if (connection.site_i, connection.site_j) in xx_pairs else KitaevBondFlavor.X,
+            )
+            for connection in geometry.neighbor_connections([1])
+        ]
+        graph = LatticeGraph.from_connections(5, connections, geometry=geometry)
+        all_pairs = [(0, 1), (1, 2), (2, 3), (3, 4)]
+
+        hamiltonian = create_kitaev_hamiltonian(graph, {1: -4.0}, {}, {}, j={1: 4.0})
+
+        np.testing.assert_array_equal(hamiltonian.coefficients, np.ones(10))
+        _assert_family_colorings(hamiltonian, graph, {"XX": xx_pairs, "YY": all_pairs, "ZZ": all_pairs})
+
+    def test_kitaev_coalesces_periodic_images_before_coloring(self) -> None:
+        """Periodic-image contributions combine before coloring, preserving flavored exchange despite zero adjacency."""
+        geometry = LatticeGeometry.chain(2, periodic=True)
+        bond_class = BondClass(1, 0, np.array([1.0, 0.0]))
+        connections = [
+            NeighborConnection(0, 1, bond_class, np.array([1.0, 0.0]), (0, 0), flavor=KitaevBondFlavor.X, weight=2.0),
+            NeighborConnection(
+                0, 1, bond_class, np.array([-1.0, 0.0]), (-1, 0), flavor=KitaevBondFlavor.Y, weight=-2.0
+            ),
+        ]
+        graph = LatticeGraph.from_connections(2, connections, geometry=geometry)
+
+        hamiltonian = create_kitaev_hamiltonian(graph, 8.0, 12.0, {}, j=4.0)
+
+        # The adjacency and isotropic ZZ coupling cancel, but the flavored exchanges do not.
+        np.testing.assert_array_equal(graph.adjacency_matrix(), np.zeros((2, 2)))
+        assert dict(hamiltonian.get_real_coefficients()) == {"XX": 4.0, "YY": -6.0}
+        _assert_family_colorings(hamiltonian, graph, {"XX": [(0, 1)], "YY": [(0, 1)]})
+
 
 # ---------------------------------------------------------------------------
 # Trotter consumes term_partition
@@ -532,6 +682,8 @@ class TestModelHamiltonianTermPartition:
 
 
 class TestTrotterConsumesTermPartition:
+    """Check Trotter partition support and second-order step counts."""
+
     def test_trotter_runs_with_partitioned_hamiltonian(self):
         """Trotter runs with partitioned hamiltonian."""
         lat = LatticeGraph.chain(4, periodic=True)
@@ -592,6 +744,8 @@ class TestTrotterConsumesTermPartition:
 
 
 class TestTermPartitionSerialisation:
+    """Check JSON and HDF5 round trips preserve partition types, groups, and absence."""
+
     def test_flat_partition_to_json_round_trip(self):
         """Flat partition to json round trip."""
         partition = FlatPartition(strategy="commuting", groups=[[0, 2], [1]])

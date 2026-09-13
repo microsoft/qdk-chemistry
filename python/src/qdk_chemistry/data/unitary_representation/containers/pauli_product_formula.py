@@ -12,7 +12,13 @@ from typing import Any
 import h5py
 import numpy as np
 
-from qdk_chemistry.data._hashing import _hash_array, _hash_float, _hash_int, _hash_str, _hash_uint
+from qdk_chemistry.data._hashing import (
+    _hash_array,
+    _hash_float,
+    _hash_int,
+    _hash_str,
+    _hash_uint,
+)
 
 from .base import UnitaryContainer
 
@@ -185,7 +191,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """Return whether this container uses packed sparse terms."""
         return hasattr(self, "_term_offsets")
 
-    def sparse_term_arrays(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    def sparse_term_arrays(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Return offsets, qubit indices, Pauli codes, and angles."""
         if not self.has_sparse_terms:
             raise RuntimeError("This product formula does not use packed sparse-term storage.")
@@ -365,7 +373,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
             )
         else:
             data["step_terms"] = [
-                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
+                {
+                    "pauli_term": {str(k): v for k, v in term.pauli_term.items()},
+                    "angle": term.angle,
+                }
                 for term in self.step_terms
             ]
         result = self._add_json_version(data)

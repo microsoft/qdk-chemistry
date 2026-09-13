@@ -5,16 +5,22 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from itertools import combinations
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.data import (
+    BondClass,
     BondFlavorDefinition,
     Hamiltonian,
+    LatticeGeometry,
     LatticeGraph,
     LayeredPartition,
+    NeighborConnection,
     QubitOperator,
 )
 from qdk_chemistry.utils.model_hamiltonians import (
@@ -33,6 +39,9 @@ from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute
 
 from .reference_tolerances import float_comparison_absolute_tolerance
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 
 def _get_terms_dict(qh: QubitOperator) -> dict[str, float]:
     """Return a {pauli_string: coefficient} dict for easy assertions."""
@@ -44,7 +53,9 @@ def _with_standard_kitaev_flavors(graph: LatticeGraph) -> LatticeGraph:
     return graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
 
 
-def _assert_commuting_disjoint_partition(hamiltonian: QubitOperator) -> LayeredPartition:
+def _assert_commuting_disjoint_partition(
+    hamiltonian: QubitOperator,
+) -> LayeredPartition:
     """Check the algebraic and support invariants of a layered partition."""
     partition = hamiltonian.term_partition
     assert isinstance(partition, LayeredPartition)
@@ -295,37 +306,15 @@ class TestModelHamiltonians:
                 ps[3 - 1 - edge[1]] = pauli_char
                 assert terms_w["".join(ps)] == pytest.approx(2.0, abs=float_comparison_absolute_tolerance)
 
-    def test_heisenberg_geometric_neighbor_shells(self):
+    def test_heisenberg_geometric_neighbor_shells(self) -> None:
         n = 3
         j1 = 1.25
         j2 = -0.4
-        custom = LatticeGraph.from_dense_matrix(np.zeros((3, 3)))
-        with pytest.raises(RuntimeError, match="require lattice positions"):
-            custom.mth_nearest_neighbors(1)
-
-        graph = LatticeGraph.square(n, n, t=7.0)
-        assert graph.mth_nearest_neighbors(99) == []
-        periodic_graph = LatticeGraph.square(n, n, periodic_x=True)
-        with pytest.raises(RuntimeError, match="support open lattices only"):
-            periodic_graph.mth_nearest_neighbors(1)
-        with pytest.raises(RuntimeError, match="support open lattices only"):
-            periodic_graph.nearest_neighbor_shells([1, 2])
-        with pytest.raises(ValueError, match="m must be > 0"):
-            graph.mth_nearest_neighbors(0)
-        with pytest.raises(TypeError):
-            graph.mth_nearest_neighbors(-1)
-        with pytest.raises(TypeError):
-            graph.mth_nearest_neighbors(1.5)
-        with pytest.raises(ValueError, match="tolerance must be positive"):
-            graph.mth_nearest_neighbors(1, tolerance=np.inf)
-
-        shells = graph.nearest_neighbor_shells([2, 1, 99])
+        geometry = LatticeGeometry.square(n, n)
+        graph = LatticeGraph.from_geometry(geometry, [1, 2], weight=7.0)
+        shells = geometry.nearest_neighbor_shells([1, 2])
         first_neighbors = set(shells[1])
         second_neighbors = set(shells[2])
-        assert shells[99] == []
-        assert (0, 1) in first_neighbors
-        assert (0, 4) in second_neighbors
-        assert (0, 2) not in second_neighbors
 
         couplings = {1: j1, 2: j2}
         hamiltonian = create_heisenberg_hamiltonian(
@@ -339,7 +328,10 @@ class TestModelHamiltonians:
         terms = _get_terms_dict(hamiltonian)
         assert len(terms) == 3 * (len(first_neighbors) + len(second_neighbors))
 
-        for neighbors, expected_coupling in [(first_neighbors, j1), (second_neighbors, j2)]:
+        for neighbors, expected_coupling in [
+            (first_neighbors, j1),
+            (second_neighbors, j2),
+        ]:
             for i, j in neighbors:
                 for pauli_char in ["X", "Y", "Z"]:
                     pauli = ["I"] * (n * n)
@@ -354,23 +346,6 @@ class TestModelHamiltonians:
             axial_distance_two[n * n - 1] = pauli_char
             axial_distance_two[n * n - 1 - 2] = pauli_char
             assert "".join(axial_distance_two) not in terms
-
-    def test_honeycomb_positions_define_one_cell_shells(self):
-        unit_cell = LatticeGraph.honeycomb(1, 1)
-        assert unit_cell.num_sites == 2
-        assert unit_cell.num_edges == 1
-
-        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
-        positions = graph.positions
-        assert positions.shape == (6, 2)
-
-        shells = graph.nearest_neighbor_shells([1, 2, 3])
-        for shell, expected_distance in ((1, 1.0), (2, np.sqrt(3.0)), (3, 2.0)):
-            distances = [np.linalg.norm(positions[site_j] - positions[site_i]) for site_i, site_j in shells[shell]]
-            assert distances == pytest.approx(
-                [expected_distance] * len(distances),
-                abs=float_comparison_absolute_tolerance,
-            )
 
     def test_heisenberg_ungrouped_legacy_term_order(self):
         hamiltonian = create_heisenberg_hamiltonian(
@@ -403,23 +378,51 @@ class TestModelHamiltonians:
         ]
         np.testing.assert_array_equal(
             hamiltonian.coefficients,
-            np.array([1.0, 2.0, 3.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 4.0, 5.0, 6.0, 4.0, 5.0, 6.0]),
+            np.array(
+                [
+                    1.0,
+                    2.0,
+                    3.0,
+                    1.0,
+                    2.0,
+                    3.0,
+                    4.0,
+                    5.0,
+                    6.0,
+                    4.0,
+                    5.0,
+                    6.0,
+                    4.0,
+                    5.0,
+                    6.0,
+                ]
+            ),
         )
         assert hamiltonian.content_hash() == "7283ee88ae88a265"
 
-    def test_shell_mapping_order_is_deterministic(self):
-        graph = LatticeGraph.square(3, 3)
+    @pytest.mark.parametrize("include_term_groups", [False, True])
+    def test_shell_mapping_order_is_deterministic(self, include_term_groups: bool) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.square(3, 3), [1, 2])
         forward = {1: 1.25, 2: -0.4}
         reversed_order = {2: -0.4, 1: 1.25}
 
-        forward_hamiltonian = create_heisenberg_hamiltonian(graph, forward, forward, forward)
-        reversed_hamiltonian = create_heisenberg_hamiltonian(graph, reversed_order, reversed_order, reversed_order)
+        forward_hamiltonian = create_heisenberg_hamiltonian(
+            graph, forward, forward, forward, include_term_groups=include_term_groups
+        )
+        reversed_hamiltonian = create_heisenberg_hamiltonian(
+            graph,
+            reversed_order,
+            reversed_order,
+            reversed_order,
+            include_term_groups=include_term_groups,
+        )
 
         assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
         np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
+        assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
 
-    def test_kitaev_nearest_neighbor_components(self):
+    def test_kitaev_nearest_neighbor_components(self) -> None:
         graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
         flavored_graph = _with_standard_kitaev_flavors(graph)
         cases = (
@@ -457,9 +460,16 @@ class TestModelHamiltonians:
             ),
         )
 
-        connections = flavored_graph.neighbor_connections([1])
+        connections = [connection for connection in flavored_graph.connections if connection.bond_class.shell == 1]
         for overrides, expected_by_flavor in cases:
-            parameters = {"kx": 0.0, "ky": 0.0, "kz": 0.0, "j": 0.0, "gamma": 0.0, "gamma_prime": 0.0}
+            parameters = {
+                "kx": 0.0,
+                "ky": 0.0,
+                "kz": 0.0,
+                "j": 0.0,
+                "gamma": 0.0,
+                "gamma_prime": 0.0,
+            }
             parameters.update(overrides)
             hamiltonian = create_kitaev_hamiltonian(graph, **parameters)
             assert hamiltonian.term_partition is not None
@@ -474,8 +484,8 @@ class TestModelHamiltonians:
                     expected["".join(pauli)] = coefficient
             assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
 
-    def test_kitaev_flavored_geometric_shells(self):
-        graph = LatticeGraph.honeycomb(5, 5)
+    def test_kitaev_flavored_geometric_shells(self) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb(5, 5), [1, 2, 3])
         flavored_graph = _with_standard_kitaev_flavors(graph)
         shell_couplings = {1: 4.0, 2: 8.0, 3: 12.0}
         zero_couplings = {1: 0.0, 2: 0.0, 3: 0.0}
@@ -488,7 +498,7 @@ class TestModelHamiltonians:
         _assert_commuting_disjoint_partition(hamiltonian)
         terms = _get_terms_dict(hamiltonian)
         expected: dict[str, float] = {}
-        for connection in flavored_graph.neighbor_connections([1, 2, 3]):
+        for connection in flavored_graph.connections:
             if connection.flavor != KitaevBondFlavor.X:
                 continue
             pauli = ["I"] * graph.num_sites
@@ -506,7 +516,7 @@ class TestModelHamiltonians:
         )
         heisenberg_terms = _get_terms_dict(heisenberg)
         expected_heisenberg: dict[str, float] = {}
-        for connection in flavored_graph.neighbor_connections([1, 2, 3]):
+        for connection in flavored_graph.connections:
             for component in "XYZ":
                 pauli = ["I"] * graph.num_sites
                 pauli[graph.num_sites - 1 - connection.site_i] = component
@@ -515,8 +525,10 @@ class TestModelHamiltonians:
         assert heisenberg_terms == pytest.approx(expected_heisenberg, abs=float_comparison_absolute_tolerance)
 
     @pytest.mark.parametrize(("shell", "expected_layers"), [(1, 2), (2, 3), (3, 1)])
-    def test_kitaev_shell_partition_uses_optimal_plaquette_edge_coloring(self, shell, expected_layers):
-        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
+    def test_kitaev_shell_partition_uses_optimal_plaquette_edge_coloring(
+        self, shell: int, expected_layers: int
+    ) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb_plaquettes(1, 1), [1, 2, 3])
         zero_couplings = {1: 0.0, 2: 0.0, 3: 0.0}
         hamiltonian = create_kitaev_hamiltonian(
             graph,
@@ -541,9 +553,9 @@ class TestModelHamiltonians:
 
         _assert_commuting_disjoint_partition(hamiltonian)
 
-    def test_geometric_flavors_are_optional_and_configurable(self):
-        square = LatticeGraph.square(3, 3)
-        assert all(connection.flavor is None for connection in square.neighbor_connections([1]))
+    def test_geometric_flavors_are_optional_and_configurable(self) -> None:
+        square = LatticeGraph.from_geometry(LatticeGeometry.square(3, 3), [1, 2])
+        assert all(connection.flavor is None for connection in square.connections)
 
         flavored = square.with_bond_flavors(
             [
@@ -553,14 +565,27 @@ class TestModelHamiltonians:
                 BondFlavorDefinition(shell=2, axis=np.array([1.0, -1.0]), flavor=1003),
             ]
         )
-        connections = flavored.neighbor_connections([1, 2])
-        assert {connection.flavor for connection in connections} == {1000, 1001, 1002, 1003}
+        connections = flavored.connections
+        assert {connection.flavor for connection in connections} == {
+            1000,
+            1001,
+            1002,
+            1003,
+        }
 
-    def test_kitaev_flavor_specific_gamma_terms(self):
+    def test_kitaev_flavor_specific_gamma_terms(self) -> None:
         graph = LatticeGraph.honeycomb(3, 3)
         flavored_graph = _with_standard_kitaev_flavors(graph)
-        gamma = {KitaevBondFlavor.X: 4.0, KitaevBondFlavor.Y: 8.0, KitaevBondFlavor.Z: 12.0}
-        gamma_prime = {KitaevBondFlavor.X: 16.0, KitaevBondFlavor.Y: 20.0, KitaevBondFlavor.Z: 24.0}
+        gamma = {
+            KitaevBondFlavor.X: 4.0,
+            KitaevBondFlavor.Y: 8.0,
+            KitaevBondFlavor.Z: 12.0,
+        }
+        gamma_prime = {
+            KitaevBondFlavor.X: 16.0,
+            KitaevBondFlavor.Y: 20.0,
+            KitaevBondFlavor.Z: 24.0,
+        }
         hamiltonian = create_kitaev_hamiltonian(
             graph,
             kx=0.0,
@@ -575,10 +600,16 @@ class TestModelHamiltonians:
             include_term_groups=False,
         )
         terms = _get_terms_dict(hamiltonian)
-        flavor_index = {KitaevBondFlavor.X: 0, KitaevBondFlavor.Y: 1, KitaevBondFlavor.Z: 2}
+        flavor_index = {
+            KitaevBondFlavor.X: 0,
+            KitaevBondFlavor.Y: 1,
+            KitaevBondFlavor.Z: 2,
+        }
         components = "XYZ"
         expected: dict[str, float] = {}
-        for connection in flavored_graph.neighbor_connections([1]):
+        for connection in flavored_graph.connections:
+            if connection.bond_class.shell != 1:
+                continue
             assert connection.flavor is not None
             flavor = KitaevBondFlavor(connection.flavor)
             selected = flavor_index[flavor]
@@ -632,7 +663,8 @@ class TestModelHamiltonians:
         )
         cubic_coefficients = bohr_magneton * transform.T @ (g_abc * field_abc) / 2.0
         assert _get_terms_dict(cubic) == pytest.approx(
-            expected_field_terms(cubic_coefficients), abs=float_comparison_absolute_tolerance
+            expected_field_terms(cubic_coefficients),
+            abs=float_comparison_absolute_tolerance,
         )
 
         crystallographic = create_kitaev_hamiltonian(
@@ -649,7 +681,8 @@ class TestModelHamiltonians:
         )
         abc_coefficients = bohr_magneton * g_abc * field_abc / 2.0
         assert _get_terms_dict(crystallographic) == pytest.approx(
-            expected_field_terms(abc_coefficients), abs=float_comparison_absolute_tolerance
+            expected_field_terms(abc_coefficients),
+            abs=float_comparison_absolute_tolerance,
         )
 
         identity_crystal_frame = create_kitaev_hamiltonian(
@@ -664,7 +697,8 @@ class TestModelHamiltonians:
             include_term_groups=False,
         )
         assert _get_terms_dict(identity_crystal_frame) == pytest.approx(
-            expected_field_terms(abc_coefficients), abs=float_comparison_absolute_tolerance
+            expected_field_terms(abc_coefficients),
+            abs=float_comparison_absolute_tolerance,
         )
 
         grouped = create_kitaev_hamiltonian(
@@ -679,7 +713,8 @@ class TestModelHamiltonians:
         )
         assert grouped.term_partition is not None
         assert _get_terms_dict(grouped) == pytest.approx(
-            expected_field_terms(cubic_coefficients), abs=float_comparison_absolute_tolerance
+            expected_field_terms(cubic_coefficients),
+            abs=float_comparison_absolute_tolerance,
         )
 
     def test_kitaev_field_matches_explicit_crystallographic_spin_operators(self):
@@ -718,7 +753,7 @@ class TestModelHamiltonians:
 
         np.testing.assert_allclose(actual.to_matrix(), expected, atol=1e-15)
 
-    def test_kitaev_crystallographic_transform(self):
+    def test_kitaev_crystallographic_transform(self) -> None:
         graph = LatticeGraph.honeycomb(3, 3)
         j = 1.1
         k = -2.3
@@ -756,16 +791,30 @@ class TestModelHamiltonians:
         }
         expected: dict[str, float] = {}
         components = ("X", "Y", "Z")
-        for connection in _with_standard_kitaev_flavors(graph).neighbor_connections([1]):
+        for connection in _with_standard_kitaev_flavors(graph).connections:
+            if connection.bond_class.shell != 1:
+                continue
             assert connection.flavor is not None
             flavor = KitaevBondFlavor(connection.flavor)
             cosine = np.cos(phases[flavor])
             sine = np.sin(phases[flavor])
             exchange = np.array(
                 [
-                    [j_ab + coefficient_a * cosine, -coefficient_a * sine, -np.sqrt(2) * coefficient_b * cosine],
-                    [-coefficient_a * sine, j_ab - coefficient_a * cosine, -np.sqrt(2) * coefficient_b * sine],
-                    [-np.sqrt(2) * coefficient_b * cosine, -np.sqrt(2) * coefficient_b * sine, j_c],
+                    [
+                        j_ab + coefficient_a * cosine,
+                        -coefficient_a * sine,
+                        -np.sqrt(2) * coefficient_b * cosine,
+                    ],
+                    [
+                        -coefficient_a * sine,
+                        j_ab - coefficient_a * cosine,
+                        -np.sqrt(2) * coefficient_b * sine,
+                    ],
+                    [
+                        -np.sqrt(2) * coefficient_b * cosine,
+                        -np.sqrt(2) * coefficient_b * sine,
+                        j_c,
+                    ],
                 ]
             )
             exchange[np.abs(exchange) < 100 * np.finfo(float).eps * np.max(np.abs(exchange))] = 0.0
@@ -804,10 +853,15 @@ class TestModelHamiltonians:
             commutator = spin_abc[first] @ spin_abc[second] - spin_abc[second] @ spin_abc[first]
             np.testing.assert_allclose(commutator, 1.0j * spin_abc[third], atol=1e-15)
 
-    def test_kitaev_accumulates_periodic_flavor_collisions(self):
-        graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
+    def test_kitaev_accumulates_periodic_flavor_collisions(self) -> None:
+        geometry = LatticeGeometry.honeycomb(2, 2, periodic_x=True, periodic_y=True)
+        graph = LatticeGraph.from_geometry(geometry, [1, 3])
         flavored_graph = _with_standard_kitaev_flavors(graph)
-        couplings = {KitaevBondFlavor.X: 4.0, KitaevBondFlavor.Y: 8.0, KitaevBondFlavor.Z: 12.0}
+        couplings = {
+            KitaevBondFlavor.X: 4.0,
+            KitaevBondFlavor.Y: 8.0,
+            KitaevBondFlavor.Z: 12.0,
+        }
         hamiltonian = create_kitaev_hamiltonian(
             graph,
             kx={3: couplings[KitaevBondFlavor.X]},
@@ -816,8 +870,16 @@ class TestModelHamiltonians:
         )
         terms = _get_terms_dict(hamiltonian)
         expected: dict[str, float] = {}
-        pauli_for_flavor = {KitaevBondFlavor.X: "X", KitaevBondFlavor.Y: "Y", KitaevBondFlavor.Z: "Z"}
-        for connection in flavored_graph.neighbor_connections([3]):
+        images_by_pair: dict[tuple[int, int], set[tuple[int, int]]] = {}
+        pauli_for_flavor = {
+            KitaevBondFlavor.X: "X",
+            KitaevBondFlavor.Y: "Y",
+            KitaevBondFlavor.Z: "Z",
+        }
+        for connection in flavored_graph.connections:
+            if connection.bond_class.shell != 3:
+                continue
+            images_by_pair.setdefault((connection.site_i, connection.site_j), set()).add(tuple(connection.image_shift))
             assert connection.flavor is not None
             flavor = KitaevBondFlavor(connection.flavor)
             pauli_char = pauli_for_flavor[flavor]
@@ -826,7 +888,9 @@ class TestModelHamiltonians:
             pauli[graph.num_sites - 1 - connection.site_j] = pauli_char
             pauli_string = "".join(pauli)
             expected[pauli_string] = expected.get(pauli_string, 0.0) + couplings[flavor] / 4.0
+        assert any(len(images) > 1 for images in images_by_pair.values())
         assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+        _assert_commuting_disjoint_partition(hamiltonian)
 
     def test_kitaev_requires_flavored_connections(self):
         with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
@@ -839,7 +903,10 @@ class TestModelHamiltonians:
         graph = LatticeGraph.honeycomb(3, 3)
         invalid_transforms = (
             (np.eye(2), "shape"),
-            (np.array([[np.nan, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]), "finite"),
+            (
+                np.array([[np.nan, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]),
+                "finite",
+            ),
             (np.diag([2.0, 1.0, 1.0]), "orthogonal"),
             (np.diag([-1.0, 1.0, 1.0]), "right-handed"),
         )
@@ -874,7 +941,7 @@ class TestModelHamiltonians:
         with pytest.raises(ValueError, match="bohr_magneton"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, bohr_magneton=np.inf)
 
-    def test_kitaev_explicit_flavors_override_defaults(self):
+    def test_kitaev_explicit_flavors_override_defaults(self) -> None:
         graph = LatticeGraph.honeycomb_plaquettes(1, 1)
         flavor_swap = {
             KitaevBondFlavor.X: KitaevBondFlavor.Z,
@@ -894,8 +961,8 @@ class TestModelHamiltonians:
 
         actual = _get_terms_dict(create_kitaev_hamiltonian(swapped, 4.0, 0.0, 0.0, include_term_groups=False))
         expected = {}
-        for connection in swapped.neighbor_connections([1]):
-            if connection.flavor != KitaevBondFlavor.X:
+        for connection in swapped.connections:
+            if connection.bond_class.shell != 1 or connection.flavor != KitaevBondFlavor.X:
                 continue
             pauli = ["I"] * graph.num_sites
             pauli[graph.num_sites - 1 - connection.site_i] = "X"
@@ -904,7 +971,7 @@ class TestModelHamiltonians:
 
         assert actual == expected
 
-    def test_kitaev_without_interactions_does_not_require_geometry(self):
+    def test_kitaev_without_interactions_does_not_require_geometry(self) -> None:
         graph = LatticeGraph.from_dense_matrix(np.zeros((2, 2)))
         zero = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0)
         np.testing.assert_array_equal(zero.to_matrix(), np.zeros((4, 4)))
@@ -921,21 +988,31 @@ class TestModelHamiltonians:
         assert field.num_qubits == 2
         assert field.is_hermitian()
 
-        with pytest.raises(RuntimeError, match="require lattice positions"):
+        with pytest.raises(ValueError, match=r"geometry|metadata"):
             create_kitaev_hamiltonian(graph, {1: 1.0}, 0.0, 0.0)
 
-    def test_kitaev_shell_mapping_order_is_deterministic(self):
-        graph = LatticeGraph.honeycomb(3, 3)
+    @pytest.mark.parametrize("include_term_groups", [False, True])
+    def test_kitaev_shell_mapping_order_is_deterministic(self, include_term_groups: bool) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb(3, 3), [1, 2, 3])
         forward = {1: 1.0, 2: -0.5, 3: 0.25}
         reversed_order = {3: 0.25, 2: -0.5, 1: 1.0}
-        forward_hamiltonian = create_kitaev_hamiltonian(graph, forward, forward, forward)
-        reversed_hamiltonian = create_kitaev_hamiltonian(graph, reversed_order, reversed_order, reversed_order)
+        forward_hamiltonian = create_kitaev_hamiltonian(
+            graph, forward, forward, forward, include_term_groups=include_term_groups
+        )
+        reversed_hamiltonian = create_kitaev_hamiltonian(
+            graph,
+            reversed_order,
+            reversed_order,
+            reversed_order,
+            include_term_groups=include_term_groups,
+        )
         assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
         np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
+        assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
 
-    def test_kitaev_open_hexagon_matches_explicit_matrix(self):
-        graph = LatticeGraph.honeycomb_plaquettes(1, 1)
+    def test_kitaev_open_hexagon_matches_explicit_matrix(self) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb_plaquettes(1, 1), [1, 2, 3])
         bonds = {
             (1, KitaevBondFlavor.X): {(0, 1), (4, 5)},
             (1, KitaevBondFlavor.Y): {(0, 3), (2, 5)},
@@ -948,7 +1025,7 @@ class TestModelHamiltonians:
             (3, KitaevBondFlavor.Z): {(0, 5)},
         }
         actual_bonds: dict[tuple[int, KitaevBondFlavor], set[tuple[int, int]]] = {}
-        for connection in _with_standard_kitaev_flavors(graph).neighbor_connections([1, 2, 3]):
+        for connection in _with_standard_kitaev_flavors(graph).connections:
             assert connection.flavor is not None
             key = (connection.bond_class.shell, KitaevBondFlavor(connection.flavor))
             actual_bonds.setdefault(key, set()).add((connection.site_i, connection.site_j))
@@ -1013,7 +1090,11 @@ class TestModelHamiltonians:
             return result
 
         expected = np.zeros((64, 64), dtype=complex)
-        flavor_index = {KitaevBondFlavor.X: 0, KitaevBondFlavor.Y: 1, KitaevBondFlavor.Z: 2}
+        flavor_index = {
+            KitaevBondFlavor.X: 0,
+            KitaevBondFlavor.Y: 1,
+            KitaevBondFlavor.Z: 2,
+        }
         components = "XYZ"
         for (shell, flavor), pairs in bonds.items():
             selected = flavor_index[flavor]
@@ -1041,3 +1122,204 @@ class TestModelHamiltonians:
         eigenvalues = np.linalg.eigvalsh(expected)
         assert eigenvalues[0] == pytest.approx(-31.590058786230344, abs=1e-12)
         assert eigenvalues[1] - eigenvalues[0] == pytest.approx(4.214007173911412, abs=1e-12)
+
+    @pytest.mark.parametrize("include_term_groups", [False, True])
+    @pytest.mark.parametrize("as_array", [False, True])
+    @pytest.mark.parametrize("weight", [-2.0, 0.0])
+    def test_heisenberg_mixed_couplings_preserve_weighting(
+        self, weight: float, as_array: bool, include_term_groups: bool
+    ) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(3), [1, 2], weight=weight)
+        jx = np.full((3, 3), 2.0) if as_array else 2.0
+        jy = np.full((3, 3), 3.0) if as_array else 3.0
+        jz = np.full((3, 3), 4.0) if as_array else 4.0
+
+        hamiltonian = create_heisenberg_hamiltonian(
+            graph, jx, {1: jy}, {2: jz}, include_term_groups=include_term_groups
+        )
+
+        expected = {"IYY": 3.0, "YYI": 3.0, "ZIZ": 4.0}
+        if weight != 0.0:
+            expected.update(dict.fromkeys(("IXX", "XXI", "XIX"), 2.0 * weight))
+        assert _get_terms_dict(hamiltonian) == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+        if include_term_groups:
+            _assert_commuting_disjoint_partition(hamiltonian)
+        else:
+            assert hamiltonian.term_partition is None
+
+    @pytest.mark.parametrize("as_array", [False, True])
+    @pytest.mark.parametrize("weight", [-2.0, 0.0])
+    def test_kitaev_scalar_array_weights_and_mapped_independence(self, weight: float, as_array: bool) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb(1, 1), [1], weight=weight)
+        j, kz, gamma, gamma_prime = [np.full((2, 2), value) if as_array else value for value in (4.0, 8.0, 12.0, 16.0)]
+
+        weighted = create_kitaev_hamiltonian(graph, 0.0, 0.0, kz, j=j, gamma=gamma, gamma_prime=gamma_prime)
+        mapped = create_kitaev_hamiltonian(graph, 0.0, 0.0, {1: kz}, j={1: j}, gamma=gamma, gamma_prime=gamma_prime)
+
+        exchange = {"XX": 1.0, "YY": 1.0, "ZZ": 3.0}
+        off_diagonal = {
+            "XY": 3.0,
+            "YX": 3.0,
+            "XZ": 4.0,
+            "ZX": 4.0,
+            "YZ": 4.0,
+            "ZY": 4.0,
+        }
+        if weight == 0.0:
+            np.testing.assert_array_equal(weighted.to_matrix(), np.zeros((4, 4)))
+        else:
+            expected = {label: value * weight for label, value in (exchange | off_diagonal).items()}
+            assert _get_terms_dict(weighted) == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+        expected_mapped = exchange | {label: value * weight for label, value in off_diagonal.items() if weight != 0.0}
+        assert _get_terms_dict(mapped) == pytest.approx(expected_mapped, abs=float_comparison_absolute_tolerance)
+        assert all(connection.flavor is None for connection in graph.connections)
+        _assert_commuting_disjoint_partition(mapped)
+
+    def test_kitaev_scalar_couplings_ignore_selected_higher_shells(self) -> None:
+        geometry = LatticeGeometry.honeycomb_plaquettes(1, 1)
+        union = LatticeGraph.from_geometry(geometry, [1, 2, 3], weight=2.5)
+        first_shell = LatticeGraph.from_geometry(geometry, [1], weight=2.5)
+
+        actual = create_kitaev_hamiltonian(union, 4.0, 8.0, 12.0, j={}, gamma=4.0)
+        expected = create_kitaev_hamiltonian(first_shell, 4.0, 8.0, 12.0, j={}, gamma=4.0)
+
+        assert actual.pauli_strings == expected.pauli_strings
+        np.testing.assert_array_equal(actual.coefficients, expected.coefficients)
+        assert actual.term_partition == expected.term_partition
+        _assert_commuting_disjoint_partition(actual)
+
+    def test_legacy_adjacency_requires_explicit_kitaev_selection(self) -> None:
+        graph = LatticeGraph.from_json(
+            '{"num_sites": 2, "is_symmetric": true, '
+            '"adjacency_sparse": [[0, 1, 1.0], [1, 0, 1.0]], "positions": [[0.0, 0.0], [1.0, 0.0]]}'
+        )
+        with pytest.raises(ValueError, match="metadata"):
+            create_kitaev_hamiltonian(graph, 0.0, 0.0, 4.0)
+
+    def test_kitaev_defaults_depend_only_on_active_flavors(self) -> None:
+        geometry = LatticeGeometry.honeycomb_plaquettes(1, 1)
+        graph = LatticeGraph.from_geometry(
+            geometry,
+            [1, 2],
+            bond_flavors=[BondFlavorDefinition(2, np.array([0.0, 1.0]), 1000)],
+        )
+        reference = LatticeGraph.from_geometry(geometry, [1], bond_flavors=kitaev_honeycomb_bond_flavors())
+        before = graph.content_hash()
+
+        actual = create_kitaev_hamiltonian(graph, {1: 4.0}, {1: 8.0}, {1: 12.0})
+        expected = create_kitaev_hamiltonian(reference, {1: 4.0}, {1: 8.0}, {1: 12.0})
+
+        assert actual.pauli_strings == expected.pauli_strings
+        np.testing.assert_array_equal(actual.coefficients, expected.coefficients)
+        assert actual.term_partition == expected.term_partition
+        assert graph.content_hash() == before
+        assert all(connection.flavor is None for connection in graph.connections if connection.bond_class.shell == 1)
+        assert any(connection.flavor == 1000 for connection in graph.connections if connection.bond_class.shell == 2)
+
+    def test_kitaev_does_not_fill_partial_explicit_flavors(self) -> None:
+        graph = LatticeGraph.from_geometry(
+            LatticeGeometry.honeycomb_plaquettes(1, 1),
+            [1],
+            bond_flavors=[BondFlavorDefinition(1, np.array([1.0, 0.0]), KitaevBondFlavor.Z)],
+        )
+        assert {connection.flavor for connection in graph.connections} == {
+            None,
+            KitaevBondFlavor.Z,
+        }
+
+        with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
+            create_kitaev_hamiltonian(graph, {1: 4.0}, {1: 4.0}, {1: 4.0})
+
+    @pytest.mark.parametrize("with_geometry", [False, True])
+    def test_heisenberg_and_ising_periodic_mappings_remain_unsupported(self, with_geometry: bool) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(4, periodic=True), [1, 2])
+        if not with_geometry:
+            graph = LatticeGraph.from_connections(graph.num_sites, graph.connections)
+        with pytest.raises(RuntimeError, match="support open lattices only"):
+            create_heisenberg_hamiltonian(graph, {1: 1.0}, 0.0, 0.0)
+        with pytest.raises(RuntimeError, match="support open lattices only"):
+            create_ising_hamiltonian(graph, {2: 1.0})
+
+    def test_ising_shell_mapping_uses_only_selected_edges(self) -> None:
+        geometry = LatticeGeometry.square(2, 2)
+        graph = LatticeGraph.from_geometry(geometry, [2], weight=7.0)
+        hamiltonian = create_ising_hamiltonian(graph, {2: -0.4})
+
+        assert _get_terms_dict(hamiltonian) == pytest.approx({"ZIIZ": -0.4, "IZZI": -0.4})
+        _assert_commuting_disjoint_partition(hamiltonian)
+        with pytest.raises(ValueError, match="not selected"):
+            create_ising_hamiltonian(graph, {1: 1.25})
+
+
+@pytest.mark.parametrize("factory", [create_heisenberg_hamiltonian, create_kitaev_hamiltonian])
+class TestSelectedModelShells:
+    @pytest.mark.parametrize("selected_shells", [[], [1]])
+    def test_active_shell_requires_selection(
+        self, factory: Callable[..., QubitOperator], selected_shells: list[int]
+    ) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(3), selected_shells)
+        with pytest.raises(ValueError, match="not selected"):
+            factory(graph, {2: 4.0}, {2: 4.0}, {2: 4.0})
+
+    def test_selected_unavailable_shell_is_empty(self, factory: Callable[..., QubitOperator]) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(3), [1, 99])
+        hamiltonian = factory(graph, {99: 4.0}, {99: 4.0}, {99: 4.0})
+
+        assert graph.selected_shells == [1, 99]
+        assert hamiltonian.num_qubits == 3
+        np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((8, 8)))
+        _assert_commuting_disjoint_partition(hamiltonian)
+
+    @pytest.mark.parametrize("with_geometry", [False, True])
+    def test_selected_empty_records_do_not_discover_edges(
+        self, factory: Callable[..., QubitOperator], with_geometry: bool
+    ) -> None:
+        geometry = LatticeGeometry.chain(3) if with_geometry else None
+        graph = LatticeGraph.from_connections(3, [], geometry=geometry, selected_shells=[1])
+        hamiltonian = factory(graph, {1: 4.0}, {1: 4.0}, {1: 4.0})
+
+        assert graph.connections == []
+        assert graph.selected_shells == [1]
+        assert hamiltonian.num_qubits == 3
+        np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((8, 8)))
+        _assert_commuting_disjoint_partition(hamiltonian)
+
+    def test_inactive_mappings_need_no_geometry(self, factory: Callable[..., QubitOperator]) -> None:
+        graph = LatticeGraph.from_dense_matrix(np.array([[0.0, 7.0], [7.0, 0.0]]))
+        for couplings in ({}, {1: np.zeros((2, 2)), 99: 0.0}):
+            hamiltonian = factory(graph, couplings, couplings, couplings)
+            np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((4, 4)))
+
+        with pytest.raises(ValueError, match=r"geometry|metadata"):
+            factory(graph, {1: 4.0}, {1: 4.0}, {1: 4.0})
+
+    @pytest.mark.parametrize("with_geometry", [False, True])
+    def test_custom_shell_records_are_authoritative(
+        self, factory: Callable[..., QubitOperator], with_geometry: bool
+    ) -> None:
+        """Custom shell labels and support must not be rediscovered from positions."""
+        connection = NeighborConnection(
+            0,
+            2,
+            BondClass(7, 12, np.array([1.0, 0.0])),
+            np.array([2.0, 0.0]),
+            (0, 0),
+            flavor=KitaevBondFlavor.X,
+            weight=-8.0,
+        )
+        geometry = LatticeGeometry.chain(3) if with_geometry else None
+        graph = LatticeGraph.from_connections(3, [connection], geometry=geometry, selected_shells=[1])
+        couplings = {1: 4.0, 7: 4.0}
+        hamiltonian = factory(graph, couplings, couplings, couplings)
+
+        expected = {"XIX": 4.0, "YIY": 4.0, "ZIZ": 4.0} if factory is create_heisenberg_hamiltonian else {"XIX": 1.0}
+        assert _get_terms_dict(hamiltonian) == expected
+        assert graph.selected_shells == [1, 7]
+        assert len(graph.connections) == 1
+        _assert_commuting_disjoint_partition(hamiltonian)
+
+    @pytest.mark.parametrize("shell", [0, -1, 1.5, True])
+    def test_invalid_mapped_shell_indices(self, factory: Callable[..., QubitOperator], shell: float) -> None:
+        graph = LatticeGraph.chain(3)
+        with pytest.raises(ValueError, match="shell indices must be positive integers"):
+            factory(graph, {shell: 4.0}, {}, {})

@@ -6,6 +6,8 @@ These model Hamiltonians serve as simplified representations of complex quantum 
 
 Unlike molecular Hamiltonians, model Hamiltonians do not require a molecular structure or precomputed integrals.
 They are defined directly in terms of their parameters and a :doc:`LatticeGraph <data/lattice_graph>` that specifies the site connectivity.
+For geometric interactions, first create a :doc:`LatticeGeometry <data/lattice_geometry>` and select the required shells with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
+Model builders consume the resulting graph; they do not discover or add connections.
 
 Overview
 --------
@@ -221,6 +223,29 @@ The ``pairwise_potential`` function accepts a user-defined callable ``func(i, j,
 Spin models
 -----------
 
+Selecting interaction shells
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The spin builders accept shell mappings that **filter already-selected graph connections**.
+Choose the union of active shells after resolving parameter defaults and component-specific overrides, then construct one :class:`~qdk_chemistry.data.LatticeGraph` for that union.
+A scalar coupling is active when nonzero; an array coupling is active when any entry is nonzero.
+An active mapped shell absent from ``graph.selected_shells`` raises an error, even if the geometry contains that distance.
+A selected shell with no geometric connections contributes no terms, and empty or all-zero mappings require no additional shell selection.
+
+For example, a physical-spin first- and second-neighbor Heisenberg model can be written as:
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
+      :language: python
+      :start-after: # start-cell-create-heisenberg-shells
+      :end-before: # end-cell-create-heisenberg-shells
+
+The :ref:`Kitaev builder <model-kitaev>` also needs shell 1 for nonzero effective Gamma or Gamma-prime interactions.
+Resolve each flavor override before deciding whether that shell is active: setting every override to zero disables a nonzero shared default.
+Magnetic fields are single-site terms and do not require graph edges.
+See :ref:`lattice-geometry-migration` for coordinate-query, connection-record, and edge-count migration details.
+
 .. _model-heisenberg:
 
 Heisenberg model
@@ -243,6 +268,9 @@ The anisotropic Heisenberg model describes spin-½ particles interacting on a la
 
 where :math:`J_x, J_y, J_z` are the spin-spin coupling constants, :math:`h_x, h_y, h_z` are external magnetic field components, and :math:`w_{ij}` is the edge weight from the lattice adjacency matrix.
 Each qubit corresponds to a lattice site.
+This equation describes scalar/array couplings, which act on all adjacency edges, including every shell in a union graph.
+Shell mappings instead apply their coefficients to selected shell pairs independently of adjacency weights.
+The parameters here multiply Pauli matrices directly: physical-spin exchanges require :math:`J/4` and linear spin fields require :math:`h/2` when :math:`S=\sigma/2`.
 
 .. tab:: Python API
 
@@ -281,17 +309,17 @@ The transverse-field Ising model is a special case of the Heisenberg model with 
 Kitaev-Heisenberg-Gamma model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The flavored Kitaev builder assigns an exchange matrix to each physical lattice connection.
-For the first three geometric shells, let :math:`X_m`, :math:`Y_m`, and :math:`Z_m` denote the three flavored bond-axis classes and :math:`N_m=X_m\cup Y_m\cup Z_m`.
-The extended model is
+The flavored :func:`~qdk_chemistry.utils.model_hamiltonians.create_kitaev_hamiltonian` builder assigns an exchange matrix to each selected physical lattice connection.
+For selected shells :math:`m\in\mathcal M`, let :math:`X_m`, :math:`Y_m`, and :math:`Z_m` denote the three flavored bond-axis classes and :math:`N_m=X_m\cup Y_m\cup Z_m`.
+For uniform couplings within each shell and unit connection weights, the extended model is
 
 .. math::
 
-   H_K={}&\sum_{m=1}^3\left[
+   H_K={}&\sum_{m\in\mathcal M}\left[
       K_{x,m}\sum_{ij\in X_m}S_i^xS_j^x+
       K_{y,m}\sum_{ij\in Y_m}S_i^yS_j^y+
       K_{z,m}\sum_{ij\in Z_m}S_i^zS_j^z\right]\\
-   &+\sum_{m=1}^3J_m\sum_{ij\in N_m}
+   &+\sum_{m\in\mathcal M}J_m\sum_{ij\in N_m}
       \left(S_i^xS_j^x+S_i^yS_j^y+S_i^zS_j^z\right)\\
    &+\sum_{\gamma\in\{x,y,z\}}\Gamma_\gamma
       \sum_{ij\in \mathcal B_{\gamma,1}}
@@ -307,14 +335,18 @@ The off-diagonal :math:`\Gamma_\gamma` and :math:`\Gamma'_\gamma` interactions a
 
 Here :math:`S_i^\mu=\sigma_i^\mu/2` is a spin-1/2 operator.
 The returned :class:`~qdk_chemistry.data.QubitOperator` is expressed in Pauli matrices, so every two-body exchange coefficient is divided by four and every magnetic-field coefficient is divided by two.
-Scalar and array parameters retain adjacency-based nearest-neighbor behavior and multiply edge weights.
-A mapping ``{m: coupling}`` selects geometric shell :math:`m` independently of adjacency weights.
+Scalar and array exchange parameters use selected shell-1 connections and multiply their weights.
+A mapping ``{m: coupling}`` uses already-selected connections in shell :math:`m` independently of connection weights; it does not select new graph edges.
+Gamma and Gamma-prime parameters always use weighted shell-1 connections.
 The shared ``gamma`` and ``gamma_prime`` arguments provide isotropic defaults; ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts override individual flavors.
 
 The builder interprets :class:`~qdk_chemistry.utils.model_hamiltonians.KitaevBondFlavor` values X, Y, and Z as flavor IDs 0, 1, and 2.
-When a graph has no flavor definitions, the builder applies :func:`~qdk_chemistry.utils.model_hamiltonians.kitaev_honeycomb_bond_flavors` to a temporary graph copy.
-Caller-provided flavor definitions override that default and must assign one of those three IDs to every selected :class:`~qdk_chemistry.data.NeighborConnection`.
+When all active connections are unflavored, the builder applies :func:`~qdk_chemistry.utils.model_hamiltonians.kitaev_honeycomb_bond_flavors` to a temporary graph copy.
+That helper defines the standard honeycomb axes for shells 1, 2, and 3; it neither creates edges nor limits the graph's general shell-selection API.
+Other geometries or shells require suitable explicit flavors.
+Each active :class:`~qdk_chemistry.data.NeighborConnection` must have one of the three integer IDs; partially labeled or invalid active records are rejected rather than silently replaced.
 When distinct periodic images collapse onto one finite-lattice pair, their exchange contributions are accumulated rather than discarded.
+Self-image interactions are rejected.
 
 The magnetic field and diagonal g factors are supplied in a crystallographic :math:`(a,b,c)` frame.
 Because its orientation is lattice-dependent, the caller supplies ``crystallographic_transform`` as the proper rotation :math:`D` satisfying
@@ -376,16 +408,18 @@ When enabled, the builder stores a group-and-layer structure on :attr:`~qdk_chem
 
 Shell-based grouped Heisenberg and Kitaev builders store each Pauli term by its non-identity qubit indices and axes, rather than materializing a register-width string. The :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` attribute remains a sequence-compatible view and constructs individual dense labels only when accessed. Use ``num_terms`` to inspect large operators without materializing labels.
 
-* each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
-* each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
+* equal-axis families (``XX``, ``YY``, ``ZZ``) each form one commuting *group*, as does each external-field direction (``X``, ``Y``, ``Z``);
+* each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel;
+* mixed-axis families (such as ``XY``) use a separate group for each disjoint layer, since different layers need not commute.
 
 Downstream consumers — most importantly the :doc:`Trotter time-evolution builder <algorithms/hamiltonian_unitary_builder>` — read ``term_partition`` automatically and use it to schedule fewer sequential exponentials per Trotter step.
 No manual geometry boilerplate is required at the call site.
 
 Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).
 
-For adjacency-based couplings, the builders reuse the coloring stored on the lattice.
-For geometric-shell mappings, each active Pauli interaction family is colored independently using its nonzero pair support.
+For scalar/array couplings, the builders reuse the coloring stored on the graph, falling back to ungrouped construction when none is available.
+For shell mappings, they accumulate contributions and remove zero coefficients before calling :meth:`~qdk_chemistry.data.LatticeGraph.color_edges` independently for each emitted Pauli family's pair support.
+The same union graph can therefore yield different colorings and layer counts for different families; do not color the entire union once and impose that coloring on every interaction.
 
 Parameter flexibility
 ---------------------
@@ -402,10 +436,12 @@ Per-pair parameters
    Used for: hopping (:math:`t`), intersite potential (:math:`V`), spin couplings (:math:`J_x, J_y, J_z`).
 
 Geometric-shell spin couplings
-   The Heisenberg, Ising, and Kitaev builders also accept a mapping ``{m: coupling}``, where each positive integer ``m`` selects geometric shell :math:`m` and each coupling is a scalar or ``(n, n)`` array.
+   The Heisenberg, Ising, and Kitaev builders also accept a mapping ``{m: coupling}``, where each positive integer ``m`` refers to an already-selected geometric shell and each coupling is a scalar or ``(n, n)`` array.
    Shell couplings are independent of adjacency edge weights.
-   For example, passing ``{1: J1, 2: J2}`` for each of ``jx``, ``jy``, and ``jz`` constructs an isotropic first- and second-neighbor Heisenberg model.
+   For example, select ``shells=[1, 2]`` before passing ``{1: J1, 2: J2}`` for each of ``jx``, ``jy``, and ``jz`` in an isotropic first- and second-neighbor Heisenberg model, using Pauli-normalized values for that builder.
    For the Kitaev builder, ``kx``, ``ky``, and ``kz`` select the corresponding semantic flavor within each requested shell.
+   Heisenberg and Ising shell mappings support open lattices only; Kitaev mappings retain periodic-image multiplicity.
+   To restrict a scalar exchange to shell 1 on a union graph, pass ``{1: value}`` rather than an adjacency-based Heisenberg/Ising scalar.
 
 .. tab:: Python API
 
@@ -460,6 +496,7 @@ Spin model Hamiltonians produce :class:`~qdk_chemistry.data.QubitOperator` objec
 Related classes
 ---------------
 
+- :doc:`data/lattice_geometry` — Site coordinates, periodic vectors, and geometric neighbor queries
 - :doc:`data/lattice_graph` — Lattice topology defining site connectivity
 - :doc:`data/hamiltonian` — Hamiltonian data class produced by fermionic models
 - :class:`~qdk_chemistry.data.QubitOperator` — Qubit Hamiltonian produced by spin models

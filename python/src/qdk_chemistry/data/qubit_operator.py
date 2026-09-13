@@ -20,10 +20,23 @@ from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
 
-from qdk_chemistry.data._hashing import _hash_arg, _hash_array, _hash_optional, _hash_str, _hash_uint
+from qdk_chemistry.data._hashing import (
+    _hash_arg,
+    _hash_array,
+    _hash_optional,
+    _hash_str,
+    _hash_uint,
+)
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
-from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
+from qdk_chemistry.data.term_partition import (
+    FlatPartition,
+    LayeredPartition,
+    TermPartition,
+)
+from qdk_chemistry.utils.pauli_matrix import (
+    pauli_to_dense_matrix,
+    pauli_to_sparse_matrix,
+)
 
 if TYPE_CHECKING:
     import h5py
@@ -327,7 +340,11 @@ class QubitOperator(DataClass):
         _hash_array(h, self.coefficients)
         _hash_optional(h, self.encoding, _hash_str)
         _hash_optional(h, self.fermion_mode_order, lambda h, mode: _hash_str(h, str(mode)))
-        _hash_optional(h, self.term_partition, lambda h, partition: _hash_str(h, partition.content_hash(0)))
+        _hash_optional(
+            h,
+            self.term_partition,
+            lambda h, partition: _hash_str(h, partition.content_hash(0)),
+        )
         _hash_optional(h, self.tapering, _hash_tapering)
 
     @property
@@ -358,14 +375,20 @@ class QubitOperator(DataClass):
             raise RuntimeError("This QubitOperator does not use packed sparse-term storage.")
         return self._term_offsets, self._qubit_indices, self._pauli_codes
 
-    def iter_sparse_terms(self) -> Iterable[tuple[tuple[tuple[int, str], ...], complex]]:
+    def iter_sparse_terms(
+        self,
+    ) -> Iterable[tuple[tuple[tuple[int, str], ...], complex]]:
         """Iterate over compact non-identity factors and coefficients."""
         if hasattr(self, "_term_offsets"):
             for term_index, coefficient in enumerate(self.coefficients):
                 begin = int(self._term_offsets[term_index])
                 end = int(self._term_offsets[term_index + 1])
                 factors = tuple(
-                    (int(self._qubit_indices[i]), _PAULI_CHARS[int(self._pauli_codes[i])]) for i in range(begin, end)
+                    (
+                        int(self._qubit_indices[i]),
+                        _PAULI_CHARS[int(self._pauli_codes[i])],
+                    )
+                    for i in range(begin, end)
                 )
                 yield factors, complex(coefficient)
             return
@@ -779,7 +802,11 @@ class QubitOperator(DataClass):
                 coefficients,
                 **metadata,
             )
-        return cls(pauli_strings=json_data["pauli_strings"], coefficients=coefficients, **metadata)
+        return cls(
+            pauli_strings=json_data["pauli_strings"],
+            coefficients=coefficients,
+            **metadata,
+        )
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> QubitOperator:

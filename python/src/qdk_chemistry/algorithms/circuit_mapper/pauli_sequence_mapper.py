@@ -82,7 +82,12 @@ class PauliSequenceMapper(CircuitMapper):
         target_indices = list(range(unitary_container.num_qubits))
         if unitary_container.has_sparse_terms:
             offsets, indices, codes, angles = unitary_container.sparse_term_arrays()
-            pauli_values = (qsharp.Pauli.I, qsharp.Pauli.X, qsharp.Pauli.Y, qsharp.Pauli.Z)
+            pauli_values = (
+                qsharp.Pauli.I,
+                qsharp.Pauli.X,
+                qsharp.Pauli.Y,
+                qsharp.Pauli.Z,
+            )
             term_offsets = [int(value) for value in offsets]
             qubit_indices = [int(value) for value in indices]
             paulis = [pauli_values[int(value)] for value in codes]

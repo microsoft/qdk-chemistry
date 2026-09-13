@@ -67,15 +67,14 @@ namespace QDKChemistry.Utils.PauliExp {
         paulis : Pauli[],
         pauliCoefficients : Double[],
         systems : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         for term in 0..Length(pauliCoefficients) - 1 {
             let first = termOffsets[term];
             let last = termOffsets[term + 1] - 1;
-            if first <= last {
-                let range = first..last;
-                let activeQubits = Subarray(qubitIndices[range], systems);
-                Exp(paulis[range], -pauliCoefficients[term], activeQubits);
-            }
+            let range = first..last;
+            let activeQubits = Subarray(qubitIndices[range], systems);
+            // Empty support is a phase, observable when the evolution is controlled.
+            Exp(paulis[range], -pauliCoefficients[term], activeQubits);
         }
     }
 
@@ -86,7 +85,7 @@ namespace QDKChemistry.Utils.PauliExp {
         pauliCoefficients : Double[],
         repetitions : Int,
         systems : Qubit[],
-    ) : Unit {
+    ) : Unit is Adj + Ctl {
         if IsResourceEstimating() {
             within {
                 RepeatEstimates(repetitions);
@@ -123,6 +122,18 @@ namespace QDKChemistry.Utils.PauliExp {
         );
     }
 
+    // A plain named wrapper keeps composed callables resolvable during QIR lowering.
+    operation ApplyRepSparsePauliExp(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+        systems : Qubit[],
+    ) : Unit {
+        RepSparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, systems);
+    }
+
     function MakeRepSparsePauliExpOp(
         termOffsets : Int[],
         qubitIndices : Int[],
@@ -130,7 +141,7 @@ namespace QDKChemistry.Utils.PauliExp {
         pauliCoefficients : Double[],
         repetitions : Int,
     ) : Qubit[] => Unit {
-        RepSparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, _)
+        ApplyRepSparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, _)
     }
 
     /// A helper operation to create a circuit for repeated Time Evolution for a set of Pauli exponentials.

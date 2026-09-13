@@ -30,6 +30,9 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; \text{CRZ}(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
 
+    Only non-identity factors are transferred to Q#. Packed containers are
+    traversed lazily, without allocating a full-register Pauli list per term.
+
     Notes:
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
@@ -78,28 +81,29 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
+        term_offsets = [0]
+        qubit_indices: list[int] = []
+        paulis: list[qsharp.Pauli] = []
         angles: list[float] = []
         for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
             for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
+                if pauli != "I":
+                    qubit_indices.append(index)
+                    paulis.append(getattr(qsharp.Pauli, pauli))
+            term_offsets.append(len(qubit_indices))
             angles.append(term.angle)
 
-        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
-            pauliExponents=pauli_terms,
-            pauliCoefficients=angles,
-            repetitions=unitary_container.step_reps,
-            control=control_indices[0],
-            systems=target_indices,
-        )
-
+        parameters = {
+            "termOffsets": term_offsets,
+            "qubitIndices": qubit_indices,
+            "paulis": paulis,
+            "pauliCoefficients": angles,
+            "repetitions": unitary_container.step_reps,
+        }
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            parameter=vars(controlled_evo_params),
+            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledSparsePauliExpCircuit,
+            parameter={**parameters, "control": control_indices[0], "systems": target_indices},
         )
-
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledSparsePauliExpOp(*parameters.values())
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

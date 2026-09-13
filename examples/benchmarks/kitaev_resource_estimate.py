@@ -34,11 +34,15 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     DrivenQubitHamiltonian,
+    LatticeGeometry,
     LatticeGraph,
     QubitOperator,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.model_hamiltonians import create_kitaev_hamiltonian
+from qdk_chemistry.utils.model_hamiltonians import (
+    create_kitaev_hamiltonian,
+    kitaev_honeycomb_bond_flavors,
+)
 
 if TYPE_CHECKING:
     from qdk.qre import EstimationTable
@@ -48,13 +52,22 @@ DEFAULT_KITAEV_COUPLINGS = {1: -13.3, 2: -0.67, 3: 0.1}
 DEFAULT_HEISENBERG_COUPLINGS = {1: -1.3, 3: 1.0}
 
 
-def create_lattice(nx: int = 200, ny: int | None = None) -> LatticeGraph:
-    """Create an open nx-by-ny complete-plaquette patch; ny defaults to nx."""
-    return LatticeGraph.honeycomb_plaquettes(
+def create_lattice(
+    nx: int = 200, ny: int | None = None, *, shells: Sequence[int] = (1, 2, 3)
+) -> LatticeGraph:
+    """Create an open nx-by-ny plaquette graph with selected shells; ny defaults to nx.
+
+    The default selection supports the notebook model. Custom selections need
+    all active exchange shells and shell 1 for nonzero Gamma/Gamma-prime terms.
+    """
+    geometry = LatticeGeometry.honeycomb_plaquettes(
         nx,
         nx if ny is None else ny,
         periodic_x=False,
         periodic_y=False,
+    )
+    return LatticeGraph.from_geometry(
+        geometry, shells=shells, bond_flavors=kitaev_honeycomb_bond_flavors()
     )
 
 
@@ -86,6 +99,7 @@ def create_hamiltonian(
     shells. None selects the notebook defaults for kx, ky, kz, j, and the
     crystallographic transform. Empty mappings or zero explicitly disable terms.
     Gamma flavor overrides and both basis transforms are forwarded unchanged.
+    The graph must already select the active exchange and Gamma shells.
     """
     if crystallographic_transform is None:
         crystallographic_transform = np.array(
@@ -103,7 +117,9 @@ def create_hamiltonian(
         DEFAULT_KITAEV_COUPLINGS if kz is None else kz,
         DEFAULT_HEISENBERG_COUPLINGS if j is None else j,
     ]
-    shells = [value if isinstance(value, Mapping) else {1: value} for value in couplings]
+    shells = [
+        value if isinstance(value, Mapping) else {1: value} for value in couplings
+    ]
     return create_kitaev_hamiltonian(
         graph,
         kx=shells[0],
@@ -141,16 +157,25 @@ def build_time_evolution_circuit(
     effective timestep is total_time divided by that count. No state vector,
     full-register Pauli labels, or expanded circuit is constructed.
     """
-    if not math.isfinite(dt) or dt <= 0 or not math.isfinite(total_time) or total_time <= 0:
+    if (
+        not math.isfinite(dt)
+        or dt <= 0
+        or not math.isfinite(total_time)
+        or total_time <= 0
+    ):
         raise ValueError("dt and total_time must be finite and positive.")
     if not math.isfinite(total_time / dt) or round(total_time / dt) < 1:
-        raise ValueError("total_time / dt must round to a finite, positive division count.")
+        raise ValueError(
+            "total_time / dt must round to a finite, positive division count."
+        )
     if trotter_order != 1 and (trotter_order < 2 or trotter_order % 2):
         raise ValueError("trotter_order must be 1 or a positive even integer.")
     if not math.isfinite(weight_threshold) or weight_threshold < 0:
         raise ValueError("weight_threshold must be finite and nonnegative.")
     num_steps = round(total_time / dt)
-    zero_hamiltonian = QubitOperator.from_sparse_terms(hamiltonian.num_qubits, [{}], np.array([0.0]))
+    zero_hamiltonian = QubitOperator.from_sparse_terms(
+        hamiltonian.num_qubits, [{}], np.array([0.0])
+    )
     time_dependent_hamiltonian = DrivenQubitHamiltonian(
         hamiltonian,
         zero_hamiltonian,
@@ -192,7 +217,9 @@ def estimate_physical(circuit: Circuit, name: str) -> EstimationTable:
         * LatticeSurgery.q(slow_down_factor=[1.0 * j for j in range(1, 20)])
     )
     isa_query = ThreeAux.q() * RoundBasedFactory.q(code_query=ThreeAux.q())
-    results = estimate(application, architecture, isa_query, trace_query, max_error=0.01, name=name)
+    results = estimate(
+        application, architecture, isa_query, trace_query, max_error=0.01, name=name
+    )
     results.add_qubit_partition_column()
     results.add_factory_summary_column()
     return results
@@ -235,7 +262,9 @@ def _parse_couplings(text: str) -> dict[int, float | np.ndarray]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse lattice, Hamiltonian, evolution, and output inputs."""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument("--nx", type=int, default=200, help="Plaquettes along x.")
     parser.add_argument("--ny", type=int, help="Plaquettes along y; defaults to nx.")
     for axis in ("x", "y", "z"):
@@ -251,9 +280,17 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=DEFAULT_HEISENBERG_COUPLINGS.copy(),
         help="Physical isotropic exchange: JSON scalar, matrix, or shell map.",
     )
-    parser.add_argument("--gamma", type=_parse_parameter, default=9.4, help="Shared nearest-neighbor Gamma.")
     parser.add_argument(
-        "--gamma-prime", type=_parse_parameter, default=-2.3, help="Shared nearest-neighbor Gamma-prime."
+        "--gamma",
+        type=_parse_parameter,
+        default=9.4,
+        help="Shared nearest-neighbor Gamma.",
+    )
+    parser.add_argument(
+        "--gamma-prime",
+        type=_parse_parameter,
+        default=-2.3,
+        help="Shared nearest-neighbor Gamma-prime.",
     )
     for prefix in ("gamma", "gamma-prime"):
         for axis in ("x", "y", "z"):
@@ -263,11 +300,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
                 help=f"Override {prefix} on {axis.upper()} bonds; JSON scalar or matrix.",
             )
     parser.add_argument(
-        "--magnetic-field-abc", type=float, nargs=3, default=(0.0, 10.0, 0.0), help="Field in the abc frame (T)."
+        "--magnetic-field-abc",
+        type=float,
+        nargs=3,
+        default=(0.0, 10.0, 0.0),
+        help="Field in the abc frame (T).",
     )
-    parser.add_argument("--g-factors-abc", type=float, nargs=3, default=(2.3, 2.3, 1.3), help="Diagonal abc g factors.")
     parser.add_argument(
-        "--bohr-magneton", type=float, default=5.988e-2, help="Field-to-exchange conversion (meV/T by default)."
+        "--g-factors-abc",
+        type=float,
+        nargs=3,
+        default=(2.3, 2.3, 1.3),
+        help="Diagonal abc g factors.",
+    )
+    parser.add_argument(
+        "--bohr-magneton",
+        type=float,
+        default=5.988e-2,
+        help="Field-to-exchange conversion (meV/T by default).",
     )
     parser.add_argument(
         "--crystallographic-transform",
@@ -276,16 +326,33 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Row-major 3x3 rotation; defaults to the notebook abc frame.",
     )
     parser.add_argument(
-        "--spin-basis-transform", type=float, nargs=9, help="Row-major 3x3 output-spin rotation; defaults to identity."
+        "--spin-basis-transform",
+        type=float,
+        nargs=9,
+        help="Row-major 3x3 output-spin rotation; defaults to identity.",
     )
     parser.add_argument(
-        "--total-time", type=float, default=1000.0, help="Evolution time in inverse exchange-energy units."
+        "--total-time",
+        type=float,
+        default=1000.0,
+        help="Evolution time in inverse exchange-energy units.",
     )
     parser.add_argument(
-        "--dt", "--trotter-step", type=float, default=0.04, help="Requested step; divisions = round(total_time / dt)."
+        "--dt",
+        "--trotter-step",
+        type=float,
+        default=0.04,
+        help="Requested step; divisions = round(total_time / dt).",
     )
-    parser.add_argument("--trotter-order", type=int, default=4, help="1 or any positive even order.")
-    parser.add_argument("--weight-threshold", type=float, default=1e-12, help="Trotter coefficient cutoff.")
+    parser.add_argument(
+        "--trotter-order", type=int, default=4, help="1 or any positive even order."
+    )
+    parser.add_argument(
+        "--weight-threshold",
+        type=float,
+        default=1e-12,
+        help="Trotter coefficient cutoff.",
+    )
     parser.add_argument(
         "--spin-direction",
         type=float,
@@ -294,13 +361,33 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Final measurement-free spin-basis rotation.",
     )
     parser.add_argument(
-        "--output-csv", type=Path, help="Save the result table to this CSV file; create parent directories."
+        "--output-csv",
+        type=Path,
+        help="Save the result table to this CSV file; create parent directories.",
     )
     args = parser.parse_args(argv)
     if args.ny is None:
         args.ny = args.nx
     if args.nx < 1 or args.ny < 1:
         parser.error("nx and ny must be positive.")
+    shells = {
+        shell
+        for coupling in (args.kx, args.ky, args.kz, args.j)
+        for shell, value in coupling.items()
+        if np.any(value != 0.0)
+    }
+    for shared, overrides in (
+        (args.gamma, (args.gamma_x, args.gamma_y, args.gamma_z)),
+        (
+            args.gamma_prime,
+            (args.gamma_prime_x, args.gamma_prime_y, args.gamma_prime_z),
+        ),
+    ):
+        if any(
+            np.any((shared if value is None else value) != 0.0) for value in overrides
+        ):
+            shells.add(1)
+    args.shells = sorted(shells)
     return args
 
 
@@ -308,7 +395,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Run the notebook workflow with explicit command-line parameters."""
     args = parse_args(argv)
     Logger.set_global_level(Logger.LogLevel.off)
-    graph = create_lattice(args.nx, args.ny)
+    graph = create_lattice(args.nx, args.ny, shells=args.shells)
     hamiltonian = create_hamiltonian(
         graph,
         kx=args.kx,
@@ -332,11 +419,16 @@ def main(argv: Sequence[str] | None = None) -> None:
             else np.asarray(args.crystallographic_transform).reshape(3, 3)
         ),
         spin_basis_transform=(
-            None if args.spin_basis_transform is None else np.asarray(args.spin_basis_transform).reshape(3, 3)
+            None
+            if args.spin_basis_transform is None
+            else np.asarray(args.spin_basis_transform).reshape(3, 3)
         ),
     )
     print(f"Open {args.nx} x {args.ny} complete-plaquette Kitaev benchmark", flush=True)
-    print(f"Sites: {graph.num_sites}; Hamiltonian Pauli terms: {hamiltonian.num_terms}", flush=True)
+    print(
+        f"Sites: {graph.num_sites}; Hamiltonian Pauli terms: {hamiltonian.num_terms}",
+        flush=True,
+    )
     circuit = build_time_evolution_circuit(
         hamiltonian,
         dt=args.dt,
@@ -344,7 +436,9 @@ def main(argv: Sequence[str] | None = None) -> None:
         trotter_order=args.trotter_order,
         weight_threshold=args.weight_threshold,
     )
-    circuit = circuit.with_uniform_spin_basis_rotation(args.spin_direction, num_qubits=graph.num_sites)
+    circuit = circuit.with_uniform_spin_basis_rotation(
+        args.spin_direction, num_qubits=graph.num_sites
+    )
     num_steps = round(args.total_time / args.dt)
     print(f"Spin basis rotation direction: {args.spin_direction}")
     print(

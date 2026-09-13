@@ -4,8 +4,52 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
+    import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.PauliExp.RepSparsePauliExp;
     import Std.Arrays.Subarray;
     import Std.ResourceEstimation.*;
+
+    /// Reuses sparse evolution, including its identity phases and symbolic estimator repetitions.
+    operation RepControlledSparsePauliExp(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+        control : Qubit,
+        systems : Qubit[],
+    ) : Unit is Adj + Ctl {
+        Controlled RepSparsePauliExp(
+            [control], (termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, systems)
+        );
+    }
+
+    /// Creates controlled sparse evolution with explicit physical register indices.
+    operation MakeRepControlledSparsePauliExpCircuit(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+        control : Int,
+        systems : Int[],
+    ) : Unit {
+        use qs = Qubit[MaxInt([control] + systems) + 1];
+        RepControlledSparsePauliExp(
+            termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, qs[control], Subarray(systems, qs)
+        );
+    }
+
+    /// Returns a named callable suitable for QPE and QIR composition.
+    function MakeRepControlledSparsePauliExpOp(
+        termOffsets : Int[],
+        qubitIndices : Int[],
+        paulis : Pauli[],
+        pauliCoefficients : Double[],
+        repetitions : Int,
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
+        RepControlledSparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, repetitions, _, _)
+    }
 
     /// Performs Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters

@@ -14,6 +14,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     DrivenQubitHamiltonian,
+    LatticeGeometry,
     LatticeGraph,
     QubitOperator,
 )
@@ -22,13 +23,14 @@ from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian
 
 
 def create_lattice() -> LatticeGraph:
-    """Create the open 4x4 square lattice."""
-    return LatticeGraph.square(
+    """Select first- and second-neighbor edges on the open 4x4 square lattice."""
+    geometry = LatticeGeometry.square(
         4,
         4,
         periodic_x=False,
         periodic_y=False,
     )
+    return LatticeGraph.from_geometry(geometry, shells=[1, 2])
 
 
 def create_hamiltonian(graph: LatticeGraph) -> QubitOperator:
@@ -85,7 +87,15 @@ def main() -> None:
     dt = 1.0
     total_time = 100.0
     graph = create_lattice()
-    shells = graph.nearest_neighbor_shells([1, 2])
+    connections = graph.connections
+    shells = {
+        shell: {
+            (connection.site_i, connection.site_j)
+            for connection in connections
+            if connection.bond_class.shell == shell
+        }
+        for shell in graph.selected_shells
+    }
     hamiltonian = create_hamiltonian(graph)
 
     if {shell: len(pairs) for shell, pairs in shells.items()} != {1: 24, 2: 18}:

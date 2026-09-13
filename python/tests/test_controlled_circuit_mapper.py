@@ -10,6 +10,7 @@ import json
 import numpy as np
 import pytest
 import scipy
+from qdk import qsharp
 
 try:
     from qdk._native import Circuit as QdkCircuitType
@@ -242,3 +243,129 @@ class TestPauliSequenceMapper:
 
         with pytest.raises(ValueError, match="length"):
             mapper.run(unitary_rep)
+
+
+def _map_sparse_formula(
+    terms: list[ExponentiatedPauliTerm],
+    packed: bool,
+    repetitions: int,
+    num_qubits: int = 2,
+    targets: list[int] | None = None,
+) -> Circuit:
+    """Map equivalent legacy or packed terms without widening their support."""
+    if packed:
+        offsets, indices, codes = [0], [], []
+        for term in terms:
+            for index, pauli in term.pauli_term.items():
+                if pauli != "I":  # Packed storage represents identity words by empty support.
+                    indices.append(index)
+                    codes.append("IXYZ".index(pauli))
+            offsets.append(len(indices))
+        container = PauliProductFormulaContainer.from_sparse_arrays(
+            np.array(offsets),
+            np.array(indices),
+            np.array(codes),
+            np.array([term.angle for term in terms]),
+            step_reps=repetitions,
+            num_qubits=num_qubits,
+        )
+    else:
+        container = PauliProductFormulaContainer(terms, step_reps=repetitions, num_qubits=num_qubits)
+    mapper = ControlledPauliSequenceMapper()
+    mapper.settings().set("control_indices", [num_qubits])
+    if targets is not None:
+        mapper.settings().set("target_indices", targets)
+    return mapper.run(UnitaryRepresentation(container=container))
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+@pytest.mark.parametrize("packed", [False, True], ids=["legacy", "packed"])
+@pytest.mark.parametrize("repetitions", [1, 3])
+@pytest.mark.parametrize(
+    ("empty", "targets"),
+    [(False, [0, 1]), (True, [0, 1]), (False, [4, 1])],
+    ids=["mixed", "empty", "reordered-noncontiguous"],
+)
+def test_sparse_controlled_matrix(packed: bool, repetitions: int, empty: bool, targets: list[int]) -> None:
+    """Preserve order, sign, identity-relative phases, and spectator qubits exactly."""
+    terms = [
+        ExponentiatedPauliTerm({0: "X"}, -0.31),
+        ExponentiatedPauliTerm({0: "Y"}, 0.27),
+        ExponentiatedPauliTerm({1: "X", 0: "Z"}, -0.19),
+        ExponentiatedPauliTerm({}, 0.11),
+        ExponentiatedPauliTerm({0: "I", 1: "I"}, -0.23),
+    ]
+    if empty:
+        terms = []
+    circuit = _map_sparse_formula(terms, packed, repetitions, targets=targets)
+    width = max(2, *targets) + 1
+    assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == width
+    paulis = {
+        "I": np.eye(2, dtype=complex),
+        "X": np.array([[0, 1], [1, 0]], dtype=complex),
+        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+        "Z": np.diag([1, -1]),
+    }
+    step = np.eye(2**width, dtype=complex)
+    for term in terms:
+        factors = {targets[index]: paulis[pauli] for index, pauli in term.pauli_term.items()}
+        factors[2] = np.diag([0, 1])  # exp(-i angle |1><1|_control tensor P).
+        generator = np.ones((1, 1), dtype=complex)
+        for qubit in reversed(range(width)):
+            generator = np.kron(generator, factors.get(qubit, paulis["I"]))
+        step = scipy.linalg.expm(-1j * term.angle * generator) @ step
+    expected = np.linalg.matrix_power(step, repetitions)
+    actual = Operator(circuit.get_qiskit_circuit()).data
+    # QIR elides circuit-global phase. Fix it using the control-off amplitude;
+    # the observable phase between control branches must still match exactly.
+    actual /= actual[0, 0]
+    np.testing.assert_allclose(
+        actual,
+        expected,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
+    )
+
+
+@pytest.mark.parametrize("packed", [False, True], ids=["legacy", "packed"])
+def test_wide_controlled_transport_stays_sparse(packed: bool) -> None:
+    """Transport support-sized lists and scalar repetitions, never expanded evolution."""
+    num_qubits = 40_000
+    terms = [
+        ExponentiatedPauliTerm({num_qubits - 1: "Y", 0: "X"}, -0.31),
+        ExponentiatedPauliTerm({num_qubits // 2: "Z"}, 0.27),
+        ExponentiatedPauliTerm({}, -0.19),
+    ]
+    circuit = _map_sparse_formula(terms, packed, 1_000_000, num_qubits)
+    assert circuit._qsharp_factory is not None
+    payload = circuit._qsharp_factory.parameter
+    assert payload == {
+        "termOffsets": [0, 2, 3, 3],
+        "qubitIndices": [39_999, 0, 20_000],
+        "paulis": [qsharp.Pauli.Y, qsharp.Pauli.X, qsharp.Pauli.Z],
+        "pauliCoefficients": [-0.31, 0.27, -0.19],
+        "repetitions": 1_000_000,
+        "control": num_qubits,
+        "systems": list(range(num_qubits)),
+    }
+    assert isinstance(payload["repetitions"], int)
+
+
+def test_packed_controlled_transport_preserves_duplicate_dict_semantics() -> None:
+    """Repeated packed indices keep the last Pauli, as the lazy term dictionary does."""
+    container = PauliProductFormulaContainer.from_sparse_arrays(
+        np.array([0, 3]),
+        np.array([1, 0, 1]),
+        np.array([1, 3, 2]),
+        np.array([-0.2]),
+        step_reps=1,
+        num_qubits=2,
+    )
+    mapper = ControlledPauliSequenceMapper()
+    mapper.settings().set("control_indices", [2])
+    circuit = mapper.run(UnitaryRepresentation(container=container))
+    assert circuit._qsharp_factory is not None
+    payload = circuit._qsharp_factory.parameter
+    assert payload["termOffsets"] == [0, 2]
+    assert payload["qubitIndices"] == [1, 0]
+    assert payload["paulis"] == [qsharp.Pauli.Y, qsharp.Pauli.Z]

@@ -14,20 +14,27 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     DrivenQubitHamiltonian,
+    LatticeGeometry,
     LatticeGraph,
     QubitOperator,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.model_hamiltonians import create_kitaev_hamiltonian
+from qdk_chemistry.utils.model_hamiltonians import (
+    create_kitaev_hamiltonian,
+    kitaev_honeycomb_bond_flavors,
+)
 
 
 def create_lattice() -> LatticeGraph:
-    """Create the open 4x4 complete-plaquette patch in the default orientation."""
-    return LatticeGraph.honeycomb_plaquettes(
+    """Select shells 1, 2, and 3 on the open 4x4 complete-plaquette patch."""
+    geometry = LatticeGeometry.honeycomb_plaquettes(
         4,
         4,
         periodic_x=False,
         periodic_y=False,
+    )
+    return LatticeGraph.from_geometry(
+        geometry, shells=[1, 2, 3], bond_flavors=kitaev_honeycomb_bond_flavors()
     )
 
 

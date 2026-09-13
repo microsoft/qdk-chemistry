@@ -14,8 +14,11 @@ exits nonzero after reporting failures.
 
 The first pending case runs alone to initialize QRE's shared factory cache
 before concurrent readers start. Remaining cases run with --workers processes
-(default 2). Allow roughly 9 GiB per worker for the largest lattices. BLAS,
-OpenMP, and Rayon threads are limited to one per child to avoid oversubscription.
+(default 2). Allow roughly 9 GiB per worker for the largest lattices. On Linux,
+each worker is pinned to a distinct CPU from the driver's allowed affinity set;
+its children inherit that restriction before importing any numerical libraries.
+Worker count is capped at the number of allowed CPUs. Numerical-library thread
+limits are also set to one, but auxiliary OS threads may still exist.
 Use --sizes and --fields for a subset, or --dry-run to inspect the plan.
 """
 
@@ -35,6 +38,7 @@ from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import product
 from pathlib import Path
+from queue import Queue
 from tempfile import NamedTemporaryFile
 from time import perf_counter
 
@@ -45,22 +49,46 @@ _BENCHMARKS = Path(__file__).resolve().parent
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse execution/output options without exposing model or QRE settings."""
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--workers", type=int, default=2, help="Concurrent processes; allow about 9 GiB RAM each.")
-    parser.add_argument(
-        "--sizes", type=int, nargs="+", choices=LATTICE_SIZES, default=list(LATTICE_SIZES), help="Lattice sizes to run."
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "--fields", type=int, nargs="+", choices=FIELDS_TESLA, default=list(FIELDS_TESLA), help="H_b values in tesla."
+        "--workers",
+        type=int,
+        default=2,
+        help="Maximum concurrent processes, capped by allowed CPUs; about 9 GiB RAM each.",
     )
     parser.add_argument(
-        "--output-dir", type=Path, default=_BENCHMARKS / "results" / "kitaev", help="Directory for CSV tables and logs."
+        "--sizes",
+        type=int,
+        nargs="+",
+        choices=LATTICE_SIZES,
+        default=list(LATTICE_SIZES),
+        help="Lattice sizes to run.",
     )
     parser.add_argument(
-        "--overwrite", action="store_true", help="Rerun completed cases and replace their CSVs on success."
+        "--fields",
+        type=int,
+        nargs="+",
+        choices=FIELDS_TESLA,
+        default=list(FIELDS_TESLA),
+        help="H_b values in tesla.",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", help="Report the planned sweep without running cases or writing files."
+        "--output-dir",
+        type=Path,
+        default=_BENCHMARKS / "results" / "kitaev",
+        help="Directory for CSV tables and logs.",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Rerun completed cases and replace their CSVs on success.",
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Report the planned sweep without running cases or writing files.",
     )
     args = parser.parse_args(argv)
     if args.workers < 1:
@@ -71,10 +99,22 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     return args
 
 
+def _pin_worker(cpus: Queue[int]) -> None:
+    """Pin this supervising thread so every subprocess it starts inherits one CPU."""
+    # Linux affinity is per thread. Avoid preexec_fn: it is unsafe when spawning
+    # from a thread pool, and setting affinity after Popen would race imports.
+    os.sched_setaffinity(0, {cpus.get_nowait()})
+
+
 def _run_case(n: int, field_b: int, output_csv: Path, env: dict[str, str]) -> float:
     """Run one fresh interpreter and publish its table only after success."""
     start = perf_counter()
-    with NamedTemporaryFile(dir=output_csv.parent, prefix=f".{output_csv.stem}.", suffix=".tmp", delete=False) as temp:
+    with NamedTemporaryFile(
+        dir=output_csv.parent,
+        prefix=f".{output_csv.stem}.",
+        suffix=".tmp",
+        delete=False,
+    ) as temp:
         partial_csv = Path(temp.name)
     command = [
         sys.executable,
@@ -103,9 +143,23 @@ def _run_case(n: int, field_b: int, output_csv: Path, env: dict[str, str]) -> fl
     try:
         with output_csv.with_suffix(".log").open("w", encoding="utf-8") as log:
             print(f"Command: {shlex.join(command)}", file=log, flush=True)
-            subprocess.run(command, cwd=_BENCHMARKS, env=env, stdout=log, stderr=subprocess.STDOUT, check=True)
+            print(
+                f"CPU affinity inherited by child: {sorted(os.sched_getaffinity(0))}",
+                file=log,
+                flush=True,
+            )
+            subprocess.run(
+                command,
+                cwd=_BENCHMARKS,
+                env=env,
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                check=True,
+            )
         if partial_csv.stat().st_size == 0:
-            raise RuntimeError("The benchmark exited successfully without writing a CSV table.")
+            raise RuntimeError(
+                "The benchmark exited successfully without writing a CSV table."
+            )
         partial_csv.replace(output_csv)
     finally:
         partial_csv.unlink(missing_ok=True)
@@ -119,38 +173,74 @@ def main(argv: Sequence[str] | None = None) -> None:
         (n, field_b, args.output_dir / f"kitaev_{n}x{n}_Hb_{field_b:02d}T.csv")
         for n, field_b in product(args.sizes, args.fields)
     ]
-    pending = [case for case in cases if args.overwrite or not case[2].is_file() or case[2].stat().st_size == 0]
-    print(f"Cases: {len(cases)}; pending: {len(pending)}; skipped: {len(cases) - len(pending)}", flush=True)
+    pending = [
+        case
+        for case in cases
+        if args.overwrite or not case[2].is_file() or case[2].stat().st_size == 0
+    ]
+    if not hasattr(os, "sched_getaffinity") or not hasattr(os, "sched_setaffinity"):
+        raise RuntimeError(
+            "The sweep requires Linux CPU-affinity support to prevent worker oversubscription."
+        )
+    original_affinity = os.sched_getaffinity(0)
+    available_cpus = sorted(original_affinity)
+    workers = min(args.workers, len(available_cpus))
+    print(
+        f"Cases: {len(cases)}; pending: {len(pending)}; skipped: {len(cases) - len(pending)}",
+        flush=True,
+    )
     print(f"Lattice sizes: {args.sizes}; H_b (T): {args.fields}")
-    print(f"Workers: {args.workers}; output: {args.output_dir}", flush=True)
+    print(
+        f"Workers: {workers} (requested {args.workers}); output: {args.output_dir}",
+        flush=True,
+    )
     if args.dry_run or not pending:
         return
     args.output_dir.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     for variable in (
         "OMP_NUM_THREADS",
+        "OMP_THREAD_LIMIT",
         "OPENBLAS_NUM_THREADS",
+        "GOTO_NUM_THREADS",
+        "BLIS_NUM_THREADS",
         "MKL_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
         "NUMEXPR_NUM_THREADS",
+        "NUMEXPR_MAX_THREADS",
         "RAYON_NUM_THREADS",
     ):
         env[variable] = "1"
+    # Per-domain MKL settings take precedence over MKL_NUM_THREADS.
+    env.pop("MKL_DOMAIN_NUM_THREADS", None)
 
     # The factory cache writes are not synchronized by QRE. Finish one writer
     # before starting concurrent cases that share the same fixed architecture.
     first_n, first_field, first_csv = pending[0]
     print(f"Initializing the factory cache with {first_csv.stem}", flush=True)
     try:
+        os.sched_setaffinity(0, {available_cpus[0]})
         elapsed = _run_case(first_n, first_field, first_csv, env)
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"FAILED {first_csv.stem}: {error}; log: {first_csv.with_suffix('.log')}", file=sys.stderr, flush=True)
+        print(
+            f"FAILED {first_csv.stem}: {error}; log: {first_csv.with_suffix('.log')}",
+            file=sys.stderr,
+            flush=True,
+        )
         raise SystemExit(1) from error
+    finally:
+        os.sched_setaffinity(0, original_affinity)
     print(f"[1/{len(pending)}] saved {first_csv.name} ({elapsed:.1f} s)", flush=True)
 
     failures = 0
     # Threads only supervise subprocesses: Q#/QRE state and memory never cross
     # case boundaries, and memory is released when each interpreter exits.
-    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+    worker_cpus: Queue[int] = Queue()
+    for cpu in available_cpus[:workers]:
+        worker_cpus.put(cpu)
+    with ThreadPoolExecutor(
+        max_workers=workers, initializer=_pin_worker, initargs=(worker_cpus,)
+    ) as executor:
         futures = {
             executor.submit(_run_case, n, field_b, output_csv, env): output_csv
             for n, field_b, output_csv in pending[1:]
@@ -169,7 +259,10 @@ def main(argv: Sequence[str] | None = None) -> None:
                         flush=True,
                     )
                 else:
-                    print(f"[{completed}/{len(pending)}] saved {output_csv.name} ({elapsed:.1f} s)", flush=True)
+                    print(
+                        f"[{completed}/{len(pending)}] saved {output_csv.name} ({elapsed:.1f} s)",
+                        flush=True,
+                    )
         except KeyboardInterrupt:
             for future in futures:
                 future.cancel()

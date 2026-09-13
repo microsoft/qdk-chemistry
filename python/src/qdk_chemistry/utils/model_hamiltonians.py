@@ -6,14 +6,13 @@
 # --------------------------------------------------------------------------------------------
 
 from array import array
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from enum import IntEnum
 from numbers import Integral
 
 import numpy as np
 import scipy.sparse
 
-from qdk_chemistry._core.data import greedy_edge_coloring
 from qdk_chemistry._core.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
@@ -28,6 +27,7 @@ from qdk_chemistry.data import (
     BondFlavorDefinition,
     LatticeGraph,
     LayeredPartition,
+    NeighborConnection,
     QubitOperator,
 )
 from qdk_chemistry.utils import Logger
@@ -71,129 +71,52 @@ def kitaev_honeycomb_bond_flavors() -> list[BondFlavorDefinition]:
     ]
 
 
-def _build_geometry_grouped_hamiltonian(
+def _pair_parameter(value: np.ndarray | float, graph: LatticeGraph, name: str) -> np.ndarray | float:
+    """Validate supplied matrices without expanding scalar couplings."""
+    if isinstance(value, int | float | np.integer | np.floating):
+        return float(value)
+    return to_pair_param(value, graph, name)
+
+
+def _selected_connections(
     graph: LatticeGraph,
+    shells: set[int],
     *,
-    couplings: list[tuple[str, np.ndarray | float]],
-    fields: list[tuple[str, np.ndarray | float]],
-    coloring: dict[tuple[int, int], int] | None = None,
-    apply_edge_weights: bool = True,
-    color_active_edges: bool = False,
-) -> QubitOperator:
-    r"""Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.
-
-    This helper exists separately from the ungrouped construction path
-    because it builds the Pauli-string list in a specific order dictated
-    by the lattice edge coloring, then records that order as a
-    :class:`~qdk_chemistry.data.LayeredPartition`.  The ungrouped path
-    constructs terms from the adjacency matrix directly without regard
-    to color structure.
-
-    Groups are organised first by single-body field direction (one group
-    per direction, each containing a single layer because field terms
-    have disjoint support), then by two-body coupling type (one group
-    per commuting two-body block, each split into layers by edge color).
-    Mixed-axis interactions are kept as one group per disjoint layer because
-    overlapping terms with the same ordered label need not commute. Term indices in
-    :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` align with the
-    indices stored in the returned :class:`LayeredPartition`.
-
-    Args:
-        graph: Lattice graph defining connectivity.
-        couplings: ``[(label, value), ...]`` for two-body terms (e.g. ``[(\"XX\", jx)]``).
-        fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\"X\", hx)]``).
-        coloring: Optional edge coloring ``{(i, j): color}`` (``i < j``). Reads ``graph.edge_coloring`` when ``None``.
-        apply_edge_weights: Multiply coupling matrices by adjacency weights when ``True``. Defaults to ``True``.
-        color_active_edges: Color each coupling matrix's nonzero support separately. Defaults to ``False``.
-
-    Returns:
-        QubitOperator: The assembled Hamiltonian carrying a ``LayeredPartition``
-        with ``strategy=\"geometry_coloring\"``.
-
-    """
-    n = graph.num_sites
-
-    if coloring is None and not color_active_edges:
-        coloring = graph.edge_coloring
-    if coloring is None and not color_active_edges:
+    required_shells: set[int] | None = None,
+) -> list[NeighborConnection]:
+    """Validate active shell requests without discovering or adding graph edges."""
+    if not shells:
+        return []
+    selected_shells = set(graph.selected_shells)
+    if not selected_shells and (graph.geometry is None or graph.num_nonzeros != 0):
+        raise ValueError("Shell interactions require lattice geometry or explicit neighbor-shell metadata.")
+    missing_shells = (shells if required_shells is None else required_shells) - selected_shells
+    if missing_shells:
         raise ValueError(
-            "No edge coloring available on the lattice graph. "
-            "Use a factory method that provides one, or pass an explicit coloring."
+            f"Requested neighbor shells {sorted(missing_shells)} are not selected in the lattice graph. "
+            "Select them explicitly with LatticeGraph.from_geometry before constructing the Hamiltonian."
         )
-
-    pauli_strings: list[str] = []
-    coefficients: list[complex] = []
-    groups_layers: list[tuple[tuple[int, ...], ...]] = []
-
-    # Field groups: one group per direction, single layer each.
-    for pauli_char, field in fields:
-        field_vec = to_site_param(field, graph, "field")
-        layer_indices: list[int] = []
-        for i in range(n):
-            if field_vec[i] == 0.0:
-                continue
-            ps = ["I"] * n
-            ps[i] = pauli_char
-            pauli_strings.append("".join(ps[::-1]))
-            coefficients.append(complex(field_vec[i]))
-            layer_indices.append(len(pauli_strings) - 1)
-        if layer_indices:
-            groups_layers.append((tuple(layer_indices),))
-
-    # Coupling groups: commuting equal-axis blocks retain all color layers;
-    # mixed-axis blocks use one group per layer to preserve commutativity.
-    for pauli_label, coupling in couplings:
-        coupling_mat = to_pair_param(coupling, graph, "coupling")
-        if color_active_edges:
-            support_graph = scipy.sparse.csr_matrix(coupling_mat != 0.0)
-            support_graph += support_graph.T
-            coupling_coloring = greedy_edge_coloring(support_graph, seed=0, trials=32)
-        else:
-            assert coloring is not None
-            coupling_coloring = coloring
-
-        color_to_indices: dict[int, list[int]] = {}
-        for (site_i, site_j), color in sorted(coupling_coloring.items(), key=lambda item: (item[1], item[0])):
-            edge_weight = graph.weight(site_i, site_j) if apply_edge_weights else 1.0
-            coefficient = complex(coupling_mat[site_i, site_j] * edge_weight)
-            if coefficient == 0.0:
-                continue
-            ps = ["I"] * n
-            ps[site_i] = pauli_label[0]
-            ps[site_j] = pauli_label[1]
-            pauli_strings.append("".join(ps[::-1]))
-            coefficients.append(coefficient)
-            color_to_indices.setdefault(color, []).append(len(pauli_strings) - 1)
-        if color_to_indices:
-            layers = tuple(tuple(color_to_indices[c]) for c in sorted(color_to_indices))
-            if pauli_label[0] == pauli_label[1]:
-                groups_layers.append(layers)
-            else:
-                groups_layers.extend((layer,) for layer in layers)
-
-    if not pauli_strings:
-        # Empty Hamiltonian: emit a single all-identity term with zero coefficient
-        # so the resulting QubitOperator remains constructible.
-        pauli_strings = ["I" * n]
-        coefficients = [0.0 + 0.0j]
-        groups_layers = [((0,),)]
-
-    partition = LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers))
-    return QubitOperator(
-        pauli_strings=pauli_strings,
-        coefficients=np.array(coefficients),
-        term_partition=partition,
-    )
+    return [connection for connection in graph.connections if connection.bond_class.shell in shells]
 
 
-def _build_sparse_grouped_hamiltonian(
+def _build_sparse_hamiltonian(
     graph: LatticeGraph,
     *,
     couplings: list[tuple[str, dict[tuple[int, int], float]]],
     fields: list[tuple[str, np.ndarray | float]],
+    grouped: bool,
+    coloring: dict[tuple[int, int], int] | None = None,
+    pair_first: bool = True,
 ) -> QubitOperator:
-    """Assemble grouped local terms without dense matrices or Pauli labels."""
+    """Pack local terms, preserving the model's grouped or ungrouped ordering.
+
+    With no supplied coloring, color each family's coalesced nonzero support.
+    Ungrouped mapped Heisenberg terms retain family and shell insertion order;
+    other ungrouped models use lexicographic pairs before coupling families.
+
+    """
     n = graph.num_sites
+    field_values = [(pauli, to_site_param(field, graph, "field")) for pauli, field in fields]
     offsets = array("Q", [0])
     qubits = array("I")
     paulis = array("B")
@@ -210,40 +133,57 @@ def _build_sparse_grouped_hamiltonian(
         coefficients.append(coefficient)
         return len(coefficients) - 1
 
-    for pauli, field in fields:
-        values = to_site_param(field, graph, "field")
-        layer = tuple(append_term(((site, pauli),), float(value)) for site, value in enumerate(values) if value != 0.0)
-        if layer:
-            groups_layers.append((layer,))
-
-    for label, coupling in couplings:
-        if not coupling:
-            continue
-        edges = tuple(sorted(coupling))
-        coloring = coloring_cache.get(edges)
-        if coloring is None:
-            rows = np.fromiter((edge[0] for edge in edges), dtype=np.int64)
-            cols = np.fromiter((edge[1] for edge in edges), dtype=np.int64)
-            support = scipy.sparse.csr_matrix((np.ones(len(edges)), (rows, cols)), shape=(n, n))
-            support += support.T
-            coloring = greedy_edge_coloring(support, seed=0, trials=32)
-            coloring_cache[edges] = coloring
-        color_to_indices: dict[int, list[int]] = {}
-        for edge, color in sorted(coloring.items(), key=lambda item: (item[1], item[0])):
-            color_to_indices.setdefault(color, []).append(
-                append_term(((edge[0], label[0]), (edge[1], label[1])), coupling[edge])
+    if grouped:
+        for pauli, values in field_values:
+            layer = tuple(
+                append_term(((site, pauli),), float(value)) for site, value in enumerate(values) if value != 0.0
             )
-        layers = tuple(tuple(color_to_indices[color]) for color in sorted(color_to_indices))
-        if label[0] == label[1]:
-            groups_layers.append(layers)
+            if layer:
+                groups_layers.append((layer,))
+
+        for label, coeff_by_pair in couplings:
+            support = tuple(sorted(pair for pair, value in coeff_by_pair.items() if value != 0.0))
+            if not support:
+                continue
+            coupling_coloring = coloring
+            if coupling_coloring is None:
+                coupling_coloring = coloring_cache.get(support)
+                if coupling_coloring is None:
+                    coupling_coloring = graph.color_edges(list(support), seed=0, trials=32)
+                    coloring_cache[support] = coupling_coloring
+            color_to_indices: dict[int, list[int]] = {}
+            for pair, color in sorted(coupling_coloring.items(), key=lambda item: (item[1], item[0])):
+                coefficient = coeff_by_pair.get(pair, 0.0)
+                if coefficient != 0.0:
+                    color_to_indices.setdefault(color, []).append(
+                        append_term(((pair[0], label[0]), (pair[1], label[1])), coefficient)
+                    )
+            if color_to_indices:
+                layers = tuple(tuple(color_to_indices[color]) for color in sorted(color_to_indices))
+                # Equal-axis terms commute across layers; mixed-axis terms need disjoint groups.
+                if label[0] == label[1]:
+                    groups_layers.append(layers)
+                else:
+                    groups_layers.extend((layer,) for layer in layers)
+    else:
+        if pair_first:
+            pairs = sorted({pair for _, coupling in couplings for pair, value in coupling.items() if value != 0.0})
+            terms = ((label, pair, coupling.get(pair, 0.0)) for pair in pairs for label, coupling in couplings)
         else:
-            groups_layers.extend((layer,) for layer in layers)
+            terms = ((label, pair, value) for label, coupling in couplings for pair, value in coupling.items())
+        for label, pair, coefficient in terms:
+            if coefficient != 0.0:
+                append_term(((pair[0], label[0]), (pair[1], label[1])), coefficient)
+        for site in range(n):
+            for pauli, values in field_values:
+                if values[site] != 0.0:
+                    append_term(((site, pauli),), float(values[site]))
 
     if not coefficients:
         append_term((), 0.0)
         groups_layers = [((0,),)]
-    partition = LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers))
-    return QubitOperator.from_sparse_arrays(
+    partition = LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers)) if grouped else None
+    operator = QubitOperator.from_sparse_arrays(
         n,
         np.frombuffer(offsets, dtype=np.uint64).copy(),
         np.frombuffer(qubits, dtype=np.uint32).copy(),
@@ -251,6 +191,15 @@ def _build_sparse_grouped_hamiltonian(
         np.asarray(coefficients, dtype=complex),
         term_partition=partition,
     )
+    # Content hashes distinguish eager and packed storage. Preserve the legacy
+    # output boundary without duplicating accumulation or allocating pair matrices.
+    if not grouped or coloring is not None:
+        return QubitOperator(
+            list(operator.pauli_strings),
+            operator.coefficients,
+            term_partition=partition,
+        )
+    return operator
 
 
 def create_heisenberg_hamiltonian(
@@ -281,8 +230,11 @@ def create_heisenberg_hamiltonian(
 
     For scalar and array couplings, :math:`K_a^{ij}=w_{ij}J_a^{ij}` on
     adjacency edges. A mapping from one-based geometric shell indices to
-    couplings instead defines :math:`K_a^{ij}` on those shells independently
-    of adjacency weights.
+    couplings instead defines :math:`K_a^{ij}` on already-selected graph edges
+    independently of adjacency weights. Select nonzero requested shells with
+    :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` before constructing
+    the Hamiltonian; mappings never discover or add edges. Periodic shell mappings
+    remain unsupported. Empty or all-zero mappings require no geometry.
 
     Each qubit corresponds to a lattice site.
 
@@ -299,136 +251,82 @@ def create_heisenberg_hamiltonian(
     Returns:
         QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
 
+    Raises:
+        ValueError: If the graph is asymmetric, shell metadata is absent, or an active mapped shell is unselected.
+        RuntimeError: If active shell mappings are used with periodic geometry.
+
     """
     if not graph.is_symmetric:
         raise ValueError("Lattice graph must be symmetric for a valid Hamiltonian.")
 
     shell_couplings = any(isinstance(coupling, Mapping) for coupling in (jx, jy, jz))
-    if include_term_groups and not shell_couplings:
-        if graph.edge_coloring is not None:
-            return _build_geometry_grouped_hamiltonian(
-                graph,
-                couplings=[("XX", jx), ("YY", jy), ("ZZ", jz)],
-                fields=[("X", hx), ("Y", hy), ("Z", hz)],
-            )
-        Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
-
-    n = graph.num_sites
-    hx_vec = to_site_param(hx, graph, "hx")
-    hy_vec = to_site_param(hy, graph, "hy")
-    hz_vec = to_site_param(hz, graph, "hz")
-    pauli_strings: list[str] = []
-    coefficients: list[complex] = []
-
-    def pair_parameter(value: np.ndarray | float, name: str) -> np.ndarray | float:
-        if isinstance(value, int | float | np.integer | np.floating):
-            return float(value)
-        return to_pair_param(value, graph, name)
-
-    def append_pair_terms(
-        pauli_char: str,
-        pairs: Iterable[tuple[int, int]],
-        values: np.ndarray | float,
-        weights: np.ndarray | None = None,
-    ) -> None:
-        for i, j in pairs:
-            coefficient = values if isinstance(values, float) else values[i, j]
-            if weights is not None:
-                coefficient *= weights[i, j]
-            if coefficient == 0.0:
-                continue
-            pauli = ["I"] * n
-            pauli[i] = pauli[j] = pauli_char
-            pauli_strings.append("".join(pauli[::-1]))
-            coefficients.append(complex(coefficient))
-
-    coupling_specs = [("X", "jx", jx), ("Y", "jy", jy), ("Z", "jz", jz)]
-    if not shell_couplings:
-        adjacency = graph.adjacency_matrix()
-        coupling_matrices = [to_pair_param(coupling, graph, name) for _, name, coupling in coupling_specs]
-        for i in range(n):
-            for j in range(i + 1, n):
-                edge_weight = adjacency[i, j]
-                if edge_weight == 0.0:
-                    continue
-                for (pauli_char, _, _), coupling_matrix in zip(coupling_specs, coupling_matrices, strict=True):
-                    coefficient = coupling_matrix[i, j] * edge_weight
-                    if coefficient == 0.0:
-                        continue
-                    pauli = ["I"] * n
-                    pauli[i] = pauli[j] = pauli_char
-                    pauli_strings.append("".join(pauli[::-1]))
-                    coefficients.append(complex(coefficient))
-    else:
-        normalized_shell_couplings: dict[str, list[tuple[int, np.ndarray | float]]] = {}
-        requested_shells: set[int] = set()
-        for _, name, coupling in coupling_specs:
-            if not isinstance(coupling, Mapping):
-                continue
-
-            normalized_mapping: list[tuple[int, np.ndarray | float]] = []
+    coupling_specs = [("XX", "jx", jx), ("YY", "jy", jy), ("ZZ", "jz", jz)]
+    normalized_shell_couplings: dict[str, dict[int, np.ndarray | float]] = {}
+    adjacency_couplings: dict[str, np.ndarray | float] = {}
+    requested_shells: set[int] = set()
+    for _, name, coupling in coupling_specs:
+        if isinstance(coupling, Mapping):
+            normalized: dict[int, np.ndarray | float] = {}
             for shell, shell_coupling in coupling.items():
                 if isinstance(shell, bool) or not isinstance(shell, Integral) or shell < 1:
                     raise ValueError(f"{name} shell indices must be positive integers; got {shell!r}.")
                 shell_index = int(shell)
-                normalized_mapping.append((shell_index, shell_coupling))
-                requested_shells.add(shell_index)
-            normalized_mapping.sort(key=lambda item: item[0])
-            normalized_shell_couplings[name] = normalized_mapping
+                normalized[shell_index] = _pair_parameter(shell_coupling, graph, f"{name}[{shell_index}]")
+                if np.any(normalized[shell_index] != 0.0):
+                    requested_shells.add(shell_index)
+            normalized_shell_couplings[name] = normalized
+        else:
+            adjacency_couplings[name] = _pair_parameter(coupling, graph, name)
 
-        shell_pairs = graph.nearest_neighbor_shells(sorted(requested_shells)) if requested_shells else {}
+    connections = _selected_connections(graph, requested_shells)
+    geometry = graph.geometry
+    if requested_shells and (
+        (geometry is not None and geometry.periods is not None)
+        or any(any(connection.image_shift) for connection in connections)
+    ):
+        raise RuntimeError("Heisenberg shell mappings support open lattices only.")
+    shell_pairs: dict[int, set[tuple[int, int]]] = {}
+    for connection in connections:
+        if connection.site_i == connection.site_j:
+            raise ValueError("Heisenberg interactions cannot connect a site to its own periodic image.")
+        shell_pairs.setdefault(connection.bond_class.shell, set()).add((connection.site_i, connection.site_j))
 
-        if include_term_groups:
-            grouped_couplings: list[tuple[str, dict[tuple[int, int], float]]] = []
-            adjacency = scipy.sparse.triu(graph.sparse_adjacency_matrix(), k=1).tocoo()
-            adjacency_edges = list(zip(adjacency.row, adjacency.col, adjacency.data, strict=True))
-            for pauli_char, name, coupling in coupling_specs:
-                records: dict[tuple[int, int], float] = {}
-                if name in normalized_shell_couplings:
-                    for shell_index, shell_coupling in normalized_shell_couplings[name]:
-                        values = pair_parameter(shell_coupling, f"{name}[{shell_index}]")
-                        for site_i, site_j in shell_pairs[shell_index]:
-                            value = values if isinstance(values, float) else values[site_i, site_j]
-                            if value != 0.0:
-                                records[site_i, site_j] = float(value)
-                else:
-                    values = pair_parameter(coupling, name)
-                    for site_i, site_j, weight in adjacency_edges:
-                        value = values if isinstance(values, float) else values[site_i, site_j]
-                        coefficient = float(value * weight)
-                        if coefficient != 0.0:
-                            records[int(site_i), int(site_j)] = coefficient
-                grouped_couplings.append((pauli_char * 2, records))
-            return _build_sparse_grouped_hamiltonian(
-                graph,
-                couplings=grouped_couplings,
-                fields=[("X", hx), ("Y", hy), ("Z", hz)],
-            )
+    adjacency_edges = []
+    if adjacency_couplings:
+        adjacency = scipy.sparse.triu(graph.sparse_adjacency_matrix(), k=1).tocoo()
+        adjacency_edges = sorted(zip(adjacency.row, adjacency.col, adjacency.data, strict=True))
+    couplings: list[tuple[str, dict[tuple[int, int], float]]] = []
+    for label, name, _ in coupling_specs:
+        records: dict[tuple[int, int], float] = {}
+        if name in normalized_shell_couplings:
+            for shell_index, values in sorted(normalized_shell_couplings[name].items()):
+                for site_i, site_j in sorted(shell_pairs.get(shell_index, ())):
+                    value = values if isinstance(values, float) else values[site_i, site_j]
+                    if value != 0.0:
+                        records[site_i, site_j] = float(value)
+        else:
+            values = adjacency_couplings[name]
+            for site_i, site_j, weight in adjacency_edges:
+                if weight == 0.0:
+                    continue
+                value = values if isinstance(values, float) else values[site_i, site_j]
+                coefficient = float(value * weight)
+                if coefficient != 0.0:
+                    records[int(site_i), int(site_j)] = coefficient
+        couplings.append((label, records))
 
-        adjacency = graph.adjacency_matrix() if len(normalized_shell_couplings) != len(coupling_specs) else None
-        for pauli_char, name, coupling in coupling_specs:
-            if name in normalized_shell_couplings:
-                for shell_index, shell_coupling in normalized_shell_couplings[name]:
-                    values = pair_parameter(shell_coupling, f"{name}[{shell_index}]")
-                    append_pair_terms(pauli_char, shell_pairs[shell_index], values)
-            else:
-                assert adjacency is not None
-                pairs = ((i, j) for i in range(n) for j in range(i + 1, n) if adjacency[i, j] != 0.0)
-                append_pair_terms(pauli_char, pairs, pair_parameter(coupling, name), adjacency)
-
-    for i in range(n):
-        for pauli_char, field in [("X", hx_vec), ("Y", hy_vec), ("Z", hz_vec)]:
-            if field[i] == 0.0:
-                continue
-            pauli = ["I"] * n
-            pauli[i] = pauli_char
-            pauli_strings.append("".join(pauli[::-1]))
-            coefficients.append(complex(field[i]))
-
-    if not pauli_strings:
-        pauli_strings = ["I" * n]
-        coefficients = [0.0 + 0.0j]
-    return QubitOperator(pauli_strings, np.array(coefficients))
+    coloring = None if shell_couplings else graph.edge_coloring
+    grouped = include_term_groups and (shell_couplings or coloring is not None)
+    if include_term_groups and not grouped:
+        Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
+    return _build_sparse_hamiltonian(
+        graph,
+        couplings=couplings,
+        fields=[("X", hx), ("Y", hy), ("Z", hz)],
+        grouped=grouped,
+        coloring=coloring,
+        pair_first=not shell_couplings,
+    )
 
 
 def create_kitaev_hamiltonian(
@@ -465,8 +363,11 @@ def create_kitaev_hamiltonian(
         + \Gamma'_\gamma(S_i^\alpha S_j^\gamma + S_i^\gamma S_j^\alpha
         + S_i^\beta S_j^\gamma + S_i^\gamma S_j^\beta).
 
-    Scalars and arrays retain the nearest-neighbor behavior and adjacency weighting. A mapping ``{m: coupling}``
-    applies ``kx``, ``ky``, ``kz``, or ``j`` to geometric shell ``m`` independently of adjacency weights.
+    Scalars and arrays use selected first-neighbor connections and their weights. A mapping ``{m: coupling}``
+    applies ``kx``, ``ky``, ``kz``, or ``j`` to already-selected shell ``m`` edges independently of their weights.
+    Select active mapped shells with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` first; the model never
+    discovers or adds edges. Entirely unflavored active connections use :func:`kitaev_honeycomb_bond_flavors`;
+    partial or invalid explicit flavor labels are rejected rather than replaced.
     ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts apply to first-neighbor bonds; omitted
     flavor-specific values fall back to ``gamma`` or ``gamma_prime``. Distinct periodic-image connections are
     accumulated when they collapse onto the same finite-lattice site pair.
@@ -485,7 +386,7 @@ def create_kitaev_hamiltonian(
     :math:`S_i^\mu=\sigma_i^\mu/2`.
 
     Args:
-        graph: Lattice graph with complete X, Y, and Z flavor metadata for every requested geometric connection.
+        graph: Selected interaction graph with X/Y/Z flavors, or unflavored connections matching the honeycomb defaults.
         kx: Kitaev coupling on X-flavor bonds as a scalar, ``(n, n)`` array, or shell mapping.
         ky: Kitaev coupling on Y-flavor bonds in the same format as ``kx``.
         kz: Kitaev coupling on Z-flavor bonds in the same format as ``kx``.
@@ -509,7 +410,7 @@ def create_kitaev_hamiltonian(
         QubitOperator: The flavored spin model represented in the requested spin basis.
 
     Raises:
-        ValueError: If the graph lacks required flavors, a shell index is invalid, or the basis transform is invalid.
+        ValueError: If shell metadata or flavors are missing, an active shell is unselected, or inputs are invalid.
 
     """
     if not graph.is_symmetric:
@@ -531,15 +432,11 @@ def create_kitaev_hamiltonian(
         np.eye(3) if spin_basis_transform is None else validate_transform(spin_basis_transform, "spin_basis_transform")
     )
 
-    def pair_parameter(value: np.ndarray | float, name: str) -> np.ndarray | float:
-        if isinstance(value, int | float | np.integer | np.floating):
-            return float(value)
-        return to_pair_param(value, graph, name)
-
     parameters = {"j": j, "kx": kx, "ky": ky, "kz": kz}
     mapped_parameters = {name for name, value in parameters.items() if isinstance(value, Mapping)}
     prepared: dict[str, dict[int, np.ndarray | float]] = {}
     requested_shells: set[int] = set()
+    mapped_shells: set[int] = set()
     for name, parameter in parameters.items():
         shell_values = parameter.items() if isinstance(parameter, Mapping) else [(1, parameter)]
         normalized: dict[int, np.ndarray | float] = {}
@@ -547,21 +444,29 @@ def create_kitaev_hamiltonian(
             if isinstance(shell, bool) or not isinstance(shell, Integral) or shell < 1:
                 raise ValueError(f"{name} shell indices must be positive integers; got {shell!r}.")
             shell_index = int(shell)
-            normalized[shell_index] = pair_parameter(value, f"{name}[{shell_index}]")
+            normalized[shell_index] = _pair_parameter(value, graph, f"{name}[{shell_index}]")
             if np.any(normalized[shell_index] != 0.0):
                 requested_shells.add(shell_index)
+                if name in mapped_parameters:
+                    mapped_shells.add(shell_index)
         prepared[name] = normalized
 
-    gamma_parameters = {
-        KitaevBondFlavor.X: pair_parameter(gamma if gamma_x is None else gamma_x, "gamma_x"),
-        KitaevBondFlavor.Y: pair_parameter(gamma if gamma_y is None else gamma_y, "gamma_y"),
-        KitaevBondFlavor.Z: pair_parameter(gamma if gamma_z is None else gamma_z, "gamma_z"),
-    }
-    gamma_prime_parameters = {
-        KitaevBondFlavor.X: pair_parameter(gamma_prime if gamma_prime_x is None else gamma_prime_x, "gamma_prime_x"),
-        KitaevBondFlavor.Y: pair_parameter(gamma_prime if gamma_prime_y is None else gamma_prime_y, "gamma_prime_y"),
-        KitaevBondFlavor.Z: pair_parameter(gamma_prime if gamma_prime_z is None else gamma_prime_z, "gamma_prime_z"),
-    }
+    gamma_parameters: dict[KitaevBondFlavor, np.ndarray | float] = {}
+    gamma_prime_parameters: dict[KitaevBondFlavor, np.ndarray | float] = {}
+    for name, shared, overrides, values in (
+        ("gamma", gamma, (gamma_x, gamma_y, gamma_z), gamma_parameters),
+        (
+            "gamma_prime",
+            gamma_prime,
+            (gamma_prime_x, gamma_prime_y, gamma_prime_z),
+            gamma_prime_parameters,
+        ),
+    ):
+        shared_value = _pair_parameter(shared, graph, name) if any(value is None for value in overrides) else 0.0
+        for flavor, override in zip(KitaevBondFlavor, overrides, strict=True):
+            values[flavor] = (
+                shared_value if override is None else _pair_parameter(override, graph, f"{name}_{flavor.name.lower()}")
+            )
     if any(np.any(value != 0.0) for value in (*gamma_parameters.values(), *gamma_prime_parameters.values())):
         requested_shells.add(1)
 
@@ -585,12 +490,12 @@ def create_kitaev_hamiltonian(
         weighted_field_xyz = crystal_transform.T @ weighted_field_abc
         output_field = bohr_magneton * transform @ weighted_field_xyz / 2.0
 
-    model_graph = (
-        graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
-        if requested_shells and graph.positions is not None and not graph.bond_flavor_definitions
-        else graph
-    )
-    connections = model_graph.neighbor_connections(sorted(requested_shells))
+    connections = _selected_connections(graph, requested_shells, required_shells=mapped_shells)
+    if connections and all(connection.flavor is None for connection in connections):
+        model_graph = graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
+        connections = [
+            connection for connection in model_graph.connections if connection.bond_class.shell in requested_shells
+        ]
     try:
         connection_flavors = [KitaevBondFlavor(connection.flavor) for connection in connections]
     except (TypeError, ValueError) as error:
@@ -600,32 +505,26 @@ def create_kitaev_hamiltonian(
     if any(connection.site_i == connection.site_j for connection in connections):
         raise ValueError("Kitaev interactions cannot connect a site to its own periodic image.")
 
-    shell_one_multiplicity: dict[tuple[int, int], int] = {}
-    for connection in connections:
-        if connection.bond_class.shell == 1:
-            pair = (connection.site_i, connection.site_j)
-            shell_one_multiplicity[pair] = shell_one_multiplicity.get(pair, 0) + 1
-
-    def parameter_value(name: str, connection) -> float:
+    def parameter_value(name: str, connection: NeighborConnection) -> float:
         shell = connection.bond_class.shell
         if shell not in prepared[name]:
             return 0.0
         value = prepared[name][shell]
         result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
         if name not in mapped_parameters:
-            pair = (connection.site_i, connection.site_j)
-            result *= graph.weight(*pair) / shell_one_multiplicity[pair]
+            result *= connection.weight
         return float(result)
 
     def nearest_neighbor_value(
-        values: dict[KitaevBondFlavor, np.ndarray | float], connection, flavor: KitaevBondFlavor
+        values: dict[KitaevBondFlavor, np.ndarray | float],
+        connection: NeighborConnection,
+        flavor: KitaevBondFlavor,
     ) -> float:
         if connection.bond_class.shell != 1:
             return 0.0
         value = values[flavor]
         result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
-        pair = (connection.site_i, connection.site_j)
-        return float(result * graph.weight(*pair) / shell_one_multiplicity[pair])
+        return float(result * connection.weight)
 
     exchange_by_pair: dict[tuple[int, int], np.ndarray] = {}
     for connection, flavor in zip(connections, connection_flavors, strict=True):
@@ -649,68 +548,27 @@ def create_kitaev_hamiltonian(
         exchange_by_pair[pair] += transformed
 
     pauli_components = ("X", "Y", "Z")
-    if include_term_groups and mapped_parameters:
-        sparse_couplings = []
-        for first_index, first in enumerate(pauli_components):
-            for second_index, second in enumerate(pauli_components):
-                records = {
-                    pair: float(exchange[first_index, second_index])
-                    for pair, exchange in exchange_by_pair.items()
-                    if exchange[first_index, second_index] != 0.0
-                }
-                sparse_couplings.append((first + second, records))
-        return _build_sparse_grouped_hamiltonian(
-            graph,
-            couplings=sparse_couplings,
-            fields=list(zip(pauli_components, output_field, strict=True)),
-        )
+    couplings: list[tuple[str, dict[tuple[int, int], float]]] = []
+    for first_index, first in enumerate(pauli_components):
+        for second_index, second in enumerate(pauli_components):
+            records = {
+                pair: float(exchange[first_index, second_index])
+                for pair, exchange in exchange_by_pair.items()
+                if exchange[first_index, second_index] != 0.0
+            }
+            couplings.append((first + second, records))
 
-    coupling_matrices = {
-        first + second: np.zeros((graph.num_sites, graph.num_sites))
-        for first in pauli_components
-        for second in pauli_components
-    }
-    for (site_i, site_j), exchange in exchange_by_pair.items():
-        for first_index, first in enumerate(pauli_components):
-            for second_index, second in enumerate(pauli_components):
-                coupling_matrices[first + second][site_i, site_j] = exchange[first_index, second_index]
-
-    couplings = list(coupling_matrices.items())
-    if include_term_groups:
-        if graph.edge_coloring is not None:
-            return _build_geometry_grouped_hamiltonian(
-                graph,
-                couplings=couplings,
-                fields=list(zip(pauli_components, output_field, strict=True)),
-                apply_edge_weights=False,
-            )
+    coloring = None if mapped_parameters else graph.edge_coloring
+    grouped = include_term_groups and (bool(mapped_parameters) or coloring is not None)
+    if include_term_groups and not grouped:
         Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
-
-    pauli_strings: list[str] = []
-    coefficients: list[complex] = []
-    for (site_i, site_j), exchange in sorted(exchange_by_pair.items()):
-        for first_index, first in enumerate(pauli_components):
-            for second_index, second in enumerate(pauli_components):
-                coefficient = exchange[first_index, second_index]
-                if coefficient == 0.0:
-                    continue
-                pauli = ["I"] * graph.num_sites
-                pauli[site_i] = first
-                pauli[site_j] = second
-                pauli_strings.append("".join(pauli[::-1]))
-                coefficients.append(complex(coefficient))
-    for site in range(graph.num_sites):
-        for component, coefficient in zip(pauli_components, output_field, strict=True):
-            if coefficient == 0.0:
-                continue
-            pauli = ["I"] * graph.num_sites
-            pauli[site] = component
-            pauli_strings.append("".join(pauli[::-1]))
-            coefficients.append(complex(coefficient))
-    if not pauli_strings:
-        pauli_strings = ["I" * graph.num_sites]
-        coefficients = [0.0 + 0.0j]
-    return QubitOperator(pauli_strings, np.array(coefficients))
+    return _build_sparse_hamiltonian(
+        graph,
+        couplings=couplings,
+        fields=list(zip(pauli_components, output_field, strict=True)),
+        grouped=grouped,
+        coloring=coloring,
+    )
 
 
 def create_ising_hamiltonian(
@@ -728,8 +586,10 @@ def create_ising_hamiltonian(
           + \sum_i h^{i}\,\sigma_i^x
 
     Scalar and array couplings use adjacency edges and their weights. A mapping
-    ``{m: coupling}`` instead applies couplings to geometric neighbor shells
-    independently of adjacency weights.
+    ``{m: coupling}`` instead filters already-selected graph edges by geometric
+    shell, independently of adjacency weights. Select active mapped shells with
+    :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` first; no edges are added
+    by the model. Periodic shell mappings remain unsupported.
 
     Args:
         graph: Lattice graph defining the connectivity.
