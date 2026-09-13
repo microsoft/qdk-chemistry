@@ -33,7 +33,7 @@ class DoubleFactorizationSettings : public qdk::chemistry::data::Settings {
  * @details The input must be a restricted qdk::chemistry::data::Hamiltonian
  * backed by a qdk::chemistry::data::CholeskyHamiltonianContainer.
  *
- * @see qdk::chemistry::data::FactorizedHamiltonianContainer
+ * @see qdk::chemistry::data::DFTHCHamiltonianContainer
  */
 class DoubleFactorization : public HamiltonianFactorization {
  public:
