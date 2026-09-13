@@ -986,11 +986,10 @@ Args:
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
   // ============================================================================
-  // FactorizedHamiltonianContainer - double-factorized container
+  // DFTHCHamiltonianContainer - double-factorized tensor hypercontraction
   // ============================================================================
-  py::class_<FactorizedHamiltonianContainer, HamiltonianContainer,
-             py::smart_holder>
-      factorized_container(data, "FactorizedHamiltonianContainer", R"(
+  py::class_<DFTHCHamiltonianContainer, HamiltonianContainer, py::smart_holder>
+      factorized_container(data, "DFTHCHamiltonianContainer", R"(
 Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
 )");
 
@@ -1020,8 +1019,32 @@ Raises:
       py::arg("core_energy"), py::arg("inactive_fock_matrix"),
       py::arg("type") = HamiltonianType::Hermitian);
 
+  factorized_container.def(
+      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
+               const Eigen::VectorXd&, std::shared_ptr<Orbitals>, double,
+               const Eigen::MatrixXd&, HamiltonianType>(),
+      R"(
+Construct an ordinary double-factorized Hamiltonian with zero WB.
+
+Args:
+    one_body_integrals (numpy.ndarray): Conventional one-body integrals with shape [N,N].
+    u_matrices (numpy.ndarray): U factors flattened in [R,N,N] order. Each basis row must be a unit vector.
+    w_matrices (numpy.ndarray): W factors flattened in [R,N] order.
+    orbitals (Orbitals): Restricted orbitals with N active spatial orbitals.
+    core_energy (float): Nuclear and inactive-core energy.
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix over the full molecular-orbital space.
+    type (HamiltonianType, optional): Hamiltonian type; defaults to Hermitian.
+
+Raises:
+    ValueError: If the factors do not have ordinary DF dimensions or the general constructor rejects the data.
+)",
+      py::arg("one_body_integrals"), py::arg("u_matrices"),
+      py::arg("w_matrices"), py::arg("orbitals"), py::arg("core_energy"),
+      py::arg("inactive_fock_matrix"),
+      py::arg("type") = HamiltonianType::Hermitian);
+
   factorized_container.def("get_u_matrices",
-                           &FactorizedHamiltonianContainer::get_u_matrices,
+                           &DFTHCHamiltonianContainer::get_u_matrices,
                            py::return_value_policy::reference_internal, R"(
 Get U matrices as flat vector [R*B*N].
 
@@ -1030,7 +1053,7 @@ Returns:
 )");
 
   factorized_container.def("get_w_matrices",
-                           &FactorizedHamiltonianContainer::get_w_matrices,
+                           &DFTHCHamiltonianContainer::get_w_matrices,
                            py::return_value_policy::reference_internal, R"(
 Get W matrices as flat vector [R*B*C].
 
@@ -1039,7 +1062,7 @@ Returns:
 )");
 
   factorized_container.def("get_wb_matrix",
-                           &FactorizedHamiltonianContainer::get_wb_matrix,
+                           &DFTHCHamiltonianContainer::get_wb_matrix,
                            py::return_value_policy::reference_internal, R"(
 Get WB identity weight matrix [R x C].
 
@@ -1048,7 +1071,7 @@ Returns:
 )");
 
   factorized_container.def("get_num_orbitals",
-                           &FactorizedHamiltonianContainer::get_num_orbitals,
+                           &DFTHCHamiltonianContainer::get_num_orbitals,
                            R"(
 Number of spatial orbitals (N).
 
@@ -1057,7 +1080,7 @@ Returns:
 )");
 
   factorized_container.def("get_num_ranks",
-                           &FactorizedHamiltonianContainer::get_num_ranks, R"(
+                           &DFTHCHamiltonianContainer::get_num_ranks, R"(
 Number of ranks (R).
 
 Returns:
@@ -1065,7 +1088,7 @@ Returns:
 )");
 
   factorized_container.def("get_num_bases",
-                           &FactorizedHamiltonianContainer::get_num_bases, R"(
+                           &DFTHCHamiltonianContainer::get_num_bases, R"(
 Number of bases per rank (B).
 
 Returns:
@@ -1073,15 +1096,15 @@ Returns:
 )");
 
   factorized_container.def("get_num_copies",
-                           &FactorizedHamiltonianContainer::get_num_copies, R"(
+                           &DFTHCHamiltonianContainer::get_num_copies, R"(
 Number of copies per rank (C).
 
 Returns:
     int: Number of copies per rank.
 )");
 
-  factorized_container.def("get_lambda",
-                           &FactorizedHamiltonianContainer::get_lambda, R"(
+  factorized_container.def("get_lambda", &DFTHCHamiltonianContainer::get_lambda,
+                           R"(
 Compute the normalization from the adjusted one-body matrix and factors.
 
 Returns:
@@ -1092,7 +1115,7 @@ Raises:
 )");
 
   factorized_container.def("get_h1_prime",
-                           &FactorizedHamiltonianContainer::get_h1_prime, R"(
+                           &DFTHCHamiltonianContainer::get_h1_prime, R"(
 Return the adjusted one-body matrix used by the DFTHC block encoding.
 
 Returns:
@@ -1101,17 +1124,16 @@ Returns:
 
   factorized_container.def(
       "reconstruct_two_body_integrals",
-      &FactorizedHamiltonianContainer::reconstruct_two_body_integrals, R"(
+      &DFTHCHamiltonianContainer::reconstruct_two_body_integrals, R"(
 Reconstruct the two-body integrals from U and W.
 
 Returns:
     numpy.ndarray: New flat N**4 array in [p,q,r,s] order.
 )");
 
-  factorized_container.def(
-      "get_two_body_integrals",
-      &FactorizedHamiltonianContainer::get_two_body_integrals,
-      py::return_value_policy::reference_internal, R"(
+  factorized_container.def("get_two_body_integrals",
+                           &DFTHCHamiltonianContainer::get_two_body_integrals,
+                           py::return_value_policy::reference_internal, R"(
 Return the lazily reconstructed two-body integrals.
 
 Returns:
@@ -1119,8 +1141,7 @@ Returns:
 )");
 
   factorized_container.def(
-      "get_two_body_element",
-      &FactorizedHamiltonianContainer::get_two_body_element,
+      "get_two_body_element", &DFTHCHamiltonianContainer::get_two_body_element,
       R"(
 Get specific two-electron integral element <ij|kl>.
 
@@ -1137,9 +1158,9 @@ Raises:
       py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
       py::arg("channel") = SpinChannel::aaaa);
 
-  factorized_container.def(
-      "has_two_body_integrals",
-      &FactorizedHamiltonianContainer::has_two_body_integrals, R"(
+  factorized_container.def("has_two_body_integrals",
+                           &DFTHCHamiltonianContainer::has_two_body_integrals,
+                           R"(
 Check if two-body integrals are available.
 
 Returns:
@@ -1147,15 +1168,14 @@ Returns:
 )");
 
   factorized_container.def("is_restricted",
-                           &FactorizedHamiltonianContainer::is_restricted, R"(
+                           &DFTHCHamiltonianContainer::is_restricted, R"(
 Return whether the container is restricted.
 
 Returns:
     bool: Always ``True``.
 )");
 
-  factorized_container.def("is_valid",
-                           &FactorizedHamiltonianContainer::is_valid, R"(
+  factorized_container.def("is_valid", &DFTHCHamiltonianContainer::is_valid, R"(
 Check if the Hamiltonian data is complete and consistent.
 
 Returns:
@@ -1164,7 +1184,7 @@ Returns:
 
   factorized_container.def(
       "to_json",
-      [](const FactorizedHamiltonianContainer& self) -> std::string {
+      [](const DFTHCHamiltonianContainer& self) -> std::string {
         return self.to_json().dump();
       },
       R"(
@@ -1175,9 +1195,8 @@ Returns:
 )");
 
   factorized_container.def(
-      "__repr__",
-      [](const FactorizedHamiltonianContainer& self) -> std::string {
-        return "<FactorizedHamiltonianContainer N=" +
+      "__repr__", [](const DFTHCHamiltonianContainer& self) -> std::string {
+        return "<DFTHCHamiltonianContainer N=" +
                std::to_string(self.get_num_orbitals()) +
                " R=" + std::to_string(self.get_num_ranks()) +
                " B=" + std::to_string(self.get_num_bases()) +

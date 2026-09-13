@@ -115,9 +115,9 @@ std::shared_ptr<Hamiltonian> make_cholesky_hamiltonian(
           core_energy, Eigen::MatrixXd::Zero(0, 0)));
 }
 
-const FactorizedHamiltonianContainer& as_factorized(
+const DFTHCHamiltonianContainer& as_factorized(
     const std::shared_ptr<Hamiltonian>& hamiltonian) {
-  return hamiltonian->get_container<FactorizedHamiltonianContainer>();
+  return hamiltonian->get_container<DFTHCHamiltonianContainer>();
 }
 
 }  // namespace
