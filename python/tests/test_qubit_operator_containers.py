@@ -10,7 +10,14 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (
+    PartiallyRandomized,
+)
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
@@ -405,3 +412,25 @@ class TestSumOfSquaresQubitMapper:
 
         with pytest.raises(ValueError, match=match):
             SumOfSquaresQubitMapper().run(Hamiltonian(factorized), mapping)
+
+
+class TestPauliOnlyAlgorithmsRejectSumOfSquares:
+    """Algorithms written against Pauli terms must reject a sum-of-squares operator."""
+
+    @pytest.mark.parametrize(
+        ("builder_type", "settings"),
+        [
+            (LCUBuilder, {}),
+            (QDrift, {"time": 1.0}),
+            (PartiallyRandomized, {"time": 1.0}),
+            (Trotter, {"time": 1.0}),
+            (Zassenhaus, {"time": 1.0}),
+        ],
+        ids=["lcu", "qdrift", "partially_randomized", "trotter", "zassenhaus"],
+    )
+    def test_run_rejects_a_sum_of_squares_operator(self, builder_type, settings):
+        """The run fails naming the algorithm rather than on a missing Pauli attribute."""
+        operator = QubitOperator(container=_sum_of_squares_container())
+
+        with pytest.raises(ValueError, match="requires a Pauli decomposition"):
+            builder_type(**settings).run(operator)

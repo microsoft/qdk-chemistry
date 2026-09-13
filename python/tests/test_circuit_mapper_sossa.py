@@ -356,6 +356,24 @@ class TestSOSSAMapper:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
+    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self):
+        """Regression: the old 4:1 inner/free-rider ratio split this case out."""
+        coefficients = [[1.0, 1.0, 1.0, 1.0] for _ in range(6)]
+        free_rider_data = [[False, True] for _ in range(6)]
+
+        # Inner pair costs are 27 inline versus 25 split; the free-rider pair costs 5. One
+        # block applies two inner pairs, so splitting costs 2*25 + 5 = 55 against 2*27 = 54
+        # and the word stays inline. The old 4:1 ratio priced it 4*25 + 5 = 105 against
+        # 4*27 = 108 and split it out. Both ratios clear by a margin, so the case does not
+        # rest on a tie-break.
+        load_separately = QSHARP_UTILS.SOSSAWalk.TestShouldLoadFreeRiderSeparately(
+            coefficients,
+            free_rider_data,
+            1,
+        )
+
+        assert load_separately is False
+
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
         operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
         sossa = operator.get_container()

@@ -14,6 +14,8 @@
 
 namespace QDKChemistry.Utils.SOSSAWalk {
 
+    import Std.Arrays.Flattened;
+    import Std.Arrays.MappedOverRange;
     import Std.Arrays.Padded;
     import Std.Arrays.Reversed;
     import Std.Arrays.Subarray;
@@ -27,8 +29,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Diagnostics.Fact;
 
     import Std.Math.AbsD;
-    import Std.Math.BitSizeI;
-
+    import Std.Math.MaxI;
     import Std.Math.PI;
     import Std.Math.Round;
     import Std.StatePreparation.PreparePureStateD;
@@ -38,8 +39,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
+    import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Parameters
@@ -117,20 +117,25 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numRotAngles : Int,
         bRot : Int,
     ) : Bool[][] {
-        mutable table : Bool[][] = [];
-        for xo in 0..N - 1 {
-            mutable bits : Bool[] = [];
-            for j in 0..numRotAngles - 1 {
-                let angle = if j < Length(params.OneBodyRotationAngles[xo]) {
-                    params.OneBodyRotationAngles[xo][j]
-                } else {
-                    0.0
-                };
-                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
-            }
-            set table += [bits];
-        }
-        return table;
+        MappedOverRange(
+            xo -> Flattened(
+                MappedOverRange(
+                    j -> IntAsBoolArray(
+                        QuantizeGivensAngle(
+                            if j < Length(params.OneBodyRotationAngles[xo]) {
+                                params.OneBodyRotationAngles[xo][j]
+                            } else {
+                                0.0
+                            },
+                            bRot
+                        ),
+                        bRot
+                    ),
+                    0..numRotAngles - 1
+                )
+            ),
+            0..N - 1
+        )
     }
 
     /// Whether the SF rotation table is cheaper addressed `rBits ++ bReg` than `bReg ++ rBits`.
@@ -162,20 +167,26 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         for idx in 0..tableSize - 1 {
             let b = if rankFirst { idx / rSlots } else { idx % bSlots };
             let r = if rankFirst { idx % rSlots } else { idx / bSlots };
+            let angleIdx = b * params.numRanks + r;
 
-            mutable bits : Bool[] = [];
-            for j in 0..numRotAngles - 1 {
-                let angleIdx = b * params.numRanks + r;
-                let angle = if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
-                    params.TwoBodyRotationAngles[angleIdx][j]
-                } else {
-                    0.0
-                };
-                set bits += IntAsBoolArray(QuantizeGivensAngle(angle, bRot), bRot);
-            }
+            let angleBits = Flattened(
+                MappedOverRange(
+                    j -> IntAsBoolArray(
+                        QuantizeGivensAngle(
+                            if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
+                                params.TwoBodyRotationAngles[angleIdx][j]
+                            } else {
+                                0.0
+                            },
+                            bRot
+                        ),
+                        bRot
+                    ),
+                    0..numRotAngles - 1
+                )
+            );
             // Append bEqB flag: true when b == numBases (the identity term)
-            set bits += [b == params.numBases];
-            set table += [bits];
+            set table += [angleBits + [b == params.numBases]];
         }
         return table;
     }
@@ -246,9 +257,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let N = params.numOrbitals;
         let numSF = params.numRanks * params.numCopies;
         let Xo = N + numSF;
-        let xoBits = BitSizeI((if Xo > 1 { Xo } else { 2 }) - 1);
+        let xoBits = MaxI(1, AddressQubits(Xo));
         let numBp1 = params.numBases + 1;
-        let bBits = BitSizeI((if numBp1 > 1 { numBp1 } else { 2 }) - 1);
+        let bBits = MaxI(1, AddressQubits(numBp1));
         let numRotAngles = N - 1;
 
         // Register slicing
@@ -517,14 +528,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// rotated basis, then undoes the chain and releases the angle word.
     ///
     /// Loads ALL (N-1) rotation angles at once using two Select calls:
-    ///   - SF: Select over min(R*2^bBits, (B+1)*2^rankBits) entries, uncontrolled
+    ///   - SF: Select over min(R*2^bBits, (B+1)*2^rankBits) entries, fires when isSF=1
     ///   - DQ: Select(N entries) addressed by xoReg[0..⌈log₂N⌉-1], fires when isSF=0
     ///
-    /// Cost: (L_SF - 2) + unlookup(L_SF) for SF, 2*(N-1) for DQ, and 2*(N-1) uncontrolled
-    /// Adder(bRot) for the rotations -- each Givens rotation is the neighbor-gated CRy(2θ)
-    /// built as Ry(θ)·CNOT·Ry(-θ)·CNOT from two uncontrolled Ry(θ) sharing one angle word, so it
-    /// preserves particle number (matching the direct path) without a controlled adder. The SF
-    /// unlookup is measurement-based and costs O(sqrt(L)), which is the paper's R + B phase fixup.
+    /// Cost: the controlled SF table load is adjointed by a second full controlled lookup, so
+    /// it contributes 2*(L_SF - 2); the DQ table likewise contributes 2*(N-1). The rotations
+    /// add 2*(N-1) uncontrolled Adder(bRot) -- each Givens rotation is the neighbor-gated
+    /// CRy(2θ) built as Ry(θ)·CNOT·Ry(-θ)·CNOT from two uncontrolled Ry(θ) sharing one angle
+    /// word, so it preserves particle number (matching the direct path) without a controlled
+    /// adder.
     ///
     /// L_SF is above the paper's R*B because `Select` pads whichever register addresses the
     /// low bits out to a power of two; `SFTableRankAddressedFirst` picks the cheaper of the
@@ -551,7 +563,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let bBits = Length(bReg);
         let R = params.numRanks;
         let nRotBits = numRotAngles * bRot;
-        let nDQBits = BitSizeI((if N > 1 { N } else { 2 }) - 1);
+        let nDQBits = MaxI(1, AddressQubits(N));
 
         // DQ table: N entries × (N-1)*bRot bits, addressed by xoReg[0..nDQBits-1]
         let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
@@ -661,7 +673,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // A single inner entry still gets a one-qubit b register, matching MakeInnerPrepareDirect
         // and the Python layout. Letting this fall to zero would leave the alias PREPARE treating
         // innerReg[0] as its uniform register while SELECT treats it as b.
-        let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
+        let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
         let mu = coefficientBitPrecision;
         let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let qromEnd = 2 * nIndexBits + 2 * mu + 2;
@@ -691,9 +703,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Load the free-rider word (G, r) for the current x_o.
     ///
-    /// It is a function of x_o alone, so the block encoding loads it once around both SELECT
-    /// calls rather than letting each inner PREPARE carry it: one `Select` round trip against
-    /// four widened QROAM round trips.
+    /// It is a function of x_o alone, so the block encoding loads it once around both inner
+    /// PREPARE/uncompute pairs rather than letting each pair carry it in the alias QROAM output.
     function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         (outerReg, freeRiderReg) => {
             if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
@@ -702,10 +713,46 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
+    /// Whether the free-rider word should be loaded separately from the inner alias tables.
+    ///
+    /// `SelectSwapCost2D` already covers one lookup/uncompute pair. One SOSSA block applies
+    /// two inner PREPARE/uncompute pairs and, if split out, one free-rider lookup pair.
+    internal function ShouldLoadFreeRiderSeparately(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+    ) : Bool {
+        let numConditions = Length(innerCoefficients);
+        let nIndexBits = MaxI(1, AddressQubits(Length(innerCoefficients[0])));
+        let numInnerSlots = 1 <<< nIndexBits;
+        let numWordBits = coefficientBitPrecision + nIndexBits + 2;
+        let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        let inlineBits = numWordBits + numExtraBits;
+        let inlineLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
+        let separateLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
+        let innerPreparePairsPerBlock = 2;
+        let freeRiderPairsPerBlock = 1;
+        let inlineCost = innerPreparePairsPerBlock * SelectSwapCost2D(
+            inlineLambda,
+            numConditions,
+            numInnerSlots,
+            inlineBits,
+            true
+        );
+        let separateCost = innerPreparePairsPerBlock * SelectSwapCost2D(
+            separateLambda,
+            numConditions,
+            numInnerSlots,
+            numWordBits,
+            true
+        ) + freeRiderPairsPerBlock * SelectSwapCost2D(0, numConditions, 1, numExtraBits, true);
+        numExtraBits > 0 and separateCost < inlineCost
+    }
+
     /// Build the inner alias-sampling PREPARE and its free-rider loader together.
     ///
-    /// Carrying the free-rider word widens the QROAM output charged on each of the four
-    /// inner-table lookups in one block encoding. Loading it separately costs one `Select`
+    /// Carrying the free-rider word widens the QROAM output charged on each of the two inner
+    /// PREPARE/uncompute pairs in one block encoding. Loading it separately costs one `Select`
     /// round trip over the outer conditions but lets the inner table use a narrower output
     /// and potentially a different swap width.
     function MakeInnerPrepareAliasSamplingOracles(
@@ -716,22 +763,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         ((Qubit[], Qubit[]) => Unit is Adj),
         ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
     ) {
-        let numConditions = Length(innerCoefficients);
-        let numInnerSlots = 1 <<< BitSizeI(Length(innerCoefficients[0]) - 1);
-        let numWordBits = coefficientBitPrecision + BitSizeI(numInnerSlots - 1) + 2;
-        let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let inlineBits = numWordBits + numExtraBits;
-        let inlineLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
-        let separateLambda = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
-        let inlineCost = 4 * SelectSwapCost2D(inlineLambda, numConditions, numInnerSlots, inlineBits, true);
-        let separateCost = 4 * SelectSwapCost2D(
-            separateLambda,
-            numConditions,
-            numInnerSlots,
-            numWordBits,
-            true
-        ) + SelectSwapCost2D(0, numConditions, 1, 1, true);
-        let loadSeparately = numExtraBits > 0 and separateCost < inlineCost;
+        let loadSeparately = ShouldLoadFreeRiderSeparately(
+            innerCoefficients,
+            freeRiderData,
+            coefficientBitPrecision
+        );
         let inlineData = if loadSeparately { [] } else { freeRiderData };
         let separateData = if loadSeparately { freeRiderData } else { [] };
 
@@ -751,7 +787,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][]
     ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = BitSizeI((if nCoeffs > 1 { nCoeffs } else { 2 }) - 1);
+        let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
         let signData = BuildInnerSignTable(innerCoefficients, nIndexBits);
         (outerReg, innerReg) => {
             let bReg = innerReg[0..nIndexBits - 1];
@@ -852,9 +888,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let numPositiveOneBody = selectData.numPositiveOneBody;
         let numSF = selectData.numRanks * selectData.numCopies;
         let Xo = N + numSF;
-        let xoBits = BitSizeI((if Xo > 1 { Xo } else { 2 }) - 1);
+        let xoBits = MaxI(1, AddressQubits(Xo));
         let numBp1 = selectData.numBases + 1;
-        let bBits = BitSizeI((if numBp1 > 1 { numBp1 } else { 2 }) - 1);
+        let bBits = MaxI(1, AddressQubits(numBp1));
         let nFR = selectData.numFreeRiderBits;
 
         let nOuter = xoBits;
@@ -905,5 +941,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
+    function TestShouldLoadFreeRiderSeparately(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+    ) : Bool {
+        ShouldLoadFreeRiderSeparately(innerCoefficients, freeRiderData, coefficientBitPrecision)
+    }
 
 }

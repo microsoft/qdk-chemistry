@@ -195,6 +195,15 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         compute_capacity = int(self._settings.get("compute_capacity"))
         if compute_capacity == 0 or compute_capacity < -1:
             raise ValueError(f"compute_capacity must be -1 or a positive integer. Got {compute_capacity}.")
+        if compute_capacity > 0:
+            Logger.warn(
+                "Memory-compute placement counts are unreliable for this circuit. Under resource "
+                "estimation the signed-power schedule emits one representative query wrapped in "
+                "RepeatEstimates, and the estimator scales the memory delta of that single cold "
+                "iteration rather than replaying the LRU state machine. Reads and writes are "
+                "therefore wrong in both directions -- undercounted when the working set exceeds "
+                "the capacity, overcounted when it fits. Gate counts and qubit counts are exact."
+            )
         configured_num_bits = self._settings.get("num_bits")
         if configured_num_bits > 0 and configured_num_bits != num_phase_qubits:
             Logger.warn(
