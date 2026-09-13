@@ -72,7 +72,7 @@ class TestPauliDecompositionContainer:
         container = operator.get_container()
 
         assert isinstance(container, QubitOperatorContainer)
-        assert QubitOperator(container).get_container() is container
+        assert QubitOperator(container=container).get_container() is container
         assert operator.get_container_type() == "pauli_decomposition"
         assert operator.num_qubits == 2
         assert operator.pauli_strings is container.pauli_strings
@@ -83,7 +83,9 @@ class TestPauliDecompositionContainer:
 
         # equiv and arithmetic are defined on the wrapper rather than forwarded, so they
         # have to unwrap the operand and rewrap the result.
-        assert operator.equiv(QubitOperator(PauliDecompositionContainer(["ZZ", "XI"], np.array([-0.25, 0.5]))))
+        assert operator.equiv(
+            QubitOperator(container=PauliDecompositionContainer(["ZZ", "XI"], np.array([-0.25, 0.5])))
+        )
         scaled = 2 * operator
         added = operator + operator
         assert isinstance(scaled, QubitOperator)
@@ -121,7 +123,7 @@ class TestPauliDecompositionContainer:
         """Complex coefficients keep their shape and dtype across the shared array codec."""
         coefficients = np.array([0.5 + 0.25j, -0.25j], dtype=np.complex64)
         container = PauliDecompositionContainer(["XI", "ZZ"], coefficients, "jordan-wigner", "blocked")
-        operator = QubitOperator(container)
+        operator = QubitOperator(container=container)
 
         json_data = operator.to_json()
         assert json_data["coefficients"] == {
@@ -148,7 +150,7 @@ class TestPauliDecompositionContainer:
         """The container reloads from HDF5 through the qubit operator's container dispatch."""
         coefficients = np.array([0.5 + 0.25j, -0.25j], dtype=np.complex64)
         container = PauliDecompositionContainer(["XI", "ZZ"], coefficients, "jordan-wigner", "blocked")
-        operator = QubitOperator(container)
+        operator = QubitOperator(container=container)
         path = tmp_path / "pauli.h5"
 
         with h5py.File(path, "w") as handle:
@@ -179,7 +181,7 @@ class TestSumOfSquaresContainer:
         """
         container = _sum_of_squares_container()
 
-        json_data = QubitOperator(container).to_json()
+        json_data = QubitOperator(container=container).to_json()
         assert json_data["one_body"]["coeffs"]["shape"] == [2, 2]
         assert json_data["one_body"]["coeffs"]["dtype"] == "complex128"
         assert json_data["one_body"]["paulis"] == ["X", "Y"]
@@ -196,7 +198,7 @@ class TestSumOfSquaresContainer:
         path = tmp_path / "sos.h5"
 
         with h5py.File(path, "w") as handle:
-            QubitOperator(container).to_hdf5(handle.create_group("operator"))
+            QubitOperator(container=container).to_hdf5(handle.create_group("operator"))
 
         with h5py.File(path, "r") as handle:
             assert handle["operator"].attrs["container_type"] == "sum_of_squares"
@@ -205,7 +207,7 @@ class TestSumOfSquaresContainer:
         restored = operator.get_container()
         assert isinstance(restored, SumOfSquaresContainer)
         _assert_sum_of_squares_containers_match(restored, container)
-        assert operator.content_hash() == QubitOperator(container).content_hash()
+        assert operator.content_hash() == QubitOperator(container=container).content_hash()
 
     def test_rejects_inputs_that_are_not_internally_consistent(self) -> None:
         """A block owns the shape facts every block shares; the container owns metadata agreement."""

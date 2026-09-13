@@ -22,15 +22,14 @@ import numpy as np
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresMetadata
 
-from .block_encoding import _wavefunction_from_hdf5, _wavefunction_to_hdf5
-from .quantum_walk import QuantumWalkContainer
+from .block_encoding import BlockEncodingContainer, _wavefunction_from_hdf5, _wavefunction_to_hdf5
 
 if TYPE_CHECKING:
     import h5py
 
     from qdk_chemistry.data import Wavefunction
 
-__all__ = ["SOSSAInnerPrepare", "SOSSARegisterLayout", "SOSSASelect", "SOSSAWalkContainer"]
+__all__ = ["SOSSABlockEncodingContainer", "SOSSAInnerPrepare", "SOSSARegisterLayout", "SOSSASelect"]
 
 
 @dataclass(frozen=True)
@@ -153,21 +152,27 @@ class SOSSASelect:
         )
 
 
-class SOSSAWalkContainer(QuantumWalkContainer):
+class SOSSABlockEncodingContainer(BlockEncodingContainer):
     r"""Container for the Sum of Squares Spectral Amplification (SOSSA) block encoding.
 
-    The walk operator is defined inline above Eq. (9) of :cite:`Low2025` and derived in
-    its Appendix A 2, with spectrum :math:`e^{\pm i \arccos(E_k/\Lambda - 1)}`:
+    This is the block encoding :math:`B` alone. The walk
 
     .. math::
 
-        W = \mathrm{Ref}_{a,B} \cdot U^\dagger \cdot \mathrm{Ref}_B \cdot U
+        W = \mathrm{Ref}_{a,B} \cdot B, \qquad
+        B = U^\dagger \cdot \mathrm{Ref}_B \cdot U
 
-    where :math:`U = \text{OuterPREP} \cdot \text{within\{InnerPREP\} apply\{SELECT\}}`.
+    (inline above Eq. (9) of :cite:`Low2025`, derived in its Appendix A 2) is completed by
+    the caller, which owns :math:`\mathrm{Ref}_{a,B}`. Here
+    :math:`U = \text{OuterPREP} \cdot \text{within\{InnerPREP\} apply\{SELECT\}}`.
 
-    Supported by the ``qdk_unary`` phase estimation builder only. Iterative and standard
-    QPE drive the walk through a ``controlled_circuit_mapper``, and none of the registered
-    ones accepts this container, so those builders cannot construct a SOSSA circuit.
+    Supported by the ``qdk_unary`` phase estimation builder only, which interleaves the
+    reflection into its own query schedule so it can omit one and realize a signed walk
+    power. Iterative and standard QPE drive a pre-composed walk through a
+    ``controlled_circuit_mapper``, and none of the registered ones accepts this container.
+
+    :meth:`eigenvalue_from_phase` still decodes the phase of that completed walk, whose
+    spectrum is :math:`e^{\pm i \arccos(E_k/\Lambda - 1)}`.
 
     """
 
@@ -178,10 +183,10 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         """Return the wire-format identifier for SOSSA-walk containers.
 
         Returns:
-            ``"sossa_walk_container"``.
+            ``"sossa_block_encoding_container"``.
 
         """
-        return "sossa_walk_container"
+        return "sossa_block_encoding_container"
 
     def __init__(
         self,
@@ -194,7 +199,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         power: int = 1,
         lambda_eff: float | None = None,
     ) -> None:
-        r"""Initialize a SOSSAWalkContainer.
+        r"""Initialize a SOSSABlockEncodingContainer.
 
         Args:
             outer_prepare: The outer PREPARE Wavefunction, whose amplitudes are the
@@ -204,7 +209,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
             metadata: Dimensions and scalar constants carried from the SOS qubit operator.
             layout: Ancilla register widths the builder derived from those dimensions.
             normalization: Block-encoding normalization :math:`\Lambda = \tfrac12\sum_\alpha c_\alpha^2`.
-            power: Number of times to apply the walk operator.
+            power: Number of times to apply the block encoding.
             lambda_eff: Effective (spectrally amplified) normalization, or ``None`` when the
                 builder was given no reference energy to derive it from. See :attr:`lambda_eff`.
 
@@ -241,7 +246,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     @property
     def power(self) -> int:
-        """Number of times to apply the walk operator."""
+        """Number of times to apply the block encoding."""
         return self._power
 
     @property
@@ -258,7 +263,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         """
         if self._lambda_eff is None:
             raise ValueError(
-                "lambda_eff is unset for this SOSSA walk. Rebuild the block encoding with the "
+                "lambda_eff is unset for this SOSSA block encoding. Rebuild it with the "
                 "SOSSA builder's 'reference_ground_state_energy' setting or its "
                 "'reference_energy_gap' setting."
             )
@@ -266,21 +271,28 @@ class SOSSAWalkContainer(QuantumWalkContainer):
 
     @property
     def num_qubits(self) -> int:
-        """Total number of qubits to be allocated in QPE or other callers."""
+        """Total number of qubits to be allocated in QPE or other callers.
+
+        Only the first ``inner_prep_bits`` qubits of the inner register are caller-visible;
+        the QROM output and free-rider bits behind them are scratch the walk allocates
+        itself. An inner PREPARE that samples coefficients (rather than reading them
+        directly) widens the caller-visible part by a mapper-chosen bit precision this
+        container does not see, so callers composing such a circuit must take the width
+        from the mapped :class:`~qdk_chemistry.data.circuit.Circuit` instead.
+        """
         meta = self.metadata
         layout = self.layout
         num_system = 2 * meta.num_spatial_orbitals
-        num_inner = layout.inner_prep_bits + layout.num_free_rider_bits
-        num_ancilla = layout.outer_prep_bits + num_inner + 2
+        num_ancilla = layout.outer_prep_bits + layout.inner_prep_bits + 2
         return num_system + num_ancilla
 
     @property
     def type(self) -> str:
         """Get the type of the unitary container."""
-        return "sossa_walk"
+        return "sossa_block_encoding"
 
     def to_json(self) -> dict[str, Any]:
-        """Save the SOSSAWalkContainer to a JSON-serializable dictionary."""
+        """Save the SOSSABlockEncodingContainer to a JSON-serializable dictionary."""
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
@@ -295,7 +307,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the SOSSAWalkContainer to an HDF5 group."""
+        """Save the SOSSABlockEncodingContainer to an HDF5 group."""
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
@@ -309,8 +321,8 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> SOSSAWalkContainer:
-        """Create a SOSSAWalkContainer from a JSON dictionary."""
+    def from_json(cls, json_data: dict[str, Any]) -> SOSSABlockEncodingContainer:
+        """Create a SOSSABlockEncodingContainer from a JSON dictionary."""
         cls._validate_json_version(cls._serialization_version, json_data)
 
         from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
@@ -331,8 +343,8 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> SOSSAWalkContainer:
-        """Load a SOSSAWalkContainer from an HDF5 group."""
+    def from_hdf5(cls, group: h5py.Group) -> SOSSABlockEncodingContainer:
+        """Load a SOSSABlockEncodingContainer from an HDF5 group."""
         cls._validate_hdf5_version(cls._serialization_version, group)
         outer_prepare = _wavefunction_from_hdf5(group["outer_prepare"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
@@ -356,7 +368,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         c = self.metadata.num_copies
         lambda_eff_line = "" if self._lambda_eff is None else f"  Effective normalization = {self._lambda_eff:.6f}\n"
         return (
-            f"SOSSA Container (DFTHC block encoding):\n"
+            f"SOSSA Block Encoding:\n"
             f"  Power: {self.power}\n"
             f"  Orbitals N={n}, Ranks R={r}, Bases B={b}, Copies C={c}\n"
             f"  Normalization Lambda = {self.normalization:.6f}\n"
@@ -372,7 +384,7 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         _hash_arg(h, self.to_json())
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
-        r"""Recover a Hamiltonian eigenvalue from the SOSSA walk operator phase.
+        r"""Recover a Hamiltonian eigenvalue from the phase of the completed SOSSA walk.
 
         For the SOSSA walk operator, QPE measures :math:`\varphi` such that:
 
@@ -393,11 +405,11 @@ class SOSSAWalkContainer(QuantumWalkContainer):
         phi = phase_fraction % 1.0
         return float(2.0 * self.normalization * np.cos(np.pi * phi) ** 2 + self.metadata.energy_shift)
 
-    def combine(self, other: SOSSAWalkContainer) -> SOSSAWalkContainer:  # type: ignore[override]
+    def combine(self, other: SOSSABlockEncodingContainer) -> SOSSABlockEncodingContainer:  # type: ignore[override]
         """Not supported for SOSSA containers.
 
         Raises:
             NotImplementedError: Always.
 
         """
-        raise NotImplementedError("SOSSAWalkContainer does not support combining containers.")
+        raise NotImplementedError("SOSSABlockEncodingContainer does not support combining containers.")

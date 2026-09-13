@@ -535,7 +535,7 @@ class TestSOSSAQPEIntegration:
         Exercises the full decoding chain the QPE driver uses: the walk
         eigenvalue associated with gap energy ``E_gap`` is ``e^{±2πiφ}`` with
         ``E_gap = Λ(1 + cos 2πφ)`` (:cite:`Low2025`, Eq. 11), and
-        ``SOSSAWalkContainer.eigenvalue_from_phase`` adds ``E_SOS`` back.
+        ``SOSSABlockEncodingContainer.eigenvalue_from_phase`` adds ``E_SOS`` back.
         Feeding it the phase fraction of the exact gap ground state must
         reproduce the exact ground-state energy of the *physical* Hamiltonian,
         which is what makes the energy shift meaningful.
@@ -587,7 +587,7 @@ class TestSOSSAQPEIntegration:
            ground-state energy and subtracts ``energy_shift``. The two routes to
            ``E_gap`` share no code, so this simultaneously pins the shift convention:
            ``reference_ground_state_energy`` must be a total energy, core included.
-        2. Against the derivative of :meth:`SOSSAWalkContainer.eigenvalue_from_phase`,
+        2. Against the derivative of :meth:`SOSSABlockEncodingContainer.eigenvalue_from_phase`,
            which is what actually converts a phase estimate into an energy. Because
            :math:`E(\varphi) = \Lambda(1 + \cos 2\pi\varphi) + E_{\text{SOS}}`,
            :math:`|\mathrm{d}E/\mathrm{d}\varphi| = 2\pi\lambda_{\text{eff}}` at the
@@ -706,11 +706,11 @@ class TestSOSSAQPEIntegration:
 class TestSOSSAQPEScope:
     """SOSSA is supported under unary QPE only."""
 
-    def test_no_controlled_mapper_accepts_the_sossa_walk(self):
+    def test_no_controlled_mapper_accepts_the_sossa_block_encoding(self):
         """Iterative and standard QPE cannot drive the SOSSA walk.
 
         Both build their circuits through a ``controlled_circuit_mapper``, so SOSSA would
-        need one that accepts ``SOSSAWalkContainer``. None is registered, which is what
+        need one that accepts ``SOSSABlockEncodingContainer``. None is registered, which is what
         confines SOSSA to ``qdk_unary``. If a controlled SOSSA mapper is ever added, this
         test fails and the unary-only claim in the mapper and container docstrings should
         be revisited alongside it.

@@ -10,7 +10,10 @@ import numpy as np
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
+    BlockEncodingContainer,
+    LCUContainer,
+)
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -165,19 +168,22 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
-            ValueError: If the unitary representation is not a quantum walk, if the mapper does
-                not declare its register width, if the block encoding has no ancilla register
-                for the walk to reflect about, or if the state preparation and block encoding
-                disagree on the shared ancilla count.
+            ValueError: If the unitary representation is neither a quantum walk nor a block
+                encoding, if the mapper does not declare its register width, if the block
+                encoding has no ancilla register for the walk to reflect about, or if the
+                state preparation and block encoding disagree on the shared ancilla count.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
-        if not isinstance(container, QuantumWalkContainer):
+        # This builder owns the walk's reflection so it can omit one occurrence and realize a
+        # signed power, so it maps the block encoding rather than a pre-composed walk. A walk
+        # container is unwrapped to the encoding it carries; a block encoding is used directly.
+        if not isinstance(container, QuantumWalkContainer | BlockEncodingContainer):
             raise ValueError(
-                "Requires a LCU or SOSSA walk unitary representation because this circuit explicitly controls "
-                f"the block encoding's reflection, got '{container.type}'."
+                "Requires a quantum walk or block encoding unitary representation because this circuit "
+                f"explicitly controls the block encoding's reflection, got '{container.type}'."
             )
 
         nested = getattr(container, "block_encoding", None)

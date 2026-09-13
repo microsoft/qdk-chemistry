@@ -14,6 +14,7 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.data.circuit import CircuitMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
@@ -37,7 +38,7 @@ def _build_sossa_unitary(
     *,
     seed: int = 42,
 ) -> UnitaryRepresentation:
-    """Helper: build UnitaryRepresentation with SOSSAWalkContainer from random factorized data."""
+    """Helper: build UnitaryRepresentation with SOSSABlockEncodingContainer from random factorized data."""
     fh = create_random_factorized_hamiltonian(
         num_orbitals=num_orbitals,
         num_ranks=num_ranks,
@@ -153,14 +154,16 @@ def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
 
 
 class TestOuterPrep:
-    """Tests for SOSSAMapper._build_outer_prep."""
+    """Tests for SOSSAMapper._build_outer_prepare_circuit."""
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
     def test_build_outer_prep_fidelity(self, algorithm):
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op, num_gradient = mapper._build_outer_prep(container)
+        prepare_circuit = mapper._build_outer_prepare_circuit(container)
+        op = prepare_circuit._qsharp_op
+        num_gradient = prepare_circuit.metadata.num_phase_gradient_ancillas
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -194,8 +197,9 @@ class TestOuterPrep:
         container = sossa_unitary.get_container()
         bit_precision = 10
         mapper = _make_sossa_mapper(outer_algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
-        op, num_gradient = mapper._build_outer_prep(container)
-        assert num_gradient == 0
+        prepare_circuit = mapper._build_outer_prepare_circuit(container)
+        op = prepare_circuit._qsharp_op
+        assert prepare_circuit.metadata.num_phase_gradient_ancillas == 0
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -230,7 +234,7 @@ class TestInnerPrep:
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op, _ = outer_mapper._build_outer_prep(container)
+        outer_op = outer_mapper._build_outer_prepare_circuit(container)._qsharp_op
 
         # Build inner prep
         bit_precision = 6
@@ -306,10 +310,10 @@ class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
 
     def test_rejects_non_sossa_container(self):
-        """Verify SOSSAMapper raises ValueError for non-SOSSAWalkContainer containers."""
+        """Verify SOSSAMapper raises ValueError for non-SOSSABlockEncodingContainer containers."""
 
         class MockContainer:
-            """Mock container that is not a SOSSAWalkContainer."""
+            """Mock container that is not a SOSSABlockEncodingContainer."""
 
             @property
             def type(self):
@@ -427,6 +431,25 @@ class TestSOSSAMapper:
         assert num_gradient == mapper.settings().get("rotation_bit_precision")
         assert circuit.num_qubits == num_system_qubits + num_outer_qubits + num_reflect_inner + 2 + num_gradient
         assert circuit.num_qubits - num_system_qubits - num_gradient > 0
+
+    def test_outer_prepare_layout_uses_declared_circuit_width(self):
+        unitary = _build_sossa_unitary()
+        container = unitary.get_container()
+        mapper = _make_sossa_mapper(select_algorithm="direct")
+        outer_extra_bits = 2
+        gradient_bits = 3
+        outer_prepare_circuit = Circuit(
+            qasm="OPENQASM 3.0;",
+            num_qubits=container.layout.outer_prep_bits + outer_extra_bits + gradient_bits,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=gradient_bits),
+        )
+
+        regs, _ = mapper._compute_register_sizes(container, outer_prepare_circuit)
+
+        assert regs["num_outer_qubits"] == container.layout.outer_prep_bits + outer_extra_bits
+        assert regs["num_outer_prepare_gradient_qubits"] == gradient_bits
+        assert regs["num_phase_gradient_qubits"] == gradient_bits
+        assert regs["num_ancilla_qubits"] == (regs["num_outer_qubits"] + regs["num_reflect_inner"] + 2 + gradient_bits)
 
 
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:

@@ -16,7 +16,7 @@ from .containers.base import UnitaryContainer
 from .containers.block_encoding import LCUContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
 from .containers.quantum_walk import LCUWalkContainer
-from .containers.sossa import SOSSAWalkContainer
+from .containers.sossa import SOSSABlockEncodingContainer
 
 __all__: list[str] = []
 
@@ -127,8 +127,8 @@ class UnitaryRepresentation(DataClass):
             container = LCUContainer.from_json(json_data)
         elif container_type == "lcu_walk":
             container = LCUWalkContainer.from_json(json_data)
-        elif container_type == "sossa_walk":
-            container = SOSSAWalkContainer.from_json(json_data)
+        elif container_type == "sossa_block_encoding":
+            container = SOSSABlockEncodingContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
 
@@ -152,8 +152,8 @@ class UnitaryRepresentation(DataClass):
             container = LCUContainer.from_hdf5(group)
         elif container_type == "lcu_walk":
             container = LCUWalkContainer.from_hdf5(group)
-        elif container_type == "sossa_walk":
-            container = SOSSAWalkContainer.from_hdf5(group)
+        elif container_type == "sossa_block_encoding":
+            container = SOSSABlockEncodingContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
         return cls(container=container)

@@ -284,10 +284,17 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
             _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
 
-    def test_a_plain_block_encoding_is_rejected(self):
-        """The schedule drops one reflection, so a bare LCU has nothing to drop."""
-        with pytest.raises(ValueError, match="Requires a LCU or SOSSA walk unitary representation"):
-            _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
+    def test_a_plain_block_encoding_defers_its_failure_to_decoding(self):
+        """The builder owns the reflection, so a bare LCU maps like any block encoding.
+
+        What a bare LCU lacks is a phase-to-energy relation, so the configuration is only
+        surfaced when the measured phase is decoded.
+        """
+        assert len(_run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))) == 1
+
+        container = LCUBuilder(quantum_walk=False).run(_hamiltonian()).get_container()
+        with pytest.raises(NotImplementedError, match="does not define an eigenvalue-phase relationship"):
+            container.eigenvalue_from_phase(0.25)
 
     @pytest.mark.parametrize(
         ("declared_width", "message"),

@@ -1,4 +1,4 @@
-r"""QDK/Chemistry implementation of the SOSSA (Sum of Squares Spectral Amplification) block encoding."""
+r"""QDK/Chemistry implementation of the Sum of Squares Spectral Amplification (SOSSA) block encoding."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -23,20 +23,20 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresContainer
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
+    SOSSABlockEncodingContainer,
     SOSSAInnerPrepare,
     SOSSARegisterLayout,
     SOSSASelect,
-    SOSSAWalkContainer,
 )
 
-__all__: list[str] = ["SOSSABuilder", "SOSSASettings"]
+__all__: list[str] = ["SOSSABuilder", "SOSSABuilderSettings"]
 
 
-class SOSSASettings(HamiltonianUnitaryBuilderSettings):
+class SOSSABuilderSettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the SOSSA block encoding builder."""
 
     def __init__(self):
-        """Initialize SOSSASettings with default values.
+        """Initialize SOSSABuilderSettings with default values.
 
         Attributes:
             reference_ground_state_energy: Reference total ground-state energy E_gs.
@@ -64,7 +64,7 @@ class SOSSASettings(HamiltonianUnitaryBuilderSettings):
 
 
 class SOSSABuilder(HamiltonianUnitaryBuilder):
-    """SOSSA (Sum of Squares Spectral Amplification) block encoding builder."""
+    """Sum of Squares Spectral Amplification (SOSSA) block encoding builder."""
 
     def __init__(
         self,
@@ -78,7 +78,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             power: The power to raise the walk operator to. Defaults to 1.
             reference_ground_state_energy: Reference total ground-state energy E_gs, including
                 the core/nuclear contribution, used to derive
-                :attr:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSAWalkContainer.lambda_eff`.
+                :attr:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSABlockEncodingContainer.lambda_eff`.
                 Defaults to NaN, which leaves ``lambda_eff`` unset. Mutually exclusive with
                 ``reference_energy_gap``.
             reference_energy_gap: Reference gap E_gap = E_gs - E_SOS, an alternative to
@@ -86,7 +86,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
 
         """
         super().__init__()
-        self._settings = SOSSASettings()
+        self._settings = SOSSABuilderSettings()
         self._settings.set("power", power)
         self._settings.set("reference_ground_state_energy", reference_ground_state_energy)
         self._settings.set("reference_energy_gap", reference_energy_gap)
@@ -98,7 +98,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             qubit_hamiltonian: Qubit operator with SumOfSquaresContainer.
 
         Returns:
-            UnitaryRepresentation wrapping the SOSSAWalkContainer.
+            UnitaryRepresentation wrapping the SOSSABlockEncodingContainer.
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
@@ -112,6 +112,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         meta = sossa.metadata
         n_orbitals = meta.num_spatial_orbitals
         num_positive = meta.num_positive_one_body_terms
+        self._validate_one_body_generators(sossa, n_orbitals, num_positive)
 
         outer_coefficients = self._outer_coefficients(sossa)
         normalization = 0.5 * float(np.sum(a=outer_coefficients**2))
@@ -141,7 +142,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             num_positive, n_orbitals, meta.num_ranks, meta.num_copies, reg_bits.rank_bits
         )
 
-        container = SOSSAWalkContainer(
+        container = SOSSABlockEncodingContainer(
             outer_prepare=self._build_outer_prepare(outer_coefficients, num_outer_qubits),
             inner_prepare=SOSSAInnerPrepare(
                 conditional_coefficients=self._inner_conditional_coefficients(sossa, len(one_body_rotation_angles)),
@@ -159,6 +160,41 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         )
 
         return UnitaryRepresentation(container=container)
+
+    @staticmethod
+    def _validate_one_body_generators(
+        sossa: SumOfSquaresContainer,
+        num_orbitals: int,
+        num_positive: int,
+    ) -> None:
+        """Validate one-body rows before they are packed into the fixed outer layout."""
+        one_body = sossa.one_body
+        angles = np.asarray(one_body.angles)
+        coeffs = np.asarray(one_body.coeffs, dtype=complex)
+        if angles.shape[0] != num_orbitals or coeffs.shape[0] != num_orbitals:
+            raise ValueError(
+                "SOSSA requires exactly one one-body generator row per spatial orbital because the "
+                f"outer register reserves {num_orbitals} one-body slots; got {angles.shape[0]} angle rows "
+                f"and {coeffs.shape[0]} coefficient rows."
+            )
+        if one_body.paulis != ("X", "Y"):
+            raise ValueError(
+                "SOSSA one-body generators must use Pauli labels ('X', 'Y') so SELECT can implement "
+                f"weighted creation and annihilation operators; got {one_body.paulis!r}."
+            )
+
+        signs = np.ones(num_orbitals)
+        signs[num_positive:] = -1.0
+        expected_y = 1j * signs * coeffs[:, 0]
+        matches = np.isclose(coeffs[:, 1], expected_y, rtol=1e-12, atol=1e-12)
+        if not np.all(matches):
+            row = int(np.flatnonzero(~matches)[0])
+            generator = "particle" if row < num_positive else "hole"
+            relation = "c_Y = +i*c_X" if row < num_positive else "c_Y = -i*c_X"
+            raise ValueError(
+                f"SOSSA one-body coefficient row {row} describes a {generator} generator and must satisfy "
+                f"{relation}; got c_X={coeffs[row, 0]!r}, c_Y={coeffs[row, 1]!r}."
+            )
 
     @staticmethod
     def _outer_coefficients(sossa: SumOfSquaresContainer) -> np.ndarray:

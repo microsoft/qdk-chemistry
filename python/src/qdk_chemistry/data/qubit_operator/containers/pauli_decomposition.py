@@ -23,9 +23,6 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
-    import qdk_chemistry.data.enums.fermion_mode_order
-    import qdk_chemistry.data.term_partition
-
 from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
@@ -113,8 +110,8 @@ class PauliDecompositionContainer(QubitOperatorContainer):
         pauli_strings: list[str],
         coefficients: np.ndarray,
         encoding: str | None = None,
-        fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
-        term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
+        fermion_mode_order: FermionModeOrder | str | None = None,
+        term_partition: TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> None:
         """Initialize a PauliDecompositionContainer.
@@ -283,15 +280,15 @@ class PauliDecompositionContainer(QubitOperatorContainer):
             other: The qubit operator to add.
 
         Returns:
-            A new ``QubitOperator`` with concatenated terms.
+            A new ``QubitOperator`` with concatenated terms, or ``NotImplemented``
+            if *other* is not a ``PauliDecompositionContainer``.
 
         Raises:
-            TypeError: If *other* is not a ``QubitOperator``.
             ValueError: If the two operators have different qubit counts, encodings, or modes.
 
         """
         if not isinstance(other, PauliDecompositionContainer):
-            raise TypeError(f"Cannot add PauliDecompositionContainer with {type(other).__name__}.")
+            return NotImplemented
         if self.num_qubits != other.num_qubits:
             raise ValueError(f"Cannot add operators with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:

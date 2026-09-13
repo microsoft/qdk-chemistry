@@ -22,22 +22,23 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
+    RotatedPaulis,
     SumOfSquaresContainer,
     SumOfSquaresMetadata,
 )
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
+    SOSSABlockEncodingContainer,
     SOSSAInnerPrepare,
     SOSSARegisterLayout,
     SOSSASelect,
-    SOSSAWalkContainer,
 )
 
 from .test_helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
 
 
 def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | None = None):
-    """Build a UnitaryRepresentation with SOSSAWalkContainer."""
+    """Build a UnitaryRepresentation with SOSSABlockEncodingContainer."""
     num_orbitals = 2
     num_ranks = 2
     num_bases = 1
@@ -105,7 +106,7 @@ def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | No
     lambda_sqrt = np.sum(np.abs(outer_coefficients) * inner_l1)
     normalization = 0.5 * lambda_sqrt**2
 
-    container = SOSSAWalkContainer(
+    container = SOSSABlockEncodingContainer(
         outer_prepare=outer_prepare,
         inner_prepare=inner_prepare,
         select=select,
@@ -126,7 +127,7 @@ def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | No
     return UnitaryRepresentation(container=container)
 
 
-def _assert_sossa_containers_equal(actual: SOSSAWalkContainer, expected: SOSSAWalkContainer) -> None:
+def _assert_sossa_containers_equal(actual: SOSSABlockEncodingContainer, expected: SOSSABlockEncodingContainer) -> None:
     """Assert equality of every serialized SOSSA walk field."""
     assert actual.type == expected.type
     assert actual.power == expected.power
@@ -154,7 +155,32 @@ def _assert_sossa_containers_equal(actual: SOSSAWalkContainer, expected: SOSSAWa
     assert actual.to_json() == expected.to_json()
 
 
-class TestSOSSAWalkContainer:
+def _sossa_operator_with_one_body(
+    source: SumOfSquaresContainer,
+    one_body: RotatedPaulis,
+    *,
+    num_positive: int,
+) -> QubitOperator:
+    """Rebuild a SOSSA operator while keeping the source two-body block and dimensions."""
+    return QubitOperator(
+        container=SumOfSquaresContainer(
+            one_body,
+            source.two_body,
+            source.encoding,
+            source.fermion_mode_order,
+            SumOfSquaresMetadata(
+                num_spatial_orbitals=source.metadata.num_spatial_orbitals,
+                num_ranks=source.metadata.num_ranks,
+                num_bases=source.metadata.num_bases,
+                num_copies=source.metadata.num_copies,
+                num_positive_one_body_terms=num_positive,
+                energy_shift=source.metadata.energy_shift,
+            ),
+        )
+    )
+
+
+class TestSOSSABlockEncodingContainer:
     """Tests for the SOSSA container serialization."""
 
     def test_json_roundtrip(self):
@@ -163,15 +189,15 @@ class TestSOSSAWalkContainer:
         container = result.get_container()
 
         json_data = container.to_json()
-        restored = SOSSAWalkContainer.from_json(json_data)
+        restored = SOSSABlockEncodingContainer.from_json(json_data)
 
         _assert_sossa_containers_equal(restored, container)
 
         json_data = result.to_json()
         restored = UnitaryRepresentation.from_json(json_data)
 
-        assert restored.get_container_type() == "sossa_walk"
-        assert isinstance(restored.get_container(), SOSSAWalkContainer)
+        assert restored.get_container_type() == "sossa_block_encoding"
+        assert isinstance(restored.get_container(), SOSSABlockEncodingContainer)
 
     def test_hdf5_roundtrip(self):
         """Test HDF5 serialization/deserialization round-trip."""
@@ -183,7 +209,7 @@ class TestSOSSAWalkContainer:
             with h5py.File(filepath, "w") as f:
                 container.to_hdf5(f)
             with h5py.File(filepath, "r") as f:
-                restored = SOSSAWalkContainer.from_hdf5(f)
+                restored = SOSSABlockEncodingContainer.from_hdf5(f)
 
         _assert_sossa_containers_equal(restored, container)
 
@@ -214,7 +240,7 @@ class TestSOSSAWalkContainer:
         assert container.layout.num_free_rider_bits > 0, "fixture must reserve the bits under test"
 
         def rebuild(inner_prepare):
-            return SOSSAWalkContainer(
+            return SOSSABlockEncodingContainer(
                 outer_prepare=container.outer_prepare,
                 inner_prepare=inner_prepare,
                 select=container.select,
@@ -263,23 +289,68 @@ class TestSOSSABuilder:
         result = builder.run(factorized_hamiltonian_to_sossa_operator(fh))
         container = result.get_container()
 
-        assert isinstance(container, SOSSAWalkContainer)
+        assert isinstance(container, SOSSABlockEncodingContainer)
         x_o_dim = num_orbitals + num_ranks * num_copies
         assert len(container.outer_prepare.get_coefficients()) == x_o_dim
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
         assert container.normalization > 0
 
+    @pytest.mark.parametrize(
+        ("num_orbitals", "num_rows", "coeffs", "paulis", "num_positive", "match"),
+        [
+            (3, 2, None, None, 1, "outer register reserves 3 one-body slots"),
+            (2, None, None, ("X", "Z"), None, "must use Pauli labels"),
+            (2, None, np.array([[1.0, 2.0j], [0.0, 0.0]], dtype=complex), None, 1, "row 0 describes a particle"),
+            (2, None, np.array([[1.0, 1.0j], [1.0, 1.0j]], dtype=complex), None, 1, "row 1 describes a hole"),
+            (2, None, np.array([[1.0, 1.0j], [0.0, 0.0]], dtype=complex), None, 1, None),
+        ],
+        ids=["too-few-rows", "unencodable-paulis", "not-a-particle", "not-a-hole", "screened-row-accepted"],
+    )
+    def test_one_body_generators_must_match_what_select_can_encode(
+        self, num_orbitals, num_rows, coeffs, paulis, num_positive, match
+    ):
+        """SELECT reads one X/Y creation-annihilation row per spatial orbital.
+
+        Rows are rejected when they are too few to fill the reserved outer slots, carry Pauli
+        labels SELECT cannot encode, or hold X/Y coefficients that are neither the particle nor
+        the hole form. A screened mode is still a valid row: it keeps its slot at zero amplitude.
+        """
+        source = factorized_hamiltonian_to_sossa_operator(
+            create_random_factorized_hamiltonian(num_orbitals, 1, 1, 1)
+        ).get_container()
+        angles = source.one_body.angles
+        row_coeffs = source.one_body.coeffs if coeffs is None else coeffs
+        if num_rows is not None:
+            angles, row_coeffs = angles[:num_rows], row_coeffs[:num_rows]
+        one_body = RotatedPaulis(angles, row_coeffs, paulis or source.one_body.paulis)
+        operator = _sossa_operator_with_one_body(
+            source,
+            one_body,
+            num_positive=source.metadata.num_positive_one_body_terms if num_positive is None else num_positive,
+        )
+
+        if match is None:
+            assert isinstance(SOSSABuilder().run(operator).get_container(), SOSSABlockEncodingContainer)
+            return
+        with pytest.raises(ValueError, match=match):
+            SOSSABuilder().run(operator)
+
     def test_outer_prepare_weights_and_one_body_addressing(self):
         r"""The outer PREPARE holds :math:`c/\|c\|`, with the scale carried by :math:`\Lambda`."""
         operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(2, 1, 1, 1))
         sossa = operator.get_container()
-        sossa.one_body.coeffs[...] = np.array([[1.0, -2.0j], [-3.0, 4.0j]])
         sossa.two_body.coeffs[...] = np.array([[-5.0, 6.0]])
+        one_body = RotatedPaulis(
+            sossa.one_body.angles,
+            np.array([[1.0, 1.0j], [-3.0, 3.0j]], dtype=complex),
+            sossa.one_body.paulis,
+        )
+        operator = _sossa_operator_with_one_body(sossa, one_body, num_positive=1)
 
         container = SOSSABuilder().run(operator).get_container()
 
         amplitudes = np.asarray(container.outer_prepare.get_coefficients(), dtype=float)
-        expected_weights = np.array([3.0 * np.sqrt(2.0), 7.0 * np.sqrt(2.0), 11.0 / np.sqrt(2.0)])
+        expected_weights = np.array([2.0 * np.sqrt(2.0), 6.0 * np.sqrt(2.0), 11.0 / np.sqrt(2.0)])
         expected_normalization = 0.5 * np.sum(expected_weights**2)
         expected_amplitudes = expected_weights / np.linalg.norm(expected_weights)
 
@@ -316,22 +387,12 @@ class TestSOSSABuilder:
         source = factorized_hamiltonian_to_sossa_operator(
             create_random_factorized_hamiltonian(3, 3, 1, 2)
         ).get_container()
-        operator = QubitOperator(
-            SumOfSquaresContainer(
-                source.one_body,
-                source.two_body,
-                source.encoding,
-                source.fermion_mode_order,
-                SumOfSquaresMetadata(
-                    num_spatial_orbitals=3,
-                    num_ranks=3,
-                    num_bases=1,
-                    num_copies=2,
-                    num_positive_one_body_terms=1,
-                    energy_shift=source.metadata.energy_shift,
-                ),
-            )
+        one_body = RotatedPaulis(
+            source.one_body.angles,
+            np.array([[1.0, 1.0j], [2.0, -2.0j], [3.0, -3.0j]], dtype=complex),
+            source.one_body.paulis,
         )
+        operator = _sossa_operator_with_one_body(source, one_body, num_positive=1)
 
         container = SOSSABuilder().run(operator).get_container()
         actual = np.asarray(container.inner_prepare.free_rider_data, dtype=bool)
