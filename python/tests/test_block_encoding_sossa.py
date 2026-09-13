@@ -300,12 +300,7 @@ class TestSOSSABuilder:
         assert container.normalization > 0
 
     def test_every_table_is_addressed_by_outer_slot_on_one_deterministic_fixture(self):
-        """Pin the table layout that SELECT and the inner PREPARE address by outer index.
-
-        Spin-free angles transpose from rank-major to basis-major and pad an identity tail;
-        every other table keeps one row per outer slot, including the screened one-body mode
-        whose zero eigenvalue must hold its slot rather than shift the rows after it.
-        """
+        """Pin the table layout that SELECT and the inner PREPARE address by outer index."""
         num_orbitals, num_ranks, num_bases = 3, 3, 2
         source = factorized_hamiltonian_to_sossa_operator(
             create_random_factorized_hamiltonian(num_orbitals, num_ranks, num_bases, 1)

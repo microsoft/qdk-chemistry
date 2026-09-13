@@ -550,27 +550,43 @@ def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
 
 @pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre not available")
 def test_a_positive_compute_capacity_moves_qubits_into_memory():
-    """A honoured ``computeCapacity`` splits the QRE trace into a compute and a memory area.
+    """A honoured ``computeCapacity`` splits the estimate into a compute and a memory area.
 
     ``Circuit.estimate`` reports one ``numQubits`` total and cannot see the split, so an
-    ignored capacity looks identical to an honoured one. The QRE trace carries both counts.
+    ignored capacity looks identical to an honoured one. Only a memory-aware ISA, which
+    yokes a memory code onto the compute code, supplies the ``MEMORY`` instruction the
+    capacity-bounded trace requires.
     """
-    from qdk.qre import PSSPC, LatticeSurgery  # noqa: PLC0415
+    from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
+    from qdk.qre.models import (  # noqa: PLC0415
+        GateBased,
+        RoundBasedFactory,
+        SurfaceCode,
+        TwoDimensionalYokedSurfaceCode,
+    )
+    from qdk.qre.property_keys import LOGICAL_COMPUTE_QUBITS, LOGICAL_MEMORY_QUBITS  # noqa: PLC0415
 
+    distances = list(range(5, 26, 2))
+    isa_query = (
+        SurfaceCode.q(distance=distances)
+        * RoundBasedFactory.q(use_cache=True, code_query=SurfaceCode.q(distance=distances))
+        * TwoDimensionalYokedSurfaceCode.q(source=SurfaceCode.q(distance=distances))
+    )
     trace_query = PSSPC.q() * LatticeSurgery.q()
+    architecture = GateBased(error_rate=1e-4, gate_time=50, measurement_time=100)
 
-    def split(compute_capacity: int) -> tuple[int, int | None]:
+    def split(compute_capacity: int) -> tuple[int, int]:
         circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
-        traces = trace_query.enumerate(circuit.get_qre_application().context())
-        splits = {(trace.compute_qubits, trace.memory_qubits) for trace in traces}
-        assert len(splits) == 1, f"capacity {compute_capacity} split depends on trace parameters: {splits}"
-        return splits.pop()
+        result = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, max_error=0.1)
+        entries = list(result)
+        assert entries, f"capacity {compute_capacity} admitted no feasible estimate"
+        best = min(entries, key=lambda entry: entry.qubits)
+        return best.properties.get(LOGICAL_COMPUTE_QUBITS, 0), best.properties.get(LOGICAL_MEMORY_QUBITS, 0)
 
     disabled_compute, disabled_memory = split(-1)
     capped_compute, capped_memory = split(2)
 
-    assert disabled_memory is None, f"the disabled sentinel reserved {disabled_memory} memory qubits"
-    assert capped_memory is not None, "capacity 2 disabled the memory area entirely"
+    assert disabled_memory == 0, f"the disabled sentinel reserved {disabled_memory} memory qubits"
     assert capped_memory > 0, f"capacity 2 left every qubit in compute ({capped_compute}, {capped_memory})"
     assert capped_compute < disabled_compute, (
         f"capacity 2 did not shrink the compute area: {capped_compute} against {disabled_compute} when disabled"

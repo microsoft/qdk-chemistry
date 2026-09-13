@@ -271,7 +271,12 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
 
     @property
     def num_qubits(self) -> int:
-        """Total number of qubits to be allocated in QPE or other callers."""
+        """Width of the canonical ``[system | outer index | inner index | spin]`` register.
+
+        Sub-algorithms chosen at mapping time add scratch this container cannot see: alias
+        sampling widens the reflected inner register and ``qrom_phase_gradient`` adds a
+        gradient register, so the mapper's ``Circuit.num_qubits`` is authoritative.
+        """
         meta = self.metadata
         layout = self.layout
         num_system = 2 * meta.num_spatial_orbitals
