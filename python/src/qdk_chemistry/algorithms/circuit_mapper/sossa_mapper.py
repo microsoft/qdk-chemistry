@@ -204,8 +204,8 @@ class SOSSAMapper(CircuitMapper):
         """Compute the register widths and the Q# ``SOSSAWalkLayout`` describing them.
 
         Args:
-            container: The SOSSA walk container describing the block encoding.
-            outer_prepare_circuit: The outer PREPARE circuit already created for this walk.
+            container: The SOSSA block encoding container.
+            outer_prepare_circuit: The outer PREPARE circuit already created for this block encoding.
 
         Returns:
             The width map, and the Q# ``SOSSAWalkLayout`` built from it.
@@ -269,7 +269,7 @@ class SOSSAMapper(CircuitMapper):
             "num_outer_prepare_gradient_qubits": outer_gradient_bits,
             "num_ancilla_qubits": num_outer_qubits + num_reflect_inner + num_spin_qubits + num_phase_gradient_qubits,
         }
-        walk_layout = QSHARP_UTILS.SOSSAWalk.SOSSAWalkLayout(
+        register_layout = QSHARP_UTILS.SOSSAWalk.SOSSAWalkLayout(
             numSystemQubits=regs["num_system_qubits"],
             numOuterQubits=regs["num_outer_qubits"],
             numOuterIndexQubits=regs["num_outer_index_qubits"],
@@ -279,7 +279,7 @@ class SOSSAMapper(CircuitMapper):
             numFreeRiderQubits=num_free_rider_bits,
             numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
         )
-        return regs, walk_layout
+        return regs, register_layout
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the SOSSA block encoding on the flat ``[system | ancilla]`` register.
@@ -301,14 +301,14 @@ class SOSSAMapper(CircuitMapper):
         free_rider = container.inner_prepare.free_rider_data
         if container.layout.num_free_rider_bits and (free_rider is None or free_rider.size == 0):
             raise ValueError(
-                f"The walk layout reserves {container.layout.num_free_rider_bits} free-rider bits "
+                f"The register layout reserves {container.layout.num_free_rider_bits} free-rider bits "
                 "but the container carries no free-rider table."
             )
         if container.power != 1:
-            Logger.warn(f"The container's walk power {container.power} is ignored.")
+            Logger.warn(f"The container's power {container.power} is ignored.")
 
         outer_prepare_circuit = self._build_outer_prepare_circuit(container)
-        regs, walk_layout = self._compute_register_sizes(container, outer_prepare_circuit)
+        regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
         outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
         inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         select_op = self._build_select(container)
@@ -320,7 +320,7 @@ class SOSSAMapper(CircuitMapper):
                 "freeRiderOp": free_rider_op,
                 "innerPrepareOp": inner_prepare_op,
                 "selectOp": select_op,
-                "layout": walk_layout,
+                "layout": register_layout,
             },
         )
         qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingOp(
@@ -328,7 +328,7 @@ class SOSSAMapper(CircuitMapper):
             free_rider_op,
             inner_prepare_op,
             select_op,
-            walk_layout,
+            register_layout,
         )
 
         return Circuit(

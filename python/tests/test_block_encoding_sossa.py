@@ -298,10 +298,10 @@ class TestSOSSABuilder:
     @pytest.mark.parametrize(
         ("num_orbitals", "num_rows", "coeffs", "paulis", "num_positive", "match"),
         [
-            (3, 2, None, None, 1, "outer register reserves 3 one-body slots"),
+            (3, 2, None, None, 1, "SOSSA requires 3 one-body slots"),
             (2, None, None, ("X", "Z"), None, "must use Pauli labels"),
-            (2, None, np.array([[1.0, 2.0j], [0.0, 0.0]], dtype=complex), None, 1, "row 0 describes a particle"),
-            (2, None, np.array([[1.0, 1.0j], [1.0, 1.0j]], dtype=complex), None, 1, "row 1 describes a hole"),
+            (2, None, np.array([[1.0, 2.0j], [0.0, 0.0]], dtype=complex), None, 1, "row 0 generator particle"),
+            (2, None, np.array([[1.0, 1.0j], [1.0, 1.0j]], dtype=complex), None, 1, "row 1 generator hole"),
             (2, None, np.array([[1.0, 1.0j], [0.0, 0.0]], dtype=complex), None, 1, None),
         ],
         ids=["too-few-rows", "unencodable-paulis", "not-a-particle", "not-a-hole", "screened-row-accepted"],
@@ -332,6 +332,58 @@ class TestSOSSABuilder:
         if match is None:
             assert isinstance(SOSSABuilder().run(operator).get_container(), SOSSABlockEncodingContainer)
             return
+        with pytest.raises(ValueError, match=match):
+            SOSSABuilder().run(operator)
+
+    def test_an_all_zero_operator_has_no_outer_distribution_to_prepare(self):
+        """Every generator screened out leaves the outer PREPARE with nothing to normalize."""
+        source = factorized_hamiltonian_to_sossa_operator(
+            create_random_factorized_hamiltonian(2, 1, 1, 1)
+        ).get_container()
+        source.two_body.coeffs[...] = 0.0
+        operator = _sossa_operator_with_one_body(
+            source,
+            RotatedPaulis(source.one_body.angles, np.zeros_like(source.one_body.coeffs), source.one_body.paulis),
+            num_positive=source.metadata.num_positive_one_body_terms,
+        )
+
+        with pytest.raises(ValueError, match="positive normalization"):
+            SOSSABuilder().run(operator)
+
+    @pytest.mark.parametrize(
+        ("truncate_angle_rows", "drop_coeff_column", "complex_coeffs", "match"),
+        [
+            (True, False, False, "two-body angles of shape"),
+            (False, True, False, "two-body coefficients of shape"),
+            (False, False, True, "real two-body coefficients"),
+        ],
+        ids=["short-angle-table", "short-coefficient-row", "complex-coefficients"],
+    )
+    def test_two_body_generators_must_fill_the_spin_free_select_table(
+        self, truncate_angle_rows, drop_coeff_column, complex_coeffs, match
+    ):
+        """SELECT reads one Givens angle set per (rank, basis) and one weight row per (rank, copy).
+
+        A short angle table mis-addresses the QROM rather than failing, and a short or
+        complex-valued weight row carries no real rotated-Z amplitude for SELECT to emit.
+        """
+        source = factorized_hamiltonian_to_sossa_operator(
+            create_random_factorized_hamiltonian(2, 2, 2, 1)
+        ).get_container()
+        angles = source.two_body.angles[:-1] if truncate_angle_rows else source.two_body.angles
+        coeffs = source.two_body.coeffs[:, :-1] if drop_coeff_column else source.two_body.coeffs.copy()
+        if complex_coeffs:
+            coeffs[0, 0] += 1j
+        operator = QubitOperator(
+            container=SumOfSquaresContainer(
+                source.one_body,
+                RotatedPaulis(angles, coeffs, source.two_body.paulis),
+                source.encoding,
+                source.fermion_mode_order,
+                source.metadata,
+            )
+        )
+
         with pytest.raises(ValueError, match=match):
             SOSSABuilder().run(operator)
 

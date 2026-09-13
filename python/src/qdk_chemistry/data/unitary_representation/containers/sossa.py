@@ -271,15 +271,7 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
 
     @property
     def num_qubits(self) -> int:
-        """Total number of qubits to be allocated in QPE or other callers.
-
-        Only the first ``inner_prep_bits`` qubits of the inner register are caller-visible;
-        the QROM output and free-rider bits behind them are scratch the walk allocates
-        itself. An inner PREPARE that samples coefficients (rather than reading them
-        directly) widens the caller-visible part by a mapper-chosen bit precision this
-        container does not see, so callers composing such a circuit must take the width
-        from the mapped :class:`~qdk_chemistry.data.circuit.Circuit` instead.
-        """
+        """Total number of qubits to be allocated in QPE or other callers."""
         meta = self.metadata
         layout = self.layout
         num_system = 2 * meta.num_spatial_orbitals

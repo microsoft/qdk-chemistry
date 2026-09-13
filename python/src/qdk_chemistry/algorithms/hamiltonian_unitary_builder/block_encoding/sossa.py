@@ -5,7 +5,7 @@ r"""QDK/Chemistry implementation of the Sum of Squares Spectral Amplification (S
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from math import ceil, isnan, log2, nan, sqrt
+from math import ceil, isfinite, isnan, log2, nan, sqrt
 
 import numpy as np
 
@@ -113,9 +113,12 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         n_orbitals = meta.num_spatial_orbitals
         num_positive = meta.num_positive_one_body_terms
         self._validate_one_body_generators(sossa, n_orbitals, num_positive)
+        self._validate_two_body_generators(sossa, n_orbitals, meta.num_ranks, meta.num_bases, meta.num_copies)
 
         outer_coefficients = self._outer_coefficients(sossa)
         normalization = 0.5 * float(np.sum(a=outer_coefficients**2))
+        if not isfinite(normalization) or normalization <= 0.0:
+            raise ValueError(f"SOSSA block encoding requires a positive normalization, got {normalization}.")
         lambda_eff = _resolve_lambda_eff(
             normalization,
             meta.energy_shift,
@@ -173,15 +176,11 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         coeffs = np.asarray(one_body.coeffs, dtype=complex)
         if angles.shape[0] != num_orbitals or coeffs.shape[0] != num_orbitals:
             raise ValueError(
-                "SOSSA requires exactly one one-body generator row per spatial orbital because the "
-                f"outer register reserves {num_orbitals} one-body slots; got {angles.shape[0]} angle rows "
+                f"SOSSA requires {num_orbitals} one-body slots; got {angles.shape[0]} angle rows "
                 f"and {coeffs.shape[0]} coefficient rows."
             )
         if one_body.paulis != ("X", "Y"):
-            raise ValueError(
-                "SOSSA one-body generators must use Pauli labels ('X', 'Y') so SELECT can implement "
-                f"weighted creation and annihilation operators; got {one_body.paulis!r}."
-            )
+            raise ValueError(f"SOSSA one-body generators must use Pauli labels ('X', 'Y'); got {one_body.paulis!r}.")
 
         signs = np.ones(num_orbitals)
         signs[num_positive:] = -1.0
@@ -192,9 +191,33 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             generator = "particle" if row < num_positive else "hole"
             relation = "c_Y = +i*c_X" if row < num_positive else "c_Y = -i*c_X"
             raise ValueError(
-                f"SOSSA one-body coefficient row {row} describes a {generator} generator and must satisfy "
+                f"SOSSA one-body coefficient row {row} generator {generator} and must satisfy "
                 f"{relation}; got c_X={coeffs[row, 0]!r}, c_Y={coeffs[row, 1]!r}."
             )
+
+    @staticmethod
+    def _validate_two_body_generators(
+        sossa: SumOfSquaresContainer,
+        num_orbitals: int,
+        num_ranks: int,
+        num_bases: int,
+        num_copies: int,
+    ) -> None:
+        """Validate spin-free rows before they are packed into the fixed outer layout."""
+        angles = np.asarray(sossa.two_body.angles)
+        coeffs = np.asarray(sossa.two_body.coeffs, dtype=complex)
+        if angles.shape[0] != num_ranks * num_bases or (angles.shape[0] and angles.shape[1] != num_orbitals - 1):
+            raise ValueError(
+                f"SOSSA requires two-body angles of shape {(num_ranks * num_bases, num_orbitals - 1)}; "
+                f"got {angles.shape}."
+            )
+        if coeffs.shape[0] != num_ranks * num_copies or (coeffs.shape[0] and coeffs.shape[1] != num_bases + 1):
+            raise ValueError(
+                f"SOSSA requires two-body coefficients of shape {(num_ranks * num_copies, num_bases + 1)}; "
+                f"got {coeffs.shape}."
+            )
+        if not np.allclose(coeffs.imag, 0.0):
+            raise ValueError("SOSSA requires real two-body coefficients; got a complex-valued block")
 
     @staticmethod
     def _outer_coefficients(sossa: SumOfSquaresContainer) -> np.ndarray:
@@ -233,8 +256,6 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         sf = np.asarray(sossa.two_body.coeffs)
         sf_rows = np.zeros((sf.shape[0] if sf.ndim == 2 else 0, b_plus_1))
         if sf.size:
-            if not np.allclose(sf.imag, 0.0):
-                raise ValueError("SOSSA requires real two-body coefficients; got a complex-valued block")
             weights = np.real(sf)
             sf_rows = np.sign(weights) * np.sqrt(np.abs(weights))
             empty_rows = ~sf_rows.any(axis=1)

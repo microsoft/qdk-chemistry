@@ -177,9 +177,6 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_builder = self._create_nested("unitary_builder")
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
-        # This builder owns the walk's reflection so it can omit one occurrence and realize a
-        # signed power, so it maps the block encoding rather than a pre-composed walk. A walk
-        # container is unwrapped to the encoding it carries; a block encoding is used directly.
         if not isinstance(container, QuantumWalkContainer | BlockEncodingContainer):
             raise ValueError(
                 "Requires a quantum walk or block encoding unitary representation because this circuit "

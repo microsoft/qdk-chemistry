@@ -198,9 +198,6 @@ class QubitOperator(DataClass):
         if not isinstance(other, QubitOperator):
             return NotImplemented
         added = self._forward("__add__")(other.get_container())
-        # A container returns NotImplemented when it does not define addition against the
-        # operand's container type. Propagate the sentinel instead of wrapping it, so Python
-        # can still try the reflected operation before raising TypeError.
         return NotImplemented if added is NotImplemented else QubitOperator(container=added)
 
     def __mul__(self, scalar: Any) -> QubitOperator:
