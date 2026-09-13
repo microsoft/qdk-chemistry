@@ -19,6 +19,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
 
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
 )
@@ -29,7 +30,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import dense_matrix
@@ -346,3 +347,67 @@ class TestSparseControlledEvolution:
         got = dense_matrix(_sparse_controlled_op(terms), num_qubits + 1)
         control_off_size = 2**num_qubits
         assert np.max(np.abs(got[:control_off_size, :control_off_size] - np.eye(control_off_size))) < _TOL
+
+
+def test_batched_mapper_is_opt_in_and_reduces_rotation_depth() -> None:
+    """Both variants stay sparse and symbolic; batching reduces rotation rounds, not gate counts."""
+    assert create("controlled_circuit_mapper").name() == "pauli_sequence"
+    terms = [ExponentiatedPauliTerm({2 * i: "X", 2 * i + 1: "Y"}, 0.123) for i in range(6)]
+    unitary = UnitaryRepresentation(container=PauliProductFormulaContainer(terms, 2, 12))
+    counts = []
+    for variant in ("pauli_sequence", "batched_pauli_sequence"):
+        mapper = create("controlled_circuit_mapper", variant)
+        assert mapper.name() == variant
+        circuit = mapper.run(unitary)
+        payload = circuit._qsharp_factory.parameter
+        params = vars(payload["params"])
+        assert params["repetitions"] == 2
+        assert sum(map(len, params["pauliIndices"])) == 12
+        if variant == "batched_pauli_sequence":
+            assert payload["batchOffsets"] == [0, 6]
+        else:
+            assert "batchOffsets" not in payload
+        application = circuit.get_qre_application()
+        counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
+    assert counts[0]["numQubits"] == counts[1]["numQubits"] == 13
+    assert counts[0]["rotationCount"] == counts[1]["rotationCount"] == 24
+    assert counts[1]["rotationDepth"] == 4
+    assert counts[1]["rotationDepth"] < counts[0]["rotationDepth"]
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+@pytest.mark.parametrize("repetitions", [1, 3])
+@pytest.mark.parametrize("empty", [False, True])
+def test_batched_mapper_full_matrix(repetitions: int, empty: bool) -> None:
+    """Preserve mixed supports, noncommuting order, identity phases, and permuted target wires."""
+    terms = [
+        ExponentiatedPauliTerm({3: "Y", 0: "X"}, -0.31),
+        ExponentiatedPauliTerm({2: "Z", 1: "Y"}, 0.27),
+        ExponentiatedPauliTerm({0: "Y"}, -0.19),
+        ExponentiatedPauliTerm({}, 0.11),
+        ExponentiatedPauliTerm({0: "I", 2: "Z"}, -0.23),
+    ]
+    if empty:
+        terms = []
+    targets = [3, 0, 2, 1]
+    mapper = create("controlled_circuit_mapper", "batched_pauli_sequence", control_indices=[4], target_indices=targets)
+    circuit = mapper.run(UnitaryRepresentation(container=PauliProductFormulaContainer(terms, repetitions, 4)))
+    paulis = {
+        "I": np.eye(2),
+        "X": np.array([[0, 1], [1, 0]]),
+        "Y": np.array([[0, -1j], [1j, 0]]),
+        "Z": np.diag([1, -1]),
+    }
+    step = np.eye(16, dtype=complex)
+    for term in terms:
+        factors = {targets[q]: paulis[axis] for q, axis in term.pauli_term.items()}
+        generator = np.ones((1, 1), dtype=complex)
+        for q in reversed(range(4)):
+            generator = np.kron(generator, factors.get(q, paulis["I"]))
+        step = scipy.linalg.expm(-1j * term.angle * generator) @ step
+    zero = np.zeros_like(step)
+    expected = np.block([[np.eye(16), zero], [zero, np.linalg.matrix_power(step, repetitions)]])
+    actual = Operator(circuit.get_qiskit_circuit()).data
+    # Fix only the circuit-global phase QIR can elide, using the known control-off branch.
+    actual /= actual[0, 0]
+    np.testing.assert_allclose(actual, expected, atol=1e-12, rtol=0)

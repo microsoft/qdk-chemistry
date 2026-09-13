@@ -79,13 +79,17 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
+        return self._map_sequence(unitary_container, control_indices[0], target_indices)
+
+    def _map_sequence(self, container: PauliProductFormulaContainer, control: int, systems: list[int]) -> Circuit:
+        """Map a validated product formula, allowing variants to choose its gate schedule."""
+        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(container))
         program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
         controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params)
 
         qsharp_factory = QsharpFactoryData(
             program=program,
-            parameter={"params": evo_params, "control": control_indices[0], "systems": target_indices},
+            parameter={"params": evo_params, "control": control, "systems": systems},
         )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
