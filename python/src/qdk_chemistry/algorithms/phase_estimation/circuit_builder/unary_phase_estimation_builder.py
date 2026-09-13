@@ -11,10 +11,10 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
-    BlockEncodingContainer,
     LCUContainer,
 )
-from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -168,8 +168,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
-            ValueError: If the unitary representation is neither a quantum walk nor a block
-                encoding, if the mapper does not declare its register width, if the block
+            ValueError: If the unitary representation is neither an LCU walk nor a SOSSA
+                block encoding, if the mapper does not declare its register width, if the block
                 encoding has no ancilla register for the walk to reflect about, or if the
                 state preparation and block encoding disagree on the shared ancilla count.
 
@@ -177,9 +177,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_builder = self._create_nested("unitary_builder")
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
-        if not isinstance(container, QuantumWalkContainer | BlockEncodingContainer):
+        if not isinstance(container, LCUWalkContainer | SOSSABlockEncodingContainer):
             raise ValueError(
-                "Requires a quantum walk or block encoding unitary representation because this circuit "
+                "Requires an LCU walk or SOSSA block encoding unitary representation because this circuit "
                 f"explicitly controls the block encoding's reflection, got '{container.type}'."
             )
 

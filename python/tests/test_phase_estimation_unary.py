@@ -35,6 +35,13 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
+try:
+    import qdk.qre  # noqa: F401
+
+    _HAS_QRE = True
+except ImportError:
+    _HAS_QRE = False
+
 
 def _address_qubits(num_actions: int) -> int:
     """Number of address qubits the Q# operations expect for ``num_actions`` values."""
@@ -284,17 +291,10 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
             _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
 
-    def test_a_plain_block_encoding_defers_its_failure_to_decoding(self):
-        """The builder owns the reflection, so a bare LCU maps like any block encoding.
-
-        What a bare LCU lacks is a phase-to-energy relation, so the configuration is only
-        surfaced when the measured phase is decoded.
-        """
-        assert len(_run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))) == 1
-
-        container = LCUBuilder(quantum_walk=False).run(_hamiltonian()).get_container()
-        with pytest.raises(NotImplementedError, match="does not define an eigenvalue-phase relationship"):
-            container.eigenvalue_from_phase(0.25)
+    def test_a_plain_block_encoding_is_rejected(self):
+        """A bare LCU has no phase-to-energy relation, so it cannot back a unary QPE run."""
+        with pytest.raises(ValueError, match="Requires an LCU walk or SOSSA block encoding"):
+            _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
 
     @pytest.mark.parametrize(
         ("declared_width", "message"),
@@ -548,11 +548,33 @@ def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
     assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
 
 
-def test_a_positive_compute_capacity_can_be_resource_estimated():
-    """The memory-aware branch must execute on the Q# resource-estimation path."""
-    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=2))[0]
+@pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre not available")
+def test_a_positive_compute_capacity_moves_qubits_into_memory():
+    """A honoured ``computeCapacity`` splits the QRE trace into a compute and a memory area.
 
-    assert circuit.estimate().logical_counts["numQubits"] > 0
+    ``Circuit.estimate`` reports one ``numQubits`` total and cannot see the split, so an
+    ignored capacity looks identical to an honoured one. The QRE trace carries both counts.
+    """
+    from qdk.qre import PSSPC, LatticeSurgery  # noqa: PLC0415
+
+    trace_query = PSSPC.q() * LatticeSurgery.q()
+
+    def split(compute_capacity: int) -> tuple[int, int | None]:
+        circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
+        traces = trace_query.enumerate(circuit.get_qre_application().context())
+        splits = {(trace.compute_qubits, trace.memory_qubits) for trace in traces}
+        assert len(splits) == 1, f"capacity {compute_capacity} split depends on trace parameters: {splits}"
+        return splits.pop()
+
+    disabled_compute, disabled_memory = split(-1)
+    capped_compute, capped_memory = split(2)
+
+    assert disabled_memory is None, f"the disabled sentinel reserved {disabled_memory} memory qubits"
+    assert capped_memory is not None, "capacity 2 disabled the memory area entirely"
+    assert capped_memory > 0, f"capacity 2 left every qubit in compute ({capped_compute}, {capped_memory})"
+    assert capped_compute < disabled_compute, (
+        f"capacity 2 did not shrink the compute area: {capped_compute} against {disabled_compute} when disabled"
+    )
 
 
 def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:

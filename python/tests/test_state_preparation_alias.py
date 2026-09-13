@@ -319,10 +319,10 @@ class TestConditionalAliasSampling:
     def test_non_power_of_two_prepare_can_be_adjointed_after_a_phase(self):
         r"""``PREP†·Z(index₀)·PREP`` returns to the start with amplitude :math:`\langle Z\rangle`.
 
-        A norm check alone holds for any unitary. The return amplitude is what shows the
-        non-power-of-two PREPARE was actually uncomputed: garbage is identical for equal
-        indices, so it cancels and the overlap is :math:`\sum_i p_i (-1)^{b(i)}`. ``indexReg[0]``
-        is the index's low bit, so ``Z`` flips the sign of the odd indices.
+        Garbage cancels between equal indices, so the overlap is :math:`\sum_i p_i (-1)^{b(i)}`;
+        ``indexReg[0]`` is the index's low bit, so ``Z`` flips the odd indices. Only the magnitude
+        is asserted: ``Adjoint Select`` erases by measurement, leaving a random global
+        :math:`\pm 1`.
         """
         coefficients = [[0.2, 0.3, 0.5], [0.4, 0.1, 0.5]]
         bits_precision = 4
@@ -344,7 +344,9 @@ class TestConditionalAliasSampling:
         initial = condition_value << (total_qubits - 1)
 
         assert np.linalg.norm(state) == pytest.approx(1.0)
-        assert state[initial] == pytest.approx(expected, abs=len(probs) * _alias_atol(len(probs), bits_precision))
+        assert abs(state[initial]) == pytest.approx(
+            abs(expected), abs=len(probs) * _alias_atol(len(probs), bits_precision)
+        )
 
     @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
     @pytest.mark.parametrize("condition_value", [0, 1])

@@ -299,6 +299,83 @@ class TestSOSSABuilder:
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
         assert container.normalization > 0
 
+    def test_every_table_is_addressed_by_outer_slot_on_one_deterministic_fixture(self):
+        """Pin the table layout that SELECT and the inner PREPARE address by outer index.
+
+        Spin-free angles transpose from rank-major to basis-major and pad an identity tail;
+        every other table keeps one row per outer slot, including the screened one-body mode
+        whose zero eigenvalue must hold its slot rather than shift the rows after it.
+        """
+        num_orbitals, num_ranks, num_bases = 3, 3, 2
+        source = factorized_hamiltonian_to_sossa_operator(
+            create_random_factorized_hamiltonian(num_orbitals, num_ranks, num_bases, 1)
+        ).get_container()
+        for rank in range(num_ranks):
+            for basis in range(num_bases):
+                marker = 10.0 * rank + basis + 1.0
+                source.two_body.angles[rank * num_bases + basis] = [marker, marker + 0.5]
+        source.two_body.coeffs[...] = np.array([[1.0, -3.0, 5.0], [-2.0, 2.0, 6.0], [5.0, -1.0, 8.0]])
+        one_body = RotatedPaulis(
+            source.one_body.angles,
+            np.array([[2.0, 2.0j], [0.0, 0.0], [3.0, -3.0j]], dtype=complex),
+            source.one_body.paulis,
+        )
+        operator = _sossa_operator_with_one_body(source, one_body, num_positive=1)
+
+        container = SOSSABuilder().run(operator).get_container()
+
+        np.testing.assert_allclose(
+            container.select.two_body_rotation_angles,
+            np.array(
+                [
+                    [1.0, 1.5],  # basis 0, rank 0
+                    [11.0, 11.5],  # basis 0, rank 1
+                    [21.0, 21.5],  # basis 0, rank 2
+                    [2.0, 2.5],  # basis 1, rank 0
+                    [12.0, 12.5],  # basis 1, rank 1
+                    [22.0, 22.5],  # basis 1, rank 2
+                    [0.0, 0.0],  # b == B selects the identity term
+                    [0.0, 0.0],
+                    [0.0, 0.0],
+                ]
+            ),
+        )
+
+        root2 = np.sqrt(2.0)
+        weights = np.array([4.0 * root2, 0.0, 6.0 * root2, 9.0 / root2, 10.0 / root2, 14.0 / root2])
+        np.testing.assert_allclose(
+            np.asarray(container.outer_prepare.get_coefficients(), dtype=float),
+            weights / np.linalg.norm(weights),
+        )
+        assert container.normalization == pytest.approx(0.5 * float(np.sum(weights**2)))
+
+        np.testing.assert_allclose(
+            np.asarray(container.inner_prepare.conditional_coefficients, dtype=float),
+            np.array(
+                [
+                    [1.0, 0.0, 0.0],
+                    [1.0, 0.0, 0.0],  # the screened mode keeps its delta row
+                    [1.0, 0.0, 0.0],
+                    [1.0, -np.sqrt(3.0), np.sqrt(5.0)],
+                    [-root2, root2, np.sqrt(6.0)],
+                    [np.sqrt(5.0), -1.0, 2.0 * root2],
+                ]
+            ),
+        )
+        np.testing.assert_array_equal(
+            np.asarray(container.inner_prepare.free_rider_data, dtype=bool),
+            np.array(
+                [
+                    [False, False, False, False],  # D1
+                    [False, True, False, False],  # Q1, the screened mode
+                    [False, True, False, False],  # Q1
+                    [True, True, False, False],  # SF, rank 0
+                    [True, True, True, False],  # SF, rank 1
+                    [True, True, False, True],  # SF, rank 2
+                ]
+            ),
+        )
+
     @pytest.mark.parametrize(
         ("num_orbitals", "num_rows", "coeffs", "paulis", "num_positive", "match"),
         [

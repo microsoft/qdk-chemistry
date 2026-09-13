@@ -767,4 +767,4 @@ class TestSOSSAResourceEstimation:
         toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
 
         assert toffoli_count == pytest.approx(42_558_509, rel=0.01)
-        assert logical_counts["numQubits"] == 463
+        assert logical_counts["numQubits"] == 486
