@@ -12,7 +12,7 @@ from qdk_chemistry.algorithms import DoubleFactorization, HamiltonianFactorizati
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     HamiltonianType,
     SettingNotFoundError,
@@ -73,7 +73,7 @@ class TestDoubleFactorization:
         container = factorized.get_container()
 
         assert isinstance(factorized, Hamiltonian)
-        assert isinstance(container, FactorizedHamiltonianContainer)
+        assert isinstance(container, DFTHCHamiltonianContainer)
         np.testing.assert_allclose(
             factorized.get_two_body_integrals()[0],
             (vectors @ vectors.T).ravel(),

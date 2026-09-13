@@ -13,7 +13,7 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
@@ -107,7 +107,7 @@ def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, se
     num_system_qubits = 2 * num_orbitals
     dimension = 2**num_system_qubits
 
-    container = FactorizedHamiltonianContainer(
+    container = DFTHCHamiltonianContainer(
         one_body_integrals=h1,
         u_matrices=u_matrices.reshape(-1),
         w_matrices=w_matrices.reshape(-1),

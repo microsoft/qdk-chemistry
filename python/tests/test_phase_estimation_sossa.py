@@ -1,7 +1,7 @@
 """Integration tests for unary-iteration QPE with the SOSSA block encoding.
 
 Tests the full pipeline:
-    FactorizedHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
+    DFTHCHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
     → SOSSAMapper → Circuit → unary-iteration QPE → energy
 """
 
@@ -24,7 +24,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     Configuration,
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
     StateVectorContainer,
@@ -132,7 +132,7 @@ def _dfthc_m_matrices(basis_vectors, two_body_weights):
 
 
 def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``FactorizedHamiltonianContainer::get_h1_prime`` (Eq. 36).
+    """Replicate ``DFTHCHamiltonianContainer::get_h1_prime`` (Eq. 36).
 
     The SOS generators are built from the *normal-ordering corrected* one-body
     matrix, not from the bare ``h1``::
@@ -396,7 +396,7 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
         nbeta=1,
     )
 
-    fh = FactorizedHamiltonianContainer(
+    fh = DFTHCHamiltonianContainer(
         one_body_integrals=data["h1"],
         u_matrices=data["basis_vectors"].flatten(),
         w_matrices=data["two_body_weights"].flatten(),
@@ -512,7 +512,7 @@ class TestSOSSAQPEIntegration:
             atol=1e-10,
         )
 
-        fh = FactorizedHamiltonianContainer(
+        fh = DFTHCHamiltonianContainer(
             one_body_integrals=data["h1"],
             u_matrices=data["basis_vectors"].flatten(),
             w_matrices=data["two_body_weights"].flatten(),
@@ -543,7 +543,7 @@ class TestSOSSAQPEIntegration:
         data = _build_h2_dfthc_data()
         n_orb = data["N"]
         orbitals = create_test_orbitals(n_orb)
-        fh = FactorizedHamiltonianContainer(
+        fh = DFTHCHamiltonianContainer(
             one_body_integrals=data["h1"],
             u_matrices=data["basis_vectors"].flatten(),
             w_matrices=data["two_body_weights"].flatten(),
@@ -604,7 +604,7 @@ class TestSOSSAQPEIntegration:
         # The shipped file's core energy is used rather than 0 so that the "total energy"
         # half of the contract is actually under test: with a zero core, passing an
         # active-space-only energy would be indistinguishable from passing a total one.
-        fh = FactorizedHamiltonianContainer(
+        fh = DFTHCHamiltonianContainer(
             one_body_integrals=data["h1"],
             u_matrices=data["basis_vectors"].flatten(),
             w_matrices=data["two_body_weights"].flatten(),

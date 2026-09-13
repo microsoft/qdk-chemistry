@@ -25,7 +25,7 @@ void bind_double_factorization(py::module &m) {
   backed by a :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`.
 
 See Also:
-    :class:`qdk_chemistry.data.FactorizedHamiltonianContainer`
+    :class:`qdk_chemistry.data.DFTHCHamiltonianContainer`
 
 References:
     :cite:`vonBurg2021`

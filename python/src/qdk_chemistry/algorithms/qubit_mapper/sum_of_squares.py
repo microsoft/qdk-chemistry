@@ -9,7 +9,7 @@ import numpy as np
 
 from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
-from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import DFTHCHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     RotatedPaulis,
     SumOfSquaresContainer,
@@ -75,8 +75,8 @@ class SumOfSquaresQubitMapper(QubitMapper):
             raise TypeError("SumOfSquaresQubitMapper requires a Hamiltonian")
 
         container = hamiltonian.get_container()
-        if not isinstance(container, FactorizedHamiltonianContainer):
-            raise TypeError("SumOfSquaresQubitMapper requires a Hamiltonian backed by FactorizedHamiltonianContainer")
+        if not isinstance(container, DFTHCHamiltonianContainer):
+            raise TypeError("SumOfSquaresQubitMapper requires a Hamiltonian backed by DFTHCHamiltonianContainer")
 
         self._validate_mapping(mapping, container.get_num_orbitals())
         return self._map_factorized_container(
@@ -108,7 +108,7 @@ class SumOfSquaresQubitMapper(QubitMapper):
     @classmethod
     def _map_factorized_container(
         cls,
-        container: FactorizedHamiltonianContainer,
+        container: DFTHCHamiltonianContainer,
         mapping: MajoranaMapping,
         threshold: float = 1e-12,
     ) -> QubitOperator:
@@ -212,7 +212,7 @@ class SumOfSquaresQubitMapper(QubitMapper):
 
     @classmethod
     def _map_two_body_terms(
-        cls, container: FactorizedHamiltonianContainer, mapping: MajoranaMapping
+        cls, container: DFTHCHamiltonianContainer, mapping: MajoranaMapping
     ) -> tuple[RotatedPaulis, float]:
         """Build spin-free generators and their contribution to the energy shift.
 

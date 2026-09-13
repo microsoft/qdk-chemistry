@@ -12,7 +12,7 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
-from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import DFTHCHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
@@ -288,7 +288,7 @@ class TestSumOfSquaresContainer:
         assert container.two_body.angles.shape != container.two_body.coeffs.shape
 
 
-def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
+def _factorized_with_one_body(h1: np.ndarray) -> DFTHCHamiltonianContainer:
     """Build a small factorized Hamiltonian carrying a chosen one-body matrix."""
     n = h1.shape[0]
     rng = np.random.default_rng(1)
@@ -296,7 +296,7 @@ def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
     for b in range(2):
         v = rng.standard_normal(n)
         u[b * n : (b + 1) * n] = v / np.linalg.norm(v)
-    return FactorizedHamiltonianContainer(
+    return DFTHCHamiltonianContainer(
         one_body_integrals=h1,
         u_matrices=u,
         w_matrices=rng.standard_normal(2),

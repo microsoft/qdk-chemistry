@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
     ModelOrbitals,
@@ -276,7 +276,7 @@ def create_random_factorized_hamiltonian(
     *,
     seed: int = 42,
 ):
-    """Create a random FactorizedHamiltonianContainer for testing.
+    """Create a random DFTHCHamiltonianContainer for testing.
 
     Args:
         num_orbitals: Number of spatial orbitals (N).
@@ -286,7 +286,7 @@ def create_random_factorized_hamiltonian(
         seed: Random seed for reproducibility.
 
     Returns:
-        FactorizedHamiltonianContainer from C++ pybind11.
+        DFTHCHamiltonianContainer from C++ pybind11.
 
     """
     rng = np.random.default_rng(seed)
@@ -313,7 +313,7 @@ def create_random_factorized_hamiltonian(
     orbitals = create_test_orbitals(n)
     inactive_fock = np.zeros((n, n))
 
-    return FactorizedHamiltonianContainer(
+    return DFTHCHamiltonianContainer(
         one_body_integrals=h1,
         u_matrices=u_matrices,
         w_matrices=w_matrices,
@@ -328,7 +328,7 @@ def factorized_hamiltonian_to_sossa_operator(factorized_hamiltonian):
     """Map a factorized Hamiltonian to the SOSSA QubitOperator the SOSSA builder expects.
 
     Args:
-        factorized_hamiltonian: The FactorizedHamiltonianContainer to map.
+        factorized_hamiltonian: The DFTHCHamiltonianContainer to map.
 
     Returns:
         The SOSSA QubitOperator.
