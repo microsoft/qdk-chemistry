@@ -18,6 +18,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
 
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
 )
@@ -28,6 +29,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -251,6 +253,8 @@ def _map_sparse_formula(
     repetitions: int,
     num_qubits: int = 2,
     targets: list[int] | None = None,
+    *,
+    variant: str = "pauli_sequence",
 ) -> Circuit:
     """Map equivalent legacy or packed terms without widening their support."""
     if packed:
@@ -271,7 +275,7 @@ def _map_sparse_formula(
         )
     else:
         container = PauliProductFormulaContainer(terms, step_reps=repetitions, num_qubits=num_qubits)
-    mapper = ControlledPauliSequenceMapper()
+    mapper = create("controlled_circuit_mapper", variant)
     mapper.settings().set("control_indices", [num_qubits])
     if targets is not None:
         mapper.settings().set("target_indices", targets)
@@ -279,6 +283,7 @@ def _map_sparse_formula(
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+@pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
 @pytest.mark.parametrize("packed", [False, True], ids=["legacy", "packed"])
 @pytest.mark.parametrize("repetitions", [1, 3])
 @pytest.mark.parametrize(
@@ -286,10 +291,13 @@ def _map_sparse_formula(
     [(False, [0, 1]), (True, [0, 1]), (False, [4, 1])],
     ids=["mixed", "empty", "reordered-noncontiguous"],
 )
-def test_sparse_controlled_matrix(packed: bool, repetitions: int, empty: bool, targets: list[int]) -> None:
+def test_sparse_controlled_matrix(
+    packed: bool, repetitions: int, empty: bool, targets: list[int], variant: str
+) -> None:
     """Preserve order, sign, identity-relative phases, and spectator qubits exactly."""
     terms = [
         ExponentiatedPauliTerm({0: "X"}, -0.31),
+        ExponentiatedPauliTerm({1: "Z"}, 0.13),
         ExponentiatedPauliTerm({0: "Y"}, 0.27),
         ExponentiatedPauliTerm({1: "X", 0: "Z"}, -0.19),
         ExponentiatedPauliTerm({}, 0.11),
@@ -297,7 +305,7 @@ def test_sparse_controlled_matrix(packed: bool, repetitions: int, empty: bool, t
     ]
     if empty:
         terms = []
-    circuit = _map_sparse_formula(terms, packed, repetitions, targets=targets)
+    circuit = _map_sparse_formula(terms, packed, repetitions, targets=targets, variant=variant)
     width = max(2, *targets) + 1
     assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == width
     paulis = {
@@ -328,7 +336,8 @@ def test_sparse_controlled_matrix(packed: bool, repetitions: int, empty: bool, t
 
 
 @pytest.mark.parametrize("packed", [False, True], ids=["legacy", "packed"])
-def test_wide_controlled_transport_stays_sparse(packed: bool) -> None:
+@pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
+def test_wide_controlled_transport_stays_sparse(packed: bool, variant: str) -> None:
     """Transport support-sized lists and scalar repetitions, never expanded evolution."""
     num_qubits = 40_000
     terms = [
@@ -336,7 +345,7 @@ def test_wide_controlled_transport_stays_sparse(packed: bool) -> None:
         ExponentiatedPauliTerm({num_qubits // 2: "Z"}, 0.27),
         ExponentiatedPauliTerm({}, -0.19),
     ]
-    circuit = _map_sparse_formula(terms, packed, 1_000_000, num_qubits)
+    circuit = _map_sparse_formula(terms, packed, 1_000_000, num_qubits, variant=variant)
     assert circuit._qsharp_factory is not None
     payload = circuit._qsharp_factory.parameter
     assert payload == {
@@ -347,11 +356,13 @@ def test_wide_controlled_transport_stays_sparse(packed: bool) -> None:
         "repetitions": 1_000_000,
         "control": num_qubits,
         "systems": list(range(num_qubits)),
+        **({"batchOffsets": [0, 2, 3]} if variant == "batched_pauli_sequence" else {}),
     }
     assert isinstance(payload["repetitions"], int)
 
 
-def test_packed_controlled_transport_preserves_duplicate_dict_semantics() -> None:
+@pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
+def test_packed_controlled_transport_preserves_duplicate_dict_semantics(variant: str) -> None:
     """Repeated packed indices keep the last Pauli, as the lazy term dictionary does."""
     container = PauliProductFormulaContainer.from_sparse_arrays(
         np.array([0, 3]),
@@ -361,7 +372,7 @@ def test_packed_controlled_transport_preserves_duplicate_dict_semantics() -> Non
         step_reps=1,
         num_qubits=2,
     )
-    mapper = ControlledPauliSequenceMapper()
+    mapper = create("controlled_circuit_mapper", variant)
     mapper.settings().set("control_indices", [2])
     circuit = mapper.run(UnitaryRepresentation(container=container))
     assert circuit._qsharp_factory is not None
@@ -369,3 +380,19 @@ def test_packed_controlled_transport_preserves_duplicate_dict_semantics() -> Non
     assert payload["termOffsets"] == [0, 2]
     assert payload["qubitIndices"] == [1, 0]
     assert payload["paulis"] == [qsharp.Pauli.Y, qsharp.Pauli.Z]
+
+
+def test_batched_variant_reduces_rotation_depth_without_changing_default() -> None:
+    """Batching is opt-in and reduces rotation rounds without adding qubits or rotations."""
+    assert create("controlled_circuit_mapper").name() == "pauli_sequence"
+    assert create("controlled_circuit_mapper", "batched_pauli_sequence").name() == "batched_pauli_sequence"
+    terms = [ExponentiatedPauliTerm({2 * i: "X", 2 * i + 1: "Y"}, 0.123) for i in range(6)]
+    counts = []
+    for variant in ("pauli_sequence", "batched_pauli_sequence"):
+        circuit = _map_sparse_formula(terms, True, 2, num_qubits=12, variant=variant)
+        application = circuit.get_qre_application()
+        counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
+    assert counts[0]["numQubits"] == counts[1]["numQubits"] == 13
+    assert counts[0]["rotationCount"] == counts[1]["rotationCount"] == 24
+    assert counts[1]["rotationDepth"] == 4
+    assert counts[1]["rotationDepth"] < counts[0]["rotationDepth"]

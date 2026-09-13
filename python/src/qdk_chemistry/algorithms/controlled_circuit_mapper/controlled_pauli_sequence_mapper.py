@@ -93,16 +93,38 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             term_offsets.append(len(qubit_indices))
             angles.append(term.angle)
 
+        return self._map_sequence(
+            term_offsets,
+            qubit_indices,
+            paulis,
+            angles,
+            repetitions=unitary_container.step_reps,
+            control=control_indices[0],
+            systems=target_indices,
+        )
+
+    def _map_sequence(
+        self,
+        term_offsets: list[int],
+        qubit_indices: list[int],
+        paulis: list[qsharp.Pauli],
+        angles: list[float],
+        *,
+        repetitions: int,
+        control: int,
+        systems: list[int],
+    ) -> Circuit:
+        """Map validated sparse terms, allowing variants to choose a different gate schedule."""
         parameters = {
             "termOffsets": term_offsets,
             "qubitIndices": qubit_indices,
             "paulis": paulis,
             "pauliCoefficients": angles,
-            "repetitions": unitary_container.step_reps,
+            "repetitions": repetitions,
         }
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledSparsePauliExpCircuit,
-            parameter={**parameters, "control": control_indices[0], "systems": target_indices},
+            parameter={**parameters, "control": control, "systems": systems},
         )
         controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledSparsePauliExpOp(*parameters.values())
 
