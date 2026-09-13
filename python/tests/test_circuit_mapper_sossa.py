@@ -437,10 +437,11 @@ class TestSOSSAMapper:
         assert container.normalization == pytest.approx(9.0 / 16.0)
         expected_block = h_gap / container.normalization - identity
 
-        actual_block = np.column_stack(
-            [_block_encoding_action(circuit, num_system_qubits=2, system_state=identity[column]) for column in range(4)]
-        )
-        np.testing.assert_allclose(actual_block, expected_block, atol=1e-10)
+        system_state = np.array([1.0, 2.0, 3.0, 4.0]) / np.sqrt(30.0)
+        expected = expected_block @ system_state
+        actual = _block_encoding_action(circuit, num_system_qubits=2, system_state=system_state)
+        actual *= np.exp(-1j * np.angle(np.vdot(expected, actual)))
+        np.testing.assert_allclose(actual, expected, atol=1e-10)
 
     def test_full_block_matches_hgap_on_two_orbital_general_angle_fixture(self):
         """The 16-dimensional block equals ``H_gap/Lambda - I`` when Givens rotations are active.

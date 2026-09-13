@@ -338,9 +338,10 @@ class TestSOSSABuilder:
 
         root2 = np.sqrt(2.0)
         weights = np.array([4.0 * root2, 0.0, 6.0 * root2, 9.0 / root2, 10.0 / root2, 14.0 / root2])
+        # The outer PREPARE stores its amplitudes sparsely, so the screened slot has no entry.
         np.testing.assert_allclose(
             np.asarray(container.outer_prepare.get_coefficients(), dtype=float),
-            weights / np.linalg.norm(weights),
+            weights[weights != 0.0] / np.linalg.norm(weights),
         )
         assert container.normalization == pytest.approx(0.5 * float(np.sum(weights**2)))
 
