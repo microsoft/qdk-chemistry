@@ -6,6 +6,7 @@
 ///
 /// 1D operations:
 ///   SelectSwap — loads data[address] into output.
+///   ApplyPhaseByAddress — phases each address by a classical bit, via measurement-based unlookup.
 ///
 /// 2D operations:
 ///   SelectSwap2D — loads data[outer][inner] with one select-swap over the combined address
@@ -294,6 +295,29 @@ namespace QDKChemistry.Utils.SelectSwap {
         adjoint (...) {
             EraseSwappedLoad(data, outerAddress, innerAddress, 0, outerAddressAlwaysValid, target);
         }
+    }
+
+    /// Phases each basis state of `address` by `(-1)^phases[address]`.
+    ///
+    /// `Select` XORs its data into the target, so a lookup whose target is held in |-> kicks that
+    /// data back as a phase. Taking the adjoint keeps those semantics -- an XOR lookup is its own
+    /// inverse -- while picking up the measurement-based implementation, so this costs
+    /// `O(sqrt(Length(phases)))` against the `O(Length(phases))` of a forward lookup.
+    ///
+    /// `Length(phases)` must cover the whole `2^Length(address)` space, so that no address is
+    /// left to the aliasing `Select` applies to a table shorter than its address register.
+    operation ApplyPhaseByAddress(phases : Bool[], address : Qubit[]) : Unit {
+        Fact(
+            Length(phases) == 1 <<< Length(address),
+            $"phases must cover all {1 <<< Length(address)} addresses, got {Length(phases)}"
+        );
+        use marker = Qubit();
+        X(marker);
+        H(marker);
+        Adjoint Select(Mapped(phase -> [phase], phases), address, [marker]);
+        // The adjoint may leave the marker measured out or still in |->, so the release
+        // condition is restored explicitly rather than by undoing the preparation.
+        Reset(marker);
     }
 
     /// Erases a post-butterfly 2D load by measurement instead of running it backwards.

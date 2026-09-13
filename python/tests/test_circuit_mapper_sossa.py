@@ -374,6 +374,42 @@ class TestSOSSAMapper:
 
         assert load_separately is False
 
+    @pytest.mark.parametrize(
+        ("sf_rows", "sf_address_qubits", "dq_rows", "dq_address_qubits"),
+        [
+            (4, 2, 4, 2),
+            (3, 2, 3, 2),
+            (5, 3, 3, 2),
+            (2, 1, 7, 3),
+        ],
+    )
+    def test_branched_angle_word_erasure_restores_the_address_register(
+        self,
+        sf_rows: int,
+        sf_address_qubits: int,
+        dq_rows: int,
+        dq_address_qubits: int,
+    ) -> None:
+        """The measurement-based erasure must phase exactly what the forward load wrote.
+
+        Tables whose row count is not a power of two are the case that matters: ``Select``
+        aliases the surplus addresses onto real rows rather than leaving them unloaded, so a
+        fixup keyed on "in range" alone leaves a relative phase on the address register.
+        """
+        width = 3
+        sf_data = [[(i + j) % 3 == 0 for j in range(width)] for i in range(sf_rows)]
+        dq_data = [[(i * j + 1) % 5 == 0 for j in range(width - 1)] for i in range(dq_rows)]
+
+        # The erasure measures, so a mismatched row only shows up for the outcomes whose
+        # parity it changes; repeat to keep the check from passing by luck.
+        for _ in range(8):
+            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+                sf_data,
+                dq_data,
+                sf_address_qubits,
+                dq_address_qubits,
+            )
+
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
         operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
         sossa = operator.get_container()
