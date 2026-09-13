@@ -109,15 +109,16 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         iterations = [num_iteration] if num_iteration >= 0 else range(num_bits)
         circuits: list[Circuit] = []
-        for iteration in iterations:
-            circuit = self._create_iteration_circuit(
-                state_preparation=state_preparation,
-                qubit_hamiltonian=qubit_hamiltonian,
-                iteration=iteration,
-                total_iterations=num_bits,
-                phase_correction=phase_correction,
-            )
-            circuits.append(circuit)
+        with self._shared_unitary_scope():
+            for iteration in iterations:
+                circuit = self._create_iteration_circuit(
+                    state_preparation=state_preparation,
+                    qubit_hamiltonian=qubit_hamiltonian,
+                    iteration=iteration,
+                    total_iterations=num_bits,
+                    phase_correction=phase_correction,
+                )
+                circuits.append(circuit)
 
         Logger.info(f"Built {len(circuits)} iteration circuit(s) with phase_correction={phase_correction}.")
         return circuits
