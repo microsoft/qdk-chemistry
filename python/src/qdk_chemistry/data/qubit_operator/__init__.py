@@ -80,13 +80,14 @@ class QubitOperator(DataClass):
             term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Term partition
                 for Pauli decomposition construction.
             tapering (TaperingSpecification | None): Tapering metadata for Pauli decomposition construction.
-            container (QubitOperatorContainer | None): A qubit operator container, for representations
-                other than a Pauli decomposition.
+            container (~qdk_chemistry.data.qubit_operator.containers.base.QubitOperatorContainer | None):
+                A qubit operator container, for representations other than a Pauli decomposition.
 
         Raises:
-            TypeError: If *container* is not a :class:`QubitOperatorContainer`, if it is combined with
-                Pauli decomposition arguments, or if neither a container nor Pauli strings and
-                coefficients are given.
+            TypeError: If *container* is not a
+                :class:`~qdk_chemistry.data.qubit_operator.containers.base.QubitOperatorContainer`,
+                if it is combined with Pauli decomposition arguments, or if neither a container nor
+                Pauli strings and coefficients are given.
 
         """
         if container is not None:
