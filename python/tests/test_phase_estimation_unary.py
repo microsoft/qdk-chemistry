@@ -584,13 +584,19 @@ def test_a_positive_compute_capacity_moves_qubits_into_memory():
         return best.properties.get(LOGICAL_COMPUTE_QUBITS, 0), best.properties.get(LOGICAL_MEMORY_QUBITS, 0)
 
     disabled_compute, disabled_memory = split(-1)
-    capped_compute, capped_memory = split(2)
+    capacities = (1, 2, 4)
+    capped = {capacity: split(capacity) for capacity in capacities}
 
     assert disabled_memory == 0, f"the disabled sentinel reserved {disabled_memory} memory qubits"
-    assert capped_memory > 0, f"capacity 2 left every qubit in compute ({capped_compute}, {capped_memory})"
-    assert capped_compute < disabled_compute, (
-        f"capacity 2 did not shrink the compute area: {capped_compute} against {disabled_compute} when disabled"
-    )
+    for capacity, (compute, memory) in capped.items():
+        assert memory > 0, f"capacity {capacity} left every qubit in compute ({compute}, {memory})"
+        assert compute < disabled_compute, (
+            f"capacity {capacity} did not shrink the compute area: {compute} against {disabled_compute} when disabled"
+        )
+
+    computes = [capped[capacity][0] for capacity in capacities]
+    assert computes == sorted(computes), f"the compute area is not monotone in the capacity: {capped}"
+    assert len(set(computes)) > 1, f"every capacity produced the same compute area, so it is ignored: {capped}"
 
 
 def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:
