@@ -43,9 +43,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Arithmetic.RippleCarryCGIncByLE;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
-    import QDKChemistry.Utils.SelectSwap.ApplyPhaseByAddress, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
+    import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
 
     // ═══════════════════════════════════════════════════════════════════════════
     // Parameters
@@ -530,51 +529,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
     }
 
-    /// Phase fixup for one branch of a shared angle-word load, with `isSF` in the low address bit.
-    ///
-    /// Row `2k + isSF` carries the parity of the measurement against the word that branch wrote
-    /// at its own address `k`, and the rows for the opposite flag value carry `false` -- the
-    /// identity phase -- because the load is controlled and writes nothing there. When a table is
-    /// not a power of two long, `Select` does not leave the surplus addresses unloaded: its
-    /// recursion aliases each onto a valid row, so the fixup routes through
-    /// `UnaryIterationActionIndex` to phase exactly the word the forward load wrote.
-    internal function BranchFixupPhases(
-        measured : Bool[],
-        data : Bool[][],
-        activeOnSF : Bool,
-        numAddressQubits : Int,
-    ) : Bool[] {
-        MappedOverRange(
-            index -> {
-                if ((index % 2 == 1) == activeOnSF) {
-                    let word = data[UnaryIterationActionIndex(Length(data), index / 2)];
-                    mutable parity = false;
-                    // `Zipped` stops at the shorter of the two, which is what lets the narrower
-                    // DQ word share the measurement taken over the full target.
-                    for (measuredBit, wordBit) in Zipped(measured, word) {
-                        set parity = parity != (measuredBit and wordBit);
-                    }
-                    parity
-                } else {
-                    false
-                }
-            },
-            0..(1 <<< numAddressQubits) - 1
-        )
-    }
-
     /// Loads the branch-selected Givens angle word; the adjoint erases it by measurement.
-    ///
-    /// Both tables write the same `target`, and a measurement-based erasure consumes it, so the
-    /// adjoint can measure only once and must then repair the phase of whichever branch fired.
-    /// It measures `target` in the X basis and applies one phase fixup per table, each addressed
-    /// by `isSF` prepended to that table's own address.
-    ///
-    /// Letting `within` generate the uncompute instead costs a second full lookup, because
-    /// `Adjoint Controlled Select` is not measurement-optimized: it measures at exactly 2x the
-    /// forward cost, against 1.05-1.13x for the uncontrolled pair. Folding `isSF` into the
-    /// forward address loses more than it saves, because both tables are used unpadded and
-    /// folding forces the idle branch out to a power of two.
+    /// Both tables write the same `target` and measuring consumes it, so the adjoint measures once
+    /// and repairs each branch's phase; letting `within` uncompute instead costs a second lookup.
     internal operation ControlledSelectWithUnlookup(
         sfData : Bool[][],
         sfAddress : Qubit[],
@@ -595,14 +552,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             let measured = ResultArrayAsBoolArray(ForEach(MResetX, target));
             // Each branch contributes the parity of its own word, and the two contributions
             // compose, so the fixups are independent and their order does not matter.
-            ApplyPhaseByAddress(
-                BranchFixupPhases(measured, sfData, true, Length(sfAddress) + 1),
-                [isSF] + sfAddress
-            );
-            ApplyPhaseByAddress(
-                BranchFixupPhases(measured, dqData, false, Length(dqAddress) + 1),
-                [isSF] + dqAddress
-            );
+            ApplyBranchPhaseFixup(measured, sfData, true, [isSF] + sfAddress);
+            ApplyBranchPhaseFixup(measured, dqData, false, [isSF] + dqAddress);
         }
     }
 
@@ -616,8 +567,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Cost: each table is loaded once, by a controlled `Select` that fires only on its own
     /// branch, so the SF table contributes L_SF - 2 and the DQ table N - 1. Both are then erased
     /// together by a single measurement plus one phase fixup per branch, at O(sqrt(2*L_SF)) and
-    /// O(sqrt(2*N)) -- measured at 41% below the previous structure, whose `within` block undid
-    /// each load with a second full controlled lookup. The rotations add 2*(N-1) uncontrolled
+    /// O(sqrt(2*N)). The rotations add 2*(N-1) uncontrolled
     /// Adder(bRot) -- each Givens rotation is the neighbor-gated CRy(2θ) built as
     /// Ry(θ)·CNOT·Ry(-θ)·CNOT from two uncontrolled Ry(θ) sharing one angle word, so it
     /// preserves particle number (matching the direct path) without a controlled adder.
