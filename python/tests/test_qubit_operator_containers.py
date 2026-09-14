@@ -461,7 +461,7 @@ class TestPauliOnlyAlgorithmsRejectSumOfSquares:
                 ValueError,
                 "requires a Pauli decomposition",
             ),
-            (lambda op: commutator_bound_first_order(op), ValueError, "requires a Pauli decomposition"),
+            (commutator_bound_first_order, ValueError, "requires a Pauli decomposition"),
             (
                 lambda op: qdrift_samples_campbell(op, time=1.0, target_accuracy=1e-3),
                 ValueError,
