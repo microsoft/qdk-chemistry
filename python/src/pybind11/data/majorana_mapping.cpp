@@ -195,7 +195,7 @@ bilinear(j, k) is available on both forms.
       .def(
           "bilinear",
           [](const MajoranaMapping& self, std::size_t j, std::size_t k) {
-            auto [coeff, word] = self.bilinear(j, k);
+            auto [coeff, word] = self.bilinear_product(j, k);
             return py::make_tuple(coeff, word);
           },
           py::arg("j"), py::arg("k"))

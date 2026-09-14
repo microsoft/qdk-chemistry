@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
 #include <complex>
 #include <cstdint>
 #include <fstream>
@@ -45,6 +46,8 @@ stabilizers_from_json(const nlohmann::json& data) {
 }
 
 }  // namespace detail
+
+constexpr std::size_t max_cached_bilinear_qubits = 128;
 
 static void hash_sparse_pauli_word(qdk::chemistry::utils::HashContext& ctx,
                                    const SparsePauliWord& word) {
@@ -103,16 +106,19 @@ MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
   auto num_modes = table.size() / 2;
   auto num_qubits = compute_num_qubits(table);
 
-  // Precompute all bilinears from the table.
+  // Precompute all bilinears from the table, unless the mapping is large
+  // enough that the cache dominates its footprint.
   const std::size_t M = table.size();
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
-  bilinears.reserve(M * (M - 1) / 2);
-  for (std::size_t j = 0; j < M; ++j) {
-    for (std::size_t k = j + 1; k < M; ++k) {
-      auto [phase, word] =
-          PauliTermAccumulator::multiply_uncached(table[j], table[k]);
-      bilinears.emplace_back(std::complex<double>(0.0, 1.0) * phase,
-                             std::move(word));
+  if (num_qubits <= max_cached_bilinear_qubits) {
+    bilinears.reserve(M * (M - 1) / 2);
+    for (std::size_t j = 0; j < M; ++j) {
+      for (std::size_t k = j + 1; k < M; ++k) {
+        auto [phase, word] =
+            PauliTermAccumulator::multiply_uncached(table[j], table[k]);
+        bilinears.emplace_back(std::complex<double>(0.0, 1.0) * phase,
+                               std::move(word));
+      }
     }
   }
 
@@ -186,12 +192,46 @@ MajoranaMapping::bilinear(std::size_t j, std::size_t k) const {
         std::to_string(j) +
         "); the bilinear i*gamma_j*gamma_k requires distinct indices.");
   }
+  if (bilinears_.empty()) {
+    throw std::logic_error(
+        "MajoranaMapping::bilinear returns a reference into the precomputed "
+        "cache, which is skipped above " +
+        std::to_string(max_cached_bilinear_qubits) +
+        " qubits; use bilinear_product(j, k) instead.");
+  }
   if (j < k) {
     const auto& entry = bilinears_[bilinear_index(j, k)];
     return {entry.first, entry.second};
   }
   const auto& entry = bilinears_[bilinear_index(k, j)];
   return {-entry.first, entry.second};
+}
+
+std::pair<std::complex<double>, SparsePauliWord>
+MajoranaMapping::bilinear_product(std::size_t j, std::size_t k) const {
+  const std::size_t M = 2 * num_modes_;
+  if (j >= M || k >= M) {
+    throw std::out_of_range(
+        "MajoranaMapping::bilinear_product index out of range: requested (" +
+        std::to_string(j) + ", " + std::to_string(k) + "), valid range [0, " +
+        std::to_string(M) + ")");
+  }
+  if (j == k) {
+    throw std::invalid_argument(
+        "MajoranaMapping::bilinear_product is undefined for j == k (got " +
+        std::to_string(j) +
+        "); the bilinear i*gamma_j*gamma_k requires distinct indices.");
+  }
+  const std::size_t lo = std::min(j, k);
+  const std::size_t hi = std::max(j, k);
+  if (!bilinears_.empty()) {
+    const auto& entry = bilinears_[bilinear_index(lo, hi)];
+    return {j < k ? entry.first : -entry.first, entry.second};
+  }
+  auto [phase, word] =
+      PauliTermAccumulator::multiply_uncached(table_[lo], table_[hi]);
+  const std::complex<double> coeff = std::complex<double>(0.0, 1.0) * phase;
+  return {j < k ? coeff : -coeff, std::move(word)};
 }
 
 MajoranaMapping MajoranaMapping::without_tapering() const {

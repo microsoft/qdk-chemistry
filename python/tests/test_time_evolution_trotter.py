@@ -5,12 +5,24 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from unittest.mock import Mock, patch
+
 import numpy as np
 import pytest
 import scipy
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.data import FlatPartition, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.algorithms.propagator import MagnusPropagator
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    DrivenQubitHamiltonian,
+    FlatPartition,
+    LayeredPartition,
+    QubitOperator,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -949,3 +961,119 @@ class TestPartitionGrouping:
         x_indices = [i for i, label in enumerate(term_labels) if label in pauli_x_labels]
         assert zz_indices == list(range(zz_indices[0], zz_indices[0] + len(zz_indices)))
         assert x_indices == list(range(x_indices[0], x_indices[0] + len(x_indices)))
+
+
+class TestSparseTrotter:
+    """Sparse words follow the existing decomposition without materializing dense labels."""
+
+    @pytest.mark.parametrize(("canceling_drive", "scale"), [(False, 0.0), (True, 0.0), (False, 1e-18)])
+    def test_driven_sparse_evolution(self, canceling_drive, scale):
+        """Preserve exact-zero partition reuse through evaluation/averaging and sparse Euler-to-QRE composition."""
+        h0 = QubitOperator.from_sparse_terms(
+            2, [{1: "Z"}], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),))
+        )
+        td = DrivenQubitHamiltonian(
+            h0, QubitOperator(["IX"], np.array([2.0])), drive=lambda t: t if canceling_drive else scale
+        )
+        for result in (td.evaluate(scale), MagnusPropagator().run(td, -1.0, 1.0)):
+            if scale == 0.0:
+                assert result is h0
+            else:
+                assert result is not h0
+                assert result.term_partition is None
+                np.testing.assert_allclose(result.coefficients, [1.0, 2.0 * scale], rtol=1e-12, atol=0.0)
+        builder = create(
+            "evolution_circuit_builder",
+            "euler",
+            evolution_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=2, order=1),
+            total_time=1.0,
+            dt=1.0,
+        )
+        circuit = builder.run(td, identity_state_prep(num_qubits=2))
+        assert '"required_num_qubits"="2"' in str(circuit.get_qir())
+        assert circuit.get_qre_application() is not None
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.complex64])
+    def test_threshold_uses_the_same_precision_as_dense_terms(self, dtype):
+        """Promote coefficients before applying a double-precision threshold."""
+        # float32(0.1) is slightly above the double-precision threshold 0.1.
+        coefficients = np.array([0.1], dtype=dtype)
+        sparse = QubitOperator.from_sparse_terms(1, [{0: "X"}], coefficients)
+        builder = Trotter(time=0.5, weight_threshold=0.1)
+        actual = builder.run(sparse).get_container()
+        assert list(actual.step_terms) == [ExponentiatedPauliTerm({0: "X"}, float(np.float32(0.1)) * 0.5)]
+
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    @pytest.mark.parametrize(
+        ("order", "partition"),
+        [
+            (1, None),
+            (2, FlatPartition(strategy="commuting", groups=((), (3, 4), (6, 1, 0), (2, 5), ()))),
+            (
+                4,
+                LayeredPartition(
+                    strategy="commuting", groups=(((0,), (1,), (), (6,)), ((),), ((3, 4), (), (), ()), (), ((2,), (5,)))
+                ),
+            ),
+        ],
+        ids=["absent", "flat-with-empty-groups", "layered-with-empty-layers"],
+    )
+    def test_schedule_matches_dense(self, order, power_strategy, partition):
+        """Match ordering and angles for all partition types, empty groups, and both power strategies."""
+        coefficients = np.array([0.8, -0.4, 0.2 + 5e-13j, 0.3, 1e-14, 1e-12, -0.6])
+        dense = QubitOperator(
+            ["IIIX", "IZII", "XIYI", "IIII", "IIZI", "IIIY", "ZIII"],
+            coefficients,
+            term_partition=partition,
+        )
+        sparse = QubitOperator.from_sparse_terms(
+            4,
+            (term for term, _ in dense.iter_sparse_terms()),
+            coefficients,
+            term_partition=partition,
+        )
+        builder = Trotter(
+            order=order, time=-0.7, num_divisions=3, power=3, power_strategy=power_strategy, weight_threshold=1e-12
+        )
+        expected = builder.run(dense).get_container()
+        actual = builder.run(sparse).get_container()
+
+        assert actual.to_json() == expected.to_json()
+
+    def test_large_register_never_builds_dense_labels_or_suboperators(self, monkeypatch):
+        """Large registers and symbolic powers must not reach dense compatibility paths."""
+        hamiltonian = QubitOperator.from_sparse_terms(
+            80_800,
+            [{0: "X", 80_799: "Z"}, {}, {40_400: "Y"}],
+            np.array([1.0, 0.25, -0.5]),
+            term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (), (2,))),
+        )
+
+        no_densification = Mock(side_effect=AssertionError("Dense labels or sub-Hamiltonians"))
+        monkeypatch.setattr(type(hamiltonian.pauli_strings), "__getitem__", no_densification)
+        monkeypatch.setattr(Trotter, "_group_terms", no_densification)
+        monkeypatch.setattr(Trotter, "_pauli_label_to_map", no_densification)
+        container = Trotter(order=4, time=0.7, num_divisions=7, power=1_000_000).run(hamiltonian).get_container()
+        assert container.num_qubits == 80_800
+        assert container.step_reps == 7_000_000
+        assert len(container.step_terms) < 100
+        assert {q for term in container.step_terms for q in term.pauli_term} == {0, 80_799, 40_400}
+        assert any(not term.pauli_term for term in container.step_terms)
+        assert sum(term.angle for term in container.step_terms) == pytest.approx(0.075)
+
+    @pytest.mark.parametrize(("coefficient", "expected_angles"), [(0.0, []), (0.6, [0.24])])
+    def test_empty_and_identity_formula(self, coefficient, expected_angles):
+        """A zero operator has an empty formula; a nonzero identity keeps its phase."""
+        hamiltonian = QubitOperator.from_sparse_terms(2, [{}], np.array([coefficient]))
+        container = Trotter(order=4, time=1.2, num_divisions=3).run(hamiltonian).get_container()
+        assert all(not term.pauli_term for term in container.step_terms)
+        np.testing.assert_allclose([term.angle for term in container.step_terms], expected_angles, atol=1e-15)
+
+    def test_dense_path_still_caches_pauli_maps(self):
+        """The PR's original dense-map caching remains effective at higher Trotter order."""
+        labels = ["IIX", "IYI", "ZII"]
+        hamiltonian = QubitOperator(labels, np.ones(3))
+        with patch.object(Trotter, "_pauli_label_to_map", wraps=Trotter._pauli_label_to_map) as convert:
+            container = Trotter(order=4, time=0.5).run(hamiltonian).get_container()
+        assert [call.args[0] for call in convert.call_args_list] == labels
+        assert len(container.step_terms) > len(labels)

@@ -282,10 +282,26 @@ When enabled, the builder consults the lattice's edge coloring and stores the re
 * each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
 
+Coupling families with identical nonzero edge supports share a coloring.
+The full factory coloring is reused when all its edges are active; smaller supports are colored independently.
+Recoloring can reduce the number of layers and change the ordering of noncommuting groups in a finite-step Trotter approximation, while leaving the Hamiltonian unchanged.
+
 Downstream consumers — most importantly the :doc:`Trotter time-evolution builder <algorithms/hamiltonian_unitary_builder>` — read ``term_partition`` automatically and use it to schedule fewer sequential exponentials per Trotter step.
 No manual geometry boilerplate is required at the call site.
 
 Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).
+
+Sparse storage
+~~~~~~~~~~~~~~
+
+Spin-model builders iterate sparse adjacency edges and retain scalar couplings without expanding them into dense pair matrices.
+The returned :class:`~qdk_chemistry.data.QubitOperator` uses :class:`~qdk_chemistry.data.SparsePauliTerms` to store only non-identity factors, for grouped and ungrouped construction alike.
+The :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` constructor accepts arbitrary non-identity Pauli words, retaining term order, duplicates, and empty identity words.
+Use :meth:`~qdk_chemistry.data.QubitOperator.iter_sparse_terms` to inspect these factors without constructing full-register labels.
+The ``pauli_strings`` compatibility view materializes labels on access; dense matrix conversion remains appropriate only for small systems.
+
+Sparse operators serialize their non-identity words without expanding labels; product formulas use their existing JSON/HDF5 format.
+Operator content hashes identify the stored representation, so equivalent dense and sparse operators can have different hashes.
 
 Parameter flexibility
 ---------------------
