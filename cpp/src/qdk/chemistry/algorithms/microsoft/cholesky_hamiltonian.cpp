@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <cstring>
 #include <filesystem>
-#include <set>
 #include <tuple>
 #include <unordered_set>
 
@@ -592,61 +591,6 @@ Eigen::MatrixXd build_K_from_cholesky(
 
 }  // namespace detail
 
-namespace detail_chol {
-/**
- * @brief Validate active orbital indices
- * @param indices The indices to validate
- * @param spin_label Label for error messages (e.g., "Alpha", "Beta")
- * @param num_molecular_orbitals Total number of molecular orbitals
- * @return true if the indices are contiguous, false otherwise
- */
-bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
-                                        const std::string& spin_label,
-                                        size_t num_molecular_orbitals) {
-  QDK_LOG_TRACE_ENTERING();
-  if (indices.empty()) return true;
-
-  // Cannot contain more than the total number of MOs
-  if (indices.size() > num_molecular_orbitals) {
-    throw std::runtime_error("Number of requested " + spin_label +
-                             " active orbitals exceeds total number of MOs");
-  }
-
-  // Make sure that the indices are within bounds
-  for (const auto& idx : indices) {
-    if (static_cast<size_t>(idx) >= num_molecular_orbitals) {
-      throw std::runtime_error(
-          spin_label +
-          " active orbital index out of bounds: " + std::to_string(idx));
-    }
-  }
-
-  // Make sure that the indices are unique
-  std::set<size_t> unique_indices(indices.begin(), indices.end());
-  if (unique_indices.size() != indices.size()) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be unique");
-  }
-
-  // Make sure that the indices are sorted
-  std::vector<size_t> sorted_indices(indices.begin(), indices.end());
-  std::sort(sorted_indices.begin(), sorted_indices.end());
-  if (indices != sorted_indices) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be sorted");
-  }
-
-  // Check if indices are contiguous
-  for (size_t i = 0; i < indices.size() - 1; ++i) {
-    if (indices[i + 1] - indices[i] != 1) {
-      return false;
-    }
-  }
-
-  return true;
-}
-}  // namespace detail_chol
-
 std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
@@ -659,8 +603,6 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   const auto& Cb =
       orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
-
   // Get alpha and beta active space indices
   const auto active_ai = orbitals->active_indices();
   auto active_indices_alpha =
@@ -681,15 +623,14 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // Validate alpha active orbitals and check contiguity
   bool alpha_space_is_contiguous =
-      detail_chol::validate_active_contiguous_indices(
-          active_indices_alpha, "Alpha", num_molecular_orbitals);
+      detail::indices_are_contiguous(active_indices_alpha);
 
   // Validate beta active orbitals (if different from alpha) and check
   // contiguity
   bool beta_space_is_contiguous = true;
   if (active_indices_beta != active_indices_alpha) {
-    beta_space_is_contiguous = detail_chol::validate_active_contiguous_indices(
-        active_indices_beta, "Beta", num_molecular_orbitals);
+    beta_space_is_contiguous =
+        detail::indices_are_contiguous(active_indices_beta);
   } else {
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
@@ -706,9 +647,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   const double effective_nuclear_repulsion =
       basis_set->calculate_effective_nuclear_repulsion_energy();
 
-  // Create internal BasisSet (includes ECP-adjusted nuclear charges)
-  auto internal_basis_set =
-      utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  auto [internal_basis_set, H_full] = detail::build_one_body_ao(
+      *basis_set, _settings->get<std::string>("integral_dressing"));
   // Create dummy SCFConfig
   auto scf_config = std::make_unique<qcs::SCFConfig>();
 
@@ -723,24 +663,6 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
-  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), internal_basis_set->mol.get(), scf_config->mpi);
-
-  // Compute Core Hamiltonian in AO basis
-  Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
-      V_full(num_atomic_orbitals, num_atomic_orbitals);
-  int1e->kinetic_integral(T_full.data());
-  int1e->nuclear_integral(V_full.data());
-  Eigen::MatrixXd H_full = T_full + V_full;
-
-  // Add ECP integrals if present
-  if (internal_basis_set->ecp_shells.size() > 0) {
-    Eigen::MatrixXd ECP_full =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    int1e->ecp_integral(ECP_full.data());
-    H_full += ECP_full;
-  }
-
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
   Eigen::MatrixXd Ca_active(num_atomic_orbitals, nactive_alpha);
@@ -786,6 +708,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Use Cholesky Decomposition
   double cholesky_tol = _settings->get<double>("cholesky_tolerance");
@@ -874,13 +797,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     const auto& inactive_indices = inactive_indices_alpha;
 
     // Determine whether the inactive space is contiguous
-    bool inactive_space_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices.size() - 1; ++i) {
-      if (inactive_indices[i + 1] - inactive_indices[i] != 1) {
-        inactive_space_is_contiguous = false;
-        break;
-      }
-    }
+    bool inactive_space_is_contiguous =
+        detail::indices_are_contiguous(inactive_indices);
 
     // Compute the inactive density matrix
     Eigen::MatrixXd D_inactive =
@@ -937,22 +855,12 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     // Unrestricted case
 
     // Determine whether the alpha inactive space is contiguous
-    bool alpha_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_alpha.size() - 1; ++i) {
-      if (inactive_indices_alpha[i + 1] - inactive_indices_alpha[i] != 1) {
-        alpha_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    bool alpha_inactive_is_contiguous =
+        detail::indices_are_contiguous(inactive_indices_alpha);
 
     // Determine whether the beta inactive space is contiguous
-    bool beta_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_beta.size() - 1; ++i) {
-      if (inactive_indices_beta[i + 1] - inactive_indices_beta[i] != 1) {
-        beta_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    bool beta_inactive_is_contiguous =
+        detail::indices_are_contiguous(inactive_indices_beta);
 
     // Compute separate alpha and beta inactive density matrices
     Eigen::MatrixXd D_inactive_alpha =

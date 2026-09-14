@@ -72,6 +72,14 @@ class ScfSettings
         "'incore' stores all integrals in memory",
         data::ListConstraint<std::string>{
             {std::vector<std::string>{"direct", "incore"}}});
+    set_default(
+        "integral_dressing", std::string(""),
+        "One-electron integral dressing: '' uses nonrelativistic integrals, "
+        "'x2c_1e' uses decontracted spin-free X2C-1e integrals, and "
+        "'x2c_1e_contracted' applies spin-free X2C-1e directly in the "
+        "contracted basis",
+        data::ListConstraint<std::string>{
+            {std::vector<std::string>{"", "x2c_1e", "x2c_1e_contracted"}}});
     set_default("nthreads", static_cast<int64_t>(-1),
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");

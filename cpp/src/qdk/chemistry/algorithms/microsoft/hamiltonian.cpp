@@ -4,16 +4,8 @@
 
 #include "hamiltonian.hpp"
 
-// STL Headers
-#include <filesystem>
-#include <set>
-
-// MACIS Headers
-#include <macis/mcscf/fock_matrices.hpp>
-
 // QDK/Chemistry SCF headers
 #include <qdk/chemistry/scf/core/moeri.h>
-#include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 
@@ -23,72 +15,59 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "util/one_body.h"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-namespace detail {
-/**
- * @brief Validate active orbital indices
- * @param indices The indices to validate
- * @param spin_label Label for error messages (e.g., "Alpha", "Beta")
- * @param num_molecular_orbitals Total number of molecular orbitals
- * @return true if the indices are contiguous, false otherwise
- */
-bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
-                                        const std::string& spin_label,
-                                        size_t num_molecular_orbitals) {
-  QDK_LOG_TRACE_ENTERING();
-  if (indices.empty()) return true;
-
-  // Cannot contain more than the total number of MOs
-  if (indices.size() > num_molecular_orbitals) {
-    throw std::runtime_error("Number of requested " + spin_label +
-                             " active orbitals exceeds total number of MOs");
+std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
+detail::build_one_body_ao(const data::BasisSet& basis_set,
+                          const std::string& integral_dressing) {
+  const bool use_x2c =
+      integral_dressing == "x2c_1e" || integral_dressing == "x2c_1e_contracted";
+  if (use_x2c &&
+      basis_set.get_atomic_orbital_type() == data::AOType::Cartesian) {
+    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
   }
 
-  // Make sure that the indices are within bounds
-  for (const auto& idx : indices) {
-    if (static_cast<size_t>(idx) >= num_molecular_orbitals) {
-      throw std::runtime_error(
-          spin_label +
-          " active orbital index out of bounds: " + std::to_string(idx));
-    }
+  auto internal_basis_set =
+      utils::microsoft::convert_basis_set_from_qdk(basis_set);
+  const auto mpi = qcs::mpi_default_input();
+
+  if (use_x2c) {
+    return {internal_basis_set,
+            qcs::build_x2c_one_body_ao(internal_basis_set, mpi,
+                                       integral_dressing == "x2c_1e")};
+  }
+  if (!integral_dressing.empty()) {
+    throw std::invalid_argument("Unsupported integral dressing '" +
+                                integral_dressing + "'");
   }
 
-  // Make sure that the indices are unique
-  std::set<size_t> unique_indices(indices.begin(), indices.end());
-  if (unique_indices.size() != indices.size()) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be unique");
-  }
+  const size_t dimension = basis_set.get_num_atomic_orbitals();
+  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
+      internal_basis_set.get(), internal_basis_set->mol.get(), mpi);
+  Eigen::MatrixXd kinetic(dimension, dimension);
+  Eigen::MatrixXd potential(dimension, dimension);
+  int1e->kinetic_integral(kinetic.data());
+  int1e->nuclear_integral(potential.data());
+  Eigen::MatrixXd one_body_ao = kinetic + potential;
 
-  // Make sure that the indices are sorted
-  std::vector<size_t> sorted_indices(indices.begin(), indices.end());
-  std::sort(sorted_indices.begin(), sorted_indices.end());
-  if (indices != sorted_indices) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be sorted");
+  if (!internal_basis_set->ecp_shells.empty()) {
+    Eigen::MatrixXd ecp = Eigen::MatrixXd::Zero(dimension, dimension);
+    int1e->ecp_integral(ecp.data());
+    one_body_ao += ecp;
   }
-
-  // Check if indices are contiguous
-  for (size_t i = 0; i < indices.size() - 1; ++i) {
-    if (indices[i + 1] - indices[i] != 1) {
-      return false;
-    }
-  }
-
-  return true;
+  return {std::move(internal_basis_set), std::move(one_body_ao)};
 }
-}  // namespace detail
 
-std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals) const {
+std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
+    std::shared_ptr<data::Orbitals> orbitals,
+    const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
+    const Eigen::MatrixXd& H_full, const std::string& eri_method) {
   QDK_LOG_TRACE_ENTERING();
-  // Initialize the backend if not already done
-  utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
   const auto& Ca = orbitals->coefficients()->block(
@@ -96,7 +75,11 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   const auto& Cb =
       orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
+  if (H_full.rows() != static_cast<Eigen::Index>(num_atomic_orbitals) ||
+      H_full.cols() != static_cast<Eigen::Index>(num_atomic_orbitals)) {
+    throw std::invalid_argument(
+        "AO one-body matrix dimensions must match the orbital basis");
+  }
 
   // Get alpha and beta active space indices
   const auto active_ai = orbitals->active_indices();
@@ -117,22 +100,18 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   const size_t nactive_beta = active_indices_beta.size();
 
   // Validate alpha active orbitals and check contiguity
-  bool alpha_space_is_contiguous = detail::validate_active_contiguous_indices(
-      active_indices_alpha, "Alpha", num_molecular_orbitals);
+  bool alpha_space_is_contiguous =
+      detail::indices_are_contiguous(active_indices_alpha);
 
   // Validate beta active orbitals (if different from alpha) and check
   // contiguity
   bool beta_space_is_contiguous = true;
   if (active_indices_beta != active_indices_alpha) {
-    beta_space_is_contiguous = detail::validate_active_contiguous_indices(
-        active_indices_beta, "Beta", num_molecular_orbitals);
+    beta_space_is_contiguous =
+        detail::indices_are_contiguous(active_indices_beta);
   } else {
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
-
-  // Overall contiguity requires both alpha and beta to be contiguous
-  bool active_space_is_contiguous =
-      alpha_space_is_contiguous && beta_space_is_contiguous;
 
   // Ensure alpha and beta active spaces have the same size
   if (nactive_alpha != nactive_beta) {
@@ -146,10 +125,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   const double effective_nuclear_repulsion =
       basis_set->calculate_effective_nuclear_repulsion_energy();
 
-  // Create internal BasisSet (includes ECP-adjusted nuclear charges)
-  auto internal_basis_set =
-      utils::microsoft::convert_basis_set_from_qdk(*basis_set);
-  // Create dummy SCFConfig
   auto scf_config = std::make_unique<qcs::SCFConfig>();
 
   // Use the default MPI configuration (fallback to serial if MPI not enabled)
@@ -159,38 +134,18 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   scf_config->cartesian = !internal_basis_set->pure;
   scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
 
-  // Set ERI method based on settings
-  std::string method_name = _settings->get<std::string>("eri_method");
-  if (!method_name.compare("incore")) {
+  if (eri_method == "incore") {
     scf_config->eri.method = qcs::ERIMethod::Incore;
     scf_config->k_eri.method = qcs::ERIMethod::Incore;
-  } else if (!method_name.compare("direct")) {
+  } else if (eri_method == "direct") {
     scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
     scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
   } else {
-    throw std::runtime_error("Unsupported ERI method '" + method_name +
+    throw std::runtime_error("Unsupported ERI method '" + eri_method +
                              "'. Only CPU ERI methods are supported now");
   }
 
-  // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
-  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), internal_basis_set->mol.get(), scf_config->mpi);
-
-  // Compute Core Hamiltonian in AO basis
-  Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
-      V_full(num_atomic_orbitals, num_atomic_orbitals);
-  int1e->kinetic_integral(T_full.data());
-  int1e->nuclear_integral(V_full.data());
-  Eigen::MatrixXd H_full = T_full + V_full;
-
-  // Add ECP integrals if present
-  if (internal_basis_set->ecp_shells.size() > 0) {
-    Eigen::MatrixXd ECP_full =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    int1e->ecp_integral(ECP_full.data());
-    H_full += ECP_full;
-  }
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
@@ -240,6 +195,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
+  const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Declare MOERI vectors
   Eigen::VectorXd moeri_aaaa;
@@ -335,13 +291,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     auto inactive_indices = inactive_indices_alpha;
 
     // Determine whether the inactive space is contiguous
-    bool inactive_space_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices.size() - 1; ++i) {
-      if (inactive_indices[i + 1] - inactive_indices[i] != 1) {
-        inactive_space_is_contiguous = false;
-        break;
-      }
-    }
+    bool inactive_space_is_contiguous =
+        detail::indices_are_contiguous(inactive_indices);
 
     // Compute the inactive density matrix
     Eigen::MatrixXd D_inactive =
@@ -393,22 +344,12 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     // Unrestricted case
 
     // Determine whether the alpha inactive space is contiguous
-    bool alpha_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_alpha.size() - 1; ++i) {
-      if (inactive_indices_alpha[i + 1] - inactive_indices_alpha[i] != 1) {
-        alpha_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    bool alpha_inactive_is_contiguous =
+        detail::indices_are_contiguous(inactive_indices_alpha);
 
     // Determine whether the beta inactive space is contiguous
-    bool beta_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_beta.size() - 1; ++i) {
-      if (inactive_indices_beta[i + 1] - inactive_indices_beta[i] != 1) {
-        beta_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    bool beta_inactive_is_contiguous =
+        detail::indices_are_contiguous(inactive_indices_beta);
 
     // Compute separate alpha and beta inactive density matrices
     Eigen::MatrixXd D_inactive_alpha =
@@ -497,5 +438,19 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
             orbitals, E_inactive + effective_nuclear_repulsion,
             F_inactive_alpha, F_inactive_beta));
   }
+}
+
+std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
+    std::shared_ptr<data::Orbitals> orbitals) const {
+  QDK_LOG_TRACE_ENTERING();
+  utils::microsoft::initialize_backend();
+
+  auto basis_set = orbitals->get_basis_set();
+  auto [internal_basis_set, one_body_ao] = detail::build_one_body_ao(
+      *basis_set, _settings->get<std::string>("integral_dressing"));
+
+  return detail::construct_canonical_hamiltonian(
+      std::move(orbitals), internal_basis_set, one_body_ao,
+      _settings->get<std::string>("eri_method"));
 }
 }  // namespace qdk::chemistry::algorithms::microsoft
