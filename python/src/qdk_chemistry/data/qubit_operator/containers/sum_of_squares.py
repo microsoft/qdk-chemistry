@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from math import isfinite
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import numpy as np
 
@@ -174,6 +174,21 @@ class SumOfSquaresContainer(QubitOperatorContainer):
     def num_qubits(self) -> int:
         """Return the number of qubits (two spin-orbitals per spatial orbital)."""
         return 2 * self.metadata.num_spatial_orbitals
+
+    def to_matrix(self, sparse: bool = False) -> NoReturn:
+        """Reject matrix conversion, which this representation does not implement.
+
+        Args:
+            sparse: Accepted so the signature matches the Pauli decomposition container.
+
+        Raises:
+            NotImplementedError: Always; the SOS factors carry no explicit Pauli terms.
+
+        """
+        raise NotImplementedError(
+            "Matrix conversion is not implemented for the 'sum_of_squares' representation; "
+            "rebuild the operator as a Pauli decomposition first."
+        )
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""

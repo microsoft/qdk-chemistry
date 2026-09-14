@@ -11,7 +11,6 @@ from qdk_chemistry.data import AlgorithmRef, SettingNotFound, Settings
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
-from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import CircuitMapper
@@ -292,7 +291,8 @@ class SOSSAMapper(CircuitMapper):
             phase gradient qubits its caller must prepare.
 
         Raises:
-            ValueError: If the container is not a :class:`SOSSABlockEncodingContainer`.
+            ValueError: If the container is not a :class:`SOSSABlockEncodingContainer` or its
+                power is not one.
 
         """
         container = unitary.get_container()
@@ -305,7 +305,7 @@ class SOSSAMapper(CircuitMapper):
                 "but the container carries no free-rider table."
             )
         if container.power != 1:
-            Logger.warn(f"The container's power {container.power} is ignored.")
+            raise ValueError(f"The SOSSA mapper supports only unit power, got {container.power}.")
 
         outer_prepare_circuit = self._build_outer_prepare_circuit(container)
         regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)

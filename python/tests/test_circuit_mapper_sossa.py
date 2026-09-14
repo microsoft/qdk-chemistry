@@ -16,6 +16,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa i
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 from .test_helpers import (
@@ -335,6 +336,14 @@ class TestSOSSAMapper:
         mapper = SOSSAMapper()
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(unitary_rep)
+
+    def test_rejects_non_unit_power(self):
+        """The mapper emits a single block encoding, so a powered container must be refused."""
+        built = _build_sossa_unitary().get_container()
+        powered = SOSSABlockEncodingContainer.from_json({**built.to_json(), "power": 3})
+
+        with pytest.raises(ValueError, match="only unit power"):
+            SOSSAMapper().run(UnitaryRepresentation(container=powered))
 
     @pytest.mark.parametrize(
         ("outer_alg", "inner_alg", "select_alg"),

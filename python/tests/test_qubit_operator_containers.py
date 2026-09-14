@@ -16,8 +16,14 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partial
     PartiallyRandomized,
 )
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import qdrift_samples_campbell
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_naive
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
+    zassenhaus_omitted_commutator_norm,
+    zassenhaus_steps_naive,
+)
 from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
@@ -27,6 +33,7 @@ from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     SumOfSquaresContainer,
     SumOfSquaresMetadata,
 )
+from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
 
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
 
@@ -435,19 +442,69 @@ class TestPauliOnlyAlgorithmsRejectSumOfSquares:
     """Algorithms written against Pauli terms must reject a sum-of-squares operator."""
 
     @pytest.mark.parametrize(
-        ("builder_type", "settings"),
+        ("invoke", "error", "match"),
         [
-            (LCUBuilder, {}),
-            (QDrift, {"time": 1.0}),
-            (PartiallyRandomized, {"time": 1.0}),
-            (Trotter, {"time": 1.0}),
-            (Zassenhaus, {"time": 1.0}),
+            (lambda op: LCUBuilder().run(op), ValueError, "requires a Pauli decomposition"),
+            (lambda op: QDrift(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
+            (lambda op: PartiallyRandomized(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
+            (lambda op: Trotter(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
+            (lambda op: Zassenhaus(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
+            (lambda op: create("term_grouper", "commuting").run(op), ValueError, "requires a Pauli decomposition"),
+            (
+                lambda op: create("term_grouper", "qubit_wise_commuting").run(op),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (lambda op: create("term_grouper", "identity").run(op), ValueError, "requires a Pauli decomposition"),
+            (
+                lambda op: create("term_grouper", "vacuum_annihilating").run(op),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (lambda op: commutator_bound_first_order(op), ValueError, "requires a Pauli decomposition"),
+            (
+                lambda op: qdrift_samples_campbell(op, time=1.0, target_accuracy=1e-3),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (
+                lambda op: trotter_steps_naive(op, time=1.0, target_accuracy=1e-3),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (
+                lambda op: zassenhaus_steps_naive(op, time=1.0, target_accuracy=1e-3),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (
+                lambda op: zassenhaus_omitted_commutator_norm(op, order=1, weight_threshold=1e-12),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (lambda op: op.to_matrix(), NotImplementedError, "sum_of_squares"),
         ],
-        ids=["lcu", "qdrift", "partially_randomized", "trotter", "zassenhaus"],
+        ids=[
+            "lcu",
+            "qdrift",
+            "partially_randomized",
+            "trotter",
+            "zassenhaus",
+            "term_grouper_commuting",
+            "term_grouper_qubit_wise_commuting",
+            "term_grouper_identity",
+            "term_grouper_vacuum_annihilating",
+            "commutator_bound",
+            "qdrift_samples",
+            "trotter_steps",
+            "zassenhaus_steps",
+            "zassenhaus_omitted_commutator_norm",
+            "to_matrix",
+        ],
     )
-    def test_run_rejects_a_sum_of_squares_operator(self, builder_type, settings):
-        """The run fails naming the algorithm rather than on a missing Pauli attribute."""
+    def test_run_rejects_a_sum_of_squares_operator(self, invoke, error, match):
+        """The call fails naming the representation rather than on a missing Pauli attribute."""
         operator = QubitOperator(container=_sum_of_squares_container())
 
-        with pytest.raises(ValueError, match="requires a Pauli decomposition"):
-            builder_type(**settings).run(operator)
+        with pytest.raises(error, match=match):
+            invoke(operator)
