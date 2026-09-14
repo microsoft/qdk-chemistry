@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
 from abc import abstractmethod
 
 import numpy as np
@@ -28,6 +29,8 @@ __all__: list[str] = [
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
 ]
+
+_NON_IDENTITY = re.compile(r"[^I]")
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
@@ -60,11 +63,9 @@ class HamiltonianUnitaryBuilder(Algorithm):
             Dictionary assigning each non-identity qubit index to its Pauli axis.
 
         """
-        mapping: dict[int, str] = {}
-        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
-            if char != "I":
-                mapping[index] = char
-        return mapping
+        # Skip identity runs in the regex engine rather than stepping over them in Python.
+        last = len(label) - 1
+        return {last - match.start(): match[0] for match in reversed(list(_NON_IDENTITY.finditer(label)))}
 
 
 class HamiltonianUnitaryBuilderSettings(Settings):
@@ -191,23 +192,23 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 fermion_mode_order=fmo,
             )
 
+        return [[_make(layer) for layer in group] for group in self._partition_indices(partition)]
+
+    @staticmethod
+    def _partition_indices(partition: TermPartition, *, keep_empty_layers: bool = False) -> list[list[tuple[int, ...]]]:
+        """Return index layers stably ordered by group size, retaining legacy sparse empty layers when requested."""
         if isinstance(partition, LayeredPartition):
             layered_groups = partition.groups
         elif isinstance(partition, FlatPartition):
-            layered_groups = tuple((g,) for g in partition.groups)
+            layered_groups = tuple((g,) for g in partition.groups if g)
         else:
             raise TypeError(
                 f"Unsupported TermPartition subtype: {type(partition).__name__}. "
                 "Expected FlatPartition or LayeredPartition."
             )
 
-        groups: list[list[QubitOperator]] = [
-            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
-        ]
-
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
+        groups = [[layer for layer in layers if layer or keep_empty_layers] for layers in layered_groups]
+        return sorted((group for group in groups if group), key=len)
 
     def _exponentiate_commuting(
         self,

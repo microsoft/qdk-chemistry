@@ -60,7 +60,10 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
             The qubit operator at the given time.
 
         """
-        return self._base_hamiltonian + self._drive(t) * self._drive_hamiltonian
+        scale = self._drive(t)
+        if scale == 0.0 and self._base_hamiltonian.term_partition is not None:
+            return self._base_hamiltonian
+        return self._base_hamiltonian + scale * self._drive_hamiltonian
 
     @property
     def base_hamiltonian(self) -> QubitOperator:

@@ -217,6 +217,8 @@ class MagnusPropagator(Propagator):
         h0, h1, drive = container.base_hamiltonian, container.drive_hamiltonian, container.drive
         f_avg = integrate.quad(drive, t_start, t_end)[0] / dt
 
+        if f_avg == 0.0 and h0.term_partition is not None:
+            return h0
         return h0 + f_avg * h1
 
     def name(self) -> str:

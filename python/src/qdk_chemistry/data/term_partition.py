@@ -6,8 +6,7 @@ relevant subsets.  Concrete subclasses include :class:`FlatPartition`
 (single-level groups) and :class:`LayeredPartition` (group → layer
 hierarchy).
 
-The partition stores **indices** into
-:attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` so that it
+The partition stores **indices** into the operator's ordered terms so that it
 serialises trivially and remains small.
 
 Lifecycle
@@ -32,7 +31,10 @@ Lifecycle
 from __future__ import annotations
 
 import json as _json
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 from qdk_chemistry.data._hashing import _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
@@ -80,6 +82,10 @@ class TermPartition(DataClass):
 
     def all_indices(self) -> list[int]:
         """Return every term index referenced by the partition, in order."""
+        return list(self.iter_indices())
+
+    def iter_indices(self) -> Iterator[int]:
+        """Iterate over every referenced term index."""
         raise NotImplementedError
 
     def get_summary(self) -> str:
@@ -145,7 +151,7 @@ class FlatPartition(TermPartition):
     (for example, qubit-wise commuting groups for measurement basis selection).
 
     The ``groups`` field is a tuple of groups; each group is a tuple of term
-    indices into :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings`.
+    indices into the operator's ordered terms.
 
     Raises:
         TypeError: If ``groups`` is not a sequence of sequences of integers.
@@ -182,7 +188,11 @@ class FlatPartition(TermPartition):
 
     def all_indices(self) -> list[int]:
         """Return every term index referenced by the partition, in order."""
-        return [i for group in self.groups for i in group]
+        return list(self.iter_indices())
+
+    def iter_indices(self) -> Iterator[int]:
+        """Iterate over every referenced term index."""
+        return (i for group in self.groups for i in group)
 
     def get_summary(self) -> str:
         """Return a summary of the flat partition."""
@@ -216,7 +226,7 @@ class LayeredPartition(TermPartition):
 
     The ``groups`` field is a nested tuple ``(group, layer, term_index)``:
     outer = groups, middle = layers within a group, inner = term indices into
-    :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings`.
+    the operator's ordered terms.
 
     Raises:
         TypeError: If ``groups`` is not the expected nested-sequence shape.
@@ -261,7 +271,11 @@ class LayeredPartition(TermPartition):
 
     def all_indices(self) -> list[int]:
         """Return every term index referenced by the partition, in order."""
-        return [i for group in self.groups for layer in group for i in layer]
+        return list(self.iter_indices())
+
+    def iter_indices(self) -> Iterator[int]:
+        """Iterate over every referenced term index."""
+        return (i for group in self.groups for layer in group for i in layer)
 
     def get_summary(self) -> str:
         """Return a summary of the layered partition."""

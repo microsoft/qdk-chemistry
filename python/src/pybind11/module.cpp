@@ -52,6 +52,7 @@ void bind_dynamical_correlation_calculator(py::module& m);
 void bind_logger(py::module& m);
 void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
+void bind_lattice_geometry(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
 void bind_cube_generator(py::module& m);
@@ -88,6 +89,7 @@ PYBIND11_MODULE(_core, m) {
   bind_settings(data);
   bind_basis_set(data);
   bind_orbitals(data);
+  bind_lattice_geometry(data);
   bind_lattice_graph(data);
   bind_hamiltonian(data);
   bind_configuration(data);

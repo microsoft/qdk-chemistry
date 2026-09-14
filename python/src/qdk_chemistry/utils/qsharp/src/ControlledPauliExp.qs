@@ -4,96 +4,48 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
+    import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import Std.Arrays.Subarray;
-    import Std.ResourceEstimation.*;
 
-    /// Performs Controlled Time Evolution for a set of Pauli exponentials.
+    /// Applies repeated sparse Pauli evolution controlled on a single qubit.
+    ///
+    /// This is a named operation rather than a closure so that callables produced by
+    /// `MakeRepControlledPauliExpOp` stay resolvable by the Q# defunctionalizer, which
+    /// runs when a caller such as `HadamardTest` is lowered to QIR.
     /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `control`: The index of the control qubit.
-    /// - `system`: An array of integers representing the indices of the system qubits.
-    /// # Returns
-    /// - `Unit`: The operation prepares the controlled time evolution on the allocated qubits.
-    operation ControlledPauliExp(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
+    /// - `params`: The sparse repeated Pauli evolution parameters.
+    /// - `control`: The control qubit.
+    /// - `systems`: The system qubits the evolution acts on.
+    operation RepControlledPauliExp(
+        params : SparseRepPauliExpParams,
         control : Qubit,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        for idx in 0..Length(pauliExponents) - 1 {
-            let paulis = pauliExponents[idx];
-            let coeff = pauliCoefficients[idx];
-            Controlled Exp([control], (paulis, -coeff, systems));
-        }
-    }
-
-
-    /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the controlled evolution.
-    /// - `control`: The index of the control qubit.
-    /// - `systems`: An array of integers representing the indices of the system qubits.
-    struct RepControlledPauliExpParams {
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
-        control : Int,
-        systems : Int[],
-    }
-
-    /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
-    /// - `control`: The control qubit for the operation.
-    /// - `systems`: An array of qubits representing the system on which the operation acts.
-    /// # Returns
-    /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
-    operation RepControlledPauliExp(
-        params : RepControlledPauliExpParams,
-        control : Qubit,
-        systems : Qubit[],
-    ) : Unit is Adj + Ctl {
-        for i in 1..params.repetitions {
-            if BeginEstimateCaching("ControlledPauliExp", 0) {
-                ControlledPauliExp(params.pauliExponents, params.pauliCoefficients, control, systems);
-                EndEstimateCaching();
-            }
-        }
+        Controlled SparseRepPauliExp([control], (params, systems));
     }
 
     /// A helper operation to create a circuit for repeated Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the controlled evolution.
+    /// - `params`: The sparse repeated Pauli evolution parameters.
     /// - `control`: The index of the control qubit.
     /// - `systems`: An array of integers representing the indices of the system qubits.
     /// # Returns
     /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
     operation MakeRepControlledPauliExpCircuit(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
+        params : SparseRepPauliExpParams,
         control : Int,
         systems : Int[]
     ) : Unit {
-        use qs = Qubit[Length(systems) + 1];
-        RepControlledPauliExp(
-            new RepControlledPauliExpParams { pauliExponents = pauliExponents, pauliCoefficients = pauliCoefficients, repetitions = repetitions, control = control, systems = systems },
-            qs[control],
-            Subarray(systems, qs)
-        );
+        use qs = Qubit[MaxInt([control] + systems) + 1];
+        RepControlledPauliExp(params, qs[control], Subarray(systems, qs));
     }
 
-    /// A helper function to create a callable for repeated Controlled Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
-    /// # Returns
-    /// - `(Qubit, Qubit[]) => Unit is Adj + Ctl`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
-    function MakeRepControlledPauliExpOp(params : RepControlledPauliExpParams) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
+    /// Returns a single-control callable for repeated sparse Pauli evolution.
+    function MakeRepControlledPauliExpOp(
+        params : SparseRepPauliExpParams
+    ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         RepControlledPauliExp(params, _, _)
     }
 }

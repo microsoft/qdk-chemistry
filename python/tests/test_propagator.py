@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.propagator import MagnusPropagator
-from qdk_chemistry.data import DrivenQubitHamiltonian, QubitOperator
+from qdk_chemistry.data import DrivenQubitHamiltonian, LayeredPartition, QubitOperator
 
 
 def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitOperator:
@@ -37,15 +37,16 @@ class TestTimeAveragedPropagatorDriven:
 
     def test_zero_drive_returns_h0(self):
         """Zero drive f(t)=0 should give H0 + 0*H1 = H0."""
-        h0 = _make_hamiltonian(["ZI"], [1.0])
+        partition = LayeredPartition(strategy="geometry_coloring", groups=(((0, 1),),))
+        h0 = QubitOperator(["ZI", "IZ"], np.array([1.0, 2.0]), term_partition=partition)
         h1 = _make_hamiltonian(["IX"], [2.0])
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda _t: 0.0)
 
         propagator = MagnusPropagator()
         result = propagator.run(td, 0.0, 1.0)
 
-        # f_avg = 0, so result should be h0 + 0*h1
-        np.testing.assert_allclose(result.coefficients[0], 1.0)
+        np.testing.assert_allclose(result.coefficients, h0.coefficients)
+        assert result.term_partition == partition
 
     def test_sinusoidal_drive_averages_correctly(self):
         """sin(t) averaged over [0, pi] should be 2/pi."""
