@@ -108,7 +108,7 @@ def _build_sparse_hamiltonian(
     coloring: dict[tuple[int, int], int] | None = None,
     pair_first: bool = True,
 ) -> QubitOperator:
-    """Pack local terms, preserving the model's grouped or ungrouped ordering.
+    """Assemble sparse words, preserving the model's grouped or ungrouped ordering.
 
     With no supplied coloring, color each family's coalesced nonzero support.
     Ungrouped mapped Heisenberg terms retain family and shell insertion order;
@@ -117,19 +117,13 @@ def _build_sparse_hamiltonian(
     """
     n = graph.num_sites
     field_values = [(pauli, to_site_param(field, graph, "field")) for pauli, field in fields]
-    offsets = array("Q", [0])
-    qubits = array("I")
-    paulis = array("B")
+    words: list[tuple[tuple[int, str], ...]] = []
     coefficients = array("d")
-    pauli_code = {"X": 1, "Y": 2, "Z": 3}
     groups_layers: list[tuple[tuple[int, ...], ...]] = []
     coloring_cache: dict[tuple[tuple[int, int], ...], dict[tuple[int, int], int]] = {}
 
     def append_term(factors: tuple[tuple[int, str], ...], coefficient: float) -> int:
-        for qubit, pauli in sorted(factors):
-            qubits.append(qubit)
-            paulis.append(pauli_code[pauli])
-        offsets.append(len(qubits))
+        words.append(tuple(sorted(factors)))
         coefficients.append(coefficient)
         return len(coefficients) - 1
 
@@ -183,15 +177,13 @@ def _build_sparse_hamiltonian(
         append_term((), 0.0)
         groups_layers = [((0,),)]
     partition = LayeredPartition(strategy="geometry_coloring", groups=tuple(groups_layers)) if grouped else None
-    operator = QubitOperator.from_sparse_arrays(
+    operator = QubitOperator.from_sparse_terms(
         n,
-        np.frombuffer(offsets, dtype=np.uint64).copy(),
-        np.frombuffer(qubits, dtype=np.uint32).copy(),
-        np.frombuffer(paulis, dtype=np.uint8).copy(),
+        words,
         np.asarray(coefficients, dtype=complex),
         term_partition=partition,
     )
-    # Content hashes distinguish eager and packed storage. Preserve the legacy
+    # Content hashes distinguish dense and sparse storage. Preserve the legacy
     # output boundary without duplicating accumulation or allocating pair matrices.
     if not grouped or coloring is not None:
         return QubitOperator(

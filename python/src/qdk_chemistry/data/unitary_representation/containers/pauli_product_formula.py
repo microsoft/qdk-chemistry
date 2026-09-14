@@ -13,7 +13,6 @@ import h5py
 import numpy as np
 
 from qdk_chemistry.data._hashing import (
-    _hash_array,
     _hash_float,
     _hash_int,
     _hash_str,
@@ -41,35 +40,35 @@ class ExponentiatedPauliTerm:
     """The rotation angle for the exponentiation."""
 
 
-class _PackedStepTerms(Sequence[ExponentiatedPauliTerm]):
-    """Lazy term objects backed by packed sparse arrays."""
-
-    def __init__(
-        self,
-        term_offsets: np.ndarray,
-        qubit_indices: np.ndarray,
-        pauli_codes: np.ndarray,
-        angles: np.ndarray,
-    ) -> None:
-        self.term_offsets = term_offsets
-        self.qubit_indices = qubit_indices
-        self.pauli_codes = pauli_codes
-        self.angles = angles
-
-    def __len__(self) -> int:
-        return len(self.angles)
-
-    def __getitem__(self, index: int | slice) -> ExponentiatedPauliTerm | list[ExponentiatedPauliTerm]:
-        if isinstance(index, slice):
-            return [self[i] for i in range(*index.indices(len(self)))]
-        if index < 0:
-            index += len(self)
-        if index < 0 or index >= len(self):
-            raise IndexError("Product-formula term index out of range")
-        begin = int(self.term_offsets[index])
-        end = int(self.term_offsets[index + 1])
-        pauli_term = {int(self.qubit_indices[i]): "IXYZ"[int(self.pauli_codes[i])] for i in range(begin, end)}
-        return ExponentiatedPauliTerm(pauli_term=pauli_term, angle=float(self.angles[index]))
+def _read_legacy_step_terms(
+    num_qubits: int,
+    term_offsets: np.ndarray,
+    qubit_indices: np.ndarray,
+    pauli_codes: np.ndarray,
+    angles: np.ndarray,
+) -> list[ExponentiatedPauliTerm]:
+    """Convert the old packed 0.3.0 payload at the JSON/HDF5 loader boundary."""
+    if (
+        num_qubits <= 0
+        or any(a.ndim != 1 or (a.size and a.dtype.kind not in "iu") for a in (term_offsets, qubit_indices, pauli_codes))
+        or angles.ndim != 1
+        or len(term_offsets) != len(angles) + 1
+        or len(qubit_indices) != len(pauli_codes)
+        or term_offsets[0] != 0
+        or term_offsets[-1] != len(qubit_indices)
+        or np.any(term_offsets[1:] < term_offsets[:-1])
+        or np.any((qubit_indices < 0) | (qubit_indices >= num_qubits))
+        or np.any((pauli_codes < 1) | (pauli_codes > 3))
+    ):
+        raise ValueError("Invalid packed product-formula arrays.")
+    # Legacy terms used a dict: repeated indices retain their first position and last axis.
+    return [
+        ExponentiatedPauliTerm(
+            {int(qubit_indices[i]): "IXYZ"[int(pauli_codes[i])] for i in range(int(begin), int(end))},
+            float(angle),
+        )
+        for begin, end, angle in zip(term_offsets[:-1], term_offsets[1:], angles, strict=True)
+    ]
 
 
 class PauliProductFormulaContainer(UnitaryContainer):
@@ -100,11 +99,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
-    _packed_serialization_version = "0.3.0"
 
     def __init__(
         self,
-        step_terms: list[ExponentiatedPauliTerm],
+        step_terms: Sequence[ExponentiatedPauliTerm],
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
@@ -112,7 +110,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """Initialize a PauliProductFormulaContainer.
 
         Args:
-            step_terms: The list of exponentiated Pauli terms in a single step.
+            step_terms: The sequence of exponentiated Pauli terms in a single step.
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
@@ -133,71 +131,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self._num_qubits = num_qubits
         self.scale = scale
         super().__init__()
-
-    @classmethod
-    def from_sparse_arrays(
-        cls,
-        term_offsets: np.ndarray,
-        qubit_indices: np.ndarray,
-        pauli_codes: np.ndarray,
-        angles: np.ndarray,
-        *,
-        step_reps: int,
-        num_qubits: int,
-        scale: float = 1.0,
-    ) -> "PauliProductFormulaContainer":
-        """Construct a product formula from packed local Pauli terms."""
-        if isinstance(step_reps, bool) or not isinstance(step_reps, int | np.integer):
-            raise TypeError(f"step_reps must be an integer, got {type(step_reps).__name__}.")
-        if step_reps <= 0:
-            raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
-        if num_qubits <= 0:
-            raise ValueError(f"num_qubits must be positive, got {num_qubits}.")
-        term_offsets = np.asarray(term_offsets, dtype=np.uint64)
-        qubit_indices = np.asarray(qubit_indices, dtype=np.uint32)
-        pauli_codes = np.asarray(pauli_codes, dtype=np.uint8)
-        angles = np.asarray(angles, dtype=float)
-        if (
-            term_offsets.ndim != 1
-            or qubit_indices.ndim != 1
-            or pauli_codes.ndim != 1
-            or angles.ndim != 1
-            or len(term_offsets) != len(angles) + 1
-            or len(qubit_indices) != len(pauli_codes)
-            or len(term_offsets) == 0
-            or term_offsets[0] != 0
-            or term_offsets[-1] != len(qubit_indices)
-            or np.any(term_offsets[1:] < term_offsets[:-1])
-            or np.any(qubit_indices >= num_qubits)
-            or np.any((pauli_codes < 1) | (pauli_codes > 3))
-        ):
-            raise ValueError("Invalid packed product-formula arrays.")
-        object_ = cls.__new__(cls)
-        object_.__dict__.update(
-            _term_offsets=term_offsets,
-            _qubit_indices=qubit_indices,
-            _pauli_codes=pauli_codes,
-            _angles=angles,
-            _num_qubits=num_qubits,
-        )
-        object_.step_terms = _PackedStepTerms(term_offsets, qubit_indices, pauli_codes, angles)
-        object_.step_reps = int(step_reps)
-        object_.scale = scale
-        UnitaryContainer.__init__(object_)
-        return object_
-
-    @property
-    def has_sparse_terms(self) -> bool:
-        """Return whether this container uses packed sparse terms."""
-        return hasattr(self, "_term_offsets")
-
-    def sparse_term_arrays(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Return offsets, qubit indices, Pauli codes, and angles."""
-        if not self.has_sparse_terms:
-            raise RuntimeError("This product formula does not use packed sparse-term storage.")
-        return self._term_offsets, self._qubit_indices, self._pauli_codes, self._angles
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
@@ -221,15 +154,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "pauli_product_formula")
-        if self.has_sparse_terms:
-            _hash_array(h, self._term_offsets)
-            _hash_array(h, self._qubit_indices)
-            _hash_array(h, self._pauli_codes)
-            _hash_array(h, self._angles)
-            _hash_int(h, self.step_reps)
-            _hash_int(h, self._num_qubits)
-            _hash_float(h, self.scale)
-            return
         _hash_uint(h, len(self.step_terms))
         for term in self.step_terms:
             _hash_uint(h, len(term.pauli_term))
@@ -276,7 +200,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             ``permutation = [2, 0, 1]`` yields ``new_terms = [old_terms[2], old_terms[0], old_terms[1]]``.
 
         """
-        # Validate permutation
         if len(permutation) != len(self.step_terms):
             raise ValueError(
                 f"Permutation length ({len(permutation)}) must match the number of terms ({len(self.step_terms)})."
@@ -284,35 +207,22 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if set(permutation) != set(range(len(self.step_terms))):
             raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")
 
-        reordered_step_terms: list[ExponentiatedPauliTerm] = []
-        for i in permutation:
-            reordered_step_terms.append(self.step_terms[i])
-
         return PauliProductFormulaContainer(
-            step_terms=reordered_step_terms,
-            step_reps=self.step_reps,
-            num_qubits=self._num_qubits,
+            [self.step_terms[i] for i in permutation], self.step_reps, self.num_qubits, self.scale
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
-        """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
+        """Compose two evolutions, fusing only adjacent equal Pauli factors.
 
-        The terms from ``self`` (repeated ``step_reps`` times) are followed by the
-        terms from ``other_container`` (also repeated according to its
-        ``step_reps``). When two consecutive terms act with the same Pauli operator
-        string (i.e., have identical ``pauli_term`` dictionaries), their rotation
-        angles are summed into a single ``ExponentiatedPauliTerm``. If the summed
-        angle has magnitude less than ``atol``, the resulting term is removed.
+        Each input's repetitions are consumed in order. Angles are added sequentially;
+        removing a cancelled pair can expose another matching pair on the stack.
 
         Args:
-            other_container: The second ``PauliProductFormulaContainer`` appended
-                after this container.
-            atol: Absolute tolerance used when deciding whether a merged term with
-                a small rotation angle should be dropped.
+            other_container: Evolution to append, with matching register width and scale.
+            atol: Drop a merged rotation when its absolute angle is at most this tolerance.
 
         Returns:
-            A single ``PauliProductFormulaContainer`` representing the combined
-            evolution with adjacent identical terms fused.
+            A formula with ``step_reps=1``.
 
         """
         if self.num_qubits != other_container.num_qubits:
@@ -328,26 +238,18 @@ class PauliProductFormulaContainer(UnitaryContainer):
             )
 
         merged: list[ExponentiatedPauliTerm] = []
-        for step_terms, step_reps in (
-            (self.step_terms, self.step_reps),
-            (other_container.step_terms, other_container.step_reps),
-        ):
-            for _ in range(step_reps):
-                for term in step_terms:
+        for container in (self, other_container):
+            for _ in range(container.step_reps):
+                for term in container.step_terms:
                     if merged and merged[-1].pauli_term == term.pauli_term:
-                        new_angle = merged[-1].angle + term.angle
-                        if abs(new_angle) > atol:
-                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+                        angle = merged[-1].angle + term.angle
+                        if abs(angle) > atol:
+                            merged[-1] = ExponentiatedPauliTerm(term.pauli_term, angle)
                         else:
                             merged.pop()
                     else:
                         merged.append(term)
-        return PauliProductFormulaContainer(
-            step_terms=merged,
-            step_reps=1,
-            num_qubits=self.num_qubits,
-            scale=self.scale,
-        )
+        return PauliProductFormulaContainer(merged, 1, self.num_qubits, self.scale)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
@@ -358,31 +260,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """
         data: dict[str, Any] = {
             "container_type": self.type,
-            "step_reps": self.step_reps,
-            "num_qubits": self.num_qubits,
-            "scale": self.scale,
-        }
-        if self.has_sparse_terms:
-            data.update(
-                {
-                    "term_offsets": self._term_offsets.tolist(),
-                    "qubit_indices": self._qubit_indices.tolist(),
-                    "pauli_codes": self._pauli_codes.tolist(),
-                    "angles": self._angles.tolist(),
-                }
-            )
-        else:
-            data["step_terms"] = [
-                {
-                    "pauli_term": {str(k): v for k, v in term.pauli_term.items()},
-                    "angle": term.angle,
-                }
+            "step_terms": [
+                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
                 for term in self.step_terms
-            ]
-        result = self._add_json_version(data)
-        if self.has_sparse_terms:
-            result["version"] = self._packed_serialization_version
-        return result
+            ],
+        }
+        data.update(step_reps=self.step_reps, num_qubits=self.num_qubits, scale=self.scale)
+        return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
         """Save the PauliProductFormulaContainer to an HDF5 group.
@@ -396,14 +280,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
         group.attrs["step_reps"] = self.step_reps
         group.attrs["num_qubits"] = self.num_qubits
         group.attrs["scale"] = self.scale
-
-        if self.has_sparse_terms:
-            group.attrs["version"] = self._packed_serialization_version
-            group.create_dataset("term_offsets", data=self._term_offsets)
-            group.create_dataset("qubit_indices", data=self._qubit_indices)
-            group.create_dataset("pauli_codes", data=self._pauli_codes)
-            group.create_dataset("angles", data=self._angles)
-            return
 
         step_terms_group = group.create_group("step_terms")
         for i, term in enumerate(self.step_terms):
@@ -424,16 +300,17 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        expected_version = (
-            cls._packed_serialization_version if "term_offsets" in json_data else cls._serialization_version
-        )
+        expected_version = "0.3.0" if "term_offsets" in json_data else cls._serialization_version
         cls._validate_json_version(expected_version, json_data)
         if "term_offsets" in json_data:
-            return cls.from_sparse_arrays(
-                np.asarray(json_data["term_offsets"], dtype=np.uint64),
-                np.asarray(json_data["qubit_indices"], dtype=np.uint32),
-                np.asarray(json_data["pauli_codes"], dtype=np.uint8),
-                np.asarray(json_data["angles"], dtype=float),
+            return cls(
+                _read_legacy_step_terms(
+                    json_data["num_qubits"],
+                    np.asarray(json_data["term_offsets"]),
+                    np.asarray(json_data["qubit_indices"]),
+                    np.asarray(json_data["pauli_codes"]),
+                    np.asarray(json_data["angles"], dtype=float),
+                ),
                 step_reps=json_data["step_reps"],
                 num_qubits=json_data["num_qubits"],
                 scale=json_data.get("scale", 1.0),
@@ -477,17 +354,20 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        expected_version = cls._packed_serialization_version if "term_offsets" in group else cls._serialization_version
+        expected_version = "0.3.0" if "term_offsets" in group else cls._serialization_version
         cls._validate_hdf5_version(expected_version, group)
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]
 
         if "term_offsets" in group:
-            return cls.from_sparse_arrays(
-                np.array(group["term_offsets"], dtype=np.uint64),
-                np.array(group["qubit_indices"], dtype=np.uint32),
-                np.array(group["pauli_codes"], dtype=np.uint8),
-                np.array(group["angles"], dtype=float),
+            return cls(
+                _read_legacy_step_terms(
+                    num_qubits,
+                    np.array(group["term_offsets"]),
+                    np.array(group["qubit_indices"]),
+                    np.array(group["pauli_codes"]),
+                    np.array(group["angles"], dtype=float),
+                ),
                 step_reps=step_reps,
                 num_qubits=num_qubits,
                 scale=float(group.attrs.get("scale", 1.0)),
@@ -495,8 +375,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         step_terms: list[ExponentiatedPauliTerm] = []
         step_terms_group = group["step_terms"]
-        for term_name in step_terms_group:
-            term_group = step_terms_group[term_name]
+        for i in range(len(step_terms_group)):
+            term_group = step_terms_group[f"term_{i}"]
             angle = term_group.attrs["angle"]
             pauli_term: dict[int, str] = {}
             pauli_term_group = term_group["pauli_term"]

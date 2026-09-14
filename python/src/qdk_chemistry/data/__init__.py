@@ -44,6 +44,8 @@ Exposed classes are:
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
+- :class:`SparsePauliProductFormulaContainer`: Construct product formulas from sparse Pauli words.
+- :class:`SparsePauliTerms`: Immutable non-identity Pauli words with lazy full-width labels.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`StateVectorContainer`: Determinant-expansion wavefunction (single determinant, CAS, or SCI).
 - :class:`Structure`: Molecular structure and geometry information.
@@ -137,6 +139,10 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQub
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_formula import (
+    SparsePauliProductFormulaContainer,
+    SparsePauliTerms,
+)
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -198,6 +204,8 @@ __all__ = [
     "SettingsAreLockedError",
     "Shell",
     "SparseHamiltonianContainer",
+    "SparsePauliProductFormulaContainer",
+    "SparsePauliTerms",
     "SpinChannel",
     "StabilityResult",
     "StateVectorContainer",

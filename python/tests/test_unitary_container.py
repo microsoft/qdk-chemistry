@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 import pytest
 
+from qdk_chemistry.data import SparsePauliProductFormulaContainer, SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -29,9 +30,13 @@ def step_terms():
     ]
 
 
-@pytest.fixture
-def container(step_terms):
+@pytest.fixture(params=[False, True], ids=["ordinary", "sparse-factory"])
+def container(step_terms, request):
     """Create a PauliProductFormulaContainer instance for testing."""
+    if request.param:
+        return SparsePauliProductFormulaContainer.from_sparse_terms(
+            SparsePauliTerms(2, [{0: "X"}, {}, {0: "Y", 1: "X"}]), [0.5, 0.7, 0.3], step_reps=4, scale=1.7
+        )
     return PauliProductFormulaContainer(
         step_terms=step_terms,
         step_reps=4,
@@ -94,6 +99,7 @@ class TestPauliProductFormulaContainer:
         assert updated_container.step_terms[0] == container.step_terms[1]
         assert updated_container.step_terms[1] == container.step_terms[2]
         assert updated_container.step_terms[2] == container.step_terms[0]
+        assert updated_container.scale == container.scale
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
@@ -145,25 +151,94 @@ class TestPauliProductFormulaContainer:
         assert restored.type == container.type
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
-    def test_packed_roundtrip(self, tmp_path, file_format):
-        container = PauliProductFormulaContainer.from_sparse_arrays(
-            np.array([0, 1, 3], dtype=np.uint64),
-            np.array([0, 0, 1], dtype=np.uint32),
-            np.array([1, 2, 3], dtype=np.uint8),
-            np.array([0.5, 0.25]),
-            step_reps=3,
-            num_qubits=2,
+    def test_old_packed_load_writes_canonical(self, tmp_path, file_format):
+        """Convert old 0.3.0 arrays, retaining identity, last-axis-wins factors, angles and scale."""
+        payload = {
+            "version": "0.3.0",
+            "container_type": "pauli_product_formula",
+            "term_offsets": [0, 3, 3, 4],
+            "qubit_indices": [1, 0, 1, 0],
+            "pauli_codes": [1, 2, 3, 1],
+            "angles": [0.5, -0.25, 0.0],
+            "step_reps": 3,
+            "num_qubits": 2,
+            "scale": 1.7,
+        }
+        if file_format == "json":
+            restored = PauliProductFormulaContainer.from_json(json.loads(json.dumps(payload)))
+        else:
+            with h5py.File(tmp_path / "old.h5", "w") as group:
+                for key in ("version", "container_type", "step_reps", "num_qubits", "scale"):
+                    group.attrs[key] = payload[key]
+                for key in ("term_offsets", "qubit_indices", "pauli_codes", "angles"):
+                    group.create_dataset(key, data=payload[key])
+                restored = PauliProductFormulaContainer.from_hdf5(group)
+        expected = PauliProductFormulaContainer(
+            [
+                ExponentiatedPauliTerm({1: "Z", 0: "Y"}, 0.5),
+                ExponentiatedPauliTerm({}, -0.25),
+                ExponentiatedPauliTerm({0: "X"}, 0.0),
+            ],
+            3,
+            2,
+            scale=1.7,
         )
-        path = tmp_path / f"packed.pauli_product_formula_container.{file_format}"
-        container.to_file(path, file_format)
-        restored = PauliProductFormulaContainer.from_file(path, file_format)
+        assert restored.to_json() == expected.to_json()
+        assert list(restored.step_terms[0].pauli_term.items()) == [(1, "Z"), (0, "Y")]
+        assert restored.content_hash() == expected.content_hash()
+        path = tmp_path / f"canonical.pauli_product_formula_container.{file_format}"
+        restored.to_file(path, file_format)
+        if file_format == "json":
+            written = json.loads(path.read_text())
+            assert written == expected.to_json()
+            assert not {"term_offsets", "qubit_indices", "pauli_codes", "angles"} & written.keys()
+        else:
+            with h5py.File(path, "r") as group:
+                assert group.attrs["version"] == "0.2.0"
+                assert "step_terms" in group
+                assert not {"term_offsets", "qubit_indices", "pauli_codes", "angles"} & group.keys()
+        assert PauliProductFormulaContainer.from_file(path, file_format).content_hash() == expected.content_hash()
 
-        assert restored.has_sparse_terms
-        assert list(restored.step_terms) == list(container.step_terms)
-        assert restored.step_reps == 3
-        assert restored.num_qubits == container.num_qubits
-        assert restored.step_reps == container.step_reps
-        assert len(restored.step_terms) == len(container.step_terms)
+    @pytest.mark.parametrize(
+        ("key", "value"),
+        [
+            ("term_offsets", [0, 2, 1]),
+            ("qubit_indices", [-1]),
+            ("pauli_codes", [1.5]),
+            ("angles", [[0.5]]),
+        ],
+    )
+    def test_old_packed_rejects_invalid_arrays(self, key, value):
+        """Malformed packed payloads must fail before constructing ordinary terms."""
+        payload = {
+            "version": "0.3.0",
+            "num_qubits": 2,
+            "step_reps": 3,
+            "term_offsets": [0, 1],
+            "qubit_indices": [0],
+            "pauli_codes": [1],
+            "angles": [0.5],
+        }
+        payload[key] = value
+        with pytest.raises(ValueError, match="packed product-formula"):
+            PauliProductFormulaContainer.from_json(payload)
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_serialization_preserves_term_order_and_hash(self, container, file_format, tmp_path):
+        """Restore numeric Pauli keys and order, including double-digit HDF5 term indices."""
+        container = type(container)(
+            [ExponentiatedPauliTerm(container.step_terms[i % 3].pauli_term, i * 0.1) for i in range(13)],
+            container.step_reps,
+            container.num_qubits,
+            container.scale,
+        )
+        filename = tmp_path / f"formula.pauli_product_formula_container.{file_format}"
+        container.to_file(filename, file_format)
+        restored = PauliProductFormulaContainer.from_file(filename, file_format)
+        assert type(restored) is PauliProductFormulaContainer
+        assert restored.to_json() == container.to_json()
+        assert restored.content_hash() == container.content_hash()
+        assert all(isinstance(key, int) for term in restored.step_terms for key in term.pauli_term)
 
     def test_combine_no_adjacent_identical(self):
         """Test combine when no adjacent terms share the same Pauli string."""
@@ -237,3 +312,23 @@ class TestPauliProductFormulaContainer:
         assert "Number of qubits: 2" in summary
         assert "Number of step terms: 3" in summary
         assert "Step repetitions: 4" in summary
+
+    def test_legacy_hash_and_reordering_scale_are_unchanged(self):
+        """Ordinary formulas keep their baseline hash and scale when reordered."""
+        original = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, 0.5)], 4, 2, scale=1.7)
+        assert original.content_hash() == "c2b1c5b0979d3d48"  # da61805e2 baseline
+        assert original.reorder_terms([0]).content_hash() == original.content_hash()
+
+    @pytest.mark.parametrize("inverse_reps", [1, 4])
+    def test_sparse_factory_inherits_fusion(self, container, inverse_reps):
+        """Use the ordinary fusion rule, including complete cancellation and identities."""
+        inverse = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(container.step_terms)],
+            inverse_reps,
+            2,
+            scale=container.scale,
+        )
+        result = container.combine(inverse)
+        assert result.step_reps == 1
+        assert result.scale == container.scale
+        assert result.step_terms == list(container.step_terms) * (4 - inverse_reps)

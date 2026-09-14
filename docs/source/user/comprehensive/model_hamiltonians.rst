@@ -9,6 +9,22 @@ They are defined directly in terms of their parameters and a :doc:`LatticeGraph 
 For geometric interactions, first create a :doc:`LatticeGeometry <data/lattice_geometry>` and select the required shells with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 Model builders consume the resulting graph; they do not discover or add connections.
 
+Sparse Pauli representation
+---------------------------
+
+:meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` stores non-identity factors using
+:class:`~qdk_chemistry.data.SparsePauliTerms`, with owned, read-only coefficients.
+Use :meth:`~qdk_chemistry.data.QubitOperator.iter_sparse_terms` to traverse these factors without
+expanding full-width labels. Indexing or iterating ``pauli_strings`` explicitly materializes labels.
+Product formulas use :class:`~qdk_chemistry.data.PauliProductFormulaContainer` and symbolic repetitions;
+there is no separate packed runtime representation.
+
+JSON and HDF5 readers accept earlier packed operator and product-formula payloads and convert them
+to the current representation. Writers emit only the current formats. Sparse content hashes change
+on conversion, so invalidate caches keyed by old sparse hashes; dense hashes are unchanged.
+For mathematical comparisons use :meth:`~qdk_chemistry.data.QubitOperator.equiv`, not content hashes.
+Ordered factors, angles, and partitions remain the appropriate checks for evolution schedules.
+
 Overview
 --------
 

@@ -5,15 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
 
 from .base import CircuitMapper
 
@@ -40,6 +38,9 @@ class PauliSequenceMapper(CircuitMapper):
     3. A :math:`R_z` rotation implements
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; R_z(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
+
+    Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
+    indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
 
     Notes:
         * Requires a ``PauliProductFormulaContainer`` for the unitary representation.
@@ -79,59 +80,10 @@ class PauliSequenceMapper(CircuitMapper):
                 "PauliSequenceMapper only supports PauliProductFormula containers."
             )
 
+        evo_params = _pauli_evolution_parameters(unitary_container)
+        program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
+        evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
         target_indices = list(range(unitary_container.num_qubits))
-        if unitary_container.has_sparse_terms:
-            offsets, indices, codes, angles = unitary_container.sparse_term_arrays()
-            pauli_values = (
-                qsharp.Pauli.I,
-                qsharp.Pauli.X,
-                qsharp.Pauli.Y,
-                qsharp.Pauli.Z,
-            )
-            term_offsets = [int(value) for value in offsets]
-            qubit_indices = [int(value) for value in indices]
-            paulis = [pauli_values[int(value)] for value in codes]
-            coefficients = angles.tolist()
-            repetitions = unitary_container.step_reps
-            program = QSHARP_UTILS.PauliExp.MakeRepSparsePauliExpCircuit
-            evolution_op = QSHARP_UTILS.PauliExp.MakeRepSparsePauliExpOp(
-                term_offsets, qubit_indices, paulis, coefficients, repetitions
-            )
-            factory = QsharpFactoryData(
-                program=program,
-                parameter={
-                    "termOffsets": term_offsets,
-                    "qubitIndices": qubit_indices,
-                    "paulis": paulis,
-                    "pauliCoefficients": coefficients,
-                    "repetitions": repetitions,
-                    "system": target_indices,
-                },
-            )
-            return Circuit(
-                qsharp_op=evolution_op,
-                qsharp_factory=factory,
-                num_qubits=unitary_container.num_qubits,
-            )
-
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        angles: list[float] = []
-        for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
-            for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
-            angles.append(term.angle)
-
-        evo_params = {
-            "pauliExponents": pauli_terms,
-            "pauliCoefficients": angles,
-            "repetitions": unitary_container.step_reps,
-        }
-
-        program = QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit
-
-        evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)
 
         factory = QsharpFactoryData(
             program=program,

@@ -47,7 +47,6 @@ from qdk_chemistry.utils.model_hamiltonians import (
 if TYPE_CHECKING:
     from qdk.qre import EstimationTable
 
-ShellCoupling = float | np.ndarray | Mapping[int, float | np.ndarray]
 DEFAULT_KITAEV_COUPLINGS = {1: -13.3, 2: -0.67, 3: 0.1}
 DEFAULT_HEISENBERG_COUPLINGS = {1: -1.3, 3: 1.0}
 
@@ -74,10 +73,10 @@ def create_lattice(
 def create_hamiltonian(
     graph: LatticeGraph,
     *,
-    kx: ShellCoupling | None = None,
-    ky: ShellCoupling | None = None,
-    kz: ShellCoupling | None = None,
-    j: ShellCoupling | None = None,
+    kx: float | np.ndarray | Mapping[int, float | np.ndarray] | None = None,
+    ky: float | np.ndarray | Mapping[int, float | np.ndarray] | None = None,
+    kz: float | np.ndarray | Mapping[int, float | np.ndarray] | None = None,
+    j: float | np.ndarray | Mapping[int, float | np.ndarray] | None = None,
     gamma: float | np.ndarray = 9.4,
     gamma_prime: float | np.ndarray = -2.3,
     gamma_x: float | np.ndarray | None = None,
@@ -109,7 +108,7 @@ def create_hamiltonian(
                 [1.0 / np.sqrt(3.0), 1.0 / np.sqrt(3.0), 1.0 / np.sqrt(3.0)],
             ]
         )
-    # Shell mappings select the packed, geometry-grouped construction path,
+    # Shell mappings select the sparse, geometry-grouped construction path,
     # including when every requested exchange is a nearest-neighbor scalar.
     couplings = [
         DEFAULT_KITAEV_COUPLINGS if kx is None else kx,
@@ -151,7 +150,7 @@ def build_time_evolution_circuit(
     trotter_order: int = 4,
     weight_threshold: float = 1e-12,
 ) -> Circuit:
-    """Build one Euler interval with a symbolically repeated packed Trotter step.
+    """Build one Euler interval with a symbolically repeated sparse Trotter step.
 
     As in the notebook, the division count is round(total_time / dt); the
     effective timestep is total_time divided by that count. No state vector,

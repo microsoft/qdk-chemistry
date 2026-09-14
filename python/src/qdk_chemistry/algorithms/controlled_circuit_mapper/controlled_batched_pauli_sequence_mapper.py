@@ -5,10 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
 
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 
@@ -33,22 +32,12 @@ class ControlledBatchedPauliSequenceMapper(ControlledPauliSequenceMapper):
         """Return the opt-in batched mapper's registry name."""
         return "batched_pauli_sequence"
 
-    def _map_sequence(
-        self,
-        term_offsets: list[int],
-        qubit_indices: list[int],
-        paulis: list[qsharp.Pauli],
-        angles: list[float],
-        *,
-        repetitions: int,
-        control: int,
-        systems: list[int],
-    ) -> Circuit:
+    def _map_sequence(self, container: PauliProductFormulaContainer, control: int, systems: list[int]) -> Circuit:
         """Interleave controlled-rotation gadgets only within disjoint data supports."""
+        parameters = _pauli_evolution_parameters(container)
         batch_offsets = [0]
         occupied: set[int] = set()
-        for term_index in range(len(angles)):
-            support = qubit_indices[term_offsets[term_index] : term_offsets[term_index + 1]]
+        for term_index, support in enumerate(parameters["pauliIndices"]):
             if not support:
                 # Identity phases act on the control, not on a parity target.
                 if batch_offsets[-1] != term_index:
@@ -60,21 +49,14 @@ class ControlledBatchedPauliSequenceMapper(ControlledPauliSequenceMapper):
                     batch_offsets.append(term_index)
                     occupied.clear()
                 occupied.update(support)
-        if batch_offsets[-1] != len(angles):
-            batch_offsets.append(len(angles))
+        if batch_offsets[-1] != len(container.step_terms):
+            batch_offsets.append(len(container.step_terms))
 
-        parameters = {
-            "termOffsets": term_offsets,
-            "qubitIndices": qubit_indices,
-            "paulis": paulis,
-            "pauliCoefficients": angles,
-            "batchOffsets": batch_offsets,
-            "repetitions": repetitions,
-        }
+        params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**parameters)
         return Circuit(
             qsharp_factory=QsharpFactoryData(
-                program=QSHARP_UTILS.BatchedControlledPauliExp.MakeRepControlledSparsePauliExpCircuit,
-                parameter={**parameters, "control": control, "systems": systems},
+                program=QSHARP_UTILS.BatchedControlledPauliExp.MakeRepControlledPauliExpCircuit,
+                parameter={"params": params, "batchOffsets": batch_offsets, "control": control, "systems": systems},
             ),
-            qsharp_op=QSHARP_UTILS.BatchedControlledPauliExp.MakeRepControlledSparsePauliExpOp(*parameters.values()),
+            qsharp_op=QSHARP_UTILS.BatchedControlledPauliExp.MakeRepControlledPauliExpOp(params, batch_offsets),
         )

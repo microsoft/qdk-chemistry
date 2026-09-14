@@ -5,126 +5,105 @@
 namespace QDKChemistry.Utils.BatchedControlledPauliExp {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import Std.Arrays.Subarray;
-    import Std.ResourceEstimation.*;
+    import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.RepeatEstimates;
 
-    /// Batches consecutive, disjoint-support terms without changing their product.
-    /// batchOffsets indexes terms; termOffsets indexes their nonidentity factors.
-    /// Empty supports must be singleton batches so their controlled phases are retained.
-    operation ControlledSparsePauliExp(
-        termOffsets : Int[],
-        qubitIndices : Int[],
-        paulis : Pauli[],
-        pauliCoefficients : Double[],
+    /// Applies one step in consecutive disjoint-support batches.
+    /// batchOffsets indexes terms; empty supports must be singleton batches.
+    operation ControlledPauliExp(
+        params : SparseRepPauliExpParams,
         batchOffsets : Int[],
         control : Qubit,
-        systems : Qubit[],
+        systems : Qubit[]
     ) : Unit is Adj + Ctl {
         for batch in 0..Length(batchOffsets) - 2 {
             let first = batchOffsets[batch];
             let last = batchOffsets[batch + 1] - 1;
-            if termOffsets[first] == termOffsets[first + 1] {
-                // A phase on |1> also remains correct under further controls;
-                // a target-only Rz would introduce a control-relative phase.
-                R1(-pauliCoefficients[first], control);
+            if Length(params.pauliIndices[first]) == 0 {
+                // Retain the relative phase, including under further controls.
+                R1(-params.pauliCoefficients[first], control);
             } elif first == last {
-                let range = termOffsets[first]..termOffsets[first + 1] - 1;
                 Controlled Exp([control], (
-                    paulis[range], -pauliCoefficients[first], Subarray(qubitIndices[range], systems)
+                    params.pauliOps[first], -params.pauliCoefficients[first],
+                    Subarray(params.pauliIndices[first], systems)
                 ));
             } else {
                 within {
-                    for position in termOffsets[first]..termOffsets[last + 1] - 1 {
-                        let q = systems[qubitIndices[position]];
-                        if paulis[position] == PauliX {
-                            H(q);
-                        } elif paulis[position] == PauliY {
-                            Adjoint S(q);
-                            H(q);
-                        }
-                    }
                     for term in first..last {
-                        let start = termOffsets[term];
-                        let target = systems[qubitIndices[start]];
-                        for position in start + 1..termOffsets[term + 1] - 1 {
-                            CNOT(systems[qubitIndices[position]], target);
+                        let indices = params.pauliIndices[term];
+                        let paulis = params.pauliOps[term];
+                        for position in 0..Length(indices) - 1 {
+                            let q = systems[indices[position]];
+                            if paulis[position] == PauliX {
+                                H(q);
+                            } elif paulis[position] == PauliY {
+                                Adjoint S(q);
+                                H(q);
+                            }
+                        }
+                        let target = systems[indices[0]];
+                        for position in 1..Length(indices) - 1 {
+                            CNOT(systems[indices[position]], target);
                         }
                     }
                 } apply {
-                    // Interleave only disjoint terms' CRz gadgets: two rotation
-                    // rounds, not one complete gadget at a time. CNOTs still share control.
+                    // Two rotation rounds across disjoint data supports;
+                    // the CNOTs still share the control and are not simultaneous.
                     for term in first..last {
-                        Rz(pauliCoefficients[term], systems[qubitIndices[termOffsets[term]]]);
+                        Rz(params.pauliCoefficients[term], systems[params.pauliIndices[term][0]]);
                     }
                     for term in first..last {
-                        CNOT(control, systems[qubitIndices[termOffsets[term]]]);
+                        CNOT(control, systems[params.pauliIndices[term][0]]);
                     }
                     for term in first..last {
-                        Rz(-pauliCoefficients[term], systems[qubitIndices[termOffsets[term]]]);
+                        Rz(-params.pauliCoefficients[term], systems[params.pauliIndices[term][0]]);
                     }
                     for term in first..last {
-                        CNOT(control, systems[qubitIndices[termOffsets[term]]]);
+                        CNOT(control, systems[params.pauliIndices[term][0]]);
                     }
                 }
             }
         }
     }
 
-    /// Repeats the batched step symbolically during resource estimation.
-    operation RepControlledSparsePauliExp(
-        termOffsets : Int[],
-        qubitIndices : Int[],
-        paulis : Pauli[],
-        pauliCoefficients : Double[],
+    /// Keeps repetitions symbolic during resource estimation.
+    operation RepControlledPauliExp(
+        params : SparseRepPauliExpParams,
         batchOffsets : Int[],
-        repetitions : Int,
         control : Qubit,
-        systems : Qubit[],
+        systems : Qubit[]
     ) : Unit is Adj + Ctl {
         if IsResourceEstimating() {
             within {
-                RepeatEstimates(repetitions);
+                RepeatEstimates(params.repetitions);
             } apply {
-                ControlledSparsePauliExp(
-                    termOffsets, qubitIndices, paulis, pauliCoefficients, batchOffsets, control, systems
-                );
+                ControlledPauliExp(params, batchOffsets, control, systems);
             }
         } else {
-            for _ in 1..repetitions {
-                ControlledSparsePauliExp(
-                    termOffsets, qubitIndices, paulis, pauliCoefficients, batchOffsets, control, systems
-                );
+            for _ in 1..params.repetitions {
+                ControlledPauliExp(params, batchOffsets, control, systems);
             }
         }
     }
 
-    /// Creates controlled sparse evolution with explicit physical register indices.
-    operation MakeRepControlledSparsePauliExpCircuit(
-        termOffsets : Int[],
-        qubitIndices : Int[],
-        paulis : Pauli[],
-        pauliCoefficients : Double[],
+    /// Creates a batched controlled circuit with explicit physical register indices.
+    operation MakeRepControlledPauliExpCircuit(
+        params : SparseRepPauliExpParams,
         batchOffsets : Int[],
-        repetitions : Int,
         control : Int,
-        systems : Int[],
+        systems : Int[]
     ) : Unit {
         use qs = Qubit[MaxInt([control] + systems) + 1];
-        RepControlledSparsePauliExp(
-            termOffsets, qubitIndices, paulis, pauliCoefficients, batchOffsets,
-            repetitions, qs[control], Subarray(systems, qs)
-        );
+        RepControlledPauliExp(params, batchOffsets, qs[control], Subarray(systems, qs));
     }
 
-    /// Returns a named callable suitable for QPE and QIR composition.
-    function MakeRepControlledSparsePauliExpOp(
-        termOffsets : Int[],
-        qubitIndices : Int[],
-        paulis : Pauli[],
-        pauliCoefficients : Double[],
-        batchOffsets : Int[],
-        repetitions : Int,
-    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
-        RepControlledSparsePauliExp(termOffsets, qubitIndices, paulis, pauliCoefficients, batchOffsets, repetitions, _, _)
+    /// Named partial application remains composable in QPE and QIR.
+    function MakeRepControlledPauliExpOp(
+        params : SparseRepPauliExpParams,
+        batchOffsets : Int[]
+    ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
+        RepControlledPauliExp(params, batchOffsets, _, _)
     }
 }

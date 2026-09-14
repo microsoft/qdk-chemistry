@@ -28,6 +28,10 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_formula import (
+    SparsePauliProductFormulaContainer,
+    SparsePauliTerms,
+)
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
@@ -249,29 +253,22 @@ class TestPauliSequenceMapper:
 
 def _map_sparse_formula(
     terms: list[ExponentiatedPauliTerm],
-    packed: bool,
+    sparse: bool,
     repetitions: int,
     num_qubits: int = 2,
     targets: list[int] | None = None,
     *,
     variant: str = "pauli_sequence",
 ) -> Circuit:
-    """Map equivalent legacy or packed terms without widening their support."""
-    if packed:
-        offsets, indices, codes = [0], [], []
-        for term in terms:
-            for index, pauli in term.pauli_term.items():
-                if pauli != "I":  # Packed storage represents identity words by empty support.
-                    indices.append(index)
-                    codes.append("IXYZ".index(pauli))
-            offsets.append(len(indices))
-        container = PauliProductFormulaContainer.from_sparse_arrays(
-            np.array(offsets),
-            np.array(indices),
-            np.array(codes),
-            np.array([term.angle for term in terms]),
+    """Map canonical objects or sparse words without widening their support."""
+    if sparse:
+        container = SparsePauliProductFormulaContainer.from_sparse_terms(
+            SparsePauliTerms(
+                num_qubits,
+                [{index: axis for index, axis in term.pauli_term.items() if axis != "I"} for term in terms],
+            ),
+            [term.angle for term in terms],
             step_reps=repetitions,
-            num_qubits=num_qubits,
         )
     else:
         container = PauliProductFormulaContainer(terms, step_reps=repetitions, num_qubits=num_qubits)
@@ -284,7 +281,7 @@ def _map_sparse_formula(
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
 @pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
-@pytest.mark.parametrize("packed", [False, True], ids=["legacy", "packed"])
+@pytest.mark.parametrize("sparse", [False, True], ids=["objects", "sparse-terms"])
 @pytest.mark.parametrize("repetitions", [1, 3])
 @pytest.mark.parametrize(
     ("empty", "targets"),
@@ -292,7 +289,7 @@ def _map_sparse_formula(
     ids=["mixed", "empty", "reordered-noncontiguous"],
 )
 def test_sparse_controlled_matrix(
-    packed: bool, repetitions: int, empty: bool, targets: list[int], variant: str
+    sparse: bool, repetitions: int, empty: bool, targets: list[int], variant: str
 ) -> None:
     """Preserve order, sign, identity-relative phases, and spectator qubits exactly."""
     terms = [
@@ -305,7 +302,7 @@ def test_sparse_controlled_matrix(
     ]
     if empty:
         terms = []
-    circuit = _map_sparse_formula(terms, packed, repetitions, targets=targets, variant=variant)
+    circuit = _map_sparse_formula(terms, sparse, repetitions, targets=targets, variant=variant)
     width = max(2, *targets) + 1
     assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == width
     paulis = {
@@ -335,9 +332,9 @@ def test_sparse_controlled_matrix(
     )
 
 
-@pytest.mark.parametrize("packed", [False, True], ids=["legacy", "packed"])
+@pytest.mark.parametrize("sparse", [False, True], ids=["objects", "sparse-terms"])
 @pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
-def test_wide_controlled_transport_stays_sparse(packed: bool, variant: str) -> None:
+def test_wide_controlled_transport_stays_sparse(sparse: bool, variant: str) -> None:
     """Transport support-sized lists and scalar repetitions, never expanded evolution."""
     num_qubits = 40_000
     terms = [
@@ -345,41 +342,50 @@ def test_wide_controlled_transport_stays_sparse(packed: bool, variant: str) -> N
         ExponentiatedPauliTerm({num_qubits // 2: "Z"}, 0.27),
         ExponentiatedPauliTerm({}, -0.19),
     ]
-    circuit = _map_sparse_formula(terms, packed, 1_000_000, num_qubits, variant=variant)
+    circuit = _map_sparse_formula(terms, sparse, 1_000_000, num_qubits, variant=variant)
     assert circuit._qsharp_factory is not None
     payload = circuit._qsharp_factory.parameter
-    assert payload == {
-        "termOffsets": [0, 2, 3, 3],
-        "qubitIndices": [39_999, 0, 20_000],
-        "paulis": [qsharp.Pauli.Y, qsharp.Pauli.X, qsharp.Pauli.Z],
+    params = vars(payload["params"])
+    assert params == {
+        "pauliIndices": [[0, 39_999] if sparse else [39_999, 0], [20_000], []],
+        "pauliOps": [
+            [qsharp.Pauli.X, qsharp.Pauli.Y] if sparse else [qsharp.Pauli.Y, qsharp.Pauli.X],
+            [qsharp.Pauli.Z],
+            [],
+        ],
         "pauliCoefficients": [-0.31, 0.27, -0.19],
         "repetitions": 1_000_000,
-        "control": num_qubits,
-        "systems": list(range(num_qubits)),
-        **({"batchOffsets": [0, 2, 3]} if variant == "batched_pauli_sequence" else {}),
     }
-    assert isinstance(payload["repetitions"], int)
+    assert isinstance(params["repetitions"], int)
+    assert payload["control"] == num_qubits
+    assert payload["systems"] == list(range(num_qubits))
+    if variant == "batched_pauli_sequence":
+        assert payload["batchOffsets"] == [0, 2, 3]
+    else:
+        assert "batchOffsets" not in payload
 
 
 @pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
 def test_packed_controlled_transport_preserves_duplicate_dict_semantics(variant: str) -> None:
-    """Repeated packed indices keep the last Pauli, as the lazy term dictionary does."""
-    container = PauliProductFormulaContainer.from_sparse_arrays(
-        np.array([0, 3]),
-        np.array([1, 0, 1]),
-        np.array([1, 3, 2]),
-        np.array([-0.2]),
-        step_reps=1,
-        num_qubits=2,
+    """Repeated legacy packed indices keep the last Pauli and original dictionary order."""
+    container = PauliProductFormulaContainer.from_json(
+        {
+            "version": "0.3.0",
+            "term_offsets": [0, 3],
+            "qubit_indices": [1, 0, 1],
+            "pauli_codes": [1, 3, 2],
+            "angles": [-0.2],
+            "step_reps": 1,
+            "num_qubits": 2,
+        }
     )
     mapper = create("controlled_circuit_mapper", variant)
     mapper.settings().set("control_indices", [2])
     circuit = mapper.run(UnitaryRepresentation(container=container))
     assert circuit._qsharp_factory is not None
-    payload = circuit._qsharp_factory.parameter
-    assert payload["termOffsets"] == [0, 2]
-    assert payload["qubitIndices"] == [1, 0]
-    assert payload["paulis"] == [qsharp.Pauli.Y, qsharp.Pauli.Z]
+    params = vars(circuit._qsharp_factory.parameter["params"])
+    assert params["pauliIndices"] == [[1, 0]]
+    assert params["pauliOps"] == [[qsharp.Pauli.Y, qsharp.Pauli.Z]]
 
 
 def test_batched_variant_reduces_rotation_depth_without_changing_default() -> None:

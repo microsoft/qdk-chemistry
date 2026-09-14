@@ -20,6 +20,7 @@ except ImportError:
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )
+from qdk_chemistry.data import SparsePauliProductFormulaContainer, SparsePauliTerms
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -71,14 +72,11 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
-    def test_run_builds_packed_term_circuit(self):
-        container = PauliProductFormulaContainer.from_sparse_arrays(
-            np.array([0, 1, 2], dtype=np.uint64),
-            np.array([0, 1], dtype=np.uint32),
-            np.array([1, 3], dtype=np.uint8),
-            np.array([0.5, 0.25]),
+    def test_run_builds_sparse_term_circuit(self):
+        container = SparsePauliProductFormulaContainer.from_sparse_terms(
+            SparsePauliTerms(2, [{0: "X"}, {1: "Z"}]),
+            [0.5, 0.25],
             step_reps=2,
-            num_qubits=2,
         )
         circuit = PauliSequenceMapper().run(UnitaryRepresentation(container=container))
 
