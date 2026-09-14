@@ -17,8 +17,8 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::python;
 
 void bind_double_factorization(py::module &m) {
-  py::class_<DoubleFactorizer, py::smart_holder> double_factorizer(
-      m, "DoubleFactorizer", R"(
+  py::class_<DoubleFactorization, HamiltonianFactorization, py::smart_holder>
+      double_factorization(m, "DoubleFactorization", R"(
   Double-factorize a restricted Hamiltonian into low-rank two-electron fragments.
 
   The result is backed by a
@@ -53,11 +53,11 @@ References:
     :cite:`vonBurg2021`
 )");
 
-  double_factorizer.def(py::init<>(), R"(
-Create a double factorizer with default settings.
+  double_factorization.def(py::init<>(), R"(
+Create a double factorization algorithm with default settings.
 )");
 
-  double_factorizer.def("run", &DoubleFactorizer::run, R"(
+  double_factorization.def("run", &DoubleFactorization::run, R"(
 Double-factorize the given Hamiltonian.
 
 Args:
@@ -70,46 +70,43 @@ Raises:
   ValueError: If the input or its two-electron integrals are invalid, or no fragment survives truncation.
   RuntimeError: If an eigendecomposition fails.
 )",
-                        py::arg("hamiltonian"));
+                           py::arg("hamiltonian"));
 
-  double_factorizer.def("settings", &DoubleFactorizer::settings, R"(
+  double_factorization.def("settings", &DoubleFactorization::settings, R"(
 Return this factorizer's settings.
 
 Returns:
   qdk_chemistry.data.Settings: Mutable settings, locked after the first call to :meth:`run`.
 )",
-                        py::return_value_policy::reference_internal);
+                           py::return_value_policy::reference_internal);
 
-  double_factorizer.def("name", &DoubleFactorizer::name, R"(
+  double_factorization.def("name", &DoubleFactorization::name, R"(
 Return the implementation name.
 
 Returns:
-  str: ``"qdk"``.
+  str: ``"double_factorization"``.
 )");
 
-  double_factorizer.def("aliases", &DoubleFactorizer::aliases, R"(
+  double_factorization.def("aliases", &DoubleFactorization::aliases, R"(
 Return all registered names for the implementation.
 
 Returns:
   list[str]: Every lookup name, including the canonical one.
 )");
 
-  double_factorizer.def("type_name", &DoubleFactorizer::type_name, R"(
+  double_factorization.def("type_name", &DoubleFactorization::type_name, R"(
 Return the algorithm type name.
 
 Returns:
-  str: ``"double_factorizer"``.
+  str: ``"hamiltonian_factorization"``.
 )");
 
-  double_factorizer.def("hash", &DoubleFactorizer::hash,
-                        py::arg("hamiltonian"));
+  double_factorization.def("hash", &DoubleFactorization::hash,
+                           py::arg("hamiltonian"));
 
-  bind_algorithm_factory<DoubleFactorizerFactory, DoubleFactorizer>(
-      m, "DoubleFactorizerFactory");
-
-  double_factorizer.def("__repr__", [](const DoubleFactorizer &) {
-    return "<qdk_chemistry.algorithms.DoubleFactorizer>";
+  double_factorization.def("__repr__", [](const DoubleFactorization &) {
+    return "<qdk_chemistry.algorithms.DoubleFactorization>";
   });
 
-  qdk::chemistry::python::bind_create_nested(double_factorizer);
+  qdk::chemistry::python::bind_create_nested(double_factorization);
 }
