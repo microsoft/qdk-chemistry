@@ -173,6 +173,19 @@ def test_parse_set_overrides():
     assert _parse_set_overrides([]) == {}
 
 
+@pytest.mark.parametrize("override", ["=null", ".=null", "a..b=null"])
+def test_parse_set_overrides_rejects_empty_path_components(override):
+    """Reject dotted key paths with empty components."""
+    with pytest.raises(argparse.ArgumentTypeError, match="Path components must be non-empty"):
+        _parse_set_overrides([override])
+
+
+def test_parse_set_overrides_rejects_scalar_prefix_conflicts():
+    """Reject a nested override beneath an existing scalar value."""
+    with pytest.raises(argparse.ArgumentTypeError, match="already contains a non-object value"):
+        _parse_set_overrides(["settings=null", "settings.max_iterations=50"])
+
+
 def test_deep_merge():
     """Test recursive dict merging."""
     base = {"a": {"b": 1, "c": 2}, "d": 3}
