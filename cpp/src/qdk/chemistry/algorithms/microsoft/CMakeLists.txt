@@ -3,6 +3,7 @@ target_sources(chemistry PRIVATE
     active_space/autocas_active_space.cpp
     active_space/entropy_active_space.cpp
     active_space/occupation_active_space.cpp
+    active_space/qicas_active_space.cpp
     active_space/valence_active_space.cpp
     localization/iterative_localizer_base.cpp
     localization/gauge_fixing.cpp
@@ -11,6 +12,7 @@ target_sources(chemistry PRIVATE
     localization/pipek_mezey.cpp
     localization/active_space_qio.cpp
     localization/vvhv.cpp
+    qio/jacobi_optimizer.cpp
     hamiltonian.cpp
     cholesky_hamiltonian.cpp
     macis_asci.cpp

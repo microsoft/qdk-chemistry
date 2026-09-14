@@ -3,12 +3,11 @@
 // license information.
 
 #pragma once
-#include <cstdint>
-#include <limits>
-#include <numbers>
+
 #include <qdk/chemistry/algorithms/localization.hpp>
-#include <qdk/chemistry/data/settings.hpp>
 #include <string>
+
+#include "../qio/jacobi_settings.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -16,34 +15,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @class ActiveSpaceQIOLocalizerSettings
  * @brief Tunable Jacobi-sweep controls for the active-space QIO localizer.
  */
-class ActiveSpaceQIOLocalizerSettings : public data::Settings {
- public:
-  ActiveSpaceQIOLocalizerSettings() {
-    set_default(
-        "max_cycles", int64_t{200},
-        "Maximum number of Jacobi sweeps over all active orbital pairs",
-        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
-    set_default(
-        "convergence_tolerance", 1e-10,
-        "Sweep-to-sweep single-orbital entropy-sum change below which the "
-        "optimization stops",
-        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
-    set_default(
-        "coarse_angle_step", 0.02,
-        "Coarse grid spacing (radians) for the per-pair angle scan over "
-        "[0, pi/2); practical range [1e-4, pi/2]",
-        data::BoundConstraint<double>{1e-4, std::numbers::pi / 2.0});
-    set_default("fine_samples", int64_t{201},
-                "Number of samples in the fine-refinement angle scan",
-                data::BoundConstraint<int64_t>{
-                    4, static_cast<int64_t>(std::numeric_limits<int>::max())});
-    set_default(
-        "improvement_tolerance", 1e-12,
-        "Minimum single-orbital entropy decrease required to accept a "
-        "pair rotation",
-        data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
-  }
-};
+class ActiveSpaceQIOLocalizerSettings : public qio::JacobiSettings {};
 
 /**
  * @class ActiveSpaceQIOLocalizer
