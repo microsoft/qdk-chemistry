@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from functools import partial
+from operator import methodcaller
+
 import h5py
 import numpy as np
 import pytest
@@ -438,51 +441,65 @@ class TestSumOfSquaresQubitMapper:
             SumOfSquaresQubitMapper().run(Hamiltonian(factorized), mapping)
 
 
+def _run_builder(qubit_hamiltonian, builder_type, **settings):
+    """Run a freshly constructed unitary builder on the operator."""
+    return builder_type(**settings).run(qubit_hamiltonian)
+
+
+def _run_term_grouper(qubit_hamiltonian, strategy):
+    """Run a registered term-grouping strategy on the operator."""
+    return create("term_grouper", strategy).run(qubit_hamiltonian)
+
+
 class TestPauliOnlyAlgorithmsRejectSumOfSquares:
     """Algorithms written against Pauli terms must reject a sum-of-squares operator."""
 
     @pytest.mark.parametrize(
         ("invoke", "error", "match"),
         [
-            (lambda op: LCUBuilder().run(op), ValueError, "requires a Pauli decomposition"),
-            (lambda op: QDrift(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
-            (lambda op: PartiallyRandomized(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
-            (lambda op: Trotter(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
-            (lambda op: Zassenhaus(time=1.0).run(op), ValueError, "requires a Pauli decomposition"),
-            (lambda op: create("term_grouper", "commuting").run(op), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_builder, builder_type=LCUBuilder), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_builder, builder_type=QDrift, time=1.0), ValueError, "requires a Pauli decomposition"),
             (
-                lambda op: create("term_grouper", "qubit_wise_commuting").run(op),
+                partial(_run_builder, builder_type=PartiallyRandomized, time=1.0),
                 ValueError,
                 "requires a Pauli decomposition",
             ),
-            (lambda op: create("term_grouper", "identity").run(op), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_builder, builder_type=Trotter, time=1.0), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_builder, builder_type=Zassenhaus, time=1.0), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_term_grouper, strategy="commuting"), ValueError, "requires a Pauli decomposition"),
             (
-                lambda op: create("term_grouper", "vacuum_annihilating").run(op),
+                partial(_run_term_grouper, strategy="qubit_wise_commuting"),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (partial(_run_term_grouper, strategy="identity"), ValueError, "requires a Pauli decomposition"),
+            (
+                partial(_run_term_grouper, strategy="vacuum_annihilating"),
                 ValueError,
                 "requires a Pauli decomposition",
             ),
             (commutator_bound_first_order, ValueError, "requires a Pauli decomposition"),
             (
-                lambda op: qdrift_samples_campbell(op, time=1.0, target_accuracy=1e-3),
+                partial(qdrift_samples_campbell, time=1.0, target_accuracy=1e-3),
                 ValueError,
                 "requires a Pauli decomposition",
             ),
             (
-                lambda op: trotter_steps_naive(op, time=1.0, target_accuracy=1e-3),
+                partial(trotter_steps_naive, time=1.0, target_accuracy=1e-3),
                 ValueError,
                 "requires a Pauli decomposition",
             ),
             (
-                lambda op: zassenhaus_steps_naive(op, time=1.0, target_accuracy=1e-3),
+                partial(zassenhaus_steps_naive, time=1.0, target_accuracy=1e-3),
                 ValueError,
                 "requires a Pauli decomposition",
             ),
             (
-                lambda op: zassenhaus_omitted_commutator_norm(op, order=1, weight_threshold=1e-12),
+                partial(zassenhaus_omitted_commutator_norm, order=1, weight_threshold=1e-12),
                 ValueError,
                 "requires a Pauli decomposition",
             ),
-            (lambda op: op.to_matrix(), NotImplementedError, "sum_of_squares"),
+            (methodcaller("to_matrix"), NotImplementedError, "sum_of_squares"),
         ],
         ids=[
             "lcu",
