@@ -15,6 +15,7 @@ Supported formats and conversions:
 # --------------------------------------------------------------------------------------------
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import h5py
@@ -296,8 +297,12 @@ class Circuit(DataClass):
             )
         return result
 
-    def get_qre_application(self):
+    def get_qre_application(self, cache_dir: Path | None = None):
         """Convert the circuit to a ``qdk.qre`` Application for resource estimation.
+
+        Args:
+            cache_dir: Directory used to cache traces for Q# factory circuits.
+                Defaults to the QRE application cache directory.
 
         Returns a ``QSharpApplication``, ``OpenQASMApplication``, or ``QIRApplication``
         depending on the available circuit representation.
@@ -310,16 +315,20 @@ class Circuit(DataClass):
 
         """
         try:
-            from qdk.qre.application import OpenQASMApplication, QIRApplication, QSharpApplication  # noqa: PLC0415
+            from qdk.qre.application import OpenQASMApplication, QIRApplication  # noqa: PLC0415
         except ImportError as err:
             raise RuntimeError(
                 "qdk.qre is not available. Install QRE dependencies with: pip install 'qdk-chemistry[qre]'"
             ) from err
 
         if self._qsharp_factory is not None:
-            return QSharpApplication(
+            from qdk_chemistry.data._qre import CachedQSharpApplication  # noqa: PLC0415
+
+            return CachedQSharpApplication(
                 self._qsharp_factory.program,
                 args=tuple(self._qsharp_factory.parameter.values()),
+                cache_key=self.content_hash(truncate_chars=0),
+                cache_dir=cache_dir,
             )
         if self.qasm is not None:
             return OpenQASMApplication(self.qasm)
@@ -397,16 +406,16 @@ class Circuit(DataClass):
         if self.qasm is not None:
             _hash_str(h, "qasm")
             _hash_str(h, self.qasm)
+        elif self._qsharp_factory is not None:
+            # Deterministically identify factory-based circuits by hashing the compiled QIR.
+            _hash_str(h, "qsharp_factory_qir")
+            _hash_str(h, str(self.get_qir()))
         elif self.qir is not None:
             _hash_str(h, "qir")
             _hash_str(h, str(self.qir))
         elif self.qsharp is not None:
             _hash_str(h, "qsharp")
             _hash_str(h, self.qsharp.json())
-        elif self._qsharp_factory is not None:
-            # Deterministically identify factory-based circuits by hashing the compiled QIR.
-            _hash_str(h, "qsharp_factory_qir")
-            _hash_str(h, str(self.get_qir()))
         _hash_optional(h, self.encoding, _hash_str)
         _hash_optional(h, self.num_qubits, _hash_uint)
         # Only fed when non-zero, so circuits without a phase gradient keep their digest.
