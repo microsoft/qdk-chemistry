@@ -18,6 +18,7 @@ include(CMakeFindDependencyMacro)
 # openblas_set_num_threads) while the exported dependency is the
 # vendor-agnostic BLAS::BLAS. Steer the search below to the same provider, or a
 # machine with several BLAS installations may pick another and fail to link.
+# The symbols themselves are checked after the dependencies below.
 set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "@QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR@")
 set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS "@QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS@")
 if(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR AND NOT BLAS_PREFERENCE_LIST)
@@ -68,10 +69,8 @@ endif()
 
 list(REMOVE_AT CMAKE_MODULE_PATH 0)
 
-# Check the bound symbols rather than comparing vendor names: BLAS_VENDOR is
-# only set when the linalg FindBLAS module performs the search, so it is empty
-# whenever another module found BLAS first. Both halves are checked because the
-# library calls both, and either one missing fails the link.
+# Check the symbols the library actually calls, so a BLAS that lacks them is
+# reported here instead of as an unresolved symbol at the consumer's link step.
 if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
   include(CheckFunctionExists)
 
@@ -99,15 +98,12 @@ if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
   if(_qdk_blas_missing_symbols)
     list(JOIN _qdk_blas_missing_symbols ", " _qdk_blas_missing_symbols_text)
     message(FATAL_ERROR
-      "qdk::chemistry was built against BLAS vendor "
-      "'${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}' and calls "
-      "'${_qdk_blas_missing_symbols_text}', which the BLAS resolved here "
-      "(${BLAS_LIBRARIES}) does not provide; linking would fail with an "
-      "unresolved symbol. Point this project at the same BLAS (e.g. "
-      "-DBLAS_LIBRARIES=..., -DBLA_VENDOR=... or "
+      "qdk::chemistry calls '${_qdk_blas_missing_symbols_text}', which the BLAS "
+      "resolved here (${BLAS_LIBRARIES}) does not provide; linking would fail "
+      "with an unresolved symbol. Point this project at the same BLAS "
+      "qdk-chemistry was built against (e.g. -DBLAS_LIBRARIES=... or "
       "-DBLAS_PREFERENCE_LIST=${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}), or "
-      "rebuild qdk-chemistry with -DQDK_CHEMISTRY_BLAS_THREAD_API=NONE to make "
-      "the library independent of a particular BLAS provider.")
+      "rebuild qdk-chemistry with -DQDK_CHEMISTRY_BLAS_THREAD_API=NONE.")
   endif()
 endif()
 
