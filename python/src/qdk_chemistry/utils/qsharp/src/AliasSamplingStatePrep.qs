@@ -10,18 +10,15 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Arrays.MappedOverRange;
     import Std.Arrays.Reversed;
     import Std.Canon.ApplyToEachCA;
-    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsD;
     import Std.Math.BitSizeI;
-    import Std.Math.Ceiling;
     import Std.Math.Floor;
     import Std.Math.IsInfinite;
     import Std.Math.IsNaN;
-    import Std.Math.Lg;
     import Std.Math.MinI;
     import Std.Math.Sqrt;
     import Std.StatePreparation.PreparePureStateD;
@@ -415,119 +412,4 @@ namespace QDKChemistry.Utils.AliasSampling {
         use qs = Qubit[numQubits];
         AliasSamplingPrepare(params, qs);
     }
-
-    /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.
-    internal function MakeConditionalAliasSamplingPrepOp(
-        coefficients : Double[][],
-        bitsPrecision : Int,
-        conditionValue : Int,
-        numSwapBits : Int,
-    ) : Qubit[] => Unit {
-        (qs) => {
-            let nCond = Length(coefficients);
-            let nCoeffs = Length(coefficients[0]);
-            let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-            let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
-            let nQromOutput = bitsPrecision + nIndexBits + 2;
-
-            let conditionalReg = qs[0..nCondBits - 1];
-            let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
-            let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
-            let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
-            let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
-
-            ApplyXorInPlace(conditionValue, conditionalReg);
-
-            ConditionalAliasSamplingPrepare(
-                coefficients,
-                bitsPrecision,
-                conditionalReg,
-                indexReg,
-                uniformReg,
-                flagQubit,
-                qromOut,
-                numSwapBits
-            );
-        }
-    }
-
-    /// Test wrapper: prepare conditional alias sampling, apply an index phase,
-    /// and unprepare to exercise the adjoint on a non-power-of-two table.
-    internal function MakeConditionalAliasSamplingPhaseTestOp(
-        coefficients : Double[][],
-        bitsPrecision : Int,
-        conditionValue : Int,
-        numSwapBits : Int,
-    ) : Qubit[] => Unit {
-        (qs) => {
-            let nCond = Length(coefficients);
-            let nCoeffs = Length(coefficients[0]);
-            let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-            let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
-            let nQromOutput = bitsPrecision + nIndexBits + 2;
-
-            let conditionalReg = qs[0..nCondBits - 1];
-            let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
-            let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
-            let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
-            let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
-
-            ApplyXorInPlace(conditionValue, conditionalReg);
-
-            within {
-                ConditionalAliasSamplingPrepare(
-                    coefficients,
-                    bitsPrecision,
-                    conditionalReg,
-                    indexReg,
-                    uniformReg,
-                    flagQubit,
-                    qromOut,
-                    numSwapBits
-                );
-            } apply {
-                Z(indexReg[0]);
-            }
-        }
-    }
-
-    /// Test wrapper: conditional alias sampling with free-rider data.
-    internal function MakeConditionalAliasSamplingPrepWithFreeRiderOp(
-        coefficients : Double[][],
-        freeRiderData : Bool[][],
-        bitsPrecision : Int,
-        conditionValue : Int,
-    ) : Qubit[] => Unit {
-        (qs) => {
-            let nCond = Length(coefficients);
-            let nCoeffs = Length(coefficients[0]);
-            let nIndexBits = Ceiling(Lg(IntAsDouble(nCoeffs)));
-            let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
-            let nFreeRiderBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-            let nQromOutput = bitsPrecision + nIndexBits + 2;
-
-            let conditionalReg = qs[0..nCondBits - 1];
-            let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
-            let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
-            let flagQubit = qs[nCondBits + nIndexBits + bitsPrecision];
-            let qromOut = qs[nCondBits + nIndexBits + bitsPrecision + 1..nCondBits + nIndexBits + bitsPrecision + nQromOutput];
-            let freeRiderReg = qs[nCondBits + nIndexBits + bitsPrecision + 1 + nQromOutput..nCondBits + nIndexBits + bitsPrecision + nQromOutput + nFreeRiderBits];
-
-            ApplyXorInPlace(conditionValue, conditionalReg);
-
-            ConditionalAliasSamplingPrepareWithFreeRider(
-                coefficients,
-                freeRiderData,
-                bitsPrecision,
-                conditionalReg,
-                indexReg,
-                uniformReg,
-                flagQubit,
-                qromOut,
-                freeRiderReg,
-                0
-            );
-        }
-    }
-
 }

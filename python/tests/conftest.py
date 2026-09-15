@@ -40,6 +40,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .test_helpers import create_test_orbitals
 
@@ -73,6 +74,34 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_context_factory():
+    """Return a factory for isolated Q# contexts containing the test-only sources."""
+
+    def create_test_context():
+        context = create_qsharp_context()
+        for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")):
+            try:
+                context.eval(path.read_text(encoding="utf-8"))
+            except Exception as error:
+                raise RuntimeError(f"failed to evaluate Q# test source {path.name}: {error}") from error
+        return context
+
+    return create_test_context
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_context(qsharp_test_context_factory):
+    """Create a shared Q# context containing the test-only sources."""
+    return qsharp_test_context_factory()
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_utils(qsharp_test_context):
+    """Return the test-only Q# utilities namespace."""
+    return qsharp_test_context.code.QDKChemistry.TestUtils
 
 
 @pytest.fixture
