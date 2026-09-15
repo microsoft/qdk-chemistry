@@ -237,6 +237,10 @@ nitpick_ignore_regex = [
     (r"py:class", r"azure\.core\.polling\._poller\.(_SansIONoPolling|PollingMethod)"),
     (r"py:obj", r"azure\.core\.polling\._poller\.PollingReturnType_co"),
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
+    (
+        r"py:class",
+        r"^qdk_chemistry\.algorithms\.phase_estimation\.circuit_builder\.robust_builder\._AlgorithmSnapshot$",
+    ),
     (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases
     (r"py:class", r"^PlanTerm$"),
     (r"py:class", r"^CommutatorPlan$"),

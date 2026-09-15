@@ -2,7 +2,7 @@ Phase estimation circuit builder
 ================================
 
 The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder` is an abstract base class that defines the interface for constructing phase estimation circuits.
-It serves as the central component that orchestrates circuit synthesis by composing a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` (to construct the target unitary) with a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` (to convert it to a controlled circuit).
+It serves as the central component that orchestrates variant-specific circuit synthesis.
 
 The ``QpeCircuitBuilder`` is the primary algorithm reference configured in the :class:`~qdk_chemistry.algorithms.PhaseEstimation` class via the ``qpe_circuit_builder`` setting.
 It encapsulates all details about circuit composition, allowing the high-level phase estimation interface to remain agnostic to the specific phase estimation variant (iterative or standard).
@@ -12,8 +12,8 @@ Overview
 
 Phase estimation circuit builders are responsible for:
 
-1. **Composing circuits** from state preparation, controlled unitaries, and measurement/QFT operations
-2. **Generating variant-specific circuits** (iterative uses adaptive feedback; standard uses QFT)
+1. **Composing circuits** from state preparation, unitaries, and phase-readout operations
+2. **Generating variant-specific circuits** (iterative uses adaptive feedback, standard uses QFT, and robust uses paired Hadamard tests)
 
 The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder` abstract class provides the common interface, while concrete implementations handle variant-specific details.
 All variants delegate to the same nested algorithm interfaces, enabling flexible composition of different circuit synthesis strategies.
@@ -27,6 +27,9 @@ Use QpeCircuitBuilder
 
 This section demonstrates how to create, configure, and run a phase estimation circuit builder.
 The ``run`` method returns a list of :class:`~qdk_chemistry.data.Circuit` containing the constructed phase estimation circuits.
+
+The robust implementation additionally exposes ``schedule``, ``build``, and ``iter_build``.
+These methods retain the workload metadata needed for execution and allow randomized X/Y pairs to be streamed without retaining the complete circuit list.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -42,7 +45,8 @@ QubitOperator
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly by the user.
 
 
-The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilderSettings` class defines the general configuration parameters shared by all QPE circuit builders.
+The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilderSettings` class defines settings used by iterative and standard QPE circuit builders.
+The robust implementation replaces these with an ``experiment_scheduler`` algorithm reference; see :doc:`robust_phase_estimation_circuit_builder`.
 
 .. list-table::
    :header-rows: 1
@@ -138,6 +142,32 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    :language: python
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
+
+Robust Phase Estimation Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Class: ``QdkRobustPhaseEstimationCircuitBuilder``
+
+.. rubric:: Factory name: ``"qdk_robust"``
+
+Constructs X- and Y-basis Hadamard-test pairs from a reproducible experiment schedule.
+Its standard ``run`` method returns the canonical flat ``list[Circuit]``.
+Use ``schedule`` followed by ``iter_build`` when workload metadata or bounded-memory construction is required.
+
+**Additional setting:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Setting
+     - Type
+     - Description
+   * - ``experiment_scheduler``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - Reference to the ``"rpe_experiment_scheduler"`` that resolves rounds, error budgets, randomized draws, and nested construction settings.
+
+See :doc:`robust_phase_estimation_circuit_builder` for the scheduler settings and workload APIs.
 
 Unary-iteration Phase Estimation Circuit Builder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
