@@ -102,7 +102,7 @@ class GeometryOptimizer
                           std::move(input), n_inactive_orbitals);
   }
 
-  virtual std::string name() const = 0;
+  virtual std::string name() const override = 0;
 
   /**
    * @brief Return the factory type name for geometry optimizers.
@@ -116,7 +116,7 @@ class GeometryOptimizer
   virtual GeometryOptimizationResult _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
       int spin_multiplicity, GeometryOptimizationInputType input,
-      unsigned int n_inactive_orbitals) const = 0;
+      unsigned int n_inactive_orbitals) const override = 0;
 };
 
 /**
