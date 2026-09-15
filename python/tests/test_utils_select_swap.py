@@ -39,6 +39,8 @@ _DATA_2D_RAGGED_OUTER = [
     [[False, True, True], [True, True, False], [False, False, True], [True, False, False]],
 ]
 
+_DATA_2D_POWER_OF_TWO = _DATA_2D_RAGGED_OUTER[:4]
+
 _PHASE_TRIALS = 12
 
 
@@ -68,11 +70,24 @@ class TestSelectSwapLoadsCorrectValues:
             _DATA_1D_RAGGED, num_swap_bits
         )
 
+    @pytest.mark.parametrize("data", [_DATA_1D, _DATA_1D_RAGGED])
+    def test_1d_auto_swap_width_loads_every_address(self, data):
+        """``numSwapBits = -1`` hands the select/swap split to ``ComputeOptimalLambda1D``."""
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelectSwap1DCorrectness(data, -1)
+
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_word_loads_every_address(self, num_swap_bits, outer_always_valid):
         assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelectSwap2DCorrectness(
             _DATA_2D, num_swap_bits, outer_always_valid
+        )
+
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
+    def test_2d_word_loads_every_address_when_both_lengths_are_powers_of_two(self, num_swap_bits, outer_always_valid):
+        """No address is aliased onto a real row, so the in-range fixups must be no-ops."""
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelectSwap2DCorrectness(
+            _DATA_2D_POWER_OF_TWO, num_swap_bits, outer_always_valid
         )
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])

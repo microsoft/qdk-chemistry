@@ -35,6 +35,13 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
+try:
+    import qdk.qre  # noqa: F401
+
+    _HAS_QRE = True
+except ImportError:
+    _HAS_QRE = False
+
 
 def _address_qubits(num_actions: int) -> int:
     """Number of address qubits the Q# operations expect for ``num_actions`` values."""
@@ -57,6 +64,11 @@ def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: b
 
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
+
+    @pytest.mark.parametrize("num_actions", [2, 3, 5, 6, 7, 9, 10, 13])
+    def test_classical_action_index_matches_every_address(self, num_actions: int) -> None:
+        """The unlookup mirror must include the circuit's routing of padded addresses."""
+        assert QSHARP_UTILS.UnaryIteration.TestUnaryIterationActionIndex(num_actions)
 
     @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 7, 8, 9])
     def test_action_index_matches_every_address(self, qsharp_test_utils, num_actions):
@@ -112,6 +124,17 @@ class TestUnaryIterationQsharp:
 
 class TestBlockEncodingAgnosticSchedule:
     """The signed-power schedule must work for any self-inverse block encoding."""
+
+    @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7])
+    def test_resource_optimization_preserves_logical_counts(self, num_queries):
+        """Repeating one representative slot must match the literal schedule's costs."""
+        operation = QSHARP_UTILS.UnaryPhaseEstimation.TestSignedPowerScheduleResources
+        context = get_qsharp_context()
+
+        optimized = context.logical_counts(operation, num_queries, True)
+        direct = context.logical_counts(operation, num_queries, False)
+
+        assert optimized == direct
 
     @pytest.mark.parametrize(
         ("num_queries", "address_value"),
@@ -280,9 +303,15 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(ValueError, match="num_queries must be a positive integer"):
             QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
 
+    @pytest.mark.parametrize("compute_capacity", [0, -2])
+    def test_an_invalid_compute_capacity_is_rejected(self, compute_capacity):
+        """Memory placement accepts a positive compute capacity or the disabled sentinel."""
+        with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
+            _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
+
     def test_a_plain_block_encoding_is_rejected(self):
-        """The schedule drops one reflection, so a bare LCU has nothing to drop."""
-        with pytest.raises(ValueError, match="Requires a LCU walk unitary representation"):
+        """A bare LCU has no phase-to-energy relation, so it cannot back a unary QPE run."""
+        with pytest.raises(ValueError, match="Requires an LCU walk or SOSSA block encoding"):
             _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
 
     @pytest.mark.parametrize(
@@ -527,6 +556,65 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     )[0]
 
     assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
+
+
+@pytest.mark.parametrize("compute_capacity", [-1, 2])
+def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
+    """The Python setting must reach the Q# factory unchanged."""
+    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
+
+    assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
+
+
+@pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre not available")
+def test_a_positive_compute_capacity_moves_qubits_into_memory():
+    """A honoured ``computeCapacity`` splits the estimate into a compute and a memory area.
+
+    ``Circuit.estimate`` reports one ``numQubits`` total and cannot see the split, so an
+    ignored capacity looks identical to an honoured one. Only a memory-aware ISA, which
+    yokes a memory code onto the compute code, supplies the ``MEMORY`` instruction the
+    capacity-bounded trace requires.
+    """
+    from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
+    from qdk.qre.models import (  # noqa: PLC0415
+        GateBased,
+        RoundBasedFactory,
+        SurfaceCode,
+        TwoDimensionalYokedSurfaceCode,
+    )
+    from qdk.qre.property_keys import LOGICAL_COMPUTE_QUBITS, LOGICAL_MEMORY_QUBITS  # noqa: PLC0415
+
+    distances = list(range(5, 26, 2))
+    isa_query = (
+        SurfaceCode.q(distance=distances)
+        * RoundBasedFactory.q(use_cache=True, code_query=SurfaceCode.q(distance=distances))
+        * TwoDimensionalYokedSurfaceCode.q(source=SurfaceCode.q(distance=distances))
+    )
+    trace_query = PSSPC.q() * LatticeSurgery.q()
+    architecture = GateBased(error_rate=1e-4, gate_time=50, measurement_time=100)
+
+    def split(compute_capacity: int) -> tuple[int, int]:
+        circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
+        result = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, max_error=0.1)
+        entries = list(result)
+        assert entries, f"capacity {compute_capacity} admitted no feasible estimate"
+        best = min(entries, key=lambda entry: entry.qubits)
+        return best.properties.get(LOGICAL_COMPUTE_QUBITS, 0), best.properties.get(LOGICAL_MEMORY_QUBITS, 0)
+
+    disabled_compute, disabled_memory = split(-1)
+    capacities = (1, 2, 4)
+    capped = {capacity: split(capacity) for capacity in capacities}
+
+    assert disabled_memory == 0, f"the disabled sentinel reserved {disabled_memory} memory qubits"
+    for capacity, (compute, memory) in capped.items():
+        assert memory > 0, f"capacity {capacity} left every qubit in compute ({compute}, {memory})"
+        assert compute < disabled_compute, (
+            f"capacity {capacity} did not shrink the compute area: {compute} against {disabled_compute} when disabled"
+        )
+
+    computes = [capped[capacity][0] for capacity in capacities]
+    assert computes == sorted(computes), f"the compute area is not monotone in the capacity: {capped}"
+    assert len(set(computes)) > 1, f"every capacity produced the same compute area, so it is ignored: {capped}"
 
 
 def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:
