@@ -14,6 +14,7 @@ namespace QDKChemistry.TestUtils.UnaryIterationTests {
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.ResultAsBool;
     import Std.Diagnostics.Fact;
+    import Std.Measurement.MResetEachZ;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
