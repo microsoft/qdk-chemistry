@@ -16,6 +16,7 @@
 
 #include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
+#include "../two_body_symmetry.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -518,6 +519,19 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
   if (is_unrestricted()) {
     throw std::runtime_error(
         "FCIDUMP format is not supported for unrestricted Hamiltonians.");
+  }
+
+  // Ordinary FCIDUMP readers reconstruct the eight permutations of every
+  // two-electron record, so a permutation class that is only partially stored
+  // or whose stored records disagree cannot be represented by this format.
+  if (has_two_body_integrals() &&
+      !detail::sparse_entries_have_eightfold_symmetry(
+          _two_body_sparse->block(
+              {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()}),
+          detail::two_body_symmetry_tolerance)) {
+    throw std::runtime_error(
+        "FCIDUMP export requires 8-fold two-body permutation symmetry; "
+        "reduced-symmetry tensors cannot be represented losslessly.");
   }
 
   std::ofstream file(filename);
