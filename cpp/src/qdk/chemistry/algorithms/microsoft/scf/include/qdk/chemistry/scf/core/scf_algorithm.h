@@ -161,23 +161,28 @@ class SCFAlgorithm {
    * Converts spin-blocked Fock/density matrices into the effective ROHF Fock
    * and total-density representation used for OG evaluation.
    *
+   * When the MO coefficient matrix @p C is rectangular (n_MO < n_AO due to
+   * linear-dependency removal) the back-transform uses the overlap-mediated
+   * projection S C F_eff_MO C^T S instead of the square-matrix inversion,
+   * matching the RHF/UHF treatment in the reduced MO space.
+   *
    * @param[in] F Spin-blocked Fock matrix in AO basis with alpha and beta
    * blocks stacked by row
    * @param[in] C Molecular-orbital coefficient matrix used for AO<->MO
    * transformations
    * @param[in] P Spin-blocked density matrix in AO basis with alpha and beta
    * blocks stacked by row
+   * @param[in] S AO overlap matrix; used for the back-transform when
+   * n_MO < n_AO
    * @param[in] nelec_alpha Number of alpha electrons
    * @param[in] nelec_beta Number of beta electrons
    * @param[out] effective_fock Effective ROHF Fock matrix in AO basis
    * @param[out] total_density Total AO density matrix (P_alpha + P_beta)
    */
-  static void build_rohf_f_p_matrix(const RowMajorMatrix& F,
-                                    const RowMajorMatrix& C,
-                                    const RowMajorMatrix& P, int nelec_alpha,
-                                    int nelec_beta,
-                                    RowMajorMatrix& effective_fock,
-                                    RowMajorMatrix& total_density);
+  static void build_rohf_f_p_matrix(
+      const RowMajorMatrix& F, const RowMajorMatrix& C, const RowMajorMatrix& P,
+      const RowMajorMatrix& S, int nelec_alpha, int nelec_beta,
+      RowMajorMatrix& effective_fock, RowMajorMatrix& total_density);
 
   /**
    * @brief Access cached ROHF effective Fock matrix
