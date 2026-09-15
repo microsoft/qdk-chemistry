@@ -223,7 +223,7 @@ jobs:
         else
           ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
         fi
-        jobs=$(printf "%.0f" "$(awk "BEGIN { print $ram_gb / 8 }")")
+        jobs=$(awk "BEGIN { print int($ram_gb / 8) }")
         [ "$jobs" -lt 1 ] && jobs=1
         [ "$jobs" -gt "$cpu" ] && jobs=$cpu
         echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
