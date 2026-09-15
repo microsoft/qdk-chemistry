@@ -17,6 +17,7 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
     import Std.Math.AbsI;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSchedule;
+    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerScheduleDirect;
     import QDKChemistry.Utils.UnaryPhaseEstimation.MakeUnaryQPECircuit;
     import QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize;
 
@@ -55,6 +56,23 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
         };
     }
 
+    operation TestSignedPowerScheduleResources(numQueries : Int, useOptimizedSchedule : Bool) : Unit {
+        let numAddressQubits = AddressQubits(numQueries + 1);
+        use qs = Qubit[numAddressQubits + 1];
+        let address = qs[0..numAddressQubits - 1];
+        let targets = qs[numAddressQubits...];
+        let applyBlockEncoding = (register) => T(register[0]);
+        let applyReflection = (register) => Z(register[0]);
+
+        if useOptimizedSchedule {
+            ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
+        } else {
+            ApplySignedPowerScheduleDirect(applyBlockEncoding, applyReflection, numQueries, address, targets);
+        }
+
+        ResetAll(qs);
+    }
+
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
     operation TestRunSyntheticWalkQpe(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         Fact(
@@ -77,7 +95,8 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
             0,
             0,
             false,
-            false
+            false,
+            -1
         );
     }
 }

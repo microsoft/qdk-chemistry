@@ -14,7 +14,6 @@
 
 namespace QDKChemistry.Utils.SOSSAWalk {
 
-    import Std.Arrays.All;
     import Std.Arrays.Flattened;
     import Std.Arrays.ForEach;
     import Std.Arrays.MappedOverRange;
@@ -24,7 +23,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
-    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
     import Std.Convert.ResultArrayAsBoolArray;
@@ -35,7 +33,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Math.MaxI;
     import Std.Math.PI;
     import Std.Math.Round;
-    import Std.Measurement.MeasureEachZ;
     import Std.Measurement.MResetX;
     import Std.StatePreparation.PreparePureStateD;
     import Std.TableLookup.Select;
@@ -889,125 +886,4 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, allQubits);
         ResetAll(allQubits);
     }
-
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /// Adapter: outer PREPARE then inner PREPARE, over one flat register.
-    function MakeOuterInnerPrepOp(
-        outerOp : (Qubit[]) => Unit is Adj + Ctl,
-        innerOp : (Qubit[], Qubit[]) => Unit is Adj,
-        nOuter : Int,
-    ) : Qubit[] => Unit {
-        (qs) => {
-            let outerReg = qs[0..nOuter - 1];
-            outerOp(outerReg);
-            innerOp(outerReg, qs[nOuter...]);
-        }
-    }
-
-
-    /// Test the full SELECT on an entry with known angles.
-    operation TestSelectDQ(
-        selectData : SelectParams,
-        xoValue : Int,
-        bValue : Int,
-        usePhaseGradient : Bool,
-    ) : Unit {
-        let N = selectData.numOrbitals;
-        let numPositiveOneBody = selectData.numPositiveOneBody;
-        let numSF = selectData.numRanks * selectData.numCopies;
-        let Xo = N + numSF;
-        let xoBits = MaxI(1, AddressQubits(Xo));
-        let numBp1 = selectData.numBases + 1;
-        let bBits = MaxI(1, AddressQubits(numBp1));
-        let nFR = selectData.numFreeRiderBits;
-
-        let nOuter = xoBits;
-        let nInner = bBits + nFR;
-        let nSpin = 2;
-        let nSystem = 2 * N;
-        // The gradient register is allocated only on the QROM path. It is conjugated back to
-        // |0...0>, so the direct path's state is recovered from the QROM dump by restricting
-        // to the gradient=|0...0> subspace.
-        let nGradient = if usePhaseGradient { selectData.rotationBitPrecision } else { 0 };
-        let total = nOuter + nInner + nSpin + nSystem + nGradient;
-        let qs = QIR.Runtime.AllocateQubitArray(total);
-
-        let outerReg = qs[0..nOuter - 1];
-        let innerReg = qs[nOuter..nOuter + nInner - 1];
-        let spinReg = qs[nOuter + nInner..nOuter + nInner + nSpin - 1];
-        let systemReg = qs[nOuter + nInner + nSpin..nOuter + nInner + nSpin + nSystem - 1];
-        let gradientReg = qs[total - nGradient...];
-
-        let xoReg = outerReg[0..xoBits - 1];
-        ApplyXorInPlace(xoValue, xoReg);
-        H(spinReg[0]); // spinDQ
-
-        ApplyXorInPlace(bValue, innerReg[0..bBits - 1]);
-
-        let frStart = bBits;
-        if nFR >= 2 {
-            if xoValue >= N { X(innerReg[frStart]); }
-            if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
-
-            // Rank as the inner PREPARE's free-rider data would carry it: 0 for one-body.
-            let rValue = if xoValue >= N { (xoValue - N) / selectData.numCopies } else { 0 };
-            ApplyXorInPlace(rValue, innerReg[frStart + 2..frStart + nFR - 1]);
-        }
-
-        X(systemReg[0]);
-
-        if usePhaseGradient {
-            // Conjugated so the gradient register returns to |0...0> and does not contribute
-            // its own amplitudes to the comparison against the direct path.
-            within {
-                PreparePhaseGradientState(gradientReg);
-            } apply {
-                SelectImpl(selectData, true, outerReg, innerReg, spinReg, systemReg, gradientReg);
-            }
-        } else {
-            SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg, []);
-        }
-    }
-
-    function TestShouldLoadFreeRiderSeparately(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][],
-        coefficientBitPrecision : Int,
-    ) : Bool {
-        ShouldLoadFreeRiderSeparately(innerCoefficients, freeRiderData, coefficientBitPrecision)
-    }
-
-    /// Checks that loading and then erasing the branched angle word leaves the address
-    /// registers untouched, including the relative phase between the two branches.
-    ///
-    /// Conjugating by H turns any phase that is not global into a nonzero measurement, which is
-    /// what a fixup table that disagreed with the forward load would produce. Tables whose row
-    /// count is not a power of two are the case worth covering: `Select` aliases the surplus
-    /// addresses onto real rows instead of leaving them unloaded.
-    operation TestBranchedRotationWordRoundTrip(
-        sfData : Bool[][],
-        dqData : Bool[][],
-        numSFAddressQubits : Int,
-        numDQAddressQubits : Int,
-    ) : Bool {
-        use isSF = Qubit();
-        use sfAddress = Qubit[numSFAddressQubits];
-        use dqAddress = Qubit[numDQAddressQubits];
-        use target = Qubit[Length(sfData[0])];
-        let addressReg = [isSF] + sfAddress + dqAddress;
-
-        ApplyToEachCA(H, addressReg);
-        ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, target);
-        Adjoint ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, target);
-        ApplyToEachCA(H, addressReg);
-
-        let results = MeasureEachZ(addressReg + target);
-        ResetAll(addressReg + target);
-        All(result -> result == Zero, results)
-    }
-
 }

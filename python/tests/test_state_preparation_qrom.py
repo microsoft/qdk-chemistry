@@ -231,10 +231,10 @@ class TestRyViaPhaseGradient:
             (7, 4),
         ],
     )
-    def test_rotation_amplitudes(self, x, n):
+    def test_rotation_amplitudes(self, qsharp_test_context, qsharp_test_utils, x, n):
         """Ry(θ)|0⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ with θ = 4πx/2^n."""
-        op = QSHARP_UTILS.PhaseGradient.MakeTestRyOp(x, n)
-        sv = _dump_op(op, 1 + 2 * n)
+        op = qsharp_test_utils.PhaseGradientTests.TestMakeRyOp(x, n)
+        sv = np.array(dump_operation_on_state(op, 1 + 2 * n, context=qsharp_test_context))
         a0, a1 = _target_amps(sv, x, n)
 
         theta = 4.0 * math.pi * x / (1 << n)
@@ -244,10 +244,10 @@ class TestRyViaPhaseGradient:
         np.testing.assert_allclose(a1.imag, 0.0, atol=1e-6)
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (3, 4)])
-    def test_adjoint_roundtrip(self, x, n):
+    def test_adjoint_roundtrip(self, qsharp_test_context, qsharp_test_utils, x, n):
         """Ry followed by Adjoint Ry returns target to |+⟩."""
-        op = QSHARP_UTILS.PhaseGradient.MakeTestRyRoundtripOp(x, n)
-        sv = _dump_op(op, 1 + 2 * n)
+        op = qsharp_test_utils.PhaseGradientTests.TestMakeRyRoundtripOp(x, n)
+        sv = np.array(dump_operation_on_state(op, 1 + 2 * n, context=qsharp_test_context))
         a0, a1 = _target_amps(sv, x, n)
 
         np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
@@ -259,10 +259,10 @@ class TestRzViaPhaseGradient:
     """Tests for the RzViaPhaseGradient operation."""
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (2, 4), (3, 4), (1, 5), (5, 5)])
-    def test_polarity(self, x, n):
+    def test_polarity(self, qsharp_test_context, qsharp_test_utils, x, n):
         """Rz(θ) = diag(e^{-iθ/2}, e^{+iθ/2}) with θ = +4πx/2^n."""
-        op = QSHARP_UTILS.PhaseGradient.MakeTestRzOnPlusOp(x, n)
-        sv = _dump_op(op, 1 + 2 * n)
+        op = qsharp_test_utils.PhaseGradientTests.TestMakeRzOnPlusOp(x, n)
+        sv = np.array(dump_operation_on_state(op, 1 + 2 * n, context=qsharp_test_context))
         a0, a1 = _target_amps(sv, x, n)
 
         theta = 4.0 * math.pi * x / (1 << n)

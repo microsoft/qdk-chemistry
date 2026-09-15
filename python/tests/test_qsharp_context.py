@@ -228,7 +228,19 @@ class TestTestOnlySourcesAreNotShipped:
 
     def test_a_default_context_cannot_reach_the_test_helpers(self) -> None:
         """A user context must not be able to call the test drivers."""
-        assert not hasattr(create_qsharp_context().code.QDKChemistry, "TestUtils")
+        chemistry = create_qsharp_context().code.QDKChemistry
+        assert not hasattr(chemistry, "TestUtils")
+        legacy_helpers = {
+            "MakeConditionalAliasSamplingPrepOp",
+            "MakeConditionalAliasSamplingPrepWithFreeRiderOp",
+            "MakeOuterInnerPrepOp",
+        }
+        shipped_helpers = [
+            path
+            for path, name, is_namespace in self._walk_namespaces(chemistry.Utils, "Utils")
+            if not is_namespace and (("Test" in name and name != "HadamardTest") or name in legacy_helpers)
+        ]
+        assert shipped_helpers == []
 
     def test_the_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
         """Evaluating the test sources is what makes the drivers available to the Python tests."""

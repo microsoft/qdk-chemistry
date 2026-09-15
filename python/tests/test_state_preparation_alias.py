@@ -12,7 +12,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
 
@@ -74,7 +74,7 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
-    def test_resource_counts(self):
+    def test_resource_counts(self, qsharp_test_context, qsharp_test_utils):
         """Pin the logical resource counts so a costing regression is visible."""
         prep = AliasSamplingStatePreparation(bits_precision=4)
         circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
@@ -86,7 +86,7 @@ class TestAliasSamplingStatePreparation:
         assert lc["rotationCount"] == 0
         assert lc["measurementCount"] == 6
 
-        context = create_qsharp_context()
+        context = qsharp_test_context
         select_swap = context.code.QDKChemistry.Utils.SelectSwap
         lookup_data = [
             [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
@@ -131,7 +131,11 @@ class TestAliasSamplingStatePreparation:
         }
         for direction, (flags, expected) in expected_lookup_counts.items():
             counts = context.logical_counts(
-                select_swap.TestSelectSwap2DResourceProbe, lookup_data, num_swap_bits, True, *flags
+                qsharp_test_utils.SelectSwapTests.TestSelectSwap2DResourceProbe,
+                lookup_data,
+                num_swap_bits,
+                True,
+                *flags,
             )
             actual = {name: counts[name] for name in expected}
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
@@ -230,6 +234,7 @@ class TestAliasSamplingStatePreparation:
 
 
 def _run_conditional_alias_fr_and_dump(
+    context,
     coefficients: list[list[float]],
     free_rider_data: list[list[bool]],
     bits_precision: int,
@@ -243,10 +248,10 @@ def _run_conditional_alias_fr_and_dump(
     n_free_rider_bits = len(free_rider_data[0]) if free_rider_data else 0
     n_qrom_output = bits_precision + n_index_bits + 2
     total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output + n_free_rider_bits
-    op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPrepWithFreeRiderOp(
+    op = context.code.QDKChemistry.TestUtils.AliasSamplingTests.TestMakeConditionalAliasSamplingPrepWithFreeRiderOp(
         coefficients, free_rider_data, bits_precision, condition_value
     )
-    return np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
+    return np.array(dump_operation_on_state(op, total_qubits, context=context))
 
 
 def _compute_conditional_marginal_probs(
@@ -277,14 +282,16 @@ class TestConditionalAliasSamplingWithFreeRider:
     """Tests for conditional alias sampling with free-rider data."""
 
     @pytest.mark.parametrize("condition_value", [0, 1])
-    def test_free_rider_register_holds_the_loaded_bits(self, condition_value):
+    def test_free_rider_register_holds_the_loaded_bits(self, qsharp_test_context, condition_value):
         """The free rider depends only on the condition, so it comes out definite, not sampled."""
         n_cond, n_coeffs, n_fr_bits = 2, 4, 3
         rng = np.random.default_rng(seed=456 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
         free_rider_data = [[bool(rng.integers(0, 2)) for _ in range(n_fr_bits)] for _ in range(n_cond)]
 
-        full_sv = _run_conditional_alias_fr_and_dump(coefficients, free_rider_data, 6, condition_value)
+        full_sv = _run_conditional_alias_fr_and_dump(
+            qsharp_test_context, coefficients, free_rider_data, 6, condition_value
+        )
 
         # The free rider occupies the last qubits, so its bits are the low field of the basis
         # index, read most significant first.
@@ -295,6 +302,7 @@ class TestConditionalAliasSamplingWithFreeRider:
 
 
 def _run_conditional_alias_and_dump(
+    context,
     coefficients: list[list[float]],
     bits_precision: int,
     condition_value: int,
@@ -307,16 +315,16 @@ def _run_conditional_alias_and_dump(
     n_cond_bits = math.ceil(math.log2(n_cond))
     n_qrom_output = bits_precision + n_index_bits + 2
     total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
-    op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPrepOp(
+    op = context.code.QDKChemistry.TestUtils.AliasSamplingTests.TestMakeConditionalAliasSamplingPrepOp(
         coefficients, bits_precision, condition_value, num_swap_bits
     )
-    return np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
+    return np.array(dump_operation_on_state(op, total_qubits, context=context))
 
 
 class TestConditionalAliasSampling:
     """Tests for conditional alias sampling without free-rider data."""
 
-    def test_non_power_of_two_prepare_can_be_adjointed_after_a_phase(self):
+    def test_non_power_of_two_prepare_can_be_adjointed_after_a_phase(self, qsharp_test_context, qsharp_test_utils):
         r"""``PREP†·Z(index₀)·PREP`` returns to the start with amplitude :math:`\langle Z\rangle`.
 
         Garbage cancels between equal indices, so the overlap is :math:`\sum_i p_i (-1)^{b(i)}`;
@@ -331,11 +339,11 @@ class TestConditionalAliasSampling:
         n_index_bits = 2
         n_qrom_output = bits_precision + n_index_bits + 2
         total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
-        op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPhaseTestOp(
+        op = qsharp_test_utils.AliasSamplingTests.TestMakeConditionalAliasSamplingPhaseOp(
             coefficients, bits_precision, condition_value, 0
         )
 
-        state = np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
+        state = np.array(dump_operation_on_state(op, total_qubits, context=qsharp_test_context))
 
         probs = np.abs(coefficients[condition_value]) ** 2
         probs = probs / probs.sum()
@@ -350,7 +358,7 @@ class TestConditionalAliasSampling:
 
     @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
     @pytest.mark.parametrize("condition_value", [0, 1])
-    def test_marginal_probs(self, condition_value, num_swap_bits):
+    def test_marginal_probs(self, qsharp_test_context, condition_value, num_swap_bits):
         """Verify conditional marginal probs for no-swap, optimal, and select-swap loads."""
         n_cond, n_coeffs = 2, 4
         rng = np.random.default_rng(seed=789 + condition_value)
@@ -359,7 +367,9 @@ class TestConditionalAliasSampling:
         n_index_bits = math.ceil(math.log2(n_coeffs))
         n_cond_bits = math.ceil(math.log2(n_cond))
 
-        full_sv = _run_conditional_alias_and_dump(coefficients, bits_precision, condition_value, num_swap_bits)
+        full_sv = _run_conditional_alias_and_dump(
+            qsharp_test_context, coefficients, bits_precision, condition_value, num_swap_bits
+        )
         marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
 
         abs_coeffs = np.abs(coefficients[condition_value])

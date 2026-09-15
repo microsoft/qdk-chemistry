@@ -65,12 +65,7 @@ def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: b
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
-    @pytest.mark.parametrize("num_actions", [2, 3, 5, 6, 7, 9, 10, 13])
-    def test_classical_action_index_matches_every_address(self, num_actions: int) -> None:
-        """The unlookup mirror must include the circuit's routing of padded addresses."""
-        assert QSHARP_UTILS.UnaryIteration.TestUnaryIterationActionIndex(num_actions)
-
-    @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 7, 8, 9])
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 6, 7, 8, 9, 10, 13])
     def test_action_index_matches_every_address(self, qsharp_test_utils, num_actions):
         """Classical routing must match the circuit, including unused address states."""
         assert qsharp_test_utils.UnaryIterationTests.TestUnaryIterationActionIndex(num_actions)
@@ -126,13 +121,12 @@ class TestBlockEncodingAgnosticSchedule:
     """The signed-power schedule must work for any self-inverse block encoding."""
 
     @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7])
-    def test_resource_optimization_preserves_logical_counts(self, num_queries):
+    def test_resource_optimization_preserves_logical_counts(self, qsharp_test_context, qsharp_test_utils, num_queries):
         """Repeating one representative slot must match the literal schedule's costs."""
-        operation = QSHARP_UTILS.UnaryPhaseEstimation.TestSignedPowerScheduleResources
-        context = get_qsharp_context()
+        operation = qsharp_test_utils.UnaryPhaseEstimationTests.TestSignedPowerScheduleResources
 
-        optimized = context.logical_counts(operation, num_queries, True)
-        direct = context.logical_counts(operation, num_queries, False)
+        optimized = qsharp_test_context.logical_counts(operation, num_queries, True)
+        direct = qsharp_test_context.logical_counts(operation, num_queries, False)
 
         assert optimized == direct
 
