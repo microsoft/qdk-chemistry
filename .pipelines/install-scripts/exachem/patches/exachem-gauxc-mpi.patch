@@ -1,0 +1,33 @@
+# exachem-gauxc-mpi.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Let ExaChem's SCF/GauXC glue compile against a GauXC built WITHOUT MPI (GAUXC_ENABLE_MPI=OFF), so CI can reuse the
+# GauXC it already builds for qdk-chemistry itself instead of building a second, MPI-enabled copy.
+#
+# scf_gauxc.cpp constructs GauXC's runtime env with an MPI communicator unconditionally; GauXC's own ctors are
+# guarded by its GAUXC_MPI_CODE(...) macro, which expands to nothing when built without MPI. Wrap the comm
+# arg(s) in that same macro so the source compiles against both MPI-on and MPI-off GauXC.
+#
+# Semantic note: with MPI-off GauXC the XC grid is not distributed (each rank computes the full VXC) -- results
+# are unchanged, and this CI's coupled-cluster workloads never invoke the XC integrator anyway. Only a DFT run
+# would lose XC-phase scaling across ranks -- an acceptable trade for reusing qdk-chemistry's own GauXC build.
+#
+# Apply: git -C <exachem-src> apply exachem-gauxc-mpi.patch
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/exachem/scf/scf_gauxc.cpp b/exachem/scf/scf_gauxc.cpp
+index 2eb6896..2e8fde7 100644
+--- a/exachem/scf/scf_gauxc.cpp
++++ b/exachem/scf/scf_gauxc.cpp
+@@ -88,10 +88,10 @@ SCFGauxc<T>::setup_gauxc(ExecutionContext& ec, const ChemEnv& chem_env,
+   auto lb_exec_space  = exec_space_map.at(xc_space_str);
+   auto int_exec_space = exec_space_map.at(xc_space_str);
+   auto gauxc_rt       = txt_utils::strequal_case(xc_space_str, "device")
+-                          ? GauXC::DeviceRuntimeEnvironment(ec.pg().comm(), gauxc_gpu_pool)
+-                          : GauXC::RuntimeEnvironment(ec.pg().comm());
++                          ? GauXC::DeviceRuntimeEnvironment(GAUXC_MPI_CODE(ec.pg().comm(), ) gauxc_gpu_pool)
++                          : GauXC::RuntimeEnvironment(GAUXC_MPI_CODE(ec.pg().comm()));
+ #else
+-  auto gauxc_rt       = GauXC::RuntimeEnvironment(ec.pg().comm());
++  auto gauxc_rt       = GauXC::RuntimeEnvironment(GAUXC_MPI_CODE(ec.pg().comm()));
+   auto lb_exec_space  = GauXC::ExecutionSpace::Host;
+   auto int_exec_space = GauXC::ExecutionSpace::Host;
+ #endif

@@ -91,7 +91,7 @@ extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     settings:
-      networkIsolationPolicy: Permissive,CFSClean,CFSClean2,CFSClean3
+      networkIsolationPolicy: DefaultDeny,CFSClean,CFSClean2,CFSClean3
     sdl:
       autobaseline:
         enableForGitHub: true
@@ -121,18 +121,48 @@ extends:
       # Windows C++ dependency build (vcpkg + FetchContent targets).
       # Runs once so the 5 parallel Python-version wheel jobs share a single
       # warm cache entry instead of each rebuilding deps independently.
-      - job: Build_windows_x86_64_deps
-        pool:
-          name: $(CPU_POOL_X86)
-          demands:
-          - ImageOverride -equals windows-2025-1espt
-          os: windows
-        timeoutInMinutes: 480
-        displayName: Build Windows x86_64 C++ dependencies
-        steps:
-        - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
-          parameters:
-            march: x86-64-v3
+      # Gated on windows_x86_64 being present in the matrix, so overriding the matrix (e.g. Linux-only) doesn't
+      # waste a Windows agent on an unused dependency build.
+      - ${{ each target in parameters.matrix }}:
+        - ${{ if eq(target.name, 'windows_x86_64') }}:
+          - job: Build_windows_x86_64_deps
+            pool:
+              name: $(CPU_POOL_X86)
+              demands:
+              - ImageOverride -equals windows-2025-1espt
+              os: windows
+            timeoutInMinutes: 480
+            displayName: Build Windows x86_64 C++ dependencies
+            steps:
+            - template: .pipelines/templates/build-pip-wheels-windows-deps.yml@self
+              parameters:
+                march: x86-64-v3
+
+      # ExaChem (+ TAMM) build for the Linux x86_64 test environment, built once here (not per-Python-version)
+      # and published as a pipeline artifact. Entirely separate from qdk-chemistry's own wheel build/prefix.
+      # Gated on linux_x86_64 being present in the matrix, same reasoning as the Windows deps job above.
+      - ${{ each target in parameters.matrix }}:
+        - ${{ if eq(target.name, 'linux_x86_64') }}:
+          - job: Build_linux_x86_64_exachem
+            pool:
+              name: $(CPU_POOL_X86)
+              demands:
+              - ImageOverride -equals Ubuntu24.04Nightly
+              os: linux
+            timeoutInMinutes: 480
+            displayName: Build Linux x86_64 ExaChem (BLIS+LibFLAME)
+            templateContext:
+              outputs:
+              - output: pipelineArtifact
+                displayName: Upload ExaChem install (Linux x86_64)
+                # Hardcoded path, not $(System.DefaultWorkingDirectory) -- see the matching download input below.
+                targetPath: $(Agent.BuildDirectory)/qdk-chemistry/exachem_install
+                artifactName: linux-x86_64-exachem-install
+            steps:
+            - template: .pipelines/templates/build-exachem-linux.yml@self
+              parameters:
+                march: x86-64-v3
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
 
       # Same rationale for Windows ARM64, on the 1ES ARM64 pool. hostArchitecture
       # avoids the 1ES template defaulting to an x64-emulated agent.
@@ -182,7 +212,8 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: windows
-          ${{ else }}:
+          ${{ elseif eq(target.name, 'linux_x86_64') }}:
+            dependsOn: Build_linux_x86_64_exachem
             pool:
               name: $(CPU_POOL_X86)
               demands:
@@ -200,8 +231,14 @@ extends:
             maxParallel: 5
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
-            LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+            # Must stay a literal value: ADO's variables: block doesn't expand $VAR.
+            LD_LIBRARY_PATH: /usr/local/lib
           templateContext:
+            ${{ if eq(target.name, 'linux_x86_64') }}:
+              inputs:
+              - input: pipelineArtifact
+                artifactName: linux-x86_64-exachem-install
+                targetPath: $(Agent.BuildDirectory)/exachem_install
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}

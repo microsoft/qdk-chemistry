@@ -4,7 +4,7 @@ parameters:
   default: $(Agent.BuildDirectory)
 - name: dockerImage
   type: string
-  default: ubuntu:22.04
+  default: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
 - name: imageTag
   type: string
   default: linux/amd64
