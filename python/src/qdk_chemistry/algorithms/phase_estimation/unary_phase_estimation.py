@@ -56,12 +56,16 @@ def _post_process_phase_estimation(
         method: Phase estimation algorithm label recorded on the result.
         resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
             ``False`` the non-positive one, as wanted for a ground state.
-        eigenvalue_from_phase: A callable mapping a walk phase fraction to a Hamiltonian eigenvalue.
+        eigenvalue_from_phase: A callable mapping a walk phase fraction to its Hamiltonian eigenvalue.
 
     Returns:
         A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
         ``canonical_phase_fraction`` is the decoded walk phase, and ``branching``
         holds both sign candidates.
+
+    Raises:
+        ValueError: If the unitary folds several eigenvalues onto a phase, since the sign branch
+            the flag names is then not a single energy.
 
     """
     num_bins = 2**num_bits
@@ -168,8 +172,10 @@ class UnaryPhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
 
-        # Resolve container before running the circuit
+        # Resolve container before running the circuit. The builder drops any carried power,
+        # so inversion must use the base (power=1) unitary.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 
