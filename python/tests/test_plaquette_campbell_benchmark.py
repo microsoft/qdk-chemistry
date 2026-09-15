@@ -298,21 +298,22 @@ class TestPlaquetteAgainstTableII:
 
     @pytest.mark.parametrize("size", _SIZES)
     def test_synthesized_t_count_approaches_the_paper_as_the_lattice_grows(self, size):
-        """Our T total sits above Campbell's, by a factor that falls from 3.3x to 1.2x.
+        """Our T total falls from 3.2x Campbell's down to 0.95x as the lattice grows.
 
         The gap is rotation count, not step count: Campbell's directional-control
         costing emits fewer controlled rotations than a conventional controlled mapper,
         and each surviving rotation is then synthesized at his own ``N_HT``. Because the
         excess is a fixed number of rotations per step while his total grows with
-        ``N_PE``, the ratio shrinks with the lattice. Asserted as a decreasing bound
-        rather than one tolerance, since no single budget is honest across the range.
+        ``N_PE``, the ratio shrinks with the lattice, and with the hopping layer merged
+        into the boundary it crosses below his published count near L=30. Asserted as a
+        band rather than one tolerance, since no single budget is honest across the range.
         """
         schedule = campbell_schedule(size)
         counts = _logical_counts(size, max_batch=size * size // 2)
         synthesized = counts["tCount"] + counts["rotationCount"] * schedule["synthesis_t"]
 
         ratio = synthesized / _TABLE_II_U8[size][1]
-        assert 1.0 < ratio <= 3.4, f"T ratio {ratio:.2f}x outside the measured band"
+        assert 0.9 < ratio <= 3.3, f"T ratio {ratio:.2f}x outside the measured band"
 
     def test_the_t_gap_narrows_with_the_lattice(self):
         """The rotation excess is per step, so it is amortized as N_PE grows.

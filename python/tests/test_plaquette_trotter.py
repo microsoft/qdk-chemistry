@@ -254,13 +254,14 @@ class TestPlaquetteTrotterDecomposition:
 
         assert np.allclose(actual, expected, atol=1e-10)
 
-    def test_repeated_formula_has_boundary_and_four_factor_body(self):
-        """Campbell's rewrite emits one boundary layer around the repeated P-G-P-D body.
+    def test_repeated_formula_merges_the_hopping_layer_into_the_boundary(self):
+        """The rewrite emits a pink boundary around a body carrying only two hop layers.
 
-        The D layer is the interaction, whose equal-angle families are phased through
-        Hamming weight registers: one batch per family, plus the identity factor
-        carrying the Jordan-Wigner constant. Bounding ``max_batch`` would split those
-        families into more batches without changing the three hopping conjugations.
+        Merging the hopping layer rather than the interaction is the saving: a symmetric
+        step written with hopping outside contributes one merged pink layer per
+        repetition instead of two pink half-layers, so the body holds two hopping
+        conjugations rather than three. The interaction half-layers that move inward in
+        exchange are batched through Hamming weight registers and cost far less.
         """
         operator = _hubbard_operator(4, 4, interaction=4.0)
         container = (
@@ -275,14 +276,15 @@ class TestPlaquetteTrotterDecomposition:
         )
 
         assert container.step_reps == 3
-        assert container.conjugating_terms
+        assert [isinstance(term, ConjugatedExponentiatedPauliTerm) for term in container.conjugating_terms] == [True], (
+            "the one-time boundary is a single pink hopping half-layer"
+        )
         hopping = [term for term in container.step_terms if isinstance(term, ConjugatedExponentiatedPauliTerm)]
-        assert len(hopping) == 3
-        assert container.step_terms[:3] == hopping, "the hopping tilings must come first"
-        assert all(
-            isinstance(term, ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm)
-            for term in container.step_terms[3:]
-        ), "the interaction layer holds only plain and batched factors"
+        assert len(hopping) == 2, "the merged body carries gold and one full pink layer"
+        assert container.step_terms[-1] is hopping[-1], "the merged pink layer closes the body"
+        assert not isinstance(container.step_terms[0], ConjugatedExponentiatedPauliTerm), (
+            "the body opens with a batched interaction half-layer"
+        )
 
 
 PauliGroup = ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm
@@ -303,15 +305,10 @@ def _qsharp_groups(groups: Sequence[PauliGroup]) -> str:
     return "[" + ", ".join(serialized) + "]"
 
 
-def _dump_container_state(
-    container: PauliProductFormulaContainer,
-    *,
-    basis: int = 0,
-    hadamards: Sequence[int] = (),
-) -> np.ndarray:
-    """Apply a product formula in an isolated context and return its statevector."""
+def _qsharp_blocks(terms: Sequence[PauliGroup | ConjugatedExponentiatedPauliTerm]) -> str:
+    """Serialize terms as a Q# array of conjugated blocks."""
     blocks: list[str] = []
-    for block in container.step_terms:
+    for block in terms:
         conjugated = isinstance(block, ConjugatedExponentiatedPauliTerm)
         within_groups = block.within_terms if conjugated else []
         apply_groups = block.apply_terms if conjugated else [block]
@@ -319,10 +316,20 @@ def _dump_container_state(
             "new QDKChemistry.Utils.PauliExp.ConjugatedSparsePauliExpParams { "
             f"withinGroups = {_qsharp_groups(within_groups)}, applyGroups = {_qsharp_groups(apply_groups)} }}"
         )
+    return "[" + ", ".join(blocks) + "]"
+
+
+def _dump_container_state(
+    container: PauliProductFormulaContainer,
+    *,
+    basis: int = 0,
+    hadamards: Sequence[int] = (),
+) -> np.ndarray:
+    """Apply a product formula in an isolated context and return its statevector."""
     params = (
         "new QDKChemistry.Utils.PauliExp.StructuredSparseRepPauliExpParams { "
-        f"conjugatingGroups = {_qsharp_groups(container.conjugating_terms)}, "
-        f"stepBlocks = [{', '.join(blocks)}], repetitions = {container.step_reps} }}"
+        f"conjugatingGroups = {_qsharp_blocks(container.conjugating_terms)}, "
+        f"stepBlocks = {_qsharp_blocks(container.step_terms)}, repetitions = {container.step_reps} }}"
     )
 
     context = create_qsharp_context()

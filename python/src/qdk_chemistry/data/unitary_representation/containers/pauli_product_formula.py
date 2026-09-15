@@ -126,7 +126,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
-        conjugating_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm] | None = None,
+        conjugating_terms: Sequence[
+            ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm
+        ]
+        | None = None,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
