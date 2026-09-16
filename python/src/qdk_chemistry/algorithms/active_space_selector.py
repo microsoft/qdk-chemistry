@@ -15,5 +15,6 @@ from qdk_chemistry._core._algorithms import (
     QdkAutocasActiveSpaceSelector,  # noqa: F401 - re-export
     QdkAutocasEosActiveSpaceSelector,  # noqa: F401 - re-export
     QdkOccupationActiveSpaceSelector,  # noqa: F401 - re-export
+    QdkQICASActiveSpaceSelector,  # noqa: F401 - re-export
     QdkValenceActiveSpaceSelector,  # noqa: F401 - re-export
 )
