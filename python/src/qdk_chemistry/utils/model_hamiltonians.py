@@ -111,6 +111,8 @@ def _build_sparse_hamiltonian(
     """Assemble sparse words, preserving the model's grouped or ungrouped ordering.
 
     With no supplied coloring, color each family's coalesced nonzero support.
+    Same-axis fields and interactions share a commuting group, with fields in
+    their own disjoint layer. Only partition metadata changes; term order is kept.
     Ungrouped mapped Heisenberg terms retain family and shell insertion order;
     other ungrouped models use lexicographic pairs before coupling families.
 
@@ -128,11 +130,13 @@ def _build_sparse_hamiltonian(
         return len(coefficients) - 1
 
     if grouped:
+        field_groups: dict[str, int] = {}
         for pauli, values in field_values:
             layer = tuple(
                 append_term(((site, pauli),), float(value)) for site, value in enumerate(values) if value != 0.0
             )
             if layer:
+                field_groups[pauli] = len(groups_layers)
                 groups_layers.append((layer,))
 
         for label, coeff_by_pair in couplings:
@@ -156,7 +160,11 @@ def _build_sparse_hamiltonian(
                 layers = tuple(tuple(color_to_indices[color]) for color in sorted(color_to_indices))
                 # Equal-axis terms commute across layers; mixed-axis terms need disjoint groups.
                 if label[0] == label[1]:
-                    groups_layers.append(layers)
+                    field_group = field_groups.get(label[0])
+                    if field_group is None:
+                        groups_layers.append(layers)
+                    else:
+                        groups_layers[field_group] += layers
                 else:
                     groups_layers.extend((layer,) for layer in layers)
     else:

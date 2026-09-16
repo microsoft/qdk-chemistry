@@ -129,6 +129,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``order``
      - int
      - Trotter-Suzuki order (1 for first-order, 2+ for higher even orders). Default is 1.
+    * - ``minimize_rotations``
+       - bool
+       - Reorder groups to minimize emitted Pauli rotations for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
@@ -209,8 +212,22 @@ When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :a
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
 * :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
 
-In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
-This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
+By default, groups are sorted by ascending layer count, preserving the historical splitting order.
+This ordering does not generally minimize the number of individual Pauli exponentials.
+
+Set ``minimize_rotations=True`` on the ``"trotter"`` algorithm to place the group with the most active terms centrally and the second-largest group outside the Strang/Suzuki splitting.
+Group sizes are counted after ``weight_threshold`` filtering, rather than by their number of disjoint layers.
+Other groups retain their relative order, and ties are resolved stably from the existing order.
+Neither the input partition nor the layers within its groups are mutated.
+
+For order :math:`2k`, let :math:`f=5^{k-1}`, :math:`M` be the number of active terms, and :math:`a,c` the sizes of the outer and central groups.
+The internally fused one-step schedule contains :math:`2fM-(f-1)a-fc` individual Pauli exponentials.
+Thus the selected endpoints minimize this structural count over permutations of the given partition.
+The setting does not add fusion across symbolic repetitions, change the requested time or number of steps, or optimize angle-dependent gate synthesis.
+Reordering can change Trotter error, so a lower count at fixed step size is not an equal-accuracy guarantee.
+First-order formulas retain the default ordering even when the setting is enabled.
+
+This is an algorithm :class:`~qdk_chemistry.data.Settings` option: it can be supplied to :func:`~qdk_chemistry.algorithms.create`, updated through ``settings()``, or passed in a nested :class:`~qdk_chemistry.data.AlgorithmRef` used by evolution or QPE builders.
 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.

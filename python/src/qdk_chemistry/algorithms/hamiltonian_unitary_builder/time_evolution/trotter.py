@@ -45,11 +45,12 @@ class TrotterSettings(TimeEvolutionSettings):
         """Initialize TrotterSettings with default values.
 
         Attributes:
-            order: The order of the Trotter decomposition (currently only first order is supported).
+            order: The order of the Trotter decomposition (1 or a positive even integer).
             target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).
             num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).
             error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
+            minimize_rotations: Place the largest active groups at the Suzuki endpoints. Defaults to False.
 
         """
         super().__init__()
@@ -76,6 +77,12 @@ class TrotterSettings(TimeEvolutionSettings):
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
+        self._set_default(
+            "minimize_rotations",
+            "bool",
+            False,
+            "Minimize emitted Pauli rotations for a fixed partition and even Suzuki order by reordering groups.",
+        )
 
 
 class Trotter(TimeEvolutionBuilder):
@@ -92,6 +99,7 @@ class Trotter(TimeEvolutionBuilder):
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
+        minimize_rotations: bool = False,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -129,6 +137,13 @@ class Trotter(TimeEvolutionBuilder):
         directly for schedule-level grouping.  When no partition is present, each Pauli term
         is exponentiated as its own group.
 
+        With ``minimize_rotations=True``, even-order formulas place the group with
+        the most active Pauli terms centrally and the second-largest group outside.
+        Remaining groups keep their relative order; ties use the existing order.
+        This minimizes emitted Pauli factors for a fixed partition and step count,
+        not angle-dependent synthesis cost or simulation error. It does not fuse
+        repetition boundaries. First-order formulas retain their original ordering.
+
         Args:
             order: Trotter decomposition order (1, 2, or any positive even integer). Defaults to 1.
             time: The evolution time. Defaults to 0.0.
@@ -138,6 +153,7 @@ class Trotter(TimeEvolutionBuilder):
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
+            minimize_rotations: Reorder even-order groups to minimize emitted Pauli factors. Defaults to False.
 
         """
         super().__init__()
@@ -150,6 +166,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
+        self._settings.set("minimize_rotations", minimize_rotations)
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
@@ -304,6 +321,16 @@ class Trotter(TimeEvolutionBuilder):
             return terms
 
         first_order = self._settings.get("order") == 1
+        if not first_order and self._settings.get("minimize_rotations") and len(groups) > 1:
+            # For order 2k, f=5**(k-1): endpoint multiplicities are f and f+1,
+            # versus 2f internally. Count after filtering, not by layer count.
+            weights = [sum(i in maps for layer in group for i in layer) for group in groups]
+            central, outer = sorted(range(len(groups)), key=lambda i: weights[i], reverse=True)[:2]
+            groups = [
+                groups[outer],
+                *(group for i, group in enumerate(groups) if i not in (outer, central)),
+                groups[central],
+            ]
         for fraction, group_index in self._trotter_schedule(len(groups)):
             # Native calibration fingerprints require the historical multiplication
             # order: sparse uses (coefficient * time) * fraction, dense time * fraction first.

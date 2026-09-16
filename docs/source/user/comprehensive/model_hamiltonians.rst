@@ -424,7 +424,8 @@ When enabled, the builder stores a group-and-layer structure on :attr:`~qdk_chem
 
 Shell-based grouped Heisenberg and Kitaev builders store each Pauli term by its non-identity qubit indices and axes, rather than materializing a register-width string. The :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` attribute remains a sequence-compatible view and constructs individual dense labels only when accessed. Use ``num_terms`` to inspect large operators without materializing labels.
 
-* equal-axis families (``XX``, ``YY``, ``ZZ``) each form one commuting *group*, as does each external-field direction (``X``, ``Y``, ``Z``);
+* each equal-axis family (``XX``, ``YY``, ``ZZ``) shares one commuting *group* with its same-axis external field (``X``, ``Y``, ``Z``), when present; fields without same-axis interactions retain their own group;
+* a field forms its own disjoint single-site *layer* within the combined group; coefficients and Pauli term order are unchanged;
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel;
 * mixed-axis families (such as ``XY``) use a separate group for each disjoint layer, since different layers need not commute.
 
