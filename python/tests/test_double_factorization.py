@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import DoubleFactorizer, create
+from qdk_chemistry.algorithms import DoubleFactorization, HamiltonianFactorization, create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     FactorizedHamiltonianContainer,
@@ -48,14 +48,15 @@ def create_positive_semidefinite_test_hamiltonian(num_orbitals=4, num_factors=3,
 
 @pytest.fixture
 def factorizer():
-    return create("double_factorizer", "qdk")
+    return create("hamiltonian_factorization", "double_factorization")
 
 
-class TestDoubleFactorizer:
+class TestDoubleFactorization:
     def test_metadata(self, factorizer):
-        assert isinstance(factorizer, DoubleFactorizer)
-        assert factorizer.type_name() == "double_factorizer"
-        assert factorizer.name() == "qdk"
+        assert isinstance(factorizer, DoubleFactorization)
+        assert isinstance(factorizer, HamiltonianFactorization)
+        assert factorizer.type_name() == "hamiltonian_factorization"
+        assert factorizer.name() == "double_factorization"
         assert factorizer.name() in factorizer.aliases()
         assert factorizer.settings().has("truncation_threshold")
 
@@ -77,5 +78,5 @@ class TestDoubleFactorizer:
     @pytest.mark.parametrize("num_factors", [1, 2, 3, 4])
     def test_rank_equals_the_number_of_independent_factors(self, num_factors):
         hamiltonian = create_positive_semidefinite_test_hamiltonian(num_factors=num_factors)
-        container = create("double_factorizer", "qdk").run(hamiltonian).get_container()
+        container = create("hamiltonian_factorization", "double_factorization").run(hamiltonian).get_container()
         assert container.get_num_ranks() == num_factors

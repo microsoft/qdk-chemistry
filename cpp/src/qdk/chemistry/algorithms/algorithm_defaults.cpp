@@ -4,11 +4,11 @@
 
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
-#include <qdk/chemistry/algorithms/double_factorization.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/geometry_optimization.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian_factorization.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
@@ -52,7 +52,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(NuclearDerivativeCalculatorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
-  REGISTER_FACTORY_SETTINGS_INIT(DoubleFactorizerFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(HamiltonianFactorizationFactory)
 
 #undef REGISTER_FACTORY_SETTINGS_INIT
 
