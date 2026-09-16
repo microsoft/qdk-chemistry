@@ -125,7 +125,7 @@ Returns:
   py::class_<QdkNuclearDerivativeCalculator, NuclearDerivativeCalculator,
              py::smart_holder>(
       m, "QdkNuclearDerivativeCalculator",
-      R"(QDK nuclear derivative calculator using analytic internal SCF gradients.)")
+      R"(QDK nuclear derivative calculator using analytic internal SCF gradients and gradient-difference Hessians.)")
       .def(py::init<>(),
-           R"(Create a QDK analytic nuclear derivative calculator.)");
+           R"(Create a QDK analytic-gradient nuclear derivative calculator.)");
 }
