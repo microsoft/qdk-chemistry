@@ -70,6 +70,10 @@ num_shells = basis_set.get_num_shells()
 num_atomic_orbitals = basis_set.get_num_atomic_orbitals()
 num_atoms = basis_set.get_num_atoms()
 
+# Get ECP-adjusted nuclear properties
+effective_charges = basis_set.get_effective_nuclear_charges()
+effective_nuclear_repulsion = basis_set.calculate_effective_nuclear_repulsion_energy()
+
 # Get atomic orbital information (returns tuple[int, int])
 shell_index, m_quantum_number = basis_set.get_atomic_orbital_info(2)
 atom_index = basis_set.get_atom_index_for_atomic_orbital(2)

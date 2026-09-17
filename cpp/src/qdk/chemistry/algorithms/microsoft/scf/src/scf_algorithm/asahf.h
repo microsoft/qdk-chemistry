@@ -7,6 +7,8 @@
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 
+#include <unordered_map>
+
 #include "diis.h"
 
 namespace qdk::chemistry::scf {

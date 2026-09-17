@@ -767,7 +767,7 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
   const int num_molecular_orbitals =
       static_cast<int>(ctx.num_molecular_orbitals);
 
-  auto n_ecp_electrons = ctx.basis_set->n_ecp_electrons;
+  auto n_ecp_electrons = ctx.basis_set->get_n_ecp_electrons();
   auto spin = mol.multiplicity - 1;
   auto num_alpha_electrons =
       static_cast<int>((mol.n_electrons - n_ecp_electrons + spin) / 2);

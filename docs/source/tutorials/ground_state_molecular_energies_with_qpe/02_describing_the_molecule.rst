@@ -24,10 +24,10 @@ After completing this chapter, you will be able to:
    Record the molecular inputs and both Hartree--Fock energies before calculating their difference.
    Interpret the difference as basis-set sensitivity rather than as the total error of either energy.
 
-Example download
-====================
+Example files
+=============
 
-Download :download:`tutorial_describe_n2.py <../../_static/examples/python/tutorial_describe_n2.py>` and save it in your tutorial working directory.
+Add :download:`tutorial_describe_n2.py <../../_static/examples/python/tutorial_describe_n2.py>` to your tutorial working folder.
 Open the file in Visual Studio Code and review the complete script, including imports and setup code omitted from the excerpts below.
 The sections below explain the inputs and calculations in this complete executable file before you run it.
 
@@ -155,10 +155,11 @@ It measures how much the Hartree--Fock energy changes with basis size while the 
 
 .. _tutorial-wavefunction-hierarchy:
 
-.. graphviz:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.dot
+.. figure:: /_static/diagrams/tutorial_qpe_wavefunction_hierarchy.svg
    :alt: Flow from one-electron functions to many-electron wavefunctions. Nucleus-centered basis functions combine into spatial molecular orbitals; pairing a spatial orbital with alpha or beta spin gives a spin orbital. Choosing occupied spin orbitals defines an electron configuration, and its antisymmetric state is a Slater determinant. Hartree--Fock uses one optimized determinant, while a multiconfigurational wavefunction combines several determinants with coefficients.
    :align: center
-   :caption: Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
+
+   Basis functions build molecular orbitals with spin; occupied orbitals define determinants, which form one-determinant or multiconfigurational many-electron wavefunctions.
 
 .. admonition:: Which basis set gives a lower energy and why?
    :class: quiz-question

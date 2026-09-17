@@ -175,6 +175,15 @@ Returns:
 
 )");
 
+  hamiltonian_constructor.def("aliases", &HamiltonianConstructor::aliases,
+                              R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   hamiltonian_constructor.def("type_name", &HamiltonianConstructor::type_name,
                               R"(
 The algorithm's type name.
@@ -300,6 +309,7 @@ Abstract algorithm for expressing a Hamiltonian in a target orbital basis.
           },
           py::return_value_policy::reference_internal)
       .def("name", &HamiltonianBasisTransformer::name)
+      .def("aliases", &HamiltonianBasisTransformer::aliases)
       .def("type_name", &HamiltonianBasisTransformer::type_name)
       .def("hash", &HamiltonianBasisTransformer::hash, py::arg("hamiltonian"),
            py::arg("target_orbitals"))

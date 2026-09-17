@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
+#include <qdk/chemistry/scf/util/blas_threads.h>
 #include <qdk/chemistry/scf/util/cache.h>
 #include <qdk/chemistry/scf/util/class_registry.h>
 #include <qdk/chemistry/scf/util/gauxc_util.h>
@@ -522,6 +523,20 @@ TEST(AtomGuessTest, BasisSetMap) {
                basis_json["electron_shells"].end());
   auto basis3 = BasisSet::from_serialized_json(mol, basis_json);
 
+  auto shell_only_basis = std::make_shared<BasisSet>(
+      mol, basis1->shells, BasisMode::PSI4, true, false);
+  auto shell_only_json = shell_only_basis->to_json();
+  EXPECT_EQ(shell_only_json["atom_ecp_electrons"], std::vector<int>({0}));
+  EXPECT_NO_THROW(BasisSet::from_serialized_json(mol, shell_only_json));
+
+  auto invalid_ecp_json = shell_only_json;
+  invalid_ecp_json["atom_ecp_electrons"] = std::vector<int>({-1});
+  EXPECT_THROW(BasisSet::from_serialized_json(mol, invalid_ecp_json),
+               std::runtime_error);
+  invalid_ecp_json["atom_ecp_electrons"] = std::vector<int>({4});
+  EXPECT_THROW(BasisSet::from_serialized_json(mol, invalid_ecp_json),
+               std::runtime_error);
+
   // Create a different basis set (different basis name)
   auto basis4 =
       BasisSet::from_database_json(mol, "6-31g", BasisMode::PSI4, true, false);
@@ -560,6 +575,59 @@ TEST(AtomGuessTest, BasisSetMap) {
   EXPECT_EQ(it5, basis_map.end());
 }
 
+TEST(AtomGuessTest, InvalidEcpJsonDoesNotMutateMolecule) {
+  auto mol = std::make_shared<Molecule>();
+  mol->atomic_nums = {47, 1};
+  mol->n_atoms = 2;
+  mol->atomic_charges = {47, 1};
+  mol->total_nuclear_charge = 48;
+  mol->n_electrons = 48;
+  mol->coords = {{{0.0, 0.0, 0.0}}, {{5.0, 0.0, 0.0}}};
+
+  auto basis = BasisSet::from_database_json(mol, "def2-svp", BasisMode::RAW,
+                                            true, false);
+  auto basis_json = basis->to_json();
+
+  mol->atomic_charges = {47, 1};
+  mol->total_nuclear_charge = 48;
+  mol->n_electrons = 48;
+  basis_json["atom_ecp_electrons"] = std::vector<int>({28, 2});
+
+  EXPECT_THROW(BasisSet::from_serialized_json(mol, basis_json),
+               std::runtime_error);
+  EXPECT_EQ(mol->atomic_charges, std::vector<uint64_t>({47, 1}));
+  EXPECT_EQ(mol->total_nuclear_charge, 48);
+  EXPECT_EQ(mol->n_electrons, 48);
+
+  basis_json["atom_ecp_electrons"] = std::vector<int>({28, 0});
+  EXPECT_NO_THROW(BasisSet::from_serialized_json(mol, basis_json));
+  EXPECT_EQ(mol->atomic_charges, std::vector<uint64_t>({19, 1}));
+  EXPECT_EQ(mol->total_nuclear_charge, 20);
+  EXPECT_EQ(mol->n_electrons, 20);
+}
+
+TEST(AtomGuessTest, RejectsInsufficientShellsForPerAtomEcpCounts) {
+  auto mol = std::make_shared<Molecule>();
+  mol->atomic_nums = {47, 47};
+  mol->n_atoms = 2;
+  mol->atomic_charges = {47, 19};
+  mol->total_nuclear_charge = 66;
+  mol->n_electrons = 66;
+  mol->coords = {{{0.0, 0.0, 0.0}}, {{5.0, 0.0, 0.0}}};
+
+  auto standard_basis =
+      BasisSet::from_database_json(mol, "lanl2dz", BasisMode::RAW, true, false);
+  auto mixed_basis = std::make_shared<BasisSet>(
+      mol, standard_basis->shells, std::vector<Shell>{},
+      std::vector<int>({0, 28}), BasisMode::RAW, true, false);
+  mixed_basis->name = "custom_mixed_ecp_basis";
+
+  int n = mixed_basis->num_atomic_orbitals;
+  RowMajorMatrix density = RowMajorMatrix::Zero(n, n);
+  EXPECT_THROW(atom_guess(*mixed_basis, *mol, density.data()),
+               std::runtime_error);
+}
+
 TEST(AtomGuessTest, CompareWithFileGuess) {
   std::vector<std::shared_ptr<Molecule>> molecules = {make_bf(), make_o2()};
   std::vector<std::string> basis_names = {"sto-3g", "def2-svp", "cc-pvdz"};
@@ -588,4 +656,49 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
           << "for basis " << basis_name << std::endl;
     }
   }
+}
+
+//==============================================================================
+// BLAS thread control tests
+//==============================================================================
+
+TEST(BlasThreadsTest, DetectionIsConsistent) {
+  using namespace qdk::chemistry::scf::util;
+
+  const BlasVendor vendor = detected_blas_vendor();
+  EXPECT_NE(to_string(vendor), nullptr);
+
+  if (vendor == BlasVendor::Unknown) {
+    // Legal (e.g. macOS Accelerate exposes no thread-count API); the guard
+    // then degrades to a no-op.
+    EXPECT_EQ(get_blas_num_threads(), 0);
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+  EXPECT_GT(get_blas_num_threads(), 0);
+}
+
+TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
+  using namespace qdk::chemistry::scf::util;
+
+  if (detected_blas_vendor() == BlasVendor::Unknown) {
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+
+  const int original = get_blas_num_threads();
+  ASSERT_GT(original, 0);
+
+  {
+    ScopedBlasThreads guard;
+    EXPECT_TRUE(guard.active());
+    EXPECT_EQ(get_blas_num_threads(), 1);
+
+    // Nested guards must not restore the count early.
+    {
+      ScopedBlasThreads nested;
+      EXPECT_EQ(get_blas_num_threads(), 1);
+    }
+    EXPECT_EQ(get_blas_num_threads(), 1);
+  }
+
+  EXPECT_EQ(get_blas_num_threads(), original);
 }

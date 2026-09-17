@@ -22,6 +22,7 @@ def test_qdk_transformer_registry():
     assert isinstance(transformer, QdkHamiltonianBasisTransformer)
     assert "run" in QdkHamiltonianBasisTransformer.__dict__
     assert transformer.name() == "qdk"
+    assert transformer.aliases() == ["qdk"]
     assert transformer.settings().get("validation_tolerance") == pytest.approx(1.0e-10)
     assert inspect_settings("hamiltonian_basis_transformer", "qdk")[0][0] == "validation_tolerance"
 

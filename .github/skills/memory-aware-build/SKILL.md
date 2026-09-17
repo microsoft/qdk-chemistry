@@ -19,17 +19,17 @@ job. Limit build parallelism by both the available memory and the CPU count.
    including builds started indirectly by `pip`.
 
 For example, a machine with 32 GB of available RAM and 16 logical CPUs should
-compile with at most six jobs:
+compile with at most four jobs:
 
 ```bash
-export CMAKE_BUILD_PARALLEL_LEVEL=6
+export CMAKE_BUILD_PARALLEL_LEVEL=4
 cmake --build cpp/build
 ```
 
 For a Python package build, apply the same limit:
 
 ```bash
-CMAKE_BUILD_PARALLEL_LEVEL=6 python -m pip install ./python
+CMAKE_BUILD_PARALLEL_LEVEL=4 python -m pip install ./python
 ```
 
 If a build is killed or reports an out-of-memory error, reduce

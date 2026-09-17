@@ -89,12 +89,14 @@ class AmplitudeAmplification(Algorithm):
         if good_state_operation is None:
             raise TypeError("Amplitude amplification requires a good state oracle qsharp operation.")
 
-        try:
-            num_qubits = int(state_prep_oracle.estimate().logical_counts["numQubits"])
-        except Exception as error:
-            raise RuntimeError(
-                "Could not read the register width from a resource estimate of the state prep oracle."
-            ) from error
+        num_qubits = state_prep_oracle.num_qubits
+        if num_qubits is None:
+            try:
+                num_qubits = int(state_prep_oracle.estimate().logical_counts["numQubits"])
+            except Exception as error:
+                raise RuntimeError(
+                    "Could not read the register width from a resource estimate of the state prep oracle."
+                ) from error
 
         rounds = int(self._settings.get("rounds"))
         if rounds < 0:

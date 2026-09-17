@@ -1212,6 +1212,41 @@ const std::vector<size_t>& BasisSet::get_ecp_electrons() const {
   return _ecp_electrons;
 }
 
+Eigen::VectorXd BasisSet::get_effective_nuclear_charges() const {
+  QDK_LOG_TRACE_ENTERING();
+  const auto structure = get_structure();
+  if (!has_ecp_electrons()) {
+    return structure->get_nuclear_charges();
+  }
+
+  Eigen::VectorXd effective_charges = structure->get_nuclear_charges();
+  for (Eigen::Index i = 0; i < effective_charges.size(); ++i) {
+    effective_charges(i) -=
+        static_cast<double>(_ecp_electrons[static_cast<size_t>(i)]);
+  }
+  return effective_charges;
+}
+
+double BasisSet::calculate_effective_nuclear_repulsion_energy() const {
+  QDK_LOG_TRACE_ENTERING();
+  const auto structure = get_structure();
+  if (!has_ecp_electrons()) {
+    return structure->calculate_nuclear_repulsion_energy();
+  }
+
+  const auto effective_charges = get_effective_nuclear_charges();
+  const auto& coordinates = structure->get_coordinates();
+
+  double repulsion_energy = 0.0;
+  for (Eigen::Index i = 0; i < effective_charges.size(); ++i) {
+    for (Eigen::Index j = i + 1; j < effective_charges.size(); ++j) {
+      repulsion_energy += effective_charges(i) * effective_charges(j) /
+                          (coordinates.row(j) - coordinates.row(i)).norm();
+    }
+  }
+  return repulsion_energy;
+}
+
 bool BasisSet::has_ecp_electrons() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if any atom has a finite number of ECP electrons
@@ -1228,6 +1263,17 @@ bool BasisSet::_is_consistent_with_structure() const {
 
   if (!has_structure()) {
     return true;  // No structure to validate against
+  }
+
+  if (_ecp_electrons.size() != _structure->get_num_atoms()) {
+    return false;
+  }
+  const auto& nuclear_charges = _structure->get_nuclear_charges();
+  for (size_t atom_idx = 0; atom_idx < _ecp_electrons.size(); ++atom_idx) {
+    if (static_cast<double>(_ecp_electrons[atom_idx]) >
+        nuclear_charges(static_cast<Eigen::Index>(atom_idx))) {
+      return false;
+    }
   }
 
   // Check if we have shells for atoms that don't exist in the structure

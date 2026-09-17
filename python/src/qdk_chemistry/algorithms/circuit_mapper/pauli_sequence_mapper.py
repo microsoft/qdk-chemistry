@@ -104,4 +104,8 @@ class PauliSequenceMapper(CircuitMapper):
             parameter={"evo_params": evo_params, "target_indices": target_indices},
         )
 
-        return Circuit(qsharp_op=evolution_op, qsharp_factory=factory)
+        return Circuit(
+            qsharp_op=evolution_op,
+            qsharp_factory=factory,
+            num_qubits=unitary_container.num_qubits,
+        )

@@ -530,7 +530,7 @@ class TestZassenhausPhaseEstimation:
             active_hamiltonian,
             MajoranaMapping.jordan_wigner(n_spin_orbitals),
         )
-        state_preparation = create("state_prep", "sparse_isometry_gf2x").run(casci_wavefunction)
+        state_preparation = create("state_prep", "sparse_isometry").run(casci_wavefunction)
 
         # Configure the Zassenhaus evolution builder reference
         num_bits = 12

@@ -41,6 +41,9 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         Returns:
             A Qiskit QuantumCircuit representing the same quantum operations as the QIR module.
 
+        Raises:
+            UnsupportedQIROperationError: If the entry point has no basic blocks to walk.
+
         """
         # Get qubit/result counts from entry point function attributes
         entry_point = next(filter(pyqir.is_entry_point, qir.functions))
@@ -59,8 +62,172 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
             self._circuit = QuantumCircuit()
 
         # Build the circuit
-        self.run(qir)
+        basic_blocks = entry_point.basic_blocks
+        if not basic_blocks:
+            raise UnsupportedQIROperationError("QIR entry point has no function body.")
+        self._walk_blocks(basic_blocks[0])
         return self._circuit
+
+    # =========================================================================
+    # Control flow
+    # =========================================================================
+
+    def _walk_blocks(self, block: "pyqir.BasicBlock") -> None:
+        """Walk the control-flow graph from *block*, emitting conditional blocks as Qiskit if-blocks.
+
+        The default pyqir visitor iterates basic blocks flatly and ignores branch
+        terminators, which would silently emit conditional bodies unconditionally.
+
+        Args:
+            block: The entry basic block to start walking from.
+
+        Raises:
+            UnsupportedQIROperationError: If the control flow is not a forward-only chain of
+                single-sided conditionals, or if a block is revisited (loop).
+
+        """
+        visited: set[str] = set()
+        current: pyqir.BasicBlock | None = block
+        while current is not None:
+            if current.name in visited:
+                raise UnsupportedQIROperationError("Loops in QIR are not supported in Qiskit QuantumCircuit.")
+            visited.add(current.name)
+            self._on_block(current)
+            current = self._next_block(current)
+
+    def _next_block(self, block: "pyqir.BasicBlock") -> "pyqir.BasicBlock | None":
+        """Emit any conditional body reachable from *block* and return the block to continue with.
+
+        Args:
+            block: The basic block whose terminator is being resolved.
+
+        Returns:
+            The next basic block to visit, or ``None`` when the terminator returns.
+
+        Raises:
+            UnsupportedQIROperationError: If the branch is not a single-sided conditional.
+
+        """
+        terminator = block.terminator
+        successors = terminator.successors
+        if not successors:
+            return None
+        if len(successors) == 1:
+            return terminator.operands[0]
+        if len(successors) != 2:
+            raise UnsupportedQIROperationError(f"Unsupported branch with {len(successors)} successors.")
+
+        # LLVM stores conditional branch operands as [condition, false_target, true_target].
+        condition, false_block, true_block = terminator.operands[0], terminator.operands[1], terminator.operands[2]
+        clbit = self._condition_clbit(condition)
+        if self._branches_to(true_block, false_block):
+            self._emit_conditional_block(true_block, None, clbit)
+            return false_block
+        if self._branches_to(false_block, true_block):
+            self._emit_conditional_block(None, false_block, clbit)
+            return true_block
+        join = self._common_successor(true_block, false_block)
+        if join is None:
+            raise UnsupportedQIROperationError(
+                f"Unsupported control flow: branches to '{true_block.name}' and '{false_block.name}' do not reconverge."
+            )
+        self._emit_conditional_block(true_block, false_block, clbit)
+        return join
+
+    @staticmethod
+    def _branches_to(block: "pyqir.BasicBlock", target: "pyqir.BasicBlock") -> bool:
+        """Check whether *block* ends in an unconditional branch to *target*.
+
+        Args:
+            block: The candidate conditional body block.
+            target: The expected join block.
+
+        Returns:
+            True if *block* falls through to *target*.
+
+        """
+        successors = block.terminator.successors
+        return len(successors) == 1 and successors[0].name == target.name
+
+    @staticmethod
+    def _common_successor(a: "pyqir.BasicBlock", b: "pyqir.BasicBlock") -> "pyqir.BasicBlock | None":
+        """Return the block both *a* and *b* unconditionally branch to, if any.
+
+        Args:
+            a: The true-branch block.
+            b: The false-branch block.
+
+        Returns:
+            The shared join block, or ``None`` if the branches do not reconverge immediately.
+
+        """
+        a_successors, b_successors = a.terminator.successors, b.terminator.successors
+        if len(a_successors) == 1 and len(b_successors) == 1 and a_successors[0].name == b_successors[0].name:
+            return a_successors[0]
+        return None
+
+    def _condition_clbit(self, condition: pyqir.Value) -> int:
+        """Resolve the classical bit index a branch condition reads.
+
+        Args:
+            condition: The QIR value used as the branch condition.
+
+        Returns:
+            The index of the classical bit holding the measurement result.
+
+        Raises:
+            UnsupportedQIROperationError: If the condition is not a measurement result read.
+
+        """
+        callee = getattr(getattr(condition, "callee", None), "name", "")
+        if "read_result" not in callee:
+            raise UnsupportedQIROperationError(
+                f"Branch conditions must read a measurement result directly, got '{callee or condition}'."
+            )
+        return self._clbit(condition.args[0])
+
+    def _emit_conditional_block(
+        self,
+        true_block: "pyqir.BasicBlock | None",
+        false_block: "pyqir.BasicBlock | None",
+        clbit: int,
+    ) -> None:
+        """Emit conditional branch bodies as a Qiskit if/else block guarded on a classical bit.
+
+        Args:
+            true_block: Block executed when the classical bit is 1, or ``None`` when empty.
+            false_block: Block executed when the classical bit is 0, or ``None`` when empty.
+            clbit: Index of the classical bit to test.
+
+        """
+        outer = self._circuit
+        condition = (outer.clbits[clbit], 1)
+        true_body = self._body_circuit(true_block)
+        if false_block is None:
+            outer.if_test(condition, true_body, outer.qubits, outer.clbits)
+            return
+        outer.if_else(condition, true_body, self._body_circuit(false_block), outer.qubits, outer.clbits)
+
+    def _body_circuit(self, block: "pyqir.BasicBlock | None") -> QuantumCircuit:
+        """Build a Qiskit circuit holding the operations of a conditional branch body.
+
+        Args:
+            block: The basic block to convert, or ``None`` for an empty body.
+
+        Returns:
+            A circuit over the same registers as the enclosing circuit.
+
+        """
+        outer = self._circuit
+        body = QuantumCircuit(*outer.qregs, *outer.cregs)
+        if block is None:
+            return body
+        self._circuit = body
+        try:
+            self._on_block(block)
+        finally:
+            self._circuit = outer
+        return body
 
     def _qubit(self, q: pyqir.Value) -> int:
         """Get circuit qubit index for a QIR qubit value.
@@ -387,9 +554,14 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # Unsupported operations
     # =========================================================================
 
-    def _on_qis_read_result(self) -> None:
-        """Handle read_result operation, which is not supported in Qiskit."""
-        raise UnsupportedQIROperationError("read_result is not supported in Qiskit QuantumCircuit.")
+    def _on_qis_read_result(self, call: pyqir.Call, result: pyqir.Value) -> None:
+        """Ignore a result read; the value is consumed by the branch terminator.
+
+        Args:
+            call: The QIR call instruction reading the result.
+            result: The QIR value representing the measurement result.
+
+        """
 
 
 def qir_ir_to_qiskit(ir: str) -> QuantumCircuit:

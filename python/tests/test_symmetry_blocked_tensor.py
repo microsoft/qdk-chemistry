@@ -7,10 +7,13 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
 from qdk_chemistry.data import symmetry as sym
+from qdk_chemistry.remote.serialization import deserialize_outputs, serialize_outputs
 
 
 @pytest.fixture
@@ -46,6 +49,7 @@ def unrestricted_spin():
 )
 def test_tensor_specializations_have_distinct_loader_names(
     unrestricted_spin,
+    tmp_path,
     tensor_type,
     rank,
     is_complex,
@@ -59,7 +63,15 @@ def test_tensor_specializations_have_distinct_loader_names(
     tensor = tensor_type([syms] * rank, extents, [(labels, block)])
 
     scalar_tag = "complex" if is_complex else "real"
-    assert tensor.get_data_type_name() == f"symmetry_blocked_tensor_{rank}_{scalar_tag}"
+    expected_type_name = f"symmetry_blocked_tensor_{rank}_{scalar_tag}"
+    assert tensor.get_data_type_name() == expected_type_name
+
+    serialize_outputs(tmp_path, tensor)
+    manifest = json.loads((tmp_path / "manifest.json").read_text())
+    assert manifest["results"][0]["dataclass_type"] == expected_type_name
+
+    restored = deserialize_outputs(tmp_path)
+    assert type(restored) is tensor_type
 
 
 class TestSymmetryBlockedTensorRank2:
