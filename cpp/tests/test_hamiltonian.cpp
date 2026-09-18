@@ -1247,6 +1247,27 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
 }
 
+TEST_F(HamiltonianTest, CholeskyBasisTransformerFactoryDefaults) {
+  auto transformer = HamiltonianBasisTransformerFactory::create();
+  EXPECT_EQ(transformer->name(), "qdk");
+  EXPECT_EQ(transformer->type_name(), "hamiltonian_basis_transformer");
+  EXPECT_EQ(HamiltonianBasisTransformerFactory::default_algorithm_name(),
+            "qdk");
+
+  AlgorithmRef reference("hamiltonian_basis_transformer", "qdk");
+  EXPECT_EQ(reference.get_algorithm_type(), "hamiltonian_basis_transformer");
+  ASSERT_NE(reference.get_settings(), nullptr);
+  EXPECT_DOUBLE_EQ(
+      reference.get_settings()->get<double>("validation_tolerance"), 1e-10);
+  reference.set("validation_tolerance", SettingValue{1e-8});
+  EXPECT_DOUBLE_EQ(
+      reference.get_settings()->get<double>("validation_tolerance"), 1e-8);
+  EXPECT_DOUBLE_EQ(transformer->settings().get<double>("validation_tolerance"),
+                   1e-10);
+  EXPECT_THROW(reference.set("validation_tolerance", SettingValue{1.0}),
+               std::invalid_argument);
+}
+
 TEST_F(HamiltonianTest, CholeskyBasisTransformer) {
   const std::vector<size_t> active_indices = {0, 2};
   const std::vector<size_t> inactive_indices = {1};
