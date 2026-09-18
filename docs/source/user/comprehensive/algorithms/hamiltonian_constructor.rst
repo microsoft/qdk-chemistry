@@ -12,6 +12,13 @@ The electronic Hamiltonian describes the energy of a system of electrons in the 
 It consists of kinetic energy terms, electron-nucleus attraction terms, and electron-electron repulsion terms.
 The ``HamiltonianConstructor`` algorithm computes the matrix elements of this operator in a given orbital basis, which can be the full orbital space or an active subspace.
 
+Conversion with :func:`~qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf` respects the
+:class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals and scalar core energy,
+rather than using only its :class:`~qdk_chemistry.data.Orbitals`.
+For molecular references, the conversion retains the AO basis and evaluates ordinary Coulomb two-electron integrals from that basis.
+For restricted closed-shell model references, it uses the stored two-electron integrals as well.
+This contract applies to both nonrelativistic and dressed one-electron operators; active-space effective Hamiltonians are not supported by this conversion.
+
 Using the HamiltonianConstructor
 ---------------------------------
 
@@ -122,6 +129,40 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
+   * - ``integral_dressing``
+     - string
+     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
+
+Spin-Free X2C-1e Option
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Setting: ``integral_dressing="x2c_1e"`` or ``integral_dressing="x2c_1e_contracted"``
+
+.. note::
+
+   To include X2C-1e during the SCF procedure, set the same ``integral_dressing`` value on :doc:`ScfSolver <scf_solver>`.
+
+The ``integral_dressing`` setting applies spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
+The X2C-1e path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
+
+This implementation uses the X2C-1e approximation: the two-electron integrals are not transformed, and spin-orbit terms are not included.
+ECPs and Cartesian atomic orbitals are not supported.
+With ``integral_dressing="x2c_1e"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
+Use ``integral_dressing="x2c_1e_contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
+
+.. tab:: Python API
+
+    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
+         :language: python
+         :start-after: # start-cell-x2c
+         :end-before: # end-cell-x2c
+
+.. tab:: C++ API
+
+    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+         :language: cpp
+         :start-after: // start-cell-x2c
+         :end-before: // end-cell-x2c
 
 QDK Cholesky
 ~~~~~~~~~~~~
@@ -153,6 +194,9 @@ Four-center integrals are lazily computed from the three-center integrals on dem
    * - ``store_ao_cholesky_vectors``
      - bool
      - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
+   * - ``integral_dressing``
+     - string
+     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
 
 Related classes
 ---------------

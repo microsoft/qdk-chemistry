@@ -90,6 +90,13 @@ enum class DensityInitializationMethod {
   Atom,          ///< Atom-by-atom guess
 };
 
+/// One-electron integral dressing applied to the SCF core Hamiltonian
+enum class IntegralDressing {
+  None,             ///< Nonrelativistic one-electron integrals
+  X2C1e,            ///< X2C-1e with basis decontraction and recontraction
+  X2C1eContracted,  ///< X2C-1e in the supplied contracted basis
+};
+
 /// An enum to classify the available SCF algorithm methods
 enum class SCFAlgorithmName {
   ASAHF,    ///< Atomic Spherically Averaged Hartree-Fock

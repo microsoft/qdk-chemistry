@@ -167,6 +167,15 @@ ScfCalculationResult ScfSolver::_run_with_options(
   double convergence_threshold =
       _settings->get<double>("convergence_threshold");
   int64_t max_iterations = _settings->get<int64_t>("max_iterations");
+  const std::string integral_dressing =
+      _settings->get<std::string>("integral_dressing");
+  const qcs::IntegralDressing dressing =
+      utils::microsoft::parse_integral_dressing(integral_dressing);
+
+  if (dressing != qcs::IntegralDressing::None &&
+      qdk_raw_basis_set->get_atomic_orbital_type() == data::AOType::Cartesian) {
+    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
+  }
 
   // Set different convergence threshold according to tolerance
   double orbital_gradient_threshold = convergence_threshold;
@@ -192,6 +201,7 @@ ScfCalculationResult ScfSolver::_run_with_options(
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
   ms_scf_config->scf_orbital_type = scf_orbital_type;
+  ms_scf_config->integral_dressing = dressing;
   ms_scf_config->scf_algorithm.density_threshold = density_threshold;
   ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
   ms_scf_config->scf_algorithm.max_iteration = max_iterations;
