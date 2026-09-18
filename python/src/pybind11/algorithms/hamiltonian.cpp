@@ -335,7 +335,7 @@ QDK basis transformer for restricted Cholesky Hamiltonians.
              std::shared_ptr<Orbitals> target_orbitals) {
             // Freeze settings while the GIL still serializes Python access,
             // then release it for the synchronized native transformation.
-            self.settings().lock();
+            self.lock_settings_once();
             py::gil_scoped_release release;
             return self.run(std::move(hamiltonian), std::move(target_orbitals));
           },

@@ -5,8 +5,10 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <barrier>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <numeric>
@@ -29,6 +31,7 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "qdk/chemistry/algorithms/microsoft/hamiltonian_basis_transformer.hpp"
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
@@ -1418,6 +1421,30 @@ TEST_F(HamiltonianTest, CholeskyBasisTransformer) {
   ASSERT_TRUE(source_container.get_ao_cholesky_vectors().has_value());
   EXPECT_TRUE(source_container.get_ao_cholesky_vectors()->isApprox(ao_factors));
   EXPECT_EQ(source->get_orbitals(), source_orbitals);
+}
+
+TEST_F(HamiltonianTest, CholeskyBasisTransformerConcurrentSettingsLock) {
+  microsoft::QdkHamiltonianBasisTransformer transformer;
+  transformer.settings().set("validation_tolerance", 1.0e-9);
+  constexpr int thread_count = 4;
+  std::barrier start(thread_count);
+  std::vector<std::future<void>> calls;
+  for (int thread = 0; thread < thread_count; ++thread) {
+    calls.push_back(std::async(std::launch::async, [&, thread] {
+      start.arrive_and_wait();
+      for (int iteration = 0; iteration < 100; ++iteration) {
+        if (thread % 2 == 0) {
+          transformer.lock_settings_once();
+        }
+        EXPECT_THROW(transformer.run(nullptr, nullptr), std::invalid_argument);
+      }
+    }));
+  }
+  for (auto& call : calls) {
+    EXPECT_NO_THROW(call.get());
+  }
+  EXPECT_THROW(transformer.settings().set("validation_tolerance", 1.0e-8),
+               SettingsAreLocked);
 }
 
 TEST_F(HamiltonianTest,

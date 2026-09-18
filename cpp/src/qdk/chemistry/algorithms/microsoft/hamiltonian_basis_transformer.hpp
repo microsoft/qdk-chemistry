@@ -16,6 +16,10 @@ class QdkHamiltonianBasisTransformer final
   QdkHamiltonianBasisTransformer();
 
   std::string name() const final { return "qdk"; }
+
+  /** Freeze settings once across Python and native execution entry points. */
+  void lock_settings_once() const;
+
   std::shared_ptr<data::Hamiltonian> run(
       std::shared_ptr<data::Hamiltonian> hamiltonian,
       std::shared_ptr<data::Orbitals> target_orbitals) const final;
@@ -26,6 +30,7 @@ class QdkHamiltonianBasisTransformer final
       std::shared_ptr<data::Orbitals> target_orbitals) const final;
 
  private:
+  mutable std::once_flag _settings_lock_once;
   mutable std::mutex _run_mutex;
 };
 

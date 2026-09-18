@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
 import numpy as np
 import pytest
 
@@ -35,6 +38,37 @@ def test_qdk_transformer_rejects_non_cholesky_hamiltonian():
 
     with pytest.raises(ValueError, match="requires a Cholesky Hamiltonian"):
         transformer.run(source, source.get_orbitals())
+
+    with pytest.raises(SettingsAreLocked):
+        transformer.settings().set("validation_tolerance", 1.0e-9)
+
+
+@pytest.mark.parametrize("direct", [False, True])
+def test_qdk_transformer_concurrent_calls(direct):
+    """Shared native instances freeze settings safely across Python threads."""
+    basis_set = create_test_basis_set(2, "test-concurrent-basis-transform")
+    active_indices = spin_index_set(2, [0, 1], [0, 1])
+    source_orbitals = Orbitals(np.eye(2), None, np.eye(2), basis_set, active_indices, None)
+    rotation = np.array([[0.0, 1.0], [-1.0, 0.0]])
+    target_orbitals = Orbitals(rotation, None, np.eye(2), basis_set, active_indices, None)
+    source = Hamiltonian(
+        CholeskyHamiltonianContainer(np.diag([1.0, 2.0]), np.ones((4, 1)), source_orbitals, 1.25, np.empty((0, 0)))
+    )
+    transformer = QdkHamiltonianBasisTransformer() if direct else create("hamiltonian_basis_transformer")
+    barrier = Barrier(4)
+
+    def run():
+        barrier.wait(timeout=10)
+        for _ in range(20):
+            result = transformer.run(source, target_orbitals)
+            np.testing.assert_allclose(result.get_one_body_integrals()[0], np.diag([2.0, 1.0]), atol=1.0e-13)
+            assert result.get_orbitals() is target_orbitals
+            assert result.get_core_energy() == pytest.approx(1.25)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(run) for _ in range(4)]
+        for future in futures:
+            future.result()
 
     with pytest.raises(SettingsAreLocked):
         transformer.settings().set("validation_tolerance", 1.0e-9)
