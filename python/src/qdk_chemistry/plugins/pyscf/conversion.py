@@ -607,40 +607,36 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
 
 
 def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.RHF:
-    """Convert QDK/Chemistry Hamiltonian to PySCF SCF object.
+    """Convert a QDK/Chemistry Hamiltonian object to a PySCF mean-field reference.
 
-    This function creates a PySCF SCF object from a QDK/Chemistry Hamiltonian object, making it possible to use
-    QDK/Chemistry Hamiltonian data with PySCF's post-HF methods such as Coupled Cluster. It extracts one- and two-body
-    integrals, core energy, and electron counts from the Hamiltonian and configures them in a PySCF SCF object without
-    performing an actual SCF calculation.
+    The conversion respects the :class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals
+    and scalar core energy, rather than using only its orbitals. This applies to nonrelativistic and dressed
+    Hamiltonians alike. No SCF optimization is performed.
 
     Args:
-        hamiltonian: QDK/Chemistry Hamiltonian object.
-
-            Contains the electronic structure information including one- and two-body integrals,
-            core energy, and orbital data.
-
+        hamiltonian: QDK/Chemistry Hamiltonian containing integrals, core energy, and orbital data.
         alpha_occ: Occupation numbers for alpha (spin-up) electrons.
         beta_occ: Occupation numbers for beta (spin-down) electrons.
 
     Returns:
-        PySCF RHF object initialized with the Hamiltonian data, ready for post-HF calculations. This is a "fake" SCF
-        object that provides the necessary interfaces for post-HF methods without having performed an SCF calculation.
+        A PySCF mean-field reference initialized for post-HF calculations.
 
     Raises:
-        ValueError: If the Hamiltonian uses unsupported features like model Hamiltonian with unrestricted orbitals,
-            open-shell systems, or active spaces.
+        ValueError: If occupations, orbital metrics, or Hamiltonian features violate the restrictions below.
 
     Note:
-        * This function is intended for (restricted) model hamiltonian usage, since the orbitals are not used directly.
-        * If a non-model Hamiltonian is passed, this function automatically re-routes to orbitals_to_scf.
-        * Active spaces are not supported.
-        * The function creates a "fake" SCF object with the necessary interfaces for post-HF methods without actually
-          performing an SCF calculation.
-        * The returned SCF object contains dummy molecular orbitals and occupations suitable for post-HF method
-          initialization.
-        * For an interface using n_electrons and multiplicity, see
-          ``hamiltonian_to_scf_from_n_electrons_and_multiplicity``.
+        Molecular references retain their AO basis and orbital coefficients. Their spin-free AO core operator
+        reproduces the stored one-body matrices in both MO spin spaces. Two-electron integrals are evaluated
+        from the molecular basis, requiring ordinary Coulomb interactions and supporting AO-direct CCSD.
+
+        Restricted closed-shell model references use stored one- and two-body integrals with identity
+        coefficients and overlap. Unrestricted and open-shell model references are not supported.
+
+        All represented MOs must be active, with no inactive orbitals. Overlap-rank reduction is allowed;
+        active-space effective Hamiltonians with folded core contributions are not supported.
+
+        For an interface using electron count and multiplicity, see
+        :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.
 
     Examples:
         >>> import numpy as np
@@ -661,24 +657,54 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     """
     Logger.trace_entering()
     orbitals = hamiltonian.get_orbitals()
+    norb = orbitals.get_num_molecular_orbitals()
+    alpha_occ = np.asarray(alpha_occ)
+    beta_occ = np.asarray(beta_occ)
+    if any(
+        occ.shape != (norb,) or not np.all(np.isfinite(occ)) or np.any((occ < 0) | (occ > 1))
+        for occ in (alpha_occ, beta_occ)
+    ):
+        raise ValueError("Occupations must contain one finite value between 0 and 1 per molecular orbital and spin.")
+
+    active = [spin_channel_indices(orbitals.active_indices(), spin) for spin in (axes.alpha(), axes.beta())]
+    if any(indices != list(range(norb)) for indices in active) or any(
+        spin_channel_indices(orbitals.inactive_indices(), spin) for spin in (axes.alpha(), axes.beta())
+    ):
+        raise ValueError("Active space is not supported.")
+
     try:
-        orbitals.coefficients()
-        # is not a model hamiltonian - reroute to orbitals_to_scf
-        return orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ)
+        coefficients = orbitals.coefficients()
     except RuntimeError:
         if hamiltonian.is_unrestricted():
             raise ValueError("You cannot pass an unrestricted model Hamiltonian here.") from None
+    else:
+        mf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ)
+        overlap = mf.get_ovlp()
+        core = mf.get_hcore()
+        one_body = hamiltonian.get_one_body_integrals()
+        mo_coefficients = [spin_channel_matrix(coefficients, spin) for spin in (axes.alpha(), axes.beta())]
+        for coeff, h1 in zip(mo_coefficients, one_body, strict=True):
+            if h1.shape != (norb, norb) or not np.all(np.isfinite(h1)):
+                raise ValueError("One-body integrals must be finite square matrices in the full MO space.")
+            if not np.allclose(coeff.T @ overlap @ coeff, np.eye(norb), rtol=0.0, atol=1e-7):
+                raise ValueError("Molecular orbital coefficients must be orthonormal in the AO overlap metric.")
 
-    norb = orbitals.get_num_molecular_orbitals()
+        # get_hcore is an AO operator. The overlap-metric dual also supports rectangular C after rank reduction.
+        coeff = mo_coefficients[0]
+        dual = np.linalg.solve(coeff.T @ overlap @ coeff, coeff.T @ overlap).T
+        core = core + dual @ (one_body[0] - coeff.T @ core @ coeff) @ dual.T
+        core = (core + core.T) * 0.5
+        # A spin-free AO operator must reproduce both channels, including independently rotated UHF orbitals.
+        for coeff, h1 in zip(mo_coefficients, one_body, strict=True):
+            if not np.allclose(coeff.T @ core @ coeff, h1, rtol=1e-9, atol=1e-8):
+                raise ValueError("Molecular one-body spin blocks must represent a common spin-free AO operator.")
+        mf.get_hcore = lambda *_: core
+        mf.energy_nuc = lambda *_: hamiltonian.get_core_energy()
+        return mf
 
     # Consistency checks
     if np.any(alpha_occ != beta_occ):
         raise ValueError("Open-shell is not supported.")
-    if (
-        orbitals.has_active_space()
-        and len(spin_channel_indices(orbitals.active_indices(), axes.alpha())) != orbitals.get_num_molecular_orbitals()
-    ):
-        raise ValueError("Active space is not supported.")
 
     # Dummy molecule
     mol = pyscf.gto.M()

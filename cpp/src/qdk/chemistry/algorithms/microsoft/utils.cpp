@@ -472,4 +472,40 @@ size_t binomial_coefficient(size_t n, size_t k) {
   return result;
 }
 
+namespace {
+
+// Settings validation and parsing share this vocabulary.
+struct IntegralDressingLabel {
+  const char* label;
+  qcs::IntegralDressing dressing;
+};
+
+constexpr IntegralDressingLabel kIntegralDressingLabels[] = {
+    {"", qcs::IntegralDressing::None},
+    {"x2c_1e", qcs::IntegralDressing::X2C1e},
+    {"x2c_1e_contracted", qcs::IntegralDressing::X2C1eContracted},
+};
+
+}  // namespace
+
+const std::vector<std::string>& integral_dressing_labels() {
+  static const std::vector<std::string> labels = [] {
+    std::vector<std::string> result;
+    for (const auto& entry : kIntegralDressingLabels) {
+      result.emplace_back(entry.label);
+    }
+    return result;
+  }();
+  return labels;
+}
+
+qcs::IntegralDressing parse_integral_dressing(const std::string& label) {
+  for (const auto& entry : kIntegralDressingLabels) {
+    if (label == entry.label) {
+      return entry.dressing;
+    }
+  }
+  throw std::invalid_argument("Unsupported integral dressing '" + label + "'");
+}
+
 }  // namespace qdk::chemistry::utils::microsoft

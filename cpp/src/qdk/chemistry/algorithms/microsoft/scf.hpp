@@ -7,6 +7,8 @@
 #include <Eigen/Dense>
 #include <qdk/chemistry/algorithms/scf.hpp>
 
+#include "utils.hpp"
+
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
@@ -79,7 +81,7 @@ class ScfSettings
         "'x2c_1e_contracted' applies spin-free X2C-1e directly in the "
         "contracted basis",
         data::ListConstraint<std::string>{
-            {std::vector<std::string>{"", "x2c_1e", "x2c_1e_contracted"}}});
+            {utils::microsoft::integral_dressing_labels()}});
     set_default("nthreads", static_cast<int64_t>(-1),
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");

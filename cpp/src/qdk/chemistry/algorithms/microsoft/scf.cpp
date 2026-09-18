@@ -169,17 +169,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
   int64_t max_iterations = _settings->get<int64_t>("max_iterations");
   const std::string integral_dressing =
       _settings->get<std::string>("integral_dressing");
-  qcs::IntegralDressing dressing;
-  if (integral_dressing.empty()) {
-    dressing = qcs::IntegralDressing::None;
-  } else if (integral_dressing == "x2c_1e") {
-    dressing = qcs::IntegralDressing::X2C1e;
-  } else if (integral_dressing == "x2c_1e_contracted") {
-    dressing = qcs::IntegralDressing::X2C1eContracted;
-  } else {
-    throw std::invalid_argument("Unsupported integral dressing '" +
-                                integral_dressing + "'");
-  }
+  const qcs::IntegralDressing dressing =
+      utils::microsoft::parse_integral_dressing(integral_dressing);
 
   if (dressing != qcs::IntegralDressing::None &&
       qdk_raw_basis_set->get_atomic_orbital_type() == data::AOType::Cartesian) {

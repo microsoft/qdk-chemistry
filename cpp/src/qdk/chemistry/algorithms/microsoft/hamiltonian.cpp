@@ -24,9 +24,10 @@ namespace qcs = qdk::chemistry::scf;
 
 std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
 detail::build_one_body_ao(const data::BasisSet& basis_set,
-                          const std::string& integral_dressing) {
+                          qcs::IntegralDressing integral_dressing) {
   const bool use_x2c =
-      integral_dressing == "x2c_1e" || integral_dressing == "x2c_1e_contracted";
+      integral_dressing == qcs::IntegralDressing::X2C1e ||
+      integral_dressing == qcs::IntegralDressing::X2C1eContracted;
   if (use_x2c &&
       basis_set.get_atomic_orbital_type() == data::AOType::Cartesian) {
     throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
@@ -38,12 +39,9 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
 
   if (use_x2c) {
     return {internal_basis_set,
-            qcs::build_x2c_one_body_ao(internal_basis_set, mpi,
-                                       integral_dressing == "x2c_1e")};
-  }
-  if (!integral_dressing.empty()) {
-    throw std::invalid_argument("Unsupported integral dressing '" +
-                                integral_dressing + "'");
+            qcs::build_x2c_one_body_ao(
+                internal_basis_set, mpi,
+                integral_dressing == qcs::IntegralDressing::X2C1e)};
   }
 
   const size_t dimension = basis_set.get_num_atomic_orbitals();
@@ -447,7 +445,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   auto basis_set = orbitals->get_basis_set();
   auto [internal_basis_set, one_body_ao] = detail::build_one_body_ao(
-      *basis_set, _settings->get<std::string>("integral_dressing"));
+      *basis_set, utils::microsoft::parse_integral_dressing(
+                      _settings->get<std::string>("integral_dressing")));
 
   return detail::construct_canonical_hamiltonian(
       std::move(orbitals), internal_basis_set, one_body_ao,

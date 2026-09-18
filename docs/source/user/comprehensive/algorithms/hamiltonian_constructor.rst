@@ -12,6 +12,13 @@ The electronic Hamiltonian describes the energy of a system of electrons in the 
 It consists of kinetic energy terms, electron-nucleus attraction terms, and electron-electron repulsion terms.
 The ``HamiltonianConstructor`` algorithm computes the matrix elements of this operator in a given orbital basis, which can be the full orbital space or an active subspace.
 
+Conversion with :func:`~qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf` respects the
+:class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals and scalar core energy,
+rather than using only its :class:`~qdk_chemistry.data.Orbitals`.
+For molecular references, the conversion retains the AO basis and evaluates ordinary Coulomb two-electron integrals from that basis.
+For restricted closed-shell model references, it uses the stored two-electron integrals as well.
+This contract applies to both nonrelativistic and dressed one-electron operators; active-space effective Hamiltonians are not supported by this conversion.
+
 Using the HamiltonianConstructor
 ---------------------------------
 

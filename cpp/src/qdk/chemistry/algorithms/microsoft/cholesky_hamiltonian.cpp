@@ -648,7 +648,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       basis_set->calculate_effective_nuclear_repulsion_energy();
 
   auto [internal_basis_set, H_full] = detail::build_one_body_ao(
-      *basis_set, _settings->get<std::string>("integral_dressing"));
+      *basis_set, utils::microsoft::parse_integral_dressing(
+                      _settings->get<std::string>("integral_dressing")));
   // Create dummy SCFConfig
   auto scf_config = std::make_unique<qcs::SCFConfig>();
 
