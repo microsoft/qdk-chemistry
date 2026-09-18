@@ -457,6 +457,35 @@ TEST_F(BasisSetTest, JSONSerialization) {
   std::remove("test.basis_set.json");
 }
 
+TEST_F(BasisSetTest, SerializationPreservesNamedBasisIdentity) {
+  for (bool use_ecp : {false, true}) {
+    SCOPED_TRACE(use_ecp);
+    auto structure = std::make_shared<Structure>(
+        std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}},
+        std::vector<std::string>{use_ecp ? "Ag" : "H", "H"});
+    auto basis =
+        BasisSet::from_basis_name(use_ecp ? "def2-svp" : "sto-3g", structure);
+    ASSERT_EQ(basis->has_ecp_shells(), use_ecp);
+    ASSERT_EQ(basis->has_ecp_electrons(), use_ecp);
+    for (const auto& shell : basis->get_shells()) {
+      EXPECT_FALSE(shell.has_radial_powers());
+    }
+
+    auto restored_json = BasisSet::from_json(basis->to_json());
+    EXPECT_EQ(restored_json->get_ecp_name(), basis->get_ecp_name());
+    EXPECT_EQ(restored_json->get_ecp_electrons(), basis->get_ecp_electrons());
+    EXPECT_EQ(restored_json->content_hash(), basis->content_hash());
+
+    const std::string filename = "test_named_identity.basis_set.h5";
+    basis->to_hdf5_file(filename);
+    auto restored_hdf5 = BasisSet::from_hdf5_file(filename);
+    EXPECT_EQ(restored_hdf5->get_ecp_name(), basis->get_ecp_name());
+    EXPECT_EQ(restored_hdf5->get_ecp_electrons(), basis->get_ecp_electrons());
+    EXPECT_EQ(restored_hdf5->content_hash(), basis->content_hash());
+    std::filesystem::remove(filename);
+  }
+}
+
 TEST_F(BasisSetTest, FileIO) {
   // Create shells with Eigen vectors
   std::vector<Shell> shells;

@@ -201,20 +201,16 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
       // fill exponents and coefficients
       std::vector<double> exponents;
       std::vector<double> coefficients;
-      std::vector<int> rpowers;
-      int power = 0;
       for (size_t k = 0; k < shell["exponents"].size(); k++) {
         exponents.push_back(
             std::stod(shell["exponents"][k].get<std::string>()));
         coefficients.push_back(
             std::stod(shell["coefficients"][i][k].get<std::string>()));
-        rpowers.push_back(0);
-        power++;
       }
 
       // create shell and add to list
       Shell sh{atom_index, static_cast<OrbitalType>(momentum), exponents,
-               coefficients, rpowers};
+               coefficients};
       shells.push_back(sh);
     }
   }
@@ -1932,15 +1928,14 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
     if (group.nameExists("structure")) {
       H5::Group structure_group = group.openGroup("structure");
       auto structure = Structure::from_hdf5(structure_group);
-      if (!ecp_shells.empty()) {
-        if (!ecp_name.empty() && !ecp_electrons.empty()) {
-          basis_set = std::make_shared<BasisSet>(
-              name, shells, ecp_name, ecp_shells, ecp_electrons, *structure,
-              atomic_orbital_type);
-        } else {
-          basis_set = std::make_shared<BasisSet>(
-              name, shells, ecp_shells, *structure, atomic_orbital_type);
-        }
+      // All-electron bases can also carry ECP metadata in their content hash.
+      if (!ecp_name.empty() && !ecp_electrons.empty()) {
+        basis_set = std::make_shared<BasisSet>(name, shells, ecp_name,
+                                               ecp_shells, ecp_electrons,
+                                               *structure, atomic_orbital_type);
+      } else if (!ecp_shells.empty()) {
+        basis_set = std::make_shared<BasisSet>(name, shells, ecp_shells,
+                                               *structure, atomic_orbital_type);
       } else {
         basis_set = std::make_shared<BasisSet>(name, shells, *structure,
                                                atomic_orbital_type);
@@ -2273,15 +2268,14 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     std::shared_ptr<BasisSet> basis_set;
     if (j.contains("structure")) {
       auto structure = Structure::from_json(j["structure"]);
-      if (!ecp_shells.empty()) {
-        if (!ecp_name.empty() && !ecp_electrons.empty()) {
-          basis_set = std::make_shared<BasisSet>(
-              name, shells, ecp_name, ecp_shells, ecp_electrons, *structure,
-              atomic_orbital_type);
-        } else {
-          basis_set = std::make_shared<BasisSet>(
-              name, shells, ecp_shells, *structure, atomic_orbital_type);
-        }
+      // All-electron bases can also carry ECP metadata in their content hash.
+      if (!ecp_name.empty() && !ecp_electrons.empty()) {
+        basis_set = std::make_shared<BasisSet>(name, shells, ecp_name,
+                                               ecp_shells, ecp_electrons,
+                                               *structure, atomic_orbital_type);
+      } else if (!ecp_shells.empty()) {
+        basis_set = std::make_shared<BasisSet>(name, shells, ecp_shells,
+                                               *structure, atomic_orbital_type);
       } else {
         basis_set = std::make_shared<BasisSet>(name, shells, *structure,
                                                atomic_orbital_type);

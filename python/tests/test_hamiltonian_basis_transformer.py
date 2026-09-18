@@ -12,8 +12,9 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import QdkHamiltonianBasisTransformer, available, create, inspect_settings
-from qdk_chemistry.data import CholeskyHamiltonianContainer, Hamiltonian, Orbitals, SettingsAreLocked
-from qdk_chemistry.data.symmetry import spin_index_set
+from qdk_chemistry.data import CholeskyHamiltonianContainer, Hamiltonian, Orbitals, SettingsAreLocked, Structure
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes, spin_index_set
 
 from .test_helpers import create_test_basis_set, create_test_hamiltonian
 
@@ -72,6 +73,41 @@ def test_qdk_transformer_concurrent_calls(direct):
 
     with pytest.raises(SettingsAreLocked):
         transformer.settings().set("validation_tolerance", 1.0e-9)
+
+
+@pytest.mark.parametrize(("file_type", "suffix"), [("json", "json"), ("hdf5", "h5")])
+def test_qdk_transformer_accepts_serialized_molecular_hamiltonian(tmp_path, file_type, suffix):
+    """Stored molecular Hamiltonians retain the AO basis identity needed for rotation."""
+    structure = Structure.from_xyz("2\nH2\nH 0 0 0\nH 0 0 0.74\n")
+    _, wavefunction = create("scf_solver", "qdk").run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    source_orbitals = wavefunction.get_orbitals()
+    source = create("hamiltonian_constructor", "qdk_cholesky").run(source_orbitals)
+    rotation = np.array([[0.8, -0.6], [0.6, 0.8]])
+    target_orbitals = Orbitals(
+        spin_channel_matrix(source_orbitals.coefficients(), axes.alpha()) @ rotation,
+        None,
+        source_orbitals.get_overlap_matrix(),
+        source_orbitals.get_basis_set(),
+        source_orbitals.active_indices(),
+        source_orbitals.inactive_indices(),
+    )
+    filename = tmp_path / f"source.hamiltonian.{suffix}"
+    source.to_file(filename, file_type)
+    restored = Hamiltonian.from_file(filename, file_type)
+
+    transformer = create("hamiltonian_basis_transformer")
+    expected = transformer.run(source, target_orbitals)
+    actual = transformer.run(restored, target_orbitals)
+
+    assert restored.content_hash() == source.content_hash()
+    np.testing.assert_allclose(
+        actual.get_one_body_integrals()[0], expected.get_one_body_integrals()[0], atol=1.0e-12, rtol=0
+    )
+    np.testing.assert_allclose(
+        actual.get_two_body_integrals()[0], expected.get_two_body_integrals()[0], atol=1.0e-12, rtol=0
+    )
+    assert actual.get_core_energy() == pytest.approx(expected.get_core_energy())
+    assert actual.get_orbitals() is target_orbitals
 
 
 @pytest.mark.parametrize("source_null_eigenvalue", [0.0, 1.0e-30])
