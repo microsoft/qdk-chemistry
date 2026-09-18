@@ -17,6 +17,10 @@
     "nlohmann-json",
     "spdlog",
     "fmt",
+    {
+      "name": "openssl",
+      "platform": "windows & arm64"
+    },
     "openblas"
   ]
 }

@@ -1,10 +1,10 @@
 # Ground-state molecular energies with QPE: completed lab notebook
 
-This completed example records the reference results for the documented QDK/Chemistry 2.1.0 workflow.
+This completed example records the reference results for the documented QDK/Chemistry 2.2.0 workflow.
 
 ## Setup and provenance
 
-- QDK/Chemistry version: 2.1.0
+- QDK/Chemistry version: 2.2.0
 - Built-in implementation verification result: Passed for all required implementations.
 
 ## Calculation goal and reference plan

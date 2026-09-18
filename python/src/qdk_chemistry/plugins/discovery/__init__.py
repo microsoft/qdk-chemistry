@@ -1,4 +1,4 @@
-"""QDK/Chemistry Discovery remote backend."""
+"""QDK/Chemistry remote backend for Microsoft Discovery."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -19,7 +19,7 @@ _loaded = False
 
 
 def __getattr__(name: str) -> Any:
-    """Load the Discovery backend only when explicitly requested."""
+    """Load the Microsoft Discovery backend only when explicitly requested."""
     if name == "DiscoveryBackend":
         from qdk_chemistry.plugins.discovery.backend import DiscoveryBackend  # noqa: PLC0415
 
@@ -28,7 +28,7 @@ def __getattr__(name: str) -> Any:
 
 
 def load() -> None:
-    """Register the Discovery backend when its SDK is installed."""
+    """Register the Microsoft Discovery backend when its SDK is installed."""
     global _loaded  # noqa: PLW0603
     if _loaded:
         return

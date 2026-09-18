@@ -43,6 +43,27 @@ class TermGrouper(Algorithm):
         """Return ``term_grouper`` as the algorithm type name."""
         return "term_grouper"
 
+    def run(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
+        """Reject non-Pauli representations, then run the grouping strategy.
+
+        Args:
+            qubit_hamiltonian: Hamiltonian whose Pauli terms should be partitioned.
+
+        Returns:
+            QubitOperator: A copy of the input with its term partition populated.
+
+        Raises:
+            ValueError: If the operator is not a Pauli decomposition.
+
+        """
+        container_type = qubit_hamiltonian.get_container_type()
+        if container_type != "pauli_decomposition":
+            raise ValueError(
+                f"Term grouping requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+        return super().run(qubit_hamiltonian)
+
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
         """Compute a term partition and return a new ``QubitOperator`` carrying it.

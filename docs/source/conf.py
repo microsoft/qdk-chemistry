@@ -232,6 +232,8 @@ nitpick_ignore_regex = [
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
     (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
+    (r"py:class", r"mcp\..*"),  # MCP has no intersphinx inventory
+    (r"py:class", r"pydantic\..*"),  # Pydantic has no intersphinx inventory
     (r"py:class", r"azure\.core\.polling\._poller\.(_SansIONoPolling|PollingMethod)"),
     (r"py:obj", r"azure\.core\.polling\._poller\.PollingReturnType_co"),
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
@@ -276,26 +278,8 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
         ):
             return True
 
-        # Skip standard library modules (pathlib, typing, etc.)
-        if module and any(
-            module.startswith(prefix)
-            for prefix in [
-                "pathlib",
-                "typing",
-                "collections",
-                "abc",
-                "enum",
-                "numpy",
-                "pydantic_settings",
-                "qiskit",
-                "qiskit_aer",
-                "ruamel",
-                "dataclasses",
-                "pybind11_builtins",
-                "qiskit_nature",
-                "h5py",
-            ]
-        ):
+        # Skip standard-library and third-party re-exports.
+        if module and not module.startswith("qdk_chemistry"):
             return True
     return skip
 
@@ -350,17 +334,18 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
         rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
             lines[idx] = rewritten
-    if options is not None and "._core." in name:
-        options["noindex"] = True
 
 
-def on_builder_inited(app):
+def normalize_public_export_modules():
+    """Give pybind11 exports their public module names before Sphinx inspects them."""
     for internal_mod, public_mod in _MODULE_ALIAS_RULES:
         if internal_mod.endswith("."):
             continue  # prefix-only rewrite, nothing to alias
+        # Importing the public module loads the private pybind11 module whose
+        # exported objects need public names in the generated documentation.
+        pub = importlib.import_module(public_mod)
         if internal_mod not in sys.modules:
             continue  # nothing imported yet
-        pub = importlib.import_module(public_mod)
         exports = getattr(pub, "__all__", ())
         for name in exports:
             obj = getattr(pub, name, None)
@@ -368,6 +353,12 @@ def on_builder_inited(app):
             if isinstance(module_name, str) and module_name.startswith(internal_mod):
                 with suppress(AttributeError):
                     obj.__module__ = public_mod  # docs-only shim
+
+
+# Sphinx 9 resolves type annotations while initializing extensions, before the
+# ``builder-inited`` event. Normalize exports as part of loading this config so
+# autodoc and sphinx-autodoc-typehints both see the same public object names.
+normalize_public_export_modules()
 
 
 # Pattern to match :cite:`key` in text nodes (handles the raw text form)
@@ -573,7 +564,6 @@ def setup(app):
     app.connect("autodoc-process-signature", normalize_autodoc_signature)
     app.connect("autodoc-process-docstring", normalize_autodoc_docstring)
     app.connect("autodoc-process-docstring", process_breathe_docstring)
-    app.connect("builder-inited", on_builder_inited)
     # Transform :cite:`key` markers in Doxygen/Breathe content before reference resolution
     # Using doctree-read so pending_xref nodes get resolved by bibtex extension
     app.connect("doctree-read", transform_doctree_citations)

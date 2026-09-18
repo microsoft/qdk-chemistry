@@ -45,12 +45,32 @@ import subprocess
 import sys
 import warnings
 
+
+def _import_core() -> None:
+    """Import the native extension with an actionable Windows failure message."""
+    try:
+        importlib.import_module("qdk_chemistry._core")
+    except ModuleNotFoundError:
+        raise
+    except ImportError as exc:
+        if _sys.platform == "win32":
+            raise ImportError(
+                "QDK/Chemistry requires the current Microsoft Visual C++ v14 "
+                "Redistributable on Windows. Install the x64 package (which also "
+                "includes ARM64), restart Python, and try again: "
+                "https://aka.ms/vc14/vc_redist.x64.exe"
+            ) from exc
+        raise
+
+
+_import_core()
+
 # Import some tools for convenience
-import qdk_chemistry.constants
-from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
-from qdk_chemistry._core import QDKChemistryConfig
-from qdk_chemistry.utils import Logger, telemetry_events
-from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
+import qdk_chemistry.constants  # noqa: E402
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError  # noqa: E402
+from qdk_chemistry._core import QDKChemistryConfig  # noqa: E402
+from qdk_chemistry.utils import Logger, telemetry_events  # noqa: E402
+from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED  # noqa: E402
 
 if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
@@ -340,9 +360,9 @@ def _generate_registry_stubs() -> None:
         for algorithm_type, algorithm_names in all_algorithms.items():
             for algorithm_name in algorithm_names:
                 try:
-                    settings = reg_module.inspect_settings(algorithm_type, algorithm_name)
-                    instance = reg_module.create(algorithm_type, algorithm_name)
-                    class_type = type(instance)
+                    instance = reg_module.create(algorithm_type, algorithm_name, True)
+                    settings = reg_module._inspect_instance_settings(instance)  # noqa: SLF001
+                    class_type = instance.__class__
                     class_name = class_type.__name__
                     class_module = class_type.__module__
 
@@ -360,8 +380,11 @@ def _generate_registry_stubs() -> None:
                     overload_lines.append("def create(")
                     overload_lines.append(f"    algorithm_type: Literal['{algorithm_type}'],")
                     overload_lines.append(f"    algorithm_name: Literal['{algorithm_name}'] | None = None,")
+                    overload_lines.append("    *suppress_warnings: bool,")
 
                     for setting_name, setting_type, default, _, _ in settings:
+                        if setting_name == "suppress_warnings":
+                            continue
                         if setting_type == "str":
                             overload_lines.append(f'    {setting_name}: {setting_type} = "{default}",')
                         elif "int" in setting_type:
@@ -398,6 +421,7 @@ def _generate_registry_stubs() -> None:
                 "def create(",
                 "    algorithm_type: str,",
                 "    algorithm_name: str | None = None,",
+                "    *suppress_warnings: bool,",
                 "    **kwargs,",
                 f") -> Union[{all_return_types_str}]: ...",
             ]

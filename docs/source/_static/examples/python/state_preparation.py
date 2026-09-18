@@ -90,6 +90,6 @@ print(f"Dense pure state circuit:\n{dense_circuit.get_qsharp_circuit()}")
 from qdk_chemistry.algorithms import registry
 
 print(registry.available("state_prep"))
-# ['sparse_isometry', 'dense_pure_state', 'qiskit_regular_isometry']
+# ['dense_pure_state', 'sparse_isometry', 'alias_sampling', 'qrom', 'qiskit_regular_isometry']
 # end-cell-list-implementations
 ################################################################################
