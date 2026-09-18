@@ -224,13 +224,17 @@ class TestPauliProductFormulaContainer:
             PauliProductFormulaContainer.from_json(payload)
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
-    def test_serialization_preserves_term_order_and_hash(self, container, file_format, tmp_path):
+    @pytest.mark.parametrize("with_endpoints", [False, True])
+    def test_serialization_preserves_term_order_and_hash(self, container, file_format, tmp_path, with_endpoints):
         """Restore numeric Pauli keys and order, including double-digit HDF5 term indices."""
         container = type(container)(
             [ExponentiatedPauliTerm(container.step_terms[i % 3].pauli_term, i * 0.1) for i in range(13)],
             container.step_reps,
             container.num_qubits,
             container.scale,
+            beginning=container.step_terms[:1] if with_endpoints else (),
+            end=container.step_terms[-1:] if with_endpoints else (),
+            group_offsets=tuple(range(14)) if with_endpoints else None,
         )
         filename = tmp_path / f"formula.pauli_product_formula_container.{file_format}"
         container.to_file(filename, file_format)
@@ -332,3 +336,42 @@ class TestPauliProductFormulaContainer:
         assert result.step_reps == 1
         assert result.scale == container.scale
         assert result.step_terms == list(container.step_terms) * (4 - inverse_reps)
+
+    @pytest.mark.parametrize("repetitions", [1, 3, 10**9])
+    @pytest.mark.parametrize("cancel", [False, True])
+    def test_group_boundary_fusion_stays_compact(self, repetitions: int, cancel: bool) -> None:
+        """Fuse reordered commuting boundaries without storing each repetition."""
+        left = [ExponentiatedPauliTerm({0: "X"}, 0.125), ExponentiatedPauliTerm({1: "X"}, 0.25)]
+        middle = [ExponentiatedPauliTerm({0: "Z"}, 0.3)]
+        right = [ExponentiatedPauliTerm(t.pauli_term, -t.angle if cancel else t.angle) for t in reversed(left)]
+        formula = PauliProductFormulaContainer(left + middle + right, repetitions, 2, group_offsets=(0, 2, 3, 5))
+        fused = formula.combine(atol=0.0)
+        saved_per_boundary = 4 if cancel else 2
+        assert fused.num_pauli_exponentials == 5 * repetitions - saved_per_boundary * (repetitions - 1)
+        assert fused.num_stored_terms <= 8
+        assert formula.step_terms == left + middle + right
+        assert fused.combine() is fused
+        if repetitions > 1:
+            assert fused.beginning == left
+            assert fused.end == middle + right
+            doubled = fused.combine(fused, atol=0.0)
+            assert doubled.num_pauli_exponentials == 2 * fused.num_pauli_exponentials - saved_per_boundary
+            assert doubled.num_stored_terms <= 8
+
+    def test_combine_different_bodies_includes_endpoints(self) -> None:
+        """The general flatten-and-merge fallback preserves both formulas' endpoints."""
+        x = ExponentiatedPauliTerm({0: "X"}, 0.3)
+        z = ExponentiatedPauliTerm({0: "Z"}, 0.2)
+        y = ExponentiatedPauliTerm({0: "Y"}, 0.25)
+        phase = ExponentiatedPauliTerm({}, 0.1)
+        first = PauliProductFormulaContainer([x, z], 2, 1, beginning=[phase], end=[y])
+        second = PauliProductFormulaContainer(
+            [x], 3, 1, beginning=[ExponentiatedPauliTerm(y.pauli_term, -y.angle)], end=[phase]
+        )
+        combined = first.combine(second)
+        assert combined.step_reps == 1
+        assert not combined.beginning
+        assert not combined.end
+        expected = [phase, x, z, x, z, ExponentiatedPauliTerm(x.pauli_term, 0.9), phase]
+        assert [t.pauli_term for t in combined.step_terms] == [t.pauli_term for t in expected]
+        np.testing.assert_allclose([t.angle for t in combined.step_terms], [t.angle for t in expected])
