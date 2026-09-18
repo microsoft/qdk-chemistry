@@ -40,7 +40,6 @@ _BASE_PROFILE_FILES = (
     "IterativePhaseEstimation.qs",
     "StandardPhaseEstimation.qs",
     "ControlledPauliExp.qs",
-    "BatchedControlledPauliExp.qs",
     "ControlledSwapPauliExp.qs",
     "HadamardTest.qs",
     "PauliExp.qs",

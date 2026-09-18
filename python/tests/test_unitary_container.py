@@ -235,6 +235,7 @@ class TestPauliProductFormulaContainer:
             beginning=container.step_terms[:1] if with_endpoints else (),
             end=container.step_terms[-1:] if with_endpoints else (),
             group_offsets=tuple(range(14)) if with_endpoints else None,
+            layer_offsets=tuple(range(16)) if with_endpoints else None,
         )
         filename = tmp_path / f"formula.pauli_product_formula_container.{file_format}"
         container.to_file(filename, file_format)
@@ -344,7 +345,9 @@ class TestPauliProductFormulaContainer:
         left = [ExponentiatedPauliTerm({0: "X"}, 0.125), ExponentiatedPauliTerm({1: "X"}, 0.25)]
         middle = [ExponentiatedPauliTerm({0: "Z"}, 0.3)]
         right = [ExponentiatedPauliTerm(t.pauli_term, -t.angle if cancel else t.angle) for t in reversed(left)]
-        formula = PauliProductFormulaContainer(left + middle + right, repetitions, 2, group_offsets=(0, 2, 3, 5))
+        formula = PauliProductFormulaContainer(
+            left + middle + right, repetitions, 2, group_offsets=(0, 2, 3, 5), layer_offsets=(0, 2, 3, 5)
+        )
         fused = formula.combine(atol=0.0)
         saved_per_boundary = 4 if cancel else 2
         assert fused.num_pauli_exponentials == 5 * repetitions - saved_per_boundary * (repetitions - 1)
@@ -364,9 +367,14 @@ class TestPauliProductFormulaContainer:
         z = ExponentiatedPauliTerm({0: "Z"}, 0.2)
         y = ExponentiatedPauliTerm({0: "Y"}, 0.25)
         phase = ExponentiatedPauliTerm({}, 0.1)
-        first = PauliProductFormulaContainer([x, z], 2, 1, beginning=[phase], end=[y])
+        first = PauliProductFormulaContainer([x, z], 2, 1, beginning=[phase], end=[y], layer_offsets=(0, 1, 2, 3, 4))
         second = PauliProductFormulaContainer(
-            [x], 3, 1, beginning=[ExponentiatedPauliTerm(y.pauli_term, -y.angle)], end=[phase]
+            [x],
+            3,
+            1,
+            beginning=[ExponentiatedPauliTerm(y.pauli_term, -y.angle)],
+            end=[phase],
+            layer_offsets=(0, 1, 2, 3),
         )
         combined = first.combine(second)
         assert combined.step_reps == 1

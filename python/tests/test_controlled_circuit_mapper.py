@@ -258,7 +258,7 @@ def _map_sparse_formula(
     num_qubits: int = 2,
     targets: list[int] | None = None,
     *,
-    variant: str = "pauli_sequence",
+    layer_offsets: tuple[int, ...] | None = None,
 ) -> Circuit:
     """Map canonical objects or sparse words without widening their support."""
     if sparse:
@@ -269,10 +269,13 @@ def _map_sparse_formula(
             ),
             [term.angle for term in terms],
             step_reps=repetitions,
+            layer_offsets=layer_offsets,
         )
     else:
-        container = PauliProductFormulaContainer(terms, step_reps=repetitions, num_qubits=num_qubits)
-    mapper = create("controlled_circuit_mapper", variant)
+        container = PauliProductFormulaContainer(
+            terms, step_reps=repetitions, num_qubits=num_qubits, layer_offsets=layer_offsets
+        )
+    mapper = create("controlled_circuit_mapper", "pauli_sequence")
     mapper.settings().set("control_indices", [num_qubits])
     if targets is not None:
         mapper.settings().set("target_indices", targets)
@@ -280,7 +283,7 @@ def _map_sparse_formula(
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-@pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
+@pytest.mark.parametrize("layered", [False, True])
 @pytest.mark.parametrize("sparse", [False, True], ids=["objects", "sparse-terms"])
 @pytest.mark.parametrize("repetitions", [1, 3])
 @pytest.mark.parametrize(
@@ -289,7 +292,7 @@ def _map_sparse_formula(
     ids=["mixed", "empty", "reordered-noncontiguous"],
 )
 def test_sparse_controlled_matrix(
-    sparse: bool, repetitions: int, empty: bool, targets: list[int], variant: str
+    sparse: bool, repetitions: int, empty: bool, targets: list[int], layered: bool
 ) -> None:
     """Preserve order, sign, identity-relative phases, and spectator qubits exactly."""
     terms = [
@@ -302,7 +305,8 @@ def test_sparse_controlled_matrix(
     ]
     if empty:
         terms = []
-    circuit = _map_sparse_formula(terms, sparse, repetitions, targets=targets, variant=variant)
+    layer_offsets = ((0,) if empty else (0, 2, 3, 6)) if layered else None
+    circuit = _map_sparse_formula(terms, sparse, repetitions, targets=targets, layer_offsets=layer_offsets)
     width = max(2, *targets) + 1
     assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == width
     paulis = {
@@ -333,8 +337,8 @@ def test_sparse_controlled_matrix(
 
 
 @pytest.mark.parametrize("sparse", [False, True], ids=["objects", "sparse-terms"])
-@pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
-def test_wide_controlled_transport_stays_sparse(sparse: bool, variant: str) -> None:
+@pytest.mark.parametrize("layered", [False, True])
+def test_wide_controlled_transport_stays_sparse(sparse: bool, layered: bool) -> None:
     """Transport support-sized lists and scalar repetitions, never expanded evolution."""
     num_qubits = 40_000
     terms = [
@@ -342,7 +346,7 @@ def test_wide_controlled_transport_stays_sparse(sparse: bool, variant: str) -> N
         ExponentiatedPauliTerm({num_qubits // 2: "Z"}, 0.27),
         ExponentiatedPauliTerm({}, -0.19),
     ]
-    circuit = _map_sparse_formula(terms, sparse, 1_000_000, num_qubits, variant=variant)
+    circuit = _map_sparse_formula(terms, sparse, 1_000_000, num_qubits, layer_offsets=(0, 2, 3) if layered else None)
     assert circuit._qsharp_factory is not None
     payload = circuit._qsharp_factory.parameter
     params = vars(payload["params"])
@@ -361,14 +365,10 @@ def test_wide_controlled_transport_stays_sparse(sparse: bool, variant: str) -> N
     assert isinstance(params["repetitions"], int)
     assert payload["control"] == num_qubits
     assert payload["systems"] == list(range(num_qubits))
-    if variant == "batched_pauli_sequence":
-        assert payload["batchOffsets"] == [0, 2, 3]
-    else:
-        assert "batchOffsets" not in payload
+    assert payload["layerOffsets"] == ([0, 2, 3] if layered else [])
 
 
-@pytest.mark.parametrize("variant", ["pauli_sequence", "batched_pauli_sequence"])
-def test_packed_controlled_transport_preserves_duplicate_dict_semantics(variant: str) -> None:
+def test_packed_controlled_transport_preserves_duplicate_dict_semantics() -> None:
     """Repeated legacy packed indices keep the last Pauli and original dictionary order."""
     container = PauliProductFormulaContainer.from_json(
         {
@@ -381,7 +381,7 @@ def test_packed_controlled_transport_preserves_duplicate_dict_semantics(variant:
             "num_qubits": 2,
         }
     )
-    mapper = create("controlled_circuit_mapper", variant)
+    mapper = create("controlled_circuit_mapper", "pauli_sequence")
     mapper.settings().set("control_indices", [2])
     circuit = mapper.run(UnitaryRepresentation(container=container))
     assert circuit._qsharp_factory is not None
@@ -390,14 +390,13 @@ def test_packed_controlled_transport_preserves_duplicate_dict_semantics(variant:
     assert params["pauliOps"] == [[qsharp.Pauli.Y, qsharp.Pauli.Z]]
 
 
-def test_batched_variant_reduces_rotation_depth_without_changing_default() -> None:
-    """Batching is opt-in and reduces rotation rounds without adding qubits or rotations."""
+def test_declared_layers_reduce_rotation_depth_without_changing_default() -> None:
+    """Declared layers reduce rotation rounds without adding qubits or rotations."""
     assert create("controlled_circuit_mapper").name() == "pauli_sequence"
-    assert create("controlled_circuit_mapper", "batched_pauli_sequence").name() == "batched_pauli_sequence"
     terms = [ExponentiatedPauliTerm({2 * i: "X", 2 * i + 1: "Y"}, 0.123) for i in range(6)]
     counts = []
-    for variant in ("pauli_sequence", "batched_pauli_sequence"):
-        circuit = _map_sparse_formula(terms, True, 2, num_qubits=12, variant=variant)
+    for layer_offsets in (None, (0, 6)):
+        circuit = _map_sparse_formula(terms, True, 2, num_qubits=12, layer_offsets=layer_offsets)
         application = circuit.get_qre_application()
         counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
     assert counts[0]["numQubits"] == counts[1]["numQubits"] == 13

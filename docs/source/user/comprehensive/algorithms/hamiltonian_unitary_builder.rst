@@ -213,7 +213,11 @@ Consuming term partitions
 When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
-* :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
+* :class:`~qdk_chemistry.data.FlatPartition` (group → index) supplies commuting groups, but does not certify disjoint qubit supports.
+
+The emitted formula retains each nonempty :class:`~qdk_chemistry.data.LayeredPartition` layer in ``layer_offsets``, after coefficient filtering and for every Suzuki schedule occurrence.
+The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper` uses these declared boundaries directly; no downstream regrouping is performed.
+Layer propagation is independent of ``minimize_rotations`` and ``fuse_group_boundaries``.
 
 By default, groups are sorted by ascending layer count, preserving the historical splitting order.
 This ordering does not generally minimize the number of individual Pauli exponentials.
@@ -302,15 +306,20 @@ These are structural counts, not synthesized gate counts.
 Optional ``group_offsets`` delimit validated commuting groups in ``step_terms`` only, increasing strictly from zero to the body length.
 Without this metadata, boundary fusion treats each term as a singleton group.
 
+Optional ``layer_offsets`` delimit validated disjoint-support layers over the stored concatenation ``beginning + step_terms + end``.
+They increase strictly from zero to the stored term count and include both endpoint/body boundaries; an empty formula uses ``(0,)``.
+Fusion and composition retain the surviving terms' declared layers without merging neighboring layers; arbitrary body reordering falls back to singleton body layers.
+Formulas without this metadata retain term-by-term controlled mapping.
+
 With no argument, :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` fuses repetition boundaries with equal commuting Pauli-word sets by adding signed angles, without unrolling.
 A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``beginning`` or ``end`` are returned unchanged, making the rewrite idempotent.
 The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
 
 With another formula, ``combine(other_container, atol=1e-12)`` appends its evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
-It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including endpoints, and returns ``step_reps=1``.
+It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including endpoints, and returns ``step_reps=1``.
 
 :doc:`JSON and HDF5 serialization <../data/serialization>` always write fixed schema ``0.4.0`` without expansion and read legacy ``0.2.0`` lists and packed ``0.3.0`` payloads.
-Plain formulas without endpoints or group metadata retain their legacy content hashes.
+Plain formulas without endpoints or group/layer metadata retain their legacy content hashes.
 Compact storage and :ref:`mapping <compact-formula-mappers>` do not guarantee compact circuit export, simulation, or resource estimation.
 
 

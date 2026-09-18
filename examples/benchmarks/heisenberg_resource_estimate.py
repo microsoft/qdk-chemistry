@@ -5,7 +5,7 @@ J1-J2 lattice with J1 = 1 and J2 = 0.5, ten phase bits, fourth-order Trotter,
 and longest powered time 1000. The base time is 1000 / 512 = 1.953125.
 Requested dt = 0.1 gives ceil(base_time / dt) = 20 divisions and an actual
 step of 0.09765625, unchanged across powers by power_strategy="repeat".
-The batched_pauli_sequence controlled mapper batches disjoint supports.
+The pauli_sequence controlled mapper preserves the formula's declared disjoint layers.
 Identity preparation, inverse QFT, and phase measurements are included;
 there is no final spin-basis rotation.
 
@@ -162,7 +162,7 @@ def build_qpe_circuit(
             power_strategy="repeat",
         ),
         controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper", "batched_pauli_sequence"
+            "controlled_circuit_mapper", "pauli_sequence"
         ),
     )
     return circuit_builder.run(

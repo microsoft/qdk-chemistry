@@ -53,8 +53,8 @@ Settings
 
 .. rubric:: Compact product-formula support
 
-:ref:`Compact product-formula containers <compact-product-formulas>` are supported by :class:`~qdk_chemistry.algorithms.circuit_mapper.PauliSequenceMapper`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`, and :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledBatchedPauliSequenceMapper`.
-They execute ``beginning`` and ``end`` once, preserving the body's symbolic ``step_reps``; batches do not cross these segment boundaries.
+:ref:`Compact product-formula containers <compact-product-formulas>` are supported by :class:`~qdk_chemistry.algorithms.circuit_mapper.PauliSequenceMapper` and :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`.
+They execute ``beginning`` and ``end`` once, preserving the body's symbolic ``step_reps``; declared layers do not cross these segment boundaries.
 The :ref:`CSWAP mapper <cswap-pauli-sequence-mapper>` requires empty endpoints.
 
 .. rubric:: Creating a mapper
@@ -104,25 +104,17 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 .. note::
    The current implementation supports a single control qubit.
 
-Batched Pauli sequence mapper
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the :class:`~qdk_chemistry.data.PauliProductFormulaContainer` supplies ``layer_offsets``,
+the mapper interleaves controlled-rotation decompositions into two rotation rounds
+per declared disjoint layer. These boundaries originate in the unitary builder;
+the mapper does not infer layers from supports or merge neighboring layers.
+Term order, signed angles, and symbolic repetitions are preserved, and identity
+terms retain their phase on the control. Without layer metadata, each controlled
+exponential is completed separately.
 
-.. rubric:: Factory name: ``"batched_pauli_sequence"``
-
-The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledBatchedPauliSequenceMapper`
-is an opt-in alternative for a :class:`~qdk_chemistry.data.PauliProductFormulaContainer`.
-It groups consecutive terms with disjoint data-qubit supports and interleaves their
-controlled-rotation decompositions into two rotation rounds per batch, without
-changing the term order, angles, or repetitions. This can reduce logical rotation
-depth and resource-estimation tracing cost. Overlapping terms remain in separate
-batches; identity terms retain their phase on the control.
-
-It uses the same single-control settings and allocates no extra ancillas.
-Shared-control CNOTs remain serial in a two-qubit-gate model, so the rotation-depth
-improvement is not a guarantee of constant total gate depth. The default
-``"pauli_sequence"`` mapper continues to complete one controlled exponential at a time.
-Select the batched variant through a :class:`~qdk_chemistry.data.AlgorithmRef` in
-the ``controlled_circuit_mapper`` setting of a :doc:`QPE circuit builder <qpe_circuit_builder>`.
+This can reduce logical rotation depth without extra ancillas or a different
+mapper selection. Shared-control CNOTs remain serial in a two-qubit-gate model,
+so the rotation-depth improvement is not a guarantee of constant total gate depth.
 
 .. _cswap-pauli-sequence-mapper:
 

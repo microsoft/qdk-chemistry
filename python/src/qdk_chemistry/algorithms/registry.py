@@ -910,7 +910,6 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
-        ControlledBatchedPauliSequenceMapper,
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
         ControlledSwapPauliSequenceMapper,
@@ -985,7 +984,6 @@ def _register_python_algorithms():
     register(lambda: PSPMapper())
     register(lambda: ControlledPSPMapper())
     register(lambda: ControlledPauliSequenceMapper())
-    register(ControlledBatchedPauliSequenceMapper)
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())

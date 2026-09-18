@@ -118,14 +118,14 @@ class TestPauliSequenceMapperNonControlled:
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
 @pytest.mark.parametrize("profile", [TargetProfile.Base, TargetProfile.Adaptive_RIF])
-@pytest.mark.parametrize("variant", ["uncontrolled", "pauli_sequence", "batched_pauli_sequence"])
+@pytest.mark.parametrize("variant", ["uncontrolled", "pauli_sequence"])
 def test_fused_formula_matrix(profile: TargetProfile, variant: str) -> None:
     """Fused endpoints execute once and retain identity phases under control."""
     xx = ExponentiatedPauliTerm({0: "X", 1: "X"}, 0.13)
     yy = ExponentiatedPauliTerm({0: "Y", 1: "Y"}, -0.21)
     phase = ExponentiatedPauliTerm({}, 0.07)
     terms = [xx, yy, phase, ExponentiatedPauliTerm({0: "Z"}, 0.32), phase, yy, xx]
-    formula = PauliProductFormulaContainer(terms, 3, 2, group_offsets=(0, 3, 4, 7))
+    formula = PauliProductFormulaContainer(terms, 3, 2, group_offsets=(0, 3, 4, 7), layer_offsets=(0, 1, 3, 4, 6, 7))
     with use_qsharp_context(create_qsharp_context(profile)):
         mapper = (
             create("circuit_mapper", "pauli_sequence")

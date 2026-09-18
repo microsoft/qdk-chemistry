@@ -30,6 +30,9 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
     Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
     indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
+    When the formula declares disjoint layers, their controlled rotations share two
+    rotation rounds per layer. The declared boundaries are used without regrouping;
+    formulas without layer metadata retain term-by-term controlled evolution.
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
@@ -79,17 +82,19 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        return self._map_sequence(unitary_container, control_indices[0], target_indices)
-
-    def _map_sequence(self, container: PauliProductFormulaContainer, control: int, systems: list[int]) -> Circuit:
-        """Map a validated product formula, allowing variants to choose its gate schedule."""
-        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(container))
-        program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params)
+        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
+        layer_offsets = list(unitary_container.layer_offsets or ())
 
         qsharp_factory = QsharpFactoryData(
-            program=program,
-            parameter={"params": evo_params, "control": control, "systems": systems},
+            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
+            parameter={
+                "params": evo_params,
+                "layerOffsets": layer_offsets,
+                "control": control_indices[0],
+                "systems": target_indices,
+            },
         )
+
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params, layer_offsets)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
