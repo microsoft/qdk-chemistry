@@ -33,7 +33,7 @@ class CachedQSharpApplication(QSharpApplication):
             super().__init__(entry_expr, args=args, cache_dir=cache_dir, use_cache=True)
         self.cache_key = cache_key
 
-    def get_trace(self, _parameters: None = None) -> Trace:
+    def get_trace(self, parameters: None = None) -> Trace:  # noqa: ARG002
         """Return the cached trace, computing and storing it when absent."""
         return trace_from_entry_expr_cached(
             self.entry_expr,

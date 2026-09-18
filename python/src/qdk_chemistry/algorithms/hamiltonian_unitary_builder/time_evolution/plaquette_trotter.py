@@ -553,7 +553,7 @@ class PlaquetteTrotter(Trotter):
             return None
         return ConjugatedExponentiatedPauliTerm(
             within_terms=heads,
-            apply_terms=self._batch_equal_angles(phases),
+            apply_terms=self._batch_equal_angles(phases, max_batch=self._settings.get("max_batch")),
         )
 
     @classmethod
@@ -627,9 +627,9 @@ class PlaquetteTrotterSettings(TrotterSettings):
             "max_batch",
             "int",
             0,
-            "Largest Hamming-weight phasing batch, or 0 for unbounded. A batch of m "
-            "equal-angle terms on disjoint qubits costs ceil(log2(m+1)) rotations and "
-            "about m ancillas, so capping it trades rotations for width. Campbell's "
-            "Table II budgets L^2/2 ancillas (arXiv:2012.09238v4); pass that to "
-            "reproduce his qubit counts rather than the cheaper rotation count.",
+            "Largest Hamming-weight phasing batch, or 0 for unbounded, or 1 to phase every "
+            "term individually. A batch of m equal-angle terms on disjoint qubits costs "
+            "ceil(log2(m+1)) rotations and about m ancillas, so capping it trades rotations "
+            "for width. Campbell's Table II budgets L^2/2 ancillas (arXiv:2012.09238v4); pass "
+            "that to reproduce his qubit counts rather than the cheaper rotation count.",
         )
