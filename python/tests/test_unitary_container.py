@@ -32,7 +32,11 @@ def container(step_terms, request):
     """Create a PauliProductFormulaContainer instance for testing."""
     if request.param:
         return SparsePauliProductFormulaContainer.from_sparse_terms(
-            SparsePauliTerms(2, [{0: "X"}, {}, {0: "Y", 1: "X"}]), [0.5, 0.7, 0.3], step_reps=4, scale=1.7
+            SparsePauliTerms(2, [{0: "X"}, {}, {0: "Y", 1: "X"}]),
+            [0.5, 0.7, 0.3],
+            step_reps=4,
+            scale=1.7,
+            layer_offsets=(0, 2, 3),
         )
     return PauliProductFormulaContainer(
         step_terms=step_terms,
@@ -113,6 +117,7 @@ class TestPauliProductFormulaContainer:
             container.step_reps,
             container.num_qubits,
             container.scale,
+            layer_offsets=tuple(range(14)) if container.layer_offsets is not None else None,
         )
         filename = tmp_path / f"formula.pauli_product_formula_container.{format_name}"
         container.to_file(filename, format_name)
@@ -131,6 +136,7 @@ class TestPauliProductFormulaContainer:
             ],
             step_reps=2,
             num_qubits=2,
+            layer_offsets=(0, 2),
         )
         b = PauliProductFormulaContainer(
             step_terms=[
@@ -145,6 +151,7 @@ class TestPauliProductFormulaContainer:
         # a expanded: [X, Z, X, Z], b expanded: [Y, X, Y, X]
         # No adjacent duplicates anywhere, so all 8 terms survive.
         assert result.step_reps == 1
+        assert result.layer_offsets == (0, 2, 4, 5, 6, 7, 8)
         expected_angles = [0.1, 0.2, 0.1, 0.2, 0.3, 0.4, 0.3, 0.4]
         np.testing.assert_allclose([term.angle for term in result.step_terms], expected_angles, rtol=1e-5, atol=1e-14)
 

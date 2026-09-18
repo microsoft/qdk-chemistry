@@ -349,24 +349,22 @@ class TestSparseControlledEvolution:
         assert np.max(np.abs(got[:control_off_size, :control_off_size] - np.eye(control_off_size))) < _TOL
 
 
-def test_batched_mapper_is_opt_in_and_reduces_rotation_depth() -> None:
-    """Both variants stay sparse and symbolic; batching reduces rotation rounds, not gate counts."""
+def test_declared_layers_reduce_rotation_depth() -> None:
+    """The standard mapper preserves declared layers, reducing rotation rounds rather than gate counts."""
     assert create("controlled_circuit_mapper").name() == "pauli_sequence"
     terms = [ExponentiatedPauliTerm({2 * i: "X", 2 * i + 1: "Y"}, 0.123) for i in range(6)]
-    unitary = UnitaryRepresentation(container=PauliProductFormulaContainer(terms, 2, 12))
     counts = []
-    for variant in ("pauli_sequence", "batched_pauli_sequence"):
-        mapper = create("controlled_circuit_mapper", variant)
-        assert mapper.name() == variant
+    for layer_offsets in (None, (0, 6)):
+        unitary = UnitaryRepresentation(
+            container=PauliProductFormulaContainer(terms, 2, 12, layer_offsets=layer_offsets)
+        )
+        mapper = create("controlled_circuit_mapper", "pauli_sequence")
         circuit = mapper.run(unitary)
         payload = circuit._qsharp_factory.parameter
         params = vars(payload["params"])
         assert params["repetitions"] == 2
         assert sum(map(len, params["pauliIndices"])) == 12
-        if variant == "batched_pauli_sequence":
-            assert payload["batchOffsets"] == [0, 6]
-        else:
-            assert "batchOffsets" not in payload
+        assert payload["layerOffsets"] == list(layer_offsets or ())
         application = circuit.get_qre_application()
         counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
     assert counts[0]["numQubits"] == counts[1]["numQubits"] == 13
@@ -378,7 +376,7 @@ def test_batched_mapper_is_opt_in_and_reduces_rotation_depth() -> None:
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
 @pytest.mark.parametrize("repetitions", [1, 3])
 @pytest.mark.parametrize("empty", [False, True])
-def test_batched_mapper_full_matrix(repetitions: int, empty: bool) -> None:
+def test_declared_layers_full_matrix(repetitions: int, empty: bool) -> None:
     """Preserve mixed supports, noncommuting order, identity phases, and permuted target wires."""
     terms = [
         ExponentiatedPauliTerm({3: "Y", 0: "X"}, -0.31),
@@ -390,8 +388,9 @@ def test_batched_mapper_full_matrix(repetitions: int, empty: bool) -> None:
     if empty:
         terms = []
     targets = [3, 0, 2, 1]
-    mapper = create("controlled_circuit_mapper", "batched_pauli_sequence", control_indices=[4], target_indices=targets)
-    circuit = mapper.run(UnitaryRepresentation(container=PauliProductFormulaContainer(terms, repetitions, 4)))
+    mapper = create("controlled_circuit_mapper", "pauli_sequence", control_indices=[4], target_indices=targets)
+    container = PauliProductFormulaContainer(terms, repetitions, 4, layer_offsets=(0,) if empty else (0, 2, 5))
+    circuit = mapper.run(UnitaryRepresentation(container=container))
     paulis = {
         "I": np.eye(2),
         "X": np.array([[0, 1], [1, 0]]),

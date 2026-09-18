@@ -212,7 +212,12 @@ Consuming term partitions
 When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
-* :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
+* :class:`~qdk_chemistry.data.FlatPartition` (group → index) supplies commuting groups, but does not certify disjoint qubit supports.
+
+For a :class:`~qdk_chemistry.data.LayeredPartition`, the emitted :class:`~qdk_chemistry.data.PauliProductFormulaContainer` retains each nonempty layer in ``layer_offsets``, after coefficient filtering and for every Suzuki schedule occurrence.
+These boundaries span the stored step without expanding repetitions and are preserved by JSON/HDF5 serialization and formula composition.
+The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper` consumes the declared boundaries directly, without downstream regrouping.
+Formulas without layer metadata retain term-by-term controlled evolution.
 
 In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
 This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.

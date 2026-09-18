@@ -25,7 +25,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data import LayeredPartition, QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
 )
@@ -201,7 +201,7 @@ class Trotter(TimeEvolutionBuilder):
 
         delta = time / num_divisions
 
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
+        terms, layer_offsets = self._decompose_trotter_layers(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -210,6 +210,7 @@ class Trotter(TimeEvolutionBuilder):
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
             scale=time,
+            layer_offsets=layer_offsets,
         )
 
         return UnitaryRepresentation(container=container)
@@ -272,7 +273,19 @@ class Trotter(TimeEvolutionBuilder):
             A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
 
         """
+        return self._decompose_trotter_layers(qubit_hamiltonian, time, atol=atol)[0]
+
+    def _decompose_trotter_layers(
+        self,
+        qubit_hamiltonian: QubitOperator,
+        time: float,
+        *,
+        atol: float = 1e-12,
+    ) -> tuple[list[ExponentiatedPauliTerm], tuple[int, ...] | None]:
+        """Retain declared disjoint-layer boundaries after ordering and coefficient filtering."""
         terms: list[ExponentiatedPauliTerm] = []
+        partition = qubit_hamiltonian.term_partition
+        layer_offsets = [0] if isinstance(partition, LayeredPartition) else None
 
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
@@ -289,10 +302,9 @@ class Trotter(TimeEvolutionBuilder):
         }
         if not maps:
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
-            return terms
+            return terms, None if layer_offsets is None else (0,)
 
-        partition = qubit_hamiltonian.term_partition
-        groups = (
+        groups: list[list[tuple[int, ...]]] = (
             self._partition_indices(partition)
             if partition is not None
             else [[(i,)] for i in range(qubit_hamiltonian.num_terms)]
@@ -302,8 +314,10 @@ class Trotter(TimeEvolutionBuilder):
                 terms.extend(
                     ExponentiatedPauliTerm(maps[i], coefficients[i] * time * fraction) for i in layer if i in maps
                 )
+                if layer_offsets is not None and len(terms) != layer_offsets[-1]:
+                    layer_offsets.append(len(terms))
 
-        return terms
+        return terms, None if layer_offsets is None else tuple(layer_offsets)
 
     def _trotter_schedule(self, num_groups: int) -> list[tuple[float, int]]:
         """Return shared Strang/Suzuki time fractions and group indices for one step."""

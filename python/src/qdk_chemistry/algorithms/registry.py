@@ -910,7 +910,6 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
-        ControlledBatchedPauliSequenceMapper,
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
         ControlledSwapPauliSequenceMapper,
@@ -925,6 +924,9 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquette_trotter import (  # noqa: PLC0415
+        PlaquetteTrotter,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
@@ -979,6 +981,7 @@ def _register_python_algorithms():
     register(lambda: IdentityTermGrouper())
     register(lambda: VacuumAnnihilatingTermGrouper())
     register(lambda: Trotter())
+    register(lambda: PlaquetteTrotter())
     register(lambda: Zassenhaus())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
@@ -989,7 +992,6 @@ def _register_python_algorithms():
     register(lambda: AliasSamplingStatePreparation())
     register(lambda: QROMStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
-    register(ControlledBatchedPauliSequenceMapper)
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())

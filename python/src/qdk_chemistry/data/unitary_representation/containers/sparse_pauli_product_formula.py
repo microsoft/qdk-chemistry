@@ -107,6 +107,7 @@ class SparsePauliProductFormulaContainer(PauliProductFormulaContainer):
         *,
         step_reps: int,
         scale: float = 1.0,
+        layer_offsets: tuple[int, ...] | None = None,
     ) -> SparsePauliProductFormulaContainer:
         """Pair immutable sparse words with angles, retaining identity and term order."""
         return cls(
@@ -114,4 +115,5 @@ class SparsePauliProductFormulaContainer(PauliProductFormulaContainer):
             step_reps,
             terms.num_qubits,
             scale,
+            layer_offsets=layer_offsets,
         )
