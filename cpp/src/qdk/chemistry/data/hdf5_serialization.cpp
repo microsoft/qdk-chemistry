@@ -184,13 +184,13 @@ void save_vector_to_group(H5::Group& group, const std::string& dataset_name,
 void save_vector_to_group(H5::Group& group, const std::string& dataset_name,
                           const std::vector<size_t>& vector) {
   QDK_LOG_TRACE_ENTERING();
+  hsize_t dims[1] = {vector.size()};
+  H5::DataSpace dataspace(1, dims);
+  // Windows LLP64: unsigned long is 4 bytes, so use a fixed-width type.
+  static_assert(sizeof(size_t) == 8);
+  H5::DataSet dataset =
+      group.createDataSet(dataset_name, H5::PredType::NATIVE_UINT64, dataspace);
   if (!vector.empty()) {
-    hsize_t dims[1] = {vector.size()};
-    H5::DataSpace dataspace(1, dims);
-    // Windows LLP64: unsigned long is 4 bytes, so use NATIVE_UINT64 for size_t.
-    static_assert(sizeof(size_t) == 8);
-    H5::DataSet dataset = group.createDataSet(
-        dataset_name, H5::PredType::NATIVE_UINT64, dataspace);
     dataset.write(vector.data(), H5::PredType::NATIVE_UINT64);
   }
 }
@@ -228,7 +228,9 @@ std::vector<size_t> load_size_vector_from_group(
   dataspace.getSimpleExtentDims(dims);
   std::vector<size_t> vector(dims[0]);
   static_assert(sizeof(size_t) == 8);
-  dataset.read(vector.data(), H5::PredType::NATIVE_UINT64);
+  if (!vector.empty()) {
+    dataset.read(vector.data(), H5::PredType::NATIVE_UINT64);
+  }
   return vector;
 }
 

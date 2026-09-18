@@ -29,8 +29,15 @@ class EnergyExpectationResult(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "energy_expectation_result"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for energy expectation results.
+
+        Returns:
+            ``"energy_expectation_result"``.
+
+        """
+        return "energy_expectation_result"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -191,8 +198,15 @@ class MeasurementData(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "measurement_data"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for measurement data.
+
+        Returns:
+            ``"measurement_data"``.
+
+        """
+        return "measurement_data"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

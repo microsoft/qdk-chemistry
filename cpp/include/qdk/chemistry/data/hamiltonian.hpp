@@ -10,7 +10,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -40,13 +39,14 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
  * calculations, specifically designed for active space methods. It contains:
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
  * - Molecular orbital information for the active space
- * - Core energy contributions from inactive orbitals and nuclear repulsion
+ * - A constant (zero-body) energy term
  *
  * Note that this class does not store two-electron integrals; derived classes
  * are expected to implement storage and access for these integrals.
  *
- * This class implies that all inactive orbitals are fully occupied for the
- * purpose of computing the core energy and inactive Fock matrix.
+ * This class implies that all inactive orbitals are fully occupied when
+ * constructing inactive-orbital contributions to the constant energy term and
+ * inactive Fock matrix.
  *
  * The Hamiltonian is immutable after construction, meaning all data must be
  * provided during construction and cannot be modified afterwards. The
@@ -230,8 +230,8 @@ class HamiltonianContainer {
   bool has_orbitals() const;
 
   /**
-   * @brief Get core energy
-   * @return Core energy in atomic units
+   * @brief Get the constant (zero-body) energy term
+   * @return Constant energy term in atomic units
    */
   double get_core_energy() const;
 
@@ -322,7 +322,7 @@ class HamiltonianContainer {
   /// Molecular orbital data (coefficients, energies, occupations)
   const std::shared_ptr<Orbitals> _orbitals;
 
-  /// Core energy (nuclear repulsion + inactive orbital contributions)
+  /// Constant (zero-body) energy term, including any scalar shifts
   const double _core_energy;
 
   /// Type of Hamiltonian (Hermitian or NonHermitian)
@@ -345,7 +345,7 @@ class HamiltonianContainer {
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
  * - Two-electron integrals (electron-electron repulsion) in MO representation
  * - Molecular orbital information for the active space
- * - Core energy contributions from inactive orbitals and nuclear repulsion
+ * - A constant (zero-body) energy term
  */
 class Hamiltonian : public DataClass,
                     public std::enable_shared_from_this<Hamiltonian> {
@@ -465,8 +465,8 @@ class Hamiltonian : public DataClass,
   bool has_orbitals() const;
 
   /**
-   * @brief Get core energy
-   * @return Core energy in atomic units
+   * @brief Get the constant (zero-body) energy term
+   * @return Constant energy term in atomic units
    */
   double get_core_energy() const;
 
@@ -527,12 +527,18 @@ class Hamiltonian : public DataClass,
   bool is_unrestricted() const;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "hamiltonian"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(Hamiltonian);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "hamiltonian"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get summary string of Hamiltonian information

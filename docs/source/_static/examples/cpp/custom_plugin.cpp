@@ -72,74 +72,83 @@ static auto registration =
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// start-cell-geometry-settings
-class GeometryOptimizerSettings : public qdk::chemistry::data::Settings {
+// start-cell-descriptor-settings
+class MolecularDescriptorSettings : public qdk::chemistry::data::Settings {
  public:
-  GeometryOptimizerSettings() {
-    set_default<int64_t>(
-        "max_steps", 100, "Maximum optimization steps",
-        qdk::chemistry::data::BoundConstraint<int64_t>{1, 10000});
-    set_default<double>("convergence_threshold", 1e-5,
-                        "Gradient convergence threshold");
-    set_default<double>("step_size", 0.1, "Initial optimization step size");
+  MolecularDescriptorSettings() {
+    set_default<bool>("normalize", false, "Normalize the descriptor");
   }
 };
-// end-cell-geometry-settings
+// end-cell-descriptor-settings
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// start-cell-geometry-base-class
-class GeometryOptimizer
+// start-cell-descriptor-base-class
+class MolecularDescriptorCalculator
     : public qdk::chemistry::algorithms::Algorithm<
-          GeometryOptimizer,
-          std::shared_ptr<qdk::chemistry::data::Structure>,  // Return type
+          MolecularDescriptorCalculator,
+          double,                                            // Return type
           std::shared_ptr<qdk::chemistry::data::Structure>>  // Input type
 {
  public:
-  static std::string type_name() { return "geometry_optimizer"; }
-};
-// end-cell-geometry-base-class
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// start-cell-geometry-factory
-// The Algorithm base class template provides factory functionality
-// automatically.
-// end-cell-geometry-factory
-// -----------------------------------------------------------------------------
-
-// -----------------------------------------------------------------------------
-// start-cell-geometry-implementations
-class BfgsOptimizer : public GeometryOptimizer {
- public:
-  BfgsOptimizer() { _settings = std::make_unique<GeometryOptimizerSettings>(); }
-
-  std::string name() const override { return "bfgs"; }
-
- protected:
-  std::shared_ptr<qdk::chemistry::data::Structure> _run_impl(
-      std::shared_ptr<qdk::chemistry::data::Structure> structure) override {
-    auto max_steps = _settings->get<int64_t>("max_steps");
-    auto threshold = _settings->get<double>("convergence_threshold");
-
-    // BFGS optimization implementation
-    return optimized_structure;
+  std::string type_name() const final {
+    return "molecular_descriptor_calculator";
   }
 };
-// end-cell-geometry-implementations
+// end-cell-descriptor-base-class
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// start-cell-geometry-registration
-// During library initialization
-static auto factory_reg = register_factory<GeometryOptimizer>();
-static auto bfgs_reg = GeometryOptimizer::register_implementation(
-    []() { return std::make_unique<BfgsOptimizer>(); });
-// end-cell-geometry-registration
+// start-cell-descriptor-factory
+struct MolecularDescriptorCalculatorFactory
+    : public qdk::chemistry::algorithms::AlgorithmFactory<
+          MolecularDescriptorCalculator, MolecularDescriptorCalculatorFactory> {
+  static std::string algorithm_type_name() {
+    return "molecular_descriptor_calculator";
+  }
+
+  static std::string default_algorithm_name() { return "nuclear_charge"; }
+};
+// end-cell-descriptor-factory
 // -----------------------------------------------------------------------------
 
 // -----------------------------------------------------------------------------
-// start-cell-usage
+// start-cell-descriptor-implementations
+class NuclearChargeDescriptor : public MolecularDescriptorCalculator {
+ public:
+  NuclearChargeDescriptor() {
+    _settings = std::make_unique<MolecularDescriptorSettings>();
+  }
+
+  std::string name() const override { return "nuclear_charge"; }
+
+ protected:
+  double _run_impl(std::shared_ptr<qdk::chemistry::data::Structure> structure)
+      const override {
+    const auto& charges = structure->get_nuclear_charges();
+    double descriptor = 0.0;
+    for (double charge : charges) descriptor += charge;
+    if (_settings->get<bool>("normalize") && structure->get_num_atoms() > 0) {
+      descriptor /= static_cast<double>(structure->get_num_atoms());
+    }
+    return descriptor;
+  }
+};
+// end-cell-descriptor-implementations
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-descriptor-registration
+static auto descriptor_registration = []() {
+  MolecularDescriptorCalculatorFactory::register_instance(
+      []() { return std::make_unique<NuclearChargeDescriptor>(); });
+  return true;
+}();
+// end-cell-descriptor-registration
+// -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// start-cell-descriptor-usage
 #include <iostream>
 #include <qdk/chemistry.hpp>
 
@@ -147,13 +156,13 @@ using namespace qdk::chemistry::algorithms;
 
 int main() {
   // After registration, use like any built-in algorithm
-  auto optimizer = GeometryOptimizerFactory::create("bfgs");
-  optimizer->settings().set("max_steps", 200);
-  optimizer->settings().set("convergence_threshold", 1e-6);
+  auto calculator =
+      MolecularDescriptorCalculatorFactory::create("nuclear_charge");
+  calculator->settings().set("normalize", true);
 
   // List available implementations
-  auto available = GeometryOptimizerFactory::available();
-  std::cout << "Available geometry optimizers: ";
+  auto available = MolecularDescriptorCalculatorFactory::available();
+  std::cout << "Available molecular descriptor calculators: ";
   for (const auto& name : available) {
     std::cout << name << " ";
   }
@@ -161,5 +170,5 @@ int main() {
 
   return 0;
 }
-// end-cell-usage
+// end-cell-descriptor-usage
 // -----------------------------------------------------------------------------

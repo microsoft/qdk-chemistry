@@ -1,0 +1,147 @@
+.. _release-v2.1.0:
+
+==========================
+What's New in Version 2.1
+==========================
+
+Version 2.1 adds geometry optimization as a first-class algorithm type, isolates the
+vendored Q# utilities in a dedicated context so that importing QDK/Chemistry no longer
+mutates global interpreter state, and corrects the phase-to-energy convention used when
+phase estimation runs on a time-evolution unitary.
+
+There are no breaking API changes relative to :ref:`2.0 <release-v2.0.0>`, but the
+phase-convention fix changes the *numerical* results of time-evolution
+:term:`QPE`; see :ref:`Time-evolution phase convention <v2-1-phase-convention>`.
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+
+Highlights
+==========
+
+- **Geometry optimization.** A new ``geometry_optimizer`` algorithm type relaxes molecular structures on top of the nuclear derivative calculators introduced in 2.0, with a geomeTRIC-backed implementation shipped as an optional plugin.
+- **Isolated Q# context.** The vendored Q# utilities load into a private ``qdk.Context`` instead of the global ``qsharp`` interpreter, and four helpers in :mod:`qdk_chemistry.utils.qsharp` expose that context for user-defined Q# operations.
+- **Corrected time-evolution phase convention.** Energies recovered from :math:`U = e^{-iHt}` now use :math:`E = -\theta / t`, and the ``bits_msb_first`` field of :class:`~qdk_chemistry.data.QpeResult` from iterative :term:`QPE` is genuinely most-significant-bit first.
+- **Python 3.14 Qiskit support.** The ``qiskit-extras`` extra now installs on Python 3.14.
+
+
+Geometry Optimization
+=====================
+
+Version 2.0 added nuclear gradients and finite-difference Hessians, but left the
+optimization loop to the caller. Version 2.1 closes that gap with a
+``geometry_optimizer`` :doc:`algorithm type <../user/comprehensive/algorithms/index>`
+that drives a nuclear derivative calculator to a stationary point.
+
+Optimizers follow the usual factory and settings conventions and are created by name:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_1.py
+   :language: python
+   :start-after: # start-cell-geometry-optimizer
+   :end-before: # end-cell-geometry-optimizer
+
+The energy and gradient engine is itself an algorithm reference, so any registered
+nuclear derivative calculator can drive the optimization:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_1.py
+   :language: python
+   :start-after: # start-cell-geometry-derivative
+   :end-before: # end-cell-geometry-derivative
+
+Shared settings on ``GeometryOptimizerSettings`` are ``derivative_calculator``,
+``max_iterations`` (default 300), and ``compute_hessian`` (default ``False``; when
+``True``, a Hessian is evaluated at the converged geometry and returned).
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_1.py
+   :language: python
+   :start-after: # start-cell-geometry-run
+   :end-before: # end-cell-geometry-run
+
+``run()`` takes an initial :class:`~qdk_chemistry.data.Structure`, the charge and spin
+multiplicity, and an ``input`` that is either a basis-set name, a
+:class:`~qdk_chemistry.data.BasisSet`, an :class:`~qdk_chemistry.data.Orbitals`, or a
+:class:`~qdk_chemistry.data.Wavefunction`. It returns the converged energy, the optimized
+structure, an optional :class:`~qdk_chemistry.data.NuclearHessian`, and the optional
+converged wavefunction. The optional trailing ``n_inactive_orbitals`` argument excludes
+doubly occupied orbitals from the active space used by the derivative calculator.
+
+.. rubric:: geomeTRIC plugin
+
+The bundled ``"geometric"`` implementation wraps
+`geomeTRIC <https://github.com/leeping/geomeTRIC>`_ and is enabled automatically when the
+package is installed:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[plugins]'
+
+It adds transition-state search (``transition_state``), a choice of coordinate system
+(``optimizer``, one of ``tric``, ``tric-p``, ``dlc``, ``hdlc``, ``prim``, ``cart``), the
+five geomeTRIC convergence thresholds (``convergence_energy``,
+``convergence_rms_gradient``, ``convergence_max_gradient``,
+``convergence_rms_displacement``, ``convergence_max_displacement``), and
+``print_level``. As with geomeTRIC itself, all five convergence criteria must be
+satisfied together.
+
+
+Q# Context Management
+=====================
+
+Previously, importing ``qdk_chemistry`` initialized the process-global Q# interpreter and
+forced its target profile to ``Base``, which silently invalidated Q# code the caller had
+already imported. The vendored utilities now load into a dedicated ``qdk.Context`` owned
+by the library, and importing ``qdk_chemistry`` leaves the caller's global ``qsharp``
+state untouched.
+
+QDK requires that composed Q# callables belong to the same context, so
+:mod:`qdk_chemistry.utils.qsharp` exposes that context directly:
+
+- :func:`~qdk_chemistry.utils.qsharp.get_qsharp_context` returns the shared context; define your own Q# operations against it so they compose with the chemistry circuit builders.
+- :func:`~qdk_chemistry.utils.qsharp.create_qsharp_context` builds a fresh context preloaded with the chemistry utilities, forwarding ``target_profile`` and other ``qdk.Context`` options.
+- :func:`~qdk_chemistry.utils.qsharp.set_qsharp_context` installs a caller-supplied context process-wide (pass ``None`` to restore the default).
+- :func:`~qdk_chemistry.utils.qsharp.use_qsharp_context` is a context manager that overrides the active context on the current thread only.
+
+See :ref:`shared-qsharp-context` for worked examples of bringing your own Q# operation or
+your own context.
+
+
+Bug Fixes
+=========
+
+.. _v2-1-phase-convention:
+
+Time-evolution phase convention
+-------------------------------
+
+For :math:`U(t) = e^{-iHt}` an eigenstate of energy :math:`E` accumulates phase
+:math:`e^{-iEt}`, so phase estimation measures
+:math:`\varphi = (-Et / 2\pi) \bmod 1`. ``PauliProductFormulaContainer.eigenvalue_from_phase``
+previously inverted this as :math:`E = \theta / t`, dropping the sign. It now returns
+:math:`E = -\theta / t`.
+
+This affects any phase estimation run — standard or iterative — whose unitary comes from a
+product-formula builder; qubitization-based runs, which recover
+:math:`E = \lambda\cos(\theta)`, are unchanged. Energies previously reported for
+time-evolution :term:`QPE` have the wrong sign and should be recomputed.
+
+Two related iterative :term:`QPE` defects are fixed alongside it:
+
+- The feedback phase applied to each iteration circuit is now negated to match the same convention.
+- The ``bits_msb_first`` field of :class:`~qdk_chemistry.data.QpeResult` is now reversed before being stored. Kitaev's iteration extracts bits least-significant first, so the field previously held them in the opposite order to its name.
+
+Other fixes
+-----------
+
+- ``QpeResult`` files are now understood by ``python -m qdk_chemistry.migrate``, which drops the obsolete evolution-time field while preserving the result. The ``qpe_result`` type tag participates in the ``name.type.ext`` filename convention. See :doc:`../user/migrating-data-files`.
+- The migration converter rejects v1 ``TimeEvolutionUnitary`` files explicitly: they do not carry the scale required by the current :class:`~qdk_chemistry.data.UnitaryRepresentation` schema and must be regenerated.
+- The geomeTRIC plugin restores the host application's root logging handlers and level after geomeTRIC reconfigures logging.
+- Fixed a flaky cube-file generation test.
+
+
+Infrastructure and Packaging
+=============================
+
+- **Python 3.14 Qiskit support.** ``qiskit-extras`` now installs on Python 3.14. ``qiskit-aer`` is omitted on Linux ARM64 (aarch64) for that version only, because no cp314 manylinux aarch64 wheel is published yet; all other platforms install the full set.
+- **New** ``plugins`` **dependency.** ``geometric>=1.0`` joins PySCF in the ``plugins`` extra.

@@ -40,3 +40,49 @@ a.bibtex.internal {
 a.bibtex.internal:hover {
     text-decoration: underline;
 }
+
+/* Distinguish tutorial chapter orientation from notes, assignments, and hints. */
+.rst-content .admonition.chapter-focus {
+    background-color: #f7f2fa;
+    border-left: 4px solid #6d3f8c;
+}
+
+.rst-content .admonition.chapter-focus > .admonition-title {
+    background-color: #6d3f8c;
+    color: #ffffff;
+}
+
+/* Required cumulative course work: blue title with a pale blue body. */
+.rst-content .admonition.lab-notebook-assignment {
+    background-color: #eef7fb;
+    border-left: 4px solid #005a8d;
+}
+
+.rst-content .admonition.lab-notebook-assignment > .admonition-title {
+    background-color: #005a8d;
+    color: #ffffff;
+}
+
+/* Collapsible course questions: orange title with a pale amber body. */
+.rst-content details.admonition.quiz-question {
+    background-color: #fff8e6;
+    border-left: 4px solid #8c4a00;
+}
+
+.rst-content details.admonition.quiz-question > .admonition-title {
+    background-color: #8c4a00;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.rst-content details.admonition.quiz-question > .admonition-title::after {
+    content: "Show answer";
+    float: right;
+    font-size: 0.85em;
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+.rst-content details.admonition.quiz-question[open] > .admonition-title::after {
+    content: "Hide answer";
+}

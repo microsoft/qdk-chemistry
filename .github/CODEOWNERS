@@ -2,16 +2,16 @@
 # See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners for more information
 
 # Global owners
-* @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong
+* @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong @agamshayit-ms @mmoerchen
 
 # Pipelines
-/.pipelines/ @wavefunction91 @nabbelbabbel @v-georgen @sobolevnrm @RushiGong
+/.pipelines/ @wavefunction91 @nabbelbabbel @v-georgen @sobolevnrm @RushiGong @agamshayit-ms @mmoerchen
 
 # Samples
-/examples/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong
+/examples/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong @agamshayit-ms @mmoerchen
 
 # C++
-/cpp/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong
+/cpp/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong @agamshayit-ms @mmoerchen
 
 # Python
-/python/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong
+/python/ @sobolevnrm @wavefunction91 @nabbelbabbel @ConradJohnston @RushiGong @agamshayit-ms @mmoerchen

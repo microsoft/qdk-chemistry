@@ -23,6 +23,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import axes
 
 from .reference_tolerances import (
@@ -352,6 +353,5 @@ class TestAnsatzSerialization:
 
 
 def test_ansatz_data_type_name():
-    """Test that Ansatz has the correct _data_type_name class attribute."""
-    assert hasattr(Ansatz, "_data_type_name")
-    assert Ansatz._data_type_name == "ansatz"
+    """Test that Ansatz exposes its static wire-format identifier."""
+    assert class_data_type_name(Ansatz) == "ansatz"

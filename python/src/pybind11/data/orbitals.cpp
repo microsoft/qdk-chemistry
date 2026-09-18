@@ -12,7 +12,6 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <utility>
 
 #include "path_utils.hpp"
@@ -32,7 +31,6 @@ void orbitals_to_file_wrapper(qdk::chemistry::data::Orbitals &self,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
   return qdk::chemistry::data::Orbitals::from_file(
@@ -920,7 +918,7 @@ Examples:
   orbitals.def_static(
       "from_json",
       [](const std::string &json_str) {
-        return *Orbitals::from_json(nlohmann::json::parse(json_str));
+        return Orbitals::from_json(nlohmann::json::parse(json_str));
       },
       R"(
 Load orbital data from JSON string (static method).
@@ -1013,8 +1011,13 @@ Examples:
             return *Orbitals::from_json(nlohmann::json::parse(json_str));
           }));
 
-  // Data type name class attribute
-  orbitals.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Orbitals);
+  orbitals.def_static("data_type_name", &Orbitals::data_type_name, R"(
+Return the wire-format identifier for orbitals.
+
+Returns:
+        str: ``"orbitals"``
+
+)");
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);

@@ -4,6 +4,7 @@
 # --------------------------------------------------------------------------------------------
 
 import importlib
+import importlib.util
 import os
 import re
 import shutil
@@ -22,6 +23,18 @@ author = "QDK/Chemistry Team"
 # Repo root (docs/source/conf.py -> docs/source -> docs -> repo root)
 _repo_root = Path(__file__).resolve().parent.parent.parent
 
+_tutorial_versions_file = Path(__file__).resolve().parent / "tutorials" / "_versions.py"
+_tutorial_versions_spec = importlib.util.spec_from_file_location(
+    "tutorial_versions", _tutorial_versions_file
+)
+if _tutorial_versions_spec is None or _tutorial_versions_spec.loader is None:
+    raise ImportError(
+        f"Unable to load tutorial versions from {_tutorial_versions_file}"
+    )
+_tutorial_versions = importlib.util.module_from_spec(_tutorial_versions_spec)
+_tutorial_versions_spec.loader.exec_module(_tutorial_versions)
+GROUND_STATE_TUTORIAL_VERSION: str = _tutorial_versions.GROUND_STATE_TUTORIAL_VERSION
+
 # Read version from VERSION file
 _version_file = _repo_root / "VERSION"
 if not _version_file.exists():
@@ -29,6 +42,11 @@ if not _version_file.exists():
         f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
 release = _version_file.read_text().strip()
+
+# Expose tutorial compatibility versions to reStructuredText.
+rst_epilog = f"""
+.. |ground-state-tutorial-version| replace:: {GROUND_STATE_TUTORIAL_VERSION}
+"""
 
 # -----------------------------------------------------------------------------
 # Perform initial setup and tests
@@ -59,13 +77,13 @@ extensions = [
     "sphinx.ext.autosummary",  # Create summary tables for modules/classes
     "sphinx.ext.intersphinx",  # Link to other projects' documentation
     "sphinx.ext.viewcode",  # Add links to view source code
+    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     # Additional extensions
     "sphinx_autodoc_typehints",  # Better support for Python type annotations
     "sphinx_inline_tabs",  # Support for tabbed content in docs
     # C++ documentation
     "breathe",  # Bridge between Sphinx and Doxygen
     # Enable Google-style docstrings parsing
-    "sphinx.ext.napoleon",  # Support for Google-style and NumPy-style docstrings
     "sphinx.ext.todo",  # Support for listing to-dos
     "sphinx.ext.graphviz",  # Support for Graphviz diagrams
     "sphinxcontrib.bibtex",  # Support for bibliographic references
@@ -214,6 +232,10 @@ nitpick_ignore_regex = [
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
     (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
+    (r"py:class", r"mcp\..*"),  # MCP has no intersphinx inventory
+    (r"py:class", r"pydantic\..*"),  # Pydantic has no intersphinx inventory
+    (r"py:class", r"azure\.core\.polling\._poller\.(_SansIONoPolling|PollingMethod)"),
+    (r"py:obj", r"azure\.core\.polling\._poller\.PollingReturnType_co"),
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
     (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases
     (r"py:class", r"^PlanTerm$"),
@@ -256,26 +278,8 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
         ):
             return True
 
-        # Skip standard library modules (pathlib, typing, etc.)
-        if module and any(
-            module.startswith(prefix)
-            for prefix in [
-                "pathlib",
-                "typing",
-                "collections",
-                "abc",
-                "enum",
-                "numpy",
-                "pydantic_settings",
-                "qiskit",
-                "qiskit_aer",
-                "ruamel",
-                "dataclasses",
-                "pybind11_builtins",
-                "qiskit_nature",
-                "h5py",
-            ]
-        ):
+        # Skip standard-library and third-party re-exports.
+        if module and not module.startswith("qdk_chemistry"):
             return True
     return skip
 
@@ -330,17 +334,18 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
         rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
             lines[idx] = rewritten
-    if options is not None and "._core." in name:
-        options["noindex"] = True
 
 
-def on_builder_inited(app):
+def normalize_public_export_modules():
+    """Give pybind11 exports their public module names before Sphinx inspects them."""
     for internal_mod, public_mod in _MODULE_ALIAS_RULES:
         if internal_mod.endswith("."):
             continue  # prefix-only rewrite, nothing to alias
+        # Importing the public module loads the private pybind11 module whose
+        # exported objects need public names in the generated documentation.
+        pub = importlib.import_module(public_mod)
         if internal_mod not in sys.modules:
             continue  # nothing imported yet
-        pub = importlib.import_module(public_mod)
         exports = getattr(pub, "__all__", ())
         for name in exports:
             obj = getattr(pub, name, None)
@@ -348,6 +353,12 @@ def on_builder_inited(app):
             if isinstance(module_name, str) and module_name.startswith(internal_mod):
                 with suppress(AttributeError):
                     obj.__module__ = public_mod  # docs-only shim
+
+
+# Sphinx 9 resolves type annotations while initializing extensions, before the
+# ``builder-inited`` event. Normalize exports as part of loading this config so
+# autodoc and sphinx-autodoc-typehints both see the same public object names.
+normalize_public_export_modules()
 
 
 # Pattern to match :cite:`key` in text nodes (handles the raw text form)
@@ -553,7 +564,6 @@ def setup(app):
     app.connect("autodoc-process-signature", normalize_autodoc_signature)
     app.connect("autodoc-process-docstring", normalize_autodoc_docstring)
     app.connect("autodoc-process-docstring", process_breathe_docstring)
-    app.connect("builder-inited", on_builder_inited)
     # Transform :cite:`key` markers in Doxygen/Breathe content before reference resolution
     # Using doctree-read so pending_xref nodes get resolved by bibtex extension
     app.connect("doctree-read", transform_doctree_citations)

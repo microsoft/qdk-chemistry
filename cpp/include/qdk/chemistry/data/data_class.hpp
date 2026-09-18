@@ -12,6 +12,7 @@ class Group;
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <type_traits>
 
@@ -162,6 +163,7 @@ inline void hash_value(qdk::chemistry::utils::HashContext& ctx,
  */
 template <typename T>
 concept DataClassCompliant = std::derived_from<T, DataClass> && requires {
+  { T::data_type_name() } -> std::convertible_to<std::string>;
   T::from_file(std::declval<std::string>(), std::declval<std::string>());
 } && requires { T::from_json_file(std::declval<std::string>()); } && requires {
   T::from_json(std::declval<nlohmann::json>());

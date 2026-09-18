@@ -439,4 +439,13 @@ Raises:
         // __setstate__ - deserialize from JSON string
         return ConfigurationSet::from_json(nlohmann::json::parse(json_str));
       }));
+
+  configuration_set.def_static("data_type_name",
+                               &ConfigurationSet::data_type_name, R"(
+Return the wire-format identifier for configuration sets.
+
+Returns:
+        str: ``"configuration_set"``
+
+)");
 }

@@ -33,6 +33,7 @@ Examples:
 # --------------------------------------------------------------------------------------------
 
 from collections import Counter
+from typing import TypeVar
 
 import numpy as np
 import pyscf
@@ -49,6 +50,8 @@ __all__ = [
     "pyscf_mol_to_qdk_basis",
     "structure_to_pyscf_atom_labels",
 ]
+
+_ECPData = TypeVar("_ECPData")
 
 
 class SCFType(CaseInsensitiveStrEnum):
@@ -116,6 +119,30 @@ def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
     return atoms, pyscf_symbols, elements
 
 
+def _key_ecp_data_by_element_or_atom(
+    elements: list[str],
+    pyscf_symbols: list[str],
+    ecp_data_by_atom: dict[int, _ECPData],
+) -> dict[str, _ECPData]:
+    """Use an element key only when every atom of that element has identical ECP data."""
+    atom_indices_by_element: dict[str, list[int]] = {}
+    for iatm, element in enumerate(elements):
+        atom_indices_by_element.setdefault(element, []).append(iatm)
+
+    ecp_dict: dict[str, _ECPData] = {}
+    for element, atom_indices in atom_indices_by_element.items():
+        element_ecp_data = [ecp_data_by_atom.get(iatm) for iatm in atom_indices]
+        first_ecp_data = element_ecp_data[0]
+        if first_ecp_data is not None and all(ecp_data == first_ecp_data for ecp_data in element_ecp_data):
+            ecp_dict[element] = first_ecp_data
+        else:
+            for iatm, ecp_data in zip(atom_indices, element_ecp_data, strict=True):
+                if ecp_data is not None:
+                    ecp_dict[pyscf_symbols[iatm]] = ecp_data
+
+    return ecp_dict
+
+
 def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) -> pyscf.gto.mole.Mole:
     """Convert QDK/Chemistry BasisSet instance to PySCF Mole object.
 
@@ -155,7 +182,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
             exponents = shell.exponents
             coefficients = shell.coefficients
             for j in range(len(exponents)):
-                shell_rec += f"{exponents[j]:16.8f} {coefficients[j]:16.8f}\n"
+                shell_rec += f"{exponents[j]:.17g} {coefficients[j]:.17g}\n"
             atom_basis.append(pyscf.gto.parse(shell_rec))
         basis_dict[pyscf_symbols[i]] = atom_basis
 
@@ -168,63 +195,82 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
     # Handle ECP (Effective Core Potential) if present
     if basis.has_ecp_shells() and basis.has_ecp_electrons():
         # Build PySCF ECP structure from QDK ECP shells
-        ecp_dict = {}
+        ecp_data_by_atom: dict[int, list] = {}
         ecp_electrons = basis.get_ecp_electrons()
 
         for iatm in range(natoms):
             ncore = ecp_electrons[iatm]
+            ecp_shells_atom = basis.get_ecp_shells_for_atom(iatm)
 
-            if ncore > 0:
-                # Get ECP shells for this atom
-                ecp_shells_atom = basis.get_ecp_shells_for_atom(iatm)
+            if ncore == 0:
+                continue
 
-                if ecp_shells_atom:
-                    # Group shells by angular momentum: {l_value: {r_power: [(exp, coeff), ...]}}
-                    shells_by_l: dict[int, dict[int, list[tuple[float, float]]]] = {}
+            if not ecp_shells_atom:
+                raise ValueError(f"Atom {iatm} has {ncore} ECP electrons but no explicit ECP shells.")
 
-                    for shell in ecp_shells_atom:
-                        # Get l value from orbital type (OrbitalType enum values == l values)
-                        l_value = int(shell.orbital_type)
+            # Group shells by angular momentum: {l_value: {r_power: [(exp, coeff), ...]}}
+            shells_by_l: dict[int, dict[int, list[tuple[float, float]]]] = {}
 
-                        if l_value not in shells_by_l:
-                            shells_by_l[l_value] = {}
+            for shell in ecp_shells_atom:
+                # Get l value from orbital type (OrbitalType enum values == l values)
+                l_value = int(shell.orbital_type)
 
-                        # Each primitive may have different r-power
-                        for k in range(len(shell.exponents)):
-                            r_power = int(shell.rpowers[k])
-                            exp = float(shell.exponents[k])
-                            coeff = float(shell.coefficients[k])
+                if l_value not in shells_by_l:
+                    shells_by_l[l_value] = {}
 
-                            if r_power not in shells_by_l[l_value]:
-                                shells_by_l[l_value][r_power] = []
+                # Each primitive may have different r-power
+                for k in range(len(shell.exponents)):
+                    r_power = int(shell.rpowers[k])
+                    exp = float(shell.exponents[k])
+                    coeff = float(shell.coefficients[k])
 
-                            shells_by_l[l_value][r_power].append((exp, coeff))
+                    if r_power not in shells_by_l[l_value]:
+                        shells_by_l[l_value][r_power] = []
 
-                    # Build PySCF format: [ncore, [[l, [term0, term1, ...]], ...]]
-                    l_components = []
-                    for l_value in sorted(shells_by_l.keys()):
-                        # Find max r-power for this l to know array size
-                        max_r = max(shells_by_l[l_value].keys())
+                    shells_by_l[l_value][r_power].append((exp, coeff))
 
-                        # Build terms list with empty lists for unused r-powers
-                        terms: list[list[tuple[float, float]]] = [[] for _ in range(max_r + 1)]
-                        for r_power, primitives in shells_by_l[l_value].items():
-                            terms[r_power] = primitives
+            # Build PySCF format: [ncore, [[l, [term0, term1, ...]], ...]]
+            l_components = []
+            for l_value in sorted(shells_by_l.keys()):
+                # Find max r-power for this l to know array size
+                max_r = max(shells_by_l[l_value].keys())
 
-                        l_components.append([l_value, terms])
+                # Build terms list with empty lists for unused r-powers
+                terms: list[list[tuple[float, float]]] = [[] for _ in range(max_r + 1)]
+                for r_power, primitives in shells_by_l[l_value].items():
+                    terms[r_power] = primitives
 
-                    # Store in ecp_dict using elements
-                    ecp_dict[elements[iatm]] = [ncore, l_components]
+                l_components.append([l_value, terms])
 
+            ecp_data_by_atom[iatm] = [ncore, l_components]
+
+        ecp_dict = _key_ecp_data_by_element_or_atom(elements, pyscf_symbols, ecp_data_by_atom)
         if ecp_dict:
             mol.ecp = ecp_dict
             # Store ECP name as attribute for roundtrip conversion
             mol.qdk_ecp_name = basis.get_ecp_name()
     elif basis.has_ecp_electrons():
         # Fallback: only ECP name available, no shells
-        mol.ecp = basis.get_ecp_name()
+        ecp_name = basis.get_ecp_name()
+        ecp_electrons = basis.get_ecp_electrons()
+        named_ecp_data_by_atom = {iatm: (int(ncore), ecp_name) for iatm, ncore in enumerate(ecp_electrons) if ncore > 0}
+        keyed_named_ecp_data = _key_ecp_data_by_element_or_atom(elements, pyscf_symbols, named_ecp_data_by_atom)
+        ecp_dict = {key: data[1] for key, data in keyed_named_ecp_data.items()}
+
+        mol.ecp = ecp_dict
+        mol.qdk_ecp_name = ecp_name
 
     mol.build()
+
+    if basis.has_ecp_electrons():
+        expected_ecp_electrons = [int(ncore) for ncore in basis.get_ecp_electrons()]
+        for iatm, expected_ncore in enumerate(expected_ecp_electrons):
+            actual_ncore = mol.atom_nelec_core(iatm)
+            if actual_ncore != expected_ncore:
+                raise ValueError(
+                    f"Inconsistent ECP electron count for atom {iatm}: "
+                    f"basis has {expected_ncore}, mol.atom_nelec_core has {actual_ncore}"
+                )
 
     return mol
 
@@ -293,8 +339,9 @@ def pyscf_mol_to_qdk_basis(
         for iatm in range(pyscf_mol.natm):
             atom_symbol = atom_symbols[iatm]
             element = atom_symbol.rstrip("0123456789")
-            if element in pyscf_mol._ecp:  # noqa: SLF001
-                ecp_data = pyscf_mol._ecp[element]  # noqa: SLF001
+            ecp_key = atom_symbol if atom_symbol in pyscf_mol._ecp else element  # noqa: SLF001
+            if ecp_key in pyscf_mol._ecp:  # noqa: SLF001
+                ecp_data = pyscf_mol._ecp[ecp_key]  # noqa: SLF001
                 # Structure: [ncore, [[l, [[[exp, coeff]], ...]], ...]], where the inner structure has r-power terms
                 ecp_components = ecp_data[1]
 
@@ -368,9 +415,11 @@ def pyscf_mol_to_qdk_basis(
 
                 # Extract ncore values directly from the ECP dictionary structure
                 for iatm in range(pyscf_mol.natm):
-                    element = atom_symbols[iatm].rstrip("0123456789")
-                    if element in pyscf_mol.ecp:
-                        ecp_electrons[iatm] = pyscf_mol.ecp[element][0]
+                    atom_symbol = atom_symbols[iatm]
+                    element = atom_symbol.rstrip("0123456789")
+                    ecp_key = atom_symbol if atom_symbol in pyscf_mol.ecp else element
+                    if ecp_key in pyscf_mol.ecp:
+                        ecp_electrons[iatm] = pyscf_mol.ecp[ecp_key][0]
 
                 # Validate consistency with mol.atom_nelec_core if available
                 if hasattr(pyscf_mol, "atom_nelec_core"):

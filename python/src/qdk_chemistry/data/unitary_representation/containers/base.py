@@ -18,8 +18,15 @@ __all__: list[str] = ["UnitaryContainer"]
 class UnitaryContainer(DataClass):
     """Abstract class for a unitary container."""
 
-    # Class attribute for filename validation
-    _data_type_name = "unitary_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for unitary containers.
+
+        Returns:
+            ``"unitary_container"``.
+
+        """
+        return "unitary_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

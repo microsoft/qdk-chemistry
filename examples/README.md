@@ -5,13 +5,13 @@ This directory contains example scripts demonstrating how to use QDK/Chemistry f
 ## Version compatibility
 
 > **Important:** The `main` branch is the active development branch and may contain changes that are incompatible with the version of `qdk-chemistry` installed via pip.
-> If you installed `qdk-chemistry` from PyPI (e.g., `pip install qdk-chemistry`), checkout the `stable/major.minor` branch corresponding to your installed version to ensure the examples work correctly.
-> For example, if you have `qdk-chemistry` 1.0.x installed:
+> If you installed `qdk-chemistry` from PyPI (e.g., `pip install qdk-chemistry`), check out the release tag corresponding to your exact installed version to ensure the examples work correctly.
+> For example, if you have `qdk-chemistry` `<major>.<minor>.<patch>` installed:
 >
 > ```bash
 > git clone https://github.com/microsoft/qdk-chemistry.git
 > cd qdk-chemistry
-> git checkout stable/1.0
+> git checkout v<major>.<minor>.<patch>
 > ```
 >
 > You can check your installed version with `pip show qdk-chemistry`.
@@ -23,9 +23,12 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 
 | Example | Install command |
 |---------|----------------|
-| `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
-| `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
-| `factory_list.ipynb` | `pip install 'qdk-chemistry[plugins]'` |
+| `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
+| `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
+| `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
+| `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
+| `factory_list.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
 | `interoperability/qiskit/` | `pip install 'qdk-chemistry[qiskit-extras]'` |
 | `interoperability/openFermion/` | `pip install 'qdk-chemistry[openfermion-extras]'` |
@@ -37,6 +40,22 @@ To install everything needed for all examples at once:
 python -m pip install 'qdk-chemistry[all]'
 python -m pip install pennylane rdkit
 ```
+
+In PowerShell, use double quotes around targets containing square brackets:
+
+```powershell
+python -m pip install "qdk-chemistry[all]"
+python -m pip install pennylane rdkit
+```
+
+### Platform notes
+
+The examples run on Linux, macOS, and Windows, with one exception. `factory_list.ipynb` and
+`extended_hubbard.ipynb` import `qdk_chemistry.plugins.pyscf`, and PySCF publishes no Windows
+wheels, so those two notebooks fail at the import on native Windows. Run them under
+[WSL](https://learn.microsoft.com/windows/wsl/install) instead. See
+[Notes for Windows users](https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#notes-for-windows-users)
+for details.
 
 ## Standalone examples and data
 
@@ -50,6 +69,9 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `language/sample_sci_workflow.py`: Python script demonstrating a sample classical workflow for selected CI quantum chemistry calculations.
 - `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
+- `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
+- `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
 
 ## Companion datasets and assets
 

@@ -136,7 +136,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
+            iteration: Current iteration index (0-based); iteration 0 uses the largest power and
+                measures the least-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
 
@@ -183,6 +184,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
         iterative_parameters = {
             "statePrep": state_prep_op,
             "repControlledUnitary": ctrl_unitary_op,

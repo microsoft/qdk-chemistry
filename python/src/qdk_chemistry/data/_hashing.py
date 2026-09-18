@@ -12,9 +12,26 @@ from typing import Any
 
 import numpy as np
 
+from qdk_chemistry._core.data import AlgorithmRef
+from qdk_chemistry._core.data import DataClass as CoreDataClass
+from qdk_chemistry.data._type_name import instance_data_type_name
+
 __all__: list[str] = []
 
 _NATIVE_IS_BIG = sys.byteorder == "big"
+
+
+def _numpy_scalar_to_python(value: Any) -> Any:
+    """Convert supported NumPy scalars to JSON-safe Python primitives."""
+    if isinstance(value, np.bool_):
+        return bool(value)
+    if isinstance(value, np.integer):
+        return int(value)
+    if isinstance(value, np.floating):
+        return float(value)
+    if isinstance(value, np.generic):
+        return value.item()
+    return value
 
 
 def _hash_bytes(h: "hashlib._Hash", data: bytes) -> None:
@@ -91,11 +108,37 @@ def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
         hash_fn(h, val)
 
 
+def _hash_algorithm_ref(h: "hashlib._Hash", reference: AlgorithmRef) -> None:
+    """Hash an algorithm reference and its recursively configured settings.
+
+    Args:
+        h: Hash object receiving the reference representation.
+        reference: Algorithm reference to hash.
+
+    """
+    _hash_str(h, reference.algorithm_type)
+    _hash_str(h, reference.algorithm_name)
+    settings = reference.settings
+    if settings is None:
+        h.update(b"\x00")
+        return
+
+    h.update(b"\x01")
+    keys = sorted(settings.keys())
+    _hash_uint(h, len(keys))
+    for key in keys:
+        _hash_str(h, key)
+        _hash_arg(h, settings.get(key))
+
+
 def _hash_arg(h: "hashlib._Hash", arg: Any) -> None:
     """Hash an arbitrary argument, dispatching by type."""
     if arg is None:
         h.update(b"N")
         h.update(b"\x00")
+    elif isinstance(arg, AlgorithmRef):
+        h.update(b"R")
+        _hash_algorithm_ref(h, arg)
     elif hasattr(arg, "content_hash"):
         h.update(b"H")
         _hash_str(h, arg.content_hash())
@@ -173,12 +216,13 @@ def _item_content_hash(item: Any) -> str:
 
 def _type_tag(item: Any) -> str:  # noqa: PLR0911
     """Return a short type tag for an item (used in output_hashes)."""
+    item = _numpy_scalar_to_python(item)
     if isinstance(item, list):
-        if item and hasattr(item[0], "_data_type_name"):
-            return f"list[{item[0]._data_type_name}]"  # noqa: SLF001
+        if item and isinstance(item[0], CoreDataClass):
+            return f"list[{instance_data_type_name(item[0])}]"
         return "list"
-    if hasattr(item, "_data_type_name"):
-        return item._data_type_name  # noqa: SLF001
+    if isinstance(item, CoreDataClass):
+        return instance_data_type_name(item)
     if isinstance(item, bool):
         return "bool"
     if isinstance(item, int):
@@ -225,6 +269,6 @@ def collect_content_hashes(result: Any) -> list[dict[str, Any]]:
             "type": tag,
         }
         if _is_primitive(tag):
-            entry["value"] = item
+            entry["value"] = _numpy_scalar_to_python(item)
         entries.append(entry)
     return entries

@@ -83,7 +83,7 @@ nlohmann::json NuclearHessian::to_json() const {
 
 void NuclearHessian::to_json_file(const std::string& filename) const {
   auto validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(NuclearHessian));
+      filename, NuclearHessian::data_type_name());
   _to_json_file(validated_filename);
 }
 
@@ -111,7 +111,7 @@ void NuclearHessian::to_hdf5(H5::Group& group) const {
 
 void NuclearHessian::to_hdf5_file(const std::string& filename) const {
   auto validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(NuclearHessian));
+      filename, NuclearHessian::data_type_name());
   _to_hdf5_file(validated_filename);
 }
 
@@ -128,8 +128,8 @@ std::shared_ptr<NuclearHessian> NuclearHessian::from_file(
 
 std::shared_ptr<NuclearHessian> NuclearHessian::from_json_file(
     const std::string& filename) {
-  auto validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "nuclear_hessian");
+  auto validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, NuclearHessian::data_type_name());
   return _from_json_file(validated_filename);
 }
 
@@ -153,8 +153,8 @@ std::shared_ptr<NuclearHessian> NuclearHessian::from_json(
 
 std::shared_ptr<NuclearHessian> NuclearHessian::from_hdf5_file(
     const std::string& filename) {
-  auto validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "nuclear_hessian");
+  auto validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, NuclearHessian::data_type_name());
   return _from_hdf5_file(validated_filename);
 }
 

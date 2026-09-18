@@ -54,6 +54,14 @@ void bind_symmetry_blocked_index_set(py::module& m) {
            "True iff indices are stored for the given label.")
       .def("labels", &SymmetryBlockedIndexSet::labels,
            "The labels for which indices are stored.")
+      .def_static("data_type_name", &SymmetryBlockedIndexSet::data_type_name,
+                  R"(
+    Return the wire-format identifier for symmetry-blocked index sets.
+
+    Returns:
+        str: ``"symmetry_blocked_index_set"``
+
+    )")
       .def("get_data_type_name", &SymmetryBlockedIndexSet::get_data_type_name)
       .def("get_summary", &SymmetryBlockedIndexSet::get_summary)
       .def("__repr__", &SymmetryBlockedIndexSet::get_summary)

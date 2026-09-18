@@ -21,16 +21,22 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkOccupationActiveSpaceSelector,
     QdkValenceActiveSpaceSelector,
 )
+from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification import AmplitudeAmplification
+from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
+from qdk_chemistry.algorithms.double_factorization import DoubleFactorization
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
+from qdk_chemistry.algorithms.effective_hamiltonian_constructor import EffectiveHamiltonianConstructor
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
+from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_factorization import HamiltonianFactorization
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
@@ -45,6 +51,8 @@ from qdk_chemistry.algorithms.nuclear_derivative import (
 )
 from qdk_chemistry.algorithms.orbital_localizer import (
     OrbitalLocalizer,
+    QdkActiveSpaceQIOLocalizer,
+    QdkGaugeFixingLocalizer,
     QdkMP2NaturalOrbitalLocalizer,
     QdkNaturalOrbitalLocalizer,
     QdkPipekMezeyLocalizer,
@@ -52,6 +60,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
+from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -67,23 +76,33 @@ from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 __all__ = [
     # Classes
     "ActiveSpaceSelector",
+    "AmplitudeAmplification",
     "CircuitExecutor",
     "ControlledCircuitMapper",
+    "DoubleFactorization",
     "DynamicalCorrelationCalculator",
+    "EffectiveHamiltonianConstructor",
     "ExpectationEstimator",
     "FiniteDifferenceNuclearDerivativeCalculator",
+    "GeometryOptimizer",
+    "GeometryOptimizerSettings",
     "HadamardTest",
     "HamiltonianConstructor",
+    "HamiltonianFactorization",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
     "OrbitalLocalizer",
     "PhaseEstimation",
+    "PopulationAnalyzer",
     "ProjectedMultiConfigurationCalculator",
+    "QPESubspaceMarking",
+    "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkExpectationEstimator",
+    "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",
     "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",
@@ -94,6 +113,7 @@ __all__ = [
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkPopulationAnalyzer",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",

@@ -1,8 +1,12 @@
 """Iterative phase estimation implementation.
 
 This module implements the Kitaev-style iterative quantum phase estimation (IQPE)
-algorithm, which measures phase bits sequentially from most-significant to least-significant
-using a single ancilla qubit and adaptive feedback corrections.
+algorithm, which measures phase bits sequentially from least-significant to most-significant
+using a single ancilla qubit and adaptive feedback corrections. The first iteration applies
+the largest controlled power :math:`U^{2^{n-1}}` (``n`` = ``num_bits``) and therefore measures
+the least-significant bit; subsequent iterations proceed toward the most-significant bit.
+The returned `QpeResult.bits_msb_first` reverses this execution order
+into the conventional most-significant-first bitstring.
 
 References:
     Kitaev, A. (1995). arXiv:quant-ph/9511026. :cite:`Kitaev1995`
@@ -108,7 +112,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         # Iterate over the number of phase bits
         for iteration in range(num_bits):
             # Create the iteration circuit via the builder
-            circuit_builder.settings().update("phase_correction", phase_feedback)
+            circuit_builder.settings().update("phase_correction", -phase_feedback)
             circuit_builder.settings().update("num_iteration", iteration)
             iteration_circuits = circuit_builder._run_impl(  # noqa: SLF001
                 state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
@@ -137,7 +141,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             method=self.name(),
             phase_fraction=phase_fraction,
             eigenvalue_from_phase=container.eigenvalue_from_phase,
-            bits_msb_first=bits,
+            bits_msb_first=bits[::-1],
         )
 
     def name(self) -> str:

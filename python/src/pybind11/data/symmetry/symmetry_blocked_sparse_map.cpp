@@ -87,6 +87,13 @@ void bind_symmetry_blocked_sparse_map(py::module& m) {
              const SBSM::IndexTuple& idx) { return self.get(labels, idx); },
           py::arg("labels"), py::arg("idx"),
           "Single-entry lookup; returns 0.0 if the entry is absent.")
+      .def_static("data_type_name", &SBSM::data_type_name, R"(
+      Return the wire-format identifier for symmetry-blocked sparse maps.
+
+      Returns:
+        str: ``"symmetry_blocked_sparse_map_4_real"``
+
+      )")
       .def("get_data_type_name", &SBSM::get_data_type_name)
       .def("get_summary", &SBSM::get_summary)
       .def("__repr__", &SBSM::get_summary)

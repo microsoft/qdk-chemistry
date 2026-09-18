@@ -22,8 +22,15 @@ __all__: list[str] = []
 class QpeResult(DataClass):
     """Structured output for quantum phase estimation workflows."""
 
-    # Class attribute for filename validation
-    _data_type_name = "qpe_result"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for QPE results.
+
+        Returns:
+            ``"qpe_result"``.
+
+        """
+        return "qpe_result"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
@@ -48,11 +55,13 @@ class QpeResult(DataClass):
             method: Identifier for the algorithm or workflow that produced the result.
             phase_fraction:  Raw measured phase fraction in ``[0, 1)``.
             phase_angle: Raw measured phase angle in radians.
-            canonical_phase_fraction:  Alias-resolved phase fraction consistent with the selected energy branch.
+            canonical_phase_fraction: Alias-resolved phase fraction consistent with the selected energy branch.
+                Equals ``phase_fraction`` when the algorithm performs no alias resolution.
             canonical_phase_angle: Alias-resolved phase angle in radians.
-            raw_energy: Energy computed directly from ``phase_fraction``.
-            branching: Sorted tuple of all alias energy candidates considered.
-            resolved_energy: Alias energy selected with the optional reference value, if available.
+            raw_energy: Energy computed from ``canonical_phase_fraction``.
+            branching: Sorted tuple of all alias energy candidates considered, including ``raw_energy``.
+            resolved_energy: Candidate from ``branching`` picked by the algorithm's alias-resolution rule,
+                or ``None`` when no resolution was performed.
             bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
             bitstring_msb_first: Measured bitstring representation, when provided.
             metadata: Optional metadata dictionary.
@@ -103,6 +112,9 @@ class QpeResult(DataClass):
         method: str,
         phase_fraction: float,
         eigenvalue_from_phase: Callable[[float], float],
+        canonical_phase_fraction: float | None = None,
+        branching: Sequence[float] | None = None,
+        resolved_energy: float | None = None,
         bits_msb_first: Sequence[int] | None = None,
         bitstring_msb_first: str | None = None,
         metadata: dict[str, object] | None = None,
@@ -117,6 +129,9 @@ class QpeResult(DataClass):
             method: Phase estimation algorithm or workflow label.
             phase_fraction: Measured phase fraction in ``[0, 1)``.
             eigenvalue_from_phase: A callable mapping phase fraction to the Hamiltonian eigenvalue.
+            canonical_phase_fraction: Alias-resolved phase the energy is computed from. Defaults to ``phase_fraction``.
+            branching: Alias energy candidates considered. Defaults to ``(raw_energy,)``.
+            resolved_energy: Candidate picked by the algorithm's alias-resolution rule, if any.
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
             bitstring_msb_first: Optional string representation of the measured bits.
             metadata: Optional dictionary copied into the result for caller-defined context.
@@ -130,7 +145,10 @@ class QpeResult(DataClass):
 
         normalized_phase = float(phase_fraction % 1.0)
         phase_angle = float(normalized_phase * (2 * np.pi))
-        raw_energy = eigenvalue_from_phase(normalized_phase)
+
+        canonical = normalized_phase if canonical_phase_fraction is None else float(canonical_phase_fraction % 1.0)
+        canonical_angle = float(canonical * (2 * np.pi))
+        raw_energy = eigenvalue_from_phase(canonical)
 
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first
@@ -145,11 +163,11 @@ class QpeResult(DataClass):
             method=method_label,
             phase_fraction=normalized_phase,
             phase_angle=phase_angle,
-            canonical_phase_fraction=normalized_phase,
-            canonical_phase_angle=phase_angle,
+            canonical_phase_fraction=canonical,
+            canonical_phase_angle=canonical_angle,
             raw_energy=raw_energy,
-            branching=(raw_energy,),
-            resolved_energy=None,
+            branching=(raw_energy,) if branching is None else tuple(branching),
+            resolved_energy=resolved_energy,
             bits_msb_first=normalized_bits,
             bitstring_msb_first=bitstring,
             metadata=metadata_copy,

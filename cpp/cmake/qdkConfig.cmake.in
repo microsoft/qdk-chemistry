@@ -14,6 +14,16 @@ set(QDK_CHEMISTRY_ENABLE_DFTD3 "@QDK_CHEMISTRY_ENABLE_DFTD3@" CACHE BOOL "Enable
 # Always Required Dependencies
 include(CMakeFindDependencyMacro)
 
+# The installed archive references vendor-specific symbols (e.g.
+# openblas_set_num_threads) while the exported dependency is the
+# vendor-agnostic BLAS::BLAS. Steer the search below to the same provider, or a
+# machine with several BLAS installations may pick another and fail to link.
+set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "@QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR@")
+set(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS "@QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS@")
+if(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR AND NOT BLAS_PREFERENCE_LIST)
+  set(BLAS_PREFERENCE_LIST "${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}")
+endif()
+
 # Make sure C / CXX / CUDA are enabled (former for BLAS discovery)
 enable_language(C)
 enable_language(CXX)
@@ -57,6 +67,49 @@ if(QDK_CHEMISTRY_ENABLE_PCM)
 endif()
 
 list(REMOVE_AT CMAKE_MODULE_PATH 0)
+
+# Check the bound symbols rather than comparing vendor names: BLAS_VENDOR is
+# only set when the linalg FindBLAS module performs the search, so it is empty
+# whenever another module found BLAS first. Both halves are checked because the
+# library calls both, and either one missing fails the link.
+if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
+  include(CheckFunctionExists)
+
+  # A function, not a macro, so CMAKE_REQUIRED_* stays local.
+  function(_qdk_check_blas_thread_symbol symbol out_var)
+    if(TARGET BLAS::BLAS)
+      set(CMAKE_REQUIRED_LIBRARIES BLAS::BLAS)
+    else()
+      set(CMAKE_REQUIRED_LIBRARIES ${BLAS_LIBRARIES})
+    endif()
+    set(CMAKE_REQUIRED_INCLUDES ${BLAS_INCLUDE_DIRS})
+    set(CMAKE_REQUIRED_QUIET TRUE)
+    check_function_exists(${symbol} QDK_CHEMISTRY_CONSUMER_HAS_${symbol})
+    set(${out_var} "${QDK_CHEMISTRY_CONSUMER_HAS_${symbol}}" PARENT_SCOPE)
+  endfunction()
+
+  set(_qdk_blas_missing_symbols "")
+  foreach(_qdk_blas_symbol IN LISTS QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
+    _qdk_check_blas_thread_symbol("${_qdk_blas_symbol}" _qdk_blas_symbol_found)
+    if(NOT _qdk_blas_symbol_found)
+      list(APPEND _qdk_blas_missing_symbols "${_qdk_blas_symbol}")
+    endif()
+  endforeach()
+
+  if(_qdk_blas_missing_symbols)
+    list(JOIN _qdk_blas_missing_symbols ", " _qdk_blas_missing_symbols_text)
+    message(FATAL_ERROR
+      "qdk::chemistry was built against BLAS vendor "
+      "'${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}' and calls "
+      "'${_qdk_blas_missing_symbols_text}', which the BLAS resolved here "
+      "(${BLAS_LIBRARIES}) does not provide; linking would fail with an "
+      "unresolved symbol. Point this project at the same BLAS (e.g. "
+      "-DBLAS_LIBRARIES=..., -DBLA_VENDOR=... or "
+      "-DBLAS_PREFERENCE_LIST=${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}), or "
+      "rebuild qdk-chemistry with -DQDK_CHEMISTRY_BLAS_THREAD_API=NONE to make "
+      "the library independent of a particular BLAS provider.")
+  endif()
+endif()
 
 if(NOT TARGET qdk::chemistry)
   include("${CMAKE_CURRENT_LIST_DIR}/chemistryTargets.cmake")

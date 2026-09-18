@@ -7,14 +7,13 @@
 
 import numpy as np
 import pytest
-from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
@@ -95,6 +94,15 @@ class TestPrepareSelectMapper:
         mapper = ControlledPSPMapper()
         mapper.settings().set("control_indices", [0, 1])
         with pytest.raises(ValueError, match="single control qubit"):
+            mapper.run(unitary_rep)
+
+    def test_rejects_a_control_qubit_at_a_nondefault_index(self):
+        """Verify ControlledPSPMapper raises ValueError when the control qubit is not at index 0."""
+        unitary_rep = _build_unitary_rep(["XX", "ZZ"], np.array([0.25, 0.5]))
+
+        mapper = ControlledPSPMapper()
+        mapper.settings().set("control_indices", [2])
+        with pytest.raises(ValueError, match="single control qubit at index 0"):
             mapper.run(unitary_rep)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
@@ -191,25 +199,24 @@ class TestPrepareSelectMapper:
         - :math:`R|0\rangle = +|0\rangle`
         - :math:`R|1\rangle = -|1\rangle`
 
-        Uses ``qsharp.eval`` + ``qsharp.dump_machine()`` to inspect the quantum
-        state after applying Reflect.
+        Uses an isolated Q# context to inspect the quantum state after applying
+        Reflect.
         """
-        # Ensure Q# sources are loaded
-        _ = QSHARP_UTILS.PrepSelPrep.Reflect
+        context = create_qsharp_context()
 
         # Allocate a qubit (persists across eval calls in the interpreter session)
-        qsharp.eval("use q = Qubit();")
+        context.eval("use q = Qubit();")
 
         # R|0> = +|0>
-        qsharp.eval("QDKChemistry.Utils.PrepSelPrep.Reflect([q]);")
-        state = qsharp.dump_machine()
+        context.eval("QDKChemistry.Utils.PrepSelPrep.Reflect([q]);")
+        state = context.dump_machine()
         assert state.check_eq([1.0, 0.0]), f"R|0> should be |0>, got {state.as_dense_state()}"
 
         # State is |0> after Reflect(|0>). Apply X to get |1>, then Reflect.
         # R|1> = -|1>
-        qsharp.eval("X(q); QDKChemistry.Utils.PrepSelPrep.Reflect([q]);")
-        state = qsharp.dump_machine()
+        context.eval("X(q); QDKChemistry.Utils.PrepSelPrep.Reflect([q]);")
+        state = context.dump_machine()
         assert state.check_eq([0.0, -1.0]), f"R|1> should be -|1>, got {state.as_dense_state()}"
 
         # Clean up qubit
-        qsharp.eval("Reset(q)")
+        context.eval("Reset(q)")

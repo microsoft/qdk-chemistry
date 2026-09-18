@@ -16,6 +16,7 @@ import pytest
 
 from qdk_chemistry.data import ModelOrbitals, Orbitals
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import (
     SymmetryBlockedTensorRank1,
     SymmetryBlockedTensorRank2,
@@ -24,6 +25,7 @@ from qdk_chemistry.data.symmetry import (
     axes,
     spin_index_set,
 )
+from qdk_chemistry.remote.serialization import deserialize_outputs, serialize_outputs
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set
@@ -253,6 +255,17 @@ def test_json_serialization():
         )
     finally:
         Path(filename).unlink(missing_ok=True)
+
+
+def test_json_deserialization_preserves_model_orbitals_type():
+    """Generic JSON deserialization preserves the concrete orbitals type."""
+    model = ModelOrbitals(4)
+
+    restored = Orbitals.from_json(model.to_json())
+
+    assert isinstance(restored, ModelOrbitals)
+    assert restored.num_modes() == model.num_modes()
+    assert restored.to_json() == model.to_json()
 
 
 def test_hdf5_serialization():
@@ -1090,9 +1103,18 @@ def test_model_orbitals_pickling_and_repr():
 
 
 def test_orbitals_data_type_name():
-    """Test that Orbitals has the correct _data_type_name class attribute."""
-    assert hasattr(Orbitals, "_data_type_name")
-    assert Orbitals._data_type_name == "orbitals"
+    """Test that Orbitals exposes its static wire-format identifier."""
+    assert class_data_type_name(Orbitals) == "orbitals"
+
+
+def test_model_orbitals_remote_round_trip(tmp_path):
+    """The Orbitals loader restores ModelOrbitals exactly."""
+    original = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
+
+    serialize_outputs(tmp_path, original)
+    restored = deserialize_outputs(tmp_path)
+
+    assert type(restored) is ModelOrbitals
 
 
 def test_sbt_native_constructor_accepts_active_indices():

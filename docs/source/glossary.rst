@@ -7,6 +7,9 @@ Acronym definitions
    AO
       Atomic Orbital.
 
+   API
+      Application Programming Interface.
+
    ASCI
       Adaptive Sampling Configuration Interaction.
 
@@ -40,6 +43,9 @@ Acronym definitions
 
    CNOT
       Controlled-NOT two-qubit gate used in quantum circuits.
+
+   CODATA
+      Committee on Data of the International Science Council, which publishes recommended values of fundamental physical constants.
 
    DFT
       Density Functional Theory.
@@ -112,6 +118,9 @@ Acronym definitions
       Pariser-Parr-Pople.
       Semi-empirical model Hamiltonian that adds intersite Coulomb interactions to the Hubbard model.
 
+   PySCF
+      Python-based Simulations of Chemistry Framework.
+
    QDK
       Quantum Development Kit.
 
@@ -158,3 +167,6 @@ Acronym definitions
 
    VVHV
       Valence Virtual Hard Virtual.
+
+   XYZ
+      Text file format for molecular geometries represented by element symbols and Cartesian coordinates.

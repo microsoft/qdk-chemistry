@@ -12,6 +12,7 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     DynamicalCorrelationCalculator,
+    EffectiveHamiltonianConstructor,
     HamiltonianConstructor,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
@@ -23,6 +24,7 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.algorithms.hashing import run_content_hash
 from qdk_chemistry.data import (
+    AlgorithmRef,
     AmplitudeContainer,
     AmplitudeType,
     Ansatz,
@@ -43,7 +45,7 @@ from qdk_chemistry.data.symmetry import (
     spin_index_set,
 )
 
-from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals, create_test_wavefunction
 
 
 class MockLocalizationPy(OrbitalLocalizer):
@@ -362,6 +364,23 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
         return -10.0, updated_wavefunction, None
 
 
+class MockEffectiveHamiltonianConstructor(EffectiveHamiltonianConstructor):
+    """A dummy effective-Hamiltonian constructor for testing purposes."""
+
+    def __init__(self):
+        super().__init__()
+        self._settings = Settings()
+
+    def name(self):
+        """Return the algorithm name."""
+        return "mock_effective_hamiltonian_constructor"
+
+    def _run_impl(self, reference, hamiltonian, p_indices):
+        """Validate the inputs and echo the Hamiltonian for the inheritance test."""
+        self._validate_inputs(reference, hamiltonian, p_indices)
+        return hamiltonian
+
+
 class TestAlgorithmClasses:
     """Test cases for the algorithm base classes."""
 
@@ -624,6 +643,19 @@ class TestAlgorithmClasses:
         assert t2_ab.shape == (1,)
         assert np.isclose(t2_ab[0], 0.005)
 
+    def test_effective_hamiltonian_constructor_inheritance(self):
+        """Test that EffectiveHamiltonianConstructor can be inherited from Python."""
+        constructor = MockEffectiveHamiltonianConstructor()
+        assert isinstance(constructor, EffectiveHamiltonianConstructor)
+
+        assert isinstance(constructor.settings(), Settings)
+
+        reference = create_test_wavefunction()
+        hamiltonian = create_test_hamiltonian(2)
+        p_indices = spin_index_set(2, [0], [0])
+        result = constructor.run(reference, hamiltonian, p_indices)
+        assert isinstance(result, Hamiltonian)
+
     def test_scf_solver_registration(self):
         """Test that SCF solver can be registered and used."""
 
@@ -860,6 +892,30 @@ class TestAlgorithmClasses:
 
         with pytest.raises(TypeError, match="Unsupported hash argument type"):
             run_content_hash("test_type", "test_name", Settings(), UnsupportedArgument())
+
+    def test_run_content_hash_supports_nested_algorithm_refs(self):
+        """Algorithm references contribute their nested configuration to run hashes."""
+        settings = Settings.from_json(
+            '{"circuit_executor": {'
+            '"__type__": "algorithm_ref", '
+            '"algorithm_type": "circuit_executor", '
+            '"algorithm_name": "qdk_sparse_state_simulator", '
+            '"settings": {"seed": 1}}}'
+        )
+        reference = AlgorithmRef("state_preparation", "dense_pure_state", settings)
+        matching_hash = run_content_hash("test_type", "test_name", Settings(), reference)
+
+        changed_settings = Settings.from_json(
+            '{"circuit_executor": {'
+            '"__type__": "algorithm_ref", '
+            '"algorithm_type": "circuit_executor", '
+            '"algorithm_name": "qdk_sparse_state_simulator", '
+            '"settings": {"seed": 2}}}'
+        )
+        changed_reference = AlgorithmRef("state_preparation", "dense_pure_state", changed_settings)
+
+        assert matching_hash == run_content_hash("test_type", "test_name", Settings(), reference)
+        assert matching_hash != run_content_hash("test_type", "test_name", Settings(), changed_reference)
 
     def test_run_content_hash_disambiguates_argument_types(self):
         """Test algorithm hashing tags argument types to avoid cache collisions."""

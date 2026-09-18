@@ -26,10 +26,11 @@ namespace qdk::chemistry::data {
  * - One-electron integrals (kinetic + nuclear attraction) in MO representation
  * - Two-electron integrals (electron-electron repulsion) in MO representation
  * - Molecular orbital information for the active space
- * - Core energy contributions from inactive orbitals and nuclear repulsion
+ * - A constant (zero-body) energy term
  *
- * This class implies that all inactive orbitals are fully occupied for the
- * purpose of computing the core energy and inactive Fock matrix.
+ * This class implies that all inactive orbitals are fully occupied when
+ * constructing inactive-orbital contributions to the constant energy term and
+ * inactive Fock matrix.
  *
  * The Hamiltonian is immutable after construction, meaning all data must be
  * provided during construction and cannot be modified afterwards. The

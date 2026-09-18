@@ -20,8 +20,15 @@ __all__: list[str] = []
 class CircuitExecutorData(DataClass):
     """Bitstring data and metadata from quantum circuit executions."""
 
-    # Class attribute for filename validation
-    _data_type_name = "circuit_executor_data"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for circuit executor data.
+
+        Returns:
+            ``"circuit_executor_data"``.
+
+        """
+        return "circuit_executor_data"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

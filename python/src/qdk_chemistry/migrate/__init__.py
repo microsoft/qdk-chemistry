@@ -15,7 +15,7 @@ Python::
     migrate.convert_file("old.hamiltonian.json", "new.hamiltonian.h5")
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz``) and the
+(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 Input and output formats may differ.
 
@@ -24,8 +24,9 @@ on a library release: every migratable type exposes a ``STEPS`` table mapping a
 source version to a ``(next_version, transform)`` pair, and the chain is followed
 until it reaches the version the installed library accepts. To support a future
 serialization-version bump for a data class, register the next step in that type's
-``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``); the migrated
-document is validated against the live deserializer, so a missing step fails loudly.
+``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``);
+the migrated document is validated against the live deserializer, so a missing step
+fails loudly.
 
 This module lives outside the data classes so that no legacy-schema knowledge
 leaks into the core serialization.
@@ -43,9 +44,9 @@ from pathlib import Path
 
 import h5py
 
-from qdk_chemistry.data import Ansatz, Hamiltonian, Orbitals, Wavefunction
+from qdk_chemistry.data import Ansatz, Hamiltonian, Orbitals, QpeResult, Wavefunction
 
-from . import _ansatz, _hamiltonian, _io, _orbitals, _wavefunction
+from . import _ansatz, _hamiltonian, _io, _orbitals, _qpe_result, _wavefunction
 
 __all__ = ["MigrationError", "convert_file"]
 
@@ -74,6 +75,7 @@ _MODULES = {
     "hamiltonian": _hamiltonian,
     "wavefunction": _wavefunction,
     "ansatz": _ansatz,
+    "qpe_result": _qpe_result,
 }
 
 _CLASSES = {
@@ -81,6 +83,7 @@ _CLASSES = {
     "hamiltonian": Hamiltonian,
     "wavefunction": Wavefunction,
     "ansatz": Ansatz,
+    "qpe_result": QpeResult,
 }
 
 
@@ -129,8 +132,9 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
         raise MigrationError(f"Failed to migrate '{src_path}': {error}") from error
 
     try:
-        obj = _CLASSES[data_type].from_json(json.dumps(new_json))
-    except RuntimeError as error:
+        json_input = new_json if data_type == "qpe_result" else json.dumps(new_json)
+        obj = _CLASSES[data_type].from_json(json_input)
+    except (KeyError, TypeError, ValueError, RuntimeError) as error:
         raise MigrationError(
             f"The installed qdk-chemistry rejected the migrated {data_type} ({error}). If the "
             f"{data_type} serialization schema changed, register the next step in {module.__name__}.STEPS."

@@ -12,7 +12,6 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <set>
 #include <span>
 #include <stdexcept>
@@ -854,7 +853,7 @@ bool Orbitals::is_restricted() const {
 bool Orbitals::has_active_space() const {
   QDK_LOG_TRACE_ENTERING();
   return !_active_space_indices.first.empty() ||
-         !_active_space_indices.second.empty();
+         !_active_space_indices.second.empty() || has_inactive_space();
 }
 
 bool Orbitals::has_inactive_space() const {
@@ -1084,7 +1083,7 @@ void Orbitals::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Orbitals));
+      filename, Orbitals::data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -1096,8 +1095,8 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "orbitals");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Orbitals::data_type_name());
 
   return _from_hdf5_file(validated_filename);
 }
@@ -1109,7 +1108,7 @@ void Orbitals::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Orbitals));
+      filename, Orbitals::data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -1121,8 +1120,8 @@ std::shared_ptr<Orbitals> Orbitals::from_json_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "orbitals");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Orbitals::data_type_name());
 
   return _from_json_file(validated_filename);
 }
@@ -1779,6 +1778,10 @@ ModelOrbitals::ModelOrbitals(size_t basis_size,
     : Orbitals(), _num_orbitals(basis_size) {
   QDK_LOG_TRACE_ENTERING();
   _symmetries = std::move(symmetries);
+  if (!_symmetries) {
+    _symmetries =
+        std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  }
   _is_restricted = model_restricted_from_symmetries(_symmetries);
   // Full active space over all modes by default; inactive space empty.
   std::vector<size_t> all_indices(basis_size);
@@ -2295,8 +2298,11 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     unsigned num_orbitals;
     orbitals_dataset.read(&num_orbitals, H5::PredType::NATIVE_UINT);
 
-    // Load active space indices
+    // Load active space indices. Dataset presence denotes an explicitly
+    // bounded active space even when both datasets have zero length.
     std::vector<size_t> active_indices_alpha, active_indices_beta;
+    bool has_active = group.nameExists("active_space_indices_alpha") ||
+                      group.nameExists("active_space_indices_beta");
     try {
       if (group.nameExists("active_space_indices_alpha")) {
         active_indices_alpha =
@@ -2337,12 +2343,8 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     }
 
     // Reconstruct via the symmetry-blocked index sets (or the full-active
-    // constructor when no active indices were recorded). save_vector_to_group
-    // omits empty vectors, so an explicitly empty active space is flagged by
-    // the active_space_is_empty marker; treat it as a present-but-empty active
-    // space, distinct from an absent one which defaults to the full space.
-    bool has_active =
-        !active_indices_alpha.empty() || !active_indices_beta.empty();
+    // constructor when no active indices were recorded). The marker supports
+    // files that encode an empty active space without zero-length datasets.
     try {
       if (!has_active && group.nameExists("active_space_is_empty")) {
         H5::DataSet active_empty_dataset =

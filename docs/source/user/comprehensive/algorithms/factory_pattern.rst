@@ -56,6 +56,9 @@ In Python, algorithm instantiation is managed through a centralized registry mod
    * - :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`
      - ``"hamiltonian_constructor"``
      - ``HamiltonianConstructorFactory``
+   * - :doc:`EffectiveHamiltonianConstructor <../algorithms/effective_hamiltonian_constructor>`
+     - ``"effective_hamiltonian_constructor"``
+     - ``EffectiveHamiltonianConstructorFactory``
    * - :doc:`MCCalculator <../algorithms/mc_calculator>`
      - ``"multi_configuration_calculator"``
      - ``MultiConfigurationCalculatorFactory``

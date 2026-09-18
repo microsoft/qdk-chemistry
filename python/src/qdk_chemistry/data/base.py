@@ -18,6 +18,7 @@ from qdk_chemistry._core.data import (
 from qdk_chemistry._core.data import (
     _validate_serialization_version,
 )
+from qdk_chemistry.data._type_name import class_data_type_name, instance_data_type_name
 
 __all__: list[str] = []
 
@@ -56,20 +57,10 @@ def _validate_filename_suffix(filename: str | Path, data_type: str, operation: s
         raise ValueError(f"Invalid filename for {operation}: Filename '{filename_str}' must have '.{data_type}' suffix")
 
     base = filename_str[:last_dot_idx]
-
-    # Find the second-to-last dot (data type)
-    second_last_dot_idx = base.rfind(".")
-    if second_last_dot_idx == -1:
+    if not base.endswith(f".{data_type}"):
         raise ValueError(
             f"Invalid filename for {operation}: Filename '{filename_str}' "
             f"must have '.{data_type}.' before the file extension"
-        )
-
-    file_data_type = base[second_last_dot_idx + 1 :]
-    if file_data_type != data_type:
-        raise ValueError(
-            f"Invalid filename for {operation}: Filename '{filename_str}' "
-            f"has wrong data type '{file_data_type}', expected '{data_type}'"
         )
 
     return filename_str
@@ -87,7 +78,7 @@ class DataClass(_CoreDataClass):
 
     Derived classes MUST implement:
 
-    1. _data_type_name class attribute (e.g., "structure", "wavefunction")
+    1. data_type_name() static method (e.g., "structure", "wavefunction")
     2. _serialization_version class attribute (e.g., "0.1.0")
     3. get_summary() -> str
         Return a human-readable summary string of the object
@@ -124,8 +115,29 @@ class DataClass(_CoreDataClass):
     """
 
     # Class attributes to be overridden by derived classes
-    _data_type_name: str | None = None
     _serialization_version: str | None = None
+
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for this data class.
+
+        Returns:
+            The stable identifier used in serialized manifests and filenames.
+
+        Raises:
+            NotImplementedError: Always. Subclasses must implement this method.
+
+        """
+        raise NotImplementedError("DataClass subclasses must implement data_type_name()")
+
+    def get_data_type_name(self) -> str:
+        """Return the wire-format identifier for this instance.
+
+        Returns:
+            The identifier returned by the instance's data class loader.
+
+        """
+        return type(self).data_type_name()
 
     def __init__(self) -> None:
         """Initialize the base class and mark instance as initialized.
@@ -347,8 +359,7 @@ class DataClass(_CoreDataClass):
             ValueError: If filename doesn't match required pattern
 
         """
-        if self._data_type_name:
-            _validate_filename_suffix(filename, self._data_type_name, "write")
+        _validate_filename_suffix(filename, instance_data_type_name(self), "write")
         with Path(filename).open("w", encoding="utf-8") as f:
             json.dump(self.to_json(), f, indent=2)
 
@@ -364,8 +375,7 @@ class DataClass(_CoreDataClass):
             ValueError: If filename doesn't match required pattern
 
         """
-        if self._data_type_name:
-            _validate_filename_suffix(filename, self._data_type_name, "write")
+        _validate_filename_suffix(filename, instance_data_type_name(self), "write")
         with h5py.File(filename, "w") as f:
             self.to_hdf5(f)
 
@@ -383,8 +393,7 @@ class DataClass(_CoreDataClass):
             ValueError: If format_type is not supported or filename doesn't match required pattern
 
         """
-        if self._data_type_name:
-            _validate_filename_suffix(filename, self._data_type_name, "write")
+        _validate_filename_suffix(filename, instance_data_type_name(self), "write")
         if format_type == "json":
             self.to_json_file(filename)
         elif format_type in {"hdf5", "h5"}:
@@ -438,8 +447,7 @@ class DataClass(_CoreDataClass):
             ValueError: If filename doesn't match required pattern
 
         """
-        if cls._data_type_name:
-            _validate_filename_suffix(filename, cls._data_type_name, "read")
+        _validate_filename_suffix(filename, class_data_type_name(cls), "read")
         with Path(filename).open("r", encoding="utf-8") as f:
             json_data = json.load(f)
         return cls.from_json(json_data)
@@ -479,8 +487,7 @@ class DataClass(_CoreDataClass):
             ValueError: If filename doesn't match required pattern
 
         """
-        if cls._data_type_name:
-            _validate_filename_suffix(filename, cls._data_type_name, "read")
+        _validate_filename_suffix(filename, class_data_type_name(cls), "read")
         with h5py.File(filename, "r") as f:
             return cls.from_hdf5(f)
 
@@ -502,8 +509,7 @@ class DataClass(_CoreDataClass):
             ValueError: If format_type is not supported or filename doesn't match required pattern
 
         """
-        if cls._data_type_name:
-            _validate_filename_suffix(filename, cls._data_type_name, "read")
+        _validate_filename_suffix(filename, class_data_type_name(cls), "read")
         if format_type == "json":
             return cls.from_json_file(filename)
         if format_type in {"hdf5", "h5"}:

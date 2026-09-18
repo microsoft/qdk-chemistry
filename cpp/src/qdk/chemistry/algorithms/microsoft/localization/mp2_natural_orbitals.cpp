@@ -10,6 +10,7 @@
 #include <macis/util/moller_plesset.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
@@ -165,8 +166,23 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
       std::nullopt,  // no energies for natural orbitals
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
       orbitals->active_indices(), orbitals->inactive_indices());
-  return detail::new_aufbau_determinant_wavefunction(wavefunction,
-                                                     new_orbitals);
+
+  Eigen::VectorXd occupations = Eigen::VectorXd::Zero(num_molecular_orbitals);
+  occupations.head(nalpha).setConstant(2.0);
+  for (size_t i = 0; i < num_orbitals; ++i) {
+    occupations(loc_indices_a[i]) = mp2_natural_orbital_occupations(i);
+  }
+
+  const auto active_indices = data::spin_channel_indices(
+      new_orbitals->active_indices(), data::axes::alpha());
+  Eigen::VectorXd active_occupations(active_indices.size());
+  for (size_t i = 0; i < active_indices.size(); ++i) {
+    active_occupations(i) = occupations(active_indices[i]);
+  }
+  Eigen::MatrixXd one_rdm_spin_traced = active_occupations.asDiagonal();
+  return detail::new_aufbau_determinant_wavefunction(
+      wavefunction, new_orbitals,
+      data::ContainerTypes::MatrixVariant(one_rdm_spin_traced));
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

@@ -239,9 +239,9 @@ Example::
     #           e^{fields·t/2}
     # where same-layer ZZ terms (e.g. Z₀Z₁ and Z₂Z₃) have disjoint
     # qubit support and are exponentiated independently within one step.
-    trotter = registry.create("time_evolution_builder", "trotter")
-    trotter.settings().update({"order": 2, "num_divisions": 1})
-    evolution = trotter.run(hamiltonian, time=1.0)
+    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+    trotter.settings().update({"order": 2, "num_divisions": 1, "time": 1.0})
+    evolution = trotter.run(hamiltonian)
     container = evolution.get_container()
 
     # The grouped schedule uses 11 exponentiated terms per step,
@@ -347,13 +347,23 @@ The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :
 
 .. rubric:: Example
 
-::
+.. tab:: Python API
 
-    from qdk_chemistry.algorithms import registry
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-run-lcu
+      :end-before: # end-cell-run-lcu
 
-    lcu = registry.create("hamiltonian_unitary_builder", "lcu")
-    lcu.settings().update({"quantum_walk": True})
-    unitary = lcu.run(qubit_hamiltonian)
+To use alias sampling for the PREPARE oracle, pass an
+:class:`~qdk_chemistry.data.AlgorithmRef` to the
+:class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`:
+
+.. tab:: Python API -- alias sampling PREPARE
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-lcu-prepare
+      :end-before: # end-cell-lcu-prepare
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
 

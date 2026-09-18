@@ -9,7 +9,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 
 namespace qdk::chemistry::data {
@@ -59,11 +58,18 @@ class NuclearHessian : public DataClass,
                                       size_t column_atom_index) const;
 
   /**
-   * @brief Return the serialized data type name.
+   * @brief Return the static serialized data type name.
+   * @return "nuclear_hessian"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(NuclearHessian);
   }
+
+  /**
+   * @brief Return the serialized data type name for this instance.
+   * @return "nuclear_hessian"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Return a short summary of the Hessian data.

@@ -101,11 +101,7 @@ result_1 = iqpe_1.run(
 
 phase_angle_1 = result_1.phase_angle
 phase_angle_canonical_1 = result_1.canonical_phase_angle
-raw_energy_1 = result_1.raw_energy
-candidate_energies_1 = result_1.branching
-estimated_energy_1 = (
-    result_1.resolved_energy if result_1.resolved_energy is not None else raw_energy_1
-)
+estimated_energy_1 = result_1.raw_energy
 
 Logger.info("=== Iterative QPE: Non-commuting Hamiltonian Example ===")
 Logger.info("Hamiltonian: H = 0.519 * XI + ZZ")
@@ -118,10 +114,6 @@ if not np.isclose(result_1.phase_fraction, result_1.canonical_phase_fraction):
         f"Canonical phase fraction φ: {result_1.canonical_phase_fraction:.6f} "
         f"(angle = {phase_angle_canonical_1:.6f} rad)",
     )
-Logger.info(f"Raw energy_from_phase output: {raw_energy_1:+.8f} Hartree")
-Logger.info("Candidate energies (alias checks):")
-for energy in candidate_energies_1:
-    Logger.info(f"  E = {energy:+.8f} Hartree")
 Logger.info(f"Reference energy: {REFERENCE_ENERGY_1:+.8f} Hartree")
 Logger.info(f"Estimated energy: {estimated_energy_1:+.8f} Hartree")
 
@@ -184,11 +176,7 @@ result_2 = iqpe_2.run(
 
 phase_angle_2 = result_2.phase_angle
 phase_angle_canonical_2 = result_2.canonical_phase_angle
-raw_energy_2 = result_2.raw_energy
-candidate_energies_2 = result_2.branching
-estimated_energy_2 = (
-    result_2.resolved_energy if result_2.resolved_energy is not None else raw_energy_2
-)
+estimated_energy_2 = result_2.raw_energy
 Logger.info("\n=== Iterative QPE: Second Non-commuting Hamiltonian Example ===")
 Logger.info(
     "Hamiltonian: H = -0.0289(X1 + X2) + 0.0541(Z1 + Z2) + 0.0150 X1X2 + 0.0590 Z1Z2"
@@ -202,9 +190,5 @@ if not np.isclose(result_2.phase_fraction, result_2.canonical_phase_fraction):
         f"Canonical phase fraction φ: {result_2.canonical_phase_fraction:.6f} "
         f"(angle = {phase_angle_canonical_2:.6f} rad)",
     )
-Logger.info(f"Raw energy_from_phase output: {raw_energy_2:+.8f} Hartree")
-Logger.info("Candidate energies (alias checks):")
-for energy in candidate_energies_2:
-    Logger.info(f"  E = {energy:+.8f} Hartree")
 Logger.info(f"Reference energy: {REFERENCE_ENERGY_2:+.8f} Hartree")
 Logger.info(f"Estimated energy: {estimated_energy_2:+.8f} Hartree")

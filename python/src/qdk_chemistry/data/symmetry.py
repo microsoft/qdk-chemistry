@@ -38,6 +38,8 @@ C++ standard-library exceptions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections.abc import Sequence
+
 from qdk_chemistry._core.data.symmetry import (
     AxisName,
     SpinValue,
@@ -82,9 +84,6 @@ __all__ = [
     "axis_name_to_string",
     "spin_index_set",
 ]
-
-
-from collections.abc import Sequence
 
 
 def spin_index_set(

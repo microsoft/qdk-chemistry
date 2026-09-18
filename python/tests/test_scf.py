@@ -80,8 +80,8 @@ class TestScfSolver:
         assert len(available_solvers) >= 1
         assert "qdk" in available_solvers
         assert "qdk_stabilized" in available_solvers
-        assert "stabilized" in available_solvers
-        assert "stabilized_scf" in available_solvers
+        assert "stabilized" not in available_solvers
+        assert "stabilized_scf" not in available_solvers
 
         # Test creating default solver
         scf_solver = algorithms.create("scf_solver")
@@ -93,6 +93,8 @@ class TestScfSolver:
 
         scf_solver_stabilized = algorithms.create("scf_solver", "qdk_stabilized")
         assert scf_solver_stabilized is not None
+        assert algorithms.create("scf_solver", "stabilized").name() == "qdk_stabilized"
+        assert algorithms.create("scf_solver", "stabilized_scf").name() == "qdk_stabilized"
 
         # Test that nonexistent solver raises error
         with pytest.raises(KeyError):

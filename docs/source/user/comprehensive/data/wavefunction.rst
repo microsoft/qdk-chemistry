@@ -263,6 +263,34 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides methods to access c
       :start-after: // start-cell-access-data
       :end-before: // end-cell-access-data
 
+Total spin
+-----------
+
+The :meth:`~qdk_chemistry.data.Wavefunction.compute_s_squared` method evaluates
+the total-spin expectation value :math:`\langle S^2\rangle` from the real,
+spin-resolved active-space one- and two-particle :term:`RDM` blocks. For a pure
+spin eigenstate with spin quantum number :math:`S`, the result is
+:math:`S(S+1)`.
+
+The calculation requires alpha and beta molecular orbitals to share a common
+spatial basis. Restricted closed-shell and restricted open-shell wavefunctions
+meet this requirement; unrestricted orbitals are rejected because their
+spin-flip contractions additionally require the alpha--beta molecular-orbital
+overlap. The method also raises if the required RDM blocks are unavailable,
+their symmetry-blocked extents are inconsistent, or they are complex-valued.
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      s_squared = wavefunction.compute_s_squared()
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      double s_squared = wavefunction->compute_s_squared();
+
 Accessing cluster amplitudes
 ----------------------------
 
