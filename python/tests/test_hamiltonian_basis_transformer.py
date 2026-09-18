@@ -154,6 +154,62 @@ def test_qdk_transformer_rejects_target_metric_null_mode_amplification(source_nu
         create("hamiltonian_basis_transformer").run(source, target_orbitals)
 
 
+def test_qdk_transformer_matches_molecular_rebuild_with_frozen_core():
+    """A real, noncontiguous active-space rotation agrees with fresh AO reconstruction."""
+    structure = Structure.from_xyz("2\nLiH\nLi 0 0 0\nH 0 0 1.60\n")
+    _, wavefunction = create("scf_solver", "qdk").run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    scf_orbitals = wavefunction.get_orbitals()
+    coefficients = spin_channel_matrix(scf_orbitals.coefficients(), axes.alpha())
+    nmo = coefficients.shape[1]
+    active_indices = [1, 3, 5]
+    active = spin_index_set(nmo, active_indices, active_indices)
+    inactive = spin_index_set(nmo, [0], [0])
+    source_orbitals = Orbitals(
+        coefficients, None, scf_orbitals.get_overlap_matrix(), scf_orbitals.get_basis_set(), active, inactive
+    )
+    rotation, _ = np.linalg.qr(np.random.default_rng(588).normal(size=(3, 3)))
+    target_coefficients = coefficients.copy()
+    target_coefficients[:, active_indices] = coefficients[:, active_indices] @ rotation
+    target_orbitals = Orbitals(
+        target_coefficients, None, scf_orbitals.get_overlap_matrix(), scf_orbitals.get_basis_set(), active, inactive
+    )
+    constructor = create(
+        "hamiltonian_constructor",
+        "qdk_cholesky",
+        cholesky_tolerance=1e-10,
+        store_ao_cholesky_vectors=True,
+    )
+    source = constructor.run(source_orbitals)
+    source_hash = source.content_hash()
+    source_ao_factors = source.get_container().get_ao_cholesky_vectors().copy()
+
+    transformed = create("hamiltonian_basis_transformer").run(source, target_orbitals)
+    rebuilt = constructor.run(target_orbitals)
+
+    assert transformed.has_inactive_fock_matrix()
+    for actual, expected in (
+        (transformed.get_one_body_integrals()[0], rebuilt.get_one_body_integrals()[0]),
+        (
+            transformed.get_container().get_three_center_integrals()[0],
+            rebuilt.get_container().get_three_center_integrals()[0],
+        ),
+        (transformed.get_two_body_integrals()[0], rebuilt.get_two_body_integrals()[0]),
+        (transformed.get_inactive_fock_matrix()[0], rebuilt.get_inactive_fock_matrix()[0]),
+    ):
+        np.testing.assert_allclose(actual, expected, atol=1e-10, rtol=0, equal_nan=False)
+    assert transformed.get_core_energy() == pytest.approx(rebuilt.get_core_energy(), abs=1e-12, rel=0)
+    assert transformed.get_orbitals() is target_orbitals
+    assert transformed.get_container().get_ao_cholesky_vectors() is None
+    assert source.content_hash() == source_hash
+    np.testing.assert_array_equal(source.get_container().get_ao_cholesky_vectors(), source_ao_factors)
+
+    solver = create("multi_configuration_calculator", "macis_cas", ci_residual_tolerance=1e-12)
+    source_energy, _ = solver.run(source, 1, 1)
+    transformed_energy, _ = solver.run(transformed, 1, 1)
+    rebuilt_energy, _ = solver.run(rebuilt, 1, 1)
+    np.testing.assert_allclose([transformed_energy, rebuilt_energy], source_energy, atol=1e-10, rtol=0, equal_nan=False)
+
+
 def test_qdk_transformer_runs_successfully():
     """The transformer rotates every supported Hamiltonian component."""
     angle = 0.3

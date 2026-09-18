@@ -77,6 +77,31 @@ Download or clone the full `examples/` directory structure to run the examples.
 
 Additional curated datasets and benchmark materials that complement these examples are available at [microsoft/qdk-chemistry-data](https://github.com/microsoft/qdk-chemistry-data).
 
+## Cholesky basis-transformation benchmark
+
+[`benchmarks/hamiltonian_basis_transformer.py`](benchmarks/hamiltonian_basis_transformer.py)
+compares active-orbital transformation with a fresh Cholesky Hamiltonian rebuild
+for LiH/cc-pVDZ, water/cc-pVDZ, and benzene/6-31G. It uses only the base package.
+Run it from the repository root with a matching source build:
+
+```bash
+python examples/benchmarks/hamiltonian_basis_transformer.py --case all --threads 1 --warmups 1 --repeats 5
+```
+
+Use `--case lih`, `--case water`, or `--case benzene` to select one system.
+Thread environment variables are set before importing the numerical libraries.
+The script emits a `BENCHMARK_CONFIG` JSON record followed by one
+`BENCHMARK_RESULT` record per case, alongside the library's diagnostic output.
+Results include package and platform information, basis and orbital dimensions,
+Cholesky rank and thresholds, all timing samples, and maximum numerical errors.
+
+SCF and the initial source Hamiltonian build are timed separately. Reported
+speedups compare subsequent transformations against rebuilding the same target
+Hamiltonian, with call order alternated between repetitions and numerical
+validation outside the timed region. A numerical mismatch fails the run.
+There is no wall-clock pass/fail threshold: results depend on hardware, threading,
+and system size.
+
 ## Examples of interoperability with other quantum computing frameworks
 
 ### PennyLane
