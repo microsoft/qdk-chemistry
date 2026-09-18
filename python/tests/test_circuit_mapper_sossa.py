@@ -14,7 +14,9 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.data.circuit import CircuitMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 from .test_helpers import (
@@ -37,7 +39,7 @@ def _build_sossa_unitary(
     *,
     seed: int = 42,
 ) -> UnitaryRepresentation:
-    """Helper: build UnitaryRepresentation with SOSSAWalkContainer from random factorized data."""
+    """Helper: build UnitaryRepresentation with SOSSABlockEncodingContainer from random factorized data."""
     fh = create_random_factorized_hamiltonian(
         num_orbitals=num_orbitals,
         num_ranks=num_ranks,
@@ -77,8 +79,7 @@ def _block_encoding_action(circuit, num_system_qubits: int, system_state: np.nda
     Returns :math:`(\langle 0|_\mathrm{anc} \otimes I) B (|0\rangle_\mathrm{anc} \otimes I) |\psi\rangle`,
     i.e. the top-left block of the encoding applied to ``system_state``. The mapper lays the
     register out as ``[system | ancilla]`` while :func:`dump_operation_on_state` numbers basis
-    states big-endian, so the system register takes the high bits and its index runs the other
-    way -- hence the bit reversal on both ends.
+    states big-endian.
     """
     stride = 2 ** (circuit.num_qubits - num_system_qubits)
     dimension = 2**num_system_qubits
@@ -93,15 +94,12 @@ def _block_encoding_action(circuit, num_system_qubits: int, system_state: np.nda
     return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
 
 
-def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, seed=0, atol=1e-9):
+def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, seed=0, atol=1e-9, sweep_basis=False):
     r"""Assert the simulated SOSSA block equals ``H_gap/\Lambda - I`` on a full fixture.
 
-    The block is compared against the gap Hamiltonian element by element -- not just via a
-    decoded eigenphase, which is blind to any similarity transform. Because the Q# walk works
-    in spin-blocked order while :func:`_build_dfthc_hamiltonian_matrix` builds ``H_gap`` in the
-    interleaved ``(p, sigma)`` order, the oracle is carried across with the *fermionic* reorder
-    (:func:`_python_to_qsharp_sign`), whose signs relabelling the basis on its own drops. That
-    sign is what makes the many-body (multi-particle) sectors agree.
+    No global phase is fitted, so a block that is right up to a sign still fails. With
+    ``sweep_basis`` the whole block is reconstructed column by column instead of being probed
+    along a single random vector.
     """
     num_orbitals = h1.shape[0]
     num_system_qubits = 2 * num_orbitals
@@ -134,13 +132,26 @@ def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, se
     h_gap = _build_dfthc_hamiltonian_matrix(h1, u_matrices, w_matrices, wb_matrix)
     expected_block = reorder @ h_gap @ reorder.T / normalization - np.eye(dimension)
 
+    if sweep_basis:
+        actual_block = np.column_stack(
+            [
+                _block_encoding_action(
+                    circuit, num_system_qubits=num_system_qubits, system_state=np.eye(dimension)[column]
+                )
+                for column in range(dimension)
+            ]
+        )
+        np.testing.assert_allclose(actual_block, expected_block, atol=atol)
+        return
+
     rng = np.random.default_rng(seed)
     system_state = rng.standard_normal(dimension)
     system_state /= np.linalg.norm(system_state)
-    expected = expected_block @ system_state
-    actual = _block_encoding_action(circuit, num_system_qubits=num_system_qubits, system_state=system_state)
-    actual *= np.exp(-1j * np.angle(np.vdot(expected, actual)))
-    np.testing.assert_allclose(actual, expected, atol=atol)
+    np.testing.assert_allclose(
+        _block_encoding_action(circuit, num_system_qubits=num_system_qubits, system_state=system_state),
+        expected_block @ system_state,
+        atol=atol,
+    )
 
 
 def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
@@ -153,14 +164,16 @@ def _alias_atol(num_coefficients: int, bits_precision: int) -> float:
 
 
 class TestOuterPrep:
-    """Tests for SOSSAMapper._build_outer_prep."""
+    """Tests for SOSSAMapper._build_outer_prepare_circuit."""
 
     @pytest.mark.parametrize("algorithm", ["dense_pure_state", "qrom"])
     def test_build_outer_prep_fidelity(self, algorithm):
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
         mapper = _make_sossa_mapper(outer_algorithm=algorithm)
-        op, num_gradient = mapper._build_outer_prep(container)
+        prepare_circuit = mapper._build_outer_prepare_circuit(container)
+        op = prepare_circuit._qsharp_op
+        num_gradient = prepare_circuit.metadata.num_phase_gradient_ancillas
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -194,8 +207,9 @@ class TestOuterPrep:
         container = sossa_unitary.get_container()
         bit_precision = 10
         mapper = _make_sossa_mapper(outer_algorithm="alias_sampling", coefficient_bit_precision=bit_precision)
-        op, num_gradient = mapper._build_outer_prep(container)
-        assert num_gradient == 0
+        prepare_circuit = mapper._build_outer_prepare_circuit(container)
+        op = prepare_circuit._qsharp_op
+        assert prepare_circuit.metadata.num_phase_gradient_ancillas == 0
 
         coefficients = np.asarray(container.outer_prepare.get_coefficients())
         num_index_qubits = math.ceil(math.log2(len(coefficients))) if len(coefficients) > 1 else 1
@@ -230,7 +244,7 @@ class TestInnerPrep:
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op, _ = outer_mapper._build_outer_prep(container)
+        outer_op = outer_mapper._build_outer_prepare_circuit(container)._qsharp_op
 
         # Build inner prep
         bit_precision = 6
@@ -288,8 +302,10 @@ class TestInnerPrep:
 
             # Normalize to conditional probability
             total_prob = np.sum(probs)
-            if total_prob < 1e-10:
-                continue
+            expected_outer_prob = abs(outer_coeffs[ell]) ** 2 / np.sum(np.abs(outer_coeffs) ** 2)
+            assert total_prob == pytest.approx(expected_outer_prob, abs=1e-9), (
+                f"outer={ell}, algorithm={algorithm}: branch weight {total_prob} != {expected_outer_prob}"
+            )
             probs /= total_prob
 
             # Expected: |c_{l,b}|² / Σ|c_{l,j}|²
@@ -306,10 +322,10 @@ class TestSOSSAMapper:
     """Tests for the SOSSA block-encoding circuit mapper."""
 
     def test_rejects_non_sossa_container(self):
-        """Verify SOSSAMapper raises ValueError for non-SOSSAWalkContainer containers."""
+        """Verify SOSSAMapper raises ValueError for non-SOSSABlockEncodingContainer containers."""
 
         class MockContainer:
-            """Mock container that is not a SOSSAWalkContainer."""
+            """Mock container that is not a SOSSABlockEncodingContainer."""
 
             @property
             def type(self):
@@ -320,6 +336,14 @@ class TestSOSSAMapper:
         mapper = SOSSAMapper()
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(unitary_rep)
+
+    def test_rejects_non_unit_power(self):
+        """The mapper emits a single block encoding, so a powered container must be refused."""
+        built = _build_sossa_unitary().get_container()
+        powered = SOSSABlockEncodingContainer.from_json({**built.to_json(), "power": 3})
+
+        with pytest.raises(ValueError, match="only unit power"):
+            SOSSAMapper().run(UnitaryRepresentation(container=powered))
 
     @pytest.mark.parametrize(
         ("outer_alg", "inner_alg", "select_alg"),
@@ -352,6 +376,54 @@ class TestSOSSAMapper:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
+    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self):
+        """One block applies two inner PREPARE pairs against a single free-rider pair."""
+        coefficients = [[1.0, 1.0, 1.0, 1.0] for _ in range(6)]
+        free_rider_data = [[False, True] for _ in range(6)]
+
+        # Inner pair costs are 27 inline versus 25 split; the free-rider pair costs 5. At the
+        # 2:1 pair ratio splitting costs 2*25 + 5 = 55 against 2*27 = 54, so the word stays
+        # inline; at 4:1 it was 4*25 + 5 = 105 against 4*27 = 108 and was split out. Both
+        # clear by a margin, so the case does not rest on a tie-break.
+        load_separately = QSHARP_UTILS.SOSSAWalk.TestShouldLoadFreeRiderSeparately(
+            coefficients,
+            free_rider_data,
+            1,
+        )
+
+        assert load_separately is False
+
+    @pytest.mark.parametrize(
+        ("sf_rows", "sf_address_qubits", "dq_rows", "dq_address_qubits"),
+        [
+            (4, 2, 4, 2),
+            (3, 2, 3, 2),
+            (5, 3, 3, 2),
+            (2, 1, 7, 3),
+        ],
+    )
+    def test_branched_angle_word_erasure_restores_the_address_register(
+        self,
+        sf_rows: int,
+        sf_address_qubits: int,
+        dq_rows: int,
+        dq_address_qubits: int,
+    ) -> None:
+        """The measurement-based erasure must phase exactly what the forward load wrote."""
+        width = 3
+        sf_data = [[(i + j) % 3 == 0 for j in range(width)] for i in range(sf_rows)]
+        dq_data = [[bool((i >> j) & 1) for j in range(width - 1)] for i in range(dq_rows)]
+
+        # The erasure measures, so a mismatched row only shows up for the outcomes whose
+        # parity it changes; repeat to keep the check from passing by luck.
+        for _ in range(8):
+            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+                sf_data,
+                dq_data,
+                sf_address_qubits,
+                dq_address_qubits,
+            )
+
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
         operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(1, 1, 1, 1))
         sossa = operator.get_container()
@@ -377,8 +449,7 @@ class TestSOSSAMapper:
         system_state = np.array([1.0, 2.0, 3.0, 4.0]) / np.sqrt(30.0)
         expected = expected_block @ system_state
         actual = _block_encoding_action(circuit, num_system_qubits=2, system_state=system_state)
-        global_phase = np.vdot(expected, actual)
-        actual *= np.exp(-1j * np.angle(global_phase))
+        actual *= np.exp(-1j * np.angle(np.vdot(expected, actual)))
         np.testing.assert_allclose(actual, expected, atol=1e-10)
 
     def test_full_block_matches_hgap_on_two_orbital_general_angle_fixture(self):
@@ -392,7 +463,7 @@ class TestSOSSAMapper:
         u_matrices = np.array([[[0.6, 0.8]]])  # (R=1, B=1, N=2), general angle
         w_matrices = np.array([[[0.7]]])  # (R=1, B=1, C=1)
         wb_matrix = np.array([[0.3]])  # (R=1, C=1)
-        _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix)
+        _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, sweep_basis=True)
 
     def test_full_block_matches_hgap_with_multiple_ranks_copies_mixed_signs(self):
         """The block matches ``H_gap/Lambda - I`` for R>1, C>1, mixed-sign ``w_b`` and ``w_B>0``.
@@ -427,6 +498,25 @@ class TestSOSSAMapper:
         assert num_gradient == mapper.settings().get("rotation_bit_precision")
         assert circuit.num_qubits == num_system_qubits + num_outer_qubits + num_reflect_inner + 2 + num_gradient
         assert circuit.num_qubits - num_system_qubits - num_gradient > 0
+
+    def test_outer_prepare_layout_uses_declared_circuit_width(self):
+        unitary = _build_sossa_unitary()
+        container = unitary.get_container()
+        mapper = _make_sossa_mapper(select_algorithm="direct")
+        outer_extra_bits = 2
+        gradient_bits = 3
+        outer_prepare_circuit = Circuit(
+            qasm="OPENQASM 3.0;",
+            num_qubits=container.layout.outer_prep_bits + outer_extra_bits + gradient_bits,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=gradient_bits),
+        )
+
+        regs, _ = mapper._compute_register_sizes(container, outer_prepare_circuit)
+
+        assert regs["num_outer_qubits"] == container.layout.outer_prep_bits + outer_extra_bits
+        assert regs["num_outer_prepare_gradient_qubits"] == gradient_bits
+        assert regs["num_phase_gradient_qubits"] == gradient_bits
+        assert regs["num_ancilla_qubits"] == (regs["num_outer_qubits"] + regs["num_reflect_inner"] + 2 + gradient_bits)
 
 
 def _vector_to_givens_angles(vec: np.ndarray) -> list[float]:
@@ -514,7 +604,6 @@ class TestSelectFullFidelity:
         total = round(math.log2(len(sv)))
         xo_bits = math.ceil(math.log2(N + 1)) if N + 1 > 1 else 1
         system0 = xo_bits + (1 + 2) + 2  # outer + (b bits + free-rider) + spin
-        spin_dq = xo_bits + 1 + 2
 
         def amplitude(occupied):
             index = sum(1 << (total - 1 - (system0 + q)) for q in occupied)
@@ -529,7 +618,6 @@ class TestSelectFullFidelity:
             f"SELECT applied the Majorana of {measured} where the angles encode {u}; "
             f"the Givens chain is not the rotation U(u) of Eq. 93"
         )
-        assert spin_dq < system0  # layout guard: spinDQ precedes the system register
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
@@ -626,74 +714,4 @@ class TestSOSSAWalkLogicalCounts:
         max_overhead = n_xo + n_b + N + 10
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
-        )
-
-
-def _int_to_bools(value: int, width: int) -> list[bool]:
-    """Convert integer to little-endian Bool array (matching Q# IntAsBoolArray)."""
-    return [(value >> i) & 1 == 1 for i in range(width)]
-
-
-def _bools_to_qs(data: list) -> str:
-    """Convert nested Python bool list to Q# literal string."""
-    if isinstance(data[0], list):
-        return "[" + ", ".join(_bools_to_qs(row) for row in data) + "]"
-    return "[" + ", ".join("true" if b else "false" for b in data) + "]"
-
-
-def _make_random_data_1d(n_data: int, n_bits: int, seed: int = 42) -> list[list[bool]]:
-    """Generate random Bool[][] data for 1D SelectSwap tests."""
-    rng = np.random.default_rng(seed)
-    return [_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_data)]
-
-
-_NS = "QDKChemistry.Utils.SelectSwap"
-
-
-class TestSelectSwapCorrectness:
-    """Verify SelectSwap loads the correct data for each address."""
-
-    @pytest.mark.parametrize(
-        ("n_data", "n_bits", "num_swap_bits"),
-        [
-            (4, 3, 0),  # no swap (plain Select)
-            (4, 3, 1),  # 1 swap bit
-            (8, 4, 0),  # 8 entries, no swap
-            (8, 4, 1),  # 8 entries, 1 swap bit
-            (8, 4, 2),  # 8 entries, 2 swap bits
-        ],
-    )
-    def test_1d_all_addresses(self, n_data, n_bits, num_swap_bits):
-        """For each address |i⟩, SelectSwap should load data[i] into output."""
-        data = _make_random_data_1d(n_data, n_bits)
-        result = create_qsharp_context().eval(
-            f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, {num_swap_bits})"
-        )
-        assert result, f"SelectSwap 1D failed: n_data={n_data}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
-
-    def test_1d_auto_lambda(self):
-        """SelectSwap with numSwapBits=-1 (auto-optimal) should produce correct results."""
-        data = _make_random_data_1d(8, 4)
-        result = create_qsharp_context().eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
-        assert result, "SelectSwap 1D with auto lambda failed"
-
-    @pytest.mark.parametrize(
-        ("n_outer", "n_inner", "n_bits", "num_swap_bits"),
-        [
-            (2, 4, 3, 0),  # no swap
-            (2, 4, 3, 1),  # 1 swap bit
-            (3, 4, 4, 0),  # non-power-of-2 outer
-        ],
-    )
-    def test_2d_all_addresses(self, n_outer, n_inner, n_bits, num_swap_bits):
-        """For each (i, j), SelectSwap2D should load data[i][j] into target."""
-        rng = np.random.default_rng(42)
-        data = [
-            [_int_to_bools(int(rng.integers(0, 2**n_bits)), n_bits) for _ in range(n_inner)] for _ in range(n_outer)
-        ]
-        result = create_qsharp_context().eval(
-            f"{_NS}.TestSelectSwap2DCorrectness({_bools_to_qs(data)}, {num_swap_bits}, false)"
-        )
-        assert result, (
-            f"SelectSwap2D failed: n_outer={n_outer}, n_inner={n_inner}, n_bits={n_bits}, num_swap_bits={num_swap_bits}"
         )

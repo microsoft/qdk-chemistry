@@ -283,15 +283,15 @@ class PauliDecompositionContainer(QubitOperatorContainer):
             other: The qubit operator to add.
 
         Returns:
-            A new ``QubitOperator`` with concatenated terms.
+            A new ``QubitOperator`` with concatenated terms, or ``NotImplemented``
+            if *other* is not a ``PauliDecompositionContainer``.
 
         Raises:
-            TypeError: If *other* is not a ``QubitOperator``.
             ValueError: If the two operators have different qubit counts, encodings, or modes.
 
         """
         if not isinstance(other, PauliDecompositionContainer):
-            raise TypeError(f"Cannot add PauliDecompositionContainer with {type(other).__name__}.")
+            return NotImplemented
         if self.num_qubits != other.num_qubits:
             raise ValueError(f"Cannot add operators with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:

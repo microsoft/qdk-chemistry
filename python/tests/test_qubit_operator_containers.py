@@ -5,12 +5,28 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from functools import partial
+from operator import methodcaller
+
 import h5py
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (
+    PartiallyRandomized,
+)
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import qdrift_samples_campbell
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_naive
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
+    zassenhaus_omitted_commutator_norm,
+    zassenhaus_steps_naive,
+)
 from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
@@ -20,6 +36,7 @@ from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     SumOfSquaresContainer,
     SumOfSquaresMetadata,
 )
+from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
 
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
 
@@ -72,7 +89,7 @@ class TestPauliDecompositionContainer:
         container = operator.get_container()
 
         assert isinstance(container, QubitOperatorContainer)
-        assert QubitOperator(container).get_container() is container
+        assert QubitOperator(container=container).get_container() is container
         assert operator.get_container_type() == "pauli_decomposition"
         assert operator.num_qubits == 2
         assert operator.pauli_strings is container.pauli_strings
@@ -83,7 +100,9 @@ class TestPauliDecompositionContainer:
 
         # equiv and arithmetic are defined on the wrapper rather than forwarded, so they
         # have to unwrap the operand and rewrap the result.
-        assert operator.equiv(QubitOperator(PauliDecompositionContainer(["ZZ", "XI"], np.array([-0.25, 0.5]))))
+        assert operator.equiv(
+            QubitOperator(container=PauliDecompositionContainer(["ZZ", "XI"], np.array([-0.25, 0.5])))
+        )
         scaled = 2 * operator
         added = operator + operator
         assert isinstance(scaled, QubitOperator)
@@ -121,7 +140,7 @@ class TestPauliDecompositionContainer:
         """Complex coefficients keep their shape and dtype across the shared array codec."""
         coefficients = np.array([0.5 + 0.25j, -0.25j], dtype=np.complex64)
         container = PauliDecompositionContainer(["XI", "ZZ"], coefficients, "jordan-wigner", "blocked")
-        operator = QubitOperator(container)
+        operator = QubitOperator(container=container)
 
         json_data = operator.to_json()
         assert json_data["coefficients"] == {
@@ -148,7 +167,7 @@ class TestPauliDecompositionContainer:
         """The container reloads from HDF5 through the qubit operator's container dispatch."""
         coefficients = np.array([0.5 + 0.25j, -0.25j], dtype=np.complex64)
         container = PauliDecompositionContainer(["XI", "ZZ"], coefficients, "jordan-wigner", "blocked")
-        operator = QubitOperator(container)
+        operator = QubitOperator(container=container)
         path = tmp_path / "pauli.h5"
 
         with h5py.File(path, "w") as handle:
@@ -179,7 +198,7 @@ class TestSumOfSquaresContainer:
         """
         container = _sum_of_squares_container()
 
-        json_data = QubitOperator(container).to_json()
+        json_data = QubitOperator(container=container).to_json()
         assert json_data["one_body"]["coeffs"]["shape"] == [2, 2]
         assert json_data["one_body"]["coeffs"]["dtype"] == "complex128"
         assert json_data["one_body"]["paulis"] == ["X", "Y"]
@@ -196,7 +215,7 @@ class TestSumOfSquaresContainer:
         path = tmp_path / "sos.h5"
 
         with h5py.File(path, "w") as handle:
-            QubitOperator(container).to_hdf5(handle.create_group("operator"))
+            QubitOperator(container=container).to_hdf5(handle.create_group("operator"))
 
         with h5py.File(path, "r") as handle:
             assert handle["operator"].attrs["container_type"] == "sum_of_squares"
@@ -205,7 +224,24 @@ class TestSumOfSquaresContainer:
         restored = operator.get_container()
         assert isinstance(restored, SumOfSquaresContainer)
         _assert_sum_of_squares_containers_match(restored, container)
-        assert operator.content_hash() == QubitOperator(container).content_hash()
+        assert operator.content_hash() == QubitOperator(container=container).content_hash()
+
+    def test_hdf5_dispatch_accepts_a_byte_valued_container_type(self, tmp_path) -> None:
+        """h5py hands back fixed-length string attributes as bytes, which must still dispatch."""
+        container = _sum_of_squares_container()
+        path = tmp_path / "sos_bytes.h5"
+
+        with h5py.File(path, "w") as handle:
+            group = handle.create_group("operator")
+            QubitOperator(container=container).to_hdf5(group)
+            group.attrs["container_type"] = np.bytes_(b"sum_of_squares")
+
+        with h5py.File(path, "r") as handle:
+            assert isinstance(handle["operator"].attrs["container_type"], bytes)
+            restored = QubitOperator.from_hdf5(handle["operator"]).get_container()
+
+        assert isinstance(restored, SumOfSquaresContainer)
+        _assert_sum_of_squares_containers_match(restored, container)
 
     def test_rejects_inputs_that_are_not_internally_consistent(self) -> None:
         """A block owns the shape facts every block shares; the container owns metadata agreement."""
@@ -403,3 +439,89 @@ class TestSumOfSquaresQubitMapper:
 
         with pytest.raises(ValueError, match=match):
             SumOfSquaresQubitMapper().run(Hamiltonian(factorized), mapping)
+
+
+def _run_builder(qubit_hamiltonian, builder_type, **settings):
+    """Run a freshly constructed unitary builder on the operator."""
+    return builder_type(**settings).run(qubit_hamiltonian)
+
+
+def _run_term_grouper(qubit_hamiltonian, strategy):
+    """Run a registered term-grouping strategy on the operator."""
+    return create("term_grouper", strategy).run(qubit_hamiltonian)
+
+
+class TestPauliOnlyAlgorithmsRejectSumOfSquares:
+    """Algorithms written against Pauli terms must reject a sum-of-squares operator."""
+
+    @pytest.mark.parametrize(
+        ("invoke", "error", "match"),
+        [
+            (partial(_run_builder, builder_type=LCUBuilder), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_builder, builder_type=QDrift, time=1.0), ValueError, "requires a Pauli decomposition"),
+            (
+                partial(_run_builder, builder_type=PartiallyRandomized, time=1.0),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (partial(_run_builder, builder_type=Trotter, time=1.0), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_builder, builder_type=Zassenhaus, time=1.0), ValueError, "requires a Pauli decomposition"),
+            (partial(_run_term_grouper, strategy="commuting"), ValueError, "requires a Pauli decomposition"),
+            (
+                partial(_run_term_grouper, strategy="qubit_wise_commuting"),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (partial(_run_term_grouper, strategy="identity"), ValueError, "requires a Pauli decomposition"),
+            (
+                partial(_run_term_grouper, strategy="vacuum_annihilating"),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (commutator_bound_first_order, ValueError, "requires a Pauli decomposition"),
+            (
+                partial(qdrift_samples_campbell, time=1.0, target_accuracy=1e-3),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (
+                partial(trotter_steps_naive, time=1.0, target_accuracy=1e-3),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (
+                partial(zassenhaus_steps_naive, time=1.0, target_accuracy=1e-3),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (
+                partial(zassenhaus_omitted_commutator_norm, order=1, weight_threshold=1e-12),
+                ValueError,
+                "requires a Pauli decomposition",
+            ),
+            (methodcaller("to_matrix"), NotImplementedError, "sum_of_squares"),
+        ],
+        ids=[
+            "lcu",
+            "qdrift",
+            "partially_randomized",
+            "trotter",
+            "zassenhaus",
+            "term_grouper_commuting",
+            "term_grouper_qubit_wise_commuting",
+            "term_grouper_identity",
+            "term_grouper_vacuum_annihilating",
+            "commutator_bound",
+            "qdrift_samples",
+            "trotter_steps",
+            "zassenhaus_steps",
+            "zassenhaus_omitted_commutator_norm",
+            "to_matrix",
+        ],
+    )
+    def test_run_rejects_a_sum_of_squares_operator(self, invoke, error, match):
+        """The call fails naming the representation rather than on a missing Pauli attribute."""
+        operator = QubitOperator(container=_sum_of_squares_container())
+
+        with pytest.raises(error, match=match):
+            invoke(operator)

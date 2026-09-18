@@ -60,45 +60,50 @@ class QubitOperator(DataClass):
 
     def __init__(
         self,
-        container: QubitOperatorContainer | list[str] | None = None,
+        pauli_strings: list[str] | None = None,
         coefficients: np.ndarray | None = None,
         encoding: str | None = None,
         fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
         term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
         *,
-        pauli_strings: list[str] | None = None,
+        container: QubitOperatorContainer | None = None,
     ) -> None:
         """Initialize from a container or directly from Pauli strings and coefficients.
 
         Args:
-            container (QubitOperatorContainer | list[str] | None): A qubit operator container, or
-                legacy positional Pauli strings.
-            coefficients (numpy.ndarray | None): Coefficients for legacy Pauli-string construction.
-            encoding (str | None): Fermion-to-qubit encoding for legacy Pauli-string construction.
+            pauli_strings (list[str] | None): Pauli strings for Pauli decomposition construction.
+            coefficients (numpy.ndarray | None): Coefficients for Pauli decomposition construction.
+            encoding (str | None): Fermion-to-qubit encoding for Pauli decomposition construction.
             fermion_mode_order (~qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None):
-                Fermion mode ordering for legacy Pauli-string construction.
+                Fermion mode ordering for Pauli decomposition construction.
             term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Term partition
-                for legacy Pauli-string construction.
-            tapering (TaperingSpecification | None): Tapering metadata for legacy Pauli-string construction.
-            pauli_strings (list[str] | None): Pauli strings for legacy keyword construction.
+                for Pauli decomposition construction.
+            tapering (TaperingSpecification | None): Tapering metadata for Pauli decomposition construction.
+            container (~qdk_chemistry.data.qubit_operator.containers.base.QubitOperatorContainer | None):
+                A qubit operator container, for representations other than a Pauli decomposition.
+
+        Raises:
+            TypeError: If *container* is not a
+                :class:`~qdk_chemistry.data.qubit_operator.containers.base.QubitOperatorContainer`,
+                if it is combined with Pauli decomposition arguments, or if neither a container nor
+                Pauli strings and coefficients are given.
 
         """
-        if isinstance(container, QubitOperatorContainer):
+        if container is not None:
+            if not isinstance(container, QubitOperatorContainer):
+                raise TypeError(f"container must be a QubitOperatorContainer, got {type(container).__name__}")
             if any(
                 value is not None
-                for value in (coefficients, encoding, fermion_mode_order, term_partition, tapering, pauli_strings)
+                for value in (pauli_strings, coefficients, encoding, fermion_mode_order, term_partition, tapering)
             ):
                 raise TypeError("QubitOperator container construction does not accept Pauli decomposition arguments")
-            resolved_container = container
+            resolved_container: QubitOperatorContainer = container
         else:
-            if container is not None and pauli_strings is not None:
-                raise TypeError("Specify Pauli strings either positionally or by keyword, not both")
-            resolved_pauli_strings = pauli_strings if pauli_strings is not None else container
-            if resolved_pauli_strings is None or coefficients is None:
+            if pauli_strings is None or coefficients is None:
                 raise TypeError("QubitOperator requires a QubitOperatorContainer or Pauli strings and coefficients")
             resolved_container = PauliDecompositionContainer(
-                resolved_pauli_strings,
+                pauli_strings,
                 np.asarray(coefficients),
                 encoding,
                 fermion_mode_order,
@@ -183,7 +188,7 @@ class QubitOperator(DataClass):
             AttributeError: If the wrapped representation does not define the reordering.
 
         """
-        return QubitOperator(self._forward("to_interleaved")(n_spatial))
+        return QubitOperator(container=self._forward("to_interleaved")(n_spatial))
 
     def __add__(self, other: Any) -> QubitOperator:
         """Return the sum of two qubit operators, rewrapped.
@@ -193,13 +198,14 @@ class QubitOperator(DataClass):
         """
         if not isinstance(other, QubitOperator):
             return NotImplemented
-        return QubitOperator(self._forward("__add__")(other.get_container()))
+        added = self._forward("__add__")(other.get_container())
+        return NotImplemented if added is NotImplemented else QubitOperator(container=added)
 
     def __mul__(self, scalar: Any) -> QubitOperator:
         """Return the operator with all coefficients scaled by *scalar*."""
         # The container owns which scalars it accepts, so ask it rather than restating the set.
         scaled = self._forward("__mul__")(scalar)
-        return NotImplemented if scaled is NotImplemented else QubitOperator(scaled)
+        return NotImplemented if scaled is NotImplemented else QubitOperator(container=scaled)
 
     def __rmul__(self, scalar: Any) -> QubitOperator:
         """Support ``scalar * operator``."""
@@ -241,7 +247,7 @@ class QubitOperator(DataClass):
             container = SumOfSquaresContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
-        return cls(container)
+        return cls(container=container)
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> QubitOperator:
@@ -251,13 +257,15 @@ class QubitOperator(DataClass):
         holds a Pauli decomposition operator; see :meth:`from_json`.
         """
         container_type = group.attrs.get("container_type", "pauli_decomposition")
+        if isinstance(container_type, bytes):
+            container_type = container_type.decode("utf-8")
         if container_type == "pauli_decomposition":
             container = PauliDecompositionContainer.from_hdf5(group)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
-        return cls(container)
+        return cls(container=container)
 
 
 class _DeprecatedQubitOperatorAliasMeta(type(QubitOperator)):  # type: ignore[misc]

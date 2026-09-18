@@ -317,17 +317,36 @@ class TestConditionalAliasSampling:
     """Tests for conditional alias sampling without free-rider data."""
 
     def test_non_power_of_two_prepare_can_be_adjointed_after_a_phase(self):
+        r"""``PREP†·Z(index₀)·PREP`` returns to the start with amplitude :math:`\langle Z\rangle`.
+
+        Garbage cancels between equal indices, so the overlap is :math:`\sum_i p_i (-1)^{b(i)}`;
+        ``indexReg[0]`` is the index's low bit, so ``Z`` flips the odd indices. Only the magnitude
+        is asserted: ``Adjoint Select`` erases by measurement, leaving a random global
+        :math:`\pm 1`.
+        """
         coefficients = [[0.2, 0.3, 0.5], [0.4, 0.1, 0.5]]
         bits_precision = 4
+        condition_value = 1
         n_cond_bits = 1
         n_index_bits = 2
         n_qrom_output = bits_precision + n_index_bits + 2
         total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
-        op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPhaseTestOp(coefficients, bits_precision, 1, 0)
+        op = QSHARP_UTILS.AliasSampling.MakeConditionalAliasSamplingPhaseTestOp(
+            coefficients, bits_precision, condition_value, 0
+        )
 
-        state = dump_operation_on_state(op, total_qubits, context=get_qsharp_context())
+        state = np.array(dump_operation_on_state(op, total_qubits, context=get_qsharp_context()))
+
+        probs = np.abs(coefficients[condition_value]) ** 2
+        probs = probs / probs.sum()
+        expected = float(np.sum(probs * (-1.0) ** (np.arange(len(probs)) % 2)))
+        # The conditional register is the leading qubit and was set to `condition_value`.
+        initial = condition_value << (total_qubits - 1)
 
         assert np.linalg.norm(state) == pytest.approx(1.0)
+        assert abs(state[initial]) == pytest.approx(
+            abs(expected), abs=len(probs) * _alias_atol(len(probs), bits_precision)
+        )
 
     @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
     @pytest.mark.parametrize("condition_value", [0, 1])

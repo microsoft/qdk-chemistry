@@ -149,7 +149,7 @@ class SumOfSquaresQubitMapper(QubitMapper):
         energy_shift = container.get_core_energy() - one_body_shift - two_body_shift
 
         return QubitOperator(
-            SumOfSquaresContainer(
+            container=SumOfSquaresContainer(
                 one_body,
                 two_body,
                 mapping.name,
