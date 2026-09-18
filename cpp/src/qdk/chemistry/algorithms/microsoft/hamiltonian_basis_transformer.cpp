@@ -173,12 +173,18 @@ QdkHamiltonianBasisTransformer::QdkHamiltonianBasisTransformer() {
   _settings = std::make_unique<HamiltonianBasisTransformerSettings>();
 }
 
+void QdkHamiltonianBasisTransformer::lock_settings_once() const {
+  std::call_once(_settings_lock_once,
+                 [this] { HamiltonianBasisTransformer::lock_settings(); });
+}
+
 std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::run(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     std::shared_ptr<data::Orbitals> target_orbitals) const {
   const std::scoped_lock lock(_run_mutex);
-  return HamiltonianBasisTransformer::run(std::move(hamiltonian),
-                                          std::move(target_orbitals));
+  lock_settings_once();
+  // The base run() would write the settings lock again after releasing the GIL.
+  return _run_impl(std::move(hamiltonian), std::move(target_orbitals));
 }
 
 std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
