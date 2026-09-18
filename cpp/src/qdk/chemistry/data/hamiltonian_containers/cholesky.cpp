@@ -15,7 +15,6 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <sstream>
 #include <stdexcept>
 
 #include "../filename_utils.hpp"
@@ -276,18 +275,38 @@ void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
   }
 
   auto norb_alpha = _one_body->block({axes::alpha(), axes::alpha()}).rows();
+  auto norb_beta = _one_body->block({axes::beta(), axes::beta()}).rows();
+  const auto& row_extents = _three_center->extents()[0];
+  const auto& column_extents = _three_center->extents()[1];
+  const auto extent_matches = [](const auto& extents,
+                                 const SymmetryLabel& label, size_t expected) {
+    const auto iterator = extents.find(label);
+    return iterator != extents.end() && iterator->second == expected;
+  };
+  if (!extent_matches(row_extents, axes::alpha(), norb_alpha) ||
+      !extent_matches(row_extents, axes::beta(), norb_beta) ||
+      !extent_matches(column_extents, axes::alpha(), norb_alpha) ||
+      !extent_matches(column_extents, axes::beta(), norb_beta)) {
+    throw std::invalid_argument(
+        "Three-center MO-slot extents do not match the active one-body "
+        "dimensions");
+  }
   auto naux = _three_center->extents()[2].at(SymmetryLabel{});
-  auto expected_size = static_cast<size_t>(norb_alpha * norb_alpha) * naux;
+  const auto expected_alpha_rows =
+      static_cast<size_t>(norb_alpha) * static_cast<size_t>(norb_alpha);
+  const auto expected_beta_rows =
+      static_cast<size_t>(norb_beta) * static_cast<size_t>(norb_beta);
 
   const auto& aa =
       _three_center->block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
-  if (static_cast<size_t>(aa.size()) != expected_size) {
-    throw std::invalid_argument("Alpha-alpha three-center integrals size (" +
-                                std::to_string(aa.size()) +
-                                ") does not match expected norb^2 * naux (" +
-                                std::to_string(expected_size) + " for " +
-                                std::to_string(norb_alpha) + " orbitals and " +
-                                std::to_string(naux) + " auxiliaries)");
+  if (static_cast<size_t>(aa.rows()) != expected_alpha_rows ||
+      static_cast<size_t>(aa.cols()) != naux) {
+    throw std::invalid_argument("Alpha-alpha three-center integrals shape (" +
+                                std::to_string(aa.rows()) + ", " +
+                                std::to_string(aa.cols()) +
+                                ") does not match expected (norb^2, naux) = (" +
+                                std::to_string(expected_alpha_rows) + ", " +
+                                std::to_string(naux) + ")");
   }
 
   if (!_three_center->all_aliased(
@@ -295,9 +314,14 @@ void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
             {axes::beta(), axes::beta(), SymmetryLabel{}}}})) {
     const auto& bb =
         _three_center->block({axes::beta(), axes::beta(), SymmetryLabel{}});
-    if (static_cast<size_t>(bb.size()) != expected_size) {
+    if (static_cast<size_t>(bb.rows()) != expected_beta_rows ||
+        static_cast<size_t>(bb.cols()) != naux) {
       throw std::invalid_argument(
-          "Beta three-center integrals size does not match Alpha");
+          "Beta-beta three-center integrals shape (" +
+          std::to_string(bb.rows()) + ", " + std::to_string(bb.cols()) +
+          ") does not match expected (norb^2, naux) = (" +
+          std::to_string(expected_beta_rows) + ", " + std::to_string(naux) +
+          ")");
     }
   }
 }

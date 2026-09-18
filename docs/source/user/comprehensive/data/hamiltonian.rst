@@ -82,6 +82,10 @@ Once properly constructed with all required data, the Hamiltonian object should 
       :start-after: // start-cell-hamiltonian-creation
       :end-before: // end-cell-hamiltonian-creation
 
+To re-express an existing Cholesky Hamiltonian in another active-orbital basis,
+use the :doc:`HamiltonianBasisTransformer <../algorithms/hamiltonian_basis_transformer>`
+algorithm.
+
 Accessing Hamiltonian data
 --------------------------
 

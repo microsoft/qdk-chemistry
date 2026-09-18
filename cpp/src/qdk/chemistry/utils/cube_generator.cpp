@@ -121,8 +121,7 @@ GauXC::BasisSet<double> to_gauxc_basis(const data::BasisSet& qdk) {
   for (std::size_t ia = 0; ia < qdk.get_num_atoms(); ++ia) {
     CA center{coords(ia, 0), coords(ia, 1), coords(ia, 2)};
     for (const auto& sh : qdk.get_shells_for_atom(ia)) {
-      // All-zero radial powers are plain r^0 Gaussians, which
-      // from_basis_name uses to represent ordinary electron shells.
+      // Missing or explicitly zero radial powers are plain r^0 Gaussians.
       if (sh.has_radial_powers() && (sh.rpowers.array() != 0).any())
         throw std::invalid_argument(
             "CubeGenerator: radial-power shells are unsupported.");

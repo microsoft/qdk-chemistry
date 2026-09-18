@@ -4,6 +4,19 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+- Restricted Cholesky Hamiltonians can be transformed to another orthonormal
+  basis of the same active orbital subspace with the
+  ``HamiltonianBasisTransformer`` algorithm, reusing the existing three-center
+  factors instead of repeating AO integral evaluation and Cholesky
+  decomposition. Target-metric validation bounds numerical null-mode
+  amplification, and Python execution freezes settings once per instance before
+  releasing the GIL. JSON and HDF5 loading preserve all-electron basis metadata
+  so stored Hamiltonians remain compatible with their original orbital basis.
+  Named Gaussian AO shells no longer carry unused ECP radial-power metadata.
+
 Version 2.2.1
 =============
 

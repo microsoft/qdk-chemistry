@@ -22,7 +22,10 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data._type_name import class_data_type_name
-from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+from qdk_chemistry.data.symmetry import (
+    SymmetryProduct,
+    axes,
+)
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
@@ -1110,6 +1113,9 @@ class TestCholeskyHamiltonian:
         result = container.get_ao_cholesky_vectors()
         assert result is not None
         np.testing.assert_array_almost_equal(result, ao_vecs)
+        assert not result.flags.writeable
+        with pytest.raises(ValueError, match="read-only"):
+            result[0, 0] = 0.0
 
     def test_ao_cholesky_vectors_roundtrip_json(self):
         """Test that AO Cholesky vectors survive JSON round-trip."""
