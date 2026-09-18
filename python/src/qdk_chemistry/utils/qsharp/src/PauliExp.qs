@@ -413,7 +413,7 @@ namespace QDKChemistry.Utils.PauliExp {
 
     /// A repeated structured product formula, optionally conjugated once as a whole.
     struct StructuredSparseRepPauliExpParams {
-        conjugatingGroups : SparsePauliExpGroupParams[],
+        conjugatingGroups : ConjugatedSparsePauliExpParams[],
         stepBlocks : ConjugatedSparsePauliExpParams[],
         repetitions : Int,
     }
@@ -445,7 +445,7 @@ namespace QDKChemistry.Utils.PauliExp {
             RepeatedStructuredSparsePauliExp(params, systems);
         } else {
             within {
-                SparsePauliExpGroups(params.conjugatingGroups, systems);
+                StructuredSparsePauliExpStep(params.conjugatingGroups, systems);
             } apply {
                 RepeatedStructuredSparsePauliExp(params, systems);
             }

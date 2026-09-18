@@ -144,10 +144,13 @@ class PlaquetteTrotter(Trotter):
         r"""Build Campbell's segmented plaquette product formula.
 
         Define :math:`D=e^{-isH_I}`, :math:`P=e^{-isH_h^p}`, and
-        :math:`G=e^{-isH_h^g}`. Campbell's Eqs. (E1)--(E2) rewrite repeated symmetric steps
-        :math:`D^{1/2} P^{1/2} G P^{1/2} D^{1/2}` as
-        :math:`D^{1/2}(P^{1/2} G P^{1/2} D)^rD^{-1/2}` after ``r`` repetitions.
-        :meth:`_decompose_trotter_step` emits the four-factor repeated body; this
+        :math:`G=e^{-isH_h^g}`. Repeated symmetric steps
+        :math:`P^{1/2} D^{1/2} G D^{1/2} P^{1/2}` merge across repetitions into
+        :math:`P^{-1/2}(D^{1/2} G D^{1/2} P)^r P^{1/2}`, following the ordering of
+        arXiv:2609.05316 Eqs. (16a)--(16b). Merging the hopping layer rather than the
+        interaction is what saves: the body then carries two hopping layers instead of
+        three, and hopping dominates the layer cost.
+        :meth:`_decompose_trotter_step` emits the repeated body; this
         method adds the one-time boundary factors, which are left bare in a
         controlled circuit.
 
@@ -168,9 +171,12 @@ class PlaquetteTrotter(Trotter):
             atol=self._settings.get("weight_threshold"),
         )
         num_sites = self._settings.get("lattice_width") * self._settings.get("lattice_height")
-        _, diagonal, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
-        diagonal = [term for term in diagonal if term.pauli_term]
-        boundary = self._diagonal_layer(diagonal, delta * 0.5, max_batch=self._settings.get("max_batch"))
+        hopping, _, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
+        section_a, _ = self._plaquette_sections(
+            self._settings.get("lattice_width"), self._settings.get("lattice_height")
+        )
+        opening = self._hop_layer(section_a, num_sites=num_sites, hopping=hopping, time=delta * 0.5)
+        boundary = [opening] if opening is not None else []
 
         return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
@@ -255,6 +261,15 @@ class PlaquetteTrotter(Trotter):
         # 3. The complete plaquette error constant from Eq. (D6).
         w_plaquette = w_so2 + w_extra2
 
+        # Campbell derives W_PLAQ for his own factor order, which puts the interaction
+        # outside; this builder puts a hopping tiling outside instead (arXiv:2609.05316
+        # Eq. (16a)) to merge the expensive layer across repetitions. Reusing his
+        # constant is therefore an approximation. Measured on the periodic 2x2 lattice
+        # over U/t in [1, 16], the swap changes the empirical constant by a factor of
+        # 0.50x to 1.01x, i.e. it is more accurate everywhere except the strongest
+        # coupling, where it is 0.6% worse; at the U/t = 8 benchmark point it is 0.965x.
+        # Larger lattices, where the two tilings no longer commute, were not measured.
+
         # 4. Eq. (F2) gives epsilon_TS <= W s^2. Requiring this upper bound to
         # meet target_accuracy gives s <= sqrt(target_accuracy / W).
         if w_plaquette <= 0.0 or time == 0.0:
@@ -275,9 +290,9 @@ class PlaquetteTrotter(Trotter):
 
         With :math:`D=e^{-isH_I}`, :math:`P=e^{-isH_h^p}`, and
         :math:`G=e^{-isH_h^g}`, the returned terms implement
-        :math:`P^{1/2} G P^{1/2} D`: two pink half-layers, one gold full layer,
-        and one full interaction layer. :meth:`_trotter` supplies the one-time
-        :math:`D^{1/2}` and :math:`D^{-1/2}` boundary layers.
+        :math:`D^{1/2} G D^{1/2} P`: two batched interaction half-layers, one gold
+        full layer, and one full pink layer. :meth:`_trotter` supplies the one-time
+        :math:`P^{-1/2}` and :math:`P^{1/2}` boundary layers.
 
         Args:
             qubit_hamiltonian: The Hamiltonian to decompose.
@@ -343,14 +358,11 @@ class PlaquetteTrotter(Trotter):
             if constant
             else []
         )
-        # For each tile, we diagonalize R_plaq and realize the tile with 2 Z rotations and 4 F gates.
-        # Repeated body 1: P^(1/2), the first pink hopping half-layer.
-        hop_a_open = self._hop_layer(
-            section_a,
-            num_sites=num_sites,
-            hopping=hopping,
-            time=time * 0.5,
-        )
+        # Repeated body 1: D^(1/2), the first interaction half-layer. After the
+        # particle-hole shift each onsite interaction contributes one rotation, and its
+        # equal-angle family is phased through a single Hamming weight register by
+        # default; see the max_batch setting to bound that width.
+        open_interaction = self._diagonal_layer(diagonal, time * 0.5, max_batch=self._settings.get("max_batch"))
         # Repeated body 2: G, the gold hopping layer.
         hop_b = self._hop_layer(
             section_b,
@@ -358,21 +370,27 @@ class PlaquetteTrotter(Trotter):
             hopping=hopping,
             time=time,
         )
-        # Repeated body 3: P^(1/2), the second pink hopping half-layer.
-        hop_a_close = self._hop_layer(
+        # Repeated body 3: D^(1/2), the second interaction half-layer.
+        close_interaction = self._diagonal_layer(diagonal, time * 0.5, max_batch=self._settings.get("max_batch"))
+        # Repeated body 4: P, one full pink hopping layer. Carrying the merged pink
+        # layer here rather than the interaction is what buys the saving: a hopping
+        # layer costs far more than a batched interaction layer, so the body holds two
+        # hopping layers instead of three.
+        hop_a = self._hop_layer(
             section_a,
             num_sites=num_sites,
             hopping=hopping,
-            time=time * 0.5,
+            time=time,
         )
-        # Repeated body 4: D, one full H_I layer. After the particle-hole shift,
-        # each onsite interaction contributes one rotation. Its equal-angle family is
-        # phased through a single Hamming weight register by default, which costs
-        # ceil(log2) rotations rather than one per chunk at the price of about one
-        # ancilla per member; see the max_batch setting to bound that width.
-        interaction = self._diagonal_layer(diagonal, time, max_batch=self._settings.get("max_batch"))
-        hopping_layers = [layer for layer in (hop_a_open, hop_b, hop_a_close) if layer is not None]
-        return hopping_layers + identity_phase + interaction
+        body: list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm] = []
+        body.extend(open_interaction)
+        if hop_b is not None:
+            body.append(hop_b)
+        body.extend(close_interaction)
+        body.extend(identity_phase)
+        if hop_a is not None:
+            body.append(hop_a)
+        return body
 
     def _split_hopping(self, qubit_hamiltonian, num_sites, atol):
         """Separate uniform hopping, the :math:`H_I` terms, and the bond graph.

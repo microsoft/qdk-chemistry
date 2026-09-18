@@ -149,7 +149,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         )
         if structured:
             mapped_params = QSHARP_UTILS.PauliExp.StructuredSparseRepPauliExpParams(
-                conjugatingGroups=[self._encode_group(term) for term in unitary_container.conjugating_terms],
+                conjugatingGroups=[self._encode_block(term) for term in unitary_container.conjugating_terms],
                 stepBlocks=[self._encode_block(term) for term in unitary_container.step_terms],
                 repetitions=unitary_container.step_reps,
             )
