@@ -129,9 +129,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``order``
      - int
      - Trotter-Suzuki order (1 for first-order, 2+ for higher even orders). Default is 1.
-    * - ``minimize_rotations``
-       - bool
-       - Reorder groups to minimize emitted Pauli rotations for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
+   * - ``minimize_rotations``
+     - bool
+     - Reorder groups to minimize emitted Pauli rotations for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
@@ -144,6 +144,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+   * - ``fuse_group_boundaries``
+     - bool
+     - Fuse matching commuting-group boundaries without unrolling repetitions. Default is ``False``; independent of ``minimize_rotations``.
 
 
 .. _zassenhaus-builder:
@@ -229,6 +232,9 @@ First-order formulas retain the default ordering even when the setting is enable
 
 This is an algorithm :class:`~qdk_chemistry.data.Settings` option: it can be supplied to :func:`~qdk_chemistry.algorithms.create`, updated through ``settings()``, or passed in a nested :class:`~qdk_chemistry.data.AlgorithmRef` used by evolution or QPE builders.
 
+Independently, ``fuse_group_boundaries=True`` retains ``group_offsets`` after ordering and ``weight_threshold`` filtering, with each group spanning all its layers, and calls :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` with ``atol=0.0``.
+This preserves group order, requested time, and the Trotter approximation apart from floating-point rounding; see :ref:`compact-product-formulas` and :ref:`mapper compatibility <compact-formula-mappers>`.
+
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
 
@@ -282,6 +288,30 @@ Example::
     #   exp(-i * +0.2500 * IIXI)
     #   exp(-i * +0.2500 * IXII)
     #   exp(-i * +0.2500 * XIII)
+
+
+.. _compact-product-formulas:
+
+Compact product-formula containers
+---------------------------------
+
+A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` executes ``beginning`` once, then ``step_terms`` repeated ``step_reps`` times, then ``end`` once.
+:attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials` counts ``len(beginning) + step_reps * len(step_terms) + len(end)``; :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms` counts ``len(beginning) + len(step_terms) + len(end)``.
+These are structural counts, not synthesized gate counts.
+
+Optional ``group_offsets`` delimit validated commuting groups in ``step_terms`` only, increasing strictly from zero to the body length.
+Without this metadata, boundary fusion treats each term as a singleton group.
+
+With no argument, :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` fuses repetition boundaries with equal commuting Pauli-word sets by adding signed angles, without unrolling.
+A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``beginning`` or ``end`` are returned unchanged, making the rewrite idempotent.
+The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
+
+With another formula, ``combine(other_container, atol=1e-12)`` appends its evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
+It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including endpoints, and returns ``step_reps=1``.
+
+:doc:`JSON and HDF5 serialization <../data/serialization>` always write fixed schema ``0.4.0`` without expansion and read legacy ``0.2.0`` lists and packed ``0.3.0`` payloads.
+Plain formulas without endpoints or group metadata retain their legacy content hashes.
+Compact storage and :ref:`mapping <compact-formula-mappers>` do not guarantee compact circuit export, simulation, or resource estimation.
 
 
 .. _block-encoding-builder:

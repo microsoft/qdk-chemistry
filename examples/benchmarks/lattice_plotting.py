@@ -64,7 +64,9 @@ def plot_lattice_graph(
     if not np.isfinite(rotation_degrees):
         raise ValueError("rotation_degrees must be finite.")
     angle = np.deg2rad(rotation_degrees)
-    rotation = np.array([[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]])
+    rotation = np.array(
+        [[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
+    )
     original_positions = geometry.positions
     positions = original_positions @ rotation.T
     connections = graph.connections
@@ -79,27 +81,48 @@ def plot_lattice_graph(
             segment = np.array([start, start + bond.displacement]) @ rotation.T
             segments.setdefault((shell, bond.flavor), []).append(segment)
 
-    flavors = sorted({flavor for shell, flavor in segments if shell in selected and flavor is not None})
+    flavors = sorted(
+        {
+            flavor
+            for shell, flavor in segments
+            if shell in selected and flavor is not None
+        }
+    )
     palette = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     colors = {flavor: palette[i % len(palette)] for i, flavor in enumerate(flavors)}
     colors.update(flavor_colors or {})
-    scaffold = [segment for (shell, _), bonds in segments.items() if shell == 1 for segment in bonds]
+    scaffold = [
+        segment
+        for (shell, _), bonds in segments.items()
+        if shell == 1
+        for segment in bonds
+    ]
     styles = ("solid", "dashed", "dotted", "dashdot")
     figure, axes_grid = plt.subplots(
-        1, len(panels), figsize=(5.5 * len(panels), 5.6), squeeze=False, sharex=True, sharey=True, layout="constrained"
+        1,
+        len(panels),
+        figsize=(5.5 * len(panels), 5.6),
+        squeeze=False,
+        sharex=True,
+        sharey=True,
+        layout="constrained",
     )
     axes = axes_grid.ravel()
     for panel_index, (shell, axis) in enumerate(zip(panels, axes, strict=True)):
         ax: Axes = axis
         if shell is not None and shell != 1 and scaffold:
-            ax.add_collection(LineCollection(scaffold, colors="#CBD5E1", linewidths=1.0, zorder=1))
+            ax.add_collection(
+                LineCollection(scaffold, colors="#CBD5E1", linewidths=1.0, zorder=1)
+            )
         bond_count = 0
         for (bond_shell, flavor), bonds in segments.items():
             if bond_shell == shell:
                 ax.add_collection(
                     LineCollection(
                         bonds,
-                        colors=colors.get(flavor, "#1687B1"),
+                        colors=colors.get(flavor, "#1687B1")
+                        if flavor is not None
+                        else "#1687B1",
                         linestyles=styles[panel_index % len(styles)],
                         linewidths=1.9,
                         zorder=2,
@@ -117,22 +140,42 @@ def plot_lattice_graph(
                 arrowprops={"arrowstyle": "->", "color": "#475569", "lw": 1.2},
                 zorder=4,
             )
-            ax.annotate(label, xy=endpoint, xytext=(3, 4), textcoords="offset points", fontsize=13)
+            ax.annotate(
+                label,
+                xy=endpoint,
+                xytext=(3, 4),
+                textcoords="offset points",
+                fontsize=13,
+            )
             ax.update_datalim(np.array([origin, endpoint]))
         ax.autoscale_view()
         ax.margins(0.12)
         ax.set_aspect("equal")
         ax.set_axis_off()
-        ax.set_title(f"Shell {shell} | {bond_count} bonds" if shell is not None else "Sites (no shells selected)")
+        ax.set_title(
+            f"Shell {shell} | {bond_count} bonds"
+            if shell is not None
+            else "Sites (no shells selected)"
+        )
     legend = [
-        Line2D([], [], color=colors[flavor], lw=2.5, label=(flavor_labels or {}).get(flavor, f"Flavor {flavor}"))
+        Line2D(
+            [],
+            [],
+            color=colors[flavor],
+            lw=2.5,
+            label=(flavor_labels or {}).get(flavor, f"Flavor {flavor}"),
+        )
         for flavor in flavors
     ]
     if any(shell in selected and flavor is None for shell, flavor in segments):
         legend.append(Line2D([], [], color="#1687B1", lw=2.5, label="Unflavored bonds"))
     if scaffold and any(shell is not None and shell != 1 for shell in panels):
-        legend.append(Line2D([], [], color="#CBD5E1", lw=1.5, label="Nearest-neighbor scaffold"))
+        legend.append(
+            Line2D([], [], color="#CBD5E1", lw=1.5, label="Nearest-neighbor scaffold")
+        )
     if legend:
-        figure.legend(handles=legend, loc="outside lower center", ncols=len(legend), frameon=False)
+        figure.legend(
+            handles=legend, loc="outside lower center", ncols=len(legend), frameon=False
+        )
     figure.suptitle(title or f"Lattice graph | {graph.num_sites} sites")
     return figure, axes

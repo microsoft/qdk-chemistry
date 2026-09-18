@@ -37,7 +37,13 @@ class ControlledBatchedPauliSequenceMapper(ControlledPauliSequenceMapper):
         parameters = _pauli_evolution_parameters(container)
         batch_offsets = [0]
         occupied: set[int] = set()
+        boundaries = {len(container.beginning), len(container.beginning) + len(container.step_terms)}
         for term_index, support in enumerate(parameters["pauliIndices"]):
+            # A batch must not mix one-time endpoints with the repeated body.
+            if term_index in boundaries:
+                if batch_offsets[-1] != term_index:
+                    batch_offsets.append(term_index)
+                occupied.clear()
             if not support:
                 # Identity phases act on the control, not on a parity target.
                 if batch_offsets[-1] != term_index:
@@ -49,8 +55,8 @@ class ControlledBatchedPauliSequenceMapper(ControlledPauliSequenceMapper):
                     batch_offsets.append(term_index)
                     occupied.clear()
                 occupied.update(support)
-        if batch_offsets[-1] != len(container.step_terms):
-            batch_offsets.append(len(container.step_terms))
+        if batch_offsets[-1] != len(parameters["pauliIndices"]):
+            batch_offsets.append(len(parameters["pauliIndices"]))
 
         params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**parameters)
         return Circuit(

@@ -6,6 +6,7 @@ namespace QDKChemistry.Utils.BatchedControlledPauliExp {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
+    import Std.Arrays.IndexOf;
     import Std.Arrays.Subarray;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
@@ -75,17 +76,22 @@ namespace QDKChemistry.Utils.BatchedControlledPauliExp {
         control : Qubit,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
+        let first = IndexOf(offset -> offset == params.beginning, batchOffsets);
+        let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.end, batchOffsets);
+        let stepOffsets = batchOffsets[first..last];
+        ControlledPauliExp(params, batchOffsets[0..first], control, systems);
         if IsResourceEstimating() {
             within {
                 RepeatEstimates(params.repetitions);
             } apply {
-                ControlledPauliExp(params, batchOffsets, control, systems);
+                ControlledPauliExp(params, stepOffsets, control, systems);
             }
         } else {
             for _ in 1..params.repetitions {
-                ControlledPauliExp(params, batchOffsets, control, systems);
+                ControlledPauliExp(params, stepOffsets, control, systems);
             }
         }
+        ControlledPauliExp(params, batchOffsets[last...], control, systems);
     }
 
     /// Creates a batched controlled circuit with explicit physical register indices.

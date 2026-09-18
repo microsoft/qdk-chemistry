@@ -51,6 +51,7 @@ class TrotterSettings(TimeEvolutionSettings):
             error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
             minimize_rotations: Place the largest active groups at the Suzuki endpoints. Defaults to False.
+            fuse_group_boundaries: Fuse repeated commuting group boundaries without unrolling. Defaults to False.
 
         """
         super().__init__()
@@ -83,6 +84,12 @@ class TrotterSettings(TimeEvolutionSettings):
             False,
             "Minimize emitted Pauli rotations for a fixed partition and even Suzuki order by reordering groups.",
         )
+        self._set_default(
+            "fuse_group_boundaries",
+            "bool",
+            False,
+            "Fuse matching commuting groups across repetitions while retaining compact loops.",
+        )
 
 
 class Trotter(TimeEvolutionBuilder):
@@ -100,6 +107,7 @@ class Trotter(TimeEvolutionBuilder):
         power: int = 1,
         power_strategy: str = "repeat",
         minimize_rotations: bool = False,
+        fuse_group_boundaries: bool = False,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -154,6 +162,7 @@ class Trotter(TimeEvolutionBuilder):
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
             minimize_rotations: Reorder even-order groups to minimize emitted Pauli factors. Defaults to False.
+            fuse_group_boundaries: Return a compact boundary-fused formula with certified groups. Defaults to False.
 
         """
         super().__init__()
@@ -167,6 +176,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("minimize_rotations", minimize_rotations)
+        self._settings.set("fuse_group_boundaries", fuse_group_boundaries)
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
@@ -218,7 +228,9 @@ class Trotter(TimeEvolutionBuilder):
 
         delta = time / num_divisions
 
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
+        terms, group_offsets = self._decompose_grouped_trotter_step(
+            qubit_hamiltonian, time=delta, atol=weight_threshold
+        )
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -227,8 +239,11 @@ class Trotter(TimeEvolutionBuilder):
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
             scale=time,
+            group_offsets=group_offsets if self._settings.get("fuse_group_boundaries") else None,
         )
 
+        if self._settings.get("fuse_group_boundaries"):
+            container = container.combine(atol=0.0)
         return UnitaryRepresentation(container=container)
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
@@ -289,7 +304,18 @@ class Trotter(TimeEvolutionBuilder):
             A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
 
         """
+        return self._decompose_grouped_trotter_step(qubit_hamiltonian, time, atol=atol)[0]
+
+    def _decompose_grouped_trotter_step(
+        self,
+        qubit_hamiltonian: QubitOperator,
+        time: float,
+        *,
+        atol: float = 1e-12,
+    ) -> tuple[list[ExponentiatedPauliTerm], tuple[int, ...]]:
+        """Retain emitted group boundaries after ordering and coefficient filtering."""
         terms: list[ExponentiatedPauliTerm] = []
+        offsets = [0]
 
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
@@ -308,7 +334,7 @@ class Trotter(TimeEvolutionBuilder):
         }
         if not maps:
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
-            return terms
+            return terms, (0,)
 
         partition = qubit_hamiltonian.term_partition
         groups = (
@@ -318,7 +344,7 @@ class Trotter(TimeEvolutionBuilder):
         )
         if not groups:
             Logger.warn("Term partition produced no groups; returning empty term list.")
-            return terms
+            return terms, (0,)
 
         first_order = self._settings.get("order") == 1
         if not first_order and self._settings.get("minimize_rotations") and len(groups) > 1:
@@ -343,8 +369,10 @@ class Trotter(TimeEvolutionBuilder):
                     for i in layer
                     if i in maps
                 )
+            if len(terms) != offsets[-1]:
+                offsets.append(len(terms))
 
-        return terms
+        return terms, tuple(offsets)
 
     def _trotter_schedule(self, num_groups: int) -> list[tuple[float, int]]:
         """Return shared Strang/Suzuki time fractions and group indices for one step."""

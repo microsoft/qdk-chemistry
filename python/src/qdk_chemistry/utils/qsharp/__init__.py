@@ -11,6 +11,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import cache
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -80,7 +81,7 @@ def _pauli_evolution_parameters(container: "PauliProductFormulaContainer") -> di
     # Higher-order formulas reuse words; convert each ordered support only once per call.
     converted = {}
     indices, ops, angles = [], [], []
-    for term in container.step_terms:
+    for term in chain(container.beginning, container.step_terms, container.end):
         word = tuple(term.pauli_term.items())
         if word not in converted:
             converted[word] = (
@@ -96,6 +97,8 @@ def _pauli_evolution_parameters(container: "PauliProductFormulaContainer") -> di
         "pauliOps": ops,
         "pauliCoefficients": angles,
         "repetitions": container.step_reps,
+        "beginning": len(container.beginning),
+        "end": len(container.end),
     }
 
 

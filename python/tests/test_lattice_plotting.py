@@ -11,6 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+
 from qdk_chemistry.data import LatticeGeometry, LatticeGraph
 from qdk_chemistry.utils.model_hamiltonians import kitaev_honeycomb_bond_flavors
 

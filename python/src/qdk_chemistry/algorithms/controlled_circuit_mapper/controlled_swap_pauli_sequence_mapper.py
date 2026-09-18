@@ -247,6 +247,10 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the vacuum is not an eigenstate of the product formula.
 
         """
+        if container.beginning or container.end:
+            raise ValueError(
+                "CSWAP mapping does not support beginning/end terms; use a controlled Pauli sequence mapper."
+            )
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
         # A residual left by one step leaks again on every repetition, so the per-step budget shrinks.
         atol = self._settings.get("vacuum_preservation_tolerance") / container.step_reps

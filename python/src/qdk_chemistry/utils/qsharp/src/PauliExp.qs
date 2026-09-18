@@ -116,6 +116,9 @@ namespace QDKChemistry.Utils.PauliExp {
         pauliOps : Pauli[][],
         pauliCoefficients : Double[],
         repetitions : Int,
+        // Counts of one-time terms before and after the repeated body.
+        beginning : Int,
+        end : Int,
     }
 
     /// Applies one step, accessing only each term's non-identity support.
@@ -136,17 +139,23 @@ namespace QDKChemistry.Utils.PauliExp {
 
     /// Repeats a step symbolically during resource estimation, and explicitly during simulation.
     operation SparseRepPauliExp(params : SparseRepPauliExpParams, systems : Qubit[]) : Unit is Adj + Ctl {
+        let endStart = Length(params.pauliCoefficients) - params.end;
+        let beginning = 0..params.beginning - 1;
+        let step = params.beginning..endStart - 1;
+        let end = endStart..Length(params.pauliCoefficients) - 1;
+        SparsePauliExp(params.pauliIndices[beginning], params.pauliOps[beginning], params.pauliCoefficients[beginning], systems);
         if IsResourceEstimating() {
             within {
                 RepeatEstimates(params.repetitions);
             } apply {
-                SparsePauliExp(params.pauliIndices, params.pauliOps, params.pauliCoefficients, systems);
+                SparsePauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems);
             }
         } else {
             for _ in 1..params.repetitions {
-                SparsePauliExp(params.pauliIndices, params.pauliOps, params.pauliCoefficients, systems);
+                SparsePauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems);
             }
         }
+        SparsePauliExp(params.pauliIndices[end], params.pauliOps[end], params.pauliCoefficients[end], systems);
     }
 
     /// Creates a circuit for repeated sparse Pauli evolution.

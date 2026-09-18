@@ -194,7 +194,7 @@ class TestPauliProductFormulaContainer:
             assert not {"term_offsets", "qubit_indices", "pauli_codes", "angles"} & written.keys()
         else:
             with h5py.File(path, "r") as group:
-                assert group.attrs["version"] == "0.2.0"
+                assert group.attrs["version"] == PauliProductFormulaContainer._serialization_version
                 assert "step_terms" in group
                 assert not {"term_offsets", "qubit_indices", "pauli_codes", "angles"} & group.keys()
         assert PauliProductFormulaContainer.from_file(path, file_format).content_hash() == expected.content_hash()

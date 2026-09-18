@@ -49,6 +49,14 @@ Settings
    ``control_indices`` (list of int): Which qubits serve as controls (default: ``[0]``).
    ``target_indices`` (list of int): Which qubits the unitary acts on (default: auto-filled).
 
+.. _compact-formula-mappers:
+
+.. rubric:: Compact product-formula support
+
+:ref:`Compact product-formula containers <compact-product-formulas>` are supported by :class:`~qdk_chemistry.algorithms.circuit_mapper.PauliSequenceMapper`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`, and :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledBatchedPauliSequenceMapper`.
+They execute ``beginning`` and ``end`` once, preserving the body's symbolic ``step_reps``; batches do not cross these segment boundaries.
+The :ref:`CSWAP mapper <cswap-pauli-sequence-mapper>` requires empty endpoints.
+
 .. rubric:: Creating a mapper
 
 .. tab:: Python API
@@ -116,6 +124,8 @@ improvement is not a guarantee of constant total gate depth. The default
 Select the batched variant through a :class:`~qdk_chemistry.data.AlgorithmRef` in
 the ``controlled_circuit_mapper`` setting of a :doc:`QPE circuit builder <qpe_circuit_builder>`.
 
+.. _cswap-pauli-sequence-mapper:
+
 Controlled SWAP Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -165,6 +175,11 @@ commute and can be exponentiated term by term.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
+
+.. important::
+
+   This mapper raises :class:`ValueError` for nonempty ``beginning`` or ``end``, even when ``step_reps=1``; use a :ref:`supported controlled Pauli sequence mapper <compact-formula-mappers>` instead.
+   Repetitions and ``group_offsets`` remain supported when both endpoints are empty, subject to vacuum preservation.
 
 .. rubric:: Worked example
 
