@@ -9,7 +9,6 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-import scipy.sparse
 
 from qdk_chemistry.data import Hamiltonian, LatticeGraph, LayeredPartition, QubitOperator
 from qdk_chemistry.utils import model_hamiltonians
@@ -281,43 +280,40 @@ class TestSparseSpinHamiltonians:
         assert actual.pauli_strings == (["IIX", "IXI", "XII"] if field else ["III"])
         np.testing.assert_array_equal(actual.coefficients, [field] * (3 if field else 1))
 
-    def test_filtered_supports_share_native_coloring(self) -> None:
-        """Color each distinct support once and partition terms into disjoint, equal-axis layers."""
+    def test_filtered_supports_restrict_stored_coloring(self) -> None:
+        """Restrict stored colors to distinct supports with disjoint layers and complete coverage."""
         graph = LatticeGraph.square(3, 2, t=0.5)
+        coloring = graph.edge_coloring
+        assert coloring is not None
         jx = np.zeros((6, 6))
+        jy = np.zeros((6, 6))
         jz = np.zeros((6, 6))
         jx[0, 1] = jx[1, 2] = jx[3, 4] = 1.0
+        # Disjoint YY edges retain different stored colors instead of merging.
+        jy[0, 1] = jy[4, 5] = -2.0
         jz[0, 3] = jz[1, 4] = jz[2, 5] = -0.5
-        jy = -2.0 * jx
         jy[0, 5] = 9.0  # A non-edge does not alter the active support.
 
-        with patch.object(
-            model_hamiltonians, "greedy_edge_coloring", wraps=model_hamiltonians.greedy_edge_coloring
-        ) as colorer:
-            actual = create_heisenberg_hamiltonian(graph, jx, jy, jz)
-        assert colorer.call_count == 2
-        assert actual.num_terms == 9
+        actual = create_heisenberg_hamiltonian(graph, jx, jy, jz)
+        assert actual.num_terms == 8
         partition = actual.term_partition
         assert isinstance(partition, LayeredPartition)
         assert partition.num_groups == 3
         assert sorted(partition.all_indices()) == list(range(actual.num_terms))
         terms = actual.pauli_strings
-        for group in partition.groups:
+        supports = (((0, 1), (1, 2), (3, 4)), ((0, 1), (4, 5)), ((0, 3), (1, 4), (2, 5)))
+        for group, pauli_axis, support in zip(partition.groups, "XYZ", supports, strict=True):
             axes = {axis for layer in group for term in layer for _, axis in terms.factors(term)}
-            assert len(axes) == 1
+            assert axes == {pauli_axis}
+            expected_layers = [
+                [edge for edge in support if coloring[edge] == color]
+                for color in sorted({coloring[edge] for edge in support})
+            ]
+            actual_layers = [[tuple(qubit for qubit, _ in terms.factors(term)) for term in layer] for layer in group]
+            assert actual_layers == expected_layers
             for layer in group:
                 sites = [qubit for term in layer for qubit, _ in terms.factors(term)]
                 assert len(sites) == len(set(sites))
-
-    @pytest.mark.parametrize(
-        ("shape", "trials", "message"),
-        [((1, 2), 1, "square"), ((2, 1), 1, "square"), ((2, 2), 0, "positive"), ((2, 2), -1, "positive")],
-    )
-    def test_native_coloring_rejects_invalid_input(self, shape, trials, message):
-        """Validate adjacency shape and trial count before native coloring."""
-        adjacency = scipy.sparse.csr_matrix(np.ones(shape))
-        with pytest.raises(ValueError, match=message):
-            model_hamiltonians.greedy_edge_coloring(adjacency, trials=trials)
 
     @pytest.mark.parametrize("broadcast", [False, True])
     @pytest.mark.parametrize("include_term_groups", [False, True])

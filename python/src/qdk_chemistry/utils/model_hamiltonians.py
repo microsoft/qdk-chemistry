@@ -10,7 +10,6 @@ from array import array
 import numpy as np
 import scipy.sparse
 
-from qdk_chemistry._core.data import greedy_edge_coloring
 from qdk_chemistry._core.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
     create_huckel_hamiltonian,
@@ -47,16 +46,16 @@ def _build_sparse_hamiltonian(
 
     Grouped terms retain the field-axis, coupling-axis, and lexicographic
     edge order of the geometry builder. Without a coloring, terms retain
-    the expression builder's edge-major, then site-major order. Identical
-    active coupling supports share one coloring; the full factory coloring
-    is reused unchanged. Sparse assembly storage is linear in sites and edges,
-    apart from any matrices supplied by the caller.
+    the expression builder's edge-major, then site-major order. Each coupling
+    family restricts the stored graph coloring to its active edges. Sparse
+    assembly storage is linear in sites and edges, apart from any matrices
+    supplied by the caller.
 
     Args:
         graph: Lattice graph defining connectivity.
         couplings: Axis and scalar or matrix coupling for each equal-axis two-body block.
         fields: Axis and scalar or vector coefficient for each single-body block.
-        coloring: Factory edge coloring, or ``None`` to leave terms ungrouped.
+        coloring: Stored graph edge coloring, or ``None`` to leave terms ungrouped.
 
     Returns:
         QubitOperator: Sparse operator with an optional :class:`~qdk_chemistry.data.LayeredPartition`.
@@ -121,24 +120,15 @@ def _build_sparse_hamiltonian(
             if layer:
                 groups_layers.append((layer,))
 
-        coloring_cache = {np.arange(edges.nnz, dtype=np.intp).tobytes(): coloring}
         for code, coupling_terms in edge_couplings:
             active = np.flatnonzero(coupling_terms)
             if not active.size:
                 continue
-            support_key = active.tobytes()
-            coupling_coloring = coloring_cache.get(support_key)
-            if coupling_coloring is None:
-                support = scipy.sparse.csr_matrix(
-                    (np.ones(active.size), (edges.row[active], edges.col[active])), shape=(n, n)
-                )
-                coupling_coloring = greedy_edge_coloring(support + support.T, seed=0, trials=32)
-                coloring_cache[support_key] = coupling_coloring
             color_to_indices: dict[int, list[int]] = {}
             for index in active:
                 edge = (int(edges.row[index]), int(edges.col[index]))
                 coefficient = float(coupling_terms[index])
-                color_to_indices.setdefault(coupling_coloring[edge], []).append(append_term(edge, code, coefficient))
+                color_to_indices.setdefault(coloring[edge], []).append(append_term(edge, code, coefficient))
             groups_layers.append(tuple(tuple(color_to_indices[color]) for color in sorted(color_to_indices)))
 
     if not coefficients:

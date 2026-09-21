@@ -282,9 +282,8 @@ When enabled, the builder consults the lattice's edge coloring and stores the re
 * each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
 
-Coupling families with identical nonzero edge supports share a coloring.
-The full factory coloring is reused when all its edges are active; smaller supports are colored independently.
-Recoloring can reduce the number of layers and change the ordering of noncommuting groups in a finite-step Trotter approximation, while leaving the Hamiltonian unchanged.
+Builders reuse ``graph.edge_coloring`` for each Pauli family's nonzero terms without recoloring.
+If the graph has no stored coloring, construction falls back to ungrouped terms.
 
 Downstream consumers — most importantly the :doc:`Trotter time-evolution builder <algorithms/hamiltonian_unitary_builder>` — read ``term_partition`` automatically and use it to schedule fewer sequential exponentials per Trotter step.
 No manual geometry boilerplate is required at the call site.
