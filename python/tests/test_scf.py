@@ -113,7 +113,12 @@ class TestScfSolver:
 
         energy, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
 
-        assert np.isclose(energy, regular_energy, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert np.isclose(
+            energy,
+            regular_energy,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
+        )
         assert regular_wavefunction.get_orbitals().is_restricted()
         assert wavefunction.get_orbitals().is_restricted()
 
@@ -131,7 +136,12 @@ class TestScfSolver:
         assert orbitals is not None
 
         # Compare with expected energy from C++ test
-        assert np.isclose(energy, -75.9229032345, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert np.isclose(
+            energy,
+            -75.9229032345,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
+        )
 
         # Check that orbitals have expected properties
         coefficients = orbitals.coefficients()
@@ -154,7 +164,12 @@ class TestScfSolver:
         assert orbitals is not None
 
         # Compare with expected energy from C++ test
-        assert np.isclose(energy, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert np.isclose(
+            energy,
+            -76.0205776518,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
+        )
 
     def test_scf_solver_emits_iteration_logs_when_info_enabled(self, capfd):
         """Test that SCF iteration diagnostics respect the shared global logger level."""
@@ -188,7 +203,12 @@ class TestScfSolver:
         # Should solve successfully with valid settings
         scf_solver = algorithms.create("scf_solver")
         energy, _ = scf_solver.run(water, 0, 1, "def2-tzvp")
-        assert np.isclose(energy, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert np.isclose(
+            energy,
+            -76.0205776518,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
+        )
 
     def test_scf_solver_initial_guess_restart(self):
         """Test SCF solver with initial guess from converged orbitals."""
@@ -203,7 +223,10 @@ class TestScfSolver:
 
         # Verify we get the expected energy for HF/def2-tzvp
         assert np.isclose(
-            energy_first, -76.0205776518, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+            energy_first,
+            -76.0205776518,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
         )
 
         # Now restart with the converged orbitals as initial guess
@@ -217,7 +240,10 @@ class TestScfSolver:
 
         # Should get the same energy (within tight tolerance)
         assert np.isclose(
-            energy_first, energy_second, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+            energy_first,
+            energy_second,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
         )
 
     def test_scf_solver_oxygen_triplet_initial_guess(self):
@@ -232,7 +258,10 @@ class TestScfSolver:
 
         # Verify we get the expected energy for HF/STO-3G triplet
         assert np.isclose(
-            energy_o2_first, -147.63396964335112, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+            energy_o2_first,
+            -147.63396964335112,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
         )
 
         # Now restart with the converged orbitals as initial guess
@@ -246,7 +275,10 @@ class TestScfSolver:
 
         # Should get the same energy (within tight tolerance)
         assert np.isclose(
-            energy_o2_first, energy_o2_second, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+            energy_o2_first,
+            energy_o2_second,
+            rtol=float_comparison_relative_tolerance,
+            atol=scf_energy_tolerance,
         )
 
     def test_h2_scan_diis_numerical_stability(self):

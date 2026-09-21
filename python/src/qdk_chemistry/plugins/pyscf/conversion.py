@@ -636,7 +636,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         active-space effective Hamiltonians with folded core contributions are not supported.
 
         For an interface using electron count and multiplicity, see
-        :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.
+        ``hamiltonian_to_scf_from_n_electrons_and_multiplicity``.
 
     Examples:
         >>> import numpy as np
