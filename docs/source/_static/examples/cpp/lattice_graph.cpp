@@ -56,16 +56,16 @@ int main() {
   // start-cell-coloring
   // Here XX acts on shell 1 and ZZ on shell 2, with nonzero couplings
   // throughout.
-  std::vector<std::pair<std::uint64_t, std::uint64_t>> xx_pairs, zz_pairs;
+  const auto& coloring = graph.edge_coloring().value();
+  EdgeColoring xx_coloring, zz_coloring;
   for (const auto& c : graph.connections()) {
+    const auto pair = std::make_pair(c.site_i, c.site_j);
     if (c.bond_class.shell == 1) {
-      xx_pairs.emplace_back(c.site_i, c.site_j);
+      xx_coloring.emplace(pair, coloring.at(pair));
     } else if (c.bond_class.shell == 2) {
-      zz_pairs.emplace_back(c.site_i, c.site_j);
+      zz_coloring.emplace(pair, coloring.at(pair));
     }
   }
-  auto xx_coloring = graph.color_edges(xx_pairs);
-  auto zz_coloring = graph.color_edges(zz_pairs);
   // end-cell-coloring
 
   // --------------------------------------------------------------------------------------------

@@ -73,8 +73,11 @@ print(
 # Here XX acts on shell 1 and ZZ on shell 2, with nonzero couplings throughout.
 xx_pairs = [(c.site_i, c.site_j) for c in graph.connections if c.bond_class.shell == 1]
 zz_pairs = [(c.site_i, c.site_j) for c in graph.connections if c.bond_class.shell == 2]
-xx_coloring = graph.color_edges(xx_pairs)
-zz_coloring = graph.color_edges(zz_pairs)
+# Restrict the constructor's coloring; neither family is recolored.
+coloring = graph.edge_coloring
+assert coloring is not None
+xx_coloring = {pair: coloring[pair] for pair in xx_pairs}
+zz_coloring = {pair: coloring[pair] for pair in zz_pairs}
 # end-cell-coloring
 ################################################################################
 

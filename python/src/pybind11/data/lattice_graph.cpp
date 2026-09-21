@@ -84,22 +84,6 @@ Args:
         return self.flavor;
       });
 
-  // Module-level free functions for edge coloring.
-  m.def("greedy_edge_coloring", &greedy_edge_coloring,
-        R"(
-Greedy randomized edge coloring of an arbitrary graph.
-
-Args:
-    adj (scipy.sparse matrix): Sparse adjacency matrix of the graph.
-    seed (int, optional): Random seed. Defaults to 0.
-    trials (int, optional): Number of edge-order trials; fewer than one returns an empty coloring. Defaults to 1.
-
-Returns:
-    dict[tuple[int, int], int]: Mapping of canonical edges to color labels.
-)",
-        py::arg("adj"), py::arg("seed") = 0, py::arg("trials") = 1,
-        py::call_guard<py::gil_scoped_release>());
-
   m.def("trivial_edge_coloring", &trivial_edge_coloring, R"(
 Trivial edge coloring where every edge receives a unique color.
 
@@ -392,32 +376,12 @@ Returns:
       R"(
 Edge coloring stored at construction time, or ``None``.
 
-Factory methods for recognised topologies pre-populate this field.
+Factory methods and explicit physical-connection constructors pre-populate this field.
 Returns ``None`` for lattices constructed without a coloring.
 
 Returns:
     dict[tuple[int, int], int] | None: Independent mapping of canonical edges to non-negative color labels, or None.
 )");
-
-  lattice_graph.def("color_edges", &LatticeGraph::color_edges, R"(
-Greedily color only the supplied active simple support.
-
-Colors depend on the supplied pairs, not weights or stored topology coloring.
-
-Args:
-    active_pairs (list[tuple[int, int]]): Canonical pairs with ``0 <= i < j < num_sites``; duplicates are ignored.
-    seed (int, optional): Random seed, using the same traversal as greedy_edge_coloring. Defaults to 0.
-    trials (int, optional): Number of edge-order trials; fewer than one returns an empty coloring. Defaults to 32.
-
-Returns:
-    dict[tuple[int, int], int]: Active pairs mapped to colors with disjoint endpoints per color.
-
-Raises:
-    ValueError: If a pair is noncanonical or out of bounds.
-)",
-                    py::arg("active_pairs"), py::arg("seed") = 0,
-                    py::arg("trials") = 32,
-                    py::call_guard<py::gil_scoped_release>());
 
   // Static factory methods
   lattice_graph.def_static("chain", &LatticeGraph::chain, R"(

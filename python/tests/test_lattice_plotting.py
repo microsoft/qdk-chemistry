@@ -41,7 +41,11 @@ def test_positions_bonds_and_rotation(plot_graph, model):
     rotation = np.array([[0, -1], [1, 0]])
     figure, axes = plot_graph(graph, rotation_degrees=90, flavor_labels={0: "X", 1: "Y", 2: "Z"})
     try:
-        np.testing.assert_allclose(axes[0].collections[-1].get_offsets(), geometry.positions @ rotation.T, atol=1e-14)
+        np.testing.assert_allclose(
+            axes[0].collections[-1].get_offsets(),
+            geometry.positions @ rotation.T,
+            atol=1e-14,
+        )
         for shell, axis in zip(graph.selected_shells, axes, strict=True):
             actual = [
                 tuple(np.round(segment, 12).ravel())
@@ -50,7 +54,13 @@ def test_positions_bonds_and_rotation(plot_graph, model):
                 for segment in collection.get_segments()
             ]
             expected = [
-                np.array([geometry.positions[b.site_i], geometry.positions[b.site_i] + b.displacement]) @ rotation.T
+                np.array(
+                    [
+                        geometry.positions[b.site_i],
+                        geometry.positions[b.site_i] + b.displacement,
+                    ]
+                )
+                @ rotation.T
                 for b in graph.connections
                 if b.bond_class.shell == shell
             ]
@@ -59,7 +69,11 @@ def test_positions_bonds_and_rotation(plot_graph, model):
         if model == "honeycomb":
             assert graph.num_sites == 48
             assert sum(b.bond_class.shell == 1 for b in graph.connections) == 63
-            assert [text.get_text() for text in figure.legends[0].texts][:3] == ["X", "Y", "Z"]
+            assert [text.get_text() for text in figure.legends[0].texts][:3] == [
+                "X",
+                "Y",
+                "Z",
+            ]
     finally:
         plt.close(figure)
 

@@ -30,6 +30,11 @@ namespace qdk::chemistry::data {
 namespace detail {
 using Triplet = Eigen::Triplet<double>;
 
+static EdgeColoring color_edges(
+    std::uint64_t num_sites,
+    const std::vector<std::pair<std::uint64_t, std::uint64_t>>& edges_in,
+    int seed, int trials);
+
 // Helper: add an undirected edge (i, j) with weight t to the triplet list.
 static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(i, j, t);
@@ -406,6 +411,16 @@ LatticeGraph LatticeGraph::from_connections(
     std::uint64_t num_sites, std::vector<NeighborConnection> connections,
     std::shared_ptr<const LatticeGeometry> geometry,
     std::vector<std::uint64_t> selected_shells) {
+  return _from_connections(num_sites, std::move(connections),
+                           std::move(geometry), std::move(selected_shells),
+                           std::nullopt);
+}
+
+LatticeGraph LatticeGraph::_from_connections(
+    std::uint64_t num_sites, std::vector<NeighborConnection> connections,
+    std::shared_ptr<const LatticeGeometry> geometry,
+    std::vector<std::uint64_t> selected_shells,
+    std::optional<EdgeColoring> coloring) {
   if (num_sites > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
     throw std::overflow_error(
         "Lattice site count exceeds the sparse index range.");
@@ -469,7 +484,21 @@ LatticeGraph LatticeGraph::from_connections(
   Eigen::SparseMatrix<double> adjacency(n, n);
   adjacency.setFromTriplets(triplets.begin(), triplets.end());
   adjacency.makeCompressed();
-  LatticeGraph result(std::move(adjacency));
+  if (!coloring) {
+    // Color topology, not summed weights: cancelled images can still carry
+    // distinct flavored interactions, and shell couplings ignore weights.
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> pairs;
+    pairs.reserve(pair_weights.size());
+    for (const auto& [pair, weight] : pair_weights) {
+      if (pair.first != pair.second) pairs.push_back(pair);
+    }
+    // Match the native sparse-adjacency traversal before shuffled trials.
+    std::sort(pairs.begin(), pairs.end(), [](const auto& lhs, const auto& rhs) {
+      return std::tie(lhs.second, lhs.first) < std::tie(rhs.second, rhs.first);
+    });
+    coloring = detail::color_edges(num_sites, pairs, 0, 32);
+  }
+  LatticeGraph result(std::move(adjacency), std::move(coloring));
   result._geometry = std::move(geometry);
   result._selected_shells = std::move(selected_shells);
   result._connections = std::move(connections);
@@ -550,9 +579,9 @@ LatticeGraph LatticeGraph::_with_geometry(
         static_cast<double>(
             multiplicity.at({connection.site_i, connection.site_j}));
   }
-  auto result =
-      from_connections(static_cast<std::uint64_t>(adjacency.rows()),
-                       std::move(connections), std::move(geometry), {1});
+  auto result = _from_connections(static_cast<std::uint64_t>(adjacency.rows()),
+                                  std::move(connections), std::move(geometry),
+                                  {1}, coloring);
   result._restore_adjacency(std::move(adjacency));
   result._edge_coloring = std::move(coloring);
   result._validate_coloring();
@@ -973,26 +1002,6 @@ EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
                                   int seed, int trials) {
   return detail::color_edges(static_cast<std::uint64_t>(adj.rows()),
                              detail::undirected_edges(adj), seed, trials);
-}
-
-EdgeColoring LatticeGraph::color_edges(
-    std::vector<std::pair<std::uint64_t, std::uint64_t>> active_pairs, int seed,
-    int trials) const {
-  for (const auto& [i, j] : active_pairs) {
-    if (i >= j || j >= _num_sites) {
-      throw std::invalid_argument(
-          "Active coloring pairs must satisfy 0 <= i < j < num_sites.");
-    }
-  }
-  // Match Eigen's column-major upper-triangle traversal before any shuffles.
-  std::sort(active_pairs.begin(), active_pairs.end(),
-            [](const auto& lhs, const auto& rhs) {
-              return std::tie(lhs.second, lhs.first) <
-                     std::tie(rhs.second, rhs.first);
-            });
-  active_pairs.erase(std::unique(active_pairs.begin(), active_pairs.end()),
-                     active_pairs.end());
-  return detail::color_edges(_num_sites, active_pairs, seed, trials);
 }
 
 // Deterministic two-coloring of an open chain: edge (i, i+1) gets color i % 2.
@@ -1493,12 +1502,12 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
            flavor,
            entry.at("weight").get<double>()});
     }
-    auto graph = from_connections(n, std::move(connections),
-                                  std::move(geometry), std::move(shells));
+    auto graph =
+        _from_connections(n, std::move(connections), std::move(geometry),
+                          std::move(shells), std::move(coloring));
     if (j.contains("adjacency_sparse")) {
       graph._restore_adjacency(std::move(sparse));
     }
-    graph._edge_coloring = std::move(coloring);
     graph._validate_coloring();
     return graph;
   }
@@ -1748,12 +1757,12 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
              flavor,
              weights[i]});
       }
-      auto graph = from_connections(n, std::move(connections),
-                                    std::move(geometry), std::move(selected));
+      auto graph =
+          _from_connections(n, std::move(connections), std::move(geometry),
+                            std::move(selected), std::move(coloring));
       if (group.nameExists("adjacency_sparse")) {
         graph._restore_adjacency(std::move(sparse));
       }
-      graph._edge_coloring = std::move(coloring);
       graph._validate_coloring();
       return graph;
     }

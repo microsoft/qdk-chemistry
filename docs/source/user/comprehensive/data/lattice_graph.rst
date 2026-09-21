@@ -376,8 +376,9 @@ Serialization
 -------------
 
 The :class:`~qdk_chemistry.data.LatticeGraph` class supports serialization to and from JSON and HDF5 formats.
-Explicit graphs persist resolved connection records, selected shells, optional geometry, and a checked adjacency cache.
+Explicit graphs persist resolved connection records, selected shells, optional geometry, stored edge colors, and a checked adjacency cache.
 Weights, flavors, and image multiplicity are retained; an explicitly empty selection is distinct from adjacency-only input.
+Older explicit-connection files without stored colors recompute them on load using the :ref:`constructor coloring policy <lattice-edge-coloring>`.
 Legacy adjacency files retain their topology and optional coordinates without inferring connection records.
 To use their geometry in a shell- or flavor-dependent model, construct a selected graph with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` after loading.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation.
@@ -399,20 +400,26 @@ For detailed information about serialization in QDK/Chemistry, see the :doc:`Ser
       :start-after: // start-cell-serialization
       :end-before: // end-cell-serialization
 
+.. _lattice-edge-coloring:
+
 Edge coloring
 -------------
 
-The ``edge_coloring`` property contains an optional ``dict[tuple[int, int], int]`` describing a stored topology coloring.
-Nearest-neighbor convenience factories populate it; graphs built from geometry, explicit records, or raw adjacency have no stored coloring.
+The ``edge_coloring`` property contains an optional ``dict[tuple[int, int], int]`` describing the graph's stored coloring; reading it returns an independent copy.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` and :meth:`~qdk_chemistry.data.LatticeGraph.from_connections` compute it once over all stored canonical pairs with ``i < j``.
+Zero physical connection weights and cancellation between periodic-image weights do not remove pairs from this coloring.
+Distinct images of one pair share a color, and self-images are excluded.
+An explicit graph with no distinct-site pairs has an empty coloring, not ``None``.
+Nearest-neighbor convenience factories retain their existing topology colorings; raw-adjacency constructors do not assign one.
 
-Use :meth:`~qdk_chemistry.data.LatticeGraph.color_edges` to color a supplied active pair support independently of adjacency weights or stored topology colors.
-Pairs must be canonical (``i < j``) and in range; duplicate pairs are ignored.
-The greedy search defaults to ``seed=0`` and ``trials=32`` and is not guaranteed to be optimal.
+The explicit constructors use the native greedy search with ``seed=0`` and ``trials=32``; it is deterministic but is not guaranteed to be optimal.
 Edges sharing a color have disjoint vertices, enabling parallel Pauli exponentials in a :doc:`Trotter step <../algorithms/hamiltonian_unitary_builder>`.
+:meth:`~qdk_chemistry.data.LatticeGraph.with_bond_flavors` preserves stored colors, and :meth:`~qdk_chemistry.data.LatticeGraph.permute` relabels their endpoints without recoloring.
+Serialization retains the stored assignment.
 
-One union graph does **not** imply one union coloring.
-First accumulate contributions to each emitted Pauli interaction family and discard zero coefficients, then color that family's remaining distinct pairs.
-Different families can have different supports and layer counts, even on the same graph:
+Consumers restrict this single graph coloring to their active pair supports rather than recoloring each interaction family.
+For spin models, contributions are accumulated before zero coefficients and empty color layers are discarded.
+Different families can use different subsets of the stored colors, even on the same graph; restricting a coloring need not minimize a family's layer count:
 
 .. tab:: Python API
 
@@ -428,7 +435,7 @@ Different families can have different supports and layer counts, even on the sam
       :start-after: // start-cell-coloring
       :end-before: // end-cell-coloring
 
-The :ref:`shell-based spin model builders <model-term-partition>` perform this per-family coloring automatically when ``include_term_groups=True`` and store the result on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
+The :ref:`spin model builders <model-term-partition>` perform this filtering automatically when ``include_term_groups=True`` and a stored coloring is available, then store the resulting layers on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
 
 .. _lattice-geometry-migration:
 

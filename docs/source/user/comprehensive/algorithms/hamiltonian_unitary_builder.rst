@@ -297,7 +297,7 @@ Example::
 .. _compact-product-formulas:
 
 Compact product-formula containers
----------------------------------
+----------------------------------
 
 A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` executes ``beginning`` once, then ``step_terms`` repeated ``step_reps`` times, then ``end`` once.
 :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials` counts ``len(beginning) + step_reps * len(step_terms) + len(end)``; :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms` counts ``len(beginning) + len(step_terms) + len(end)``.

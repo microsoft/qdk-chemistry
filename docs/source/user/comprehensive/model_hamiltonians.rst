@@ -420,9 +420,10 @@ Geometry-aware term grouping
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Heisenberg, Ising, and Kitaev model builders accept an ``include_term_groups`` flag (default ``True``).
-When enabled, the builder stores a group-and-layer structure on :attr:`~qdk_chemistry.data.QubitOperator.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
+When enabled and the graph has a stored :ref:`edge coloring <lattice-edge-coloring>`, the builder stores a group-and-layer structure on :attr:`~qdk_chemistry.data.QubitOperator.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
 
 Shell-based grouped Heisenberg and Kitaev builders store each Pauli term by its non-identity qubit indices and axes, rather than materializing a register-width string. The :attr:`~qdk_chemistry.data.QubitOperator.pauli_strings` attribute remains a sequence-compatible view and constructs individual dense labels only when accessed. Use ``num_terms`` to inspect large operators without materializing labels.
+Calls containing shell mappings use this sparse storage only when grouped; scalar/array-only calls and all ungrouped calls retain dense storage.
 
 * each equal-axis family (``XX``, ``YY``, ``ZZ``) shares one commuting *group* with its same-axis external field (``X``, ``Y``, ``Z``), when present; fields without same-axis interactions retain their own group;
 * a field forms its own disjoint single-site *layer* within the combined group; coefficients and Pauli term order are unchanged;
@@ -434,9 +435,8 @@ No manual geometry boilerplate is required at the call site.
 
 Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).
 
-For scalar/array couplings, the builders reuse the coloring stored on the graph, falling back to ungrouped construction when none is available.
-For shell mappings, they accumulate contributions and remove zero coefficients before calling :meth:`~qdk_chemistry.data.LatticeGraph.color_edges` independently for each emitted Pauli family's pair support.
-The same union graph can therefore yield different colorings and layer counts for different families; do not color the entire union once and impose that coloring on every interaction.
+Builders reuse ``graph.edge_coloring`` for each Pauli family's nonzero terms without recoloring.
+If the graph has no stored coloring, construction falls back to ungrouped terms.
 
 Parameter flexibility
 ---------------------

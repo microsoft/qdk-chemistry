@@ -105,15 +105,16 @@ def _build_sparse_hamiltonian(
     couplings: list[tuple[str, dict[tuple[int, int], float]]],
     fields: list[tuple[str, np.ndarray | float]],
     grouped: bool,
-    coloring: dict[tuple[int, int], int] | None = None,
+    sparse_output: bool,
     pair_first: bool = True,
 ) -> QubitOperator:
     """Assemble sparse words, preserving the model's grouped or ungrouped ordering.
 
-    With no supplied coloring, color each family's coalesced nonzero support.
+    Grouped families restrict the graph's stored coloring to nonzero coefficients,
+    ordered by color and then pair; they never recolor their individual supports.
     Same-axis fields and interactions share a commuting group, with fields in
-    their own disjoint layer. Only partition metadata changes; term order is kept.
-    Ungrouped mapped Heisenberg terms retain family and shell insertion order;
+    their own disjoint layer. This merge changes metadata, not Pauli term order.
+    Ungrouped mapped Heisenberg terms retain family, ascending-shell, and pair order;
     other ungrouped models use lexicographic pairs before coupling families.
 
     """
@@ -122,7 +123,6 @@ def _build_sparse_hamiltonian(
     words: list[tuple[tuple[int, str], ...]] = []
     coefficients = array("d")
     groups_layers: list[tuple[tuple[int, ...], ...]] = []
-    coloring_cache: dict[tuple[tuple[int, int], ...], dict[tuple[int, int], int]] = {}
 
     def append_term(factors: tuple[tuple[int, str], ...], coefficient: float) -> int:
         words.append(tuple(sorted(factors)))
@@ -130,6 +130,9 @@ def _build_sparse_hamiltonian(
         return len(coefficients) - 1
 
     if grouped:
+        coloring = graph.edge_coloring
+        assert coloring is not None
+        colored_pairs = sorted(coloring.items(), key=lambda item: (item[1], item[0]))
         field_groups: dict[str, int] = {}
         for pauli, values in field_values:
             layer = tuple(
@@ -140,17 +143,10 @@ def _build_sparse_hamiltonian(
                 groups_layers.append((layer,))
 
         for label, coeff_by_pair in couplings:
-            support = tuple(sorted(pair for pair, value in coeff_by_pair.items() if value != 0.0))
-            if not support:
+            if not coeff_by_pair:
                 continue
-            coupling_coloring = coloring
-            if coupling_coloring is None:
-                coupling_coloring = coloring_cache.get(support)
-                if coupling_coloring is None:
-                    coupling_coloring = graph.color_edges(list(support), seed=0, trials=32)
-                    coloring_cache[support] = coupling_coloring
             color_to_indices: dict[int, list[int]] = {}
-            for pair, color in sorted(coupling_coloring.items(), key=lambda item: (item[1], item[0])):
+            for pair, color in colored_pairs:
                 coefficient = coeff_by_pair.get(pair, 0.0)
                 if coefficient != 0.0:
                     color_to_indices.setdefault(color, []).append(
@@ -193,7 +189,7 @@ def _build_sparse_hamiltonian(
     )
     # Content hashes distinguish dense and sparse storage. Preserve the legacy
     # output boundary without duplicating accumulation or allocating pair matrices.
-    if not grouped or coloring is not None:
+    if not sparse_output:
         return QubitOperator(
             list(operator.pauli_strings),
             operator.coefficients,
@@ -315,8 +311,7 @@ def create_heisenberg_hamiltonian(
                     records[int(site_i), int(site_j)] = coefficient
         couplings.append((label, records))
 
-    coloring = None if shell_couplings else graph.edge_coloring
-    grouped = include_term_groups and (shell_couplings or coloring is not None)
+    grouped = include_term_groups and graph.edge_coloring is not None
     if include_term_groups and not grouped:
         Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
     return _build_sparse_hamiltonian(
@@ -324,7 +319,7 @@ def create_heisenberg_hamiltonian(
         couplings=couplings,
         fields=[("X", hx), ("Y", hy), ("Z", hz)],
         grouped=grouped,
-        coloring=coloring,
+        sparse_output=grouped and shell_couplings,
         pair_first=not shell_couplings,
     )
 
@@ -558,8 +553,7 @@ def create_kitaev_hamiltonian(
             }
             couplings.append((first + second, records))
 
-    coloring = None if mapped_parameters else graph.edge_coloring
-    grouped = include_term_groups and (bool(mapped_parameters) or coloring is not None)
+    grouped = include_term_groups and graph.edge_coloring is not None
     if include_term_groups and not grouped:
         Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
     return _build_sparse_hamiltonian(
@@ -567,7 +561,7 @@ def create_kitaev_hamiltonian(
         couplings=couplings,
         fields=list(zip(pauli_components, output_field, strict=True)),
         grouped=grouped,
-        coloring=coloring,
+        sparse_output=grouped and bool(mapped_parameters),
     )
 
 

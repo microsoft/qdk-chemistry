@@ -7,6 +7,7 @@ Like other :doc:`data classes <../design/index>`, it is immutable and supports :
 
 Geometry does not store an adjacency matrix, interaction weights, semantic flavors, or edge colors.
 Use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` to turn selected geometric shells into an explicit :doc:`LatticeGraph <lattice_graph>`.
+That constructor computes and stores one :ref:`edge coloring <lattice-edge-coloring>` for the selected distinct-site pairs, including zero-weight pairs; model builders filter it rather than recoloring individual interaction families.
 The same geometry can be reused for different connectivity selections and consumers, such as :doc:`model Hamiltonians <../model_hamiltonians>` or visualization.
 
 Properties
@@ -194,6 +195,6 @@ The data type identifier is ``lattice_geometry``; a typical filename is ``patch.
 Related documentation
 ---------------------
 
-* :doc:`LatticeGraph <lattice_graph>` — selecting connectivity, assigning flavors, and coloring active supports
+* :doc:`LatticeGraph <lattice_graph>` — selecting connectivity, assigning flavors, and reusing stored edge colors
 * :ref:`lattice-geometry-migration` — migrating graph-owned coordinate and shell queries
 * :doc:`Model Hamiltonians <../model_hamiltonians>` — applying interactions to an explicit graph

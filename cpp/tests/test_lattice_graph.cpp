@@ -1278,52 +1278,42 @@ TEST_F(LatticeGraphTest, KagomeColoringSeed) {
   check_valid_edge_coloring(*kg_a.edge_coloring());
 }
 
-TEST_F(LatticeGraphTest, ColorEdgesMatchesGreedyTraversal) {
-  const auto graph = LatticeGraph::square(3, 3, false, false, 0.0);
-  std::vector<Edge> pairs = {{4, 8}, {0, 5}, {2, 7}, {1, 6}, {1, 2}, {0, 1},
-                             {3, 7}, {3, 4}, {5, 8}, {2, 4}, {0, 3}, {4, 6},
-                             {6, 8}, {1, 4}, {0, 2}, {4, 8}};
-  std::map<Edge, double> weights;
-  for (const auto& pair : pairs) weights[pair] = -2.5;
-  const LatticeGraph support(weights, graph.num_sites());
-  // Compare labels, not only color counts; shuffled trials depend on the
-  // initial column-major traversal of the canonical support.
-  for (int seed : {0, 7, 42}) {
-    for (int trials : {1, 2, 32}) {
-      const auto expected =
-          greedy_edge_coloring(support.sparse_adjacency_matrix(), seed, trials);
-      EXPECT_EQ(graph.color_edges(pairs, seed, trials), expected);
-      std::reverse(pairs.begin(), pairs.end());
-      EXPECT_EQ(graph.color_edges(pairs, seed, trials), expected);
-      check_valid_edge_coloring(expected);
-    }
+TEST_F(LatticeGraphTest, ConnectionsStoreTopologyColoring) {
+  const auto geometry = LatticeGeometry::square(3, 3);
+  const auto unit = LatticeGraph::from_geometry(geometry, {1, 2});
+  const auto expected =
+      greedy_edge_coloring(unit.sparse_adjacency_matrix(), 0, 32);
+  for (double weight : {1.0, -2.5, 0.0}) {
+    const auto graph =
+        LatticeGraph::from_geometry(geometry, {1, 2}, {}, weight);
+    ASSERT_TRUE(graph.edge_coloring());
+    EXPECT_EQ(*graph.edge_coloring(), expected);
+    check_valid_edge_coloring(*graph.edge_coloring());
+    auto connections = graph.connections();
+    std::reverse(connections.begin(), connections.end());
+    const auto reordered =
+        LatticeGraph::from_connections(graph.num_sites(), connections);
+    EXPECT_EQ(reordered.edge_coloring(), graph.edge_coloring());
+    auto json = graph.to_json();
+    json.erase("edge_coloring");
+    EXPECT_EQ(LatticeGraph::from_json(json).edge_coloring(),
+              graph.edge_coloring());
   }
-  EXPECT_EQ(graph.color_edges(pairs),
-            greedy_edge_coloring(support.sparse_adjacency_matrix(), 0, 32));
+  const auto empty = LatticeGraph::from_geometry(geometry, {});
+  ASSERT_TRUE(empty.edge_coloring());
+  EXPECT_TRUE(empty.edge_coloring()->empty());
 }
 
-TEST_F(LatticeGraphTest, ColorEdgesRecolorsSubsetsIndependently) {
-  const auto graph = LatticeGraph::chain(3, true);
-  const auto stored = graph.edge_coloring();
-  const auto union_coloring = graph.color_edges({{0, 1}, {0, 2}, {1, 2}}, 0, 1);
-  const auto subset = graph.color_edges({{1, 2}}, 0, 1);
-  EXPECT_EQ(subset, (EdgeColoring{{{1, 2}, 0}}));
-  EXPECT_NE(subset.at({1, 2}), union_coloring.at({1, 2}));
-  EXPECT_EQ(graph.color_edges({{1, 2}}, 0, 1), subset);
-  EXPECT_EQ(graph.edge_coloring(), stored);
-  check_valid_edge_coloring(union_coloring);
-}
-
-TEST_F(LatticeGraphTest, ColorEdgesValidatesActiveSupport) {
-  const auto graph = LatticeGraph::chain(3);
-  for (const Edge pair : {Edge{1, 0}, Edge{1, 1}, Edge{0, 3},
-                          Edge{0, std::numeric_limits<std::uint64_t>::max()}}) {
-    EXPECT_THROW(graph.color_edges({pair}), std::invalid_argument);
-  }
-  EXPECT_TRUE(graph.color_edges({}).empty());
-  EXPECT_TRUE(graph.color_edges({{0, 1}}, 0, 0).empty());
-  EXPECT_TRUE(graph.color_edges({{0, 1}}, 0, -1).empty());
-  EXPECT_EQ(graph.color_edges({{0, 1}, {0, 1}}), graph.color_edges({{0, 1}}));
+TEST_F(LatticeGraphTest, ColoringIncludesCancellingImages) {
+  const auto geometry = LatticeGeometry::chain(2, true);
+  auto connections = geometry.neighbor_connections({1});
+  ASSERT_EQ(connections.size(), 2);
+  connections[0].weight = 2.0;
+  connections[1].weight = -2.0;
+  const auto graph = LatticeGraph::from_connections(2, connections);
+  ASSERT_TRUE(graph.edge_coloring());
+  EXPECT_EQ(*graph.edge_coloring(), (EdgeColoring{{{0, 1}, 0}}));
+  EXPECT_DOUBLE_EQ(graph.weight(0, 1), 0.0);
 }
 
 TEST_F(LatticeGraphTest, Permute) {

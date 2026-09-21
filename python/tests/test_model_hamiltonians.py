@@ -257,6 +257,7 @@ class TestModelHamiltonians:
         qh = create_heisenberg_hamiltonian(lattice, jx=jx, jy=jy, jz=jz, hx=hx, hy=hy, hz=hz)
         assert isinstance(qh, QubitOperator)
         assert qh.num_qubits == n
+        assert not qh.has_sparse_terms
         assert qh.is_hermitian()
         terms = _get_terms_dict(qh)
         assert len(terms) == len(expected)
@@ -324,7 +325,9 @@ class TestModelHamiltonians:
             jz=couplings,
         )
         partition = _assert_commuting_disjoint_partition(hamiltonian)
-        assert [len(group) for group in partition.groups] == [8, 8, 8]
+        coloring = graph.edge_coloring
+        assert coloring is not None
+        assert [len(group) for group in partition.groups] == [len(set(coloring.values()))] * 3
         terms = _get_terms_dict(hamiltonian)
         assert len(terms) == 3 * (len(first_neighbors) + len(second_neighbors))
 
@@ -421,6 +424,7 @@ class TestModelHamiltonians:
         np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
         assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
+        assert forward_hamiltonian.has_sparse_terms is include_term_groups
 
     def test_kitaev_nearest_neighbor_components(self) -> None:
         graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
@@ -524,10 +528,8 @@ class TestModelHamiltonians:
                 expected_heisenberg["".join(pauli)] = shell_couplings[connection.bond_class.shell] / 4.0
         assert heisenberg_terms == pytest.approx(expected_heisenberg, abs=float_comparison_absolute_tolerance)
 
-    @pytest.mark.parametrize(("shell", "expected_layers"), [(1, 2), (2, 3), (3, 1)])
-    def test_kitaev_shell_partition_uses_optimal_plaquette_edge_coloring(
-        self, shell: int, expected_layers: int
-    ) -> None:
+    @pytest.mark.parametrize("shell", [1, 2, 3])
+    def test_kitaev_shell_partition_restricts_stored_plaquette_colors(self, shell: int) -> None:
         graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb_plaquettes(1, 1), [1, 2, 3])
         zero_couplings = {1: 0.0, 2: 0.0, 3: 0.0}
         hamiltonian = create_kitaev_hamiltonian(
@@ -539,7 +541,18 @@ class TestModelHamiltonians:
         )
 
         partition = _assert_commuting_disjoint_partition(hamiltonian)
-        assert {len(group) for group in partition.groups} == {expected_layers}
+        coloring = graph.edge_coloring
+        assert coloring is not None
+        pairs_by_color: dict[int, set[tuple[int, int]]] = {}
+        for connection in graph.connections:
+            if connection.bond_class.shell == shell:
+                pair = (connection.site_i, connection.site_j)
+                pairs_by_color.setdefault(coloring[pair], set()).add(pair)
+        expected_layers = [pairs_by_color[color] for color in sorted(pairs_by_color)]
+        factors = [word for word, _ in hamiltonian.iter_sparse_terms()]
+        for group in partition.groups:
+            actual_layers = [{tuple(site for site, _ in factors[index]) for index in layer} for layer in group]
+            assert actual_layers == expected_layers
 
     def test_kitaev_mixed_axis_partition_keeps_groups_commuting(self):
         graph = LatticeGraph.honeycomb_plaquettes(1, 1)
@@ -1010,6 +1023,7 @@ class TestModelHamiltonians:
         np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
         assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
+        assert forward_hamiltonian.has_sparse_terms is include_term_groups
 
     def test_kitaev_open_hexagon_matches_explicit_matrix(self) -> None:
         graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb_plaquettes(1, 1), [1, 2, 3])
@@ -1155,6 +1169,8 @@ class TestModelHamiltonians:
 
         weighted = create_kitaev_hamiltonian(graph, 0.0, 0.0, kz, j=j, gamma=gamma, gamma_prime=gamma_prime)
         mapped = create_kitaev_hamiltonian(graph, 0.0, 0.0, {1: kz}, j={1: j}, gamma=gamma, gamma_prime=gamma_prime)
+        assert not weighted.has_sparse_terms
+        assert mapped.has_sparse_terms
 
         exchange = {"XX": 1.0, "YY": 1.0, "ZZ": 3.0}
         off_diagonal = {
@@ -1173,6 +1189,7 @@ class TestModelHamiltonians:
         expected_mapped = exchange | {label: value * weight for label, value in off_diagonal.items() if weight != 0.0}
         assert _get_terms_dict(mapped) == pytest.approx(expected_mapped, abs=float_comparison_absolute_tolerance)
         assert all(connection.flavor is None for connection in graph.connections)
+        _assert_commuting_disjoint_partition(weighted)
         _assert_commuting_disjoint_partition(mapped)
 
     def test_kitaev_scalar_couplings_ignore_selected_higher_shells(self) -> None:
@@ -1183,9 +1200,8 @@ class TestModelHamiltonians:
         actual = create_kitaev_hamiltonian(union, 4.0, 8.0, 12.0, j={}, gamma=4.0)
         expected = create_kitaev_hamiltonian(first_shell, 4.0, 8.0, 12.0, j={}, gamma=4.0)
 
-        assert actual.pauli_strings == expected.pauli_strings
-        np.testing.assert_array_equal(actual.coefficients, expected.coefficients)
-        assert actual.term_partition == expected.term_partition
+        # Extra graph pairs can change colors and term order, but not the exchange coefficients.
+        assert _get_terms_dict(actual) == _get_terms_dict(expected)
         _assert_commuting_disjoint_partition(actual)
 
     def test_legacy_adjacency_requires_explicit_kitaev_selection(self) -> None:
@@ -1209,9 +1225,8 @@ class TestModelHamiltonians:
         actual = create_kitaev_hamiltonian(graph, {1: 4.0}, {1: 8.0}, {1: 12.0})
         expected = create_kitaev_hamiltonian(reference, {1: 4.0}, {1: 8.0}, {1: 12.0})
 
-        assert actual.pauli_strings == expected.pauli_strings
-        np.testing.assert_array_equal(actual.coefficients, expected.coefficients)
-        assert actual.term_partition == expected.term_partition
+        assert _get_terms_dict(actual) == _get_terms_dict(expected)
+        _assert_commuting_disjoint_partition(actual)
         assert graph.content_hash() == before
         assert all(connection.flavor is None for connection in graph.connections if connection.bond_class.shell == 1)
         assert any(connection.flavor == 1000 for connection in graph.connections if connection.bond_class.shell == 2)
@@ -1267,6 +1282,7 @@ class TestSelectedModelShells:
 
         assert graph.selected_shells == [1, 99]
         assert hamiltonian.num_qubits == 3
+        assert hamiltonian.has_sparse_terms
         np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((8, 8)))
         _assert_commuting_disjoint_partition(hamiltonian)
 
@@ -1281,6 +1297,7 @@ class TestSelectedModelShells:
         assert graph.connections == []
         assert graph.selected_shells == [1]
         assert hamiltonian.num_qubits == 3
+        assert hamiltonian.has_sparse_terms
         np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((8, 8)))
         _assert_commuting_disjoint_partition(hamiltonian)
 
@@ -1288,6 +1305,8 @@ class TestSelectedModelShells:
         graph = LatticeGraph.from_dense_matrix(np.array([[0.0, 7.0], [7.0, 0.0]]))
         for couplings in ({}, {1: np.zeros((2, 2)), 99: 0.0}):
             hamiltonian = factory(graph, couplings, couplings, couplings)
+            assert hamiltonian.term_partition is None
+            assert not hamiltonian.has_sparse_terms
             np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((4, 4)))
 
         with pytest.raises(ValueError, match=r"geometry|metadata"):

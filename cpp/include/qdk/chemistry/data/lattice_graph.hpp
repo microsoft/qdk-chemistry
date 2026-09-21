@@ -156,7 +156,8 @@ class LatticeGraph : public DataClass {
    * @param definitions Optional shell-axis flavor assignments.
    * @param weight Finite weight assigned to every physical connection.
    * @param tolerance Positive finite distance and axis tolerance.
-   * @return Graph retaining selected shells even when they are empty.
+   * @return Graph retaining selected shells and a coloring of all selected
+   * pairs.
    */
   static LatticeGraph from_geometry(
       const LatticeGeometry& geometry,
@@ -174,6 +175,8 @@ class LatticeGraph : public DataClass {
    * Orientation IDs are unsigned shell-local labels, not necessarily contiguous
    * in a selected subset. Axes must be finite unit vectors and displacements
    * finite and nonzero. Images may have different weights and flavors.
+   * Distinct non-self site pairs are colored once, including zero-weight and
+   * cancelling-image pairs, using greedy coloring with seed 0 and 32 trials.
    *
    * @param num_sites Number of vertices, including isolated sites.
    * @param connections Physical connections with finite weights.
@@ -279,18 +282,6 @@ class LatticeGraph : public DataClass {
   LatticeGraph with_bond_flavors(
       const std::vector<BondFlavorDefinition>& definitions,
       double tolerance = 1.0e-9) const;
-
-  /**
-   * @brief Greedily color only the supplied active simple support.
-   * @param active_pairs Canonical pairs i < j; duplicate pairs are ignored.
-   * @param seed Random seed, with the same traversal as greedy_edge_coloring.
-   * @param trials Number of trials; fewer than one returns an empty coloring.
-   * @return Coloring independent of weights and stored topology colors.
-   * @throws std::invalid_argument If any pair is noncanonical or out of bounds.
-   */
-  EdgeColoring color_edges(
-      std::vector<std::pair<std::uint64_t, std::uint64_t>> active_pairs,
-      int seed = 0, int trials = 32) const;
 
   /**
    * @brief Create a one-dimensional chain lattice.
@@ -629,6 +620,13 @@ class LatticeGraph : public DataClass {
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
                         std::optional<EdgeColoring> coloring = std::nullopt);
 
+  // Share record validation while preserving supplied factory/persisted colors.
+  static LatticeGraph _from_connections(
+      std::uint64_t num_sites, std::vector<NeighborConnection> connections,
+      std::shared_ptr<const LatticeGeometry> geometry,
+      std::vector<std::uint64_t> selected_shells,
+      std::optional<EdgeColoring> coloring);
+
   // Preserve legacy factory topology while distributing each pair's weight
   // over its shell-one physical images (also used for legacy deserialization).
   static LatticeGraph _with_geometry(
@@ -655,7 +653,7 @@ class LatticeGraph : public DataClass {
   /// Flag indicating whether the adjacency matrix is symmetric (undirected
   /// graph)
   bool _is_symmetric;
-  /// Edge coloring, populated at construction for recognised topologies.
+  /// Edge coloring, populated for factories and explicit physical connections.
   std::optional<EdgeColoring> _edge_coloring;
   std::shared_ptr<const LatticeGeometry> _geometry;
   std::vector<std::uint64_t> _selected_shells;
