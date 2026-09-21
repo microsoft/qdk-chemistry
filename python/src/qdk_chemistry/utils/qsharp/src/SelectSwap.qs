@@ -6,6 +6,7 @@
 ///
 /// 1D operations:
 ///   SelectSwap — loads data[address] into output.
+///   ApplyBranchPhaseFixup — repairs one branch's phase after a measurement-based erasure.
 ///
 /// 2D operations:
 ///   SelectSwap2D — loads data[outer][inner] with one select-swap over the combined address
@@ -294,6 +295,43 @@ namespace QDKChemistry.Utils.SelectSwap {
         adjoint (...) {
             EraseSwappedLoad(data, outerAddress, innerAddress, 0, outerAddressAlwaysValid, target);
         }
+    }
+
+    /// Repairs the phase one branch left on `address` after a shared load was erased by measurement.
+    /// Row `2k + flag` carries the parity of `measured` against row `k`, routed through
+    /// `UnaryIterationActionIndex` because `Select` aliases surplus addresses onto real rows.
+    internal operation ApplyBranchPhaseFixup(
+        measured : Bool[],
+        data : Bool[][],
+        activeOnLowBit : Bool,
+        address : Qubit[],
+    ) : Unit {
+        let phases = MappedOverRange(
+            index -> {
+                if ((index % 2 == 1) == activeOnLowBit) {
+                    let word = data[UnaryIterationActionIndex(Length(data), index / 2)];
+                    mutable parity = false;
+                    // `Zipped` stops at the shorter of the two, which is what lets a narrower
+                    // word share a measurement taken over the full target.
+                    for (measuredBit, wordBit) in Zipped(measured, word) {
+                        set parity = parity != (measuredBit and wordBit);
+                    }
+                    parity
+                } else {
+                    false
+                }
+            },
+            0..(1 <<< Length(address)) - 1
+        );
+        use marker = Qubit();
+        X(marker);
+        H(marker);
+        // `Select` XORs into its target, so a lookup into |-> kicks the data back as a phase;
+        // the adjoint keeps those semantics and picks up the O(sqrt) measurement-based form.
+        Adjoint Select(Mapped(phase -> [phase], phases), address, [marker]);
+        // The adjoint may leave the marker measured out or still in |->, so the release
+        // condition is restored explicitly rather than by undoing the preparation.
+        Reset(marker);
     }
 
     /// Erases a post-butterfly 2D load by measurement instead of running it backwards.

@@ -27,12 +27,6 @@ namespace {
 using RowMajorMatrix =
     Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
-std::unique_ptr<DoubleFactorizer> make_double_factorizer() {
-  QDK_LOG_TRACE_ENTERING();
-
-  return std::make_unique<DoubleFactorizer>();
-}
-
 /// First factorization: pivoted Cholesky decomposition of the two-electron
 /// supermatrix.
 ///
@@ -63,14 +57,14 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
   const std::size_t expected = pair_dim * pair_dim;
   if (static_cast<std::size_t>(two_body_integrals.size()) != expected) {
     throw std::invalid_argument(
-        "double_factorizer: expected norb^4 = " + std::to_string(expected) +
+        "double_factorization: expected norb^4 = " + std::to_string(expected) +
         " elements for norb = " + std::to_string(norb) + ", got " +
         std::to_string(two_body_integrals.size()) + ".");
   }
 
   if (!two_body_integrals.allFinite()) {
     throw std::invalid_argument(
-        "double_factorizer: two_body_integrals contains a non-finite "
+        "double_factorization: two_body_integrals contains a non-finite "
         "value (NaN or infinity).");
   }
 
@@ -125,7 +119,7 @@ Eigen::MatrixXd cholesky_vectors_from_two_body(
     // supermatrix has a negative eigenvalue, so no L with g = L L^T exists.
     if (most_negative < -noise_floor) {
       throw std::invalid_argument(
-          "double_factorizer: the two-electron supermatrix is not positive "
+          "double_factorization: the two-electron supermatrix is not positive "
           "semi-definite, so it has no Cholesky decomposition. Its most "
           "negative residual diagonal is " +
           std::to_string(most_negative) + ".");
@@ -188,14 +182,14 @@ std::size_t fragments_from_cholesky_vectors(
   const std::size_t pair_dim = norb * norb;
   if (static_cast<std::size_t>(cholesky_vectors.rows()) != pair_dim) {
     throw std::invalid_argument(
-        "double_factorizer: expected norb^2 = " + std::to_string(pair_dim) +
+        "double_factorization: expected norb^2 = " + std::to_string(pair_dim) +
         " rows for norb = " + std::to_string(norb) + ", got " +
         std::to_string(cholesky_vectors.rows()) + ".");
   }
 
   if (!cholesky_vectors.allFinite()) {
     throw std::invalid_argument(
-        "double_factorizer: cholesky_vectors contains a non-finite value.");
+        "double_factorization: cholesky_vectors contains a non-finite value.");
   }
 
   const Eigen::Index num_orbitals = static_cast<Eigen::Index>(norb);
@@ -224,7 +218,7 @@ std::size_t fragments_from_cholesky_vectors(
       const double scale = pair_matrix.cwiseAbs().maxCoeff();
       if (asymmetry > 1e-8 * std::max(scale, 1.0)) {
         QDK_LOGGER().warn(
-            "double_factorizer: Cholesky vector {} is not symmetric in its "
+            "double_factorization: Cholesky vector {} is not symmetric in its "
             "orbital pair (largest asymmetry {:.3e}); only its symmetric part "
             "is factorized.",
             static_cast<long long>(q), asymmetry);
@@ -239,7 +233,7 @@ std::size_t fragments_from_cholesky_vectors(
         w_matrices.data() + q * num_orbitals);
     if (info != 0) {
       throw std::runtime_error(
-          "double_factorizer: LAPACK syev failed to diagonalize (info=" +
+          "double_factorization: LAPACK syev failed to diagonalize (info=" +
           std::to_string(info) + ").");
     }
   }
@@ -249,7 +243,7 @@ std::size_t fragments_from_cholesky_vectors(
 
 }  // namespace
 
-std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
+std::shared_ptr<data::Hamiltonian> DoubleFactorization::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian) const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -303,14 +297,14 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
 
     if (static_cast<std::size_t>(three_center.rows()) == norb * norb) {
       QDK_LOGGER().debug(
-          "double_factorizer: using the stored three-center integrals as the "
-          "first factorization; truncation_threshold={:.3e} is ignored.",
+          "double_factorization: using the stored three-center integrals as "
+          "the first factorization; truncation_threshold={:.3e} is ignored.",
           truncation_threshold);
       cholesky_vectors = &three_center;
     } else {
       QDK_LOGGER().debug(
-          "double_factorizer: stored three-center integrals have {} rows but "
-          "num_orbitals={} implies {}, decomposing the dense tensor instead.",
+          "double_factorization: stored three-center integrals have {} rows "
+          "but num_orbitals={} implies {}, decomposing the dense tensor.",
           three_center.rows(), norb, norb * norb);
     }
   }
@@ -332,8 +326,8 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
       *cholesky_vectors, norb, u_matrices, w_matrices);
 
   QDK_LOGGER().debug(
-      "double_factorizer: num_orbitals={}, truncation_threshold={}, retained "
-      "{} fragments.",
+      "double_factorization: num_orbitals={}, truncation_threshold={}, "
+      "retained {} fragments.",
       norb, truncation_threshold, num_ranks);
 
   if (num_ranks == 0) {
@@ -356,12 +350,6 @@ std::shared_ptr<data::Hamiltonian> DoubleFactorizer::_run_impl(
       hamiltonian->get_core_energy(), inactive_fock, hamiltonian->get_type());
 
   return std::make_shared<data::Hamiltonian>(std::move(container));
-}
-
-void DoubleFactorizerFactory::register_default_instances() {
-  QDK_LOG_TRACE_ENTERING();
-
-  DoubleFactorizerFactory::register_instance(&make_double_factorizer);
 }
 
 }  // namespace qdk::chemistry::algorithms
