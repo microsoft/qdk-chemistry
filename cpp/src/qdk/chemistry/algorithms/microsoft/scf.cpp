@@ -30,6 +30,37 @@ using qcs::SCFOrbitalType;
 using qdk::chemistry::utils::Logger;
 using qdk::chemistry::utils::LogLevel;
 
+ScfSettings::ScfSettings()
+    : qdk::chemistry::algorithms::ElectronicStructureSettings() {
+  set_default("level_shift", -1.0);
+  set_default("enable_gdm", true);
+  set_default("energy_thresh_diis_switch", 1e-3);
+  set_default("gdm_max_diis_iteration", 50);
+  set_default("gdm_bfgs_history_size_limit", 50);
+  set_default("fock_reset_steps", 1073741824);
+  set_default("eri_use_atomics", false);
+  set_default("eri_threshold", -1.0);
+  set_default("shell_pair_threshold", 1e-12,
+              "Overlap-based shell pair pre-screening threshold. Shell "
+              "pairs with overlap norm below this value are excluded.");
+  set_default("eri_method", std::string("direct"),
+              "ERI evaluation method: 'direct' computes integrals on-the-fly, "
+              "'incore' stores all integrals in memory",
+              data::ListConstraint<std::string>{
+                  {std::vector<std::string>{"direct", "incore"}}});
+  set_default(
+      "integral_dressing", std::string(""),
+      "One-electron integral dressing: '' uses nonrelativistic integrals, "
+      "'x2c_1e' uses decontracted spin-free X2C-1e integrals, and "
+      "'x2c_1e_contracted' applies spin-free X2C-1e directly in the "
+      "contracted basis",
+      data::ListConstraint<std::string>{
+          {utils::microsoft::integral_dressing_labels()}});
+  set_default("nthreads", static_cast<int64_t>(-1),
+              "Number of OpenMP threads to use for SCF calculation. "
+              "Set to -1 to use all available threads.");
+}
+
 // Helper function to calculate alpha and beta electron counts
 std::pair<int, int> calculate_electron_counts(
     int total_effective_nuclear_charge, int charge, int multiplicity) {

@@ -22,6 +22,15 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
+HamiltonianSettings::HamiltonianSettings() {
+  set_default("integral_dressing", std::string(""),
+              "One-electron integral dressing: '' for nonrelativistic, "
+              "'x2c_1e' for decontracted X2C-1e, or "
+              "'x2c_1e_contracted' for X2C-1e in the contracted basis",
+              data::ListConstraint<std::string>{
+                  {utils::microsoft::integral_dressing_labels()}});
+}
+
 std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
 detail::build_one_body_ao(const data::BasisSet& basis_set,
                           qcs::IntegralDressing integral_dressing) {

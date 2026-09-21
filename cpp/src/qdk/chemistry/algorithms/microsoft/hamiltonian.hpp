@@ -14,11 +14,10 @@
 #include <utility>
 #include <vector>
 
-#include "utils.hpp"
-
 namespace qdk::chemistry::scf {
 class BasisSet;
-}
+enum class IntegralDressing;
+}  // namespace qdk::chemistry::scf
 
 namespace qdk::chemistry::data {
 class BasisSet;
@@ -53,14 +52,7 @@ std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
 
 class HamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
-  HamiltonianSettings() {
-    set_default("integral_dressing", std::string(""),
-                "One-electron integral dressing: '' for nonrelativistic, "
-                "'x2c_1e' for decontracted X2C-1e, or "
-                "'x2c_1e_contracted' for X2C-1e in the contracted basis",
-                data::ListConstraint<std::string>{
-                    {utils::microsoft::integral_dressing_labels()}});
-  }
+  HamiltonianSettings();
   ~HamiltonianSettings() override = default;
 };
 
