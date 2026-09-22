@@ -17,6 +17,7 @@ from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import QpeCircuitBuilderSettings, StandardQpeCircuitBuilder
+from .unary_phase_estimation_builder import cosine_window_state
 
 __all__: list[str] = [
     "QdkStandardQpeCircuitBuilder",
@@ -37,6 +38,16 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Measure the phase register in the computational basis. Set to false for a "
             "measurement-free, adjointable circuit, such as the preparation amplitude "
             "amplification reflects about.",
+        )
+        self._set_default(
+            "phase_window",
+            "string",
+            "uniform",
+            "Phase-register window. 'uniform' prepares a Hadamard superposition, whose "
+            "outcome distribution has tails heavy enough that its standard deviation "
+            "follows the standard quantum limit. 'sine' prepares the Heisenberg-limited "
+            "window state of Babbush et al. (PRX 8, 041015, Eq. 17), which attains the "
+            "minimum Holevo variance tan^2(pi/(N+2)) for N = 2^num_bits - 1 queries.",
         )
 
 
@@ -149,7 +160,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         self._validate_state_prep_width(state_preparation, num_system_qubits)
-        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
+        phase_qubit_prep_op = self._phase_window_op(num_bits)
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         qpe_op = QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPEOp(
@@ -178,6 +189,42 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             ),
             qsharp_op=qpe_op,
         )
+
+    def _phase_window_op(self, num_bits: int):
+        r"""Return the phase-register preparation for the configured window.
+
+        The ``uniform`` window is a Hadamard on every phase qubit. The ``sine`` window is
+        the Heisenberg-limited control state :math:`\psi_n \propto \sin(\pi(n+1)/(N+2))`
+        over the :math:`N+1 = 2^{\text{num\_bits}}` register slots, where
+        :math:`N = 2^{\text{num\_bits}} - 1` is the total number of controlled-unitary
+        applications. It attains the minimum Holevo variance
+        :math:`\tan^2(\pi/(N+2))` :cite:`Babbush2018,Berry2009`, whereas the uniform
+        window's variance follows the standard quantum limit.
+
+        Args:
+            num_bits: Number of phase-register qubits.
+
+        Returns:
+            A Q# operation preparing the phase register.
+
+        Raises:
+            ValueError: If ``phase_window`` is not a recognized window name.
+
+        """
+        window = str(self._settings.get("phase_window"))
+        if window == "uniform":
+            return QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
+        if window == "sine":
+            # cosine_window_state spans num_queries + 1 = 2^num_bits slots and normalizes
+            # against num_queries + 2 = N + 2, so it fills the register exactly.
+            params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
+                rowMap=list(range(num_bits - 1, -1, -1)),
+                stateVector=cosine_window_state((1 << num_bits) - 1),
+                expansionOps=[],
+                numQubits=num_bits,
+            )
+            return QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params)
+        raise ValueError(f"phase_window must be 'uniform' or 'sine', got {window!r}.")
 
     def name(self) -> str:
         """Return the name of the builder algorithm."""

@@ -58,6 +58,26 @@ TARGET_PRECISION_PER_SITE = 0.0051
 #: Number of phase-register precision bits.
 QPE_PRECISION_BITS = 10
 
+#: Share of the energy budget allocated to phase estimation. Minimizing the total
+#: Trotter step count sum_k r_k, which scales as 1 / (delta * sqrt(1 - delta)), gives
+#: delta = 2/3; this reproduces the analytic optimum of Campbell (arXiv:2012.09238,
+#: App. F), whose Eqs. (F5)-(F7) split the combined budget as Delta_PE = 2/3 and
+#: Delta_TS = 1/3.
+QPE_BUDGET_FRACTION = 2.0 / 3.0
+
+#: Sine-window phase error as a multiple of pi / (N tau). The minimum Holevo variance
+#: for N queries is tan^2(pi/(N + 2)) (Babbush et al., PRX 8, 041015, Eq. (17); Berry
+#: et al., PRA 80, 052114, Eq. (2.3)), i.e. a one-sigma constant of 1.0. The benchmark
+#: requires 90% confidence rather than one sigma, so we use the 90% confidence
+#: half-width of the sine-window error density, computed as in Lee et al.
+#: (PRX Quantum 2, 030305, App. D, Eqs. (D26)-(D29)).
+QPE_CONFIDENCE_CONSTANT = 1.553
+
+#: Classical precision per site assumed available as prior knowledge, in units of t.
+#: Evolution times beyond 2 pi / (CLASSICAL_PRECISION_PER_SITE * L^2) would alias into
+#: bits the classical estimate cannot already fix (arXiv:2609.05316, App. C).
+CLASSICAL_PRECISION_PER_SITE = 0.05
+
 #: The plaquette trotter is second order only.
 TROTTER_ORDER = 2
 
@@ -81,21 +101,51 @@ def num_electrons(size: int) -> int:
 def qpe_parameters(
     one_norm: float,
     energy_budget: float,
+    size: int,
 ) -> tuple[float, int, dict[str, float | int | str]]:
-    """Size QPE and choose the plaquette builder's Trotter setting.
+    """Split the energy budget and size the QPE evolution time from the QPE share.
+
+    The total budget is divided as ``eps = eps_QPE + eps_T``. The phase error of a
+    sine-windowed register with ``N = 2^bits - 1`` queries is ``C pi / (N tau)``, so
+    meeting ``eps_QPE`` fixes the base evolution time. The remainder is handed to the
+    plaquette builder, which sizes its own step count against it.
 
     Args:
-        one_norm: Hamiltonian coefficient one-norm.
-        energy_budget: Ground-state energy accuracy used for QPE resolution.
+        one_norm: Hamiltonian coefficient one-norm, used only to report the aliasing
+            factor relative to the conservative no-aliasing time ``pi / lambda``.
+        energy_budget: Total ground-state energy accuracy required.
+        size: Lattice side length, used for the classical-precision time cap.
 
     Returns:
-        Base evolution time, fixed precision bits, and builder settings containing
-        either target_accuracy or num_divisions. Currently uses target_accuracy.
+        Base evolution time, precision bits, and builder settings carrying the Trotter
+        share of the budget as ``target_accuracy``.
+
+    Raises:
+        ValueError: If the required evolution time exceeds the classical-precision cap,
+            where aliasing could no longer be resolved by prior classical knowledge.
 
     """
-    max_time = math.pi / energy_budget
-    base_time = max_time / 2**QPE_PRECISION_BITS
-    return base_time, QPE_PRECISION_BITS, {"target_accuracy": energy_budget}
+    qpe_budget = QPE_BUDGET_FRACTION * energy_budget
+    trotter_budget = energy_budget - qpe_budget
+    num_queries = 2**QPE_PRECISION_BITS - 1
+    base_time = QPE_CONFIDENCE_CONSTANT * math.pi / (num_queries * qpe_budget)
+
+    # Aliasing is expected and permitted here: the conservative bound pi / lambda is far
+    # more restrictive than necessary when a classical estimate already fixes the leading
+    # bits. The binding constraint is the classical precision instead.
+    max_time = 2.0 * math.pi / (CLASSICAL_PRECISION_PER_SITE * HOPPING_T * size * size)
+    if base_time > max_time:
+        raise ValueError(
+            f"L={size}: base evolution time {base_time:.4g} exceeds the classical-precision "
+            f"cap {max_time:.4g}. Raise QPE_PRECISION_BITS above {QPE_PRECISION_BITS} so the "
+            "same accuracy is reached with more, shorter queries."
+        )
+    Logger.debug(
+        f"L={size}: eps_QPE={qpe_budget:.4g}, eps_T={trotter_budget:.4g}, "
+        f"tau={base_time:.4g}, aliasing factor {base_time * one_norm / math.pi:.3g}x "
+        f"the conservative pi/lambda bound, {base_time / max_time:.3g}x the classical cap."
+    )
+    return base_time, QPE_PRECISION_BITS, {"target_accuracy": trotter_budget}
 
 
 def resolve_num_divisions(
@@ -134,20 +184,28 @@ def one_trotter_step_circuit(
     operator,
     step_time: float,
     size: int,
+    repetitions: int = 1,
 ) -> Circuit:
-    """Return one controlled second-order plaquette Trotter step.
+    """Return a controlled second-order plaquette Trotter step, optionally repeated.
+
+    With ``repetitions`` at 1 the circuit is a single step and the caller scales the
+    estimate by hand. Above 1 the repetition is carried in the container instead, so
+    the estimator sees the whole ladder as one workload and sizes its factories
+    against it rather than against a single step. The body is emitted once either
+    way: ``step_reps`` drives ``RepeatEstimates`` rather than unrolling.
 
     Args:
         context: Q# context to build in.
         operator: The qubit Hamiltonian.
-        step_time: Evolution time represented by the step.
+        step_time: Evolution time represented by one step.
         size: Lattice side length.
+        repetitions: Number of identical steps the container should repeat.
 
     Returns:
-        The controlled one-step circuit.
+        The controlled circuit.
 
     Raises:
-        RuntimeError: If the unitary builder emits more than one step.
+        RuntimeError: If the unitary builder does not emit the requested repetitions.
 
     """
     with use_qsharp_context(context):
@@ -160,10 +218,14 @@ def one_trotter_step_circuit(
             lattice_height=size,
             num_divisions=1,
             target_accuracy=0.0,
+            power=repetitions,
+            power_strategy="repeat",
         ).run(operator)
         step_repetitions = unitary.get_container().step_reps
-        if step_repetitions != 1:
-            raise RuntimeError(f"expected one Trotter step, got {step_repetitions}")
+        if step_repetitions != repetitions:
+            raise RuntimeError(
+                f"expected {repetitions} Trotter step(s), got {step_repetitions}"
+            )
         return create("controlled_circuit_mapper", "pauli_sequence").run(unitary)
 
 
@@ -255,13 +317,21 @@ def current_memory_gb() -> float:
     return peak_memory_gb()
 
 
-def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFrame:
+def run_sampling(
+    context,
+    size: int,
+    cache_dir: Path | None = None,
+    repeat_in_circuit: bool = False,
+) -> pd.DataFrame:
     """Measure one lattice size.
 
     Args:
         context: Q# context to build in.
         size: Lattice side length.
         cache_dir: Directory holding cached Q# application traces.
+        repeat_in_circuit: Carry the ladder's step count in the container so the
+            estimator costs the whole workload, instead of tracing a single step
+            and multiplying its frontier afterwards.
 
     Returns:
         The estimator's frontier with per-step and accumulated ladder costs, or an
@@ -283,7 +353,7 @@ def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFr
     one_norm = operator.schatten_norm
     energy_budget = target_precision(size)
     base_time, resolution_bits, trotter_settings = qpe_parameters(
-        one_norm, energy_budget
+        one_norm, energy_budget, size
     )
     max_power = 2 ** (resolution_bits - 1)
     steps_per_bit = [
@@ -296,8 +366,13 @@ def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFr
     num_divisions_for_largest_step = steps_per_bit[-1]
     step_time = base_time * max_power / num_divisions_for_largest_step
 
+    circuit_repetitions = total_steps if repeat_in_circuit else 1
+    step_budget = MAX_ESTIMATE_ERROR / (1 if repeat_in_circuit else total_steps)
+
     circuit_started = time.monotonic()
-    circuit = one_trotter_step_circuit(context, operator, step_time, size)
+    circuit = one_trotter_step_circuit(
+        context, operator, step_time, size, repetitions=circuit_repetitions
+    )
     circuit_elapsed = time.monotonic() - circuit_started
     rss_after_circuit = current_memory_gb()
 
@@ -305,7 +380,7 @@ def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFr
     table = estimate_physical(
         circuit,
         f"{size}x{size}-step",
-        max_error=MAX_ESTIMATE_ERROR / total_steps,
+        max_error=step_budget,
         cache_dir=cache_dir,
     )
     qre_elapsed = time.monotonic() - qre_started
@@ -325,6 +400,12 @@ def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFr
         "lambda": one_norm,
         "sigma": energy_budget,
         "target_precision": energy_budget,
+        "qpe_budget": QPE_BUDGET_FRACTION * energy_budget,
+        "qpe_budget_fraction": QPE_BUDGET_FRACTION,
+        "qpe_confidence_constant": QPE_CONFIDENCE_CONSTANT,
+        # Names the error model used to size base_time, not a traced subcircuit: the
+        # phase register and inverse QFT are outside the one-step trace.
+        "qpe_error_model": "sine-window-90pct",
         "base_time": base_time,
         "t_max": base_time * 2**resolution_bits,
         "qpe_type": "standard-one-step-scaled",
@@ -339,7 +420,9 @@ def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFr
         "steps_per_bit": str(steps_per_bit),
         "total_trotter_steps": total_steps,
         "trotter_step_time": step_time,
-        "step_max_error": MAX_ESTIMATE_ERROR / total_steps,
+        "step_max_error": step_budget,
+        "circuit_repetitions": circuit_repetitions,
+        "repeat_in_circuit": repeat_in_circuit,
         "num_bits": resolution_bits,
         "qubit_mapper_elapsed_s": round(mapper_elapsed, 3),
         "trotter_step_elapsed_s": round(circuit_elapsed, 3),
@@ -356,11 +439,12 @@ def run_sampling(context, size: int, cache_dir: Path | None = None) -> pd.DataFr
 
     frame = table.as_frame()
     step_seconds = pd.to_timedelta(frame["runtime"]).dt.total_seconds()
-    frame["step_runtime_s"] = step_seconds
-    frame["ladder_runtime_s"] = step_seconds * total_steps
+    ladder_factor = 1 if repeat_in_circuit else total_steps
+    frame["step_runtime_s"] = step_seconds / ladder_factor
+    frame["ladder_runtime_s"] = step_seconds * ladder_factor
     frame["ladder_runtime_days"] = frame["ladder_runtime_s"] / 86400
-    frame["step_error"] = frame["error"]
-    frame["error"] = frame["step_error"] * total_steps
+    frame["step_error"] = frame["error"] / ladder_factor
+    frame["error"] = frame["error"] * ladder_factor
     frame["runtime"] = pd.to_timedelta(frame["ladder_runtime_s"], unit="s")
     return frame
 
@@ -408,6 +492,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         type=Path,
         help="directory for cached QRE application traces (default: .qre_cache beside the output)",
     )
+    parser.add_argument(
+        "--repeat-in-circuit",
+        action="store_true",
+        help="carry the ladder's step count as container repetitions so the estimator "
+        "costs the whole workload, instead of scaling a one-step frontier afterwards",
+    )
     args = parser.parse_args(argv)
 
     Logger.set_global_level(Logger.LogLevel.off)
@@ -427,7 +517,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         print(f"Sampling L={size}; writing {destination}", flush=True)
         try:
-            frame = run_sampling(context, size, cache_dir=cache_dir)
+            frame = run_sampling(
+                context,
+                size,
+                cache_dir=cache_dir,
+                repeat_in_circuit=args.repeat_in_circuit,
+            )
         except Exception as error:  # noqa: BLE001 - keep the sweep alive; the log explains the gap
             record_no_result(log_path, size, f"{type(error).__name__}: {error}")
             print(f"L={size} produced no result; see {log_path}", flush=True)

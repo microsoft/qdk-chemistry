@@ -12,6 +12,9 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
+    QdkStandardQpeCircuitBuilder,
+)
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -268,6 +271,58 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
+
+
+def test_standard_phase_estimation_sine_window_recovers_the_same_energy(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """The Heisenberg-limited sine window is a drop-in for the uniform phase register.
+
+    The window changes only the amplitudes prepared in the phase register, so a problem
+    whose phase lands exactly on the register grid must be recovered identically. What
+    the window buys is the tail behaviour off-grid: the uniform register's outcome
+    distribution has tails heavy enough that its standard deviation follows the standard
+    quantum limit, whereas this state attains the minimum Holevo variance
+    tan^2(pi/(N+2)).
+    """
+    builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=two_qubit_phase_problem.num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time
+        ),
+        phase_window="sine",
+    )
+    qpe = StandardPhaseEstimation(shots=two_qubit_phase_problem.shots)
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set("qpe_circuit_builder", builder)
+    result = qpe.run(
+        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        state_preparation=two_qubit_phase_problem.state_prep,
+    )
+
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
+    assert np.isclose(
+        result.raw_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
+def test_standard_phase_estimation_rejects_an_unknown_window(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """An unrecognized window name fails loudly rather than silently falling back."""
+    builder = QdkStandardQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
+    builder.settings().set("phase_window", "hann")
+    with pytest.raises(ValueError, match="phase_window must be 'uniform' or 'sine'"):
+        builder._phase_window_op(two_qubit_phase_problem.num_bits)
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)
