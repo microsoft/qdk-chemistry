@@ -92,7 +92,6 @@ def num_electrons(size: int) -> int:
 
 
 def qpe_parameters(
-    one_norm: float,
     energy_budget: float,
     size: int,
 ) -> tuple[float, int, dict[str, float | int | str]]:
@@ -107,8 +106,6 @@ def qpe_parameters(
     matter of repeating the estimate, which multiplies shots rather than evolution time.
 
     Args:
-        one_norm: Hamiltonian coefficient one-norm, used only to report the aliasing
-            factor relative to the conservative no-aliasing time ``pi / lambda``.
         energy_budget: Total ground-state energy accuracy required.
         size: Lattice side length, used for logging.
 
@@ -125,9 +122,7 @@ def qpe_parameters(
     # Aliasing is expected here: the conservative pi / lambda bound is far more
     # restrictive than necessary once a classical estimate fixes the leading bits.
     Logger.debug(
-        f"L={size}: eps_QPE={qpe_budget:.4g}, eps_T={trotter_budget:.4g}, "
-        f"tau={base_time:.4g}, aliasing factor {base_time * one_norm / math.pi:.3g}x "
-        "the conservative pi/lambda bound."
+        f"L={size}: eps_QPE={qpe_budget:.4g}, eps_T={trotter_budget:.4g}, tau={base_time:.4g}"
     )
     return base_time, QPE_PRECISION_BITS, {"target_accuracy": trotter_budget}
 
@@ -336,9 +331,7 @@ def run_sampling(
     rss_after_mapper = current_memory_gb()
     one_norm = operator.schatten_norm
     energy_budget = target_precision(size)
-    base_time, resolution_bits, trotter_settings = qpe_parameters(
-        one_norm, energy_budget, size
-    )
+    base_time, resolution_bits, trotter_settings = qpe_parameters(energy_budget, size)
     max_power = 2 ** (resolution_bits - 1)
     steps_per_bit = [
         resolve_num_divisions(
