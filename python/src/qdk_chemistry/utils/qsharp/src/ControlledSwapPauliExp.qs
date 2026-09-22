@@ -4,41 +4,28 @@
 
 namespace QDKChemistry.Utils.ControlledSwapPauliExp {
 
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import Std.Arrays.Subarray;
     import Std.Math.AbsD;
-    import Std.ResourceEstimation.*;
 
-    /// Performs a controlled time evolution for a set of Pauli exponentials using
-    /// the "CSWAP-sandwich" construction.
+    /// Controls sparse Pauli evolution using a CSWAP sandwich.
     ///
-    /// An internally allocated `vacuum` register (initialized to |0...0>) is conditionally
-    /// swapped with the system register, the *uncontrolled* Pauli evolution is applied to the
-    /// vacuum register, and the swap is uncomputed. The eigenphase accumulates on the |1>
-    /// branch, matching the standard controlled-U convention. For an n-qubit system, this uses
-    /// an additional n-qubit vacuum register and two layers of n controlled-`SWAP` operations
-    /// instead of controlling every gate of `Exp`.
+    /// For an n-qubit system, this uses one additional n-qubit vacuum register and
+    /// two layers of n controlled-`SWAP` operations. The shared sparse evolution applies
+    /// its prefix once, repeats the body, and applies its suffix once inside the sandwich.
     ///
-    /// The `repetitions` loop lives *inside* the sandwich, so the same two controlled-`SWAP`
-    /// layers cover the whole repeated evolution.
-    ///
-    /// The evolution must leave the vacuum invariant, `U|0...0> = e^{i phi_0}|0...0>`, as a
-    /// particle-conserving Hamiltonian does. That `phi_0` lands on the |0> branch and is passed
-    /// in as `vacuumPhase`, applied to the control as an `R1` so the result is a genuine
+    /// The full evolution must satisfy `U|0...0> = e^{i phi_0}|0...0>`. Its vacuum phase
+    /// lands on the |0> branch; `R1(vacuumPhase)` corrects the relative phase to give
     /// controlled-`U` up to a global phase.
     ///
     /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the (uncontrolled) evolution inside the sandwich.
-    /// - `vacuumPhase`: The phase `phi_0` the repeated evolution imprints on the vacuum register.
+    /// - `evolution`: Sparse evolution, including repetition and one-time boundary terms.
+    /// - `vacuumPhase`: The phase `phi_0` of the full evolution on the vacuum.
     /// - `control`: The control qubit.
-    /// - `systems`: An array of qubits representing the system on which the operation acts.
-    /// # Returns
-    /// - `Unit`: The operation prepares the controlled time evolution on the allocated qubits.
+    /// - `systems`: System qubits indexed by the sparse evolution.
     operation RepControlledSwapPauliExp(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
+        evolution : SparseRepPauliExpParams,
         vacuumPhase : Double,
         control : Qubit,
         systems : Qubit[]
@@ -49,14 +36,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
                 Controlled SWAP([control], (systems[i], vacuum[i]));
             }
         } apply {
-            for _ in 1..repetitions {
-                if BeginEstimateCaching("ControlledSwapPauliExp", 0) {
-                    for idx in 0..Length(pauliExponents) - 1 {
-                        Exp(pauliExponents[idx], -pauliCoefficients[idx], vacuum);
-                    }
-                    EndEstimateCaching();
-                }
-            }
+            SparseRepPauliExp(evolution, vacuum);
         }
         // Skipped when negligible so a vacuum-annihilating evolution costs no extra rotation.
         if AbsD(vacuumPhase) > 1e-12 {
@@ -65,37 +45,17 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     }
 
     /// Parameters for the repeated CSWAP-sandwich controlled Pauli evolution.
-    /// # Fields
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the (uncontrolled) evolution inside the sandwich.
-    /// - `vacuumPhase`: The phase the repeated evolution imprints on the vacuum register.
-    /// - `control`: The index of the control qubit.
-    /// - `systems`: An array of integers representing the indices of the system qubits.
+    /// `control` and `systems` are register indices for circuit allocation.
     struct RepControlledSwapPauliExpParams {
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
+        evolution : SparseRepPauliExpParams,
         vacuumPhase : Double,
         control : Int,
         systems : Int[],
     }
 
-    /// A helper operation to create a circuit for the repeated CSWAP-sandwich controlled
-    /// time evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the (uncontrolled) evolution inside the sandwich.
-    /// - `vacuumPhase`: The phase the repeated evolution imprints on the vacuum register.
-    /// - `control`: The index of the control qubit.
-    /// - `systems`: An array of integers representing the indices of the system qubits.
-    /// # Returns
-    /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
+    /// Creates a CSWAP-sandwich circuit at the specified control and system indices.
     operation MakeRepControlledSwapPauliExpCircuit(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
+        evolution : SparseRepPauliExpParams,
         vacuumPhase : Double,
         control : Int,
         systems : Int[]
@@ -111,26 +71,17 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
 
         use qs = Qubit[maxIndex + 1];
         RepControlledSwapPauliExp(
-            pauliExponents,
-            pauliCoefficients,
-            repetitions,
+            evolution,
             vacuumPhase,
             qs[control],
             Subarray(systems, qs)
         );
     }
 
-    /// A helper function to create a callable for the repeated CSWAP-sandwich controlled
-    /// time evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepControlledSwapPauliExpParams` struct containing the parameters for the operation.
-    /// # Returns
-    /// - `(Qubit, Qubit[]) => Unit`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
+    /// Returns an adjointable CSWAP-sandwich callable for supplied control and system qubits.
     function MakeRepControlledSwapPauliExpOp(params : RepControlledSwapPauliExpParams) : (Qubit, Qubit[]) => Unit is Adj {
         RepControlledSwapPauliExp(
-            params.pauliExponents,
-            params.pauliCoefficients,
-            params.repetitions,
+            params.evolution,
             params.vacuumPhase,
             _,
             _

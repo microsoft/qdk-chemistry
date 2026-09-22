@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from itertools import chain, pairwise
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -74,6 +75,59 @@ class TestTrotter:
         """Test the name method of Trotter."""
         builder = Trotter()
         assert builder.name() == "trotter"
+
+    @pytest.mark.parametrize("order", [1, 2, 4])
+    @pytest.mark.parametrize("strategy", ["repeat", "rescale"])
+    def test_compact_options_preserve_layers_and_selected_formula(self, order, strategy):
+        """Reordering reduces factor count; fusion preserves its unitary, scale, and declared layers."""
+        hamiltonian = QubitOperator(
+            ["XII", "IXI", "IIX", "ZII", "IZI", "ZZI"],
+            np.array([0.7, 0.6, 0.5, -0.4, 0.3, 0.2]),
+            term_partition=LayeredPartition(strategy="test", groups=(((0, 1, 2),), ((3, 4),), ((5,),))),
+        )
+        assert Trotter().settings().get("minimize_rotations") is False
+        assert Trotter().settings().get("fuse_group_boundaries") is False
+        containers = [
+            create(
+                "hamiltonian_unitary_builder",
+                "trotter",
+                order=order,
+                time=0.2,
+                num_divisions=3,
+                power=2,
+                power_strategy=strategy,
+                minimize_rotations=reorder,
+                fuse_group_boundaries=fuse,
+            )
+            .run(hamiltonian)
+            .get_container()
+            for reorder, fuse in ((False, False), (True, False), (True, True))
+        ]
+        baseline, ordered, fused = containers
+        if order == 1:
+            assert baseline.step_terms == ordered.step_terms
+        else:
+            assert ordered.num_pauli_exponentials < baseline.num_pauli_exponentials
+            assert fused.num_pauli_exponentials < ordered.num_pauli_exponentials
+        assert fused.scale == ordered.scale == (0.2 if strategy == "repeat" else 0.4)
+        assert fused.num_stored_terms <= 2 * len(ordered.step_terms)
+        matrices = []
+        for container in (ordered, fused):
+            stored = list(chain(container.beginning, container.step_terms, container.end))
+            assert container.layer_offsets is not None
+            for start, stop in pairwise(container.layer_offsets):
+                sites = [q for term in stored[start:stop] for q in term.pauli_term]
+                assert len(sites) == len(set(sites))
+            matrix = np.eye(8, dtype=complex)
+            for term in chain(container.beginning, list(container.step_terms) * container.step_reps, container.end):
+                generator = np.ones((1, 1))
+                for q in reversed(range(3)):
+                    generator = np.kron(
+                        generator, _pauli_matrix(term.pauli_term[q]) if q in term.pauli_term else np.eye(2)
+                    )
+                matrix = scipy.linalg.expm(-1j * term.angle * generator) @ matrix
+            matrices.append(matrix)
+        np.testing.assert_allclose(matrices[0], matrices[1], atol=2e-13, rtol=0)
 
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Trotter step."""

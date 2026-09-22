@@ -9,6 +9,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import QDKChemistry.Utils.PauliExp.StructuredSparseRepPauliExp;
     import QDKChemistry.Utils.PauliExp.StructuredSparseRepPauliExpParams;
+    import Std.Arrays.IndexOf;
     import Std.Arrays.Subarray;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
@@ -104,16 +105,23 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     ) : Unit is Adj + Ctl {
         if Length(layerOffsets) == 0 {
             Controlled SparseRepPauliExp([control], (params, systems));
-        } elif IsResourceEstimating() {
-            within {
-                RepeatEstimates(params.repetitions);
-            } apply {
-                ControlledPauliLayers(params, layerOffsets, control, systems);
-            }
         } else {
-            for _ in 1..params.repetitions {
-                ControlledPauliLayers(params, layerOffsets, control, systems);
+            let first = IndexOf(offset -> offset == params.beginning, layerOffsets);
+            let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.end, layerOffsets);
+            let stepOffsets = layerOffsets[first..last];
+            ControlledPauliLayers(params, layerOffsets[0..first], control, systems);
+            if IsResourceEstimating() {
+                within {
+                    RepeatEstimates(params.repetitions);
+                } apply {
+                    ControlledPauliLayers(params, stepOffsets, control, systems);
+                }
+            } else {
+                for _ in 1..params.repetitions {
+                    ControlledPauliLayers(params, stepOffsets, control, systems);
+                }
             }
+            ControlledPauliLayers(params, layerOffsets[last...], control, systems);
         }
     }
 

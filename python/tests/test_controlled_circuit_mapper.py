@@ -271,6 +271,8 @@ def _sparse_controlled_op(terms, *, repetitions=1):
         pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
         pauliCoefficients=[term["angle"] for term in terms],
         repetitions=repetitions,
+        beginning=0,
+        end=0,
     )
     op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpAdjCtlOp(params)
     return QSHARP_UTILS.CircuitComposition.MakeControlledOnFirstQubitOp(op)

@@ -277,6 +277,20 @@ Example::
     #   exp(-i * +0.2500 * XIII)
 
 
+Compact product formulas
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``"trotter"`` builder has two optional settings, both defaulting to ``False``:
+
+* ``minimize_rotations`` reorders commuting groups in even-order formulas to reduce emitted Pauli factors. It can change the finite-step approximation; first-order ordering is unchanged.
+* ``fuse_group_boundaries`` merges matching commuting groups between repetitions without changing the chosen product formula or expanding the repetition count.
+
+A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` stores the result as ``beginning``, repeated ``step_terms``, and ``end``.
+``group_offsets`` marks commuting body groups; ``layer_offsets`` retains declared disjoint layers across all three sections.
+``num_pauli_exponentials`` counts executed factors and ``num_stored_terms`` counts stored entries.
+Calling ``combine()`` applies boundary fusion; ``combine(other)`` composes flat formulas, using a compact result where possible.
+These optimizations apply to flat Pauli formulas; structured plaquette and Hamming-weight-phasing terms retain their existing mapping path.
+
 .. _block-encoding-builder:
 
 Block encoding
