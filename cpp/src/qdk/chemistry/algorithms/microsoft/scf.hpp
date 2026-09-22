@@ -54,28 +54,7 @@ class ScfSettings
    * - Additional SCF-specific convergence and algorithm parameters
    *
    */
-  ScfSettings() : qdk::chemistry::algorithms::ElectronicStructureSettings() {
-    set_default("level_shift", -1.0);
-    set_default("enable_gdm", true);
-    set_default("energy_thresh_diis_switch", 1e-3);
-    set_default("gdm_max_diis_iteration", 50);
-    set_default("gdm_bfgs_history_size_limit", 50);
-    set_default("fock_reset_steps", 1073741824);
-    set_default("eri_use_atomics", false);
-    set_default("eri_threshold", -1.0);
-    set_default("shell_pair_threshold", 1e-12,
-                "Overlap-based shell pair pre-screening threshold. Shell "
-                "pairs with overlap norm below this value are excluded.");
-    set_default(
-        "eri_method", std::string("direct"),
-        "ERI evaluation method: 'direct' computes integrals on-the-fly, "
-        "'incore' stores all integrals in memory",
-        data::ListConstraint<std::string>{
-            {std::vector<std::string>{"direct", "incore"}}});
-    set_default("nthreads", static_cast<int64_t>(-1),
-                "Number of OpenMP threads to use for SCF calculation. "
-                "Set to -1 to use all available threads.");
-  }
+  ScfSettings();
 };
 
 /**

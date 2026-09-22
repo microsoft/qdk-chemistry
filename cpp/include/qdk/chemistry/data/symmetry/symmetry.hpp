@@ -118,7 +118,7 @@ class SpinValue : public SymmetryAxisValue {
    * @brief Construct from @f$2 M_s@f$ (e.g. +1 for alpha, -1 for beta).
    * @param two_ms Twice the spin projection of the represented label.
    */
-  constexpr explicit SpinValue(int two_ms) : _two_ms(two_ms) {}
+  explicit SpinValue(int two_ms) : _two_ms(two_ms) {}
 
   /**
    * @brief The stored @f$2 M_s@f$ value.
