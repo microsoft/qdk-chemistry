@@ -65,16 +65,11 @@ QPE_PRECISION_BITS = 10
 #: Delta_TS = 1/3.
 QPE_BUDGET_FRACTION = 2.0 / 3.0
 
-#: Sine-window phase error as a multiple of pi / (N tau). The minimum Holevo variance
-#: for N queries is tan^2(pi/(N + 2)) (Babbush et al., PRX 8, 041015, Eq. (17); Berry
-#: et al., PRA 80, 052114, Eq. (2.3)), i.e. a one-sigma constant of 1.0. The benchmark
-#: requires a confidence statement rather than one sigma, so we use the confidence
-#: half-width of the sine-window error density, computed as in Lee et al.
-#: (PRX Quantum 2, 030305, App. D, Eqs. (D26)-(D29)): 1.553 at 90%, 1.823 at 95%.
-#: Phase spread and logical failure are independent, so each is held to 5% and they
-#: compound to 0.95 * 0.95 = 0.9025, meeting the benchmark's 90% requirement.
-QPE_CONFIDENCE_CONSTANT = 1.823
-
+#: Sine-window phase spread. A register of N queries prepared in the Heisenberg-limited
+#: window attains the minimum Holevo variance tan^2(pi/(N + 2)) (Babbush et al., PRX 8,
+#: 041015, Eq. (17); Berry et al., PRA 80, 052114, Eq. (2.3); Najafi et al., AVS Quantum
+#: Sci. 5, 023802, Eq. (10)). This is a one-sigma spread: reaching a stated confidence
+#: is left to repeating the estimate rather than lengthening the evolution.
 #: The plaquette trotter is second order only.
 TROTTER_ORDER = 2
 
@@ -82,9 +77,8 @@ TROTTER_ORDER = 2
 MAJORANA_ERROR_RATE = 1e-6
 
 #: Failure-probability budget for the resource estimator. QRE composes per-operation
-#: logical failure probabilities and rejects candidates exceeding this, so it is the
-#: hardware half of the 90% confidence requirement; see QPE_CONFIDENCE_CONSTANT.
-MAX_ESTIMATE_ERROR = 0.05
+#: logical failure probabilities and rejects candidates whose total exceeds this.
+MAX_ESTIMATE_ERROR = 0.01
 
 
 def target_precision(size: int) -> float:
@@ -104,10 +98,13 @@ def qpe_parameters(
 ) -> tuple[float, int, dict[str, float | int | str]]:
     """Split the energy budget and size the QPE evolution time from the QPE share.
 
-    The total budget is divided as ``eps = eps_QPE + eps_T``. The phase error of a
-    sine-windowed register with ``N = 2^bits - 1`` queries is ``C pi / (N tau)``, so
-    meeting ``eps_QPE`` fixes the base evolution time. The remainder is handed to the
-    plaquette builder, which sizes its own step count against it.
+    The total budget is divided as ``eps = eps_QPE + eps_T``. A sine-windowed register
+    of ``N = 2^bits - 1`` queries has phase spread ``tan(pi / (N + 2))``, so requiring
+    ``eps_QPE tau`` to equal that spread fixes the base evolution time. The remainder is
+    handed to the plaquette builder, which sizes its own step count against it.
+
+    The spread is one sigma, not a confidence bound; reaching a stated confidence is a
+    matter of repeating the estimate, which multiplies shots rather than evolution time.
 
     Args:
         one_norm: Hamiltonian coefficient one-norm, used only to report the aliasing
@@ -123,7 +120,7 @@ def qpe_parameters(
     qpe_budget = QPE_BUDGET_FRACTION * energy_budget
     trotter_budget = energy_budget - qpe_budget
     num_queries = 2**QPE_PRECISION_BITS - 1
-    base_time = QPE_CONFIDENCE_CONSTANT * math.pi / (num_queries * qpe_budget)
+    base_time = math.tan(math.pi / (num_queries + 2)) / qpe_budget
 
     # Aliasing is expected here: the conservative pi / lambda bound is far more
     # restrictive than necessary once a classical estimate fixes the leading bits.
@@ -389,10 +386,10 @@ def run_sampling(
         "target_precision": energy_budget,
         "qpe_budget": QPE_BUDGET_FRACTION * energy_budget,
         "qpe_budget_fraction": QPE_BUDGET_FRACTION,
-        "qpe_confidence_constant": QPE_CONFIDENCE_CONSTANT,
         # Names the error model used to size base_time, not a traced subcircuit: the
-        # phase register and inverse QFT are outside the one-step trace.
-        "qpe_error_model": "sine-window-95pct",
+        # phase register and inverse QFT are outside the one-step trace. The spread is
+        # one sigma; confidence is bought with shots, not with evolution time.
+        "qpe_error_model": "sine-window-1sigma",
         "base_time": base_time,
         "t_max": base_time * 2**resolution_bits,
         "qpe_type": "standard-one-step-scaled",
