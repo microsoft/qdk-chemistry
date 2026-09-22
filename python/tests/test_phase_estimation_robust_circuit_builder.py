@@ -192,6 +192,39 @@ def test_num_rounds_rejects_nonpositive_epsilon(rpe_problem: tuple[Circuit, Qubi
         scheduler.run(*rpe_problem)
 
 
+@pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
+@pytest.mark.parametrize("setting", ["target_accuracy", "unitary_accuracy_fraction", "epsilon_rpe", "epsilon_unitary"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -float("inf")])
+def test_scheduler_rejects_nonfinite_budget_settings(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    builder_name: str,
+    setting: str,
+    value: float,
+) -> None:
+    """Scheduler inputs must be finite before any family-specific budget resolution."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.5,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
+    )
+    scheduler.settings().set(setting, value)
+
+    with pytest.raises(ValueError, match=rf"{setting}.*finite"):
+        scheduler.run(*rpe_problem)
+
+
+def test_scheduler_rejects_nan_explicit_budget(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """A pair of NaN tolerances must not fall back to a finite fractional budget."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.1,
+        epsilon_rpe=float("nan"),
+        epsilon_unitary=float("nan"),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "partially_randomized"),
+    )
+
+    with pytest.raises(ValueError, match=r"epsilon_rpe.*finite"):
+        scheduler.run(*rpe_problem)
+
+
 def test_qdrift_schedule_formula_and_monotonicity(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
     """RPE shots decrease while qDRIFT samples increase over the ladder."""
     state_preparation, _ = rpe_problem
@@ -207,6 +240,100 @@ def test_qdrift_schedule_formula_and_monotonicity(rpe_problem: tuple[Circuit, Qu
     assert shots == sorted(shots, reverse=True)
     assert samples == sorted(samples)
     assert all(samples[round_index] == 2 ** (2 * round_index + 1) for round_index in range(total_rounds + 1))
+
+
+@pytest.mark.parametrize("nested_accuracy", [0.0, 0.25, 10.0])
+def test_qdrift_schedule_records_effective_samples(
+    rpe_problem: tuple[Circuit, QubitOperator], nested_accuracy: float
+) -> None:
+    """Scheduled samples include nested accuracy sizing and match the constructed draw."""
+    state_preparation, hamiltonian = rpe_problem
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.5,
+        seed=7,
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder",
+            "qdrift",
+            target_accuracy=nested_accuracy,
+            merge_duplicate_terms=False,
+        ),
+    )
+
+    circuit_set = scheduler.run(state_preparation, hamiltonian)
+    circuit_set = RobustPhaseEstimationCircuitSet.from_json(circuit_set.to_json())
+
+    for round_data in circuit_set.rounds:
+        configuration = round_data.unitary_builder_configuration
+        builder = create(configuration.algorithm_type, configuration.algorithm_name, **configuration.settings.to_dict())
+        container = builder.run(hamiltonian).get_container()
+
+        assert round_data.scheduled_samples == len(container.step_terms)
+        assert configuration.settings.get("num_samples") == round_data.scheduled_samples
+        assert configuration.settings.get("target_accuracy") == nested_accuracy
+        assert round_data.scheduled_samples >= 2 ** (2 * round_data.round_index + 1)
+    assert circuit_set.final_samples == circuit_set.rounds[-1].scheduled_samples
+
+
+def test_qdrift_schedule_rejects_default_oversized_workload(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """Default chemistry-scale sampling fails before constructing a huge circuit."""
+    state_preparation, _ = rpe_problem
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(seed=7)
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[100.0])
+
+    with pytest.raises(ValueError, match=r"34359738368.*max_qdrift_samples=1000000"):
+        scheduler.run(state_preparation, hamiltonian)
+
+
+@pytest.mark.parametrize("limit", [0, -1])
+def test_qdrift_schedule_rejects_nonpositive_sample_limit(
+    rpe_problem: tuple[Circuit, QubitOperator], limit: int
+) -> None:
+    """A sample ceiling must be a positive integer, not a disabling sentinel."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, max_qdrift_samples=limit)
+
+    with pytest.raises(ValueError, match=r"max_qdrift_samples.*positive"):
+        scheduler.run(*rpe_problem)
+
+
+@pytest.mark.parametrize("limit", [8, 9])
+def test_qdrift_schedule_accepts_sample_limit_boundary(rpe_problem: tuple[Circuit, QubitOperator], limit: int) -> None:
+    """An allowed sample count is unchanged at or below the configured ceiling."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, max_qdrift_samples=limit)
+
+    circuit_set = scheduler.run(*rpe_problem)
+
+    assert circuit_set.final_samples == 8
+
+
+def test_qdrift_schedule_rejects_samples_above_limit(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """A ladder count above the ceiling raises rather than silently clamping."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, max_qdrift_samples=7)
+
+    with pytest.raises(ValueError, match=r"8.*max_qdrift_samples=7"):
+        scheduler.run(*rpe_problem)
+
+
+def test_qdrift_schedule_limit_uses_effective_samples(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """The guard includes samples required by a tighter nested accuracy setting."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.5,
+        max_qdrift_samples=50,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "qdrift", target_accuracy=0.25),
+    )
+
+    with pytest.raises(ValueError, match=r"79.*max_qdrift_samples=50"):
+        scheduler.run(*rpe_problem)
+
+
+def test_qdrift_schedule_accepts_explicit_higher_sample_limit(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """An explicit ceiling permits a large metadata-only schedule without clamping."""
+    state_preparation, _ = rpe_problem
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(seed=7, max_qdrift_samples=2**35)
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[100.0])
+
+    circuit_set = scheduler.run(state_preparation, hamiltonian)
+
+    assert circuit_set.final_samples == 2**35
 
 
 def test_scheduler_and_builder_are_registered_and_scheduling_is_lazy(
@@ -233,6 +360,15 @@ def test_robust_builder_rejects_standard_qpe_settings() -> None:
     """The shared builder type retains variant-specific settings schemas."""
     with pytest.raises(SettingNotFoundError):
         create("qpe_circuit_builder", "qdk_robust", num_bits=10)
+
+
+@pytest.mark.parametrize("base_time", [-0.1, float("nan"), float("inf"), -float("inf")])
+def test_scheduler_rejects_invalid_base_time(rpe_problem: tuple[Circuit, QubitOperator], base_time: float) -> None:
+    """Only finite, nonnegative times are valid, with zero selecting automatic time."""
+    scheduler = QdkRobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, base_time=base_time)
+
+    with pytest.raises(ValueError, match=r"base_time.*finite and non-negative"):
+        scheduler.run(*rpe_problem)
 
 
 @pytest.mark.parametrize("base_time", [pi, 1.1 * pi])

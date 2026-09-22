@@ -101,6 +101,12 @@ class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
             -1,
             "Random seed for evolution draws. Use -1 to choose one entropy-backed seed per circuit set.",
         )
+        self._set_default(
+            "max_qdrift_samples",
+            "int",
+            1_000_000,
+            "Maximum samples per scheduled qDRIFT circuit. Increase explicitly only when resources permit.",
+        )
 
 
 class RobustPhaseEstimationExperimentScheduler(Algorithm):
@@ -117,6 +123,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         epsilon_unitary: float | None = None,
         unitary_builder: AlgorithmRef | None = None,
         hadamard_test_circuit_builder: AlgorithmRef | None = None,
+        max_qdrift_samples: int = 1_000_000,
     ) -> None:
         """Initialize robust phase estimation workload scheduling.
 
@@ -130,6 +137,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             epsilon_unitary: Optional full-unitary error tolerance, converted to the builder's native accuracy setting.
             unitary_builder: Reference to a time-evolution builder; its power must be one.
             hadamard_test_circuit_builder: Reference to the builder used for each X/Y circuit pair.
+            max_qdrift_samples: Positive per-circuit sample ceiling for qDRIFT, including nested accuracy sizing.
 
         """
         super().__init__()
@@ -138,6 +146,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         self._settings.set("base_time", base_time)
         self._settings.set("energy_correction", energy_correction)
         self._settings.set("seed", seed)
+        self._settings.set("max_qdrift_samples", max_qdrift_samples)
         if unitary_accuracy_fraction is not None:
             self._settings.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
         if epsilon_rpe is not None:
@@ -211,6 +220,8 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         The workload includes round zero and every subsequent time doubling.
         Deterministic rounds use one multi-shot X/Y pair. Randomized rounds use
         one independently seeded unitary per shot, shared by the two bases.
+        qDRIFT counts include any tighter nested accuracy request and must not
+        exceed ``max_qdrift_samples``. Counts are never silently clamped.
 
         Args:
             state_preparation: State-preparation circuit stored with the workload.
@@ -224,6 +235,20 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             ValueError: If the evolution family, power, base time, or error-budget settings are unsupported or invalid.
 
         """
+        for setting in ("target_accuracy", "unitary_accuracy_fraction", "epsilon_rpe", "epsilon_unitary"):
+            value = float(self._settings.get(setting))
+            if not np.isfinite(value):
+                raise ValueError(f"{setting} must be finite, received {value}.")
+        epsilon_total = float(self._settings.get("target_accuracy"))
+        if epsilon_total <= 0.0:
+            raise ValueError(f"target_accuracy (epsilon) must be positive, received {epsilon_total}.")
+        base_time = float(self._settings.get("base_time"))
+        if not np.isfinite(base_time) or base_time < 0.0:
+            raise ValueError(f"base_time must be finite and non-negative, received {base_time}.")
+        max_qdrift_samples = int(self._settings.get("max_qdrift_samples"))
+        if max_qdrift_samples < 1:
+            raise ValueError("max_qdrift_samples must be positive.")
+
         unitary_ref = self._settings.get("unitary_builder")
         hadamard_ref = self._settings.get("hadamard_test_circuit_builder")
         unitary_snapshot = _AlgorithmSnapshot.from_ref(unitary_ref)
@@ -242,7 +267,6 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         correction = str(self._settings.get("energy_correction"))
         if correction == "auto":
             correction = "qdrift_tangent" if category == "qdrift" else "linear"
-        epsilon_total = float(self._settings.get("target_accuracy"))
         fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(
             category,
             epsilon_total,
@@ -255,10 +279,9 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
-        base_time = float(self._settings.get("base_time"))
-        if base_time <= 0.0:
+        if base_time == 0.0:
             base_time = float(np.pi / (2.0 * lambda_norm)) if lambda_norm > 0.0 else 1.0
-        elif base_time * lambda_norm >= np.pi:
+        if base_time * lambda_norm >= np.pi:
             raise ValueError(
                 "base_time must satisfy base_time * lambda_norm < pi to avoid energy aliasing; "
                 f"got base_time={base_time:.6g} and lambda_norm={lambda_norm:.6g}."
@@ -269,6 +292,14 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         if lambda_norm < 0.0:
             raise ValueError(f"lambda_norm must be non-negative, received {lambda_norm}.")
         total_round = 0 if lambda_norm <= epsilon_rpe else int(np.ceil(np.log2(lambda_norm / epsilon_rpe)))
+        if category == "qdrift":
+            final_scheduled_samples = 2 ** (2 * total_round + 1)
+            if final_scheduled_samples > max_qdrift_samples:
+                raise ValueError(
+                    f"qDRIFT round {total_round} requires at least {final_scheduled_samples} samples, exceeding "
+                    f"max_qdrift_samples={max_qdrift_samples}. Raise max_qdrift_samples explicitly only "
+                    "if sufficient resources are available."
+                )
         randomized = category in ("qdrift", "partial_randomized")
         requested_seed = int(self._settings.get("seed"))
         root_seed = None
@@ -287,6 +318,27 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             evolution_time = float((2**round_index) * base_time)
             updates: dict[str, object] = {"time": evolution_time}
             if category == "qdrift" and unitary_snapshot.has_setting("num_samples"):
+                if (
+                    unitary_snapshot.has_setting("target_accuracy")
+                    and unitary_builder.settings().get("target_accuracy") > 0.0
+                ):
+                    sample_resolver = getattr(unitary_builder, "_resolve_num_samples", None)
+                    if not callable(sample_resolver):
+                        raise TypeError("qDRIFT builders with target_accuracy must support sample-count resolution.")
+                    unitary_builder.settings().set("time", evolution_time)
+                    unitary_builder.settings().set("num_samples", samples)
+                    resolved_samples = sample_resolver(qubit_hamiltonian, evolution_time)
+                    if not isinstance(resolved_samples, int) or resolved_samples < samples:
+                        raise ValueError(
+                            "Resolved qDRIFT samples must be an integer at least as large as the RPE count."
+                        )
+                    samples = resolved_samples
+                if samples > max_qdrift_samples:
+                    raise ValueError(
+                        f"qDRIFT round {round_index} requires {samples} samples, exceeding "
+                        f"max_qdrift_samples={max_qdrift_samples}. Raise max_qdrift_samples explicitly only "
+                        "if sufficient resources are available."
+                    )
                 updates["num_samples"] = int(samples)
             elif unitary_snapshot.has_setting("target_accuracy"):
                 updates["target_accuracy"] = nested_epsilon_unitary

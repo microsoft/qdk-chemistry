@@ -83,6 +83,15 @@ The nested experiment scheduler defines:
    * - ``seed``
      - int
      - Root random seed. ``-1`` chooses one entropy-backed seed when the circuit set is scheduled.
+  * - ``max_qdrift_samples``
+    - int
+    - Positive per-circuit qDRIFT sample ceiling. Default: ``1000000``. Scheduling raises before circuit construction if any round exceeds it. Increase explicitly only when resources permit.
+
+Scheduler accuracy settings must be finite.
+``base_time`` must be finite and nonnegative, with only ``0.0`` selecting automatic time.
+For qDRIFT, a tighter nested ``target_accuracy`` can increase the sample count above the RPE ladder's minimum.
+The resolved count is recorded in the schedule and used by circuit construction and tangent energy correction.
+The sample ceiling applies to this resolved count and never clamps it or relaxes the requested accuracy.
 
 .. tab:: Python API
 

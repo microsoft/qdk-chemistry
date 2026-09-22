@@ -335,6 +335,7 @@ def _make_builder(
     seed: int = 7,
     epsilon_rpe: float | None = None,
     epsilon_unitary: float | None = None,
+    max_qdrift_samples: int = 1_000_000,
 ) -> QdkRobustPhaseEstimationCircuitBuilder:
     """Create a robust builder with a fully configured nested scheduler."""
     scheduler_ref = AlgorithmRef(
@@ -344,6 +345,7 @@ def _make_builder(
         base_time=base_time,
         energy_correction=energy_correction,
         seed=seed,
+        max_qdrift_samples=max_qdrift_samples,
         unitary_builder=AlgorithmRef(
             "hamiltonian_unitary_builder",
             unitary_builder_name,
@@ -450,6 +452,42 @@ def test_post_process_uses_experiment_identity_after_reordering() -> None:
     assert result.resolved_energy == pytest.approx(energy, abs=1e-6)
 
 
+def test_post_process_uses_effective_qdrift_samples() -> None:
+    """Tangent correction inverts the averaged signal using the executed sample count."""
+    energy = 0.3
+    hamiltonian = QubitOperator(pauli_strings=["Z", "I"], coefficients=[0.35, 0.65])
+    circuit_set = _make_scheduler(
+        target_accuracy=0.5,
+        unitary_builder_name="qdrift",
+        unitary_builder_kwargs={"target_accuracy": 0.25},
+    ).run(_DUMMY_STATE_PREPARATION, hamiltonian)
+    execution_results: list[_RpeExecutionResult] = []
+    resolution = 1_000_000_000
+    for round_data in circuit_set.rounds:
+        configuration = round_data.unitary_builder_configuration
+        builder = _AlgorithmSnapshot.from_ref(configuration).create()
+        actual_samples = builder._resolve_num_samples(hamiltonian, round_data.evolution_time)
+        step_angle = circuit_set.lambda_norm * round_data.evolution_time / actual_samples
+        signal = (np.cos(step_angle) - 1j * energy / circuit_set.lambda_norm * np.sin(step_angle)) ** actual_samples
+        basis_results = []
+        for expectation in (float(signal.real), float(signal.imag)):
+            num_zero = round((1.0 + expectation) * resolution / 2.0)
+            basis_results.append(_FakeExecutorData({"0": num_zero, "1": resolution - num_zero}))
+        execution_results.extend(
+            _RpeExecutionResult(spec, basis_results[0], basis_results[1])
+            for spec in circuit_set.experiment_specs_for_round(round_data.round_index)
+        )
+
+    result = RobustPhaseEstimation()._post_process(
+        circuit_set,
+        tuple(execution_results),
+        requested_executor_seed=None,
+        executor_root_seed=None,
+    )
+
+    assert result.resolved_energy == pytest.approx(energy, abs=1e-8)
+
+
 def test_post_process_averages_each_randomized_draw() -> None:
     """Different count totals do not change the equal weighting of randomized draws."""
     circuit_set = _make_scheduler(target_accuracy=1.0, unitary_builder_name="qdrift", energy_correction="linear").run(
@@ -494,6 +532,7 @@ def test_driver_recovers_energy_qdrift_mode(monkeypatch: pytest.MonkeyPatch, ene
         target_accuracy=1e-4,
         unitary_builder_name="qdrift",
         energy_correction="qdrift_tangent",
+        max_qdrift_samples=2**29,
     )
     driver = RobustPhaseEstimation()
     _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(energy))
