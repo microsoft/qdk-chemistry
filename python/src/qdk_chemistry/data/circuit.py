@@ -13,6 +13,7 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -327,7 +328,7 @@ class Circuit(DataClass):
             return CachedQSharpApplication(
                 self._qsharp_factory.program,
                 args=tuple(self._qsharp_factory.parameter.values()),
-                cache_key=self.content_hash(truncate_chars=0),
+                cache_key=self._qsharp_factory_cache_key(),
                 cache_dir=cache_dir,
             )
         if self.qasm is not None:
@@ -336,6 +337,30 @@ class Circuit(DataClass):
             return QIRApplication(str(self.qir))
 
         raise RuntimeError("Cannot create QRE application: no Q# factory, QASM, or QIR representation is available.")
+
+    def _qsharp_factory_cache_key(self) -> str:
+        """Return a trace cache key for a factory circuit, identified by entry point and arguments.
+
+        ``content_hash`` would identify the circuit by its compiled QIR, but materializing
+        that QIR costs far more time and memory than the trace being cached, and the
+        estimator traces the Q# callable directly without ever consuming it.
+
+        Returns:
+            A hex SHA-256 digest of the Q# entry point, its arguments, and the circuit's
+            qubit-level metadata.
+
+        """
+        factory = self._qsharp_factory
+        h = hashlib.sha256()
+        _hash_str(h, "qsharp_factory_args")
+        _hash_str(h, getattr(factory.program, "__name__", repr(factory.program)))
+        for value in factory.parameter.values():
+            _hash_str(h, repr(value))
+        _hash_optional(h, self.encoding, _hash_str)
+        _hash_optional(h, self.num_qubits, _hash_uint)
+        if self.metadata.num_phase_gradient_ancillas:
+            _hash_uint(h, self.metadata.num_phase_gradient_ancillas)
+        return h.hexdigest()
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
