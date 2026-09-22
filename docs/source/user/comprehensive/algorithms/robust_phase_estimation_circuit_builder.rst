@@ -83,9 +83,9 @@ The nested experiment scheduler defines:
    * - ``seed``
      - int
      - Root random seed. ``-1`` chooses one entropy-backed seed when the circuit set is scheduled.
-  * - ``max_qdrift_samples``
-    - int
-    - Positive per-circuit qDRIFT sample ceiling. Default: ``1000000``. Scheduling raises before circuit construction if any round exceeds it. Increase explicitly only when resources permit.
+   * - ``max_qdrift_samples``
+     - int
+     - Positive per-circuit qDRIFT sample ceiling. Default: ``1000000``. Scheduling raises before circuit construction if any round exceeds it. Increase explicitly only when resources permit.
 
 Scheduler accuracy settings must be finite.
 ``base_time`` must be finite and nonnegative, with only ``0.0`` selecting automatic time.
@@ -116,27 +116,46 @@ It is dimensionless and controls unitary sizing; it is not added to the energy-v
 ``unitary_accuracy_fraction`` and explicit ``epsilon_rpe`` are rejected for Trotter.
 For partially randomized evolution, setting ``unitary_accuracy_fraction`` explicitly retains the legacy fractional route, while setting both ``epsilon_rpe`` and ``epsilon_unitary`` selects an explicit paired budget.
 
-The partially randomized builder divides its own ``target_accuracy`` :math:`\eta` in quadrature using ``accuracy_split`` :math:`s`.
-RPE maps the full-unitary tolerance to
+The nested builder receives :math:`\epsilon_u` as its ``target_accuracy`` without conversion.
+The partially randomized builder uses ``accuracy_split`` :math:`s` to allocate additive sub-budgets:
 
 .. math::
 
-  \eta = \frac{\epsilon_u}{\sqrt{s}+\sqrt{1-s}},
-  \qquad
-  \epsilon_D=\sqrt{s}\,\eta,
-  \qquad
-  \epsilon_R=\sqrt{1-s}\,\eta,
+  \begin{aligned}
+  \epsilon_D &= \epsilon_u\,\frac{\sqrt{s}}{\sqrt{s}+\sqrt{1-s}}, \\
+  \epsilon_R &= \epsilon_u\,\frac{\sqrt{1-s}}{\sqrt{s}+\sqrt{1-s}}.
+  \end{aligned}
 
-so the conservative additive channel bound satisfies :math:`\epsilon_D+\epsilon_R=\epsilon_u`.
+The sub-budgets satisfy :math:`\epsilon_D+\epsilon_R=\epsilon_u`, using the same contract as standalone time evolution.
 
-For ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per-round full-evolution error bound, the automatic ladder gives
+For :math:`\lambda>0`, let :math:`\tau` be the resolved ``base_time`` and :math:`K` the final round index.
+The scheduler chooses
+
+.. math::
+
+  K = \max\left(0,\left\lceil\log_2\left(\frac{\pi}{2\tau\epsilon_{\mathrm{RPE}}}\right)\right\rceil\right),
+
+so the final evolution time satisfies
+
+.. math::
+
+  t_K = 2^K\tau \geq \frac{\pi}{2\epsilon_{\mathrm{RPE}}}.
+
+The automatic choice :math:`\tau=\pi/(2\lambda)` recovers the norm-based ladder.
+A shorter explicit base time requires additional rounds to retain the energy resolution.
+
+For ideal expectation values, ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per-round full-evolution error bound, successful phase unwrapping gives
 
 .. math::
 
   |\widehat E-E|
   \leq
-  \frac{2}{\pi}\,\mathtt{target\_accuracy}\,\arcsin(\mathtt{epsilon\_unitary})
-  < \mathtt{target\_accuracy}.
+  \frac{\arcsin(\epsilon_u)}{t_K}
+  \leq
+  \frac{2}{\pi}\,\epsilon_{\mathrm{RPE}}\,\arcsin(\epsilon_u).
+
+This phase-bias bound is below ``target_accuracy`` on the independent default route, and is checked against that target for explicit paired budgets.
+Finite-shot sampling contributes additional statistical error and is separate from this bound.
 
 Workload manifest
 -----------------

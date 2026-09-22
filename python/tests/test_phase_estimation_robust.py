@@ -224,14 +224,6 @@ class _FakeUnitaryBuilder(Trotter):
         """Return the category of the replaced unitary builder."""
         return self._evolution_category
 
-    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
-        """Map the unitary tolerance using the replaced builder's contract."""
-        if self._evolution_category != "partial_randomized":
-            return epsilon_unitary
-        split = float(self._settings.get("accuracy_split"))
-        split = min(max(split, 1e-6), 1.0 - 1e-6)
-        return epsilon_unitary / (np.sqrt(split) + np.sqrt(1.0 - split))
-
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record one build and return its configured time and seed."""
         record = self._settings.to_dict()
@@ -598,7 +590,8 @@ def test_energy_correction_auto_selection(builder_name: str, correction: str, ex
     assert circuit_set.energy_correction == expected
 
 
-def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("base_time", [0.0, np.pi / 32.0, 3.0 * np.pi / 4.0])
+def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.MonkeyPatch, base_time: float) -> None:
     """Non-Trotter explicit RPE and unitary tolerances retain their product bound."""
     epsilon_total = 0.1
     epsilon_unitary = 0.5
@@ -613,6 +606,7 @@ def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.Mo
         epsilon_rpe=epsilon_rpe,
         epsilon_unitary=epsilon_unitary,
         energy_correction="linear",
+        base_time=base_time,
     )
     driver = RobustPhaseEstimation()
     _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(energy, signal_factor))
@@ -620,8 +614,8 @@ def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.Mo
     result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
 
     metadata = result.metadata
-    final_round = int(np.ceil(np.log2(1.0 / epsilon_rpe)))
-    final_time = (2**final_round) * np.pi / 2.0
+    final_round = metadata["num_rounds"] - 1
+    final_time = (2**final_round) * metadata["base_time"]
     exact_energy_bound = phase_error / final_time
     propagated_energy_bound = (2.0 / np.pi) * epsilon_rpe * phase_error
     assert abs(signal_factor - 1.0) == pytest.approx(epsilon_unitary)
@@ -630,10 +624,40 @@ def test_non_trotter_product_budget_meets_target_accuracy(monkeypatch: pytest.Mo
     assert metadata["error_budget_mode"] == "explicit"
     assert metadata["energy_correction"] == "linear"
     assert metadata["unitary_builder"] == "partial_randomized"
-    assert metadata["num_rounds"] == final_round + 1
     assert abs(result.resolved_energy - energy) == pytest.approx(exact_energy_bound, rel=1e-3)
     assert propagated_energy_bound == pytest.approx(epsilon_total)
     assert exact_energy_bound <= propagated_energy_bound
+
+
+@pytest.mark.parametrize("builder_name", ["trotter", "partially_randomized"])
+@pytest.mark.parametrize("base_time", [0.0, np.pi / 32.0])
+def test_base_time_preserves_energy_accuracy_with_bounded_phase_bias(
+    monkeypatch: pytest.MonkeyPatch, builder_name: str, base_time: float
+) -> None:
+    """A permitted per-round unitary phase bias respects the energy target at any base time."""
+    energy = 0.3
+    epsilon = 0.01
+    epsilon_unitary = 0.5
+    phase_bias = 0.4
+    signal_factor = np.exp(1j * phase_bias)
+    assert abs(signal_factor - 1.0) < epsilon_unitary
+    hamiltonian = QubitOperator(pauli_strings=["I", "Z"], coefficients=[0.65, -0.35])
+    builder = _make_builder(
+        target_accuracy=epsilon,
+        unitary_builder_name=builder_name,
+        epsilon_unitary=epsilon_unitary,
+        base_time=base_time,
+        energy_correction="linear",
+    )
+    driver = RobustPhaseEstimation()
+    _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(energy, signal_factor))
+
+    result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
+
+    final_time = result.metadata["base_time"] * 2 ** (result.metadata["num_rounds"] - 1)
+    energy_error = abs(result.resolved_energy - energy)
+    assert energy_error == pytest.approx(phase_bias / final_time, rel=1e-3)
+    assert energy_error <= epsilon
 
 
 def test_non_trotter_explicit_fraction_retains_clamping() -> None:
@@ -674,7 +698,7 @@ def test_partial_builder_retains_explicit_legacy_fraction() -> None:
     for round_data in circuit_set.rounds:
         settings = round_data.unitary_builder_configuration.settings
         assert settings is not None
-        assert settings.get("target_accuracy") == pytest.approx(0.025 / np.sqrt(2.0))
+        assert settings.get("target_accuracy") == pytest.approx(0.025)
 
 
 def test_trotter_uses_independent_default_tolerances() -> None:
@@ -735,13 +759,15 @@ def test_trotter_rejects_legacy_or_nonpositive_tolerances(
 
 
 @pytest.mark.parametrize("epsilon_unitary", [None, 0.5])
-def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: float | None) -> None:
-    """Partially randomized rounds receive a normalized independent unitary budget."""
+@pytest.mark.parametrize("split", [0.1, 0.5, 0.9])
+def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: float | None, split: float) -> None:
+    """Partially randomized rounds and standalone builders share the additive accuracy contract."""
     hamiltonian = QubitOperator(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
     epsilon_total = 1e-2
     scheduler = _make_scheduler(
         target_accuracy=epsilon_total,
         unitary_builder_name="partially_randomized",
+        unitary_builder_kwargs={"accuracy_split": split},
         energy_correction="linear",
         seed=5,
         epsilon_unitary=epsilon_unitary,
@@ -750,7 +776,6 @@ def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: fl
     circuit_set = scheduler.run(_DUMMY_STATE_PREPARATION, hamiltonian)
 
     outer_epsilon_unitary = 0.85 if epsilon_unitary is None else epsilon_unitary
-    nested_target_accuracy = outer_epsilon_unitary / np.sqrt(2.0)
     assert circuit_set.epsilon_rpe == pytest.approx(epsilon_total)
     assert circuit_set.epsilon_unitary == pytest.approx(outer_epsilon_unitary)
     assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.0)
@@ -758,7 +783,9 @@ def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: fl
     for round_data in circuit_set.rounds:
         ref = round_data.unitary_builder_configuration
         assert ref.settings is not None
-        assert ref.settings.get("target_accuracy") == pytest.approx(nested_target_accuracy)
+        assert ref.settings.get("target_accuracy") == pytest.approx(outer_epsilon_unitary)
+        nested_builder = _AlgorithmSnapshot.from_ref(ref).create()
+        assert sum(nested_builder._split_accuracy()) == pytest.approx(outer_epsilon_unitary)
         assert not ref.settings.has("num_samples")
         assert round_data.num_draws == round_data.shots_per_basis
         draw_seeds = [spec.draw_seed for spec in circuit_set.experiment_specs_for_round(round_data.round_index)]

@@ -66,14 +66,6 @@ class _FakeUnitaryBuilder(Trotter):
         """Return the category of the replaced unitary builder."""
         return self._evolution_category
 
-    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
-        """Map the unitary tolerance using the replaced builder's contract."""
-        if self._evolution_category != "partial_randomized":
-            return epsilon_unitary
-        split = float(self._settings.get("accuracy_split"))
-        split = min(max(split, 1e-6), 1.0 - 1e-6)
-        return epsilon_unitary / ((split**0.5) + ((1.0 - split) ** 0.5))
-
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record settings and return a unitary marker."""
         record = self._settings.to_dict()
@@ -442,11 +434,6 @@ def test_renamed_trotter_uses_same_rpe_policy(
             "2ad586f371b4adc44fc0917312bbac281e915a6acaeb1fc815a39bb77a07c6d2",
             "1b0fc46fb14cbcbb82322e3217874fdff6ffb735048f68066eedf91469f1bb94",
         ),
-        (
-            "partially_randomized",
-            "129ee2ccc824591e93c488e7eadc197fbc51944335fa1fc202336488b9495b4e",
-            "97762fb02d33ac1ec96bd45188cde4f4b7a39b53e36ee4b82824003ee1bb6804",
-        ),
     ],
 )
 def test_builtin_schedule_preserves_serialized_baseline(
@@ -468,13 +455,31 @@ def test_builtin_schedule_preserves_serialized_baseline(
     assert circuit_set.content_hash(truncate_chars=0) == expected_content_hash
 
 
+def test_partial_schedule_serializes_additive_accuracy(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """Partially randomized snapshots retain the full additive tolerance after serialization."""
+    circuit_set = QdkRobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.5,
+        seed=17,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "partially_randomized"),
+    ).run(*rpe_problem)
+
+    restored = RobustPhaseEstimationCircuitSet.from_json(circuit_set.to_json())
+
+    assert restored.content_hash() == circuit_set.content_hash()
+    assert restored.experiment_specs == circuit_set.experiment_specs
+    for round_data in restored.rounds:
+        configuration = round_data.unitary_builder_configuration
+        assert configuration.settings.get("target_accuracy") == pytest.approx(restored.epsilon_unitary)
+        builder = _AlgorithmSnapshot.from_ref(configuration).create()
+        assert sum(builder._split_accuracy()) == pytest.approx(restored.epsilon_unitary)
+
+
 @pytest.mark.parametrize("quantum_walk", [False, True])
 def test_scheduler_rejects_block_encoding_builders(
     rpe_problem: tuple[Circuit, QubitOperator], quantum_walk: bool
 ) -> None:
     """Block encodings and walks do not inherit time-evolution capabilities."""
     assert not hasattr(HamiltonianUnitaryBuilder, "evolution_category")
-    assert not hasattr(HamiltonianUnitaryBuilder, "target_accuracy_from_unitary_tolerance")
     scheduler = QdkRobustPhaseEstimationExperimentScheduler(
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=quantum_walk)
     )
@@ -495,21 +500,6 @@ def test_scheduler_rejects_invalid_evolution_category(
     error_type = ValueError if isinstance(category, str) else TypeError
 
     with pytest.raises(error_type, match="evolution category"):
-        scheduler.run(*rpe_problem)
-
-
-@pytest.mark.parametrize("target_accuracy", ["0.5", float("nan"), float("inf"), -0.1])
-def test_scheduler_rejects_invalid_target_accuracy_conversion(
-    rpe_problem: tuple[Circuit, QubitOperator], monkeypatch: pytest.MonkeyPatch, target_accuracy: object
-) -> None:
-    """A builder's tolerance conversion must return a finite nonnegative number."""
-    monkeypatch.setattr(Trotter, "target_accuracy_from_unitary_tolerance", lambda _self, _epsilon: target_accuracy)
-    scheduler = QdkRobustPhaseEstimationExperimentScheduler(
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter")
-    )
-    error_type = ValueError if target_accuracy == -0.1 else TypeError
-
-    with pytest.raises(error_type, match="RPE target accuracy"):
         scheduler.run(*rpe_problem)
 
 
@@ -544,7 +534,8 @@ def test_default_partial_randomized_random_cost_scales_quadratically(
 
         assert circuit_set.epsilon_rpe == pytest.approx(target_accuracy)
         assert circuit_set.epsilon_unitary == pytest.approx(0.85)
-        assert settings.get("target_accuracy") == pytest.approx(0.85 / (2.0**0.5))
+        assert settings.get("target_accuracy") == pytest.approx(0.85)
+        assert sum(partial_builder._split_accuracy()) == pytest.approx(0.85)
         random_rotation_counts.append(num_divisions * block_samples)
 
     ratios = [current / previous for previous, current in pairwise(random_rotation_counts)]

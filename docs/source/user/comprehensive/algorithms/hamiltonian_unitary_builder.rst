@@ -243,18 +243,23 @@ The accuracy-aware objective evaluates the implemented pre-merge count for every
 It does not predict duplicate-term merging because that reduction depends on the random draw and commutation pattern.
 
 When ``target_accuracy`` :math:`\epsilon` is set, the builder becomes accuracy-aware.
-The squared error budget is split in quadrature between the two parts,
+The deterministic and random error budgets add to this target.
+With :math:`s` given by ``accuracy_split``, the builder normalizes their relative square-root weights:
 
 .. math::
 
-   \epsilon_D^2 + \epsilon_R^2 = \epsilon^2, \qquad \epsilon_D^2 = s\,\epsilon^2,
+  \begin{aligned}
+  \epsilon_D &= \epsilon\,\frac{\sqrt{s}}{\sqrt{s}+\sqrt{1-s}}, \\
+  \epsilon_R &= \epsilon\,\frac{\sqrt{1-s}}{\sqrt{s}+\sqrt{1-s}}.
+  \end{aligned}
 
-with the fraction :math:`s` given by ``accuracy_split``.
+Thus :math:`\epsilon_D+\epsilon_R=\epsilon`, including for standalone use outside phase estimation.
 
 .. note::
 
-   This split is an implementation policy of this builder, not a bound taken from :cite:`Guenther2025`.
-   The quadrature rule in that reference combines a phase-estimation variance with a deterministic Trotter energy bias, which are different quantities from the two channel tolerances used here.
+  This allocation is an implementation policy of the builder.
+  The two evolution error budgets are combined additively, rather than using the phase-estimation variance and deterministic energy-bias quadrature rule in :cite:`Guenther2025`.
+  Automatic deterministic step sizing retains its full-Hamiltonian heuristic, so budget normalization alone does not prove a bound for every Hamiltonian grouping.
 
 The evolution is divided into :math:`r` outer Trotter steps sized from :math:`\epsilon_D` (using ``trotter_error_bound``), and the per-step qDRIFT sample count is sized from :math:`\epsilon_R` (Campbell bound).
 Each of the :math:`r` steps draws a *fresh* independent qDRIFT block, which is required for the randomized error to add up correctly across steps.
@@ -289,7 +294,7 @@ Because the deterministic part removes the dominant terms from :math:`\lambda_R`
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic parameterization is disabled.
    * - ``accuracy_split``
      - float
-     - Fraction :math:`s` of the squared error budget given to the deterministic part (:math:`\epsilon_D^2 = s\,\epsilon^2`). Clamped to (0, 1). Default is 0.5.
+     - Relative weight :math:`s` for the normalized square-root allocation of the additive error budgets. Clamped to (0, 1). Default is 0.5.
    * - ``trotter_error_bound``
      - str
      - Error bound for sizing the outer Trotter step count: ``"commutator"`` (default, tighter) or ``"naive"``.

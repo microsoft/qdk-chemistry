@@ -24,6 +24,7 @@ See Also:
 from __future__ import annotations
 
 import math
+from itertools import islice, pairwise
 
 import numpy as np
 
@@ -33,7 +34,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data import FlatPartition, LayeredPartition, QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -66,8 +67,7 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
             num_random_samples: Number of random samples for the randomized part.
             target_accuracy: Target accuracy ε for automatic parameterization
                 (0.0 disables it and preserves the legacy single-step behavior).
-            accuracy_split: Fraction of the squared error budget assigned to the
-                deterministic part (ε_D² = s·ε², ε_R² = (1 - s)·ε²).
+            accuracy_split: Weight s in (0, 1) giving normalized square-root weights for the two additive budgets.
             trotter_error_bound: Error bound used to size the outer Trotter step
                 count ('commutator' or 'naive').
             seed: Random seed for reproducibility. Use -1 for non-deterministic.
@@ -100,14 +100,14 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
             "double",
             0.0,
             "Target accuracy ε for automatic parameterization (0.0 disables it). "
-            "Splits into deterministic (ε_D) and random (ε_R) budgets in quadrature.",
+            "Splits into deterministic and random budgets whose sum equals the target.",
         )
         self._set_default(
             "accuracy_split",
             "double",
             0.5,
-            "Fraction s of the squared error budget given to the deterministic part: "
-            "ε_D² = s·ε², ε_R² = (1 - s)·ε². Clamped to (0, 1).",
+            "Relative weight s for deterministic and random budgets proportional to sqrt(s) and sqrt(1-s), "
+            "normalized to sum to target_accuracy. Clamped to (0, 1).",
         )
         self._set_default(
             "trotter_error_bound",
@@ -132,7 +132,7 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
             "merge_duplicate_terms",
             "bool",
             True,
-            "Fuse identical Pauli terms within consecutive commuting runs of the random block.",
+            "Fuse identical Pauli terms across commuting factors, including step boundaries.",
         )
         self._set_default(
             "commutation_type",
@@ -166,9 +166,23 @@ class PartiallyRandomized(QDrift):
     randomized part :math:`H_R` sandwiched in between. The first-order variant
     applies :math:`H_D` at full angle followed by :math:`H_R`.
 
+    Identical rotations can be fused across commuting factors, including step
+    boundaries. The resulting factors are scheduled into disjoint-support
+    layers without reversing the order of overlapping factors. Layer metadata
+    allows controlled circuit synthesis to share rotation rounds across a layer.
+
+    An input :attr:`~qdk_chemistry.data.QubitOperator.term_partition` controls
+    the deterministic sweep's order and layers after the magnitude-based split.
+    Random terms retain their original sampling distribution and draw order,
+    apart from exact commuting rearrangements. Without a partition, deterministic
+    terms retain magnitude order. A changed deterministic ordering requires
+    recalibrating external order-dependent phase-error models. Automatic step
+    sizing still uses the full-Hamiltonian heuristic described below.
+
     When ``target_accuracy`` (ε) is set, the builder becomes accuracy-aware. The
-    error budget is split in quadrature into a deterministic part ε_D and a
-    random part ε_R (``ε_D² + ε_R² = ε²``, controlled by ``accuracy_split``).
+    deterministic budget ε_D and random budget ε_R sum to ε. Their relative
+    square-root weights are controlled by ``accuracy_split`` and normalized
+    before the evolution is sized.
     The evolution is divided into ``r`` outer Trotter steps sized from ε_D
     (reusing the Trotter error bounds), and the qDRIFT sample count is sized
     from ε_R (Campbell 2019 bound). Each of the ``r`` steps draws a *fresh*
@@ -244,11 +258,7 @@ class PartiallyRandomized(QDrift):
                 the outer Trotter step count and the qDRIFT sample count. Use
                 ``0.0`` (default) to disable and preserve the legacy single-step
                 behavior driven solely by ``num_random_samples``.
-            accuracy_split: Fraction ``s`` of the squared error budget assigned
-                to the deterministic part, with ``ε_D² = s·ε²`` and
-                ``ε_R² = (1 - s)·ε²``. Larger values spend more budget on the
-                deterministic Trotter part (fewer steps, more samples); smaller
-                values do the reverse. Clamped to ``(0, 1)``. Defaults to 0.5.
+            accuracy_split: Weight s in (0, 1) giving normalized square-root weights for the two additive budgets.
             trotter_error_bound: Error bound used to size the outer Trotter step
                 count when ``target_accuracy`` is set. ``"commutator"`` (default)
                 is tighter; ``"naive"`` is cheaper to compute but looser.
@@ -256,10 +266,7 @@ class PartiallyRandomized(QDrift):
                 Defaults to -1.
             tolerance: Threshold for filtering negligible coefficients.
                 Defaults to 1e-12.
-            merge_duplicate_terms: If ``True``, identical Pauli terms within
-                consecutive mutually-commuting runs in the random block
-                are fused to reduce circuit depth.  Distinct commuting
-                terms are kept separate.  Defaults to ``True``.
+            merge_duplicate_terms: Fuse matching rotations across commuting factors, including step boundaries.
             commutation_type: Commutation check used when merging duplicate
                 terms.  ``"qubit_wise"`` requires every single-qubit
                 pair to commute individually — stricter but always safe.
@@ -316,8 +323,6 @@ class PartiallyRandomized(QDrift):
         time: float = effective_time
         tolerance: float = self._settings.get("tolerance")
         trotter_order: int = self._settings.get("trotter_order")
-        seed: int = self._settings.get("seed")
-        rng = np.random.default_rng(seed if seed >= 0 else None)
 
         if not qubit_hamiltonian.is_hermitian(tolerance=tolerance):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
@@ -354,23 +359,212 @@ class PartiallyRandomized(QDrift):
         # step suffices (the qDRIFT sample count alone controls accuracy).
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time) if deterministic_terms else 1
         num_block_samples = self._resolve_block_samples(random_terms, time, num_divisions)
-        delta = time / num_divisions
-
-        # Build r independent sandwiches with freshly sampled qDRIFT blocks.
-        all_terms: list[ExponentiatedPauliTerm] = []
-        for _ in range(num_divisions):
-            all_terms.extend(
-                self._build_step_terms(deterministic_terms, random_terms, delta, trotter_order, num_block_samples, rng)
-            )
 
         return UnitaryRepresentation(
-            container=PauliProductFormulaContainer(
-                step_terms=all_terms,
-                step_reps=power_repetitions,
-                num_qubits=qubit_hamiltonian.num_qubits,
-                scale=time,
+            container=self._build_product_formula(
+                qubit_hamiltonian,
+                real_terms,
+                time=time,
+                num_deterministic=num_deterministic,
+                num_divisions=num_divisions,
+                num_block_samples=num_block_samples,
+                power_repetitions=power_repetitions,
             )
         )
+
+    def _build_product_formula(
+        self,
+        qubit_hamiltonian: QubitOperator,
+        real_terms: list[tuple[str, float]],
+        *,
+        time: float,
+        num_deterministic: int,
+        num_divisions: int,
+        num_block_samples: int,
+        power_repetitions: int = 1,
+    ) -> PauliProductFormulaContainer:
+        """Build a formula for fixed counts, also supporting representative-step resource estimates.
+
+        Args:
+            qubit_hamiltonian: Source operator carrying the original partition indices.
+            real_terms: Filtered real terms in stable descending coefficient-magnitude order.
+            time: Total evolution time for the constructed formula.
+            num_deterministic: Length of the magnitude-selected deterministic prefix.
+            num_divisions: Number of freshly sampled outer steps to construct.
+            num_block_samples: Random samples per outer step before exact fusion.
+            power_repetitions: Repetitions of the complete constructed formula.
+
+        Returns:
+            The formula with exact fusion and disjoint-layer metadata.
+
+        """
+        if num_divisions < 1 or not 0 <= num_deterministic <= len(real_terms):
+            raise ValueError("Invalid outer-step count or deterministic prefix length.")
+        seed: int = self._settings.get("seed")
+        rng = np.random.default_rng(seed if seed >= 0 else None)
+        trotter_order: int = self._settings.get("trotter_order")
+        delta = time / num_divisions
+        deterministic_terms = real_terms[:num_deterministic]
+        random_terms = real_terms[num_deterministic:]
+
+        if qubit_hamiltonian.term_partition is not None:
+            deterministic_layers = self._project_deterministic_layers(
+                qubit_hamiltonian, num_deterministic, time=delta / 2 if trotter_order == 2 else delta
+            )
+            backward_layers = [list(reversed(layer)) for layer in reversed(deterministic_layers)]
+            layers: list[list[ExponentiatedPauliTerm]] = []
+            for _ in range(num_divisions):
+                layers.extend(deterministic_layers)
+                block = self._sample_random_block(random_terms, delta, num_block_samples, rng)
+                block, offsets = self._schedule_disjoint_layers(block)
+                layers.extend(block[start:stop] for start, stop in pairwise(offsets))
+                if trotter_order == 2:
+                    layers.extend(backward_layers)
+            all_terms, layer_offsets = self._fuse_layers(layers)
+        else:
+            all_terms = []
+            for _ in range(num_divisions):
+                all_terms.extend(
+                    self._build_step_terms(
+                        deterministic_terms, random_terms, delta, trotter_order, num_block_samples, rng
+                    )
+                )
+            if self._settings.get("merge_duplicate_terms"):
+                all_terms = self._fuse_commuting_terms(all_terms, self._settings.get("commutation_type"))
+            all_terms, layer_offsets = self._schedule_disjoint_layers(all_terms)
+
+        return PauliProductFormulaContainer(
+            step_terms=all_terms,
+            step_reps=power_repetitions,
+            num_qubits=qubit_hamiltonian.num_qubits,
+            scale=time,
+            layer_offsets=layer_offsets,
+        )
+
+    def _project_deterministic_layers(
+        self, qubit_hamiltonian: QubitOperator, num_deterministic: int, *, time: float
+    ) -> list[list[ExponentiatedPauliTerm]]:
+        """Project the original-index partition onto the magnitude-selected deterministic terms."""
+        tolerance: float = self._settings.get("tolerance")
+        coefficients = [complex(coefficient).real for coefficient in qubit_hamiltonian.coefficients]
+        indices = sorted(
+            (index for index, coefficient in enumerate(coefficients) if abs(coefficient) > tolerance),
+            key=lambda index: -abs(coefficients[index]),
+        )
+        selected = {
+            index: ExponentiatedPauliTerm(
+                self._pauli_label_to_map(qubit_hamiltonian.pauli_strings[index]), coefficients[index] * time
+            )
+            for index in indices[:num_deterministic]
+        }
+        partition = qubit_hamiltonian.term_partition
+        layers = []
+        if isinstance(partition, LayeredPartition):
+            for group in partition.groups:
+                for layer in group:
+                    projected = [selected[index] for index in layer if index in selected]
+                    occupied: set[int] = set()
+                    for term in projected:
+                        if not occupied.isdisjoint(term.pauli_term):
+                            raise ValueError(
+                                "Deterministic terms in a LayeredPartition layer must have disjoint supports."
+                            )
+                        occupied.update(term.pauli_term)
+                    if projected:
+                        layers.append(projected)
+        elif isinstance(partition, FlatPartition):
+            for group in partition.groups:
+                projected = [selected[index] for index in group if index in selected]
+                projected, offsets = self._schedule_disjoint_layers(projected)
+                layers.extend(projected[start:stop] for start, stop in pairwise(offsets))
+        else:
+            raise TypeError("Expected a FlatPartition or LayeredPartition.")
+        return layers
+
+    def _fuse_layers(
+        self, layers: list[list[ExponentiatedPauliTerm]]
+    ) -> tuple[list[ExponentiatedPauliTerm], tuple[int, ...]]:
+        """Fuse rotations while retaining surviving producer-declared layer boundaries."""
+        slots: list[ExponentiatedPauliTerm | None] = [term for layer in layers for term in layer]
+        if self._settings.get("merge_duplicate_terms"):
+            slots = self._fused_term_slots(
+                [term for layer in layers for term in layer], self._settings.get("commutation_type")
+            )
+        terms: list[ExponentiatedPauliTerm] = []
+        offsets = [0]
+        start = 0
+        for layer in layers:
+            terms.extend(term for term in slots[start : start + len(layer)] if term is not None)
+            start += len(layer)
+            if len(terms) != offsets[-1]:
+                offsets.append(len(terms))
+        return terms, tuple(offsets)
+
+    @classmethod
+    def _fuse_commuting_terms(
+        cls, terms: list[ExponentiatedPauliTerm], commutation_type: str
+    ) -> list[ExponentiatedPauliTerm]:
+        """Group identical rotations whenever all intervening factors commute with them."""
+        return [term for term in cls._fused_term_slots(terms, commutation_type) if term is not None]
+
+    @staticmethod
+    def _fused_term_slots(
+        terms: list[ExponentiatedPauliTerm], commutation_type: str
+    ) -> list[ExponentiatedPauliTerm | None]:
+        """Leave removed factors as empty slots so layer provenance survives fusion."""
+        commute_fn = get_commutation_checker(commutation_type)
+        fused: list[ExponentiatedPauliTerm | None] = []
+        source_indices: list[int] = []
+        last_occurrence: dict[tuple[tuple[int, str], ...], tuple[int, ExponentiatedPauliTerm]] = {}
+        for source_index, term in enumerate(terms):
+            if term.angle == 0.0:
+                continue
+            key = tuple(sorted(term.pauli_term.items()))
+            previous = last_occurrence.get(key)
+            if previous is not None and all(
+                candidate is None or commute_fn(term.pauli_term, candidate.pauli_term)
+                for candidate in islice(fused, previous[0] + 1, None)
+            ):
+                index, previous_term = previous
+                angle = previous_term.angle + term.angle
+                if angle == 0.0:
+                    fused[index] = None
+                    del last_occurrence[key]
+                else:
+                    combined = ExponentiatedPauliTerm(term.pauli_term, angle)
+                    fused[index] = combined
+                    last_occurrence[key] = (index, combined)
+            else:
+                last_occurrence[key] = (len(fused), term)
+                fused.append(term)
+                source_indices.append(source_index)
+        slots: list[ExponentiatedPauliTerm | None] = [None] * len(terms)
+        for source_index, term in zip(source_indices, fused, strict=True):
+            slots[source_index] = term
+        return slots
+
+    @staticmethod
+    def _schedule_disjoint_layers(
+        terms: list[ExponentiatedPauliTerm],
+    ) -> tuple[list[ExponentiatedPauliTerm], tuple[int, ...]]:
+        """Schedule each factor at its earliest layer without crossing overlapping supports."""
+        layers: list[list[ExponentiatedPauliTerm]] = []
+        last_layer: dict[int, int] = {}
+        for term in terms:
+            support = {qubit for qubit, pauli in term.pauli_term.items() if pauli != "I"}
+            layer_index = 1 + max((last_layer.get(qubit, -1) for qubit in support), default=-1)
+            if layer_index == len(layers):
+                layers.append([])
+            layers[layer_index].append(term)
+            for qubit in support:
+                last_layer[qubit] = layer_index
+
+        scheduled: list[ExponentiatedPauliTerm] = []
+        offsets = [0]
+        for layer in layers:
+            scheduled.extend(layer)
+            offsets.append(len(scheduled))
+        return scheduled, tuple(offsets)
 
     def _build_step_terms(
         self,
@@ -448,25 +642,25 @@ class PartiallyRandomized(QDrift):
     def _split_accuracy(self) -> tuple[float, float]:
         r"""Split the target accuracy ε into deterministic and random budgets.
 
-        Uses a quadrature split:
+        Normalize the square-root weights so the budgets add to the target:
 
         .. math::
 
-            \epsilon_D = \sqrt{s}\,\epsilon, \qquad
-            \epsilon_R = \sqrt{1 - s}\,\epsilon, \qquad
-            \epsilon_D^2 + \epsilon_R^2 = \epsilon^2
+            \begin{aligned}
+            \epsilon_D &= \frac{\sqrt{s}}{\sqrt{s} + \sqrt{1-s}}\,\epsilon, \\
+            \epsilon_R &= \frac{\sqrt{1-s}}{\sqrt{s} + \sqrt{1-s}}\,\epsilon.
+            \end{aligned}
 
-        where ``s`` is ``accuracy_split`` clamped to ``(0, 1)``.
+        Here ``s`` is ``accuracy_split`` clamped to ``(0, 1)`` and
+        :math:`\epsilon_D + \epsilon_R = \epsilon`.
 
         .. note::
             This is an implementation policy, not a bound inherited from
-            :cite:`Guenther2025`. The quadrature rule there combines a phase
-            estimation variance with a deterministic Trotter energy bias, not
-            two channel tolerances of a single evolution circuit.
+            :cite:`Guenther2025`. It preserves the relative square-root
+            allocation while treating the two evolution error budgets additively.
 
         Returns:
-            The pair ``(ε_D, ε_R)``. Both are ``0.0`` when ``target_accuracy``
-            is disabled (``<= 0``).
+            The pair ``(ε_D, ε_R)``, both ``0.0`` when ``target_accuracy`` is disabled (``<= 0``).
 
         """
         target_accuracy: float = self._settings.get("target_accuracy")
@@ -474,8 +668,11 @@ class PartiallyRandomized(QDrift):
             return 0.0, 0.0
         split: float = self._settings.get("accuracy_split")
         split = min(max(split, ACCURACY_SPLIT_MIN), ACCURACY_SPLIT_MAX)
-        eps_d = math.sqrt(split) * target_accuracy
-        eps_r = math.sqrt(1.0 - split) * target_accuracy
+        deterministic_weight = math.sqrt(split)
+        random_weight = math.sqrt(1.0 - split)
+        normalization = deterministic_weight + random_weight
+        eps_d = deterministic_weight / normalization * target_accuracy
+        eps_r = random_weight / normalization * target_accuracy
         return eps_d, eps_r
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
@@ -655,20 +852,6 @@ class PartiallyRandomized(QDrift):
 
         """
         return "partial_randomized"
-
-    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
-        """Convert an additive tolerance to the builder's quadrature error budget.
-
-        Args:
-            epsilon_unitary: Requested sum of the deterministic and randomized error budgets.
-
-        Returns:
-            The quadrature target whose split components sum to ``epsilon_unitary``.
-
-        """
-        split = float(self._settings.get("accuracy_split"))
-        split = min(max(split, ACCURACY_SPLIT_MIN), ACCURACY_SPLIT_MAX)
-        return epsilon_unitary / (math.sqrt(split) + math.sqrt(1.0 - split))
 
     def name(self) -> str:
         """Return the name of the unitary builder."""

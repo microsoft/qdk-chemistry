@@ -134,7 +134,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             energy_correction: Phase-to-energy mapping, or ``"auto"`` to select it from the evolution family.
             seed: Unitary-draw root seed; a negative value requests entropy once per randomized workload.
             epsilon_rpe: Optional explicit energy tolerance, paired with ``epsilon_unitary`` for supported families.
-            epsilon_unitary: Optional full-unitary error tolerance, converted to the builder's native accuracy setting.
+            epsilon_unitary: Optional full-evolution error tolerance passed to the builder's accuracy setting.
             unitary_builder: Reference to a time-evolution builder; its power must be one.
             hadamard_test_circuit_builder: Reference to the builder used for each X/Y circuit pair.
             max_qdrift_samples: Positive per-circuit sample ceiling for qDRIFT, including nested accuracy sizing.
@@ -220,6 +220,8 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         The workload includes round zero and every subsequent time doubling.
         Deterministic rounds use one multi-shot X/Y pair. Randomized rounds use
         one independently seeded unitary per shot, shared by the two bases.
+        For nonzero Hamiltonians, the final evolution time is at least
+        ``pi / (2 * epsilon_rpe)``, including when ``base_time`` is explicit.
         qDRIFT counts include any tighter nested accuracy request and must not
         exceed ``max_qdrift_samples``. Counts are never silently clamped.
 
@@ -272,11 +274,6 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             epsilon_total,
             is_trotter=declared_category == "trotter",
         )
-        nested_epsilon_unitary = self._resolve_target_accuracy(
-            unitary_snapshot,
-            unitary_builder,
-            epsilon_unitary,
-        )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
         if base_time == 0.0:
@@ -291,7 +288,12 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             raise ValueError(f"epsilon must be positive, received {epsilon_rpe}.")
         if lambda_norm < 0.0:
             raise ValueError(f"lambda_norm must be non-negative, received {lambda_norm}.")
-        total_round = 0 if lambda_norm <= epsilon_rpe else int(np.ceil(np.log2(lambda_norm / epsilon_rpe)))
+        energy_resolution_scale = float(np.pi / (2.0 * base_time))
+        total_round = (
+            0
+            if lambda_norm == 0.0 or energy_resolution_scale <= epsilon_rpe
+            else int(np.ceil(np.log2(energy_resolution_scale / epsilon_rpe)))
+        )
         if category == "qdrift":
             final_scheduled_samples = 2 ** (2 * total_round + 1)
             if final_scheduled_samples > max_qdrift_samples:
@@ -341,7 +343,7 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
                     )
                 updates["num_samples"] = int(samples)
             elif unitary_snapshot.has_setting("target_accuracy"):
-                updates["target_accuracy"] = nested_epsilon_unitary
+                updates["target_accuracy"] = epsilon_unitary
             if not randomized and requested_seed >= 0 and unitary_snapshot.has_setting("seed"):
                 updates["seed"] = requested_seed + round_index
             round_snapshot = unitary_snapshot.with_updates(**updates)
@@ -438,46 +440,6 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
                 f"evolution category {category!r}; expected one of: {supported}."
             )
         return category
-
-    @staticmethod
-    def _resolve_target_accuracy(
-        snapshot: _AlgorithmSnapshot,
-        builder: TimeEvolutionBuilder,
-        epsilon_unitary: float,
-    ) -> float:
-        """Map and validate the RPE unitary tolerance for a nested builder.
-
-        Args:
-            snapshot: Builder configuration used to identify invalid tolerance conversions.
-            builder: Instantiated time-evolution builder defining the accuracy convention.
-            epsilon_unitary: Full-unitary tolerance selected by the scheduler.
-
-        Returns:
-            The finite, nonnegative value for the nested builder's native accuracy setting.
-
-        Raises:
-            TypeError: If the conversion is not callable or its result is nonnumeric or nonfinite.
-            ValueError: If the converted accuracy is negative.
-
-        """
-        target_resolver = getattr(builder, "target_accuracy_from_unitary_tolerance", None)
-        if not callable(target_resolver):
-            raise TypeError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' defines a non-callable "
-                "target_accuracy_from_unitary_tolerance attribute."
-            )
-        target_accuracy = target_resolver(epsilon_unitary)
-        if not isinstance(target_accuracy, int | float) or not np.isfinite(target_accuracy):
-            raise TypeError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned an invalid "
-                "RPE target accuracy."
-            )
-        if target_accuracy < 0.0:
-            raise ValueError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned a negative "
-                "RPE target accuracy."
-            )
-        return float(target_accuracy)
 
     def _resolve_budget(
         self,

@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+from pathlib import Path
 
 import h5py
 import numpy as np
@@ -67,6 +68,57 @@ class TestPauliProductFormulaContainer:
         assert container.num_qubits == 2
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
+
+    @pytest.mark.parametrize("offsets", [(), (1, 3), (0, 2), (0, 2, 2, 3), (0, 1.0, 3), (False, 3), (0, 3)])
+    def test_invalid_layer_offsets(self, step_terms: list[ExponentiatedPauliTerm], offsets: tuple) -> None:
+        """Layer boundaries cover the step and contain only disjoint supports."""
+        with pytest.raises(ValueError, match="layer_offsets"):
+            PauliProductFormulaContainer(step_terms, 1, 2, layer_offsets=offsets)
+
+    def test_empty_layer_offsets(self) -> None:
+        """An empty product formula has one boundary and no layers."""
+        container = PauliProductFormulaContainer([], 1, 2, layer_offsets=(0,))
+        assert container.layer_offsets == (0,)
+
+    def test_layer_offsets_roundtrip(self, tmp_path: Path) -> None:
+        """Serialization preserves layers and numeric term ordering beyond ten terms."""
+        terms = [ExponentiatedPauliTerm({index % 3: "X"}, 0.01 * index) for index in range(12)]
+        container = PauliProductFormulaContainer(terms, 3, 3, scale=0.4, layer_offsets=(0, 3, 6, 9, 12))
+        restored_json = PauliProductFormulaContainer.from_json(json.loads(json.dumps(container.to_json())))
+        with h5py.File(tmp_path / "layered.h5", "w") as handle:
+            container.to_hdf5(handle)
+        with h5py.File(tmp_path / "layered.h5", "r") as handle:
+            restored_hdf5 = PauliProductFormulaContainer.from_hdf5(handle)
+        for restored in (restored_json, restored_hdf5):
+            assert restored.step_terms == terms
+            assert restored.layer_offsets == container.layer_offsets
+            assert restored.step_reps == 3
+            assert restored.scale == 0.4
+
+    def test_reorder_layer_offsets(self, step_terms: list[ExponentiatedPauliTerm]) -> None:
+        """Reordering preserves scale while conservatively splitting declared layers."""
+        container = PauliProductFormulaContainer(step_terms, 2, 2, scale=0.4, layer_offsets=(0, 2, 3))
+        reordered = container.reorder_terms([1, 2, 0])
+        assert reordered.layer_offsets == (0, 1, 2, 3)
+        assert reordered.scale == 0.4
+
+    @pytest.mark.parametrize("cancel", [False, True])
+    def test_combine_layer_offsets(self, cancel: bool) -> None:
+        """Boundary fusion and cancellation retain valid layers on surviving terms."""
+        first = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm({0: "X"}, 0.1), ExponentiatedPauliTerm({1: "Z"}, 0.2)],
+            1,
+            3,
+            layer_offsets=(0, 2),
+        )
+        tail = [ExponentiatedPauliTerm({1: "Z"}, -0.2 if cancel else 0.3)]
+        if cancel:
+            tail.append(ExponentiatedPauliTerm({0: "X"}, -0.1))
+        tail.append(ExponentiatedPauliTerm({2: "Y"}, 0.4))
+        combined = first.combine(PauliProductFormulaContainer(tail, 1, 3))
+        assert combined.layer_offsets == ((0, 1) if cancel else (0, 2, 3))
+        assert len(combined.step_terms) == (1 if cancel else 3)
+        assert combined.step_terms[-1] == tail[-1]
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):

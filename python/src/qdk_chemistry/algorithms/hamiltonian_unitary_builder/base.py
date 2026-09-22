@@ -123,21 +123,6 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """
         return "deterministic_or_exact"
 
-    def target_accuracy_from_unitary_tolerance(self, epsilon_unitary: float) -> float:
-        """Convert a full-evolution tolerance into the builder's accuracy parameter.
-
-        The default leaves the tolerance unchanged. Builders with a different
-        error-budget convention override this conversion.
-
-        Args:
-            epsilon_unitary: Requested additive error tolerance for the full evolution.
-
-        Returns:
-            The corresponding value of the builder's ``target_accuracy`` setting, when supported.
-
-        """
-        return epsilon_unitary
-
     def _resolve_power(self) -> tuple[float, int]:
         """Resolve the power setting into effective time scale and power repetitions.
 
