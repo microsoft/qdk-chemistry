@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
+import json
 
 import numpy as np
 
@@ -15,19 +15,14 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.data import (
     AlgorithmRef,
-    Circuit,
     QubitOperator,
-    RobustPhaseEstimationCircuitSet,
-    RobustPhaseEstimationExperimentSpec,
     RobustPhaseEstimationRound,
+    RobustPhaseEstimationSchedule,
     Settings,
 )
-from qdk_chemistry.data.robust_phase_estimation import (
-    _AlgorithmConfiguration as _AlgorithmSnapshot,
-)
+from qdk_chemistry.data.robust_phase_estimation import _AlgorithmConfiguration, _HamiltonianSnapshot
 
 __all__ = [
-    "QdkRobustPhaseEstimationExperimentScheduler",
     "RobustPhaseEstimationExperimentScheduler",
     "RobustPhaseEstimationExperimentSchedulerFactory",
     "RobustPhaseEstimationExperimentSchedulerSettings",
@@ -36,6 +31,95 @@ __all__ = [
 _UNSET_BUDGET_VALUE = -1.0
 _DEFAULT_RPE_EPSILON_UNITARY = 0.85
 _SUPPORTED_RPE_CATEGORIES = frozenset({"deterministic_or_exact", "trotter", "qdrift", "partial_randomized"})
+
+
+class _AlgorithmSnapshot(_AlgorithmConfiguration):
+    """Algorithm-layer operations on independent configuration snapshots."""
+
+    @classmethod
+    def from_ref(cls, ref: AlgorithmRef) -> _AlgorithmSnapshot:
+        """Capture a resolved reference for algorithm construction.
+
+        Args:
+            ref: Reference with resolved settings to copy.
+
+        Returns:
+            A configuration snapshot with algorithm-layer operations.
+
+        """
+        configuration = _AlgorithmConfiguration.from_ref(ref)
+        return cls(configuration.algorithm_type, configuration.algorithm_name, configuration.settings_json)
+
+    def has_setting(self, key: str) -> bool:
+        """Check whether the configuration defines a setting.
+
+        Args:
+            key: Setting name to look up.
+
+        Returns:
+            Whether this setting is present.
+
+        """
+        return Settings.from_json(self.settings_json).has(key)
+
+    def with_updates(self, **updates: object) -> _AlgorithmSnapshot:
+        """Prepare a new configuration without mutating the stored snapshot.
+
+        Args:
+            **updates: Defined setting names and replacement values.
+
+        Returns:
+            An independent updated configuration.
+
+        Raises:
+            ValueError: If an update refers to an undefined setting.
+
+        """
+        settings = Settings.from_json(self.settings_json)
+        for key, value in updates.items():
+            if not settings.has(key):
+                raise ValueError(
+                    f"Algorithm '{self.algorithm_type}/{self.algorithm_name}' does not define setting '{key}'."
+                )
+            settings.set(key, value)
+        return type(self)(self.algorithm_type, self.algorithm_name, settings.to_json())
+
+    def create(self, **updates: object) -> Algorithm:
+        """Construct a fresh registered algorithm from this configuration.
+
+        Args:
+            **updates: Round-specific settings applied through the algorithm's settings schema.
+
+        Returns:
+            An algorithm initialized with independent settings.
+
+        """
+        from qdk_chemistry.algorithms import create  # noqa: PLC0415
+
+        settings = Settings.from_json(self.settings_json)
+        values = settings.to_dict()
+        values.update(updates)
+        return create(self.algorithm_type, self.algorithm_name, **values)
+
+    def validate_unit_power(self) -> None:
+        """Require the RPE schedule to be the sole source of evolution powers.
+
+        Raises:
+            TypeError: If the configured power is not an integer.
+            ValueError: If the configured power is not one.
+
+        """
+        settings = Settings.from_json(self.settings_json)
+        if not settings.has("power"):
+            return
+        power = settings.get("power")
+        if not isinstance(power, int):
+            raise TypeError(f"unitary_builder power must be an integer, got {type(power).__name__}.")
+        if power != 1:
+            raise ValueError(
+                "Robust phase estimation controls evolution powers through its round-time schedule; "
+                f"unitary_builder power must be 1, got {power}."
+            )
 
 
 class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
@@ -110,7 +194,7 @@ class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
 
 
 class RobustPhaseEstimationExperimentScheduler(Algorithm):
-    """Abstract workload scheduler for robust phase estimation."""
+    """QDK implementation of reproducible robust phase estimation scheduling."""
 
     def __init__(
         self,
@@ -167,54 +251,10 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         """
         return "rpe_experiment_scheduler"
 
-    @abstractmethod
     def _run_impl(
         self,
-        state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
-    ) -> RobustPhaseEstimationCircuitSet:
-        """Resolve and return a reproducible RPE workload.
-
-        Args:
-            state_preparation: Circuit preparing the state used for every Hadamard test.
-            qubit_hamiltonian: Hamiltonian whose time-evolution signals will be measured.
-
-        Returns:
-            A serializable workload with resolved settings and draw seeds, without materialized circuits.
-
-        """
-
-
-class RobustPhaseEstimationExperimentSchedulerFactory(AlgorithmFactory):
-    """Factory for robust phase estimation experiment schedulers."""
-
-    def algorithm_type_name(self) -> str:
-        """Return the RPE experiment-scheduler type name.
-
-        Returns:
-            ``"rpe_experiment_scheduler"``.
-
-        """
-        return "rpe_experiment_scheduler"
-
-    def default_algorithm_name(self) -> str:
-        """Return the default QDK scheduler name.
-
-        Returns:
-            ``"qdk"``.
-
-        """
-        return "qdk"
-
-
-class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimentScheduler):
-    """QDK implementation of reproducible robust phase estimation scheduling."""
-
-    def _run_impl(
-        self,
-        state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
-    ) -> RobustPhaseEstimationCircuitSet:
+    ) -> RobustPhaseEstimationSchedule:
         """Resolve rounds, randomized draws, and execution metadata.
 
         The workload includes round zero and every subsequent time doubling.
@@ -226,11 +266,10 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
         exceed ``max_qdrift_samples``. Counts are never silently clamped.
 
         Args:
-            state_preparation: State-preparation circuit stored with the workload.
             qubit_hamiltonian: Hamiltonian used to choose the norm, time ladder, and nested builder settings.
 
         Returns:
-            A reproducible circuit set containing rounds, per-basis shots, draw seeds, and input data.
+            A reproducible schedule with rounds, shared settings, and concrete draw seeds, without live inputs.
 
         Raises:
             TypeError: If the configured builder is not a time-evolution builder or its capabilities are malformed.
@@ -313,12 +352,10 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             )
 
         rounds: list[RobustPhaseEstimationRound] = []
-        experiment_specs: list[RobustPhaseEstimationExperimentSpec] = []
         for round_index in range(total_round + 1):
             shots = int(np.ceil(np.e * (11 + 4 * (total_round - round_index))))
             samples = 2 ** (2 * round_index + 1)
             evolution_time = float((2**round_index) * base_time)
-            updates: dict[str, object] = {"time": evolution_time}
             if category == "qdrift" and unitary_snapshot.has_setting("num_samples"):
                 if (
                     unitary_snapshot.has_setting("target_accuracy")
@@ -341,58 +378,44 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
                         f"max_qdrift_samples={max_qdrift_samples}. Raise max_qdrift_samples explicitly only "
                         "if sufficient resources are available."
                     )
-                updates["num_samples"] = int(samples)
-            elif unitary_snapshot.has_setting("target_accuracy"):
-                updates["target_accuracy"] = epsilon_unitary
-            if not randomized and requested_seed >= 0 and unitary_snapshot.has_setting("seed"):
-                updates["seed"] = requested_seed + round_index
-            round_snapshot = unitary_snapshot.with_updates(**updates)
-
+            draw_seeds: list[int | None] = []
             if randomized:
                 assert root_seed is not None
                 for draw_index in range(shots):
                     sequence = np.random.SeedSequence([root_seed, round_index, draw_index])
                     draw_seed = int(sequence.generate_state(1, dtype=np.uint32)[0])
-                    experiment_specs.append(
-                        RobustPhaseEstimationExperimentSpec(
-                            experiment_index=len(experiment_specs),
-                            round_index=round_index,
-                            draw_index=draw_index,
-                            draw_seed=draw_seed,
-                            shots=1,
-                        )
-                    )
-                num_draws = shots
+                    draw_seeds.append(draw_seed)
             else:
-                experiment_specs.append(
-                    RobustPhaseEstimationExperimentSpec(
-                        experiment_index=len(experiment_specs),
-                        round_index=round_index,
-                        draw_index=None,
-                        draw_seed=None,
-                        shots=shots,
-                    )
-                )
-                num_draws = 1
+                seed = None
+                if unitary_snapshot.has_setting("seed"):
+                    configured_seed = int(unitary_builder.settings().get("seed"))
+                    seed = requested_seed + round_index if requested_seed >= 0 else configured_seed
+                    if seed < 0:
+                        seed = None
+                draw_seeds.append(seed)
 
             rounds.append(
                 RobustPhaseEstimationRound(
                     round_index=round_index,
                     evolution_time=evolution_time,
                     shots_per_basis=shots,
-                    num_draws=num_draws,
                     scheduled_samples=samples,
-                    unitary_builder_configuration=round_snapshot.to_ref(),
+                    draw_seeds=tuple(draw_seeds),
                 )
             )
 
-        return RobustPhaseEstimationCircuitSet(
+        shared_settings = json.loads(unitary_snapshot.settings_json)
+        for key in ("time", "seed", "num_samples"):
+            shared_settings.pop(key, None)
+        if category != "qdrift" and "target_accuracy" in shared_settings:
+            shared_settings["target_accuracy"] = epsilon_unitary
+        shared_configuration = _AlgorithmConfiguration(
+            unitary_snapshot.algorithm_type, unitary_snapshot.algorithm_name, json.dumps(shared_settings)
+        )
+        return RobustPhaseEstimationSchedule(
             rounds=tuple(rounds),
-            experiment_specs=tuple(experiment_specs),
-            state_preparation=state_preparation,
-            qubit_hamiltonian=qubit_hamiltonian,
+            hamiltonian_hash=_HamiltonianSnapshot.from_operator(qubit_hamiltonian).content_hash(),
             lambda_norm=lambda_norm,
-            base_time=base_time,
             target_accuracy=epsilon_total,
             epsilon_rpe=epsilon_rpe,
             epsilon_unitary=epsilon_unitary,
@@ -402,6 +425,7 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
             energy_correction=correction,
             requested_seed=requested_seed,
             root_seed=root_seed,
+            unitary_builder_configuration=shared_configuration.to_ref(),
             hadamard_test_circuit_builder_configuration=hadamard_snapshot.to_ref(),
         )
 
@@ -527,6 +551,28 @@ class QdkRobustPhaseEstimationExperimentScheduler(RobustPhaseEstimationExperimen
 
     def name(self) -> str:
         """Return the QDK scheduler name.
+
+        Returns:
+            ``"qdk"``.
+
+        """
+        return "qdk"
+
+
+class RobustPhaseEstimationExperimentSchedulerFactory(AlgorithmFactory):
+    """Factory for robust phase estimation experiment schedulers."""
+
+    def algorithm_type_name(self) -> str:
+        """Return the RPE experiment-scheduler type name.
+
+        Returns:
+            ``"rpe_experiment_scheduler"``.
+
+        """
+        return "rpe_experiment_scheduler"
+
+    def default_algorithm_name(self) -> str:
+        """Return the default QDK scheduler name.
 
         Returns:
             ``"qdk"``.

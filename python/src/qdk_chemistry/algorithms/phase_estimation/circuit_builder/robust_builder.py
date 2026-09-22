@@ -7,29 +7,27 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QubitOperator,
-    RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationExperimentSpec,
+    RobustPhaseEstimationSchedule,
     Settings,
 )
-from qdk_chemistry.data.robust_phase_estimation import (
-    _AlgorithmConfiguration as _AlgorithmSnapshot,
-)
+from qdk_chemistry.data.robust_phase_estimation import _HamiltonianSnapshot
 
-from ..experiment_scheduler import RobustPhaseEstimationExperimentScheduler
+from ..rpe_experiment_scheduler import RobustPhaseEstimationExperimentScheduler, _AlgorithmSnapshot
 from .base import QpeCircuitBuilder
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 __all__ = [
-    "QdkRobustPhaseEstimationCircuitBuilder",
     "RobustPhaseEstimationCircuitBuilder",
     "RobustPhaseEstimationCircuitBuilderSettings",
 ]
@@ -50,7 +48,7 @@ class RobustPhaseEstimationCircuitBuilderSettings(Settings):
 
 
 class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
-    """Abstract circuit builder for robust phase estimation.
+    """QDK circuit builder for robust phase estimation.
 
     ``run`` returns the complete circuit list through ``_run_impl``. Scheduling
     and streaming are also exposed for bounded-memory execution and replay.
@@ -71,17 +69,15 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
 
     def schedule(
         self,
-        state_preparation: Circuit,
         qubit_hamiltonian: QubitOperator,
-    ) -> RobustPhaseEstimationCircuitSet:
+    ) -> RobustPhaseEstimationSchedule:
         """Resolve one reproducible RPE workload without constructing circuits.
 
         Args:
-            state_preparation: Circuit preparing the state for every experiment.
             qubit_hamiltonian: Hamiltonian whose evolution is scheduled.
 
         Returns:
-            The nested scheduler's circuit set, including concrete randomized-draw seeds.
+            An input-free schedule, including concrete randomized-draw seeds.
 
         Raises:
             TypeError: If the configured scheduler has the wrong algorithm type.
@@ -93,11 +89,13 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
                 "Expected experiment_scheduler to be a RobustPhaseEstimationExperimentScheduler, "
                 f"got {type(scheduler)} instead."
             )
-        return scheduler.run(state_preparation, qubit_hamiltonian)
+        return scheduler.run(qubit_hamiltonian)
 
     def iter_build(
         self,
-        circuit_set: RobustPhaseEstimationCircuitSet,
+        schedule: RobustPhaseEstimationSchedule,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitOperator,
     ) -> Iterator[tuple[RobustPhaseEstimationExperimentSpec, Circuit, Circuit]]:
         """Build scheduled X/Y circuit pairs one at a time.
 
@@ -105,79 +103,73 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
         streamed RPE execution. Reiteration uses the same recorded draw seeds.
 
         Args:
-            circuit_set: Frozen workload containing inputs, per-round settings, and experiment identities.
+            schedule: Canonical evolution parameters and draw seeds.
+            state_preparation: Live circuit used to prepare each experiment.
+            qubit_hamiltonian: Hamiltonian matching the schedule fingerprint.
 
         Yields:
             Each experiment specification followed by its X and Y circuits, built from the same unitary draw.
 
         Raises:
-            TypeError: If the workload is not an RPE circuit set or a declared power is not an integer.
-            ValueError: If a nested unitary builder has a power other than one.
+            TypeError: If the schedule or inputs have the wrong type, or a declared power is not an integer.
+            ValueError: If the input identity, nested power, or executed sample count disagrees with the schedule.
 
         """
-        if not isinstance(circuit_set, RobustPhaseEstimationCircuitSet):
-            raise TypeError(f"circuit_set must be a RobustPhaseEstimationCircuitSet, got {type(circuit_set)} instead.")
-        hadamard_configuration = _AlgorithmSnapshot.from_ref(circuit_set.hadamard_test_circuit_builder_configuration)
-        for experiment_spec in circuit_set.experiment_specs:
-            round_data = circuit_set.rounds[experiment_spec.round_index]
-            unitary_configuration = _AlgorithmSnapshot.from_ref(round_data.unitary_builder_configuration)
-            unitary_configuration.validate_unit_power()
-            if experiment_spec.draw_seed is not None and unitary_configuration.has_setting("seed"):
-                unitary_configuration = unitary_configuration.with_updates(seed=experiment_spec.draw_seed)
-            unitary = unitary_configuration.create().run(circuit_set.qubit_hamiltonian)
-            x_circuit = (
-                hadamard_configuration.with_updates(test_basis="X")
-                .create()
-                .run(
-                    circuit_set.state_preparation,
-                    unitary,
-                )
-            )
-            y_circuit = (
-                hadamard_configuration.with_updates(test_basis="Y")
-                .create()
-                .run(
-                    circuit_set.state_preparation,
-                    unitary,
-                )
-            )
+        if not isinstance(schedule, RobustPhaseEstimationSchedule):
+            raise TypeError("schedule must be a RobustPhaseEstimationSchedule.")
+        if not isinstance(state_preparation, Circuit) or not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError("Construction requires a Circuit and a QubitOperator.")
+        snapshot = _HamiltonianSnapshot.from_operator(qubit_hamiltonian)
+        if snapshot.content_hash() != schedule.hamiltonian_hash:
+            raise ValueError("Hamiltonian does not match the schedule fingerprint.")
+        hamiltonian = snapshot.to_operator()
+        if not np.isclose(hamiltonian.schatten_norm, schedule.lambda_norm, rtol=1e-12, atol=0.0):
+            raise ValueError("Hamiltonian norm does not match the schedule lambda_norm.")
+        unitary_configuration = _AlgorithmSnapshot.from_ref(schedule.unitary_builder_configuration)
+        unitary_configuration.validate_unit_power()
+        hadamard_configuration = _AlgorithmSnapshot.from_ref(schedule.hadamard_test_circuit_builder_configuration)
+        x_builder = hadamard_configuration.with_updates(test_basis="X").create()
+        y_builder = hadamard_configuration.with_updates(test_basis="Y").create()
+        for experiment_spec in schedule.experiment_specs:
+            round_data = schedule.rounds[experiment_spec.round_index]
+            updates: dict[str, object] = {"time": round_data.evolution_time}
+            draw_index = experiment_spec.draw_index if experiment_spec.draw_index is not None else 0
+            seed = round_data.draw_seeds[draw_index]
+            if seed is not None:
+                updates["seed"] = seed
+            if schedule.unitary_builder_category == "qdrift":
+                updates["num_samples"] = round_data.scheduled_samples
+            unitary_builder = unitary_configuration.create(**updates)
+            if schedule.unitary_builder_category == "qdrift":
+                sample_resolver = getattr(unitary_builder, "_resolve_num_samples", None)
+                if (
+                    callable(sample_resolver)
+                    and sample_resolver(hamiltonian, round_data.evolution_time) != round_data.scheduled_samples
+                ):
+                    raise ValueError("Executed qDRIFT sample count must match the schedule.")
+            unitary = unitary_builder.run(hamiltonian)
+            x_circuit = x_builder.run(state_preparation, unitary)
+            y_circuit = y_builder.run(state_preparation, unitary)
             yield experiment_spec, x_circuit, y_circuit
 
-    def build(self, circuit_set: RobustPhaseEstimationCircuitSet) -> list[Circuit]:
+    def build(
+        self, schedule: RobustPhaseEstimationSchedule, state_preparation: Circuit, qubit_hamiltonian: QubitOperator
+    ) -> list[Circuit]:
         """Materialize the canonical flat circuit list for one RPE workload.
 
         Args:
-            circuit_set: Previously scheduled workload to build without rescheduling.
+            schedule: Previously resolved schedule to build without rescheduling.
+            state_preparation: Live input-state circuit.
+            qubit_hamiltonian: Hamiltonian matching the schedule.
 
         Returns:
             All circuits in manifest order, with X immediately followed by Y for each experiment.
 
         """
         circuits: list[Circuit] = []
-        for _, x_circuit, y_circuit in self.iter_build(circuit_set):
+        for _, x_circuit, y_circuit in self.iter_build(schedule, state_preparation, qubit_hamiltonian):
             circuits.extend((x_circuit, y_circuit))
         return circuits
-
-    @abstractmethod
-    def _run_impl(
-        self,
-        state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
-    ) -> list[Circuit]:
-        """Schedule and build robust phase estimation circuits.
-
-        Args:
-            state_preparation: Circuit preparing the input state.
-            qubit_hamiltonian: Hamiltonian whose evolution signals will be measured.
-
-        Returns:
-            The complete flat circuit list, consistent with the shared QPE-builder contract.
-
-        """
-
-
-class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder):
-    """QDK implementation of robust phase estimation circuit construction."""
 
     def _run_impl(
         self,
@@ -194,7 +186,7 @@ class QdkRobustPhaseEstimationCircuitBuilder(RobustPhaseEstimationCircuitBuilder
             All scheduled X/Y pairs flattened in manifest order; use ``iter_build`` for lazy construction.
 
         """
-        return self.build(self.schedule(state_preparation, qubit_hamiltonian))
+        return self.build(self.schedule(qubit_hamiltonian), state_preparation, qubit_hamiltonian)
 
     def name(self) -> str:
         """Return the QDK robust circuit-builder name.

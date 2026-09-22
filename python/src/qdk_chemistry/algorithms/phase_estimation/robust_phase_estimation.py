@@ -34,6 +34,7 @@ from qdk_chemistry.data import (
     QubitOperator,
     RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationExperimentSpec,
+    RobustPhaseEstimationSchedule,
     Settings,
 )
 from qdk_chemistry.utils import Logger
@@ -154,8 +155,8 @@ class RobustPhaseEstimation(PhaseEstimation):
         """
         Logger.trace_entering()
         circuit_builder = self._create_circuit_builder()
-        circuit_set = circuit_builder.schedule(state_preparation, qubit_hamiltonian)
-        return self._execute_with_builder(circuit_builder, circuit_set, noise=noise)
+        schedule = circuit_builder.schedule(qubit_hamiltonian)
+        return self._execute_with_builder(circuit_builder, schedule, state_preparation, qubit_hamiltonian, noise=noise)
 
     def schedule_circuit_set(
         self,
@@ -172,7 +173,11 @@ class RobustPhaseEstimation(PhaseEstimation):
             A serializable circuit set that can be reused without drawing new scheduling entropy.
 
         """
-        return self._create_circuit_builder().schedule(state_preparation, qubit_hamiltonian)
+        return RobustPhaseEstimationCircuitSet(
+            schedule=self._create_circuit_builder().schedule(qubit_hamiltonian),
+            state_preparation=state_preparation,
+            qubit_hamiltonian=qubit_hamiltonian,
+        )
 
     def execute_circuit_set(
         self,
@@ -195,7 +200,13 @@ class RobustPhaseEstimation(PhaseEstimation):
         """
         if not isinstance(circuit_set, RobustPhaseEstimationCircuitSet):
             raise TypeError(f"circuit_set must be a RobustPhaseEstimationCircuitSet, got {type(circuit_set)} instead.")
-        return self._execute_with_builder(self._create_circuit_builder(), circuit_set, noise=noise)
+        return self._execute_with_builder(
+            self._create_circuit_builder(),
+            circuit_set.schedule,
+            circuit_set.state_preparation,
+            circuit_set.qubit_hamiltonian,
+            noise=noise,
+        )
 
     def _create_circuit_builder(self) -> RobustPhaseEstimationCircuitBuilder:
         """Create and validate the configured robust QPE circuit builder.
@@ -218,7 +229,9 @@ class RobustPhaseEstimation(PhaseEstimation):
     def _execute_with_builder(
         self,
         circuit_builder: RobustPhaseEstimationCircuitBuilder,
-        circuit_set: RobustPhaseEstimationCircuitSet,
+        circuit_set: RobustPhaseEstimationSchedule,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitOperator,
         *,
         noise: QuantumErrorProfile | None,
     ) -> QpeResult:
@@ -226,7 +239,9 @@ class RobustPhaseEstimation(PhaseEstimation):
 
         Args:
             circuit_builder: Builder whose shared ``iter_build`` implementation constructs each pair on demand.
-            circuit_set: Previously scheduled workload; no scheduling is repeated.
+            circuit_set: Canonical schedule, without replay inputs.
+            state_preparation: Live preparation for construction.
+            qubit_hamiltonian: Hamiltonian tied to the schedule.
             noise: Optional profile forwarded to the executor.
 
         Returns:
@@ -240,7 +255,7 @@ class RobustPhaseEstimation(PhaseEstimation):
             f"eps_rpe={circuit_set.epsilon_rpe:.3g}, eps_unitary={circuit_set.epsilon_unitary:.3g}."
         )
         execution_results, requested_executor_seed, executor_root_seed = self._execute_experiments(
-            circuit_builder.iter_build(circuit_set),
+            circuit_builder.iter_build(circuit_set, state_preparation, qubit_hamiltonian),
             noise=noise,
         )
         return self._post_process(
@@ -304,7 +319,7 @@ class RobustPhaseEstimation(PhaseEstimation):
 
     def _post_process(
         self,
-        circuit_set: RobustPhaseEstimationCircuitSet,
+        circuit_set: RobustPhaseEstimationSchedule,
         execution_results: tuple[_RpeExecutionResult, ...],
         *,
         requested_executor_seed: int | None,

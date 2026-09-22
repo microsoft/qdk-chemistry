@@ -20,6 +20,7 @@ Exposed classes are:
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
+- :class:`FactorizedHamiltonianContainer`: Container for factorized hamiltonians.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
@@ -37,7 +38,8 @@ Exposed classes are:
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitOperator`: Molecular electronic Hamiltonians mapped to qubits.
-- :class:`RobustPhaseEstimationCircuitSet`: Serializable robust phase estimation workload and execution manifest.
+- :class:`RobustPhaseEstimationCircuitSet`: Optional replay bundle containing an RPE schedule and its inputs.
+- :class:`RobustPhaseEstimationSchedule`: Serializable RPE evolution parameters, shot counts, and draw seeds.
 - :class:`RobustPhaseEstimationExperimentSpec`: Execution metadata for one planned X/Y circuit pair.
 - :class:`RobustPhaseEstimationRound`: Read-only metadata for one robust phase estimation round.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
@@ -83,6 +85,7 @@ from qdk_chemistry._core.data import (
     ConfigurationSet,
     ElectronicStructureSettings,
     Element,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
@@ -127,6 +130,7 @@ from qdk_chemistry.data.robust_phase_estimation import (
     RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationExperimentSpec,
     RobustPhaseEstimationRound,
+    RobustPhaseEstimationSchedule,
 )
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
@@ -163,6 +167,7 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
+    "FactorizedHamiltonianContainer",
     "FermionModeOrder",
     "FlatPartition",
     "Hamiltonian",
@@ -187,6 +192,7 @@ __all__ = [
     "RobustPhaseEstimationCircuitSet",
     "RobustPhaseEstimationExperimentSpec",
     "RobustPhaseEstimationRound",
+    "RobustPhaseEstimationSchedule",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",

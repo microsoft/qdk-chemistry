@@ -26,7 +26,6 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    phase_estimation
    qpe_circuit_builder
    amplitude_amplification
-   robust_phase_estimation_circuit_builder
    evolution_circuit_builder
    hamiltonian_unitary_builder
    propagator
@@ -92,12 +91,12 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`
      - Phase estimation circuit composition
      - Circuit + QubitOperator → Circuit list
-   * - :doc:`RobustPhaseEstimationCircuitBuilder <robust_phase_estimation_circuit_builder>`
-     - Robust phase-estimation X/Y circuit composition
+   * - :ref:`RobustPhaseEstimationCircuitBuilder <robust-phase-estimation-circuit-builder>`
+     - Scheduled robust phase-estimation X/Y circuits
      - Circuit + QubitOperator → Circuit list
    * - :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationExperimentScheduler`
      - Reproducible robust phase-estimation workload scheduling
-     - Circuit + QubitOperator → Circuit set
+     - QubitOperator → RobustPhaseEstimationSchedule
    * - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
      - Time-evolution circuit composition
      - TimeDependentQubitHamiltonian + Circuit → Circuit

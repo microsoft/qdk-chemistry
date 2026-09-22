@@ -212,11 +212,13 @@ The measured phase at each round selects the branch consistent with earlier roun
 
 The estimator has two direct settings:
 
-- ``qpe_circuit_builder`` — The ``"qdk_robust"`` :doc:`robust circuit builder <robust_phase_estimation_circuit_builder>`, which holds an experiment scheduler as a nested algorithm reference.
+- ``qpe_circuit_builder``: The ``"qdk_robust"`` :ref:`robust circuit builder <robust-phase-estimation-circuit-builder>`, which holds an experiment scheduler as a nested algorithm reference.
 - ``circuit_executor`` — The backend used to execute every generated basis circuit.
 
 The circuit builder's standard ``run`` method returns a flat list of circuits.
-For execution, reproducibility, or resource estimation, call ``schedule`` once to obtain a :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet`, then use ``iter_build`` to construct one X/Y pair at a time.
+For execution, reproducibility, or resource estimation, call ``schedule(qubit_hamiltonian)`` once to obtain a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule`.
+Pass that schedule, the state preparation, and the Hamiltonian to ``iter_build`` to construct one X/Y pair at a time.
+Use ``schedule_circuit_set`` on the high-level algorithm to package a schedule and its inputs in a :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet` for later replay.
 The estimator uses this streaming path internally and preserves the exact schedule and concrete random draws used by :meth:`~qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation.RobustPhaseEstimation.execute_circuit_set`.
 
 .. tab:: Python API
@@ -383,7 +385,7 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/phase_estimation.py>`_ script.
 - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`: Abstract base class for phase estimation circuit builders
-- :doc:`RobustPhaseEstimationCircuitBuilder <robust_phase_estimation_circuit_builder>`: Schedule-aware eager and streaming robust circuit generation
+- :ref:`RobustPhaseEstimationCircuitBuilder <robust-phase-estimation-circuit-builder>`: Schedule-aware eager and streaming robust circuit generation
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition or block-encoding methods
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
 - :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits

@@ -39,7 +39,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.definitions import ACCURACY_SPLIT_MAX, ACCURACY_SPLIT_MIN
+from qdk_chemistry.definitions import PARTIALLY_RANDOMIZED_ACCURACY_SPLIT_MAX, PARTIALLY_RANDOMIZED_ACCURACY_SPLIT_MIN
 from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
 
 __all__: list[str] = ["PartiallyRandomized", "PartiallyRandomizedSettings"]
@@ -323,6 +323,13 @@ class PartiallyRandomized(QDrift):
         time: float = effective_time
         tolerance: float = self._settings.get("tolerance")
         trotter_order: int = self._settings.get("trotter_order")
+
+        container_type = qubit_hamiltonian.get_container_type()
+        if container_type != "pauli_decomposition":
+            raise ValueError(
+                f"Partially randomized time evolution requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
 
         if not qubit_hamiltonian.is_hermitian(tolerance=tolerance):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
@@ -667,7 +674,7 @@ class PartiallyRandomized(QDrift):
         if target_accuracy <= 0.0:
             return 0.0, 0.0
         split: float = self._settings.get("accuracy_split")
-        split = min(max(split, ACCURACY_SPLIT_MIN), ACCURACY_SPLIT_MAX)
+        split = min(max(split, PARTIALLY_RANDOMIZED_ACCURACY_SPLIT_MIN), PARTIALLY_RANDOMIZED_ACCURACY_SPLIT_MAX)
         deterministic_weight = math.sqrt(split)
         random_weight = math.sqrt(1.0 - split)
         normalization = deterministic_weight + random_weight

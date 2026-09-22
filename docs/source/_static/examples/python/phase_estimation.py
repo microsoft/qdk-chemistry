@@ -159,6 +159,8 @@ print(result.get_summary())
 
 ################################################################################
 # start-cell-robust-circuit-set
+from qdk_chemistry.data import RobustPhaseEstimationCircuitSet
+
 # Schedule the same reproducible workload used by robust phase estimation
 experiment_scheduler = AlgorithmRef(
     "rpe_experiment_scheduler",
@@ -172,20 +174,24 @@ builder = create(
     "qdk_robust",
     experiment_scheduler=experiment_scheduler,
 )
-circuit_set = builder.schedule(
-    state_preparation=circuit,
-    qubit_hamiltonian=qubit_ham,
-)
+schedule = builder.schedule(qubit_hamiltonian=qubit_ham)
 
-# The circuit set serializes the complete schedule and execution manifest.
-print(circuit_set.get_summary())
+print(schedule.get_summary())
 
 # Stream only the circuit pair needed for execution or resource estimation.
-first_spec, x_circuit, y_circuit = next(builder.iter_build(circuit_set))
+first_spec, x_circuit, y_circuit = next(
+    builder.iter_build(schedule, circuit, qubit_ham)
+)
 x_application = x_circuit.get_qre_application()
 y_application = y_circuit.get_qre_application()
 print(first_spec.round_index, first_spec.draw_index, first_spec.shots)
 print(x_application, y_application)
+
+circuit_set = RobustPhaseEstimationCircuitSet(
+    schedule=schedule,
+    state_preparation=circuit,
+    qubit_hamiltonian=qubit_ham,
+)
 
 # Full millihartree execution is expensive. Set this to True to execute the same workload.
 run_full_rpe = False

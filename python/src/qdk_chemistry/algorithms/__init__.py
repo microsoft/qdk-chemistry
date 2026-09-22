@@ -25,6 +25,7 @@ from qdk_chemistry.algorithms.amplitude_amplification.amplitude_amplification im
 from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
+from qdk_chemistry.algorithms.double_factorization import DoubleFactorization
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
 from qdk_chemistry.algorithms.effective_hamiltonian_constructor import EffectiveHamiltonianConstructor
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
@@ -35,6 +36,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_factorization import HamiltonianFactorization
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
@@ -61,7 +63,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCi
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
 )
-from qdk_chemistry.algorithms.phase_estimation.experiment_scheduler import (
+from qdk_chemistry.algorithms.phase_estimation.rpe_experiment_scheduler import (
     RobustPhaseEstimationExperimentScheduler,
 )
 from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer
@@ -83,6 +85,7 @@ __all__ = [
     "AmplitudeAmplification",
     "CircuitExecutor",
     "ControlledCircuitMapper",
+    "DoubleFactorization",
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
     "ExpectationEstimator",
@@ -91,6 +94,7 @@ __all__ = [
     "GeometryOptimizerSettings",
     "HadamardTest",
     "HamiltonianConstructor",
+    "HamiltonianFactorization",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
