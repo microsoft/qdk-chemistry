@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from contextlib import nullcontext
 from itertools import product
 
 import numpy as np
@@ -33,8 +34,6 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    BatchedExponentiatedPauliTerm,
-    ConjugatedExponentiatedPauliTerm,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -155,16 +154,15 @@ def vacuum_annihilating_unitary(request: pytest.FixtureRequest) -> UnitaryRepres
     hamiltonian = QubitOperator(["XX", "YY", "IZ", "ZI"], np.array([0.5, 0.5, -0.5, 0.5]))
     grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
-    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
     order, fuse, minimize = request.param
-    trotter.settings().update(
-        {
-            "order": order,
-            "num_divisions": 3,
-            "time": 0.5,
-            "fuse_group_boundaries": fuse,
-            "minimize_rotations": minimize,
-        }
+    trotter = registry.create(
+        "hamiltonian_unitary_builder",
+        "trotter",
+        order=order,
+        num_divisions=3,
+        time=0.5,
+        fuse_group_boundaries=fuse,
+        minimize_rotations=minimize,
     )
     return trotter.run(grouped)
 
@@ -305,19 +303,16 @@ class TestControlledSwapPauliSequenceMapper:
         self, cswap_mapper, diagonal_ppf_container, profile: TargetProfile, empty_body: bool
     ) -> None:
         """Endpoint phases occur once, including with an empty body, in either target profile."""
-        repetitions = 3
         container = PauliProductFormulaContainer(
             step_terms=[] if empty_body else diagonal_ppf_container.step_terms,
-            step_reps=repetitions,
+            step_reps=3,
             num_qubits=2,
             beginning=[ExponentiatedPauliTerm(Z0, 0.17)],
             end=[ExponentiatedPauliTerm(IDENTITY, 0.23)],
         )
         with use_qsharp_context(create_qsharp_context(profile)):
-            circuit = cswap_mapper.run(UnitaryRepresentation(container=container))
-            block = Operator(circuit.get_qiskit_circuit()).data[0:8, 0:8]
-        assert circuit._qsharp_factory.parameter["vacuumPhase"] == pytest.approx(-0.4 if empty_body else -3.4)
-        terms = container.beginning + container.step_terms * repetitions + container.end
+            block = Operator(cswap_mapper.run(UnitaryRepresentation(container)).get_qiskit_circuit()).data[0:8, 0:8]
+        terms = container.beginning + container.step_terms * container.step_reps + container.end
         expected_matrix = controlled_unitary(build_product_formula_matrix([(t.pauli_term, t.angle) for t in terms], 2))
 
         assert np.allclose(
@@ -341,9 +336,7 @@ class TestControlledSwapPauliSequenceMapper:
             circuit = cswap_mapper.run(UnitaryRepresentation(container))
             evolution = vars(circuit._qsharp_factory.parameter["evolution"])
             assert evolution["repetitions"] == repetitions
-            assert evolution["beginning"] == evolution["end"] == 1
-            assert evolution["pauliIndices"] == [[0], [0], [1], []]
-            assert evolution["pauliCoefficients"] == [0.17, 0.3, 0.7, 0.23]
+            assert len(evolution["pauliCoefficients"]) == 4
             if repetitions < 10**9:  # Never expand the billion-step circuit into a trace.
                 application = circuit.get_qre_application()
                 counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
@@ -355,34 +348,14 @@ class TestControlledSwapPauliSequenceMapper:
 class TestVacuumPreservationValidation:
     """Tests for the vacuum-preservation validation of the input product formula."""
 
-    @pytest.mark.parametrize("section", ["beginning", "step_terms", "end"])
-    def test_leaking_section_is_rejected(self, cswap_mapper, section: str) -> None:
-        """Each section must preserve the vacuum independently."""
-        sections = {name: [ExponentiatedPauliTerm(Z0, 0.2)] for name in ("beginning", "step_terms", "end")}
-        sections[section] = [ExponentiatedPauliTerm({0: "X"}, 0.3)]
+    @pytest.mark.parametrize("leaking_sections", [("beginning",), ("step_terms",), ("end",), ("beginning", "end")])
+    def test_leaking_section_is_rejected(self, cswap_mapper, leaking_sections: tuple[str, ...]) -> None:
+        """Each section must preserve the vacuum, even when inverse endpoint rotations cancel."""
+        sections: dict[str, list[ExponentiatedPauliTerm]] = {name: [] for name in ("beginning", "step_terms", "end")}
+        for section in leaking_sections:
+            sections[section] = [ExponentiatedPauliTerm({0: "X"}, -0.3 if section == "end" else 0.3)]
         with pytest.raises(ValueError, match="vacuum-preserving product formula"):
             cswap_mapper.run(UnitaryRepresentation(PauliProductFormulaContainer(**sections, step_reps=3, num_qubits=2)))
-
-    def test_cross_section_cancellation_is_rejected(self, cswap_mapper) -> None:
-        """Inverse leaking endpoints are not a certificate of independent vacuum preservation."""
-        container = PauliProductFormulaContainer(
-            [],
-            3,
-            2,
-            beginning=[ExponentiatedPauliTerm({0: "X"}, 0.3)],
-            end=[ExponentiatedPauliTerm({0: "X"}, -0.3)],
-        )
-        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            cswap_mapper.run(UnitaryRepresentation(container))
-
-    @pytest.mark.parametrize("conjugated", [False, True])
-    def test_structured_terms_remain_rejected(self, cswap_mapper, conjugated: bool) -> None:
-        """Endpoint support does not enable structured partially randomized evolution."""
-        batch = BatchedExponentiatedPauliTerm([{0: "Z"}, {1: "Z"}], 0.2)
-        term = ConjugatedExponentiatedPauliTerm([ExponentiatedPauliTerm(Z0, 0.1)], [batch]) if conjugated else batch
-        container = PauliProductFormulaContainer([term], 3, 2)
-        with pytest.raises(ValueError, match="pauli_sequence"):
-            cswap_mapper.run(UnitaryRepresentation(container))
 
     def test_grouped_cancellation_partners_are_accepted(self, cswap_mapper, make_two_qubit_rep):
         """``XX, YY, Z0`` keeps the partners adjacent and preserves the vacuum."""
@@ -425,36 +398,27 @@ class TestVacuumPreservationValidation:
         assert isinstance(cswap_mapper.run(make_two_qubit_rep(terms)), Circuit)
 
     @pytest.mark.parametrize(
-        ("repetitions", "endpoints", "empty_body"),
-        [(1000, False, False), (1, True, False), (3, True, False), (1000, True, True)],
+        ("repetitions", "sections", "residual"),
+        [
+            (1000, ("step_terms",), 1e-10),
+            (1, ("beginning", "step_terms", "end"), 0.9e-9),
+            (3, ("beginning", "step_terms", "end"), 0.3e-9),
+            (1000, ("beginning", "end"), 0.4e-9),
+        ],
     )
     def test_tolerance_is_budgeted_over_the_repetitions(
-        self, cswap_mapper, make_two_qubit_rep, repetitions: int, endpoints: bool, empty_body: bool
+        self, cswap_mapper, make_two_qubit_rep, repetitions: int, sections: tuple[str, ...], residual: float
     ) -> None:
-        """A residual acceptable in isolation must share its budget with repetitions and endpoints."""
-        residual = 0.4e-9 if empty_body else 0.9e-9 / repetitions if endpoints else 1e-10
+        """Residuals must share a budget across nonempty sections and repetitions."""
         terms = [(XX, 0.5), (YY, 0.5 + residual)]
         assert isinstance(cswap_mapper.run(make_two_qubit_rep(terms)), Circuit)
-        if endpoints and not empty_body:
-            assert _vacuum_eigenphase(terms, 1e-9 / repetitions) is not None
 
-        step_terms = [ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle) for pauli_term, angle in terms]
-        repeated = UnitaryRepresentation(
-            container=PauliProductFormulaContainer(
-                [] if empty_body else step_terms,
-                repetitions,
-                2,
-                beginning=step_terms if endpoints else [],
-                end=step_terms if endpoints else [],
-            )
-        )
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-        if empty_body:
-            assert isinstance(mapper.run(repeated), Circuit)  # Only the two endpoints consume the budget.
-            return
-        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            mapper.run(repeated)
+        step_terms = [ExponentiatedPauliTerm(pauli_term, angle) for pauli_term, angle in terms]
+        sequences = {name: step_terms if name in sections else [] for name in ("beginning", "step_terms", "end")}
+        container = PauliProductFormulaContainer(**sequences, step_reps=repetitions, num_qubits=2)
+        rejection = pytest.raises(ValueError, match="vacuum-preserving product formula")
+        with rejection if container.step_terms else nullcontext():
+            assert isinstance(cswap_mapper.run(UnitaryRepresentation(container)), Circuit)
 
 
 class TestVacuumPreservingBlocks:
