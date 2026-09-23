@@ -10,7 +10,7 @@
 
 namespace py = pybind11;
 
-void bind_double_factorization(py::module& m) {
+void bind_utils_double_factorization(py::module& m) {
   py::enum_<qdk::chemistry::utils::DoubleFactorizationMethod>(
       m, "DoubleFactorizationMethod", R"(
 Selects how the reshaped (ij),(kl) two-electron supermatrix is decomposed.

@@ -34,6 +34,8 @@ void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_effective_hamiltonian_constructor(py::module& m);
+void bind_hamiltonian_factorization(py::module& m);
+void bind_double_factorization(py::module& m);
 void bind_scf(py::module& m);
 void bind_nuclear_derivative(py::module& m);
 void bind_population_analysis(py::module& m);
@@ -54,7 +56,7 @@ void bind_davidson_solver(py::module& m);
 void bind_syev_solver(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
-void bind_double_factorization(py::module& m);
+void bind_utils_double_factorization(py::module& m);
 void bind_hamiltonian_one_norm(py::module& m);
 void bind_cube_generator(py::module& m);
 
@@ -109,6 +111,8 @@ PYBIND11_MODULE(_core, m) {
   bind_mcscf(algorithms);
   bind_hamiltonian_constructor(algorithms);
   bind_effective_hamiltonian_constructor(algorithms);
+  bind_hamiltonian_factorization(algorithms);
+  bind_double_factorization(algorithms);
   bind_scf(algorithms);
   bind_nuclear_derivative(algorithms);
   bind_population_analysis(algorithms);
@@ -125,7 +129,7 @@ PYBIND11_MODULE(_core, m) {
   bind_valence_space(utils);
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
-  bind_double_factorization(utils);
+  bind_utils_double_factorization(utils);
   bind_hamiltonian_one_norm(utils);
   bind_logger(utils);
   bind_cube_generator(utils);
