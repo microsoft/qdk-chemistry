@@ -34,9 +34,6 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
     Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
     indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
-    When the formula declares disjoint layers, their controlled rotations share two
-    rotation rounds per layer. The declared boundaries are used without regrouping;
-    formulas without layer metadata retain term-by-term controlled evolution.
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
