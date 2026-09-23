@@ -12,6 +12,8 @@ including version awareness, metadata access, and utility functions.
 import numpy as np
 import pytest
 
+from qdk_chemistry.utils import Logger
+
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 try:
@@ -170,6 +172,14 @@ class TestConstantInfo:
 
 class TestDocumentationFunctions:
     """Test the utility functions for documentation access."""
+
+    @pytest.fixture(autouse=True)
+    def enable_output(self):
+        """Make output assertions independent of other tests' logger levels."""
+        previous_level = Logger.get_global_level()
+        Logger.set_global_level("info")
+        yield
+        Logger.set_global_level(previous_level)
 
     def test_find_constant_by_name(self):
         """Test finding constants by name substring."""
