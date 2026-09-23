@@ -201,7 +201,6 @@ class TestOuterPrep:
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-3)
 
-    @pytest.mark.slow
     def test_build_outer_prep_alias_sampling_marginal_probs(self):
         sossa_unitary = _build_sossa_unitary()
         container = sossa_unitary.get_container()
@@ -235,7 +234,6 @@ class TestOuterPrep:
 class TestInnerPrep:
     """Tests for SOSSAMapper._build_inner_prep."""
 
-    @pytest.mark.slow
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
     def test_build_inner_prep_fidelity(self, algorithm):
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
@@ -619,7 +617,6 @@ class TestSelectFullFidelity:
             f"the Givens chain is not the rotation U(u) of Eq. 93"
         )
 
-    @pytest.mark.slow
     @pytest.mark.parametrize(
         ("dims", "xo_value", "b_value", "bit_precision"),
         [

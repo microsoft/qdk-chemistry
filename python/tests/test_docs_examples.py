@@ -144,10 +144,6 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    # Expectation estimator examples run circuit simulations and are slow
-    if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
-        is_slow = True
-
     # Individual examples can declare intentionally long execution explicitly.
     if "# docs-example: slow" in content:
         is_slow = True
