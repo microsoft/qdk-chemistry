@@ -1,4 +1,9 @@
-"""Sample a one-step-scaled resource estimate for the 2D Fermi-Hubbard model.
+"""Sample a resource estimate for the 2D Fermi-Hubbard model.
+
+By default the full standard QPE circuit is built on an identity reference state and
+traced as a single workload. ``--one-step-scaled`` instead traces one controlled Trotter
+step and multiplies its frontier over the QPE ladder, which is far cheaper to evaluate
+but drops the phase register, the inverse QFT, and the state-preparation layer.
 
 Examples:
     Sample 10 x 10, 20 x 20, and 50 x 50 lattices into separate CSVs::
@@ -31,7 +36,8 @@ except ImportError:
 from qdk.qre import PSSPC, LatticeSurgery, estimate
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Circuit, LatticeGraph, MajoranaMapping
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
+from qdk_chemistry.data import AlgorithmRef, Circuit, LatticeGraph, MajoranaMapping
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.qsharp import (
@@ -183,6 +189,58 @@ def one_trotter_step_circuit(
         return create("controlled_circuit_mapper", "pauli_sequence").run(unitary)
 
 
+def full_qpe_circuit(
+    context,
+    operator,
+    base_time: float,
+    resolution_bits: int,
+    trotter_settings: dict[str, float | int | str],
+    size: int,
+) -> Circuit:
+    """Return the whole standard QPE circuit over an identity reference state.
+
+    The phase register, the controlled-U ladder, and the inverse QFT are all materialized,
+    so the estimator costs the algorithm rather than an extrapolated step.
+
+    Args:
+        context: Q# context to build in.
+        operator: The qubit Hamiltonian.
+        base_time: Evolution time controlled by the least significant phase bit.
+        resolution_bits: Number of phase-register qubits.
+        trotter_settings: Builder settings carrying the Trotter share of the budget.
+        size: Lattice side length.
+
+    Returns:
+        The standard QPE circuit.
+
+    """
+    unitary_builder = AlgorithmRef(
+        "hamiltonian_unitary_builder",
+        "plaquette",
+        order=TROTTER_ORDER,
+        time=base_time,
+        lattice_width=size,
+        lattice_height=size,
+        # Bit k evolves for base_time * 2^k rather than repeating the block 2^k times.
+        power_strategy="rescale",
+        **trotter_settings,
+    )
+    circuit_builder = create(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=resolution_bits,
+        unitary_builder=unitary_builder,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+    )
+    # Matches the Holevo spread qpe_parameters used to size base_time.
+    circuit_builder.settings().set("phase_window", "sine")
+    with use_qsharp_context(context):
+        state_prep = identity_state_prep(num_qubits=operator.num_qubits)
+        return circuit_builder.run(state_prep, operator)[0]
+
+
 def record_no_result(log_path: Path, size: int, reason: str) -> None:
     """Append a timestamped line for a lattice size that yielded no frontier point.
 
@@ -273,12 +331,14 @@ def current_memory_gb() -> float:
     return peak_memory_gb()
 
 
-def run_sampling(context, size: int) -> pd.DataFrame:
+def run_sampling(context, size: int, one_step_scaled: bool = False) -> pd.DataFrame:
     """Measure one lattice size.
 
     Args:
         context: Q# context to build in.
         size: Lattice side length.
+        one_step_scaled: Trace a single controlled Trotter step and multiply its frontier
+            over the ladder, instead of building and tracing the whole QPE circuit.
 
     Returns:
         The estimator's frontier with per-step and accumulated ladder costs, or an
@@ -311,10 +371,16 @@ def run_sampling(context, size: int) -> pd.DataFrame:
     num_divisions_for_largest_step = steps_per_bit[-1]
     step_time = base_time * max_power / num_divisions_for_largest_step
 
-    step_budget = MAX_ESTIMATE_ERROR / total_steps
+    # A one-step trace is charged a step's share of the budget; the full circuit takes it all.
+    circuit_budget = MAX_ESTIMATE_ERROR / total_steps if one_step_scaled else MAX_ESTIMATE_ERROR
 
     circuit_started = time.monotonic()
-    circuit = one_trotter_step_circuit(context, operator, step_time, size)
+    if one_step_scaled:
+        circuit = one_trotter_step_circuit(context, operator, step_time, size)
+    else:
+        circuit = full_qpe_circuit(
+            context, operator, base_time, resolution_bits, trotter_settings, size
+        )
     circuit_elapsed = time.monotonic() - circuit_started
     rss_after_circuit = current_memory_gb()
 
@@ -325,7 +391,7 @@ def run_sampling(context, size: int) -> pd.DataFrame:
         table = estimate_physical(
             circuit,
             f"{size}x{size}-{system}",
-            max_error=step_budget,
+            max_error=circuit_budget,
             error_rate=error_rate,
             cycle_ns=cycle_ns,
         )
@@ -358,7 +424,10 @@ def run_sampling(context, size: int) -> pd.DataFrame:
             "qpe_error_model": "sine-window-1sigma",
             "base_time": base_time,
             "t_max": base_time * 2**resolution_bits,
-            "qpe_type": "standard-one-step-scaled",
+            "qpe_type": (
+                "standard-one-step-scaled" if one_step_scaled else "standard-full-circuit"
+            ),
+            "one_step_scaled": one_step_scaled,
             "max_power": max_power,
             "num_unitary_queries": 2**resolution_bits - 1,
             "power_strategy": "rescale",
@@ -370,7 +439,7 @@ def run_sampling(context, size: int) -> pd.DataFrame:
             "steps_per_bit": str(steps_per_bit),
             "total_trotter_steps": total_steps,
             "trotter_step_time": step_time,
-            "step_max_error": step_budget,
+            "step_max_error": circuit_budget,
             "num_bits": resolution_bits,
             "qubit_mapper_elapsed_s": round(mapper_elapsed, 3),
             "trotter_step_elapsed_s": round(circuit_elapsed, 3),
@@ -388,11 +457,18 @@ def run_sampling(context, size: int) -> pd.DataFrame:
         frame = table.as_frame()
         traced_seconds = pd.to_timedelta(frame["runtime"]).dt.total_seconds()
         traced_error = frame["error"]
-        # The trace covers one step, so the ladder figure is that step repeated.
-        frame["step_runtime_s"] = traced_seconds
-        frame["ladder_runtime_s"] = traced_seconds * total_steps
-        frame["step_error"] = traced_error
-        frame["error"] = traced_error * total_steps
+        if one_step_scaled:
+            # The trace covers one step, so the ladder figure is that step repeated.
+            frame["step_runtime_s"] = traced_seconds
+            frame["ladder_runtime_s"] = traced_seconds * total_steps
+            frame["step_error"] = traced_error
+            frame["error"] = traced_error * total_steps
+        else:
+            # The trace is already the whole circuit; a step is its share.
+            frame["step_runtime_s"] = traced_seconds / total_steps
+            frame["ladder_runtime_s"] = traced_seconds
+            frame["step_error"] = traced_error / total_steps
+            frame["error"] = traced_error
         frame["ladder_runtime_days"] = frame["ladder_runtime_s"] / 86400
         frame["runtime"] = pd.to_timedelta(frame["ladder_runtime_s"], unit="s")
         frame["fits_budget"] = frame["qubits"] <= qubit_budget
@@ -441,6 +517,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=Path("hubbard_resources.csv"),
         help="CSV path; multiple sizes add _L<size> before the suffix",
     )
+    parser.add_argument(
+        "--one-step-scaled",
+        action="store_true",
+        help="trace one controlled Trotter step and multiply its frontier over the QPE "
+        "ladder, instead of building and tracing the full QPE circuit",
+    )
     args = parser.parse_args(argv)
 
     Logger.set_global_level(Logger.LogLevel.off)
@@ -459,7 +541,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         destination.parent.mkdir(parents=True, exist_ok=True)
         print(f"Sampling L={size}; writing {destination}", flush=True)
         try:
-            frame = run_sampling(context, size)
+            frame = run_sampling(context, size, one_step_scaled=args.one_step_scaled)
         except Exception as error:  # noqa: BLE001 - keep the sweep alive; the log explains the gap
             record_no_result(log_path, size, f"{type(error).__name__}: {error}")
             print(f"L={size} produced no result; see {log_path}", flush=True)
