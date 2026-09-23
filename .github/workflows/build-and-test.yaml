@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      parallel_python_tests:
+        description: Benchmark two pytest workers on Linux Python 3.10
+        required: false
+        default: false
+        type: boolean
       rebuild_dep_cache:
         description: Rebuild dependency cache from scratch (ignore existing cache)
         required: false
@@ -329,12 +334,18 @@ jobs:
 
     - name: Run Python tests & generate coverage report
       env:
-        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
+        OMP_NUM_THREADS: ${{ github.event_name == 'workflow_dispatch' && inputs.parallel_python_tests && matrix.os-name == 'Linux' && matrix.python-version == '3.10' && '1' || matrix.python-test-threads }}
+        PARALLEL_PYTHON_TESTS: ${{ github.event_name == 'workflow_dispatch' && inputs.parallel_python_tests && matrix.os-name == 'Linux' && matrix.python-version == '3.10' }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
         mkdir -p ../test-results
+
+        XDIST_ARGS=()
+        if [ "$PARALLEL_PYTHON_TESTS" = "true" ]; then
+          XDIST_ARGS=(-n 2 --dist=loadscope)
+        fi
 
         COV_ARGS=()
         if [ "$ENABLE_COVERAGE" = "true" ]; then
@@ -349,6 +360,7 @@ jobs:
         set +e
         set -o pipefail
         pytest \
+          "${XDIST_ARGS[@]}" \
           "${COV_ARGS[@]}" \
           --junitxml=../test-results/pytest_report.xml \
           -v \
