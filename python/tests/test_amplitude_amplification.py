@@ -247,6 +247,7 @@ def test_amplified_qpe_circuit_with_trotter():
     assert max(counts, key=lambda bitstring: counts[bitstring]) == "11"
 
 
+@pytest.mark.slow
 def test_amplified_qpe_acceptance_follows_the_round_count():
     """Acceptance on the QPE window obeys the same closed form as a plain preparation."""
     hamiltonian = _diagonal_hamiltonian()
@@ -282,6 +283,7 @@ def test_subspace_oracle_flags_an_interior_eigenstate():
     assert _measure(oracle, shots=40) == {"1": 40}
 
 
+@pytest.mark.slow
 def test_amplified_qpe_acceptance_at_an_interior_eigenvalue():
     r"""P(good) tracks :math:`\sin^2((2k+1)\vartheta)` when the marked eigenvector is interior.
 

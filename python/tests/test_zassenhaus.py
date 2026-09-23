@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
 from collections.abc import Hashable
 from fractions import Fraction
 
@@ -41,8 +40,6 @@ from qdk_chemistry.utils.zassenhaus_generation import (
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
-
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
 class TestZassenhausGeneration:
@@ -490,10 +487,6 @@ class TestZassenhausPhaseEstimation:
     """End-to-end H2/STO-3G IQPE tests using Zassenhaus evolution."""
 
     @pytest.mark.slow
-    @pytest.mark.skipif(
-        not _RUN_SLOW_TESTS,
-        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-    )
     def test_zassenhaus_h2_ground_state(self) -> None:
         """Estimate the H2/STO-3G ground-state energy with QDK IQPE and Zassenhaus evolution."""
         Logger.set_global_level("error")

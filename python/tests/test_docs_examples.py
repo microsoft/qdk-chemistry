@@ -16,6 +16,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import ClassVar
 
+import pytest
+
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
@@ -29,7 +31,6 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 GEOMETRIC_AVAILABLE = importlib.util.find_spec("geometric") is not None
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # Release-note example scripts are snapshots that only work with the matching
 # library version.  Parse the major.minor from the filename (e.g.
@@ -239,7 +240,6 @@ def _create_test_methods():
                 needs_openfermion,
                 needs_geometric,
                 needs_external_service,
-                slow,
             ):
                 """Create a test method for the given example file."""
 
@@ -269,29 +269,26 @@ def _create_test_methods():
                         self.skipTest("geomeTRIC not available")
                     if needs_external_service:
                         self.skipTest("Example requires an external service")
-                    if slow and not _RUN_SLOW_TESTS:
-                        self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
                     self._run_python_example(filepath)
 
                 return test_method
 
             # Add the test method to the TestExampleScripts class
-            setattr(
-                TestExampleScripts,
-                test_name,
-                make_test(
-                    example_file,
-                    requires_pyscf,
-                    requires_qiskit,
-                    requires_qiskit_aer,
-                    requires_qiskit_nature,
-                    requires_openfermion,
-                    requires_geometric,
-                    requires_external_service,
-                    is_slow,
-                ),
+            generated_test = make_test(
+                example_file,
+                requires_pyscf,
+                requires_qiskit,
+                requires_qiskit_aer,
+                requires_qiskit_nature,
+                requires_openfermion,
+                requires_geometric,
+                requires_external_service,
             )
+            if is_slow:
+                generated_test = pytest.mark.slow(generated_test)
+
+            setattr(TestExampleScripts, test_name, generated_test)
 
 
 # Generate test methods when the module is loaded

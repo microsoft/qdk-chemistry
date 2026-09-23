@@ -75,6 +75,24 @@ if build_dir.exists():
             break
 
 
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+
+def pytest_collection_modifyitems(items):
+    """Gate ``@pytest.mark.slow`` on QDK_CHEMISTRY_RUN_SLOW_TESTS.
+
+    The marker is the sole slow-test switch, so applying it is enough to keep a test out
+    of the default run and no test needs its own environment check.
+    """
+    if _RUN_SLOW_TESTS:
+        return
+
+    skip_slow = pytest.mark.skip(reason="Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
 @pytest.fixture
 def basic_orbital():
     """Create a basic valid Orbitals object for testing."""

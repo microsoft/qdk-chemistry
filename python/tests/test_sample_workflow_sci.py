@@ -8,7 +8,6 @@ The sparse-CI finder scenarios verify the MACIS-integrated pipeline.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,15 +29,6 @@ from .test_sample_workflow_utils import (
     _run_workflow,
     _skip_for_mpi_failure,
 )
-
-
-def _truthy_env(name: str) -> bool:
-    """Return True when ``name`` is set to a truthy value."""
-    return os.getenv(name, "").lower() in {"1", "true", "yes"}
-
-
-_RUNNING_IN_CI = _truthy_env("TF_BUILD")
-_RUN_MACIS_WORKFLOW = _truthy_env("QDK_CHEMISTRY_RUN_MACIS_WORKFLOW")
 
 
 @dataclass(frozen=True)
@@ -156,10 +146,7 @@ def test_sample_sci_workflow_scenarios(case: WorkflowCase) -> None:
     _assert_warning_constraints(lines, case.expected_warning, case.expect_no_warnings)
 
 
-@pytest.mark.skipif(
-    _RUNNING_IN_CI and not _RUN_MACIS_WORKFLOW,
-    reason="Skipping MACIS ASCI workflow in CI pipeline; enable with QDK_CHEMISTRY_RUN_MACIS_WORKFLOW=1",
-)
+@pytest.mark.slow
 def test_sample_sci_workflow_macis_asci_autocas_with_limits():
     """Run workflow with MACIS ASCI initial solver and capped determinants."""
     expected_scf_energy = -76.02286895

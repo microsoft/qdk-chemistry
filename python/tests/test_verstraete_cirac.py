@@ -18,8 +18,6 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitOperator
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_huckel_hamiltonian
 
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
-
 
 class TestVerstraeteCiracMapping:
     """Tests covering the Verstraete-Cirac mapping factory, dimensions, and properties."""
@@ -404,7 +402,6 @@ class TestVerstraeteCiracMapping:
 class TestVerstraeteCiracSpectral:
     """Tests covering the spectral validation of the Verstraete-Cirac mapping."""
 
-    @pytest.mark.skipif(not _RUN_SLOW_TESTS, reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
     def test_spectral_validation_2x2_hubbard(self) -> None:
         """Compare eigenvalues of 2x2 periodic Fermi-Hubbard model under VC and JW mappings.
 
@@ -434,10 +431,6 @@ class TestVerstraeteCiracSpectral:
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
     @pytest.mark.slow
-    @pytest.mark.skipif(
-        not _RUN_SLOW_TESTS,
-        reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-    )
     def test_spectral_validation_3x2_huckel(self) -> None:
         """Compare eigenvalues of 3x2 Hückel model under VC and JW mappings.
 

@@ -16,7 +16,6 @@ To run slow notebook tests, set:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
 from pathlib import Path
 
 import pytest
@@ -43,7 +42,6 @@ try:
 except ImportError:
     PYSCF_AVAILABLE = False
 
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 EXAMPLES_DIR = Path(__file__).parent.parent.parent / "examples"
 
 
@@ -61,10 +59,6 @@ def test_factory_list():
 
 @_requires_notebook_deps
 @pytest.mark.slow
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-)
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
@@ -93,10 +87,6 @@ def test_state_prep_energy():
 
 @_requires_notebook_deps
 @pytest.mark.slow
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-)
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
