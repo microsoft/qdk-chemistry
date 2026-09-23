@@ -117,11 +117,6 @@ Naive bound
 
 When both ``num_divisions`` and ``target_accuracy`` are specified, the builder uses whichever requires more Trotter steps.
 
-Trotter traverses :class:`~qdk_chemistry.data.QubitOperator` partition indices directly, caching each active sparse Pauli map instead of materializing subgroup operators or labels.
-The :class:`~qdk_chemistry.data.SparsePauliProductFormulaContainer` construction extension uses the existing product-formula operations and serialization; both Pauli-sequence mappers consume only each term's non-identity support.
-Repetitions remain a count on the product formula; resource estimation uses ``RepeatEstimates`` rather than tracing each repetition.
-These sparse paths do not change the cost of automatic error-bound calculations or explicit matrix/circuit expansion.
-
 .. rubric:: Settings
 
 .. list-table::
@@ -212,12 +207,7 @@ Consuming term partitions
 When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
-* :class:`~qdk_chemistry.data.FlatPartition` (group → index) supplies commuting groups, but does not certify disjoint qubit supports.
-
-For a :class:`~qdk_chemistry.data.LayeredPartition`, the emitted :class:`~qdk_chemistry.data.PauliProductFormulaContainer` retains each nonempty layer in ``layer_offsets``, after coefficient filtering and for every Suzuki schedule occurrence.
-These boundaries span the stored step without expanding repetitions and are preserved by JSON/HDF5 serialization and formula composition.
-The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper` consumes the declared boundaries directly, without downstream regrouping.
-Formulas without layer metadata retain term-by-term controlled evolution.
+* :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
 
 In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
 This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
@@ -276,20 +266,6 @@ Example::
     #   exp(-i * +0.2500 * IXII)
     #   exp(-i * +0.2500 * XIII)
 
-
-Compact product formulas
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-The ``"trotter"`` builder has two optional settings, both defaulting to ``False``:
-
-* ``minimize_rotations`` reorders commuting groups in even-order formulas to reduce emitted Pauli factors. It can change the finite-step approximation; first-order ordering is unchanged.
-* ``fuse_group_boundaries`` merges matching commuting groups between repetitions without changing the chosen product formula or expanding the repetition count.
-
-A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` stores the result as ``beginning``, repeated ``step_terms``, and ``end``.
-``group_offsets`` marks commuting body groups; ``layer_offsets`` retains declared disjoint layers across all three sections.
-``num_pauli_exponentials`` counts executed factors and ``num_stored_terms`` counts stored entries.
-Calling ``combine()`` applies boundary fusion; ``combine(other)`` composes flat formulas, using a compact result where possible.
-These optimizations apply to flat Pauli formulas; structured plaquette and Hamming-weight-phasing terms retain their existing mapping path.
 
 .. _block-encoding-builder:
 

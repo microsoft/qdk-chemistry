@@ -96,21 +96,6 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 .. note::
    The current implementation supports a single control qubit.
 
-When the :class:`~qdk_chemistry.data.PauliProductFormulaContainer` supplies ``layer_offsets``,
-the mapper interleaves controlled-rotation decompositions into two rotation rounds
-per declared disjoint layer. These boundaries originate in the unitary builder;
-the mapper does not infer layers from supports or merge neighboring layers.
-Term order, signed angles, and symbolic repetitions are preserved, and identity
-terms retain their phase on the control. Without layer metadata, each controlled
-exponential is completed separately.
-
-This can reduce logical rotation depth without extra ancillas or a different
-mapper selection. Shared-control CNOTs remain serial in a two-qubit-gate model,
-so the rotation-depth improvement is not a guarantee of constant total gate depth.
-
-Compact formulas execute ``beginning`` and ``end`` once, repeating only ``step_terms``.
-Declared ``layer_offsets`` are retained across those sections by both ordinary and controlled Pauli mapping.
-
 Controlled SWAP Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -125,8 +110,6 @@ For an :math:`n`-qubit system, an additional :math:`n`-qubit vacuum register and
 :math:`n` controlled-:math:`\mathrm{SWAP}` gates replace a fully controlled evolution circuit.
 This mapper applies to **particle-conserving** Hamiltonians only. It relies on
 :math:`|0\ldots0\rangle` staying in its own particle-number sector.
-Compact formulas support nonempty ``beginning`` and ``end``; each executes once around the repeated body inside the same CSWAP sandwich.
-The prefix, body, and suffix are independently validated for vacuum preservation, sharing one leakage tolerance across repetition counts ``1``, ``step_reps``, and ``1``.
 
 The :math:`|0\rangle` branch picks up :math:`U|0\ldots0\rangle = e^{i\varphi_0}|0\ldots0\rangle`
 with :math:`\varphi_0 = -E_0 t` and :math:`E_0 = \langle 0\ldots0|H|0\ldots0\rangle`.
