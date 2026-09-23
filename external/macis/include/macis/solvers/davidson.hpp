@@ -238,6 +238,256 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
 }
 
 /**
+ * @brief Orthonormalize a candidate block against an existing basis.
+ *
+ * Applies two passes of classical Gram-Schmidt against the existing basis,
+ * then performs a QR-like orthonormalization (Cholesky QR) on the candidate
+ * block. If the QR step fails due to rank deficiency, it falls back to a
+ * robust column-wise reorthogonalization and drops near-dependent columns.
+ *
+ * @param[in] N         Dimension of vectors
+ * @param[in] K_old     Number of existing basis vectors in V_old
+ * @param[in] V_old     Existing basis vectors (N x K_old)
+ * @param[in] LDV_old   Leading dimension of V_old
+ * @param[in] P         Number of candidate vectors in W
+ * @param[in,out] W     Candidate vectors (N x P); overwritten with accepted
+ *                      orthonormal vectors packed from column 0
+ * @param[in] LDW       Leading dimension of W
+ * @param[in] min_norm  Minimum norm threshold for accepted vectors
+ * @return Number of accepted vectors in W
+ */
+inline int64_t block_two_pass_gs_qr(int64_t N, int64_t K_old,
+                                    const double* V_old, int64_t LDV_old,
+                                    int64_t P, double* W, int64_t LDW,
+                                    double min_norm = 1e-12) {
+  if (P <= 0) return 0;
+
+  if (K_old > 0) {
+    std::vector<double> inner(K_old * P);
+    for (int rep = 0; rep < 2; ++rep) {
+      blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans, blas::Op::NoTrans,
+                 K_old, P, N, 1., V_old, LDV_old, W, LDW, 0., inner.data(),
+                 K_old);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 N, P, K_old, -1., V_old, LDV_old, inner.data(), K_old, 1., W,
+                 LDW);
+    }
+  }
+
+  // QR orthonormalization for the new block after two-pass GS.
+  try {
+    lobpcgxx::cholqr(N, P, W, LDW, 2);
+
+    int64_t keep = 0;
+    for (int64_t p = 0; p < P; ++p) {
+      auto* col = W + p * LDW;
+      auto nrm = blas::nrm2(N, col, 1);
+      if (nrm > min_norm) {
+        if (std::abs(nrm - 1.0) > 10. * min_norm) {
+          blas::scal(N, 1. / nrm, col, 1);
+        }
+        if (keep != p) {
+          std::copy_n(col, N, W + keep * LDW);
+        }
+        ++keep;
+      }
+    }
+    return keep;
+  } catch (...) {
+    // Fallback for nearly rank-deficient blocks.
+    int64_t keep = 0;
+    std::vector<double> inner_old(std::max<int64_t>(K_old, 1));
+    std::vector<double> inner_new(std::max<int64_t>(P, 1));
+
+    for (int64_t p = 0; p < P; ++p) {
+      auto* col = W + p * LDW;
+
+      if (K_old > 0) {
+        for (int rep = 0; rep < 2; ++rep) {
+          blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans,
+                     blas::Op::NoTrans, K_old, 1, N, 1., V_old, LDV_old, col,
+                     LDW, 0., inner_old.data(), K_old);
+          blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans,
+                     blas::Op::NoTrans, N, 1, K_old, -1., V_old, LDV_old,
+                     inner_old.data(), K_old, 1., col, LDW);
+        }
+      }
+
+      if (keep > 0) {
+        for (int rep = 0; rep < 2; ++rep) {
+          blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans,
+                     blas::Op::NoTrans, keep, 1, N, 1., W, LDW, col, LDW, 0.,
+                     inner_new.data(), keep);
+          blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans,
+                     blas::Op::NoTrans, N, 1, keep, -1., W, LDW,
+                     inner_new.data(), keep, 1., col, LDW);
+        }
+      }
+
+      auto nrm = blas::nrm2(N, col, 1);
+      if (nrm > min_norm) {
+        blas::scal(N, 1. / nrm, col, 1);
+        if (keep != p) {
+          std::copy_n(col, N, W + keep * LDW);
+        }
+        ++keep;
+      }
+    }
+
+    return keep;
+  }
+}
+
+/**
+ * @brief Block Davidson eigensolver for the lowest few eigenpairs.
+ *
+ * This routine advances a block of Ritz vectors each iteration. New correction
+ * vectors are orthonormalized with two-pass Gram-Schmidt against the current
+ * basis and then QR-orthonormalized before expansion.
+ *
+ * @tparam Functor Type of the matrix-vector operation functor
+ * @param[in] N      Size of the matrix
+ * @param[in] max_m  Maximum dimension of the Davidson subspace
+ * @param[in] block_size Number of vectors advanced per iteration
+ * @param[in] n_roots Number of smallest eigenpairs requested
+ * @param[in] op     Matrix-vector operation functor
+ * @param[in] D      Diagonal elements for preconditioning
+ * @param[in] tol    Convergence tolerance for max residual norm over roots
+ * @param[in,out] X  Input: initial guess block (N x block_size), Output:
+ *                   converged Ritz vectors in the first n_roots columns
+ * @param[in] min_abs_denominator Minimum absolute denominator in preconditioner
+ * @return Pair of (iteration count, n_roots lowest Ritz values)
+ */
+template <typename Functor>
+auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
+                    int64_t n_roots, const Functor& op, const double* D,
+                    double tol, double* X,
+                    double min_abs_denominator = 1e-12) {
+  if (!X) throw std::runtime_error("Block Davidson: No Guess Provided");
+  if (N <= 0) throw std::runtime_error("Block Davidson: N must be positive");
+  if (max_m <= 0)
+    throw std::runtime_error("Block Davidson: max_m must be positive");
+  if (block_size <= 0)
+    throw std::runtime_error("Block Davidson: block_size must be positive");
+  if (n_roots <= 0)
+    throw std::runtime_error("Block Davidson: n_roots must be positive");
+
+  auto logger = spdlog::get("davidson");
+  if (!logger) {
+    logger = spdlog::stdout_color_mt("davidson");
+  }
+
+  max_m = std::min(max_m, N);
+  block_size = std::min(block_size, max_m);
+  n_roots = std::min(n_roots, block_size);
+
+  logger->info("[Block Davidson Eigensolver]:");
+  logger->info("  {} = {:6}, {} = {:4}, {} = {:4}, {} = {:4}, {} = {:10.5e}",
+               "N", N, "MAX_M", max_m, "BSZ", block_size, "NROOT", n_roots,
+               "RES_TOL", tol);
+
+  std::vector<double> V(N * max_m), AV(N * max_m), C(max_m * max_m), LAM(max_m),
+      X_ritz(N * n_roots), AX_ritz(N * n_roots), R(N * n_roots),
+      W(N * block_size);
+
+  std::copy_n(X, N * block_size, V.data());
+  int64_t m =
+      block_two_pass_gs_qr(N, 0, nullptr, N, block_size, V.data(), N, 1e-12);
+  if (m < n_roots) {
+    throw std::runtime_error(
+        "Block Davidson: Initial guess block rank is smaller than n_roots");
+  }
+
+  op.operator_action(m, 1., V.data(), N, 0., AV.data(), N);
+
+  bool converged = false;
+  size_t iter = 0;
+  std::vector<double> evals(n_roots);
+
+  // Allow thick restarts; iterations are bounded by a conservative multiple.
+  const int64_t max_iter = std::max<int64_t>(max_m * 8, 32);
+  for (int64_t it = 1; it <= max_iter; ++it) {
+    iter = static_cast<size_t>(it);
+
+    lobpcgxx::rayleigh_ritz(N, m, V.data(), N, AV.data(), N, LAM.data(),
+                            C.data(), m);
+
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, N,
+               n_roots, m, 1., V.data(), N, C.data(), m, 0., X_ritz.data(), N);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, N,
+               n_roots, m, 1., AV.data(), N, C.data(), m, 0., AX_ritz.data(),
+               N);
+
+    std::copy_n(AX_ritz.data(), N * n_roots, R.data());
+    for (int64_t root = 0; root < n_roots; ++root) {
+      blas::axpy(N, -LAM[root], X_ritz.data() + root * N, 1,
+                 R.data() + root * N, 1);
+    }
+
+    double max_res_nrm = 0.0;
+    for (int64_t root = 0; root < n_roots; ++root) {
+      auto res_nrm = blas::nrm2(N, R.data() + root * N, 1);
+      max_res_nrm = std::max(max_res_nrm, res_nrm);
+    }
+
+    logger->info("iter = {:4}, LAM(0) = {:20.12e}, MAX_RNORM = {:20.12e}", it,
+                 LAM[0], max_res_nrm);
+
+    if (max_res_nrm < tol) {
+      converged = true;
+      std::copy_n(X_ritz.data(), N * n_roots, X);
+      std::copy_n(LAM.data(), n_roots, evals.data());
+      break;
+    }
+
+    if (m + block_size > max_m) {
+      std::copy_n(X_ritz.data(), N * n_roots, V.data());
+      m = block_two_pass_gs_qr(N, 0, nullptr, N, n_roots, V.data(), N, 1e-12);
+      if (m < n_roots) {
+        throw std::runtime_error(
+            "Block Davidson: Restart block rank dropped below n_roots");
+      }
+      op.operator_action(m, 1., V.data(), N, 0., AV.data(), N);
+      continue;
+    }
+
+    for (int64_t root = 0; root < n_roots; ++root) {
+      auto* wr = W.data() + root * N;
+      auto* rr = R.data() + root * N;
+      for (int64_t j = 0; j < N; ++j) {
+        double denom = D[j] - LAM[root];
+        if (std::abs(denom) < min_abs_denominator) {
+          denom = (denom >= 0) ? min_abs_denominator : -min_abs_denominator;
+        }
+        wr[j] = -rr[j] / denom;
+      }
+    }
+
+    int64_t p =
+        block_two_pass_gs_qr(N, m, V.data(), N, n_roots, W.data(), N, 1e-12);
+    if (p <= 0) {
+      std::copy_n(X_ritz.data(), N * n_roots, V.data());
+      m = block_two_pass_gs_qr(N, 0, nullptr, N, n_roots, V.data(), N, 1e-12);
+      if (m < n_roots) {
+        throw std::runtime_error(
+            "Block Davidson: Unable to generate independent correction block");
+      }
+      op.operator_action(m, 1., V.data(), N, 0., AV.data(), N);
+      continue;
+    }
+
+    std::copy_n(W.data(), N * p, V.data() + m * N);
+    op.operator_action(p, 1., W.data(), N, 0., AV.data() + m * N, N);
+    m += p;
+  }
+
+  if (!converged) throw std::runtime_error("Block Davidson Did Not Converge!");
+  logger->info("Block Davidson Converged!");
+
+  return std::make_pair(iter, evals);
+}
+
+/**
  * @brief Davidson eigensolver for finding the lowest eigenvalue and
  * eigenvector.
  *
