@@ -94,6 +94,7 @@ def validate_hamiltonian_input(
     hamiltonian: object,
     *,
     accepts_lattice: bool,
+    accepts_qubit_operator: bool = True,
     algorithm_name: str,
     algorithm_kind: str = "algorithm",
 ) -> None:
@@ -102,16 +103,30 @@ def validate_hamiltonian_input(
     Args:
         hamiltonian: The object handed to the algorithm.
         accepts_lattice: Whether the caller can consume an unmapped lattice Hamiltonian.
+        accepts_qubit_operator: Whether the caller can consume a mapped qubit Hamiltonian.
         algorithm_name: Name of the calling algorithm, used in the error message.
         algorithm_kind: Noun describing the caller, for example ``"unitary builder"``.
 
     Raises:
-        TypeError: If *hamiltonian* is not a supported input form, or is a lattice
-            Hamiltonian while *accepts_lattice* is ``False``.
+        ValueError: If neither input form is accepted, which is a programming error.
+        TypeError: If *hamiltonian* is not a supported input form.
 
     """
+    if not (accepts_lattice or accepts_qubit_operator):
+        raise ValueError(
+            f"The {algorithm_name!r} {algorithm_kind} accepts neither input form, so no Hamiltonian could "
+            "ever satisfy it. This is a bug in the algorithm, not in the caller."
+        )
+
     if isinstance(hamiltonian, QubitOperator):
-        return
+        if accepts_qubit_operator:
+            return
+        raise TypeError(
+            f"The {algorithm_name!r} {algorithm_kind} builds from a lattice Hamiltonian, but it was given a "
+            f"qubit Hamiltonian. Pass the unmapped lattice Hamiltonian instead, for example the one "
+            f"create_hubbard_hamiltonian(lattice, ...) returns, since the mapped operator no longer carries "
+            f"the lattice structure this algorithm needs."
+        )
 
     if is_lattice_hamiltonian(hamiltonian):
         if accepts_lattice:

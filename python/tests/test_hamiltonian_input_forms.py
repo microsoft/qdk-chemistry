@@ -11,8 +11,6 @@ forwards whichever form it is given to its nested builder and reports a mismatch
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections import Counter
-
 import numpy as np
 import pytest
 
@@ -21,10 +19,6 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquet
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
 from qdk_chemistry.data import AlgorithmRef, Hamiltonian, LatticeGraph, MajoranaMapping, QubitOperator
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    ConjugatedExponentiatedPauliTerm,
-    ExponentiatedPauliTerm,
-)
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_ppp_hamiltonian
 
 #: Builders that only understand an already-mapped qubit Hamiltonian.
@@ -42,83 +36,48 @@ def _to_qubits(hamiltonian: Hamiltonian, num_sites: int) -> QubitOperator:
     return create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites))
 
 
-def _leaf_counts(container) -> Counter:
-    """Return the multiset of Pauli rotations a product-formula container applies.
-
-    Conjugated blocks are expanded into their basis change, body, and inverse so the
-    comparison is independent of how terms are grouped into equal-angle batches.
-    """
-    counts: Counter = Counter()
-
-    def record(term, sign: float) -> None:
-        if isinstance(term, ExponentiatedPauliTerm):
-            key = (tuple(sorted(term.pauli_term.items())), round(sign * term.angle, 10))
-            counts[key] += 1
-        else:
-            for pauli_term in term.pauli_terms:
-                key = (tuple(sorted(pauli_term.items())), round(sign * term.angle, 10))
-                counts[key] += 1
-
-    def walk(terms) -> None:
-        for term in terms:
-            if isinstance(term, ConjugatedExponentiatedPauliTerm):
-                for inner in term.within_terms:
-                    record(inner, 1.0)
-                for inner in term.apply_terms:
-                    record(inner, 1.0)
-                for inner in term.within_terms:
-                    record(inner, -1.0)
-            else:
-                record(term, 1.0)
-
-    walk(container.conjugating_terms)
-    walk(container.step_terms)
-    return counts
+def _pauli_label(term: dict[int, str], num_qubits: int) -> str:
+    """Encode a sparse Pauli map as a big-endian label."""
+    axes = ["I"] * num_qubits
+    for qubit, axis in term.items():
+        axes[-qubit - 1] = axis
+    return "".join(axes)
 
 
-class TestPlaquetteAcceptsBothInputForms:
-    """The plaquette builder must produce the same formula from either input form."""
+class TestPlaquetteReadsTheLattice:
+    """The plaquette builder takes a lattice Hamiltonian and only a lattice Hamiltonian."""
 
     @pytest.mark.parametrize(("side", "interaction", "epsilon"), [(2, 4.0, 0.0), (2, 8.0, -4.0), (4, 4.0, 0.0)])
-    def test_lattice_input_matches_the_mapped_qubit_input(self, side, interaction, epsilon):
-        """Reading the sparse integrals reproduces the Jordan-Wigner Pauli path exactly."""
+    def test_derived_terms_reproduce_the_mapped_hamiltonian(self, side, interaction, epsilon):
+        """The analytic Jordan-Wigner image matches what the qubit mapper actually produces.
+
+        This is the ground-truth check for reading the integrals directly: the hopping,
+        interaction, and scalar offset the builder derives are reassembled into Pauli
+        strings and compared term by term against ``qubit_mapper`` output.
+        """
+        num_sites = side * side
+        num_qubits = 2 * num_sites
         lattice_hamiltonian = _hubbard_lattice(side, side, interaction=interaction, epsilon=epsilon)
-        qubit_hamiltonian = _to_qubits(lattice_hamiltonian, side * side)
+        builder = PlaquetteTrotter(lattice_width=side, lattice_height=side, time=0.2, num_divisions=1)
 
-        def build(operand):
-            return PlaquetteTrotter(
-                lattice_width=side,
-                lattice_height=side,
-                time=0.2,
-                num_divisions=3,
-            ).run(operand)
+        hopping, diagonal, bonds = builder._split_terms(lattice_hamiltonian, num_sites, 1e-12)
 
-        from_lattice = build(lattice_hamiltonian).get_container()
-        from_qubits = build(qubit_hamiltonian).get_container()
+        derived: dict[str, float] = {_pauli_label(term.pauli_term, num_qubits): term.angle for term in diagonal}
+        # Each bond contributes (X Z..Z X + Y Z..Z Y) / 2 per spin, scaled by h_ij = -t.
+        for bond in bonds:
+            low_site, high_site = sorted(bond)
+            for offset in (0, num_sites):
+                low, high = low_site + offset, high_site + offset
+                string = dict.fromkeys(range(low + 1, high), "Z")
+                for axis in ("X", "Y"):
+                    label = _pauli_label({**string, low: axis, high: axis}, num_qubits)
+                    derived[label] = derived.get(label, 0.0) - hopping / 2.0
 
-        assert from_lattice.num_qubits == from_qubits.num_qubits == 2 * side * side
-        assert from_lattice.step_reps == from_qubits.step_reps
-        assert from_lattice.scale == pytest.approx(from_qubits.scale)
-        assert _leaf_counts(from_lattice) == _leaf_counts(from_qubits)
+        mapped = dict(_to_qubits(lattice_hamiltonian, num_sites).get_real_coefficients(tolerance=1e-12))
 
-    @pytest.mark.parametrize(("side", "interaction", "epsilon"), [(2, 4.0, 0.0), (4, 8.0, -4.0)])
-    def test_auto_step_sizing_matches_across_input_forms(self, side, interaction, epsilon):
-        """The error bound reads the same hopping and interaction from either input form."""
-        lattice_hamiltonian = _hubbard_lattice(side, side, interaction=interaction, epsilon=epsilon)
-        qubit_hamiltonian = _to_qubits(lattice_hamiltonian, side * side)
-        builder = PlaquetteTrotter(
-            lattice_width=side,
-            lattice_height=side,
-            time=1.0,
-            target_accuracy=1e-3,
-        )
-
-        assert builder._interaction_strength(lattice_hamiltonian, side * side) == pytest.approx(
-            builder._interaction_strength(qubit_hamiltonian, side * side)
-        )
-        assert builder._resolve_num_divisions(lattice_hamiltonian, 1.0) == builder._resolve_num_divisions(
-            qubit_hamiltonian, 1.0
-        )
+        assert derived.keys() == mapped.keys()
+        for label, coefficient in mapped.items():
+            assert derived[label] == pytest.approx(coefficient, abs=1e-10), label
 
     def test_lattice_input_needs_no_qubit_mapping(self):
         """A lattice Hamiltonian builds without ever constructing a QubitOperator."""
@@ -132,6 +91,22 @@ class TestPlaquetteAcceptsBothInputForms:
 
         assert container.num_qubits == 8
         assert container.step_reps == 1
+
+    def test_rejects_a_mapped_qubit_operator(self):
+        """The mapped operator no longer carries the lattice structure the tiling needs."""
+        lattice_hamiltonian = _hubbard_lattice(2, 2, interaction=4.0)
+        qubit_hamiltonian = _to_qubits(lattice_hamiltonian, 4)
+        builder = PlaquetteTrotter(lattice_width=2, lattice_height=2, time=0.1, num_divisions=1)
+
+        with pytest.raises(TypeError, match="builds from a lattice Hamiltonian"):
+            builder.run(qubit_hamiltonian)
+
+    def test_declares_it_does_not_accept_a_qubit_operator(self):
+        """The capability flags describe the builder as lattice-only."""
+        builder = create("hamiltonian_unitary_builder", "plaquette")
+
+        assert builder.accepts_lattice() is True
+        assert builder.accepts_qubit_operator() is False
 
     def test_declared_lattice_must_match_the_lattice_hamiltonian(self):
         """A lattice shape inconsistent with the Hamiltonian is rejected."""
@@ -243,3 +218,39 @@ class TestPhaseEstimationInputForms:
 
         with pytest.raises(TypeError, match="plaquette"):
             iqpe.run(state_preparation=state_preparation, qubit_hamiltonian=lattice_hamiltonian)
+
+    def test_qubit_input_with_a_lattice_only_builder_is_reported(self):
+        """A qubit Hamiltonian under the plaquette builder reports the opposite mismatch."""
+        qubit_hamiltonian = _to_qubits(_hubbard_lattice(2, 2, interaction=4.0), 4)
+        iqpe = _iqpe_with_builder(
+            AlgorithmRef(
+                "hamiltonian_unitary_builder",
+                "plaquette",
+                time=0.1,
+                num_divisions=1,
+                lattice_width=2,
+                lattice_height=2,
+            )
+        )
+        state_preparation = identity_state_prep(8)
+
+        with pytest.raises(TypeError, match="unmapped lattice Hamiltonian"):
+            iqpe.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)
+
+    def test_lattice_input_runs_through_a_lattice_aware_builder(self):
+        """The matching pairing runs end to end rather than reporting a mismatch."""
+        lattice_hamiltonian = _hubbard_lattice(2, 2, interaction=0.0)
+        iqpe = _iqpe_with_builder(
+            AlgorithmRef(
+                "hamiltonian_unitary_builder",
+                "plaquette",
+                time=0.1,
+                num_divisions=1,
+                lattice_width=2,
+                lattice_height=2,
+            )
+        )
+
+        result = iqpe.run(state_preparation=identity_state_prep(8), qubit_hamiltonian=lattice_hamiltonian)
+
+        assert result.bits_msb_first is not None

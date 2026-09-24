@@ -91,7 +91,10 @@ class PhaseEstimation(Algorithm):
                     "Hamiltonian to qubits first with a 'qubit_mapper'."
                 )
             else:
-                remedy = "Pass a Hamiltonian in the form the builder expects."
+                remedy = (
+                    "That builder needs the unmapped lattice Hamiltonian, so pass it instead of "
+                    "the mapped operator, or select a builder that works from Pauli strings."
+                )
             raise TypeError(
                 f"{self.name()!r} phase estimation was given a {describe_hamiltonian_input(hamiltonian)}, "
                 f"which the nested {unitary_builder.name()!r} unitary builder cannot consume. {remedy}"

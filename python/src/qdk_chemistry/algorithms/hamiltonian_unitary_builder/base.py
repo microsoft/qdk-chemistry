@@ -65,6 +65,19 @@ class HamiltonianUnitaryBuilder(Algorithm):
         """
         return False
 
+    def accepts_qubit_operator(self) -> bool:
+        """Return whether this builder can consume a mapped qubit Hamiltonian.
+
+        Almost every builder works from Pauli strings and so leaves this ``True``. A
+        builder that needs structure the mapping discards, such as a lattice tiling,
+        overrides it to return ``False``.
+
+        Returns:
+            bool: ``True``, unless a subclass declares it needs a lattice Hamiltonian.
+
+        """
+        return True
+
     def run(self, hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
@@ -75,12 +88,13 @@ class HamiltonianUnitaryBuilder(Algorithm):
             UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
 
         Raises:
-            TypeError: If a lattice Hamiltonian is given to a builder that only accepts a qubit Hamiltonian.
+            TypeError: If the builder does not accept the input form it was given.
 
         """
         validate_hamiltonian_input(
             hamiltonian,
             accepts_lattice=self.accepts_lattice(),
+            accepts_qubit_operator=self.accepts_qubit_operator(),
             algorithm_name=self.name(),
             algorithm_kind="unitary builder",
         )

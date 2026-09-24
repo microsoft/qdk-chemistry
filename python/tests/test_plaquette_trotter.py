@@ -38,11 +38,20 @@ from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context
 
 
-def _hubbard_operator(width: int, height: int, interaction: float, *, hopping: float = 1.0) -> QubitOperator:
-    """Return the periodic Hubbard Hamiltonian in Jordan-Wigner encoding."""
+def _hubbard_lattice(width: int, height: int, interaction: float, *, hopping: float = 1.0):
+    """Return the periodic Hubbard model as an unmapped lattice Hamiltonian.
+
+    This is what :class:`PlaquetteTrotter` consumes; it reads the tiling from the
+    lattice structure, which a mapped operator no longer carries.
+    """
     lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
+    return create_hubbard_hamiltonian(lattice, epsilon=0.0, t=hopping, U=interaction)
+
+
+def _hubbard_operator(width: int, height: int, interaction: float, *, hopping: float = 1.0) -> QubitOperator:
+    """Return the same model mapped to qubits, for building independent reference matrices."""
     return create("qubit_mapper").run(
-        create_hubbard_hamiltonian(lattice, epsilon=0.0, t=hopping, U=interaction),
+        _hubbard_lattice(width, height, interaction, hopping=hopping),
         mapping=MajoranaMapping.jordan_wigner(2 * width * height),
     )
 
@@ -52,7 +61,7 @@ class TestPlaquetteTrotterConfiguration:
 
     def test_explicit_num_divisions_is_used(self):
         """An explicit division count controls the repeated formula when auto sizing is disabled."""
-        operator = _hubbard_operator(2, 2, interaction=4.0)
+        lattice = _hubbard_lattice(2, 2, interaction=4.0)
         container = (
             PlaquetteTrotter(
                 lattice_width=2,
@@ -62,7 +71,7 @@ class TestPlaquetteTrotterConfiguration:
                 target_accuracy=0.0,
                 num_divisions=7,
             )
-            .run(operator)
+            .run(lattice)
             .get_container()
         )
 
@@ -85,9 +94,16 @@ class TestPlaquetteTrotterConfiguration:
         ],
     )
     def test_rejects_missing_or_mismatched_lattice(self, builder, message):
-        """The declared lattice must identify the operator being decomposed."""
+        """The declared lattice must identify the Hamiltonian being decomposed."""
         with pytest.raises(ValueError, match=message):
-            builder.run(_hubbard_operator(4, 4, interaction=4.0))
+            builder.run(_hubbard_lattice(4, 4, interaction=4.0))
+
+    def test_rejects_a_mapped_qubit_operator(self):
+        """The tiling needs the lattice structure, which the mapped operator discards."""
+        builder = PlaquetteTrotter(lattice_width=2, lattice_height=2, order=2, time=0.05, num_divisions=1)
+
+        with pytest.raises(TypeError, match="qubit Hamiltonian"):
+            builder.run(_hubbard_operator(2, 2, interaction=4.0))
 
 
 def _pauli_label(terms: dict[int, str], num_qubits: int) -> str:
@@ -113,21 +129,9 @@ def _resolve_divisions(
         target_accuracy=target_accuracy,
         num_divisions=num_divisions,
     )
-    num_sites = side * side
-    num_qubits = 2 * num_sites
-    hopping, interaction = 1.0, 4.0
-    # The bound reads only the uniform hopping and interaction, so a minimal operator suffices.
-    operator = QubitOperator(
-        pauli_strings=[
-            _pauli_label({0: "X", 1: "X"}, num_qubits),
-            _pauli_label({0: "Y", 1: "Y"}, num_qubits),
-            _pauli_label({num_sites: "X", num_sites + 1: "X"}, num_qubits),
-            _pauli_label({num_sites: "Y", num_sites + 1: "Y"}, num_qubits),
-            _pauli_label({0: "Z", num_sites: "Z"}, num_qubits),
-        ],
-        coefficients=np.array([-hopping / 2.0, -hopping / 2.0, -hopping / 2.0, -hopping / 2.0, interaction / 4.0]),
-    )
-    return builder._resolve_num_divisions(operator, time)
+    # The bound reads only the uniform hopping and interaction.
+    lattice = _hubbard_lattice(side, side, interaction=4.0, hopping=1.0)
+    return builder._resolve_num_divisions(lattice, time)
 
 
 class TestPlaquetteTrotterAutomaticDivisions:
@@ -263,7 +267,7 @@ class TestPlaquetteTrotterDecomposition:
         conjugations rather than three. The interaction half-layers that move inward in
         exchange are batched through Hamming weight registers and cost far less.
         """
-        operator = _hubbard_operator(4, 4, interaction=4.0)
+        lattice = _hubbard_lattice(4, 4, interaction=4.0)
         container = (
             PlaquetteTrotter(
                 lattice_width=4,
@@ -271,7 +275,7 @@ class TestPlaquetteTrotterDecomposition:
                 time=0.15,
                 num_divisions=3,
             )
-            .run(operator)
+            .run(lattice)
             .get_container()
         )
 
@@ -399,7 +403,7 @@ class TestHammingWeightPhasing:
         operator, fewer qubits, more rotations.
         """
         side = 4
-        operator = _hubbard_operator(side, side, interaction=8.0)
+        lattice = _hubbard_lattice(side, side, interaction=8.0)
         shapes = {}
         for cap in (0, side * side // 2):
             container = (
@@ -410,7 +414,7 @@ class TestHammingWeightPhasing:
                     num_divisions=1,
                     max_batch=cap,
                 )
-                .run(operator)
+                .run(lattice)
                 .get_container()
             )
             batches = [term for term in container.step_terms if isinstance(term, BatchedExponentiatedPauliTerm)]
@@ -437,7 +441,7 @@ class TestPlaquetteTrotterBasisStates:
                 time=time,
                 num_divisions=1,
             )
-            .run(operator)
+            .run(_hubbard_lattice(side, side, interaction=0.0))
             .get_container()
         )
         labels, coefficients = zip(*operator.get_real_coefficients(tolerance=1e-14), strict=True)
@@ -512,7 +516,10 @@ class TestPlaquetteTrotterPhaseEstimation:
             AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
         )
 
-        result = iqpe.run(qubit_hamiltonian=operator, state_preparation=self._state_preparation(operator))
+        result = iqpe.run(
+            qubit_hamiltonian=_hubbard_lattice(self._SIDE, self._SIDE, interaction=0.0),
+            state_preparation=self._state_preparation(operator),
+        )
 
         assert list(result.bits_msb_first or []) == self._BITS
         assert np.isclose(result.phase_fraction, self._PHASE, atol=1e-9)
@@ -566,6 +573,20 @@ _TABLE_II_U8 = {
 }
 
 
+def _shifted_hubbard_lattice(size: int):
+    """Return Campbell's shifted periodic Hubbard model as an unmapped lattice Hamiltonian.
+
+    Args:
+        size: Lattice side length.
+
+    Returns:
+        The lattice Hamiltonian, particle-hole shifted by ``-U/2``.
+
+    """
+    lattice = LatticeGraph.square(size, size, periodic_x=True, periodic_y=True)
+    return create_hubbard_hamiltonian(lattice, epsilon=-_INTERACTION / 2.0, t=_HOPPING, U=_INTERACTION)
+
+
 def _shifted_hubbard_operator(size: int) -> QubitOperator:
     """Return the Jordan-Wigner image of Campbell's shifted periodic Hubbard model.
 
@@ -577,9 +598,9 @@ def _shifted_hubbard_operator(size: int) -> QubitOperator:
 
     """
     num_sites = size * size
-    lattice = LatticeGraph.square(size, size, periodic_x=True, periodic_y=True)
-    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-_INTERACTION / 2.0, t=_HOPPING, U=_INTERACTION)
-    mapped = create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites))
+    mapped = create("qubit_mapper").run(
+        _shifted_hubbard_lattice(size), mapping=MajoranaMapping.jordan_wigner(2 * num_sites)
+    )
     keep = [index for index, label in enumerate(mapped.pauli_strings) if set(label) != {"I"}]
     return QubitOperator(
         pauli_strings=[mapped.pauli_strings[index] for index in keep],
@@ -682,7 +703,6 @@ def _logical_counts(size: int, *, max_batch: int) -> dict:
     """Build the aggregate controlled circuit for one lattice and return its counts."""
     schedule = campbell_schedule(size)
     steps = int(schedule["num_pe"])
-    operator = _shifted_hubbard_operator(size)
     unitary = create(
         "hamiltonian_unitary_builder",
         "plaquette",
@@ -695,12 +715,12 @@ def _logical_counts(size: int, *, max_batch: int) -> dict:
         lattice_height=size,
         max_batch=max_batch,
         weight_threshold=_WEIGHT_THRESHOLD,
-    ).run(operator)
+    ).run(_shifted_hubbard_lattice(size))
     circuit = create(
         "controlled_circuit_mapper",
         "pauli_sequence",
         control_indices=[0],
-        target_indices=list(range(1, operator.num_qubits + 1)),
+        target_indices=list(range(1, 2 * size * size + 1)),
     ).run(unitary)
     return circuit.estimate().logical_counts
 
