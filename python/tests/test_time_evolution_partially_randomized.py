@@ -5,15 +5,140 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+from itertools import product
+from unittest.mock import Mock
+
 import numpy as np
 import pytest
+from scipy.linalg import expm
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import PartiallyRandomized
-from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import qdrift_samples_campbell
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
+    trotter_steps_commutator,
+    trotter_steps_naive,
+)
+from qdk_chemistry.data import FlatPartition, LatticeGraph, LayeredPartition, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
+from qdk_chemistry.utils.model_hamiltonians import (
+    create_heisenberg_hamiltonian,
+    create_ising_hamiltonian,
+)
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _container_to_unitary(container) -> np.ndarray:
+    """Materialise a PauliProductFormulaContainer as a dense unitary matrix."""
+    n = container.num_qubits
+    unitary = np.eye(2**n, dtype=complex)
+    for term in container.step_terms:
+        s = ["I"] * n
+        for q, op in term.pauli_term.items():
+            s[n - 1 - q] = op  # little-endian
+        pauli = pauli_to_dense_matrix(["".join(s)], np.array([1.0]))
+        unitary = expm(-1j * term.angle * pauli) @ unitary
+    return np.linalg.matrix_power(unitary, container.step_reps)
+
+
+def _partial_state_trace_error(
+    hamiltonian: QubitOperator,
+    *,
+    eps: float,
+    time: float,
+    weight_threshold: float,
+    accuracy_split: float = 0.5,
+    trotter_order: int = 2,
+    num_random_samples: int = 1,
+) -> float:
+    """Compare the exact ensemble-averaged output state with ideal evolution of the zero state.
+
+    Each independent random rotation contributes its probability-weighted
+    conjugation channel. Matrix powers compose these averages within and across
+    steps, eliminating finite-seed sampling uncertainty from the accuracy check.
+
+    Args:
+        hamiltonian: Small Hamiltonian whose averaged evolution is checked.
+        eps: Additive accuracy target used to size the builder.
+        time: Total evolution time.
+        weight_threshold: Magnitude threshold separating deterministic and random terms.
+        accuracy_split: Relative weight used for the two additive sub-budgets.
+        trotter_order: First- or second-order deterministic construction.
+        num_random_samples: Minimum random samples per outer step.
+
+    Returns:
+        The trace distance between the averaged and ideal output density matrices.
+
+    """
+    builder = PartiallyRandomized(
+        target_accuracy=eps,
+        accuracy_split=accuracy_split,
+        trotter_order=trotter_order,
+        weight_threshold=weight_threshold,
+        num_random_samples=num_random_samples,
+        time=time,
+        merge_duplicate_terms=False,
+    )
+    terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+    num_deterministic = builder._determine_num_deterministic(hamiltonian, terms, time)
+    deterministic_terms = terms[:num_deterministic]
+    random_terms = terms[num_deterministic:]
+    divisions = builder._resolve_num_divisions(hamiltonian, time) if deterministic_terms else 1
+    samples = builder._resolve_block_samples(random_terms, time, divisions)
+    delta = time / divisions
+    sweep_time = delta / 2.0 if trotter_order == 2 else delta
+    if hamiltonian.term_partition is None:
+        deterministic_rotations = [
+            ExponentiatedPauliTerm(builder._pauli_label_to_map(label), coefficient * sweep_time)
+            for label, coefficient in deterministic_terms
+        ]
+    else:
+        deterministic_rotations = [
+            term
+            for layer in builder._project_deterministic_layers(hamiltonian, num_deterministic, time=sweep_time)
+            for term in layer
+        ]
+    forward = _container_to_unitary(
+        PauliProductFormulaContainer(
+            step_terms=deterministic_rotations,
+            step_reps=1,
+            num_qubits=hamiltonian.num_qubits,
+            scale=sweep_time,
+        )
+    )
+    dimension = forward.shape[0]
+    random_channel = np.eye(dimension**2, dtype=complex)
+    if random_terms:
+        lambda_random = sum(abs(coefficient) for _, coefficient in random_terms)
+        one_draw_channel = np.zeros_like(random_channel)
+        for label, coefficient in random_terms:
+            pauli = pauli_to_dense_matrix([label], np.array([1.0]))
+            angle = np.sign(coefficient) * lambda_random * delta / samples
+            rotation = expm(-1j * angle * pauli)
+            one_draw_channel += abs(coefficient) / lambda_random * np.kron(rotation.conj(), rotation)
+        random_channel = np.linalg.matrix_power(one_draw_channel, samples)
+    step_channel = random_channel @ np.kron(forward.conj(), forward)
+    if trotter_order == 2:
+        backward = _container_to_unitary(
+            PauliProductFormulaContainer(
+                step_terms=list(reversed(deterministic_rotations)),
+                step_reps=1,
+                num_qubits=hamiltonian.num_qubits,
+                scale=sweep_time,
+            )
+        )
+        step_channel = np.kron(backward.conj(), backward) @ step_channel
+    average_channel = np.linalg.matrix_power(step_channel, divisions)
+    average_state = average_channel[:, 0].reshape((dimension, dimension), order="F")
+    exact_vector = expm(-1j * hamiltonian.to_matrix() * time)[:, 0]
+    exact_state = np.outer(exact_vector, exact_vector.conj())
+    return 0.5 * float(np.linalg.svd(average_state - exact_state, compute_uv=False).sum())
 
 
 class TestPartiallyRandomizedBasics:
@@ -28,6 +153,10 @@ class TestPartiallyRandomizedBasics:
         """Test the type_name method of PartiallyRandomized."""
         builder = PartiallyRandomized()
         assert builder.type_name() == "hamiltonian_unitary_builder"
+
+    def test_default_random_sample_floor_is_one(self):
+        """Accuracy-aware sizing starts from the canonical minimum sample floor."""
+        assert PartiallyRandomized().settings().get("num_random_samples") == 1
 
     def test_can_create_via_registry(self):
         """Test that PartiallyRandomized can be created via the algorithm registry."""
@@ -141,6 +270,207 @@ class TestPartiallyRandomizedConstruction:
         for t1, t2 in zip(terms1, terms2, strict=True):
             assert t1.pauli_term == t2.pauli_term
             assert t1.angle == t2.angle
+
+    @pytest.mark.parametrize("commutation_type", ["general", "qubit_wise"])
+    def test_fuses_deterministic_step_boundaries(self, monkeypatch: pytest.MonkeyPatch, commutation_type: str):
+        """Fuse boundary rotations without changing the independently sampled evolution."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XI", "IX", "ZI", "IZ"],
+            coefficients=[1.0, 0.8, 0.1, 0.05],
+        )
+        monkeypatch.setattr(PartiallyRandomized, "_resolve_num_divisions", lambda _self, _qubit_hamiltonian, _time: 3)
+        settings = {
+            "weight_threshold": 0.5,
+            "num_random_samples": 7,
+            "trotter_order": 2,
+            "time": 0.4,
+            "seed": 42,
+            "commutation_type": commutation_type,
+        }
+        unfused = PartiallyRandomized(**settings, merge_duplicate_terms=False).run(hamiltonian).get_container()
+        fused = PartiallyRandomized(**settings, merge_duplicate_terms=True).run(hamiltonian).get_container()
+
+        assert len(fused.step_terms) <= len(unfused.step_terms) - 4
+        np.testing.assert_allclose(_container_to_unitary(fused), _container_to_unitary(unfused), atol=1e-12)
+
+    def test_disjoint_layers_use_earliest_available_support(self) -> None:
+        """Independent factors fill earlier layers without crossing a shared-qubit dependency."""
+        terms = [
+            ExponentiatedPauliTerm({0: "X"}, 0.1),
+            ExponentiatedPauliTerm({0: "Y"}, -0.2),
+            ExponentiatedPauliTerm({1: "Z"}, 0.3),
+            ExponentiatedPauliTerm({2: "X"}, 0.4),
+            ExponentiatedPauliTerm({2: "Z"}, -0.5),
+        ]
+        scheduled, offsets = PartiallyRandomized._schedule_disjoint_layers(terms)
+        assert offsets == (0, 3, 5)
+        assert scheduled == [terms[index] for index in [0, 2, 3, 1, 4]]
+        original = PauliProductFormulaContainer(terms, 1, 3)
+        layered = PauliProductFormulaContainer(scheduled, 1, 3, layer_offsets=offsets)
+        np.testing.assert_allclose(_container_to_unitary(layered), _container_to_unitary(original), atol=1e-12)
+
+    @pytest.mark.parametrize("commutation_type", ["general", "qubit_wise"])
+    @pytest.mark.parametrize("last_angle", [-0.1, 0.4])
+    def test_fusion_crosses_only_commuting_factors(self, commutation_type: str, last_angle: float) -> None:
+        """Matching factors can fuse across a noncommuting block only when each crossing is valid."""
+        terms = [
+            ExponentiatedPauliTerm({0: "X", 1: "X"}, 0.1),
+            ExponentiatedPauliTerm({0: "Z", 1: "Z"}, 0.2),
+            ExponentiatedPauliTerm({0: "X"}, -0.3),
+            ExponentiatedPauliTerm({0: "X", 1: "X"}, last_angle),
+        ]
+        fused = PartiallyRandomized._fuse_commuting_terms(terms, commutation_type)
+        expected_count = (2 if last_angle == -0.1 else 3) if commutation_type == "general" else 4
+        assert len(fused) == expected_count
+        original = PauliProductFormulaContainer(terms, 1, 2)
+        optimized = PauliProductFormulaContainer(fused, 1, 2)
+        np.testing.assert_allclose(_container_to_unitary(optimized), _container_to_unitary(original), atol=1e-12)
+
+    @pytest.mark.parametrize("trotter_order", [1, 2])
+    @pytest.mark.parametrize("time", [-0.4, 0.4])
+    @pytest.mark.parametrize("seed", [7, 42])
+    def test_layers_preserve_sampled_evolution(
+        self, monkeypatch: pytest.MonkeyPatch, trotter_order: int, time: float, seed: int
+    ) -> None:
+        """Layered output matches fresh raw sandwiches for either order, signed time, and powers."""
+        hamiltonian = QubitOperator(
+            ["XII", "IXI", "IIY", "ZII", "IIZ", "III"],
+            [1.0, 0.8, 0.6, 0.1, 0.05, -0.02],
+        )
+        monkeypatch.setattr(PartiallyRandomized, "_resolve_num_divisions", lambda _self, _qubit_hamiltonian, _time: 3)
+        builder = PartiallyRandomized(
+            time=time, weight_threshold=0.5, num_random_samples=7, trotter_order=trotter_order, seed=seed, power=2
+        )
+        layered = builder.run(hamiltonian).get_container()
+        raw_builder = PartiallyRandomized(merge_duplicate_terms=False)
+        real_terms = hamiltonian.get_real_coefficients(sort_by_magnitude=True)
+        rng = np.random.default_rng(seed)
+        raw_terms = []
+        for _ in range(3):
+            raw_terms.extend(
+                raw_builder._build_step_terms(real_terms[:3], real_terms[3:], time / 3, trotter_order, 7, rng)
+            )
+        raw = PauliProductFormulaContainer(raw_terms, 2, 3, scale=time)
+
+        assert layered.layer_offsets[0] == 0
+        assert layered.layer_offsets[-1] == len(layered.step_terms)
+        assert layered.step_reps == 2
+        assert layered.scale == time
+        np.testing.assert_allclose(_container_to_unitary(layered), _container_to_unitary(raw), atol=1e-12)
+
+
+class TestPartiallyRandomizedPartitions:
+    """Partitions order deterministic factors without changing split membership or random draws."""
+
+    @pytest.mark.parametrize("partition_type", ["flat", "layered"])
+    @pytest.mark.parametrize("trotter_order", [1, 2])
+    @pytest.mark.parametrize("merge", [False, True])
+    def test_partitioned_formula_matches_reference(
+        self, monkeypatch: pytest.MonkeyPatch, partition_type: str, trotter_order: int, merge: bool
+    ) -> None:
+        """Filtering, split-crossing groups, signed angles, and repeated steps preserve the specified formula."""
+        groups = (((2, 3, 6), (1,)), ((0,), (4, 5)))
+        partition = (
+            LayeredPartition(strategy="test", groups=groups)
+            if partition_type == "layered"
+            else FlatPartition(
+                strategy="test", groups=tuple(tuple(index for layer in group for index in layer) for group in groups)
+            )
+        )
+        hamiltonian = QubitOperator(
+            ["XII", "IXI", "ZII", "IIZ", "IIX", "YII", "III"],
+            np.array([1.0, 0.9, -0.8, 0.7, 0.05, 0.02, 1e-15]),
+            term_partition=partition,
+        )
+        monkeypatch.setattr(PartiallyRandomized, "_resolve_num_divisions", lambda _self, _hamiltonian, _time: 2)
+        builder = PartiallyRandomized(
+            time=-0.4,
+            weight_threshold=0.5,
+            num_random_samples=5,
+            seed=7,
+            trotter_order=trotter_order,
+            merge_duplicate_terms=merge,
+            power=2,
+        )
+        actual = builder.run(hamiltonian).get_container()
+        reference_builder = PartiallyRandomized(merge_duplicate_terms=False)
+        deterministic = [
+            (hamiltonian.pauli_strings[index], float(hamiltonian.coefficients[index])) for index in (2, 3, 1, 0)
+        ]
+        random = [("IIX", 0.05), ("YII", 0.02)]
+        rng = np.random.default_rng(7)
+        reference_terms = []
+        for _ in range(2):
+            reference_terms.extend(
+                reference_builder._build_step_terms(deterministic, random, -0.2, trotter_order, 5, rng)
+            )
+        reference = PauliProductFormulaContainer(reference_terms, 2, 3, scale=-0.4)
+
+        np.testing.assert_allclose(_container_to_unitary(actual), _container_to_unitary(reference), atol=1e-12)
+        assert actual.step_reps == 2
+        assert actual.scale == -0.4
+        assert actual.layer_offsets[0] == 0
+        assert actual.layer_offsets[-1] == len(actual.step_terms)
+        assert hamiltonian.term_partition is partition
+        if not merge:
+            assert len(actual.step_terms) == len(reference_terms)
+            assert actual.step_terms[:4] == reference_terms[:4]
+
+    def test_declared_layer_boundaries_survive(self) -> None:
+        """Disjoint neighboring declared layers are not silently collapsed by the builder."""
+        hamiltonian = QubitOperator(
+            ["XI", "IZ"],
+            np.array([1.0, 0.8]),
+            term_partition=LayeredPartition(strategy="test", groups=(((1,), (0,)),)),
+        )
+        container = (
+            PartiallyRandomized(time=0.2, weight_threshold=0.0, merge_duplicate_terms=False)
+            .run(hamiltonian)
+            .get_container()
+        )
+        assert container.layer_offsets == (0, 1, 2, 3, 4)
+        assert [term.pauli_term for term in container.step_terms] == [{0: "Z"}, {1: "X"}, {1: "X"}, {0: "Z"}]
+        fused = PartiallyRandomized(time=0.2, weight_threshold=0.0).run(hamiltonian).get_container()
+        assert fused.layer_offsets == (0, 1, 2)
+        np.testing.assert_allclose(_container_to_unitary(fused), _container_to_unitary(container), atol=1e-12)
+
+    def test_duplicate_labels_keep_original_index_membership(self) -> None:
+        """Equal Pauli labels with unequal weights need not belong to the same side of the split."""
+        hamiltonian = QubitOperator(
+            ["X", "X", "Z"],
+            np.array([1.0, 0.1, 0.8]),
+            term_partition=FlatPartition(strategy="test", groups=((2,), (1, 0))),
+        )
+        container = (
+            PartiallyRandomized(time=0.4, weight_threshold=0.5, num_random_samples=1, merge_duplicate_terms=False)
+            .run(hamiltonian)
+            .get_container()
+        )
+        assert [term.pauli_term for term in container.step_terms] == [{0: "Z"}, {0: "X"}, {0: "X"}, {0: "X"}, {0: "Z"}]
+        np.testing.assert_allclose([term.angle for term in container.step_terms], [0.16, 0.2, 0.04, 0.2, 0.16])
+
+    def test_overlapping_declared_layer_rejected(self) -> None:
+        """Layer metadata cannot claim parallel execution for overlapping deterministic supports."""
+        hamiltonian = QubitOperator(
+            ["X", "Z"],
+            np.array([1.0, 0.8]),
+            term_partition=LayeredPartition(strategy="invalid", groups=(((0, 1),),)),
+        )
+        with pytest.raises(ValueError, match="disjoint supports"):
+            PartiallyRandomized(time=0.2, weight_threshold=0.0).run(hamiltonian)
+
+    def test_fusion_compacts_cancelled_and_zero_layers(self) -> None:
+        """Zero factors and exact cancellations retain the source slots until layer compaction."""
+        terms = [
+            ExponentiatedPauliTerm({0: "X"}, 0.25),
+            ExponentiatedPauliTerm({}, 0.0),
+            ExponentiatedPauliTerm({0: "X"}, 0.5),
+            ExponentiatedPauliTerm({0: "Y"}, 0.125),
+            ExponentiatedPauliTerm({0: "Y"}, -0.125),
+            ExponentiatedPauliTerm({0: "X"}, -0.75),
+        ]
+        assert PartiallyRandomized._fused_term_slots(terms, "general") == [None] * len(terms)
+        assert PartiallyRandomized()._fuse_layers([[term] for term in terms]) == ([], (0,))
 
 
 class TestPartiallyRandomizedSplitting:
@@ -271,9 +601,9 @@ class TestPartiallyRandomizedRandomPart:
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
-        # All 2 terms treated deterministically, no random samples
-        # 2nd order: 2 forward + 2 backward = 4 total
-        assert len(terms) == 4
+        assert len(terms) == 3
+        assert [term.pauli_term for term in terms] == [{0: "X"}, {0: "Z"}, {0: "X"}]
+        np.testing.assert_allclose([term.angle for term in terms], [0.05, 0.05, 0.05], atol=1e-12)
 
 
 class TestPartiallyRandomizedEdgeCases:
@@ -302,11 +632,9 @@ class TestPartiallyRandomizedEdgeCases:
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
-        # 2nd order with 1 deterministic term: X(half) + X(half) = 2 terms
-        assert len(terms) == 2
-        for term in terms:
-            assert term.pauli_term == {0: "X"}
-            assert np.isclose(term.angle, 0.1, atol=float_comparison_absolute_tolerance)
+        assert len(terms) == 1
+        assert terms[0].pauli_term == {0: "X"}
+        assert np.isclose(terms[0].angle, 0.2, atol=float_comparison_absolute_tolerance)
 
     def test_rejects_non_hermitian_hamiltonian(self):
         """Test that non-Hermitian Hamiltonians raise an error."""
@@ -357,21 +685,6 @@ class TestPartiallyRandomizedEdgeCases:
         container = unitary.get_container()
         assert container.num_qubits == 3
 
-
-class TestPartiallyRandomizedPauliLabelToMap:
-    """Tests for the _pauli_label_to_map helper function."""
-
-    def test_identity_only(self):
-        """Test that identity-only labels return an empty mapping."""
-        builder = PartiallyRandomized()
-        assert builder._pauli_label_to_map("III") == {}
-
-    def test_single_pauli(self):
-        """Test labels with a single non-identity Pauli."""
-        builder = PartiallyRandomized()
-        assert builder._pauli_label_to_map("X") == {0: "X"}
-        assert builder._pauli_label_to_map("IZ") == {0: "Z"}
-
     def test_multiple_paulis(self):
         """Test labels with multiple non-identity Paulis."""
         builder = PartiallyRandomized()
@@ -380,23 +693,663 @@ class TestPartiallyRandomizedPauliLabelToMap:
         assert mapping == {0: "Z", 1: "Y", 2: "X"}
 
 
+class TestPartiallyRandomizedAccuracyAwareStructure:
+    """Structural tests for ε-aware (target_accuracy) parameterization."""
+
+    def test_epsilon_zero_preserves_single_step(self):
+        """With target_accuracy=0 the builder uses a single sandwich (r=1)."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["X", "Z", "Y"],
+            coefficients=[1.0, 0.1, 0.05],
+        )
+        builder = PartiallyRandomized(
+            weight_threshold=0.5,
+            num_random_samples=5,
+            trotter_order=2,
+            seed=42,
+            merge_duplicate_terms=False,
+            time=0.2,
+        )
+        terms = builder.run(hamiltonian).get_container().step_terms
+        # Single sandwich: 1 det forward + 5 random + 1 det backward
+        assert len(terms) == 1 + 5 + 1
+
+    def test_resolve_num_divisions_matches_commutator_bound(self):
+        """The outer step count r equals the commutator Trotter bound for ε_D."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        eps = 0.01
+        order = 2
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            accuracy_split=0.5,
+            trotter_order=order,
+            trotter_error_bound="commutator",
+            weight_threshold=0.5,
+            time=time,
+        )
+        eps_d = 0.5 * eps
+        expected_r = trotter_steps_commutator(hamiltonian, time, eps_d, order=order, weight_threshold=1e-12)
+        assert builder._resolve_num_divisions(hamiltonian, time) == expected_r
+
+    def test_resolve_num_divisions_matches_naive_bound(self):
+        """The outer step count r equals the naive Trotter bound when selected."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        eps = 0.01
+        order = 2
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            accuracy_split=0.5,
+            trotter_order=order,
+            trotter_error_bound="naive",
+            weight_threshold=0.5,
+            time=time,
+        )
+        eps_d = 0.5 * eps
+        expected_r = trotter_steps_naive(hamiltonian, time, eps_d, order=order, weight_threshold=1e-12)
+        assert builder._resolve_num_divisions(hamiltonian, time) == expected_r
+
+    def test_smaller_epsilon_increases_divisions(self):
+        """Tightening ε increases (never decreases) the outer step count r."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        r_loose = PartiallyRandomized(
+            target_accuracy=0.1, trotter_order=2, weight_threshold=0.5, time=time
+        )._resolve_num_divisions(hamiltonian, time)
+        r_tight = PartiallyRandomized(
+            target_accuracy=0.001, trotter_order=2, weight_threshold=0.5, time=time
+        )._resolve_num_divisions(hamiltonian, time)
+        assert r_tight > r_loose
+
+    def test_time_zero_single_division(self):
+        """With ε set but time=0 the builder degenerates to a single step."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = PartiallyRandomized(target_accuracy=0.01, weight_threshold=0.6, time=0.0)
+        assert builder._resolve_num_divisions(hamiltonian, 0.0) == 1
+
+    def test_all_random_single_division(self):
+        """With no deterministic terms there is no Trotter bias, so a single block is built."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        # weight_threshold huge -> all terms random
+        builder = PartiallyRandomized(
+            target_accuracy=0.01,
+            weight_threshold=10.0,
+            num_random_samples=3,
+            trotter_order=2,
+            seed=1,
+            time=0.5,
+            merge_duplicate_terms=False,
+        )
+        container = builder.run(hamiltonian).get_container()
+        terms = container.step_terms
+        # No deterministic terms -> a single qDRIFT block (r=1). With merge off,
+        # the total term count equals one block's sample count; if r were > 1 we
+        # would instead see r identical blocks.
+        random_terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        n_block = builder._resolve_block_samples(random_terms, 0.5, 1)
+        assert len(terms) == n_block
+
+    def test_total_random_samples_match_r_times_block(self):
+        """Total qDRIFT rotations equal r times the per-step block size (merge disabled)."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        eps = 0.05
+        weight_threshold = 0.5  # XX, YY, ZZ deterministic; XI, IZ random
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            accuracy_split=0.5,
+            trotter_order=2,
+            weight_threshold=weight_threshold,
+            num_random_samples=1,
+            seed=7,
+            time=time,
+            merge_duplicate_terms=False,
+        )
+        container = builder.run(hamiltonian).get_container()
+        terms = container.step_terms
+
+        num_det = 3  # XX, YY, ZZ
+        r = builder._resolve_num_divisions(hamiltonian, time)
+        random_terms = [("XI", 0.4), ("IZ", 0.2)]
+        n_block = builder._resolve_block_samples(random_terms, time, r)
+
+        # Order-2: each step has 2*num_det deterministic + n_block random terms.
+        expected_total = r * (2 * num_det + n_block)
+        assert len(terms) == expected_total
+
+    def test_block_samples_match_campbell_bound(self):
+        """Per-step block size equals ceil(N_total / r) with N_total from Campbell."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        eps = 0.05
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            accuracy_split=0.5,
+            trotter_order=2,
+            weight_threshold=0.5,
+            num_random_samples=1,
+            time=time,
+        )
+        random_terms = [("XI", 0.4), ("IZ", 0.2)]
+        r = builder._resolve_num_divisions(hamiltonian, time)
+        h_random = QubitOperator(pauli_strings=["XI", "IZ"], coefficients=np.array([0.4, 0.2]))
+        eps_r = 0.5 * eps
+        n_total = qdrift_samples_campbell(h_random, time, eps_r, weight_threshold=1e-12)
+        expected_block = max(1, math.ceil(n_total / r))
+        assert builder._resolve_block_samples(random_terms, time, r) == expected_block
+
+    def test_num_random_samples_acts_as_floor(self):
+        """A large num_random_samples floor wins over the Campbell-derived value."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        builder = PartiallyRandomized(
+            target_accuracy=0.05,
+            trotter_order=2,
+            weight_threshold=0.5,
+            num_random_samples=1000,
+            time=time,
+        )
+        random_terms = [("XI", 0.4), ("IZ", 0.2)]
+        r = builder._resolve_num_divisions(hamiltonian, time)
+        assert builder._resolve_block_samples(random_terms, time, r) == 1000
+
+    def test_block_samples_filter_subthreshold_terms(self):
+        """Sub-threshold random coefficients do not inflate the Campbell count."""
+        builder = PartiallyRandomized(
+            target_accuracy=0.1,
+            num_random_samples=1,
+            tolerance=1e-5,
+        )
+
+        assert builder._resolve_block_samples([("X", 1e-6)], time=1e6, num_divisions=1) == 1
+
+    def test_accuracy_split_clamped(self):
+        """accuracy_split is clamped to (0, 1) so both budgets stay positive."""
+        builder_hi = PartiallyRandomized(target_accuracy=0.05, accuracy_split=5.0)
+        eps_d, eps_r = builder_hi._split_accuracy()
+        assert eps_d > 0.0
+        assert eps_r > 0.0
+        builder_lo = PartiallyRandomized(target_accuracy=0.05, accuracy_split=-3.0)
+        eps_d2, eps_r2 = builder_lo._split_accuracy()
+        assert eps_d2 > 0.0
+        assert eps_r2 > 0.0
+
+    @pytest.mark.parametrize("split", [0.1, 0.3, 0.5, 0.9])
+    @pytest.mark.parametrize("eps", [1e-3, 0.85])
+    def test_accuracy_split_additive(self, split: float, eps: float) -> None:
+        """Standalone sub-budgets sum to the target while preserving their relative weights."""
+        builder = PartiallyRandomized(target_accuracy=eps, accuracy_split=split)
+        eps_d, eps_r = builder._split_accuracy()
+
+        assert eps_d + eps_r == pytest.approx(eps)
+        assert eps_d / eps_r == pytest.approx(np.sqrt(split / (1.0 - split)))
+
+    def test_larger_split_reduces_divisions(self):
+        """A larger accuracy_split (looser ε_D) does not increase r."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        eps = 0.005
+        r_small_split = PartiallyRandomized(
+            target_accuracy=eps, accuracy_split=0.1, trotter_order=2, weight_threshold=0.5, time=time
+        )._resolve_num_divisions(hamiltonian, time)
+        r_large_split = PartiallyRandomized(
+            target_accuracy=eps, accuracy_split=0.9, trotter_order=2, weight_threshold=0.5, time=time
+        )._resolve_num_divisions(hamiltonian, time)
+        assert r_large_split <= r_small_split
+
+    def test_reproducible_with_seed_accuracy_aware(self):
+        """Two ε-aware builders with the same seed produce identical circuits."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["X", "Z", "Y"],
+            coefficients=[1.0, 0.5, 0.4],
+        )
+        kwargs = {
+            "target_accuracy": 0.05,
+            "trotter_order": 2,
+            "weight_threshold": 0.6,
+            "time": 0.5,
+            "merge_duplicate_terms": False,
+        }
+        terms1 = PartiallyRandomized(seed=2024, **kwargs).run(hamiltonian).get_container().step_terms
+        terms2 = PartiallyRandomized(seed=2024, **kwargs).run(hamiltonian).get_container().step_terms
+        assert len(terms1) == len(terms2)
+        for t1, t2 in zip(terms1, terms2, strict=True):
+            assert t1.pauli_term == t2.pauli_term
+            assert t1.angle == t2.angle
+
+    @pytest.mark.parametrize(("num_random_samples", "expected_num_deterministic"), [(1, 3), (100, 23)])
+    def test_cost_optimal_split_accounts_for_sample_floor(
+        self,
+        num_random_samples: int,
+        expected_num_deterministic: int,
+    ):
+        """The raw-cost optimum responds to the configured per-step sample floor."""
+        # Three dominant terms + a long tail of tiny terms.
+        pauli_strings = ["XX", "YY", "ZZ"] + ["XI", "IX", "IY", "YI", "ZI"] * 4
+        coefficients = [10.0, 9.0, 8.0] + [0.001] * 20
+        hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=np.array(coefficients))
+        time = 1.0
+        builder = PartiallyRandomized(
+            target_accuracy=0.01,
+            accuracy_split=0.5,
+            trotter_order=2,
+            weight_threshold=-1.0,  # automatic -> cost-optimal
+            num_random_samples=num_random_samples,
+            time=time,
+        )
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        num_det = builder._determine_num_deterministic_cost_optimal(hamiltonian, terms, time)
+        assert num_det == expected_num_deterministic
+
+    @pytest.mark.parametrize(("trotter_order", "expected_rotations"), [(1, 2), (2, 4)])
+    def test_cost_optimal_split_includes_random_sample_floor(
+        self,
+        trotter_order: int,
+        expected_rotations: int,
+    ):
+        """A tiny random tail is deterministic when its sample floor dominates cost."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.001])
+        builder = PartiallyRandomized(
+            target_accuracy=0.1,
+            accuracy_split=0.5,
+            trotter_order=trotter_order,
+            weight_threshold=-1.0,
+            num_random_samples=100,
+            time=1.0,
+            merge_duplicate_terms=False,
+        )
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+
+        num_det = builder._determine_num_deterministic_cost_optimal(hamiltonian, terms, 1.0)
+        container = builder.run(hamiltonian).get_container()
+
+        assert num_det == 2
+        assert len(container.step_terms) == expected_rotations
+
+    def test_cost_optimal_split_reduces_noncommuting_post_merge_size(self):
+        """Floor-aware selection remains cheaper when random duplicates cannot all merge."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.001, 0.001])
+        common = {
+            "target_accuracy": 0.1,
+            "accuracy_split": 0.5,
+            "trotter_order": 2,
+            "num_random_samples": 100,
+            "time": 1.0,
+            "seed": 7,
+            "merge_duplicate_terms": True,
+        }
+        automatic = PartiallyRandomized(weight_threshold=-1.0, **common)
+        one_deterministic = PartiallyRandomized(weight_threshold=0.5, **common)
+
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        selected = automatic._determine_num_deterministic_cost_optimal(hamiltonian, terms, 1.0)
+        automatic_size = len(automatic.run(hamiltonian).get_container().step_terms)
+        one_deterministic_size = len(one_deterministic.run(hamiltonian).get_container().step_terms)
+
+        assert selected == 3
+        assert automatic_size == 5
+        assert automatic_size < one_deterministic_size
+
+    @pytest.mark.parametrize("trotter_order", [1, 2])
+    @pytest.mark.parametrize("num_random_samples", [1, 7, 100])
+    def test_cost_optimal_split_matches_minimum_emitted_raw_count(
+        self,
+        trotter_order: int,
+        num_random_samples: int,
+    ):
+        """Automatic selection matches the smallest explicitly built raw formula."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZI", "YX", "IZ"],
+            coefficients=[1.0, 0.3, 0.07, 0.01],
+        )
+        common = {
+            "target_accuracy": 0.1,
+            "accuracy_split": 0.5,
+            "trotter_order": trotter_order,
+            "num_random_samples": num_random_samples,
+            "time": 0.5,
+            "seed": 7,
+            "merge_duplicate_terms": False,
+        }
+        automatic = PartiallyRandomized(weight_threshold=-1.0, **common)
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        selected = automatic._determine_num_deterministic_cost_optimal(hamiltonian, terms, 0.5)
+
+        emitted_counts = []
+        for ld in range(len(terms) + 1):
+            if ld == 0:
+                threshold = abs(terms[0][1]) + 1.0
+            elif ld == len(terms):
+                threshold = 0.0
+            else:
+                threshold = (abs(terms[ld - 1][1]) + abs(terms[ld][1])) / 2.0
+            explicit = PartiallyRandomized(weight_threshold=threshold, **common)
+            emitted_counts.append(len(explicit.run(hamiltonian).get_container().step_terms))
+
+        automatic_count = len(automatic.run(hamiltonian).get_container().step_terms)
+        assert selected == emitted_counts.index(min(emitted_counts))
+        assert automatic_count == min(emitted_counts)
+
+    def test_explicit_threshold_overrides_cost_optimal(self):
+        """An explicit weight_threshold takes precedence over cost-optimal split."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "YY", "ZZ", "XI", "IZ"],
+            coefficients=[1.0, 0.8, 0.6, 0.4, 0.2],
+        )
+        time = 1.0
+        builder = PartiallyRandomized(
+            target_accuracy=0.01,
+            trotter_order=2,
+            weight_threshold=0.5,  # explicit -> count |c| >= 0.5
+            time=time,
+        )
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+        num_det = builder._determine_num_deterministic(hamiltonian, terms, time)
+        assert num_det == 3  # XX, YY, ZZ
+
+
+class TestPartiallyRandomizedOutputAccuracy:
+    """Output-unitary accuracy tests for the ε-aware builder.
+
+    The qDRIFT block is random, so a single built unitary cannot be compared
+    directly to ``exp(-iHt)`` — its spectral error is ``O(λ_R t / sqrt(N))`` and
+    routinely exceeds ε.  These tests therefore use two complementary tiers:
+
+    * Deterministic limit (λ_R = 0): the builder reduces to a pure Trotter
+      product, which is deterministic and can be compared straight to the exact
+      unitary in operator norm.
+        * Partial case: the exact ensemble-averaged output state is compared to
+            ideal evolution, without Monte Carlo uncertainty or multiplicative slack.
+    """
+
+    def test_cost_optimal_automatic_split_within_tolerance(self):
+        """The floor-aware automatic mixed split preserves the channel-error target."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        eps = 0.05
+        time = 0.5
+        probe = PartiallyRandomized(
+            target_accuracy=eps,
+            trotter_order=2,
+            weight_threshold=-1.0,
+            num_random_samples=1,
+            time=time,
+        )
+        terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
+
+        assert probe._determine_num_deterministic_cost_optimal(hamiltonian, terms, time) == 2
+
+        err = _partial_state_trace_error(
+            hamiltonian,
+            eps=eps,
+            time=time,
+            weight_threshold=-1.0,
+            num_random_samples=1,
+        )
+        assert err <= eps
+
+    def test_deterministic_limit_within_epsilon(self):
+        """All-deterministic split (λ_R=0): exact Trotter stays within ε."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.7])
+        time = 0.8
+        eps = 0.05
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            trotter_order=2,
+            weight_threshold=0.0,  # all terms deterministic -> λ_R = 0
+            num_random_samples=1,
+            seed=0,
+            time=time,
+            merge_duplicate_terms=False,
+        )
+        u_built = _container_to_unitary(builder.run(hamiltonian).get_container())
+        u_exact = expm(-1j * hamiltonian.to_matrix() * time)
+        err = float(np.linalg.norm(u_built - u_exact, 2))
+        assert err <= eps
+
+    def test_deterministic_limit_error_decreases(self):
+        """Tightening ε reduces the deterministic-limit operator-norm error."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.7])
+        time = 0.8
+
+        def err_at(eps: float) -> float:
+            builder = PartiallyRandomized(
+                target_accuracy=eps,
+                trotter_order=2,
+                weight_threshold=0.0,
+                num_random_samples=1,
+                seed=0,
+                time=time,
+                merge_duplicate_terms=False,
+            )
+            u_built = _container_to_unitary(builder.run(hamiltonian).get_container())
+            u_exact = expm(-1j * hamiltonian.to_matrix() * time)
+            return float(np.linalg.norm(u_built - u_exact, 2))
+
+        assert err_at(0.01) < err_at(0.1)
+
+    def test_partial_state_trace_within_tolerance(self):
+        """The exact averaged output state stays within the accuracy target."""
+        # X deterministic; Z and Y random (non-commuting -> genuine qDRIFT noise).
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        eps = 0.05
+        time = 0.5
+        err = _partial_state_trace_error(hamiltonian, eps=eps, time=time, weight_threshold=0.6)
+        assert err <= eps
+
+    def test_partial_error_scales_with_epsilon(self):
+        """Tightening the target reduces the exact averaged output-state error."""
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        time = 0.5
+        err_loose = _partial_state_trace_error(hamiltonian, eps=0.1, time=time, weight_threshold=0.6)
+        err_tight = _partial_state_trace_error(hamiltonian, eps=0.02, time=time, weight_threshold=0.6)
+        assert err_tight < err_loose
+
+    def test_partial_accuracy_multi_step(self):
+        """Multi-step (r > 1) partial evolution stays within tolerance.
+
+        This is the key accuracy test for the outer Trotter loop: it forces
+        several independent sandwiches, each with its own freshly sampled qDRIFT
+        block, and checks the ensemble-averaged output state against the exact
+        evolution.  The ``r >= 3`` assertion is self-validating — if a change
+        ever collapses the loop back to a single step, this test fails loudly
+        rather than silently degrading to single-sandwich coverage.
+        """
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        eps = 0.01
+        time = 1.0
+        weight_threshold = 0.6  # X deterministic; Z, Y randomized
+
+        probe = PartiallyRandomized(target_accuracy=eps, trotter_order=2, weight_threshold=weight_threshold, time=time)
+        assert probe._resolve_num_divisions(hamiltonian, time) >= 3
+
+        err = _partial_state_trace_error(hamiltonian, eps=eps, time=time, weight_threshold=weight_threshold)
+        assert err <= eps
+
+    def test_partial_two_qubit_accuracy(self):
+        """Two-qubit partial evolution with a multi-term deterministic part.
+
+        A single-qubit / single-deterministic-term test cannot exercise the
+        order-2 sandwich reversal (``reversed(deterministic_terms)``) or the
+        little-endian multi-term ordering.  Here ``H_D = {XI, IZ}`` and
+        ``H_R = {XX, YY}`` on two qubits, and the parameters also yield
+        ``r > 1`` so the multi-step loop is exercised in the multi-qubit case.
+        """
+        hamiltonian = QubitOperator(pauli_strings=["XI", "IZ", "XX", "YY"], coefficients=[1.0, 0.8, 0.2, 0.15])
+        eps = 0.02
+        time = 0.8
+        weight_threshold = 0.5  # H_D = {XI, IZ}, H_R = {XX, YY}
+
+        probe = PartiallyRandomized(target_accuracy=eps, trotter_order=2, weight_threshold=weight_threshold, time=time)
+        assert probe._resolve_num_divisions(hamiltonian, time) >= 2
+
+        err = _partial_state_trace_error(hamiltonian, eps=eps, time=time, weight_threshold=weight_threshold)
+        assert err <= eps
+
+    @pytest.mark.parametrize("trotter_order", [1, 2])
+    @pytest.mark.parametrize("partitioned", [False, True])
+    def test_exact_channel_matches_enumerated_circuits(
+        self, monkeypatch: pytest.MonkeyPatch, trotter_order: int, partitioned: bool
+    ) -> None:
+        """The exact reference matches every possible two-sample circuit, including partition ordering."""
+        partition = LayeredPartition(strategy="test", groups=(((1,), (0,)), ((2,), (3,)))) if partitioned else None
+        hamiltonian = QubitOperator(
+            pauli_strings=["XI", "ZX", "IZ", "YY"],
+            coefficients=[1.0, 0.8, 0.4, 0.2],
+            term_partition=partition,
+        )
+        eps = 0.5
+        time = 0.1
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            time=time,
+            weight_threshold=0.6,
+            trotter_order=trotter_order,
+            num_random_samples=2,
+            merge_duplicate_terms=False,
+        )
+        assert builder._resolve_num_divisions(hamiltonian, time) == 1
+        probabilities = np.array([2.0 / 3.0, 1.0 / 3.0])
+        average_state = np.zeros((4, 4), dtype=complex)
+        for draws in product(range(2), repeat=2):
+            generator = Mock()
+            generator.choice.return_value = np.asarray(draws)
+            monkeypatch.setattr(np.random, "default_rng", lambda _seed, fixed_generator=generator: fixed_generator)
+            vector = _container_to_unitary(builder.run(hamiltonian).get_container())[:, 0]
+            assert generator.choice.call_count == 1
+            assert generator.choice.call_args.kwargs["size"] == 2
+            probability = np.prod(probabilities[list(draws)])
+            average_state += probability * np.outer(vector, vector.conj())
+        exact_vector = expm(-1j * hamiltonian.to_matrix() * time)[:, 0]
+        exact_state = np.outer(exact_vector, exact_vector.conj())
+        enumerated_error = 0.5 * np.linalg.svd(average_state - exact_state, compute_uv=False).sum()
+
+        reference_error = _partial_state_trace_error(
+            hamiltonian,
+            eps=eps,
+            time=time,
+            weight_threshold=0.6,
+            trotter_order=trotter_order,
+            num_random_samples=2,
+        )
+
+        assert reference_error == pytest.approx(enumerated_error, abs=1e-12)
+
+    def test_partial_first_order_accuracy(self):
+        """First-order partial evolution stays within tolerance.
+
+        Exercises the order-1 construction path (deterministic terms at full
+        angle followed by the qDRIFT block) against the exact unitary, which the
+        order-2 accuracy tests do not cover.
+        """
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z", "Y"], coefficients=[1.0, 0.5, 0.4])
+        eps = 0.05
+        time = 0.5
+        err = _partial_state_trace_error(hamiltonian, eps=eps, time=time, weight_threshold=0.6, trotter_order=1)
+        assert err <= eps
+
+
+class TestPartiallyRandomizedModelHamiltonians:
+    """Accuracy checks on real model Hamiltonians from the codebase.
+
+    Unlike the hand-crafted Pauli strings used elsewhere, these tests build
+    physical lattice models via :mod:`qdk_chemistry.utils.model_hamiltonians`
+    (transverse-field Ising and Heisenberg chains) and validate the
+    ensemble-averaged output state against the exact evolution.  Both models have a
+    natural weight separation (large two-body couplings vs. smaller fields),
+    which the partially randomized split exploits, and both resolve to a
+    multi-step (``r > 1``) outer loop at the chosen accuracies.
+    """
+
+    def test_transverse_field_ising_chain(self):
+        """TFIM 4-site chain: deterministic ZZ couplings, randomized X fields."""
+        lattice = LatticeGraph.chain(4)
+        # J = 1.0 (ZZ couplings) deterministic; h = 0.5 (X fields) randomized.
+        hamiltonian = create_ising_hamiltonian(lattice, j=1.0, h=0.5)
+        eps = 0.05
+        time = 0.5
+        weight_threshold = 0.75  # H_D = {ZZ couplings}, H_R = {X fields}
+
+        probe = PartiallyRandomized(target_accuracy=eps, trotter_order=2, weight_threshold=weight_threshold, time=time)
+        assert probe._resolve_num_divisions(hamiltonian, time) >= 2
+
+        err = _partial_state_trace_error(hamiltonian, eps=eps, time=time, weight_threshold=weight_threshold)
+        assert err <= eps
+
+    def test_heisenberg_chain(self):
+        """Heisenberg 4-site chain: deterministic XYZ couplings, randomized Z fields."""
+        lattice = LatticeGraph.chain(4)
+        # Uniform J = 1.0 (XX+YY+ZZ) deterministic; hz = 0.3 (Z fields) randomized.
+        hamiltonian = create_heisenberg_hamiltonian(lattice, jx=1.0, jy=1.0, jz=1.0, hz=0.3)
+        eps = 0.05
+        time = 0.3
+        weight_threshold = 0.5  # H_D = {couplings}, H_R = {Z fields}
+
+        probe = PartiallyRandomized(target_accuracy=eps, trotter_order=2, weight_threshold=weight_threshold, time=time)
+        assert probe._resolve_num_divisions(hamiltonian, time) >= 2
+
+        err = _partial_state_trace_error(hamiltonian, eps=eps, time=time, weight_threshold=weight_threshold)
+        assert err <= eps
+
+    def test_ising_deterministic_limit(self):
+        """All-deterministic TFIM chain reduces to exact Trotter within eps."""
+        lattice = LatticeGraph.chain(4)
+        hamiltonian = create_ising_hamiltonian(lattice, j=1.0, h=0.5)
+        eps = 0.02
+        time = 0.3
+        builder = PartiallyRandomized(
+            target_accuracy=eps,
+            trotter_order=2,
+            weight_threshold=0.0,  # all terms deterministic -> lambda_R = 0
+            num_random_samples=1,
+            seed=0,
+            time=time,
+            merge_duplicate_terms=False,
+        )
+        u_built = _container_to_unitary(builder.run(hamiltonian).get_container())
+        u_exact = expm(-1j * hamiltonian.to_matrix() * time)
+        err = float(np.linalg.norm(u_built - u_exact, 2))
+        assert err <= eps
+
+
 class TestPartiallyRandomizedScale:
     """Tests that the PartiallyRandomized builder sets scale correctly."""
 
     def test_scale_equals_time(self):
         """Container scale should equal the evolution time."""
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
-        t = 0.6
-        builder = PartiallyRandomized(time=t)
+        time = 0.6
+        builder = PartiallyRandomized(time=time)
         container = builder.run(hamiltonian).get_container()
-        assert container.scale == t
+        assert container.scale == time
 
     def test_eigenvalue_from_phase_roundtrip(self):
         """Verify E -> phase -> E roundtrip for a known energy."""
-        t = 1.0
+        time = 1.0
         energy = -0.4
-        phi = (-energy * t / (2 * np.pi)) % 1.0
+        phase = (-energy * time / (2 * np.pi)) % 1.0
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([1.0, 0.5]))
-        builder = PartiallyRandomized(time=t)
+        builder = PartiallyRandomized(time=time)
         container = builder.run(hamiltonian).get_container()
-        assert np.isclose(container.eigenvalue_from_phase(phi), energy, rtol=1e-10, atol=1e-12)
+        assert np.isclose(container.eigenvalue_from_phase(phase), energy, rtol=1e-10, atol=1e-12)

@@ -89,8 +89,11 @@ jobs:
 
     - name: Run full tutorial tests
       env:
+        QSHARP_PYTHON_TELEMETRY: 'false'
+        MPLBACKEND: Agg
+        PYTHONIOENCODING: utf-8
         QDK_CHEMISTRY_RUN_SLOW_TESTS: '1'
         QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
       run: >-
-        python -m pytest -q --strict-config --strict-markers
+        python -m pytest --noconftest -q --strict-config --strict-markers
         python/tests/test_sample_tutorial_gs_qpe.py

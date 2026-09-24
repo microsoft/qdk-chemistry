@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
 
 import h5py
@@ -48,6 +49,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
     The full time-evolution unitary is:
     :math:`U(t) \approx \left[ U_{\mathrm{step}}\!\left(\tfrac{t}{r}\right) \right]^{r}`,
     where ``step_reps = r`` is the number of repeated steps.
+    Optional ``layer_offsets`` delimit disjoint-support layers within the stored step.
     """
 
     @staticmethod
@@ -69,6 +71,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
+        *,
+        layer_offsets: tuple[int, ...] | None = None,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
@@ -77,10 +81,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
+            layer_offsets: Disjoint-layer boundaries spanning the step, starting at zero.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
-            ValueError: If ``step_reps`` is not positive.
+            ValueError: If ``step_reps`` is not positive or the layer boundaries are invalid.
 
         """
         # bool is an int subclass, but True as a repetition count is always a mistake.
@@ -90,6 +95,28 @@ class PauliProductFormulaContainer(UnitaryContainer):
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
         self.step_terms = step_terms
+        self.layer_offsets = None if layer_offsets is None else tuple(layer_offsets)
+        if self.layer_offsets is not None:
+            offsets = self.layer_offsets
+            if (
+                not offsets
+                or any(
+                    isinstance(offset, bool | np.bool_) or not isinstance(offset, int | np.integer)
+                    for offset in offsets
+                )
+                or offsets[0] != 0
+                or offsets[-1] != len(step_terms)
+                or any(stop <= start for start, stop in pairwise(offsets))
+            ):
+                raise ValueError("layer_offsets must strictly increase from zero to the number of step terms.")
+            for start, stop in pairwise(offsets):
+                occupied: set[int] = set()
+                for term in step_terms[start:stop]:
+                    support = {qubit for qubit, pauli in term.pauli_term.items() if pauli != "I"}
+                    if not occupied.isdisjoint(support):
+                        raise ValueError("Terms in each layer_offsets interval must have disjoint qubit supports.")
+                    occupied.update(support)
+            self.layer_offsets = tuple(int(offset) for offset in offsets)
         self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
@@ -127,6 +154,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
         _hash_float(h, self.scale)
+        if self.layer_offsets is not None:
+            _hash_str(h, "layer_offsets")
+            _hash_uint(h, len(self.layer_offsets))
+            for offset in self.layer_offsets:
+                _hash_uint(h, offset)
 
     @property
     def type(self) -> str:
@@ -161,6 +193,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         Note:
             ``permutation[i]`` is the old index for new position ``i``. For example,
             ``permutation = [2, 0, 1]`` yields ``new_terms = [old_terms[2], old_terms[0], old_terms[1]]``.
+            Declared layers become singleton layers after reordering.
 
         """
         # Validate permutation
@@ -179,6 +212,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=reordered_step_terms,
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
+            scale=self.scale,
+            layer_offsets=None if self.layer_offsets is None else tuple(range(len(self.step_terms) + 1)),
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
@@ -190,6 +225,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         string (i.e., have identical ``pauli_term`` dictionaries), their rotation
         angles are summed into a single ``ExponentiatedPauliTerm``. If the summed
         angle has magnitude less than ``atol``, the resulting term is removed.
+        Surviving factors retain their declared layer boundaries without regrouping.
 
         Args:
             other_container: The second ``PauliProductFormulaContainer`` appended
@@ -215,25 +251,44 @@ class PauliProductFormulaContainer(UnitaryContainer):
             )
 
         merged: list[ExponentiatedPauliTerm] = []
-        for step_terms, step_reps in (
-            (self.step_terms, self.step_reps),
-            (other_container.step_terms, other_container.step_reps),
-        ):
-            for _ in range(step_reps):
-                for term in step_terms:
-                    if merged and merged[-1].pauli_term == term.pauli_term:
-                        new_angle = merged[-1].angle + term.angle
-                        if abs(new_angle) > atol:
-                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+        layers = [0] if self.layer_offsets is not None or other_container.layer_offsets is not None else None
+        for container in (self, other_container):
+            offsets = (
+                container.layer_offsets
+                if container.layer_offsets is not None
+                else tuple(range(len(container.step_terms) + 1))
+                if layers is not None
+                else (0, len(container.step_terms))
+            )
+            for _ in range(container.step_reps):
+                for begin, end in pairwise(offsets):
+                    layer_start = None
+                    for term in container.step_terms[begin:end]:
+                        if merged and merged[-1].pauli_term == term.pauli_term:
+                            new_angle = merged[-1].angle + term.angle
+                            if abs(new_angle) > atol:
+                                merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+                            else:
+                                merged.pop()
+                                if layers is not None:
+                                    while len(layers) > 1 and layers[-1] >= len(merged):
+                                        layers.pop()
+                                if layer_start is not None and len(merged) <= layer_start:
+                                    layer_start = None
                         else:
-                            merged.pop()
-                    else:
-                        merged.append(term)
+                            if layers is not None and layer_start is None:
+                                layer_start = len(merged)
+                                if layers[-1] != layer_start:
+                                    layers.append(layer_start)
+                            merged.append(term)
+        if layers is not None and layers[-1] != len(merged):
+            layers.append(len(merged))
         return PauliProductFormulaContainer(
             step_terms=merged,
             step_reps=1,
             num_qubits=self.num_qubits,
             scale=self.scale,
+            layer_offsets=None if layers is None else tuple(layers),
         )
 
     def to_json(self) -> dict[str, Any]:
@@ -253,6 +308,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             "num_qubits": self.num_qubits,
             "scale": self.scale,
         }
+        if self.layer_offsets is not None:
+            data["layer_offsets"] = list(self.layer_offsets)
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -275,6 +332,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             pauli_term_group = term_group.create_group("pauli_term")
             for qubit_index, pauli_operator in term.pauli_term.items():
                 pauli_term_group.attrs[str(qubit_index)] = pauli_operator
+        if self.layer_offsets is not None:
+            group.create_dataset("layer_offsets", data=self.layer_offsets, dtype="int64")
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "PauliProductFormulaContainer":
@@ -314,6 +373,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps=step_reps,
             num_qubits=num_qubits,
             scale=json_data.get("scale", 1.0),
+            layer_offsets=json_data.get("layer_offsets"),
         )
 
     @classmethod
@@ -333,8 +393,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         step_terms: list[ExponentiatedPauliTerm] = []
         step_terms_group = group["step_terms"]
-        for term_name in step_terms_group:
-            term_group = step_terms_group[term_name]
+        for index in range(len(step_terms_group)):
+            term_group = step_terms_group[f"term_{index}"]
             angle = term_group.attrs["angle"]
             pauli_term: dict[int, str] = {}
             pauli_term_group = term_group["pauli_term"]
@@ -349,6 +409,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps=step_reps,
             num_qubits=num_qubits,
             scale=float(group.attrs.get("scale", 1.0)),
+            layer_offsets=tuple(group["layer_offsets"][()]) if "layer_offsets" in group else None,
         )
 
     def get_summary(self) -> str:
