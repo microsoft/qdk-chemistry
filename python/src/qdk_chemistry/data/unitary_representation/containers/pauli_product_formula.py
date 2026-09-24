@@ -315,17 +315,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 carry a different ``scale``; or if either container contains explicit
                 batching or conjugation structure, which ``combine`` cannot flatten safely.
 
-        Note:
-            ``atol`` is a *screening* threshold, not an error bound. Dropping a fused
-            term whose summed angle falls below ``atol`` discards up to ``atol`` of
-            rotation on that Pauli string, so merging a chain that drops :math:`k`
-            terms permits up to :math:`k \cdot \mathrm{atol}` of accumulated operator
-            error -- the error is additive in the number of terms removed, and is not
-            re-scaled by how many were kept. The default (:math:`10^{-12}`) sits far
-            below typical Trotter error, but a caller fusing many containers, or one
-            needing a guaranteed operator-norm bound, should size ``atol`` against the
-            total number of expected cancellations rather than a single one.
-
         """
         for label, container in (("self", self), ("other_container", other_container)):
             if container.conjugating_terms or any(

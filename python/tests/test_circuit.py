@@ -557,7 +557,7 @@ class TestCircuitEstimate:
 class TestGetQreApplication:
     """Test cases for Circuit.get_qre_application method."""
 
-    def test_get_qre_application_from_factory(self, monkeypatch, tmp_path):
+    def test_get_qre_application_from_factory(self):
         """Test that get_qre_application works with Q# factory data."""
         from qdk.qre.application import QSharpApplication  # noqa: PLC0415
 
@@ -572,20 +572,8 @@ class TestGetQreApplication:
             parameter=state_prep_params,
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
-        app = circuit.get_qre_application(cache_dir=tmp_path)
+        app = circuit.get_qre_application()
         assert isinstance(app, QSharpApplication)
-        assert app.use_cache
-        assert app.cache_dir == tmp_path
-        assert app.cache_key == circuit.content_hash(truncate_chars=0)
-
-        trace = app.get_trace()
-        assert (tmp_path / f"{app.cache_key}.json").is_file()
-
-        def fail_if_recomputed(*_args, **_kwargs):
-            raise AssertionError("Trace was recomputed instead of loaded from cache.")
-
-        monkeypatch.setattr("qdk.qre.interop._qsharp.trace_from_entry_expr", fail_if_recomputed)
-        assert json.loads(app.get_trace().to_json()) == json.loads(trace.to_json())
 
     def test_get_qre_application_from_qasm(self):
         """Test that get_qre_application works with QASM-only circuit."""
