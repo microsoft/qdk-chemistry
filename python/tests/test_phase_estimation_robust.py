@@ -215,14 +215,9 @@ class _FakeUnitary:
 class _FakeUnitaryBuilder(Trotter):
     """Build fake unitaries and record exact settings."""
 
-    def __init__(self, settings: Settings, records: list[dict[str, object]], evolution_category: str) -> None:
+    def __init__(self, settings: Settings, records: list[dict[str, object]]) -> None:
         self._settings = settings
         self._records = records
-        self._evolution_category = evolution_category
-
-    def evolution_category(self) -> str:
-        """Return the category of the replaced unitary builder."""
-        return self._evolution_category
 
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record one build and return its configured time and seed."""
@@ -378,16 +373,7 @@ def _install_test_stack(
         if snapshot.algorithm_type == "hamiltonian_unitary_builder":
             if use_real_unitary_builder:
                 return original_create(snapshot, **updates)
-            categories = {
-                "trotter": "trotter",
-                "qdrift": "qdrift",
-                "partially_randomized": "partial_randomized",
-            }
-            return _FakeUnitaryBuilder(
-                settings,
-                unitary_records,
-                categories.get(snapshot.algorithm_name, "deterministic_or_exact"),
-            )
+            return _FakeUnitaryBuilder(settings, unitary_records)
         if snapshot.algorithm_type == "hadamard_test_circuit_builder":
             return _FakeHadamardCircuitBuilder(settings, contexts)
         raise AssertionError(f"Unexpected algorithm type: {snapshot.algorithm_type}")

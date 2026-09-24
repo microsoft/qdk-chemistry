@@ -242,6 +242,10 @@ The nested experiment scheduler defines:
      - int
      - Positive per-circuit qDRIFT sample ceiling. Default: ``1000000``. Scheduling raises before circuit construction if any round exceeds it. Increase explicitly only when resources permit.
 
+RPE scheduling policies are selected by the registered unitary-builder name.
+The supported names are ``"trotter"``, ``"qdrift"``, ``"partially_randomized"``, and ``"zassenhaus"``.
+Other names, including renamed subclasses, are rejected until an explicit RPE policy is defined for them.
+
 Scheduler accuracy settings must be finite.
 ``base_time`` must be finite and nonnegative, with only ``0.0`` selecting automatic time.
 For qDRIFT, a tighter nested ``target_accuracy`` can increase the sample count above the RPE ladder's minimum.

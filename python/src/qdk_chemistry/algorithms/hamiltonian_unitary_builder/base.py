@@ -114,15 +114,6 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Initialize the TimeEvolutionBuilder."""
         super().__init__()
 
-    def evolution_category(self) -> str:
-        """Describe the simulation family independently of its registered name.
-
-        Returns:
-            The evolution family; the default is ``"deterministic_or_exact"``.
-
-        """
-        return "deterministic_or_exact"
-
     def _resolve_power(self) -> tuple[float, int]:
         """Resolve the power setting into effective time scale and power repetitions.
 

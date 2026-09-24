@@ -15,6 +15,7 @@ from typing import Any
 import h5py
 import numpy as np
 
+import qdk_chemistry.data
 from qdk_chemistry._core.data import AlgorithmRef, Settings
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
 from qdk_chemistry.data.base import DataClass
@@ -626,7 +627,7 @@ class RobustPhaseEstimationCircuitSet(DataClass):
         *,
         schedule: RobustPhaseEstimationSchedule,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: qdk_chemistry.data.QubitOperator,
     ) -> None:
         """Bundle immutable scheduling data with inputs for reproducible replay.
 
@@ -644,7 +645,7 @@ class RobustPhaseEstimationCircuitSet(DataClass):
             raise TypeError("schedule must be a RobustPhaseEstimationSchedule.")
         if not isinstance(state_preparation, Circuit):
             raise TypeError("state_preparation must be a Circuit.")
-        if not isinstance(qubit_hamiltonian, QubitOperator):
+        if not isinstance(qubit_hamiltonian, qdk_chemistry.data.QubitOperator):
             raise TypeError("qubit_hamiltonian must be a QubitOperator.")
         self.schedule = schedule
         self.state_preparation = state_preparation

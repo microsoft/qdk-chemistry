@@ -851,15 +851,6 @@ class PartiallyRandomized(QDrift):
                 best_ld = ld
         return best_ld
 
-    def evolution_category(self) -> str:
-        """Identify the partially randomized simulation family.
-
-        Returns:
-            ``"partial_randomized"``.
-
-        """
-        return "partial_randomized"
-
     def name(self) -> str:
         """Return the name of the unitary builder."""
         return "partially_randomized"

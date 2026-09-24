@@ -30,7 +30,12 @@ __all__ = [
 
 _UNSET_BUDGET_VALUE = -1.0
 _DEFAULT_RPE_EPSILON_UNITARY = 0.85
-_SUPPORTED_RPE_CATEGORIES = frozenset({"deterministic_or_exact", "trotter", "qdrift", "partial_randomized"})
+_RPE_BUILDER_CATEGORIES = {
+    "trotter": "deterministic_or_exact",
+    "qdrift": "qdrift",
+    "partially_randomized": "partial_randomized",
+    "zassenhaus": "deterministic_or_exact",
+}
 
 
 class _AlgorithmSnapshot(_AlgorithmConfiguration):
@@ -272,8 +277,8 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             A reproducible schedule with rounds, shared settings, and concrete draw seeds, without live inputs.
 
         Raises:
-            TypeError: If the configured builder is not a time-evolution builder or its capabilities are malformed.
-            ValueError: If the evolution family, power, base time, or error-budget settings are unsupported or invalid.
+            TypeError: If the configured builder is not a time-evolution builder.
+            ValueError: If the builder name, power, base time, or error-budget settings are unsupported or invalid.
 
         """
         for setting in ("target_accuracy", "unitary_accuracy_fraction", "epsilon_rpe", "epsilon_unitary"):
@@ -303,15 +308,18 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
                 f"'{unitary_snapshot.algorithm_type}/{unitary_snapshot.algorithm_name}' "
                 "does not represent supported time evolution. Block encodings and quantum walks are not supported."
             )
-        declared_category = self._resolve_evolution_category(unitary_snapshot, unitary_builder)
-        category = "deterministic_or_exact" if declared_category == "trotter" else declared_category
+        builder_name = unitary_snapshot.algorithm_name
+        if builder_name not in _RPE_BUILDER_CATEGORIES:
+            supported = ", ".join(sorted(_RPE_BUILDER_CATEGORIES))
+            raise ValueError(f"Unsupported RPE unitary builder {builder_name!r}. Supported builders: {supported}.")
+        category = _RPE_BUILDER_CATEGORIES[builder_name]
         correction = str(self._settings.get("energy_correction"))
         if correction == "auto":
             correction = "qdrift_tangent" if category == "qdrift" else "linear"
         fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(
             category,
             epsilon_total,
-            is_trotter=declared_category == "trotter",
+            is_trotter=builder_name == "trotter",
         )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
@@ -428,42 +436,6 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             unitary_builder_configuration=shared_configuration.to_ref(),
             hadamard_test_circuit_builder_configuration=hadamard_snapshot.to_ref(),
         )
-
-    @staticmethod
-    def _resolve_evolution_category(snapshot: _AlgorithmSnapshot, builder: TimeEvolutionBuilder) -> str:
-        """Return and validate the declared evolution family supported by this scheduler.
-
-        Args:
-            snapshot: Builder configuration used to identify invalid capability declarations.
-            builder: Instantiated time-evolution builder whose family is queried.
-
-        Returns:
-            The supported evolution category, independent of the builder's registry name.
-
-        Raises:
-            TypeError: If the capability is not callable or does not return a string.
-            ValueError: If the declared family has no scheduling policy.
-
-        """
-        category_resolver = getattr(builder, "evolution_category", None)
-        if not callable(category_resolver):
-            raise TypeError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' "
-                "must implement evolution_category()."
-            )
-        category = category_resolver()
-        if not isinstance(category, str):
-            raise TypeError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned a non-string "
-                "evolution category."
-            )
-        if category not in _SUPPORTED_RPE_CATEGORIES:
-            supported = ", ".join(sorted(_SUPPORTED_RPE_CATEGORIES))
-            raise ValueError(
-                f"Unitary builder '{snapshot.algorithm_type}/{snapshot.algorithm_name}' returned unsupported "
-                f"evolution category {category!r}; expected one of: {supported}."
-            )
-        return category
 
     def _resolve_budget(
         self,

@@ -18,7 +18,6 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (
     PartiallyRandomized,
 )
@@ -54,14 +53,9 @@ class _FakeUnitary:
 class _FakeUnitaryBuilder(Trotter):
     """Record one on-demand unitary construction."""
 
-    def __init__(self, settings: Settings, records: list[dict[str, object]], evolution_category: str) -> None:
+    def __init__(self, settings: Settings, records: list[dict[str, object]]) -> None:
         self._settings = settings
         self._records = records
-        self._evolution_category = evolution_category
-
-    def evolution_category(self) -> str:
-        """Return the category of the replaced unitary builder."""
-        return self._evolution_category
 
     def run(self, qubit_hamiltonian: QubitOperator) -> _FakeUnitary:
         """Record settings and return a unitary marker."""
@@ -119,12 +113,7 @@ def recording_builders(
             else:
                 settings._set_default(key, "double" if isinstance(value, float) else "int", value)
         if snapshot.algorithm_type == "hamiltonian_unitary_builder":
-            categories = {
-                "trotter": "trotter",
-                "qdrift": "qdrift",
-                "partially_randomized": "partial_randomized",
-            }
-            return _FakeUnitaryBuilder(settings, unitary_records, categories[snapshot.algorithm_name])
+            return _FakeUnitaryBuilder(settings, unitary_records)
         if snapshot.algorithm_type == "hadamard_test_circuit_builder":
             return _FakeHadamardBuilder(settings, hadamard_records)
         raise AssertionError(f"Unexpected algorithm type: {snapshot.algorithm_type}")
@@ -385,34 +374,19 @@ def test_explicit_base_time_below_aliasing_limit_is_retained(
     assert circuit_set.rounds[0].evolution_time == pytest.approx(base_time)
 
 
-@pytest.mark.parametrize("epsilon_unitary", [None, 0.5])
-def test_renamed_trotter_uses_same_rpe_policy(
-    rpe_problem: tuple[Circuit, QubitOperator],
-    epsilon_unitary: float | None,
-) -> None:
-    """A custom Trotter registry name preserves category-driven RPE behavior."""
-    state_preparation, hamiltonian = rpe_problem
+def test_scheduler_rejects_unrecognized_builder_name(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """RPE requires an explicit scheduling policy for each supported registered builder name."""
+    _, hamiltonian = rpe_problem
     algorithms.register(_RenamedTrotter)
     try:
-        circuit_sets = []
-        for builder_name in ("trotter", "renamed_trotter_for_rpe_test"):
-            circuit_sets.append(
-                RobustPhaseEstimationExperimentScheduler(
-                    target_accuracy=0.01,
-                    epsilon_unitary=epsilon_unitary,
-                    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
-                ).run(hamiltonian)
-            )
+        scheduler = RobustPhaseEstimationExperimentScheduler(
+            target_accuracy=0.5,
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "renamed_trotter_for_rpe_test"),
+        )
+        with pytest.raises(ValueError, match=r"Unsupported RPE unitary builder.*renamed_trotter_for_rpe_test"):
+            scheduler.run(hamiltonian)
     finally:
         algorithms.unregister("hamiltonian_unitary_builder", "renamed_trotter_for_rpe_test")
-
-    builtin, renamed = circuit_sets
-    expected_unitary_accuracy = 0.85 if epsilon_unitary is None else epsilon_unitary
-    assert builtin.error_budget_mode == renamed.error_budget_mode == "independent_trotter"
-    assert builtin.epsilon_rpe == renamed.epsilon_rpe == pytest.approx(0.01)
-    assert builtin.epsilon_unitary == renamed.epsilon_unitary == pytest.approx(expected_unitary_accuracy)
-    assert builtin.unitary_builder_category == renamed.unitary_builder_category == "deterministic_or_exact"
-    assert builtin.num_rounds == renamed.num_rounds
 
 
 @pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
@@ -466,8 +440,7 @@ def test_partial_schedule_serializes_additive_accuracy(rpe_problem: tuple[Circui
 def test_scheduler_rejects_block_encoding_builders(
     rpe_problem: tuple[Circuit, QubitOperator], quantum_walk: bool
 ) -> None:
-    """Block encodings and walks do not inherit time-evolution capabilities."""
-    assert not hasattr(HamiltonianUnitaryBuilder, "evolution_category")
+    """Block encodings and walks are not supported time-evolution builders."""
     scheduler = RobustPhaseEstimationExperimentScheduler(
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=quantum_walk)
     )
@@ -476,19 +449,36 @@ def test_scheduler_rejects_block_encoding_builders(
         scheduler.run(rpe_problem[1])
 
 
-@pytest.mark.parametrize("category", [None, 1, "unsupported"])
-def test_scheduler_rejects_invalid_evolution_category(
-    rpe_problem: tuple[Circuit, QubitOperator], monkeypatch: pytest.MonkeyPatch, category: object
+@pytest.mark.parametrize(
+    ("builder_name", "category", "budget_mode", "correction", "randomized"),
+    [
+        ("trotter", "deterministic_or_exact", "independent_trotter", "linear", False),
+        ("qdrift", "qdrift", "fraction", "qdrift_tangent", True),
+        ("partially_randomized", "partial_randomized", "independent_partial_randomized", "linear", True),
+        ("zassenhaus", "deterministic_or_exact", "fraction", "linear", False),
+    ],
+)
+def test_registered_builder_name_preserves_rpe_policy(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    builder_name: str,
+    category: str,
+    budget_mode: str,
+    correction: str,
+    randomized: bool,
 ) -> None:
-    """An invalid capability result fails before any round is scheduled."""
-    monkeypatch.setattr(Trotter, "evolution_category", lambda _self: category)
+    """Known builder names retain their accuracy, correction, and randomized-draw policies."""
     scheduler = RobustPhaseEstimationExperimentScheduler(
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter")
+        target_accuracy=0.5,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
     )
-    error_type = ValueError if isinstance(category, str) else TypeError
 
-    with pytest.raises(error_type, match="evolution category"):
-        scheduler.run(rpe_problem[1])
+    schedule = scheduler.run(rpe_problem[1])
+
+    assert schedule.unitary_builder_category == category
+    assert schedule.error_budget_mode == budget_mode
+    assert schedule.energy_correction == correction
+    for round_data in schedule.rounds:
+        assert round_data.num_draws == (round_data.shots_per_basis if randomized else 1)
 
 
 def test_default_partial_randomized_random_cost_scales_quadratically(
