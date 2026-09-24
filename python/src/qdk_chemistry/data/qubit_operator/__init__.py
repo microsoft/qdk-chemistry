@@ -15,6 +15,7 @@ import numpy as np
 from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
+from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresContainer
@@ -290,6 +291,8 @@ class QubitOperator(DataClass):
             container = SparsePauliDecompositionContainer.from_json(json_data)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_json(json_data)
+        elif container_type == "lattice":
+            container = LatticeContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container=container)
@@ -310,6 +313,8 @@ class QubitOperator(DataClass):
             container = SparsePauliDecompositionContainer.from_hdf5(group)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_hdf5(group)
+        elif container_type == "lattice":
+            container = LatticeContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported qubit operator container type: {container_type}")
         return cls(container=container)
