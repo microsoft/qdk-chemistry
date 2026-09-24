@@ -289,7 +289,10 @@ class QubitOperator(DataClass):
             The operator matrix (dense or sparse).
 
         """
-        labels = list(self.pauli_strings)
+        # Dense operators already hold a list[str]; only packed storage needs materializing.
+        labels = self.pauli_strings
+        if not isinstance(labels, list):
+            labels = list(labels)
         if sparse:
             return pauli_to_sparse_matrix(labels, self.coefficients)
         return np.asarray(pauli_to_dense_matrix(labels, self.coefficients))
