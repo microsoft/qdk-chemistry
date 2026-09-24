@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from collections.abc import Sequence
+from itertools import chain
 
 from qdk import qsharp
 
@@ -15,11 +16,41 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import CircuitMapper
 
 __all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
+
+
+def _pauli_evolution_parameters(container: PauliProductFormulaContainer) -> dict[str, object]:
+    """Lower a product formula to the sparse Q# payload.
+
+    Empty identity terms are retained so the controlled path can still apply their
+    relative phase, and repetitions stay symbolic rather than being unrolled.
+    """
+    # Higher-order formulas reuse words; convert each ordered support only once per call.
+    converted = {}
+    indices, ops, angles = [], [], []
+    for term in chain(container.beginning, container.step_terms, container.end):
+        word = tuple(term.pauli_term.items())
+        if word not in converted:
+            converted[word] = (
+                [index for index, axis in word if axis != "I"],
+                [getattr(qsharp.Pauli, axis) for _, axis in word if axis != "I"],
+            )
+        sites, axes = converted[word]
+        indices.append(sites)
+        ops.append(axes)
+        angles.append(term.angle)
+    return {
+        "pauliIndices": indices,
+        "pauliOps": ops,
+        "pauliCoefficients": angles,
+        "repetitions": container.step_reps,
+        "beginning": len(container.beginning),
+        "end": len(container.end),
+    }
 
 
 class PauliSequenceMapperSettings(Settings):

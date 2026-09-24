@@ -195,24 +195,10 @@ bilinear(j, k) is available on both forms.
       .def(
           "bilinear",
           [](const MajoranaMapping& self, std::size_t j, std::size_t k) {
-            auto [coeff, word] = self.bilinear_product(j, k);
+            auto [coeff, word] = self.bilinear(j, k);
             return py::make_tuple(coeff, word);
           },
-          py::arg("j"), py::arg("k"),
-          "Pauli image of i*gamma_j*gamma_k as (coefficient, word).\n\n"
-          "Python always receives a copy, so this is backed by "
-          "bilinear_product and therefore also works for large mappings whose "
-          "bilinear cache was skipped; unlike the C++ bilinear(), it does not "
-          "raise for uncached mappings.")
-      .def(
-          "bilinear_product",
-          [](const MajoranaMapping& self, std::size_t j, std::size_t k) {
-            auto [coeff, word] = self.bilinear_product(j, k);
-            return py::make_tuple(coeff, word);
-          },
-          py::arg("j"), py::arg("k"),
-          "Pauli image of i*gamma_j*gamma_k, computed from the Majorana table "
-          "when no precomputed cache exists.")
+          py::arg("j"), py::arg("k"))
       .def("without_tapering", &MajoranaMapping::without_tapering)
       .def("__repr__", [](const MajoranaMapping& self) {
         std::string repr = "MajoranaMapping(";
