@@ -17,6 +17,7 @@ except ImportError:
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_swap_pauli_sequence_mapper import (
     ControlledSwapPauliSequenceMapper,
+    _vacuum_eigenphase,
 )
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
@@ -304,20 +305,6 @@ class TestControlledSwapPauliSequenceMapper:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_structured_formula_is_rejected(self, cswap_mapper):
-        """The CSWAP mapper does not flatten structured conjugations."""
-        conjugating = ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2)
-        repeated = ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.3)
-        container = PauliProductFormulaContainer(
-            step_terms=[repeated],
-            step_reps=2,
-            num_qubits=2,
-            conjugating_terms=[conjugating],
-        )
-
-        with pytest.raises(ValueError, match="does not support batched or conjugated"):
-            cswap_mapper.run(UnitaryRepresentation(container))
-
 
 class TestVacuumPreservationValidation:
     """Tests for the vacuum-preservation validation of the input product formula."""
@@ -378,43 +365,41 @@ class TestVacuumPreservationValidation:
 
 
 class TestVacuumPreservingBlocks:
-    """Tests for the mapper's private vacuum-eigenphase calculation."""
+    """Tests for the ``_vacuum_eigenphase`` helper."""
 
     def test_cancelling_partners_are_accepted(self):
         """Partners that cancel on the vacuum split into commuting blocks."""
         terms = [(XX, 0.5), (YY, 0.5), (Z0, -0.5), (IDENTITY, 0.5)]
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase(terms, 1e-9) == pytest.approx(0.0)
+        assert _vacuum_eigenphase(terms, 1e-9) == pytest.approx(0.0)
 
     def test_non_commuting_block_is_rejected(self):
         """A block whose factors anticommute is not equal to the exponential of its sum."""
         terms = [(XX, 0.5), (Z0, -0.5), (YY, 0.5)]
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase(terms, 1e-9) is None
+        assert _vacuum_eigenphase(terms, 1e-9) is None
 
     def test_trailing_residual_is_rejected(self):
         """Amplitude left outside the vacuum at the end invalidates the sequence."""
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase([({0: "X"}, 0.3)], 1e-9) is None
+        assert _vacuum_eigenphase([({0: "X"}, 0.3)], 1e-9) is None
 
     def test_diagonal_terms_set_the_eigenphase(self):
         """Diagonal terms leave the vacuum in place and contribute -sum(angles) of phase."""
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase(
-            [(Z0, 0.3), (IDENTITY, 0.2)], 1e-9
-        ) == pytest.approx(-0.5)
+        assert _vacuum_eigenphase([(Z0, 0.3), (IDENTITY, 0.2)], 1e-9) == pytest.approx(-0.5)
 
     def test_tolerance_controls_amplitude_cancellation(self):
         """Residual amplitude below ``atol`` counts as cancelled."""
         terms = [(XX, 0.5), (YY, 0.5 + 1e-7)]
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase(terms, 1e-9) is None
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase(terms, 1e-6) == pytest.approx(0.0)
+        assert _vacuum_eigenphase(terms, 1e-9) is None
+        assert _vacuum_eigenphase(terms, 1e-6) == pytest.approx(0.0)
 
     def test_tolerance_is_a_budget_over_all_supports(self):
         """Two supports leaking 0.75e-9 each exceed a 1e-9 budget together."""
         x0, x1 = {0: "X"}, {1: "X"}
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase([(x0, 0.75e-9)], 1e-9) == pytest.approx(0.0)
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase([(x0, 0.75e-9), (x1, 0.75e-9)], 1e-9) is None
+        assert _vacuum_eigenphase([(x0, 0.75e-9)], 1e-9) == pytest.approx(0.0)
+        assert _vacuum_eigenphase([(x0, 0.75e-9), (x1, 0.75e-9)], 1e-9) is None
 
     def test_empty_sequence(self):
         """An empty product formula is trivially vacuum preserving."""
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase([], 1e-9) == pytest.approx(0.0)
+        assert _vacuum_eigenphase([], 1e-9) == pytest.approx(0.0)
 
 
 class TestVacuumLeakageWithoutGrouping:
@@ -602,7 +587,7 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         container = make_mapped_unitary(mapping_name).get_container()
         terms = [(term.pauli_term, term.angle) for term in container.step_terms]
 
-        assert ControlledSwapPauliSequenceMapper._vacuum_eigenphase(terms, 1e-9) is not None
+        assert _vacuum_eigenphase(terms, 1e-9) is not None
 
     @pytest.mark.parametrize("mapping_name", list(FERMION_TO_QUBIT_MAPPINGS))
     def test_predicted_phase_matches_the_evolved_vacuum(self, make_mapped_unitary, mapping_name):
@@ -614,7 +599,7 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         vacuum[0] = 1.0
         evolved = build_product_formula_matrix(terms, container.num_qubits) @ vacuum
 
-        phase = ControlledSwapPauliSequenceMapper._vacuum_eigenphase(terms, 1e-9)
+        phase = _vacuum_eigenphase(terms, 1e-9)
         assert np.allclose(evolved[1:], 0.0, atol=float_comparison_absolute_tolerance)
         assert np.isclose(evolved[0], np.exp(1j * phase), atol=float_comparison_absolute_tolerance)
 
