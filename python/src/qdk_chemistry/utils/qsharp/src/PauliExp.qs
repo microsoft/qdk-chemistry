@@ -385,29 +385,23 @@ namespace QDKChemistry.Utils.PauliExp {
         applyGroups : SparsePauliExpGroupParams[],
     }
 
-    /// Applies a direct block or a conjugation whose `within` block stays bare under control.
-    operation ConjugatedSparsePauliExp(
-        params : ConjugatedSparsePauliExpParams,
-        systems : Qubit[],
-    ) : Unit is Adj + Ctl {
-        if Length(params.withinGroups) == 0 {
-            SparsePauliExpGroups(params.applyGroups, systems);
-        } else {
-            within {
-                SparsePauliExpGroups(params.withinGroups, systems);
-            } apply {
-                SparsePauliExpGroups(params.applyGroups, systems);
-            }
-        }
-    }
-
     /// Applies one structured product-formula step.
+    /// A block with no `within` groups is applied directly; otherwise its `within` block
+    /// stays bare under control.
     operation StructuredSparsePauliExpStep(
         blocks : ConjugatedSparsePauliExpParams[],
         systems : Qubit[],
     ) : Unit is Adj + Ctl {
         for block in blocks {
-            ConjugatedSparsePauliExp(block, systems);
+            if Length(block.withinGroups) == 0 {
+                SparsePauliExpGroups(block.applyGroups, systems);
+            } else {
+                within {
+                    SparsePauliExpGroups(block.withinGroups, systems);
+                } apply {
+                    SparsePauliExpGroups(block.applyGroups, systems);
+                }
+            }
         }
     }
 
