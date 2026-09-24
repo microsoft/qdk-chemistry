@@ -10,6 +10,7 @@ target_sources(chemistry PRIVATE
     hamiltonian.cpp
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/cholesky.cpp
+    hamiltonian_containers/factorized.cpp
     hamiltonian_containers/sparse.cpp
     majorana_map_engine.cpp
     majorana_mapping.cpp
