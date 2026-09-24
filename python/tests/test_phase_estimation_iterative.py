@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     QdkIterativeQpeCircuitBuilder,
 )
@@ -19,12 +20,18 @@ from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    Configuration,
+    LatticeGraph,
+    ModelOrbitals,
     QpeResult,
     QuantumErrorProfile,
     QubitOperator,
+    StateVectorContainer,
+    Wavefunction,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -657,3 +664,59 @@ def test_iterative_qpe_builder_pairs_largest_power_with_first_iteration(
     assert recorded_powers == [2 ** (problem.num_bits - iteration - 1) for iteration in range(problem.num_bits)]
     assert recorded_powers[0] == 2 ** (problem.num_bits - 1)
     assert recorded_powers[-1] == 1
+
+
+@pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+def test_combined_iqpe_matches_per_bit_on_ising_chain(power_strategy: str) -> None:
+    """Mirror the Azure Quantum backend notebook, run on the QDK simulator.
+
+    A two-site transverse-field Ising chain with the exact eigenstate
+    ``(|00> - |11>)/sqrt(2)``. At ``t = pi/2`` every rotation is Clifford, so the
+    combined single-circuit run must reproduce the per-bit result of ``E = -1``.
+
+    Both power strategies are covered: the combined circuit takes one controlled
+    unitary per round, so it honours ``power_strategy`` just as the per-bit path does.
+    """
+    num_sites = 2
+    lattice = LatticeGraph.chain(num_sites, periodic=False)
+    hamiltonian = create_ising_hamiltonian(lattice, j=-1.0, h=1.0)
+
+    trial_state = Wavefunction(
+        StateVectorContainer(
+            np.array([1 / np.sqrt(2), -1 / np.sqrt(2)]),
+            [Configuration.from_bitstring("00"), Configuration.from_bitstring("11")],
+            ModelOrbitals(num_sites),
+        )
+    )
+    state_preparation = create("state_prep", "sparse_isometry").run(trial_state)
+
+    unitary_builder = AlgorithmRef(
+        "hamiltonian_unitary_builder", "trotter", time=float(np.pi / 2), power_strategy=power_strategy
+    )
+    circuit_mapper = AlgorithmRef("controlled_circuit_mapper", "pauli_sequence")
+
+    results = {}
+    for combine_iterations in (False, True):
+        iqpe = create(
+            "phase_estimation",
+            "qdk_iterative",
+            qpe_circuit_builder=AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_iterative",
+                num_bits=2,
+                unitary_builder=unitary_builder,
+                controlled_circuit_mapper=circuit_mapper,
+                combine_iterations=combine_iterations,
+            ),
+            circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+        )
+        results[combine_iterations] = iqpe.run(
+            state_preparation=state_preparation,
+            qubit_hamiltonian=hamiltonian,
+        )
+
+    combined, per_bit = results[True], results[False]
+    assert combined.raw_energy == pytest.approx(-1.0, abs=qpe_energy_tolerance)
+    assert combined.raw_energy == pytest.approx(per_bit.raw_energy, abs=qpe_energy_tolerance)
+    assert combined.phase_fraction == pytest.approx(0.25, abs=qpe_phase_fraction_tolerance)
+    assert list(combined.bits_msb_first) == list(per_bit.bits_msb_first)
