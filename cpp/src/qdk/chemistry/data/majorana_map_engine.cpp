@@ -45,6 +45,14 @@ constexpr std::complex<double> excitation_coeff[2][2] = {
 // words) to keep everything on the stack. The eager engine dispatches to
 // NW in {1, ..., 16}; the sparse on-demand engine uses coarse widths up to
 // 2048 words (131072 qubits).
+//
+// That 131072 figure bounds the packed Pauli width only. The practical limit
+// is lower: the one-body integrals still arrive as a dense n x n array, and
+// SparseHamiltonianContainer materializes its sparse one-body matrix into
+// dense Eigen storage, so memory grows as O(n^2) in the spatial-orbital count
+// and the one-body sweep is O(n^2) regardless of ERI sparsity. Around 65536
+// spatial orbitals that array alone is ~32 GiB. Propagating sparse one-body
+// data would be needed to make the packed-width limit reachable in practice.
 
 template <std::size_t NW>
 struct PackedPauliWord {
