@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from contextlib import contextmanager
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -14,10 +13,6 @@ from qdk_chemistry.data import (
     Circuit,
     QubitOperator,
     Settings,
-    UnitaryRepresentation,
-)
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    PauliProductFormulaContainer,
 )
 
 __all__: list[str] = [
@@ -73,8 +68,6 @@ class QpeCircuitBuilder(Algorithm):
         super().__init__()
         self._settings = QpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
-        self._shared_base_unitary: UnitaryRepresentation | None = None
-        self._share_base_unitary = False
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if controlled_circuit_mapper is not None:
@@ -121,70 +114,14 @@ class QpeCircuitBuilder(Algorithm):
             of ancilla qubits used by the unitary beyond the system qubits.
 
         """
-        unitary_rep = self._powered_unitary(qubit_hamiltonian, power)
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder.settings().update("power", power)
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
         num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
         return circuit, num_ancilla_qubits
-
-    @contextmanager
-    def _shared_unitary_scope(self):
-        """Let the controlled builds inside the block share one base-power unitary."""
-        previous_flag, previous_rep = self._share_base_unitary, self._shared_base_unitary
-        self._share_base_unitary, self._shared_base_unitary = True, None
-        try:
-            yield
-        finally:
-            self._share_base_unitary, self._shared_base_unitary = previous_flag, previous_rep
-
-    def _powered_unitary(self, qubit_hamiltonian: QubitOperator, power: int) -> UnitaryRepresentation:
-        r"""Return :math:`U^{\\text{power}}`, reusing a shared base step where that is exact.
-
-        A ``"repeat"`` power strategy leaves the evolution time, and therefore every
-        Pauli angle, untouched; the power enters only as a step-repetition count. Inside
-        a :meth:`_shared_unitary_scope` the decomposition is then built once and each
-        power is served by rescaling ``step_reps``, which avoids repeating identical
-        work for every phase-estimation bit.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            power: The power to which the unitary should be raised.
-
-        Returns:
-            The unitary representation for the requested power.
-
-        """
-        unitary_builder = self._create_nested("unitary_builder")
-        settings = unitary_builder.settings()
-        repeats_fixed_step = settings.has("power_strategy") and settings.get("power_strategy") == "repeat"
-
-        if not self._share_base_unitary or not repeats_fixed_step:
-            settings.update("power", power)
-            return unitary_builder.run(qubit_hamiltonian)
-
-        if self._shared_base_unitary is None:
-            settings.update("power", 1)
-            base_unitary = unitary_builder.run(qubit_hamiltonian)
-            if not isinstance(base_unitary.get_container(), PauliProductFormulaContainer):
-                self._share_base_unitary = False
-                settings.update("power", power)
-                return unitary_builder.run(qubit_hamiltonian)
-            self._shared_base_unitary = base_unitary
-
-        if power == 1:
-            return self._shared_base_unitary
-
-        container = self._shared_base_unitary.get_container()
-        return UnitaryRepresentation(
-            container=PauliProductFormulaContainer(
-                step_terms=container.step_terms,
-                step_reps=container.step_reps * power,
-                num_qubits=container.num_qubits,
-                scale=container.scale,
-                conjugating_terms=container.conjugating_terms,
-            )
-        )
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
