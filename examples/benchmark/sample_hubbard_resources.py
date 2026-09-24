@@ -207,7 +207,7 @@ def run_sampling(
             ),
         )
         # Matches the Holevo spread used to size base_time above.
-        circuit_builder.settings().set("phase_window", "sine")
+        circuit_builder.settings().set("phase_state", "sine")
         with use_qsharp_context(context):
             state_prep = identity_state_prep(num_qubits=num_qubits)
             circuit = circuit_builder.run(state_prep, operator)[0]

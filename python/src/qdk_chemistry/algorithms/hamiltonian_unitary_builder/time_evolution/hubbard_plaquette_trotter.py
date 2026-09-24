@@ -52,24 +52,21 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
-    "PlaquetteTrotter",
-    "PlaquetteTrotterSettings",
+    "HubbardPlaquetteTrotter",
+    "HubbardPlaquetteTrotterSettings",
 ]
 
 
-class PlaquetteTrotter(Trotter):
+class HubbardPlaquetteTrotter(Trotter):
     """Build a second-order product formula from exact plaquette evolutions.
 
     The builder takes a :class:`~qdk_chemistry.data.QubitOperator` wrapping a
     :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`, which
-    carries the lattice geometry and its two-dimensional shape. The model parameters
-    ``t``, ``U``, and ``epsilon`` are settings, so the same lattice can be evolved under
-    different couplings without rebuilding the operator.
+    carries the lattice geometry. The model parameters
+    ``t``, ``U``, and ``epsilon`` are settings.
 
     :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g` are derived from the lattice bonds and
-    those settings, constructing the Jordan-Wigner image analytically rather than
-    enumerating Pauli terms, whose count grows with the lattice. An operator backed by
-    any other container is rejected.
+    construct the Jordan-Wigner image.
 
     Note:
         This expects a periodic square lattice whose sides are even and either both at
@@ -115,7 +112,7 @@ class PlaquetteTrotter(Trotter):
 
         """
         if order != 2:
-            raise ValueError(f"PlaquetteTrotter supports order 2 only, got {order}.")
+            raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
         super().__init__(
             order,
             time=time,
@@ -126,7 +123,7 @@ class PlaquetteTrotter(Trotter):
             power=power,
             power_strategy=power_strategy,
         )
-        settings = PlaquetteTrotterSettings()
+        settings = HubbardPlaquetteTrotterSettings()
         settings.set("time", time)
         settings.set("power", power)
         settings.set("power_strategy", power_strategy)
@@ -162,20 +159,20 @@ class PlaquetteTrotter(Trotter):
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
-            raise TypeError("PlaquetteTrotter requires a QubitOperator containing a LatticeContainer")
+            raise TypeError("HubbardPlaquetteTrotter requires a QubitOperator containing a LatticeContainer")
         container = qubit_hamiltonian.get_container()
         if not isinstance(container, LatticeContainer):
             raise TypeError(
-                f"PlaquetteTrotter requires a QubitOperator containing a LatticeContainer, but the "
+                f"HubbardPlaquetteTrotter requires a QubitOperator containing a LatticeContainer, but the "
                 f"operator wraps a {container.type!r} container. Build it with "
                 f"QubitOperator(container=LatticeContainer(LatticeGraph.square(width, height)))."
             )
         dims = tuple(int(d) for d in container.lattice.dims)
         if len(dims) != 2:
             raise ValueError(
-                f"PlaquetteTrotter tiles a two-dimensional lattice, but the lattice reports "
+                f"HubbardPlaquetteTrotter tiles a two-dimensional lattice, but the lattice reports "
                 f"{list(dims) or 'no'} generating extents. Build it from "
-                "LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)."
+                "LatticeGraph.square(width, height)."
             )
         width, height = dims
         return container.lattice, width, height
@@ -211,7 +208,7 @@ class PlaquetteTrotter(Trotter):
         order = self._settings.get("order")
         if order != 2:
             raise NotImplementedError(
-                f"PlaquetteTrotter supports order 2 only, got {order}. Campbell's W_PLAQ is a "
+                f"HubbardPlaquetteTrotter supports order 2 only, got {order}. Campbell's W_PLAQ is a "
                 "second-order constant and would understate a first-order product's error."
             )
         atol = self._settings.get("weight_threshold")
@@ -300,7 +297,7 @@ class PlaquetteTrotter(Trotter):
             if abs(pair_z) > atol:
                 terms.append(ExponentiatedPauliTerm(pauli_term={site: "Z", site + num_sites: "Z"}, angle=pair_z))
 
-        Logger.debug(f"PlaquetteTrotter: U={interaction}, epsilon={epsilon}, {len(terms)} on-site terms.")
+        Logger.debug(f"HubbardPlaquetteTrotter: U={interaction}, epsilon={epsilon}, {len(terms)} on-site terms.")
         return terms, identity_angle if abs(identity_angle) > atol else 0.0
 
     def _uniform_hopping(self, lattice, atol: float) -> tuple[float, set[frozenset[int]]]:
@@ -333,12 +330,12 @@ class PlaquetteTrotter(Trotter):
             raise ValueError("The lattice carries no bonds; nothing to tile into plaquettes.")
         if len(weights) > 1:
             raise ValueError(
-                f"PlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
+                f"HubbardPlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
                 f"{len(weights)} distinct edge weights: {sorted(weights)}."
             )
 
         hopping = float(self._settings.get("t")) * next(iter(weights))
-        Logger.debug(f"PlaquetteTrotter: hopping t={hopping} over {len(bonds)} bonds per spin.")
+        Logger.debug(f"HubbardPlaquetteTrotter: hopping t={hopping} over {len(bonds)} bonds per spin.")
         return hopping, bonds
 
     @staticmethod
@@ -468,7 +465,7 @@ class PlaquetteTrotter(Trotter):
         else:
             max_step_size = math.sqrt(target_accuracy / w_plaquette)
             automatic = max(1, math.ceil(abs(time) / max_step_size))
-        Logger.debug(f"PlaquetteTrotter: bound gives r={automatic}, manual is {manual}.")
+        Logger.debug(f"HubbardPlaquetteTrotter: bound gives r={automatic}, manual is {manual}.")
         return max(manual, automatic)
 
     @staticmethod
@@ -627,7 +624,7 @@ class PlaquetteTrotter(Trotter):
         return batched + loose
 
 
-class PlaquetteTrotterSettings(TrotterSettings):
+class HubbardPlaquetteTrotterSettings(TrotterSettings):
     """Settings for the plaquette Trotter builder."""
 
     def __init__(self):

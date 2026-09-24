@@ -14,8 +14,8 @@ import pytest
 import scipy
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquette_trotter import (
-    PlaquetteTrotter,
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
+    HubbardPlaquetteTrotter,
 )
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import (
@@ -42,7 +42,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context
 def _lattice_operator(width: int, height: int) -> QubitOperator:
     """Return the periodic square lattice as a lattice-backed qubit operator.
 
-    This is what :class:`PlaquetteTrotter` consumes; the model parameters are settings,
+    This is what :class:`HubbardPlaquetteTrotter` consumes; the model parameters are settings,
     so the geometry alone defines the operator.
     """
     lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
@@ -65,7 +65,7 @@ class TestPlaquetteTrotterConfiguration:
         """An explicit division count controls the repeated formula when auto sizing is disabled."""
         operator = _lattice_operator(2, 2)
         container = (
-            PlaquetteTrotter(
+            HubbardPlaquetteTrotter(
                 t=1.0,
                 U=4.0,
                 order=2,
@@ -83,14 +83,14 @@ class TestPlaquetteTrotterConfiguration:
     def test_rejects_unsupported_order(self, order):
         """The plaquette error bound and decomposition are second order only."""
         with pytest.raises(ValueError, match="order 2 only"):
-            PlaquetteTrotter(order=order)
+            HubbardPlaquetteTrotter(order=order)
 
     def test_rejects_a_lattice_that_does_not_tile(self):
         """Open boundaries leave bonds the periodic plaquette tiling cannot cover."""
         open_lattice = QubitOperator(
             container=LatticeContainer(LatticeGraph.square(4, 4, periodic_x=False, periodic_y=False))
         )
-        builder = PlaquetteTrotter(t=1.0, U=4.0, order=2, time=0.05, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(t=1.0, U=4.0, order=2, time=0.05, num_divisions=1)
 
         with pytest.raises(ValueError, match="bond graph does not match"):
             builder.run(open_lattice)
@@ -98,14 +98,14 @@ class TestPlaquetteTrotterConfiguration:
     def test_rejects_a_one_dimensional_lattice(self):
         """A chain records a single extent, so there is no second dimension to tile."""
         chain = QubitOperator(container=LatticeContainer(LatticeGraph.chain(8, periodic=True)))
-        builder = PlaquetteTrotter(t=1.0, U=4.0, order=2, time=0.05, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(t=1.0, U=4.0, order=2, time=0.05, num_divisions=1)
 
         with pytest.raises(ValueError, match="two-dimensional lattice"):
             builder.run(chain)
 
     def test_rejects_a_mapped_qubit_operator(self):
         """The tiling needs the lattice structure, which the mapped operator discards."""
-        builder = PlaquetteTrotter(t=1.0, U=4.0, order=2, time=0.05, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(t=1.0, U=4.0, order=2, time=0.05, num_divisions=1)
 
         with pytest.raises(TypeError, match="LatticeContainer"):
             builder.run(_hubbard_operator(2, 2, interaction=4.0))
@@ -127,7 +127,7 @@ def _resolve_divisions(
     side: int = 8,
 ) -> int:
     """Resolve a division count for representative uniform Hubbard parameters."""
-    builder = PlaquetteTrotter(
+    builder = HubbardPlaquetteTrotter(
         t=1.0,
         U=4.0,
         time=time,
@@ -224,7 +224,7 @@ class TestPlaquetteTrotterDecomposition:
     def test_sections_partition_the_periodic_lattice(self, shape):
         """The two vertex-disjoint sections cover each periodic bond exactly once."""
         width, height = shape
-        sections = PlaquetteTrotter._plaquette_sections(width, height)
+        sections = HubbardPlaquetteTrotter._plaquette_sections(width, height)
         bonds: list[frozenset[int]] = []
         for section in sections:
             seen: set[int] = set()
@@ -240,7 +240,7 @@ class TestPlaquetteTrotterDecomposition:
         """The emitted basis change and phases reproduce one hopping cycle."""
         num_modes = 6
         time = 0.37
-        layer = PlaquetteTrotter()._hop_layer([sites], num_sites=num_modes, hopping=1.0, time=time)
+        layer = HubbardPlaquetteTrotter()._hop_layer([sites], num_sites=num_modes, hopping=1.0, time=time)
         assert layer is not None
         spin_up_terms = [term for term in _expand_terms([layer]) if all(qubit < num_modes for qubit in term.pauli_term)]
 
@@ -272,7 +272,7 @@ class TestPlaquetteTrotterDecomposition:
         exchange are batched through Hamming weight registers and cost far less.
         """
         container = (
-            PlaquetteTrotter(
+            HubbardPlaquetteTrotter(
                 t=1.0,
                 U=4.0,
                 time=0.15,
@@ -410,7 +410,7 @@ class TestHammingWeightPhasing:
         shapes = {}
         for cap in (0, side * side // 2):
             container = (
-                PlaquetteTrotter(
+                HubbardPlaquetteTrotter(
                     t=1.0,
                     U=8.0,
                     time=0.05,
@@ -438,7 +438,7 @@ class TestPlaquetteTrotterBasisStates:
         time = 0.29
         operator = _hubbard_operator(side, side, interaction=0.0)
         container = (
-            PlaquetteTrotter(
+            HubbardPlaquetteTrotter(
                 t=1.0,
                 U=0.0,
                 time=time,
