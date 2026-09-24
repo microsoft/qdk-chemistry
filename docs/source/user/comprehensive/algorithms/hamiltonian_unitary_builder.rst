@@ -27,25 +27,11 @@ The ``run`` method returns a :class:`~qdk_chemistry.data.UnitaryRepresentation` 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` accepts either of two
-input forms:
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
 QubitOperator
    A :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian.
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
-   Every builder accepts this form.
-
-Hamiltonian
-   An unmapped lattice :class:`~qdk_chemistry.data.Hamiltonian`, such as the one
-   :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian` builds from a
-   :class:`~qdk_chemistry.data.LatticeGraph`. It carries the lattice connectivity together with the model
-   parameters, so a lattice-aware builder can read the hopping and interaction directly and skip the
-   fermion-to-qubit mapping altogether.
-
-   Only builders whose
-   :meth:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder.accepts_lattice` returns ``True``
-   understand this form; currently that is the :ref:`plaquette <plaquette-builder>` builder. Any other
-   builder raises a :class:`TypeError` explaining that the Hamiltonian must be mapped to qubits first.
 
 .. rubric:: Creating a builder
 
@@ -225,33 +211,10 @@ Equal-angle diagonal phases are marked as batches for mappers that support
 Hamming-weight phasing, reducing synthesized rotations at the cost of ancillas.
 
 .. note::
-   This implementation requires a uniform Fermi-Hubbard model on a periodic square lattice.
-   Both side lengths must be even, and either both at least four or exactly ``2x2``. The 2x2
-   torus is a single four-cycle, so it is tiled by one plaquette and its second section is empty.
-   A :class:`~qdk_chemistry.data.QubitOperator` input must additionally be Jordan-Wigner encoded
-   and spin-blocked.
-
-.. rubric:: Lattice input
-
-This builder also accepts an unmapped lattice :class:`~qdk_chemistry.data.Hamiltonian`, reading the
-hopping and on-site interaction straight from its one- and two-body integrals::
-
-    from qdk_chemistry.algorithms import registry
-    from qdk_chemistry.data import LatticeGraph
-    from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
-
-    lattice = LatticeGraph.square(4, 4, periodic_x=True, periodic_y=True)
-    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=4.0)
-
-    plaquette = registry.create("hamiltonian_unitary_builder", "plaquette")
-    plaquette.settings().update(
-        {"time": 1.0, "num_divisions": 1, "lattice_width": 4, "lattice_height": 4}
-    )
-    unitary = plaquette.run(hamiltonian)
-
-This produces exactly the same product formula as mapping the Hamiltonian to a
-:class:`~qdk_chemistry.data.QubitOperator` first, but avoids the cost of the mapping. The declared
-``lattice_width`` and ``lattice_height`` are still required, since they fix the plaquette tiling.
+   This implementation requires a Jordan-Wigner encoded, spin-blocked, uniform
+   Fermi-Hubbard model on a periodic square lattice. Both side lengths must be even,
+   and either both at least four or exactly ``2x2``. The 2x2 torus is a single
+   four-cycle, so it is tiled by one plaquette and its second section is empty.
 
 .. rubric:: Settings
 
@@ -485,7 +448,6 @@ Related classes
 
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
 - :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
-- :class:`~qdk_chemistry.data.Hamiltonian`: Input lattice Hamiltonian, accepted by lattice-aware builders
 - :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading
