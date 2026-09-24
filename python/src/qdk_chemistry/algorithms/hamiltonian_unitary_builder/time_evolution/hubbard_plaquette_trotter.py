@@ -203,6 +203,7 @@ class HubbardPlaquetteTrotter(Trotter):
 
         Raises:
             NotImplementedError: If the configured Trotter order is not 2.
+            ValueError: If the lattice's bonds do not match a periodic square tiling.
 
         """
         order = self._settings.get("order")
@@ -214,15 +215,43 @@ class HubbardPlaquetteTrotter(Trotter):
         atol = self._settings.get("weight_threshold")
         max_batch = self._settings.get("max_batch")
 
-        # 1. Geometry, and the on-site layer it implies.
+        # 1. Geometry, and the on-site layer it implies. With spin-blocked modes
+        # (spin-up 0..n-1, spin-down n..2n-1) and n_p = (I - Z_p)/2, site i with on-site
+        # energy eps and interaction U contributes
+        #     eps (n_up + n_dn) + U n_up n_dn
+        #       = (eps + U/4) I - (eps/2 + U/4) (Z_i + Z_{i+n}) + (U/4) Z_i Z_{i+n},
+        # so the particle-hole-shifted choice eps = -U/2 cancels the single-qubit terms
+        # and leaves one equal-angle Z_i Z_{i+n} family. Angles are per unit time.
         lattice, width, height = self._lattice_geometry(qubit_hamiltonian)
         num_sites = width * height
-        diagonal, identity_angle = self._diagonal_terms(num_sites, atol)
+        interaction = float(self._settings.get("U"))
+        epsilon = float(self._settings.get("epsilon"))
+        single_z = -(0.5 * epsilon + 0.25 * interaction)
+        pair_z = 0.25 * interaction
+        identity_angle = (epsilon + 0.25 * interaction) * num_sites
+        diagonal: list[ExponentiatedPauliTerm] = []
+        for site in range(num_sites):
+            if abs(single_z) > atol:
+                diagonal.append(ExponentiatedPauliTerm(pauli_term={site: "Z"}, angle=single_z))
+                diagonal.append(ExponentiatedPauliTerm(pauli_term={site + num_sites: "Z"}, angle=single_z))
+            if abs(pair_z) > atol:
+                diagonal.append(
+                    ExponentiatedPauliTerm(pauli_term={site: "Z", site + num_sites: "Z"}, angle=pair_z)
+                )
+        if abs(identity_angle) <= atol:
+            identity_angle = 0.0
 
         # 2. Hopping amplitude and the two vertex-disjoint tilings covering every bond.
         hopping, bonds = self._uniform_hopping(lattice, atol)
         pink, gold = self._plaquette_sections(width, height)
-        self._check_tiling(bonds, pink, gold, width, height)
+        tiled = {frozenset((cycle[i], cycle[(i + 1) % 4])) for cycle in pink + gold for i in range(4)}
+        if bonds != tiled:
+            raise ValueError(
+                f"The lattice's bond graph does not match a periodic {width}x{height} "
+                f"square lattice: {len(tiled - bonds)} lattice bond(s) absent from the graph and "
+                f"{len(bonds - tiled)} graph bond(s) outside the tiling. Check the lattice "
+                "dimensions, the boundary conditions, and that sites are numbered row-major."
+            )
 
         # 3. Step count, reusing the hopping amplitude resolved above.
         time, power_repetitions = self._resolve_power()
@@ -256,49 +285,6 @@ class HubbardPlaquetteTrotter(Trotter):
                 conjugating_terms=[opening] if opening is not None else [],
             )
         )
-
-    def _diagonal_terms(self, num_sites: int, atol: float) -> tuple[list[ExponentiatedPauliTerm], float]:
-        r"""Return the on-site layer the model settings imply, scaled to unit time.
-
-        The Jordan-Wigner image is constructed analytically rather than by mapping an
-        operator. With spin-blocked modes (spin-up ``0..n-1``, spin-down ``n..2n-1``) and
-        :math:`n_p = (I - Z_p)/2`, site :math:`i` with on-site energy :math:`\epsilon` and
-        interaction :math:`U` contributes
-
-        .. math::
-            \epsilon (n_{i\uparrow} + n_{i\downarrow}) + U n_{i\uparrow} n_{i\downarrow}
-            = \Bigl(\epsilon + \tfrac{U}{4}\Bigr) I
-            - \Bigl(\tfrac{\epsilon}{2} + \tfrac{U}{4}\Bigr) (Z_i + Z_{i+n})
-            + \tfrac{U}{4} Z_i Z_{i+n},
-
-        so the particle-hole-shifted choice :math:`\epsilon = -U/2` cancels the
-        single-qubit terms and leaves one equal-angle :math:`Z_i Z_{i+n}` family.
-
-        Args:
-            num_sites: Number of lattice sites.
-            atol: Threshold below which coefficients are dropped.
-
-        Returns:
-            The non-identity on-site terms, and the scalar phase angle per unit time.
-
-        """
-        interaction = float(self._settings.get("U"))
-        epsilon = float(self._settings.get("epsilon"))
-
-        single_z = -(0.5 * epsilon + 0.25 * interaction)
-        pair_z = 0.25 * interaction
-        identity_angle = (epsilon + 0.25 * interaction) * num_sites
-
-        terms: list[ExponentiatedPauliTerm] = []
-        for site in range(num_sites):
-            if abs(single_z) > atol:
-                terms.append(ExponentiatedPauliTerm(pauli_term={site: "Z"}, angle=single_z))
-                terms.append(ExponentiatedPauliTerm(pauli_term={site + num_sites: "Z"}, angle=single_z))
-            if abs(pair_z) > atol:
-                terms.append(ExponentiatedPauliTerm(pauli_term={site: "Z", site + num_sites: "Z"}, angle=pair_z))
-
-        Logger.debug(f"HubbardPlaquetteTrotter: U={interaction}, epsilon={epsilon}, {len(terms)} on-site terms.")
-        return terms, identity_angle if abs(identity_angle) > atol else 0.0
 
     def _uniform_hopping(self, lattice, atol: float) -> tuple[float, set[frozenset[int]]]:
         """Return the uniform hopping amplitude and the lattice's bonds.
@@ -337,36 +323,6 @@ class HubbardPlaquetteTrotter(Trotter):
         hopping = float(self._settings.get("t")) * next(iter(weights))
         Logger.debug(f"HubbardPlaquetteTrotter: hopping t={hopping} over {len(bonds)} bonds per spin.")
         return hopping, bonds
-
-    @staticmethod
-    def _check_tiling(
-        bonds: set[frozenset[int]],
-        pink: list[tuple[int, ...]],
-        gold: list[tuple[int, ...]],
-        width: int,
-        height: int,
-    ) -> None:
-        """Check that the two tilings cover exactly the lattice's bonds.
-
-        Args:
-            bonds: Bonds observed on the lattice.
-            pink: The pink tiling's four-cycles.
-            gold: The gold tiling's four-cycles.
-            width: Number of lattice columns.
-            height: Number of lattice rows.
-
-        Raises:
-            ValueError: If the tilings and the lattice disagree on any bond.
-
-        """
-        tiled = {frozenset((cycle[i], cycle[(i + 1) % 4])) for cycle in pink + gold for i in range(4)}
-        if bonds != tiled:
-            raise ValueError(
-                f"The lattice's bond graph does not match a periodic {width}x{height} "
-                f"square lattice: {len(tiled - bonds)} lattice bond(s) absent from the graph and "
-                f"{len(bonds - tiled)} graph bond(s) outside the tiling. Check the lattice "
-                "dimensions, the boundary conditions, and that sites are numbered row-major."
-            )
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Return the step count the builder would use for this operator and duration.
