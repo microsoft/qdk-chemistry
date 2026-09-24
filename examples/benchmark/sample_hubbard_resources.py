@@ -63,9 +63,6 @@ QPE_BUDGET_FRACTION = 2.0 / 3.0
 # Plaquette Trotter order.
 TROTTER_ORDER = 2
 
-#: Largest Hamming-weight phasing batch; zero keeps batching unbounded.
-HWP_MAX_BATCH = 0
-
 
 def traced_step_counts(context, operator, step_time: float, size: int, num_divisions: int):
     """Return logical counts for a controlled evolution of ``num_divisions`` Trotter steps.
@@ -88,13 +85,11 @@ def traced_step_counts(context, operator, step_time: float, size: int, num_divis
             order=TROTTER_ORDER,
             time=step_time * num_divisions,
             t=HOPPING_T,
-
             U=U_OVER_T * HOPPING_T,
-            max_batch=HWP_MAX_BATCH,
             num_divisions=num_divisions,
             target_accuracy=0.0,
         ).run(operator)
-        circuit = create("controlled_circuit_mapper", "pauli_sequence").run(unitary)
+        circuit = create("controlled_circuit_mapper", "hubbard_plaquette").run(unitary)
         application = circuit.get_qre_application()
         return dict(
             get_qsharp_context().logical_counts(application.entry_expr, *application.args)
@@ -151,9 +146,7 @@ def run_sampling(
             order=TROTTER_ORDER,
             time=evolution_time,
             t=HOPPING_T,
-
             U=U_OVER_T * HOPPING_T,
-            max_batch=HWP_MAX_BATCH,
             **trotter_settings,
         )
         steps_per_bit.append(builder._resolve_num_divisions(operator, evolution_time))
@@ -190,9 +183,7 @@ def run_sampling(
             order=TROTTER_ORDER,
             time=base_time,
             t=HOPPING_T,
-
             U=U_OVER_T * HOPPING_T,
-            max_batch=HWP_MAX_BATCH,
             # Bit k evolves for base_time * 2^k rather than repeating the block 2^k times.
             power_strategy="rescale",
             **trotter_settings,
@@ -203,7 +194,7 @@ def run_sampling(
             num_bits=resolution_bits,
             unitary_builder=unitary_builder,
             controlled_circuit_mapper=AlgorithmRef(
-                "controlled_circuit_mapper", "pauli_sequence"
+                "controlled_circuit_mapper", "hubbard_plaquette"
             ),
         )
         # Matches the Holevo spread used to size base_time above.
@@ -240,8 +231,6 @@ def run_sampling(
                     if one_step_scaled
                     else "standard-full-circuit"
                 ),
-                "hwp_enabled": HWP_MAX_BATCH != 1,
-                "hwp_max_batch": HWP_MAX_BATCH,
                 "trotter_steps_per_qpe_bit": str(steps_per_bit),
                 "one_trotter_step_time": step_time,
                 "one_trotter_step_ccz_count": step_ccz_count,

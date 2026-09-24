@@ -11,10 +11,7 @@ from qdk import qsharp
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    ExponentiatedPauliTerm,
-    PauliProductFormulaContainer,
-)
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
@@ -187,7 +184,6 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         Raises:
             ValueError: If the unitary container type is not supported.
-            ValueError: If the product formula contains batched or conjugated terms.
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
 
@@ -197,13 +193,6 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             raise ValueError(
                 f"The {unitary.get_container_type()} container type is not supported. "
                 "ControlledSwapPauliSequenceMapper only supports PauliProductFormula container for the unitary."
-            )
-        if unitary_container.conjugating_terms or any(
-            not isinstance(term, ExponentiatedPauliTerm) for term in unitary_container.step_terms
-        ):
-            raise ValueError(
-                "ControlledSwapPauliSequenceMapper does not support batched or conjugated product formulas; "
-                "use the controlled pauli_sequence mapper for structured evolution."
             )
 
         control_indices = self._get_control_indices()
