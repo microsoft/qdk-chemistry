@@ -128,11 +128,13 @@ LatticeGraph::LatticeGraph(
 }
 
 LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                           std::optional<EdgeColoring> coloring)
+                           std::optional<EdgeColoring> coloring,
+                           std::vector<std::uint64_t> dims)
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
       _is_symmetric(_check_symmetry(adjacency_)),
-      _edge_coloring(std::move(coloring)) {
+      _edge_coloring(std::move(coloring)),
+      _dims(std::move(dims)) {
 #ifndef NDEBUG
   if (_edge_coloring.has_value()) {
     // Verify every edge in the coloring exists in the adjacency matrix.
@@ -189,6 +191,8 @@ LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
 }
 
 std::uint64_t LatticeGraph::num_sites() const { return _num_sites; }
+
+const std::vector<std::uint64_t>& LatticeGraph::dims() const { return _dims; }
 
 const Eigen::SparseMatrix<double>& LatticeGraph::sparse_adjacency_matrix()
     const {
@@ -249,7 +253,7 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph g(std::move(adj),
-                 chain_coloring(static_cast<std::int64_t>(N), periodic));
+                 chain_coloring(static_cast<std::int64_t>(N), periodic), {n});
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -308,7 +312,7 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph g(std::move(adj),
-                 square_coloring(Nx, Ny, periodic_x, periodic_y));
+                 square_coloring(Nx, Ny, periodic_x, periodic_y), {nx, ny});
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -379,7 +383,8 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   adj.makeCompressed();
   // No known deterministic coloring for triangular lattices with arbitrary
   // periodic boundaries; use greedy with multiple trials instead.
-  LatticeGraph g(std::move(adj), greedy_edge_coloring(adj, coloring_seed, 32));
+  LatticeGraph g(std::move(adj), greedy_edge_coloring(adj, coloring_seed, 32),
+                 {nx, ny});
   if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
@@ -443,7 +448,8 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   return LatticeGraph(std::move(adj),
-                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y));
+                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y),
+                      {nx, ny});
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -518,7 +524,7 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   return LatticeGraph(std::move(adj),
-                      greedy_edge_coloring(adj, coloring_seed, 32));
+                      greedy_edge_coloring(adj, coloring_seed, 32), {nx, ny});
 }
 
 namespace detail {
@@ -773,6 +779,7 @@ nlohmann::json LatticeGraph::to_json() const {
   j["num_sites"] = _num_sites;
   j["is_symmetric"] = _is_symmetric;
   j["adjacency_sparse"] = edges;
+  j["dims"] = _dims;
 
   if (_edge_coloring.has_value()) {
     nlohmann::json coloring_json = nlohmann::json::array();
@@ -814,6 +821,15 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
     H5::Attribute sym_attr = group.createAttribute(
         "is_symmetric", H5::PredType::NATIVE_HBOOL, scalar_space);
     sym_attr.write(H5::PredType::NATIVE_HBOOL, &sym_val);
+
+    // Generating extents, when the graph came from a factory.
+    if (!_dims.empty()) {
+      hsize_t dims_extent[1] = {static_cast<hsize_t>(_dims.size())};
+      H5::DataSpace dims_space(1, dims_extent);
+      H5::DataSet dims_ds = group.createDataSet(
+          "lattice_dims", H5::PredType::NATIVE_UINT64, dims_space);
+      dims_ds.write(_dims.data(), H5::PredType::NATIVE_UINT64);
+    }
 
     // Write adjacency as sparse dataset: N x 3 (row, col, value)
     auto nnz = static_cast<hsize_t>(adjacency_.nonZeros());
@@ -945,7 +961,8 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
     coloring = std::move(c);
   }
 
-  return LatticeGraph(std::move(sparse), std::move(coloring));
+  return LatticeGraph(std::move(sparse), std::move(coloring),
+                      j.value("dims", std::vector<std::uint64_t>{}));
 }
 
 LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
@@ -1034,7 +1051,16 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
     coloring = std::move(c);
   }
 
-  return LatticeGraph(std::move(sparse), std::move(coloring));
+  std::vector<std::uint64_t> stored_dims;
+  if (group.nameExists("lattice_dims")) {
+    H5::DataSet dims_ds = group.openDataSet("lattice_dims");
+    hsize_t dims_extent[1];
+    dims_ds.getSpace().getSimpleExtentDims(dims_extent);
+    stored_dims.resize(dims_extent[0]);
+    dims_ds.read(stored_dims.data(), H5::PredType::NATIVE_UINT64);
+  }
+  return LatticeGraph(std::move(sparse), std::move(coloring),
+                      std::move(stored_dims));
 }
 
 void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
@@ -1075,7 +1101,8 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     new_coloring = std::move(coloring);
   }
 
-  return LatticeGraph(std::move(new_adj), std::move(new_coloring));
+  return LatticeGraph(std::move(new_adj), std::move(new_coloring),
+                      graph._dims);
 }
 
 }  // namespace qdk::chemistry::data

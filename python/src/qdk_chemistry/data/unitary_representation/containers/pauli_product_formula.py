@@ -5,8 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import h5py
 import numpy as np
@@ -15,7 +16,12 @@ from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash
 
 from .base import UnitaryContainer
 
-__all__ = ["ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
+__all__ = [
+    "BatchedExponentiatedPauliTerm",
+    "ConjugatedExponentiatedPauliTerm",
+    "ExponentiatedPauliTerm",
+    "PauliProductFormulaContainer",
+]
 
 
 @dataclass(frozen=True)
@@ -34,6 +40,57 @@ class ExponentiatedPauliTerm:
     """The rotation angle for the exponentiation."""
 
 
+@dataclass(frozen=True)
+class BatchedExponentiatedPauliTerm:
+    r"""Equal-angle Pauli exponentials evaluated by Hamming-weight phasing.
+
+    The operation is :math:`\prod_j e^{-i\theta P_j}`. The Pauli strings must
+    have disjoint support so their parity representatives can be accumulated in
+    one Hamming-weight register.
+    """
+
+    pauli_terms: Sequence[dict[int, str]]
+    """Pairwise-disjoint Pauli strings sharing one rotation angle."""
+
+    angle: float
+    """The common rotation angle."""
+
+    def __post_init__(self) -> None:
+        """Validate the Hamming-weight phasing invariants."""
+        if len(self.pauli_terms) < 2:
+            raise ValueError("A batched Pauli exponential requires at least two Pauli strings.")
+        support: set[int] = set()
+        for pauli_term in self.pauli_terms:
+            if not pauli_term:
+                raise ValueError("A batched Pauli exponential cannot contain the identity term.")
+            overlap = support.intersection(pauli_term)
+            if overlap:
+                raise ValueError(f"Batched Pauli exponentials must have disjoint support; overlap: {sorted(overlap)}.")
+            support.update(pauli_term)
+
+
+@dataclass(frozen=True)
+class ConjugatedExponentiatedPauliTerm:
+    r"""A structured conjugation :math:`V D V^\dagger`.
+
+    Circuit mappers lower this to Q# ``within``/``apply`` syntax. Consequently,
+    Q# controls only the ``apply`` block when the complete operation is controlled.
+    """
+
+    within_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]
+    """The factors forming :math:`V` in execution order."""
+
+    apply_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]
+    """The factors forming :math:`D` in execution order."""
+
+    def __post_init__(self) -> None:
+        """Require both sides of the conjugation to be explicit."""
+        if not self.within_terms:
+            raise ValueError("A conjugated Pauli exponential requires at least one within term.")
+        if not self.apply_terms:
+            raise ValueError("A conjugated Pauli exponential requires at least one apply term.")
+
+
 class PauliProductFormulaContainer(UnitaryContainer):
     r"""Dataclass for a Pauli product formula container.
 
@@ -45,9 +102,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
     * :math:`\theta_j` is the rotation angle for that term
     * :math:`\prod_{j \in \pi}` is a permutation defining the multiplication order
 
-    The full time-evolution unitary is:
-    :math:`U(t) \approx \left[ U_{\mathrm{step}}\!\left(\tfrac{t}{r}\right) \right]^{r}`,
-    where ``step_reps = r`` is the number of repeated steps.
+    The optional ``conjugating_terms`` represent :math:`V` in
+    :math:`V U_{\mathrm{step}}^r V^\dagger`. Circuit mappers preserve that
+    conjugation structurally so Q# controls only the repeated body.
     """
 
     @staticmethod
@@ -61,14 +118,18 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.2.0"
+    _serialization_version = "0.2.1"
 
     def __init__(
         self,
-        step_terms: list[ExponentiatedPauliTerm],
+        step_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm],
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
+        conjugating_terms: Sequence[
+            ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm
+        ]
+        | None = None,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
@@ -77,6 +138,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
+            conjugating_terms: Terms forming the one-time conjugation around the repeated step.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
@@ -89,7 +151,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
-        self.step_terms = step_terms
+        self.conjugating_terms = [] if conjugating_terms is None else list(conjugating_terms)
+        self.step_terms = list(step_terms)
         self.step_reps = int(step_reps)
         self._num_qubits = num_qubits
         self.scale = scale
@@ -108,22 +171,64 @@ class PauliProductFormulaContainer(UnitaryContainer):
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
+        Raises:
+            ValueError: If the evolution time (``scale``) is zero, so the phase carries no
+                energy information and the inversion ``E = -angle / t`` is undefined.
+
         """
+        if self.scale == 0:
+            raise ValueError(
+                "Cannot recover an eigenvalue: the evolution time (scale) is zero, so the "
+                "measured phase carries no energy information and E = -angle / t is undefined. "
+                "Build the unitary with a non-zero evolution time."
+            )
         angle = (phase_fraction % 1.0) * (2 * np.pi)
         if angle > np.pi:
             angle -= 2 * np.pi
         return float(-angle / self.scale)
 
-    def _hash_update(self, h) -> None:
+    @staticmethod
+    def _hash_pauli_term(h: Any, pauli_term: dict[int, str]) -> None:
+        """Feed one sparse Pauli string into *h*."""
+        _hash_uint(h, len(pauli_term))
+        for qubit_idx in sorted(pauli_term):
+            _hash_int(h, qubit_idx)
+            _hash_str(h, pauli_term[qubit_idx])
+
+    @classmethod
+    def _hash_groups(
+        cls,
+        h: Any,
+        terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm],
+    ) -> None:
+        """Feed a sequence of plain or batched terms into *h*."""
+        _hash_uint(h, len(terms))
+        for term in terms:
+            if isinstance(term, ExponentiatedPauliTerm):
+                _hash_str(h, "term")
+                cls._hash_pauli_term(h, term.pauli_term)
+                _hash_float(h, term.angle)
+            else:
+                _hash_str(h, "batch")
+                _hash_uint(h, len(term.pauli_terms))
+                for pauli_term in term.pauli_terms:
+                    cls._hash_pauli_term(h, pauli_term)
+                _hash_float(h, term.angle)
+
+    def _hash_update(self, h: Any) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "pauli_product_formula")
+        _hash_str(h, "conjugating")
+        self._hash_groups(h, self.conjugating_terms)
+        _hash_str(h, "step")
         _hash_uint(h, len(self.step_terms))
         for term in self.step_terms:
-            _hash_uint(h, len(term.pauli_term))
-            for qubit_idx in sorted(term.pauli_term.keys()):
-                _hash_int(h, qubit_idx)
-                _hash_str(h, term.pauli_term[qubit_idx])
-            _hash_float(h, term.angle)
+            if isinstance(term, ConjugatedExponentiatedPauliTerm):
+                _hash_str(h, "conjugated")
+                self._hash_groups(h, term.within_terms)
+                self._hash_groups(h, term.apply_terms)
+            else:
+                self._hash_groups(h, [term])
         _hash_int(h, self.step_reps)
         _hash_int(h, self._num_qubits)
         _hash_float(h, self.scale)
@@ -171,7 +276,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if set(permutation) != set(range(len(self.step_terms))):
             raise ValueError(f"Invalid permutation: must be a permutation of [0, 1, ..., {len(self.step_terms) - 1}].")
 
-        reordered_step_terms: list[ExponentiatedPauliTerm] = []
+        reordered_step_terms: list[
+            ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm
+        ] = []
         for i in permutation:
             reordered_step_terms.append(self.step_terms[i])
 
@@ -179,10 +286,12 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms=reordered_step_terms,
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
+            scale=self.scale,
+            conjugating_terms=self.conjugating_terms,
         )
 
     def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
-        """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
+        r"""Combine two Trotter evolutions, merging adjacent identical Pauli terms.
 
         The terms from ``self`` (repeated ``step_reps`` times) are followed by the
         terms from ``other_container`` (also repeated according to its
@@ -201,7 +310,20 @@ class PauliProductFormulaContainer(UnitaryContainer):
             A single ``PauliProductFormulaContainer`` representing the combined
             evolution with adjacent identical terms fused.
 
+        Raises:
+            ValueError: If the two containers act on a different number of qubits or
+                carry a different ``scale``; or if either container contains explicit
+                batching or conjugation structure, which ``combine`` cannot flatten safely.
+
         """
+        for label, container in (("self", self), ("other_container", other_container)):
+            if container.conjugating_terms or any(
+                not isinstance(term, ExponentiatedPauliTerm) for term in container.step_terms
+            ):
+                raise ValueError(
+                    f"Cannot combine: {label} contains batched or conjugated terms. "
+                    "Map structured product formulas to circuits before composing them."
+                )
         if self.num_qubits != other_container.num_qubits:
             raise ValueError(
                 f"Cannot combine PauliProductFormulaContainer instances with different "
@@ -215,20 +337,17 @@ class PauliProductFormulaContainer(UnitaryContainer):
             )
 
         merged: list[ExponentiatedPauliTerm] = []
-        for step_terms, step_reps in (
-            (self.step_terms, self.step_reps),
-            (other_container.step_terms, other_container.step_reps),
-        ):
-            for _ in range(step_reps):
-                for term in step_terms:
-                    if merged and merged[-1].pauli_term == term.pauli_term:
-                        new_angle = merged[-1].angle + term.angle
-                        if abs(new_angle) > atol:
-                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
-                        else:
-                            merged.pop()
+        for container in (self, other_container):
+            terms = cast("list[ExponentiatedPauliTerm]", container.step_terms)
+            for term in terms * container.step_reps:
+                if merged and merged[-1].pauli_term == term.pauli_term:
+                    new_angle = merged[-1].angle + term.angle
+                    if abs(new_angle) > atol:
+                        merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
                     else:
-                        merged.append(term)
+                        merged.pop()
+                else:
+                    merged.append(term)
         return PauliProductFormulaContainer(
             step_terms=merged,
             step_reps=1,
@@ -243,11 +362,14 @@ class PauliProductFormulaContainer(UnitaryContainer):
             dict: Dictionary representation of the PauliProductFormulaContainer
 
         """
+        if self.conjugating_terms or any(not isinstance(term, ExponentiatedPauliTerm) for term in self.step_terms):
+            raise ValueError("Structured Pauli product formulas cannot be serialized.")
+
+        terms = cast("list[ExponentiatedPauliTerm]", self.step_terms)
         data: dict[str, Any] = {
             "container_type": self.type,
             "step_terms": [
-                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
-                for term in self.step_terms
+                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle} for term in terms
             ],
             "step_reps": self.step_reps,
             "num_qubits": self.num_qubits,
@@ -262,6 +384,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
             group: HDF5 group or file to write data to
 
         """
+        if self.conjugating_terms or any(not isinstance(term, ExponentiatedPauliTerm) for term in self.step_terms):
+            raise ValueError("Structured Pauli product formulas cannot be serialized.")
+
+        terms = cast("list[ExponentiatedPauliTerm]", self.step_terms)
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["step_reps"] = self.step_reps
@@ -269,7 +395,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         group.attrs["scale"] = self.scale
 
         step_terms_group = group.create_group("step_terms")
-        for i, term in enumerate(self.step_terms):
+        for i, term in enumerate(terms):
             term_group = step_terms_group.create_group(f"term_{i}")
             term_group.attrs["angle"] = term.angle
             pauli_term_group = term_group.create_group("pauli_term")
@@ -288,24 +414,24 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
-        step_terms = []
+        step_terms: list[ExponentiatedPauliTerm] = []
         for i, term_data in enumerate(json_data["step_terms"]):
             pauli_term: dict[int, str] = {}
-            for k, v in term_data["pauli_term"].items():
-                if not isinstance(k, str):
-                    raise TypeError(f"step_terms[{i}].pauli_term: expected str key, got {type(k).__name__} ({k!r})")
+            for key, value in term_data["pauli_term"].items():
+                if not isinstance(key, str):
+                    raise TypeError(f"step_terms[{i}].pauli_term: expected str key, got {type(key).__name__} ({key!r})")
                 try:
-                    qubit_index = int(k)
+                    qubit_index = int(key)
                 except ValueError as exc:
                     raise ValueError(
-                        f"step_terms[{i}].pauli_term: key {k!r} is not a valid integer qubit index"
+                        f"step_terms[{i}].pauli_term: key {key!r} is not a valid integer qubit index"
                     ) from exc
-                if str(qubit_index) != k:
+                if str(qubit_index) != key:
                     raise ValueError(
-                        f"step_terms[{i}].pauli_term: key {k!r} is not a canonical integer "
+                        f"step_terms[{i}].pauli_term: key {key!r} is not a canonical integer "
                         f"(expected {str(qubit_index)!r})"
                     )
-                pauli_term[qubit_index] = v
+                pauli_term[qubit_index] = value
             step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_data["angle"]))
         step_reps = json_data["step_reps"]
         num_qubits = json_data["num_qubits"]
@@ -330,19 +456,15 @@ class PauliProductFormulaContainer(UnitaryContainer):
         cls._validate_hdf5_version(cls._serialization_version, group)
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]
-
         step_terms: list[ExponentiatedPauliTerm] = []
         step_terms_group = group["step_terms"]
-        for term_name in step_terms_group:
-            term_group = step_terms_group[term_name]
-            angle = term_group.attrs["angle"]
-            pauli_term: dict[int, str] = {}
+        for i in range(len(step_terms_group)):
+            term_group = step_terms_group[f"term_{i}"]
             pauli_term_group = term_group["pauli_term"]
-            for qubit_index_str in pauli_term_group.attrs:
-                qubit_index = int(qubit_index_str)
-                pauli_operator = pauli_term_group.attrs[qubit_index_str]
-                pauli_term[qubit_index] = pauli_operator
-            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle))
+            pauli_term = {
+                int(qubit_index): pauli_term_group.attrs[qubit_index] for qubit_index in pauli_term_group.attrs
+            }
+            step_terms.append(ExponentiatedPauliTerm(pauli_term=pauli_term, angle=term_group.attrs["angle"]))
 
         return cls(
             step_terms=step_terms,
@@ -360,6 +482,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """
         lines = ["Pauli Product Formula Container"]
         lines.append(f"  Number of qubits: {self.num_qubits}")
+        lines.append(f"  Number of conjugating terms: {len(self.conjugating_terms)}")
         lines.append(f"  Number of step terms: {len(self.step_terms)}")
         lines.append(f"  Step repetitions: {self.step_reps}")
         return "\n".join(lines)
