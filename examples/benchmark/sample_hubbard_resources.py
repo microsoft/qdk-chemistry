@@ -67,129 +67,6 @@ TROTTER_ORDER = 2
 HWP_MAX_BATCH = 0
 
 
-def target_precision(size: int) -> float:
-    """Return the ground-state energy accuracy required of an L x L lattice."""
-    return TARGET_PRECISION_PER_SITE * size * size
-
-
-def num_electrons(size: int) -> int:
-    """Return the electron count nearest the requested per-site filling."""
-    return round(FILLING * size * size)
-
-
-def error_partition(
-    energy_budget: float,
-) -> tuple[float, int, dict[str, float | int | str]]:
-    """Split the energy budget and size the QPE evolution time from the QPE share.
-
-    The total budget is divided as ``eps = eps_QPE + eps_T``. A sine-windowed register
-    of ``N = 2^bits - 1`` queries has phase spread ``tan(pi / (N + 2))``, so requiring
-    ``eps_QPE tau`` to equal that spread fixes the base evolution time. The remainder is
-    handed to the plaquette builder, which sizes its own step count against it.
-
-    Eqn. 8 in https://arxiv.org/pdf/2609.05316.
-
-    Args:
-        energy_budget: Total ground-state energy accuracy required.
-
-    Returns:
-        Base evolution time, precision bits, and builder settings carrying the Trotter
-        share of the budget as ``target_accuracy``.
-
-    """
-    qpe_budget = QPE_BUDGET_FRACTION * energy_budget
-    trotter_budget = energy_budget - qpe_budget
-    num_queries = 2**QPE_PRECISION_BITS - 1
-    base_time = math.tan(math.pi / (num_queries + 2)) / qpe_budget
-
-    return base_time, QPE_PRECISION_BITS, {"target_accuracy": trotter_budget}
-
-
-def resolve_num_divisions(
-    operator,
-    evolution_time: float,
-    trotter_settings: dict[str, float | int | str],
-    size: int,
-) -> int:
-    """Return the Trotter step count the plaquette builder derives from its settings.
-
-    Args:
-        operator: The qubit Hamiltonian.
-        evolution_time: Base Hamiltonian evolution time.
-        trotter_settings: Builder settings containing target_accuracy or num_divisions.
-        size: Lattice side length.
-
-    Returns:
-        The step count the builder will use, which is the larger of the explicit
-        num_divisions and the value its error bound derives from target_accuracy.
-
-    """
-    builder = create(
-        "hamiltonian_unitary_builder",
-        "plaquette",
-        order=TROTTER_ORDER,
-        time=evolution_time,
-        lattice_width=size,
-        lattice_height=size,
-        max_batch=HWP_MAX_BATCH,
-        **trotter_settings,
-    )
-    return builder._resolve_num_divisions(operator, evolution_time)
-
-
-def full_qpe_circuit(
-    context,
-    operator,
-    base_time: float,
-    resolution_bits: int,
-    trotter_settings: dict[str, float | int | str],
-    size: int,
-):
-    """Return the whole standard QPE circuit over an identity reference state.
-
-    The phase register, the controlled-U ladder, and the inverse QFT are all materialized,
-    so the counts describe the algorithm rather than an extrapolated step.
-
-    Args:
-        context: Q# context to build in.
-        operator: The qubit Hamiltonian.
-        base_time: Evolution time controlled by the least significant phase bit.
-        resolution_bits: Number of phase-register qubits.
-        trotter_settings: Builder settings carrying the Trotter share of the budget.
-        size: Lattice side length.
-
-    Returns:
-        The standard QPE circuit.
-
-    """
-    unitary_builder = AlgorithmRef(
-        "hamiltonian_unitary_builder",
-        "plaquette",
-        order=TROTTER_ORDER,
-        time=base_time,
-        lattice_width=size,
-        lattice_height=size,
-        max_batch=HWP_MAX_BATCH,
-        # Bit k evolves for base_time * 2^k rather than repeating the block 2^k times.
-        power_strategy="rescale",
-        **trotter_settings,
-    )
-    circuit_builder = create(
-        "qpe_circuit_builder",
-        "qdk_standard",
-        num_bits=resolution_bits,
-        unitary_builder=unitary_builder,
-        controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper", "pauli_sequence"
-        ),
-    )
-    # Matches the Holevo spread error_partition used to size base_time.
-    circuit_builder.settings().set("phase_window", "sine")
-    with use_qsharp_context(context):
-        state_prep = identity_state_prep(num_qubits=operator.num_qubits)
-        return circuit_builder.run(state_prep, operator)[0]
-
-
 def traced_step_counts(context, operator, step_time: float, size: int, num_divisions: int):
     """Return logical counts for a controlled evolution of ``num_divisions`` Trotter steps.
 
@@ -223,48 +100,6 @@ def traced_step_counts(context, operator, step_time: float, size: int, num_divis
         )
 
 
-def scaled_step_counts(
-    step_counts: dict[str, int],
-    total_steps: int,
-    resolution_bits: int,
-) -> dict[str, int]:
-    """Return whole-ladder logical counts by scaling one traced Trotter step.
-
-    Every logical operation count is multiplied by the total number of steps in the
-    ladder. This intentionally ignores boundary merging between adjacent second-order
-    steps, so it overestimates the ladder rather than inferring a lower cost from a
-    multi-step trace.
-
-    The traced block carries one control qubit, whereas the full algorithm carries a
-    ``resolution_bits``-wide phase register, so the remaining phase qubits are added back.
-    The inverse QFT and window preparation are still omitted; both are negligible against
-    the query cost.
-
-    Args:
-        step_counts: Logical counts for one traced controlled Trotter step.
-        total_steps: Number of Trotter steps in the ladder.
-        resolution_bits: Width of the phase register.
-
-    Returns:
-        Whole-ladder logical counts keyed by the estimator's count names.
-
-    """
-    return {
-        "numQubits": int(step_counts["numQubits"]) + (resolution_bits - 1),
-        **{
-            key: int(step_counts.get(key, 0)) * total_steps
-            for key in (
-                "rotationCount",
-                "rotationDepth",
-                "tCount",
-                "cczCount",
-                "ccixCount",
-                "measurementCount",
-            )
-        },
-    }
-
-
 def run_sampling(
     context,
     size: int,
@@ -292,27 +127,89 @@ def run_sampling(
         hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites)
     )
     one_norm = operator.schatten_norm
-    energy_budget = target_precision(size)
-    base_time, resolution_bits, trotter_settings = error_partition(energy_budget)
 
-    # Bit k evolves for base_time * 2^k, so each bit resolves its own step count. The
-    # schedule is reported in both modes, and its sum is the ladder multiplier below.
-    steps_per_bit = [
-        resolve_num_divisions(operator, base_time * 2**bit, trotter_settings, size)
-        for bit in range(resolution_bits)
-    ]
+    # The total budget splits as eps = eps_QPE + eps_T. A sine-windowed register of
+    # N = 2^bits - 1 queries has phase spread tan(pi / (N + 2)), so requiring eps_QPE * tau
+    # to equal that spread fixes the base evolution time. The remainder is handed to the
+    # plaquette builder, which sizes its own step count against it.
+    # Eqn. 8 in https://arxiv.org/pdf/2609.05316.
+    energy_budget = TARGET_PRECISION_PER_SITE * num_sites
+    resolution_bits = QPE_PRECISION_BITS
+    qpe_budget = QPE_BUDGET_FRACTION * energy_budget
+    trotter_budget = energy_budget - qpe_budget
+    base_time = math.tan(math.pi / (2**resolution_bits - 1 + 2)) / qpe_budget
+    trotter_settings: dict[str, float | int | str] = {"target_accuracy": trotter_budget}
+
+    # Bit k evolves for base_time * 2^k, so each bit resolves its own step count from the
+    # builder's error bound. The schedule is reported in both modes, and its sum is the
+    # ladder multiplier in one-step mode.
+    steps_per_bit = []
+    for bit in range(resolution_bits):
+        evolution_time = base_time * 2**bit
+        builder = create(
+            "hamiltonian_unitary_builder",
+            "plaquette",
+            order=TROTTER_ORDER,
+            time=evolution_time,
+            lattice_width=size,
+            lattice_height=size,
+            max_batch=HWP_MAX_BATCH,
+            **trotter_settings,
+        )
+        steps_per_bit.append(builder._resolve_num_divisions(operator, evolution_time))
     total_steps = sum(steps_per_bit)
     step_time = base_time * 2 ** (resolution_bits - 1) / steps_per_bit[-1]
 
     circuit_started = time.monotonic()
-    # Traced in both modes: it reports the one-step cost and drives the ladder scaling.
     step_counts = traced_step_counts(context, operator, step_time, size, 1)
     if one_step_scaled:
-        logical_counts = scaled_step_counts(step_counts, total_steps, resolution_bits)
+        # Every count is multiplied by the step total. This ignores boundary merging
+        # between adjacent second-order steps, so it overestimates the ladder rather than
+        # inferring a lower cost from a multi-step trace. The traced block carries one
+        # control qubit whereas the full algorithm carries a resolution_bits-wide phase
+        # register, so the remaining phase qubits are added back. The inverse QFT and
+        # window preparation are omitted; both are negligible against the query cost.
+        logical_counts: dict[str, int] = {
+            "numQubits": int(step_counts["numQubits"]) + (resolution_bits - 1),
+            **{
+                key: int(step_counts.get(key, 0)) * total_steps
+                for key in (
+                    "rotationCount",
+                    "rotationDepth",
+                    "tCount",
+                    "cczCount",
+                    "ccixCount",
+                    "measurementCount",
+                )
+            },
+        }
     else:
-        circuit = full_qpe_circuit(
-            context, operator, base_time, resolution_bits, trotter_settings, size
+        unitary_builder = AlgorithmRef(
+            "hamiltonian_unitary_builder",
+            "plaquette",
+            order=TROTTER_ORDER,
+            time=base_time,
+            lattice_width=size,
+            lattice_height=size,
+            max_batch=HWP_MAX_BATCH,
+            # Bit k evolves for base_time * 2^k rather than repeating the block 2^k times.
+            power_strategy="rescale",
+            **trotter_settings,
         )
+        circuit_builder = create(
+            "qpe_circuit_builder",
+            "qdk_standard",
+            num_bits=resolution_bits,
+            unitary_builder=unitary_builder,
+            controlled_circuit_mapper=AlgorithmRef(
+                "controlled_circuit_mapper", "pauli_sequence"
+            ),
+        )
+        # Matches the Holevo spread used to size base_time above.
+        circuit_builder.settings().set("phase_window", "sine")
+        with use_qsharp_context(context):
+            state_prep = identity_state_prep(num_qubits=operator.num_qubits)
+            circuit = circuit_builder.run(state_prep, operator)[0]
         logical_counts = dict(circuit.estimate().logical_counts)
     circuit_elapsed = time.monotonic() - circuit_started
 
@@ -327,12 +224,12 @@ def run_sampling(
                 "sites": num_sites,
                 "system_qubits": operator.num_qubits,
                 "terms": len(operator.pauli_strings),
-                "electrons": num_electrons(size),
+                "electrons": round(FILLING * num_sites),
                 "lambda": one_norm,
                 "target_precision": energy_budget,
-                "qpe_budget": QPE_BUDGET_FRACTION * energy_budget,
+                "qpe_budget": qpe_budget,
                 "qpe_budget_fraction": QPE_BUDGET_FRACTION,
-                "trotter_budget": trotter_settings.get("target_accuracy", 0.0),
+                "trotter_budget": trotter_budget,
                 "qpe_bits": resolution_bits,
                 "num_unitary_queries": 2**resolution_bits - 1,
                 "base_time": base_time,
