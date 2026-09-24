@@ -7,8 +7,6 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
-    import QDKChemistry.Utils.PauliExp.StructuredSparseRepPauliExp;
-    import QDKChemistry.Utils.PauliExp.StructuredSparseRepPauliExpParams;
     import Std.Arrays.IndexOf;
     import Std.Arrays.Subarray;
     import Std.ResourceEstimation.IsResourceEstimating;
@@ -149,31 +147,5 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         layerOffsets : Int[]
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         RepControlledPauliExp(params, layerOffsets, _, _)
-    }
-
-    /// Applies structured sparse Pauli evolution controlled on a single qubit.
-    operation StructuredRepControlledPauliExp(
-        params : StructuredSparseRepPauliExpParams,
-        control : Qubit,
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        Controlled StructuredSparseRepPauliExp([control], (params, systems));
-    }
-
-    /// Allocates a register and applies structured controlled Pauli evolution.
-    operation MakeStructuredRepControlledPauliExpCircuit(
-        params : StructuredSparseRepPauliExpParams,
-        control : Int,
-        systems : Int[]
-    ) : Unit {
-        use qs = Qubit[MaxInt([control] + systems) + 1];
-        StructuredRepControlledPauliExp(params, qs[control], Subarray(systems, qs));
-    }
-
-    /// Returns a single-control callable for structured sparse Pauli evolution.
-    function MakeStructuredRepControlledPauliExpOp(
-        params : StructuredSparseRepPauliExpParams
-    ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
-        StructuredRepControlledPauliExp(params, _, _)
     }
 }

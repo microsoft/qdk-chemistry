@@ -20,8 +20,6 @@ from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash
 from .base import UnitaryContainer
 
 __all__ = [
-    "BatchedExponentiatedPauliTerm",
-    "ConjugatedExponentiatedPauliTerm",
     "ExponentiatedPauliTerm",
     "PauliProductFormulaContainer",
 ]
@@ -41,57 +39,6 @@ class ExponentiatedPauliTerm:
 
     angle: float
     """The rotation angle for the exponentiation."""
-
-
-@dataclass(frozen=True)
-class BatchedExponentiatedPauliTerm:
-    r"""Equal-angle Pauli exponentials evaluated by Hamming-weight phasing.
-
-    The operation is :math:`\prod_j e^{-i\theta P_j}`. The Pauli strings must
-    have disjoint support so their parity representatives can be accumulated in
-    one Hamming-weight register.
-    """
-
-    pauli_terms: Sequence[dict[int, str]]
-    """Pairwise-disjoint Pauli strings sharing one rotation angle."""
-
-    angle: float
-    """The common rotation angle."""
-
-    def __post_init__(self) -> None:
-        """Validate the Hamming-weight phasing invariants."""
-        if len(self.pauli_terms) < 2:
-            raise ValueError("A batched Pauli exponential requires at least two Pauli strings.")
-        support: set[int] = set()
-        for pauli_term in self.pauli_terms:
-            if not pauli_term:
-                raise ValueError("A batched Pauli exponential cannot contain the identity term.")
-            overlap = support.intersection(pauli_term)
-            if overlap:
-                raise ValueError(f"Batched Pauli exponentials must have disjoint support; overlap: {sorted(overlap)}.")
-            support.update(pauli_term)
-
-
-@dataclass(frozen=True)
-class ConjugatedExponentiatedPauliTerm:
-    r"""A structured conjugation :math:`V D V^\dagger`.
-
-    Circuit mappers lower this to Q# ``within``/``apply`` syntax. Consequently,
-    Q# controls only the ``apply`` block when the complete operation is controlled.
-    """
-
-    within_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]
-    """The factors forming :math:`V` in execution order."""
-
-    apply_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]
-    """The factors forming :math:`D` in execution order."""
-
-    def __post_init__(self) -> None:
-        """Require both sides of the conjugation to be explicit."""
-        if not self.within_terms:
-            raise ValueError("A conjugated Pauli exponential requires at least one within term.")
-        if not self.apply_terms:
-            raise ValueError("A conjugated Pauli exponential requires at least one apply term.")
 
 
 def _commute(terms: Sequence[ExponentiatedPauliTerm]) -> bool:
@@ -217,11 +164,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
     def __init__(
         self,
-        step_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm],
+        step_terms: Sequence[ExponentiatedPauliTerm],
         step_reps: int,
         num_qubits: int,
         scale: float = 1.0,
-        conjugating_terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm] | None = None,
         *,
         beginning: Sequence[ExponentiatedPauliTerm] = (),
         end: Sequence[ExponentiatedPauliTerm] = (),
@@ -235,7 +181,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
-            conjugating_terms: Terms forming the one-time conjugation around the repeated step.
             beginning: Flat terms executed once before the repeated steps.
             end: Flat terms executed once after the repeated steps.
             group_offsets: Strictly increasing commuting-group boundaries spanning step_terms, starting at zero.
@@ -243,7 +188,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
-            ValueError: If repetitions or boundaries are invalid, or flat metadata accompany structured terms.
+            ValueError: If repetitions or boundaries are invalid.
 
         """
         # bool is an int subclass, but True as a repetition count is always a mistake.
@@ -252,7 +197,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
-        self.conjugating_terms = [] if conjugating_terms is None else list(conjugating_terms)
         self.step_terms = [
             ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) if isinstance(t, ExponentiatedPauliTerm) else t
             for t in step_terms
@@ -261,10 +205,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             raise ValueError("beginning and end require flat Pauli exponential terms.")
         self.beginning = [ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in beginning]
         self.end = [ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in end]
-        if self.is_structured and (
-            self.beginning or self.end or group_offsets is not None or layer_offsets is not None
-        ):
-            raise ValueError("beginning, end, group_offsets and layer_offsets require a flat Pauli product formula.")
         self.group_offsets = None if group_offsets is None else tuple(group_offsets)
         if self.group_offsets is not None:
             _validate_groups(cast("Sequence[ExponentiatedPauliTerm]", self.step_terms), self.group_offsets)
@@ -325,42 +265,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
             _hash_int(h, qubit_idx)
             _hash_str(h, pauli_term[qubit_idx])
 
-    @classmethod
-    def _hash_groups(cls, h: Any, terms: Sequence[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]) -> None:
-        """Hash plain exponentials and explicit equal-angle batches."""
-        _hash_uint(h, len(terms))
-        for term in terms:
-            if isinstance(term, ExponentiatedPauliTerm):
-                _hash_str(h, "term")
-                cls._hash_pauli_term(h, term.pauli_term)
-                _hash_float(h, term.angle)
-            else:
-                _hash_str(h, "batch")
-                _hash_uint(h, len(term.pauli_terms))
-                for pauli_term in term.pauli_terms:
-                    cls._hash_pauli_term(h, pauli_term)
-                _hash_float(h, term.angle)
-
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
         _hash_str(h, "pauli_product_formula")
         # Keep the legacy flat hash unchanged, including for sparse containers.
-        if self.is_structured:
-            _hash_str(h, "conjugating")
-            self._hash_groups(h, self.conjugating_terms)
-            _hash_str(h, "step")
-            _hash_uint(h, len(self.step_terms))
-            for term in self.step_terms:
-                if isinstance(term, ConjugatedExponentiatedPauliTerm):
-                    _hash_str(h, "conjugated")
-                    self._hash_groups(h, term.within_terms)
-                    self._hash_groups(h, term.apply_terms)
-                else:
-                    self._hash_groups(h, [term])
-            _hash_int(h, self.step_reps)
-            _hash_int(h, self._num_qubits)
-            _hash_float(h, self.scale)
-            return
         _hash_uint(h, len(self.step_terms))
         for flat_term in cast("Sequence[ExponentiatedPauliTerm]", self.step_terms):
             _hash_uint(h, len(flat_term.pauli_term))
@@ -407,35 +315,14 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return self._num_qubits
 
     @property
-    def is_structured(self) -> bool:
-        """Whether the formula contains explicit batches or conjugations."""
-        return bool(self.conjugating_terms) or any(
-            not isinstance(term, ExponentiatedPauliTerm) for term in self.step_terms
-        )
-
-    @property
     def num_pauli_exponentials(self) -> int:
-        """Count executed exponential leaves, including batches and both sides of conjugations."""
-        count = len(self.beginning) + len(self.end)
-        for terms, repetitions in ((self.conjugating_terms, 2), (self.step_terms, self.step_reps)):
-            for term in terms:
-                groups = (
-                    ((term.within_terms, 2), (term.apply_terms, 1))
-                    if isinstance(term, ConjugatedExponentiatedPauliTerm)
-                    else (([term], 1),)
-                )
-                for group, multiplicity in groups:
-                    count += (
-                        repetitions
-                        * multiplicity
-                        * sum(len(t.pauli_terms) if isinstance(t, BatchedExponentiatedPauliTerm) else 1 for t in group)
-                    )
-        return count
+        """Count executed exponential leaves across the endpoints and the repeated step."""
+        return len(self.beginning) + len(self.end) + self.step_reps * len(self.step_terms)
 
     @property
     def num_stored_terms(self) -> int:
         """Count stored top-level terms, independently of repetitions or structured expansion."""
-        return len(self.conjugating_terms) + len(self.beginning) + len(self.step_terms) + len(self.end)
+        return len(self.beginning) + len(self.step_terms) + len(self.end)
 
     def reorder_terms(self, permutation: list[int]) -> "PauliProductFormulaContainer":
         """Reorder the Pauli terms according to a given permutation.
@@ -465,7 +352,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             self.step_reps,
             self.num_qubits,
             self.scale,
-            conjugating_terms=self.conjugating_terms,
             beginning=self.beginning,
             end=self.end,
             layer_offsets=None
@@ -507,14 +393,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """
         if not isfinite(atol) or atol < 0:
             raise ValueError("atol must be finite and nonnegative.")
-        for label, container in (("self", self), ("other_container", other_container)):
+        for container in (self, other_container):
             if container is None:
                 continue
-            if container.is_structured:
-                raise ValueError(
-                    f"Cannot combine: {label} contains batched or conjugated terms. "
-                    "Map structured product formulas to circuits before composing them."
-                )
             for term in chain(
                 container.beginning, cast("Sequence[ExponentiatedPauliTerm]", container.step_terms), container.end
             ):
@@ -677,8 +558,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             dict: Dictionary representation of the PauliProductFormulaContainer
 
         """
-        if self.is_structured:
-            raise ValueError("Structured Pauli product formulas cannot be serialized.")
         data: dict[str, Any] = {
             "container_type": self.type,
             "step_terms": [
@@ -705,8 +584,6 @@ class PauliProductFormulaContainer(UnitaryContainer):
             group: HDF5 group or file to write data to
 
         """
-        if self.is_structured:
-            raise ValueError("Structured Pauli product formulas cannot be serialized.")
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["step_reps"] = self.step_reps

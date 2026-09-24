@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 from collections.abc import Sequence
-from typing import Any
 
 from qdk import qsharp
 
@@ -14,9 +13,6 @@ from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    BatchedExponentiatedPauliTerm,
-    ConjugatedExponentiatedPauliTerm,
-    ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
@@ -83,34 +79,6 @@ class PauliSequenceMapper(CircuitMapper):
             pauli_ops.append(ops)
         return pauli_indices, pauli_ops
 
-    @classmethod
-    def _encode_group(cls, term: ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm) -> Any:
-        """Encode one plain exponential or equal-angle batch."""
-        pauli_terms = [term.pauli_term] if isinstance(term, ExponentiatedPauliTerm) else list(term.pauli_terms)
-        pauli_indices, pauli_ops = cls._encode_pauli_terms(pauli_terms)
-        return QSHARP_UTILS.PauliExp.SparsePauliExpGroupParams(
-            pauliIndices=pauli_indices,
-            pauliOps=pauli_ops,
-            angle=term.angle,
-        )
-
-    @classmethod
-    def _encode_block(
-        cls,
-        term: ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm,
-    ) -> Any:
-        """Encode a direct group or a structured Q# ``within``/``apply`` block."""
-        if isinstance(term, ConjugatedExponentiatedPauliTerm):
-            within_groups = [cls._encode_group(group) for group in term.within_terms]
-            apply_groups = [cls._encode_group(group) for group in term.apply_terms]
-        else:
-            within_groups = []
-            apply_groups = [cls._encode_group(term)]
-        return QSHARP_UTILS.PauliExp.ConjugatedSparsePauliExpParams(
-            withinGroups=within_groups,
-            applyGroups=apply_groups,
-        )
-
     def _run_impl(self, evolution: UnitaryRepresentation) -> Circuit:
         r"""Construct a quantum circuit implementing the given unitary.
 
@@ -132,23 +100,10 @@ class PauliSequenceMapper(CircuitMapper):
             )
 
         target_indices = list(range(unitary_container.num_qubits))
-        structured = bool(unitary_container.conjugating_terms) or any(
-            not isinstance(term, ExponentiatedPauliTerm) for term in unitary_container.step_terms
-        )
-        if structured:
-            structured_params = QSHARP_UTILS.PauliExp.StructuredSparseRepPauliExpParams(
-                conjugatingGroups=[self._encode_group(term) for term in unitary_container.conjugating_terms],
-                stepBlocks=[self._encode_block(term) for term in unitary_container.step_terms],
-                repetitions=unitary_container.step_reps,
-            )
-            program = QSHARP_UTILS.PauliExp.MakeStructuredSparseRepPauliExpCircuit
-            parameter = {"evoParams": structured_params, "system": target_indices}
-            evolution_op = QSHARP_UTILS.PauliExp.MakeStructuredSparseRepPauliExpOp(structured_params)
-        else:
-            evo_params = _pauli_evolution_parameters(unitary_container)
-            program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
-            parameter = {"evo_params": evo_params, "target_indices": target_indices}
-            evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
+        evo_params = _pauli_evolution_parameters(unitary_container)
+        program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
+        parameter = {"evo_params": evo_params, "target_indices": target_indices}
+        evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
 
         factory = QsharpFactoryData(
             program=program,

@@ -11,7 +11,6 @@ import pytest
 
 from qdk_chemistry.data import SparsePauliProductFormulaContainer, SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    BatchedExponentiatedPauliTerm,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -343,16 +342,6 @@ class TestPauliProductFormulaContainer:
         assert fused.step_terms == [z, ExponentiatedPauliTerm(x.pauli_term, 0.25)]
         assert fused.group_offsets == (0, 1, 2)
         assert fused.layer_offsets == (0, 2, 3, 4, 5, 6, 7)
-
-    def test_structured_positional_api_and_flat_metadata_rejection(self):
-        """The fifth positional argument remains conjugation, not flat endpoint metadata."""
-        x = ExponentiatedPauliTerm({0: "X"}, 0.125)
-        batch = BatchedExponentiatedPauliTerm([{0: "X"}, {1: "X"}], 0.25)
-        assert PauliProductFormulaContainer([batch], 3, 2, 1.7, [x]).conjugating_terms == [x]
-        with pytest.raises(ValueError, match="flat"):
-            PauliProductFormulaContainer([batch], 2, 2, group_offsets=(0, 1))
-        with pytest.raises(ValueError, match="flat"):
-            PauliProductFormulaContainer([], 2, 2, beginning=[batch])
 
     def test_canonical_boundary_words_and_empty_body(self):
         """Canonical identities fuse, and full cancellation permits an empty compact body."""

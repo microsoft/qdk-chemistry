@@ -5,11 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import PauliSequenceMapper
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, _pauli_evolution_parameters
@@ -83,32 +81,11 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        structured = bool(unitary_container.conjugating_terms) or any(
-            not isinstance(term, ExponentiatedPauliTerm) for term in unitary_container.step_terms
-        )
-        if structured:
-            evo_params = QSHARP_UTILS.PauliExp.StructuredSparseRepPauliExpParams(
-                conjugatingGroups=[
-                    PauliSequenceMapper._encode_group(term)  # noqa: SLF001 - shared structured lowering
-                    for term in unitary_container.conjugating_terms
-                ],
-                stepBlocks=[
-                    PauliSequenceMapper._encode_block(term)  # noqa: SLF001 - shared structured lowering
-                    for term in unitary_container.step_terms
-                ],
-                repetitions=unitary_container.step_reps,
-            )
-            program = QSHARP_UTILS.ControlledPauliExp.MakeStructuredRepControlledPauliExpCircuit
-            controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeStructuredRepControlledPauliExpOp(evo_params)
-            parameters = {"params": evo_params}
-        else:
-            evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
-            layer_offsets = list(unitary_container.layer_offsets or ())
-            program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
-            controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(
-                evo_params, layer_offsets
-            )
-            parameters = {"params": evo_params, "layerOffsets": layer_offsets}
+        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
+        layer_offsets = list(unitary_container.layer_offsets or ())
+        program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params, layer_offsets)
+        parameters = {"params": evo_params, "layerOffsets": layer_offsets}
 
         parameters.update(control=control_indices[0], systems=target_indices)
         qsharp_factory = QsharpFactoryData(
