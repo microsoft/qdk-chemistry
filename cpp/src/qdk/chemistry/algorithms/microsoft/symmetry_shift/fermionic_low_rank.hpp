@@ -19,23 +19,24 @@
 // al., arXiv:2409.18277) -- the FermionicLowRankShifter implementation of
 // qdk::chemistry::algorithms::SymmetryShifter -- together with its internal
 // building blocks. They run in the order used by
-// compute_fermionic_low_rank_shift():
+// solve_fermionic_low_rank_shift():
 //   1. The caller supplies an ALREADY double-factorized Hamiltonian, i.e. one
 //      backed by data::FactorizedHamiltonianContainer. Producing it is the job
 //      of the "double_factorization" hamiltonian_factorization algorithm; this
 //      shifter never factorizes anything itself.
 //   2. accumulate_fragment_shifts() -- per-fragment median shift (Eq. 27),
-//      aggregated into a single global two-electron shift (mu2, xi).
+//      aggregated into a single global two-electron shift (mu2, xi) and the
+//      per-fragment medians phi that produced it.
 //   3. solve_one_electron_shift() -- optimal one-electron shift mu1
 //      against the effective one-electron operator implied by (mu2, xi).
-// The resulting (mu1, mu2, xi) are packaged into a SymmetryShift and applied
-// by qdk::chemistry::algorithms::rebuild_shifted_hamiltonian().
+// rebuild_shifted_factorized_hamiltonian() then absorbs the shift into the
+// fragment eigenvalues, so input and output are both sum-of-squares
+// factorizations and no dense norb^4 tensor is ever built.
 //
 // The shared detail:: helpers (private to the library, in
-// algorithms/symmetry_shift_detail.hpp) keep step 3's
-// Coulomb/exchange-type contractions and rebuild_shifted_hamiltonian's full
-// O(norb^4) tensor derived from the same closed-form dg_ijkl definition, so
-// they cannot silently drift apart.
+// algorithms/symmetry_shift_detail.hpp) keep step 3's Coulomb/exchange-type
+// contractions derived from the same closed-form dg_ijkl definition as the
+// full tensor, so they cannot silently drift apart.
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -62,13 +63,19 @@ inline double median(const Eigen::VectorXd& values) {
 /// that is SUBTRACTED from H; the per-fragment operators are negated
 /// during aggregation because the DF+LRPS identity (Eq. C6) adds them.
 struct GlobalTwoBodyShift {
-  /// `norb` is required so that `xi` is always correctly sized, including
-  /// when there are no fragments to accumulate.
-  explicit GlobalTwoBodyShift(Eigen::Index norb)
-      : xi(Eigen::MatrixXd::Zero(norb, norb)) {}
+  /// `norb` is required so that `xi` is always correctly sized, and
+  /// (`num_ranks`, `num_copies`) so that `phi` is, including when there are
+  /// no fragments to accumulate.
+  GlobalTwoBodyShift(Eigen::Index norb, Eigen::Index num_ranks,
+                     Eigen::Index num_copies)
+      : xi(Eigen::MatrixXd::Zero(norb, norb)),
+        phi(Eigen::MatrixXd::Zero(num_ranks, num_copies)) {}
 
   double mu2 = 0.0;    ///< Aggregated mu_2 (for H - K).
   Eigen::MatrixXd xi;  ///< Aggregated xi_ij (for H - K), norb x norb.
+  /// Per-fragment median shift phi^(opt), [num_ranks, num_copies], on the
+  /// BLISS scale eps = W / sqrt(2): shifted eigenvalues are W - sqrt(2)*phi.
+  Eigen::MatrixXd phi;
   double lambda_df_baseline = 0.0;  ///< Sum of pre-shift fragment 1-norms.
   double lambda_df_shifted = 0.0;   ///< Sum of post-shift fragment 1-norms.
 };
@@ -83,7 +90,7 @@ struct GlobalTwoBodyShift {
 /// whereas BLISS is formulated for the PHYSICAL coefficient V = 1/2 g. The
 /// two differ by an overall sqrt(2) on the fragment eigenvalues, so this
 /// function uses eps = W / sqrt(2) throughout; that is what puts the
-/// aggregated (mu2, xi) on the scale rebuild_shifted_hamiltonian() expects.
+/// aggregated (mu2, xi) on the scale the rebuild expects.
 ///
 /// Note also that `U` is stored flattened [R,B,N] in ROW-major order, so row
 /// b of U^r is eigenvector b -- not column b.
@@ -118,7 +125,7 @@ struct OneElectronShiftResult {
 /// Hamiltonian.
 ///
 /// The effective operator is evaluated for the shifted two-electron
-/// integrals g~ implied by (mu2, xi), matching rebuild_shifted_hamiltonian():
+/// integrals g~ implied by (mu2, xi), matching the shifted fragments:
 ///   g~_ijkl = g_ijkl - 2*mu2*d_ij*d_kl - xi_ij*d_kl - d_ij*xi_kl
 ///   Heff0_ij = h_ij + (Ne-1)*xi_ij - mu2*d_ij
 ///              + sum_k g~[i,j,k,k] - 1/2 sum_k g~[i,k,k,j]   (mu1 = 0)
@@ -138,36 +145,77 @@ OneElectronShiftResult solve_one_electron_shift(
     const Eigen::MatrixXd& h, Eigen::MatrixXd coulomb, Eigen::MatrixXd exchange,
     double mu2, const Eigen::MatrixXd& xi, double num_electrons);
 
-/// Compute the fermionic low-rank BLISS shift (mu1, mu2, xi) for `hamiltonian`
-/// in the (n_alpha, n_beta)-electron sector (Patel et al., arXiv:2409.18277).
-///
-/// Pipeline: read the already-computed double factorization off the
-/// Hamiltonian, accumulate the per-fragment median shift into a global
-/// (mu2, xi), then solve for the optimal one-electron shift mu1. The result is
-/// returned as a SymmetryShift ready for rebuild_shifted_hamiltonian(). The
-/// Hamiltonian must be restricted.
-///
-/// The factorization is READ-ONLY input: the shift is expressed entirely as
-/// the global (mu1, mu2, xi), and rebuild_shifted_hamiltonian() applies it to
-/// the dense integrals, yielding a canonical four-center Hamiltonian. Nothing
-/// is ever written back into the factorization coefficients.
+/// The complete fermionic low-rank BLISS solution: the global (mu1, mu2, xi)
+/// and the per-fragment medians that generated them. The two are only
+/// mutually consistent when produced together on one particular
+/// factorization, so they travel as a single object.
+struct FermionicLowRankSolution {
+  SymmetryShift shift;
+  Eigen::MatrixXd phi;  ///< [num_ranks, num_copies]; zero for a zero shift.
+};
+
+/// Compute the full fermionic low-rank BLISS solution for `hamiltonian` in the
+/// (n_alpha, n_beta)-electron sector (Patel et al., arXiv:2409.18277): read the
+/// already-computed double factorization off the Hamiltonian (READ-ONLY),
+/// accumulate the per-fragment median shift into a global (mu2, xi), then solve
+/// for the optimal one-electron shift mu1.
 ///
 /// The two 1-norms are minimized sequentially, not jointly, so the total is not
-/// guaranteed to decrease; if it would increase, a zero shift is returned with
-/// a warning, leaving the Hamiltonian unchanged.
+/// guaranteed to decrease; if it would increase, a zero shift (and a zero phi)
+/// is returned with a warning, leaving the Hamiltonian unchanged.
 ///
 /// @param hamiltonian The Hamiltonian to analyze. Must be restricted and
 ///        backed by a data::FactorizedHamiltonianContainer.
 /// @param n_alpha_electrons Target number of alpha electrons.
 /// @param n_beta_electrons Target number of beta electrons.
-/// @return The computed shift, or a zero (norb x norb) shift if the computed
-///         one would not reduce the fermionic 1-norm.
+/// @return The computed solution, or a zero shift if the computed one would
+///         not reduce the fermionic 1-norm.
 /// @throws std::invalid_argument if `hamiltonian` is unrestricted, is not
-///         backed by a FactorizedHamiltonianContainer, or carries a nonzero
-///         identity weight wB.
+///         backed by a FactorizedHamiltonianContainer, carries a nonzero
+///         identity weight wB, or whose rotations are not complete orthogonal
+///         rotations (see rebuild_shifted_factorized_hamiltonian).
+FermionicLowRankSolution solve_fermionic_low_rank_shift(
+    const qdk::chemistry::data::Hamiltonian& hamiltonian,
+    unsigned int n_alpha_electrons, unsigned int n_beta_electrons);
+
+/// Thin wrapper over solve_fermionic_low_rank_shift() that discards the
+/// per-fragment medians. Use it to INSPECT a shift; applying one is
+/// SymmetryShifter::run()'s job.
+///
+/// @see solve_fermionic_low_rank_shift for the parameters and exceptions.
 SymmetryShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons);
+
+/// Apply a fermionic low-rank BLISS solution, keeping the sum-of-squares form.
+///
+/// Because K is built from per-fragment medians, H - K is again a sum of
+/// squares over the SAME rotations (Patel et al., Eq. 36): with O_r the
+/// fragment's one-body operator and [O_r, N] = 0,
+///   O_r^2 = (O_r - phi_r N)^2 + 2 phi_r N O_r - phi_r^2 N^2,
+/// whose trailing terms are exactly K. So the shift is absorbed exactly into
+/// the fragment eigenvalues and nothing is refactorized:
+///   U unchanged,  W~ = W - sqrt(2)*phi_rc,  wB = 0,
+///   h~ = h + (Ne-1)*xi - (mu1+mu2)*I,  E' = E_core + mu1*Ne + mu2*Ne^2.
+///
+/// NOT public: it is only correct when `solution` was produced by
+/// solve_fermionic_low_rank_shift() on `container` itself, and phi is not
+/// recoverable from a SymmetryShift alone.
+///
+/// @param original The Hamiltonian being shifted; supplies everything but the
+///        two-body integrals.
+/// @param container `original`'s factorization. Must satisfy the complete
+///        orthogonal rotation precondition, already enforced by
+///        solve_fermionic_low_rank_shift().
+/// @param solution The shift and the per-fragment medians that generated it.
+/// @param num_electrons Target number of active electrons (Ne).
+/// @return The shifted Hamiltonian, backed by a
+///         data::FactorizedHamiltonianContainer.
+std::shared_ptr<qdk::chemistry::data::Hamiltonian>
+rebuild_shifted_factorized_hamiltonian(
+    const qdk::chemistry::data::Hamiltonian& original,
+    const qdk::chemistry::data::FactorizedHamiltonianContainer& container,
+    const FermionicLowRankSolution& solution, unsigned int num_electrons);
 
 /**
  * @class FermionicLowRankShifterSettings
@@ -198,8 +246,10 @@ class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  * median shift, and solve for the optimal one-electron shift against the
  * effective one-electron operator.
  *
- * The input must be backed by a data::FactorizedHamiltonianContainer; the
- * output is a canonical four-center Hamiltonian.
+ * The input must be backed by a data::FactorizedHamiltonianContainer whose
+ * rotations are complete orthogonal ones, and so is the output: the shift is
+ * absorbed into the fragment eigenvalues, so the result can be block-encoded
+ * without being refactorized. Call get_two_body_integrals() for dense ones.
  *
  * Typical usage:
  * ```cpp
@@ -255,7 +305,8 @@ class FermionicLowRankShifter : public SymmetryShifter {
 
  protected:
   /**
-   * @brief Composes compute_shift() and rebuild_shifted_hamiltonian().
+   * @brief Composes solve_fermionic_low_rank_shift() and
+   *        rebuild_shifted_factorized_hamiltonian().
    */
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,

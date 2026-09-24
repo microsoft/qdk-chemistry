@@ -41,44 +41,14 @@ namespace qdk::chemistry::algorithms {
  * (BLISS [1] and its fermionic low-rank variant [2] included); only the way
  * (mu1, mu2, xi) are *computed* differs. A SymmetryShift therefore carries
  * only the *result* of a shift computation, so it may equally come from
- * SymmetryShifter::compute_shift() or an external source, and is applied via
- * rebuild_shifted_hamiltonian().
+ * SymmetryShifter::compute_shift() or an external source. Applying one is
+ * SymmetryShifter::run()'s job.
  */
 struct SymmetryShift {
   double mu1 = 0.0;    ///< One-electron shift.
   double mu2 = 0.0;    ///< Two-electron shift.
   Eigen::MatrixXd xi;  ///< Two-electron shift matrix (norb x norb).
 };
-
-/**
- * @brief Apply a symmetry shift to a Hamiltonian and assemble the shifted one.
- *
- * Applies the global symmetry shift (mu1, mu2, xi) [1,2] to the dense
- * integrals of `original`. In this container's chemist convention
- * g[i,j,k,l] = (ij|kl), subtracting K (see SymmetryShift) expands to
- *   h~_ij   = h_ij + (Ne - 1)*xi_ij - (mu1 + mu2)*delta_ij
- *   g~_ijkl = g_ijkl - 2*mu2*delta_ij*delta_kl
- *                    - xi_ij*delta_kl - delta_ij*xi_kl
- *   E_core' = E_core + mu1*Ne + mu2*Ne^2
- * so the Ne-sector energy is invariant for any (mu1, mu2, xi).
- *
- * How `shift` was computed is irrelevant: it may come from
- * SymmetryShifter::compute_shift() or any external source. Everything else
- * (integrals, core energy, orbitals, inactive Fock matrix, Hamiltonian type)
- * is read from `original`.
- *
- * @param original The Hamiltonian being shifted. Must be restricted.
- * @param shift The symmetry shift parameters (mu1, mu2, xi) to apply.
- * @param num_electrons Target number of active electrons (Ne); the
- *        invariance guarantee only holds for an integer electron count.
- * @return The shifted Hamiltonian.
- *
- * @throws std::invalid_argument if `original` is unrestricted or `shift.xi`
- *         is not norb x norb.
- */
-std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
-    const data::Hamiltonian& original, const SymmetryShift& shift,
-    unsigned int num_electrons);
 
 /**
  * @class SymmetryShifter
@@ -90,11 +60,11 @@ std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
  * lambda) may be reduced, shrinking resource estimates for algorithms such as
  * qubitized phase estimation.
  *
- * Every implementation is a thin composition of two public steps:
- *  1. compute_shift() -- compute (mu1, mu2, xi); this is what distinguishes
- *     one implementation from another.
- *  2. rebuild_shifted_hamiltonian() -- apply that shift; shared by all
- *     implementations and usable on an externally computed shift.
+ * run() computes the shift and applies it in one step; compute_shift() is the
+ * inspect-only half, reporting the (mu1, mu2, xi) run() would use. Applying a
+ * shift is deliberately not public: how it folds into the Hamiltonian depends
+ * on the representation the implementation consumes, and may need more than
+ * (mu1, mu2, xi) carries.
  *
  * Only restricted (spin-restricted) Hamiltonians are currently supported.
  *
@@ -107,7 +77,6 @@ std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
  * @endcode
  *
  * @see SymmetryShift
- * @see rebuild_shifted_hamiltonian
  * @see SymmetryShifterFactory for creating instances of symmetry shifters
  * @see data::FactorizedHamiltonianContainer::get_lambda to inspect a
  *      factorized Hamiltonian's fermionic 1-norm without running a shifter.
@@ -147,8 +116,8 @@ class SymmetryShifter
    * @brief Compute the symmetry shift (mu1, mu2, xi) for a target electron
    *        count.
    *
-   * Returns the parameters *without* rebuilding the Hamiltonian; apply them
-   * with rebuild_shifted_hamiltonian().
+   * Returns the parameters *without* rebuilding the Hamiltonian, so a caller
+   * can inspect or compare shifts. Use run() to apply one.
    *
    * @param hamiltonian The Hamiltonian to analyze. Must be restricted.
    * @param n_alpha_electrons The target number of alpha electrons.
@@ -179,8 +148,8 @@ class SymmetryShifter
   /**
    * @brief Implementation of the symmetry shift.
    *
-   * Composes compute_shift() and rebuild_shifted_hamiltonian(). Called by
-   * run() after settings have been locked.
+   * Computes the shift and applies it. Called by run() after settings have
+   * been locked.
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,

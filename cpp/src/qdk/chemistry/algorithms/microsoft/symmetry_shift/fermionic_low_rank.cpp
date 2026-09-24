@@ -42,6 +42,42 @@ Eigen::MatrixXd leaf_matrix(
   return Ur.transpose() * scaled;
 }
 
+/// True when every rank's rotation U^r is a COMPLETE ORTHOGONAL rotation
+/// (B == norb and U^r^T U^r == I) -- exactly the condition under which
+/// Sum_b n_b^r == N_hat, which is what lets the BLISS shift -phi_r * N_hat be
+/// absorbed into the fragment eigenvalues. The container only validates that
+/// each basis row is a unit vector, which is necessary but not sufficient.
+///
+/// Cholesky-backed double factorization always satisfies this; general DFTHC
+/// leaves need not.
+bool fragments_span_full_rotation(
+    const qdk::chemistry::data::FactorizedHamiltonianContainer& container,
+    double tol = 1e-10) {
+  const size_t norb = container.get_num_orbitals();
+  const size_t R = container.get_num_ranks();
+  const size_t B = container.get_num_bases();
+
+  if (B != norb) {
+    return false;
+  }
+
+  const Eigen::VectorXd& u = container.get_u_matrices();
+  const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(
+      static_cast<Eigen::Index>(norb), static_cast<Eigen::Index>(norb));
+
+  for (size_t r = 0; r < R; ++r) {
+    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                   Eigen::RowMajor>>
+        Ur(u.data() + r * B * norb, static_cast<Eigen::Index>(B),
+           static_cast<Eigen::Index>(norb));
+    const Eigen::MatrixXd gram = Ur.transpose() * Ur;
+    if ((gram - identity).cwiseAbs().maxCoeff() > tol) {
+      return false;
+    }
+  }
+  return true;
+}
+
 }  // namespace
 
 GlobalTwoBodyShift accumulate_fragment_shifts(
@@ -51,7 +87,9 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
   const size_t B = container.get_num_bases();
   const size_t C = container.get_num_copies();
 
-  GlobalTwoBodyShift result(static_cast<Eigen::Index>(norb));
+  GlobalTwoBodyShift result(static_cast<Eigen::Index>(norb),
+                            static_cast<Eigen::Index>(R),
+                            static_cast<Eigen::Index>(C));
 
   const Eigen::VectorXd& u = container.get_u_matrices();
   const Eigen::VectorXd& w = container.get_w_matrices();
@@ -77,6 +115,8 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
 
       // Eq. 27's LP has a closed-form solution: phi^(alpha) = median{eps_i}.
       const double phi = median(eps);
+      result.phi(static_cast<Eigen::Index>(r), static_cast<Eigen::Index>(c)) =
+          phi;
       const Eigen::VectorXd eps_shifted = eps.array() - phi;
 
       const double eps_shifted_abs_sum = eps_shifted.array().abs().sum();
@@ -91,8 +131,8 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
       // writes the low-1-norm shifted fragment as H^(a) + K^(a) (plus a
       // 1-electron term and a constant), i.e. the per-fragment BLISS operator
       // is *added*. The global operator is *subtracted* from H (H - K, Eq. 5),
-      // so the aggregated (mu2, xi) that rebuild_shifted_hamiltonian applies
-      // are the NEGATED sum of the per-fragment K^(a) parameters. Cholesky
+      // so the aggregated (mu2, xi) that the rebuild applies are the
+      // NEGATED sum of the per-fragment K^(a) parameters. Cholesky
       // fragments are all positive, so there is no per-fragment sign to carry.
       result.mu2 -= mu2_alpha;
 
@@ -142,7 +182,7 @@ OneElectronShiftResult solve_one_electron_shift(
 
   // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
   // exch(g~). See symmetry_shift_detail.hpp for the g~ definition and why this
-  // stays consistent with rebuild_shifted_hamiltonian's full tensor.
+  // stays consistent with the full tensor.
   detail::add_coulomb_contraction(coulomb, mu2, xi);
   detail::add_exchange_contraction(exchange, mu2, xi);
 
@@ -169,24 +209,24 @@ OneElectronShiftResult solve_one_electron_shift(
 
 // ---------------------------------------------------------------------------
 // Top-level fermionic low-rank BLISS driver: wires steps 1-3 into a
-// SymmetryShift.
+// FermionicLowRankSolution.
 // ---------------------------------------------------------------------------
 
-SymmetryShift compute_fermionic_low_rank_shift(
+FermionicLowRankSolution solve_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons) {
   QDK_LOG_TRACE_ENTERING();
 
   if (!hamiltonian.is_restricted()) {
     throw std::invalid_argument(
-        "compute_fermionic_low_rank_shift currently only supports restricted "
+        "solve_fermionic_low_rank_shift currently only supports restricted "
         "(spin-restricted) Hamiltonians.");
   }
 
   if (!hamiltonian.has_container_type<
           qdk::chemistry::data::FactorizedHamiltonianContainer>()) {
     throw std::invalid_argument(
-        "compute_fermionic_low_rank_shift requires an already double-"
+        "solve_fermionic_low_rank_shift requires an already double-"
         "factorized Hamiltonian (data::FactorizedHamiltonianContainer). Run "
         "the \"double_factorization\" hamiltonian_factorization algorithm on "
         "it first.");
@@ -195,13 +235,24 @@ SymmetryShift compute_fermionic_low_rank_shift(
   const auto& container = hamiltonian.get_container<
       qdk::chemistry::data::FactorizedHamiltonianContainer>();
 
-  // The dense reconstruction below ignores wB, so a nonzero one would be
-  // silently dropped. Nothing in tree emits one today; reject rather than
-  // guess at its meaning.
+  // Neither the mean-field contractions below nor the rebuild account for wB,
+  // so a nonzero one would be silently dropped. Nothing in tree emits one
+  // today; reject rather than guess at its meaning.
   if (!container.get_wb_matrix().isZero(0.0)) {
     throw std::invalid_argument(
-        "compute_fermionic_low_rank_shift does not support a factorized "
+        "solve_fermionic_low_rank_shift does not support a factorized "
         "Hamiltonian with a nonzero identity weight wB.");
+  }
+
+  // Without complete rotations the reported 1-norms would not describe the
+  // shifted Hamiltonian either, so the "would lambda increase?" guard below
+  // could not catch the mistake. Reject rather than fall back.
+  if (!fragments_span_full_rotation(container)) {
+    throw std::invalid_argument(
+        "solve_fermionic_low_rank_shift requires a factorization whose "
+        "rotations are complete orthogonal rotations (num_bases == "
+        "num_orbitals and U^T U == I for every rank), as produced by the "
+        "\"double_factorization\" algorithm.");
   }
 
   const double num_electrons = static_cast<double>(n_alpha_electrons) +
@@ -212,7 +263,7 @@ SymmetryShift compute_fermionic_low_rank_shift(
 
   const size_t norb = static_cast<size_t>(h_alpha.rows());
   QDK_LOGGER().debug(
-      "compute_fermionic_low_rank_shift: num_orbitals={}, num_electrons={}, "
+      "solve_fermionic_low_rank_shift: num_orbitals={}, num_electrons={}, "
       "num_ranks={}, num_copies={}",
       norb, num_electrons, container.get_num_ranks(),
       container.get_num_copies());
@@ -254,7 +305,7 @@ SymmetryShift compute_fermionic_low_rank_shift(
       global_shift.lambda_df_shifted + one_electron.lambda_1e;
 
   QDK_LOGGER().debug(
-      "compute_fermionic_low_rank_shift: lambda_total before={} ({} + {}), "
+      "solve_fermionic_low_rank_shift: lambda_total before={} ({} + {}), "
       "after={} ({} + {}); lambda_DF baseline={}, shifted={}; lambda_1e "
       "baseline={}, "
       "shifted={}; mu1={}, mu2={}",
@@ -270,7 +321,7 @@ SymmetryShift compute_fermionic_low_rank_shift(
   // the Hamiltonian unchanged.
   if (lambda_total_after > lambda_total_before) {
     QDK_LOGGER().warn(
-        "compute_fermionic_low_rank_shift: the computed shift would increase "
+        "solve_fermionic_low_rank_shift: the computed shift would increase "
         "the fermionic 1-norm (before={}, after={}); returning a zero shift, "
         "so the Hamiltonian is left unchanged.",
         lambda_total_before, lambda_total_after);
@@ -278,14 +329,98 @@ SymmetryShift compute_fermionic_low_rank_shift(
     SymmetryShift identity_shift;
     identity_shift.xi = Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(norb),
                                               static_cast<Eigen::Index>(norb));
-    return identity_shift;
+    return {identity_shift, Eigen::MatrixXd::Zero(global_shift.phi.rows(),
+                                                  global_shift.phi.cols())};
   }
 
   SymmetryShift shift;
   shift.mu1 = one_electron.mu1;
   shift.mu2 = global_shift.mu2;
   shift.xi = global_shift.xi;
-  return shift;
+  return {shift, std::move(global_shift.phi)};
+}
+
+SymmetryShift compute_fermionic_low_rank_shift(
+    const qdk::chemistry::data::Hamiltonian& hamiltonian,
+    unsigned int n_alpha_electrons, unsigned int n_beta_electrons) {
+  return solve_fermionic_low_rank_shift(hamiltonian, n_alpha_electrons,
+                                        n_beta_electrons)
+      .shift;
+}
+
+// ---------------------------------------------------------------------------
+// Applying the solution: the shift is absorbed into the fragment eigenvalues,
+// so the output stays a sum of squares over the SAME rotations.
+// ---------------------------------------------------------------------------
+
+std::shared_ptr<qdk::chemistry::data::Hamiltonian>
+rebuild_shifted_factorized_hamiltonian(
+    const qdk::chemistry::data::Hamiltonian& original,
+    const qdk::chemistry::data::FactorizedHamiltonianContainer& container,
+    const FermionicLowRankSolution& solution, unsigned int num_electrons) {
+  QDK_LOG_TRACE_ENTERING();
+
+  const SymmetryShift& shift = solution.shift;
+
+  auto [h_alpha, h_beta] = original.get_one_body_integrals();
+  (void)h_beta;
+
+  const Eigen::Index norb = h_alpha.rows();
+  if (shift.xi.rows() != norb || shift.xi.cols() != norb) {
+    throw std::invalid_argument(
+        "rebuild_shifted_factorized_hamiltonian: shift.xi must be norb x "
+        "norb.");
+  }
+
+  const size_t R = container.get_num_ranks();
+  const size_t B = container.get_num_bases();
+  const size_t C = container.get_num_copies();
+
+  if (solution.phi.rows() != static_cast<Eigen::Index>(R) ||
+      solution.phi.cols() != static_cast<Eigen::Index>(C)) {
+    throw std::invalid_argument(
+        "rebuild_shifted_factorized_hamiltonian: phi must be num_ranks x "
+        "num_copies.");
+  }
+
+  const double ne = static_cast<double>(num_electrons);
+
+  // One-body part: h~_ij = h_ij + (Ne-1)*xi_ij - (mu1+mu2)*delta_ij.
+  Eigen::MatrixXd h_tilde = h_alpha + (ne - 1.0) * shift.xi;
+  h_tilde.diagonal().array() -= (shift.mu1 + shift.mu2);
+
+  // Two-body part: subtracting phi_rc from each fragment's eigenvalues is the
+  // whole shift. sqrt(2) converts the physical scale the medians were taken on
+  // (V = g/2) back to the stored one.
+  Eigen::VectorXd w_new = container.get_w_matrices();
+  for (size_t r = 0; r < R; ++r) {
+    for (size_t c = 0; c < C; ++c) {
+      const double delta =
+          std::sqrt(2.0) * solution.phi(static_cast<Eigen::Index>(r),
+                                        static_cast<Eigen::Index>(c));
+      for (size_t b = 0; b < B; ++b) {
+        w_new[static_cast<Eigen::Index>(r * B * C + b * C + c)] -= delta;
+      }
+    }
+  }
+
+  // Constant part of -K in the Ne-electron sector: +mu1*Ne + mu2*Ne^2.
+  const double core_energy_new =
+      original.get_core_energy() + shift.mu1 * ne + shift.mu2 * ne * ne;
+
+  const Eigen::MatrixXd inactive_fock =
+      original.has_inactive_fock_matrix()
+          ? original.get_inactive_fock_matrix().first
+          : Eigen::MatrixXd(0, 0);
+
+  auto shifted =
+      std::make_unique<qdk::chemistry::data::FactorizedHamiltonianContainer>(
+          h_tilde, container.get_u_matrices(), w_new, container.get_wb_matrix(),
+          original.get_orbitals(), core_energy_new, inactive_fock,
+          original.get_type());
+
+  return std::make_shared<qdk::chemistry::data::Hamiltonian>(
+      std::move(shifted));
 }
 
 // ---------------------------------------------------------------------------
@@ -316,11 +451,21 @@ std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(
     throw std::invalid_argument("FermionicLowRankShifter: hamiltonian is null");
   }
 
-  const SymmetryShift shift =
-      compute_shift(*hamiltonian, n_alpha_electrons, n_beta_electrons);
-  const unsigned int num_electrons = n_alpha_electrons + n_beta_electrons;
+  if (!hamiltonian->is_restricted()) {
+    throw std::invalid_argument(
+        "FermionicLowRankShifter currently only supports restricted "
+        "(spin-restricted) Hamiltonians.");
+  }
 
-  return rebuild_shifted_hamiltonian(*hamiltonian, shift, num_electrons);
+  const FermionicLowRankSolution solution = solve_fermionic_low_rank_shift(
+      *hamiltonian, n_alpha_electrons, n_beta_electrons);
+
+  // solve_fermionic_low_rank_shift() has already validated the container.
+  const auto& container = hamiltonian->get_container<
+      qdk::chemistry::data::FactorizedHamiltonianContainer>();
+
+  return rebuild_shifted_factorized_hamiltonian(
+      *hamiltonian, container, solution, n_alpha_electrons + n_beta_electrons);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

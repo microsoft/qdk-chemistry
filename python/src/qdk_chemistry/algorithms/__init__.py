@@ -74,7 +74,6 @@ from qdk_chemistry.algorithms.symmetry_shift import (
     FermionicLowRankShifter,
     SymmetryShift,
     SymmetryShifter,
-    rebuild_shifted_hamiltonian,
 )
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
@@ -141,7 +140,6 @@ __all__ = [
     "create",
     "inspect_settings",
     "print_settings",
-    "rebuild_shifted_hamiltonian",
     "register",
     "show_default",
     "unregister",

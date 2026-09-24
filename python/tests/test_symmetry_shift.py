@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import rebuild_shifted_hamiltonian
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
@@ -106,31 +105,29 @@ class TestSymmetryShifterCorrectness:
             atol=ci_energy_tolerance,
         )
 
-    def test_output_is_canonical_four_center(self, water_factorized):
-        """Factorized in, dense out: the shift is applied to the dense integrals."""
+    def test_output_is_factorized(self, water_factorized):
+        """Factorized in, factorized out: the shift is absorbed into the fragments."""
         shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
         shifted = shifter.run(water_factorized, 5, 5)
 
         assert water_factorized.get_container_type() == "factorized"
-        assert shifted.get_container_type() == "canonical_four_center"
+        assert shifted.get_container_type() == "factorized"
 
-    def test_compute_shift_then_rebuild_matches_run(self, water_factorized):
-        """compute_shift() + rebuild_shifted_hamiltonian() must reproduce run()."""
+    def test_shift_reduces_reported_lambda(self, water_factorized):
+        """Because the output is still factorized, it reports its own 1-norm."""
         shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
-        shifted_run = shifter.run(water_factorized, 5, 5)
-        assert shifted_run is not None
+        shifted = shifter.run(water_factorized, 5, 5)
 
-        shifter2 = algorithms.create("symmetry_shifter", "fermionic_low_rank")
-        shift = shifter2.compute_shift(water_factorized, 5, 5)
-        shifted_manual = rebuild_shifted_hamiltonian(water_factorized, shift, 10)
-        assert shifted_manual is not None
+        assert shifted.get_container().get_lambda() < water_factorized.get_container().get_lambda()
 
-        h_run = shifted_run.get_one_body_integrals()[0]
-        h_manual = shifted_manual.get_one_body_integrals()[0]
-        assert np.allclose(h_run, h_manual, atol=1e-12)
+    def test_shift_preserves_rotations(self, water_factorized):
+        """Only the fragment eigenvalues move; the rotations and rank do not."""
+        shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        before = water_factorized.get_container()
+        after = shifter.run(water_factorized, 5, 5).get_container()
 
-        g_run = shifted_run.get_two_body_integrals()[0]
-        g_manual = shifted_manual.get_two_body_integrals()[0]
-        assert np.allclose(g_run, g_manual, atol=1e-12)
-
-        assert np.isclose(shifted_run.get_core_energy(), shifted_manual.get_core_energy(), atol=1e-12)
+        assert after.get_num_ranks() == before.get_num_ranks()
+        assert after.get_num_bases() == before.get_num_bases()
+        assert after.get_num_copies() == before.get_num_copies()
+        assert np.allclose(after.get_u_matrices(), before.get_u_matrices(), atol=1e-15)
+        assert not np.allclose(after.get_w_matrices(), before.get_w_matrices(), atol=1e-12)

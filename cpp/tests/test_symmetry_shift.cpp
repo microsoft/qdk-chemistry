@@ -16,6 +16,7 @@
 #include <string>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/symmetry_shift/fermionic_low_rank.hpp"
+#include "../src/qdk/chemistry/algorithms/symmetry_shift_detail.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
@@ -137,9 +138,9 @@ TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto shifted_ham = shifter->run(double_factorize(ham), 5, 5);
   ASSERT_NE(shifted_ham, nullptr);
 
-  // The shift is applied to the dense integrals, so what comes back is a
-  // canonical four-center Hamiltonian, not a factorized one.
-  EXPECT_FALSE(
+  // The shift is absorbed into the fragment eigenvalues, so what comes back is
+  // still a factorization.
+  EXPECT_TRUE(
       shifted_ham->has_container_type<FactorizedHamiltonianContainer>());
 
   auto mc_after = MultiConfigurationCalculatorFactory::create();
@@ -184,10 +185,9 @@ TEST_F(SymmetryShiftTest, AccumulatesZeroWeightFactorizationIntoZeroShift) {
  * @brief Regression test pinning the fermionic 1-norm reduction achieved on
  * water/STO-3G.
  *
- * The shifted Hamiltonian is canonical four-center, so it has no get_lambda()
- * of its own, and its two-body tensor is generally indefinite and cannot be
- * re-factorized. lambda is therefore observed where it is actually computed:
- * on the shift's own before/after bookkeeping.
+ * Observed on the shift's own before/after bookkeeping; see
+ * Water_STO3G_ShiftedLambdaClosure for the matching check that the shifted
+ * Hamiltonian itself reports these numbers.
  */
 TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   auto water = testing::create_water_structure();
@@ -234,45 +234,185 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
 }
 
 /**
- * @brief compute_shift() + rebuild_shifted_hamiltonian() must reproduce
- * run() exactly. This locks the refactor that split the shifter into a
- * public shift-computation step and a public, shift-agnostic rebuild step.
+ * @brief The decisive test for the factorized output: absorbing the shift into
+ * the fragment eigenvalues must reproduce the integrals that the closed-form
+ * definition of the shift prescribes.
+ *
+ * detail::add_two_body_correction() is the independent oracle, folding dg into
+ * the original tensor with no reference to the factorization. If the in-place
+ * shift (W~ = W - sqrt(2)*phi, U untouched) were wrong in sign, scale or index
+ * order, the two would disagree.
  */
-TEST_F(SymmetryShiftTest, ComputeShiftThenRebuildMatchesRun) {
+TEST_F(SymmetryShiftTest, ShiftedFactorizationReproducesDenseShiftedIntegrals) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
-  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
-
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
   auto factorized = double_factorize(ham);
 
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-  auto shifted_run = shifter->run(factorized, 5, 5);
-  ASSERT_NE(shifted_run, nullptr);
+  auto shifted = shifter->run(factorized, 5, 5);
+  ASSERT_NE(shifted, nullptr);
+  ASSERT_TRUE(shifted->has_container_type<FactorizedHamiltonianContainer>());
 
+  auto shift = SymmetryShifterFactory::create("fermionic_low_rank")
+                   ->compute_shift(*factorized, 5, 5);
+
+  auto [h0, h0_beta] = factorized->get_one_body_integrals();
+  (void)h0_beta;
+  const Eigen::Index norb = h0.rows();
+  constexpr double ne = 10.0;
+
+  Eigen::MatrixXd h_expected = h0 + (ne - 1.0) * shift.xi;
+  h_expected.diagonal().array() -= (shift.mu1 + shift.mu2);
+
+  auto [g0, g0_ab, g0_bb] = factorized->get_two_body_integrals();
+  (void)g0_ab;
+  (void)g0_bb;
+  Eigen::VectorXd g_expected = g0;
+  detail::add_two_body_correction(g_expected, norb, shift.mu2, shift.xi);
+
+  auto [h_got, h_got_beta] = shifted->get_one_body_integrals();
+  (void)h_got_beta;
+  EXPECT_TRUE(h_got.isApprox(h_expected, 1e-12));
+
+  auto [g_got, g_got_ab, g_got_bb] = shifted->get_two_body_integrals();
+  (void)g_got_ab;
+  (void)g_got_bb;
+  EXPECT_LT((g_got - g_expected).cwiseAbs().maxCoeff(), 1e-10);
+
+  EXPECT_NEAR(
+      shifted->get_core_energy(),
+      factorized->get_core_energy() + shift.mu1 * ne + shift.mu2 * ne * ne,
+      1e-12);
+}
+
+/**
+ * @brief The shift must touch nothing but the fragment eigenvalues, which is
+ * what makes the output usable by a block encoding built for the input.
+ */
+TEST_F(SymmetryShiftTest, ShiftPreservesFactorizationStructure) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
+  auto factorized = double_factorize(ham);
+  const auto& before =
+      factorized->get_container<FactorizedHamiltonianContainer>();
+
+  auto shifted = SymmetryShifterFactory::create("fermionic_low_rank")
+                     ->run(factorized, 5, 5);
+  const auto& after = shifted->get_container<FactorizedHamiltonianContainer>();
+
+  EXPECT_EQ(after.get_num_ranks(), before.get_num_ranks());
+  EXPECT_EQ(after.get_num_bases(), before.get_num_bases());
+  EXPECT_EQ(after.get_num_copies(), before.get_num_copies());
+  EXPECT_TRUE(after.get_u_matrices().isApprox(before.get_u_matrices(), 1e-15));
+  EXPECT_TRUE(after.get_wb_matrix().isZero(0.0));
+
+  // The eigenvalues did move, or the test would be vacuous.
+  EXPECT_FALSE(after.get_w_matrices().isApprox(before.get_w_matrices(), 1e-12));
+
+  // Within a fragment every eigenvalue shifts by the SAME amount, because the
+  // shift is -phi_rc * N_hat and N_hat is the fragment's own occupation sum.
+  const Eigen::VectorXd delta =
+      after.get_w_matrices() - before.get_w_matrices();
+  const size_t R = before.get_num_ranks();
+  const size_t B = before.get_num_bases();
+  const size_t C = before.get_num_copies();
+  for (size_t r = 0; r < R; ++r) {
+    for (size_t c = 0; c < C; ++c) {
+      const double reference = delta(r * B * C + c);
+      for (size_t b = 0; b < B; ++b) {
+        EXPECT_NEAR(delta(r * B * C + b * C + c), reference, 1e-12);
+      }
+    }
+  }
+}
+
+/**
+ * @brief Because the output is still a factorization, it reports its own
+ * fermionic 1-norm -- and that number must be the one the shifter's internal
+ * bookkeeping claimed. A dense output could not close this loop.
+ */
+TEST_F(SymmetryShiftTest, Water_STO3G_ShiftedLambdaClosure) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
+  auto factorized = double_factorize(ham);
+  const auto& before =
+      factorized->get_container<FactorizedHamiltonianContainer>();
+  const auto global_shift = microsoft::accumulate_fragment_shifts(before);
+
+  auto shifted = SymmetryShifterFactory::create("fermionic_low_rank")
+                     ->run(factorized, 5, 5);
+  const auto& after = shifted->get_container<FactorizedHamiltonianContainer>();
+
+  // Two-body half of Eq. 33, recomputed from the shifted eigenvalues alone.
+  const Eigen::VectorXd& w = after.get_w_matrices();
+  const size_t R = after.get_num_ranks();
+  const size_t B = after.get_num_bases();
+  const size_t C = after.get_num_copies();
+  double two_body_lambda = 0.0;
+  for (size_t r = 0; r < R; ++r) {
+    for (size_t c = 0; c < C; ++c) {
+      double sum_abs_w = 0.0;
+      for (size_t b = 0; b < B; ++b) {
+        sum_abs_w += std::abs(w(r * B * C + b * C + c));
+      }
+      two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
+    }
+  }
+  EXPECT_NEAR(two_body_lambda, global_shift.lambda_df_shifted, 1e-10);
+  EXPECT_LT(after.get_lambda(), before.get_lambda());
+}
+
+/**
+ * @brief Absorbing -phi*N_hat into the fragment eigenvalues is only valid when
+ * sum_b n_b^r really is N_hat, i.e. when U^r is a complete orthogonal
+ * rotation. Otherwise the reported 1-norms would not describe the shifted
+ * operator either, so the internal "did lambda drop?" guard could not catch it.
+ */
+TEST_F(SymmetryShiftTest, RejectsFactorizationWithoutCompleteRotations) {
+  constexpr size_t norb = 4;
+  constexpr size_t C = 1;
+
+  auto make_hamiltonian = [&](size_t B, const Eigen::VectorXd& u) {
+    auto container = std::make_unique<FactorizedHamiltonianContainer>(
+        Eigen::MatrixXd::Identity(norb, norb), u,
+        Eigen::VectorXd::Ones(1 * B * C), Eigen::MatrixXd::Zero(1, C),
+        std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
+        Eigen::MatrixXd::Zero(0, 0));
+    return std::make_shared<qdk::chemistry::data::Hamiltonian>(
+        std::move(container));
+  };
+
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+
+  // Unit-norm rows (so the container accepts them) that are not orthogonal.
+  Eigen::VectorXd u_skewed = Eigen::VectorXd::Zero(norb * norb);
+  for (size_t b = 0; b < norb; ++b) {
+    u_skewed(b * norb + 0) = 1.0;
+  }
+  EXPECT_THROW(shifter->run(make_hamiltonian(norb, u_skewed), 2, 2),
+               std::invalid_argument);
+
+  // Orthonormal but incomplete: B < norb, so sum_b n_b is a projector.
+  constexpr size_t B_small = 2;
+  Eigen::VectorXd u_partial = Eigen::VectorXd::Zero(B_small * norb);
+  for (size_t b = 0; b < B_small; ++b) {
+    u_partial(b * norb + b) = 1.0;
+  }
   auto shifter2 = SymmetryShifterFactory::create("fermionic_low_rank");
-  auto shift = shifter2->compute_shift(*factorized, 5, 5);
-  auto shifted_manual = rebuild_shifted_hamiltonian(*factorized, shift, 10u);
-  ASSERT_NE(shifted_manual, nullptr);
-
-  auto [h_run, h_run_beta] = shifted_run->get_one_body_integrals();
-  auto [h_man, h_man_beta] = shifted_manual->get_one_body_integrals();
-  (void)h_run_beta;
-  (void)h_man_beta;
-  EXPECT_TRUE(h_run.isApprox(h_man, 1e-12));
-
-  auto [g_run, g_run_ab, g_run_bb] = shifted_run->get_two_body_integrals();
-  auto [g_man, g_man_ab, g_man_bb] = shifted_manual->get_two_body_integrals();
-  (void)g_run_ab;
-  (void)g_run_bb;
-  (void)g_man_ab;
-  (void)g_man_bb;
-  EXPECT_TRUE(g_run.isApprox(g_man, 1e-12));
-
-  EXPECT_NEAR(shifted_run->get_core_energy(), shifted_manual->get_core_energy(),
-              1e-12);
+  EXPECT_THROW(shifter2->run(make_hamiltonian(B_small, u_partial), 2, 2),
+               std::invalid_argument);
 }
 
 /**

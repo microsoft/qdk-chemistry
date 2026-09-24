@@ -61,8 +61,8 @@ Bundles the three quantities (mu1, mu2, xi) that define the symmetry-shift
 operator subtracted from a Hamiltonian to reduce its fermionic 1-norm while
 leaving the target electron-number sector's energy invariant. A SymmetryShift
 carries only the *result* of a shift computation, so it can come from
-:meth:`SymmetryShifter.compute_shift` or from an external source and be
-applied via :func:`rebuild_shifted_hamiltonian`.
+:meth:`SymmetryShifter.compute_shift` or from an external source. Applying
+one is :meth:`SymmetryShifter.run`'s job.
 )")
       .def(py::init<>())
       .def_readwrite("mu1", &SymmetryShift::mu1, "One-electron shift.")
@@ -76,38 +76,6 @@ applied via :func:`rebuild_shifted_hamiltonian`.
                std::to_string(s.xi.cols()) + ">";
       });
 
-  // Module-level rebuild_shifted_hamiltonian: apply a SymmetryShift to a
-  // Hamiltonian.
-  m.def("rebuild_shifted_hamiltonian", &rebuild_shifted_hamiltonian,
-        py::arg("original"), py::arg("shift"), py::arg("num_electrons"), R"(
-Apply a symmetry shift to a Hamiltonian and assemble the shifted one.
-
-Applies the shift parameters (mu1, mu2, xi) to the dense integrals of
-``original``. Because the corresponding operator K annihilates every
-``num_electrons``-electron state, the energy of that sector is unchanged.
-
-How the shift was computed is irrelevant: it may come from
-:meth:`SymmetryShifter.compute_shift` or from any external source.
-
-Args:
-    original (qdk_chemistry.data.Hamiltonian): The Hamiltonian being shifted.
-        Must be restricted.
-    shift (qdk_chemistry.algorithms.SymmetryShift): The shift parameters
-        (mu1, mu2, xi) to apply.
-    num_electrons (int): Target number of active electrons (Ne). Must be a
-        non-negative integer; the invariance guarantee only holds for an
-        integer electron count.
-
-Returns:
-    qdk_chemistry.data.Hamiltonian: The shifted Hamiltonian.
-
-Raises:
-    ValueError: If ``original`` is unrestricted or ``shift.xi`` is not
-        norb x norb.
-    TypeError: If ``num_electrons`` is negative or non-integer.
-
-)");
-
   // SymmetryShifter abstract base class
   py::class_<SymmetryShifter, SymmetryShifterBase, py::smart_holder> shifter(
       m, "SymmetryShifter",
@@ -119,12 +87,12 @@ alpha/beta electrons, to a new Hamiltonian that is energetically equivalent
 within the target electron-number sector but whose LCU/qubitization
 coefficients (e.g. the fermionic 1-norm lambda) may be reduced.
 
-Every implementation is a thin composition of two public steps:
-:meth:`compute_shift` computes the parameters (mu1, mu2, xi) -- this is what
-distinguishes one implementation from another -- and
-:func:`rebuild_shifted_hamiltonian` applies a shift to a Hamiltonian. Callers
-can obtain a :class:`SymmetryShift` on its own, or supply an externally
-computed one to :func:`rebuild_shifted_hamiltonian` directly.
+:meth:`run` computes the shift and applies it in one step.
+:meth:`compute_shift` is the inspect-only half, reporting the parameters
+(mu1, mu2, xi) that :meth:`run` would use -- this is what distinguishes one
+implementation from another. Applying a shift is deliberately not exposed on
+its own, because how it folds into the Hamiltonian depends on the
+representation the implementation consumes.
 
 Concrete implementations should inherit from this class.
 
@@ -132,7 +100,7 @@ Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> shifter = alg.FermionicLowRankShifter()
     >>> shift = shifter.compute_shift(hamiltonian, n_alpha, n_beta)
-    >>> shifted = alg.rebuild_shifted_hamiltonian(hamiltonian, shift, n_alpha + n_beta)
+    >>> shifted = alg.FermionicLowRankShifter().run(hamiltonian, n_alpha, n_beta)
 
 )");
 
@@ -161,9 +129,8 @@ Raises:
               R"(
 Compute the symmetry shift (mu1, mu2, xi) for a target electron count.
 
-Returns the resulting parameters *without* rebuilding the Hamiltonian. Use
-:func:`rebuild_shifted_hamiltonian` to apply the returned (or an externally
-sourced) :class:`SymmetryShift`.
+Returns the resulting parameters *without* rebuilding the Hamiltonian, so a
+caller can inspect or compare shifts. Use :meth:`run` to apply one.
 
 Args:
     hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to analyze. Must be restricted.
@@ -271,8 +238,10 @@ fragments of an already double-factorized Hamiltonian each receive the
 closed-form median shift, and the one-electron shift is optimized against the
 resulting effective one-electron operator.
 
-The input must be backed by a ``FactorizedHamiltonianContainer``; the shifted
-Hamiltonian that comes back is a canonical four-center one.
+The input must be backed by a ``FactorizedHamiltonianContainer`` whose
+rotations are complete orthogonal ones, and so is the output: the shift is
+absorbed into the fragment eigenvalues, so the result can be block-encoded
+without being refactorized. Call ``get_two_body_integrals()`` for dense ones.
 
 Typical usage:
 
@@ -287,7 +256,6 @@ Typical usage:
 
 See Also:
     :class:`SymmetryShifter`
-    :func:`rebuild_shifted_hamiltonian`
 
 )")
       .def(py::init<>(), R"(

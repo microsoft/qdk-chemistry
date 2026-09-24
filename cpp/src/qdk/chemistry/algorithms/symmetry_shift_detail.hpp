@@ -13,15 +13,14 @@ namespace qdk::chemistry::algorithms::detail {
 //
 //   dg_ijkl = -2*mu2*delta_ij*delta_kl - xi_ij*delta_kl - delta_ij*xi_kl
 //
-// Single source of truth for dg: rebuild_shifted_hamiltonian() folds the full
-// tensor in via add_two_body_correction(), while a one-electron shift solver
-// needs only dg's Coulomb/exchange contractions. Deriving all three from the
-// one definition above, and defining them side by side in symmetry_shift.cpp,
-// keeps them from silently drifting apart.
+// Single source of truth for dg: a one-electron shift solver needs only dg's
+// Coulomb/exchange contractions, while add_two_body_correction() folds the
+// full tensor in and is therefore the reference definition those contractions,
+// and the shifted Hamiltonians the tests check, must agree with. Defining all
+// three side by side in symmetry_shift.cpp keeps them from drifting apart.
 //
-// Private to the library and shared between rebuild_shifted_hamiltonian() and
-// the SymmetryShifter implementations; not part of the public API, which
-// exchanges shifts only as SymmetryShift{mu1, mu2, xi}.
+// Private to the library; not part of the public API, which exchanges shifts
+// only as SymmetryShift{mu1, mu2, xi}.
 
 /// Fold the Coulomb-type contraction of dg into `coulomb` in place, so on
 /// return it holds coul(g~) = coul(g) + Sum_k dg_ijkk, where
