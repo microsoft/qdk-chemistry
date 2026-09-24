@@ -194,8 +194,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         over the :math:`N+1 = 2^{\text{num\_bits}}` register slots, where
         :math:`N = 2^{\text{num\_bits}} - 1` is the total number of controlled-unitary
         applications. It attains the minimum Holevo variance
-        :math:`\tan^2(\pi/(N+2))` :cite:`Babbush2018,Berry2009`, whereas the uniform
-        window's variance follows the standard quantum limit.
+        :math:`\tan^2(\pi/(N+2))` :cite:`Babbush2018,Berry2009`.
 
         Args:
             num_bits: Number of phase-register qubits.
@@ -211,8 +210,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         if window == "uniform":
             return QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         if window == "sine":
-            # cosine_window_state spans num_queries + 1 = 2^num_bits slots and normalizes
-            # against num_queries + 2 = N + 2, so it fills the register exactly.
             params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
                 rowMap=list(range(num_bits - 1, -1, -1)),
                 stateVector=cosine_window_state((1 << num_bits) - 1),

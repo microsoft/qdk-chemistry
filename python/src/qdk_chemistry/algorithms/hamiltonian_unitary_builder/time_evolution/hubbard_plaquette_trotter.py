@@ -43,12 +43,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
 from qdk_chemistry.data.qubit_operator import QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    BatchedExponentiatedPauliTerm,
-    ConjugatedExponentiatedPauliTerm,
-    ExponentiatedPauliTerm,
-    PauliProductFormulaContainer,
-)
+from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
@@ -82,7 +77,6 @@ class HubbardPlaquetteTrotter(Trotter):
         t: float = 1.0,
         U: float = 0.0,  # noqa: N803  (standard Hubbard symbol, as in create_hubbard_hamiltonian)
         epsilon: float = 0.0,
-        max_batch: int = 0,
         time: float = 0.0,
         target_accuracy: float = 0.0,
         num_divisions: int = 0,
@@ -98,7 +92,6 @@ class HubbardPlaquetteTrotter(Trotter):
             t: Uniform hopping amplitude of the Fermi-Hubbard model.
             U: Uniform on-site interaction of the Fermi-Hubbard model.
             epsilon: Uniform on-site energy. Use ``-U/2`` for the particle-hole-shifted model.
-            max_batch: Largest Hamming-weight phasing batch, or 0 for unbounded.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto step computation. Use 0.0 to disable.
             num_divisions: Divisions per Trotter step. Max of this and the auto value is used.
@@ -135,7 +128,6 @@ class HubbardPlaquetteTrotter(Trotter):
         settings.set("t", t)
         settings.set("U", U)
         settings.set("epsilon", epsilon)
-        settings.set("max_batch", max_batch)
         self._settings = settings
 
     def name(self) -> str:
@@ -213,35 +205,22 @@ class HubbardPlaquetteTrotter(Trotter):
                 "second-order constant and would understate a first-order product's error."
             )
         atol = self._settings.get("weight_threshold")
-        max_batch = self._settings.get("max_batch")
 
-        # 1. Geometry, and the on-site layer it implies. With spin-blocked modes
-        # (spin-up 0..n-1, spin-down n..2n-1) and n_p = (I - Z_p)/2, site i with on-site
-        # energy eps and interaction U contributes
-        #     eps (n_up + n_dn) + U n_up n_dn
-        #       = (eps + U/4) I - (eps/2 + U/4) (Z_i + Z_{i+n}) + (U/4) Z_i Z_{i+n},
-        # so the particle-hole-shifted choice eps = -U/2 cancels the single-qubit terms
-        # and leaves one equal-angle Z_i Z_{i+n} family. Angles are per unit time.
+        # 1. Geometry, and the on-site angles the model settings imply. With spin-blocked
+        # modes and n_p = (I - Z_p)/2, site i with energy eps and interaction U gives
+        #   eps (n_up + n_dn) + U n_up n_dn
+        #     = (eps + U/4) I - (eps/2 + U/4)(Z_i + Z_{i+n}) + (U/4) Z_i Z_{i+n},
+        # so eps = -U/2 cancels the single-mode family and leaves one equal-angle pair
+        # family. Angles here are per unit time; the step duration scales them below.
         lattice, width, height = self._lattice_geometry(qubit_hamiltonian)
         num_sites = width * height
         interaction = float(self._settings.get("U"))
         epsilon = float(self._settings.get("epsilon"))
         single_z = -(0.5 * epsilon + 0.25 * interaction)
         pair_z = 0.25 * interaction
-        identity_angle = (epsilon + 0.25 * interaction) * num_sites
-        diagonal: list[ExponentiatedPauliTerm] = []
-        for site in range(num_sites):
-            if abs(single_z) > atol:
-                diagonal.append(ExponentiatedPauliTerm(pauli_term={site: "Z"}, angle=single_z))
-                diagonal.append(ExponentiatedPauliTerm(pauli_term={site + num_sites: "Z"}, angle=single_z))
-            if abs(pair_z) > atol:
-                diagonal.append(
-                    ExponentiatedPauliTerm(pauli_term={site: "Z", site + num_sites: "Z"}, angle=pair_z)
-                )
-        if abs(identity_angle) <= atol:
-            identity_angle = 0.0
+        identity = (epsilon + 0.25 * interaction) * num_sites
 
-        # 2. Hopping amplitude and the two vertex-disjoint tilings covering every bond.
+        # 2. Hopping amplitude; the tilings themselves are derived in Q# from the shape.
         hopping, bonds = self._uniform_hopping(lattice, atol)
         pink, gold = self._plaquette_sections(width, height)
         tiled = {frozenset((cycle[i], cycle[(i + 1) % 4])) for cycle in pink + gold for i in range(4)}
@@ -253,44 +232,26 @@ class HubbardPlaquetteTrotter(Trotter):
                 "dimensions, the boundary conditions, and that sites are numbered row-major."
             )
 
-        # 3. Step count, reusing the hopping amplitude resolved above.
+        # 3. Step count, reusing the hopping amplitude and tilings resolved above.
         time, power_repetitions = self._resolve_power()
         num_divisions = self._step_count(hopping, (pink, gold), width, height, time)
         delta = time / num_divisions
 
-        # 4. Repeated body D^(1/2) G D^(1/2) P. The interaction half-layers are
-        # equal-angle families, so they are phased through a Hamming weight register;
-        # see max_batch to bound its width.
-        body: list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm] = []
-        body.extend(self._diagonal_layer(diagonal, delta * 0.5, max_batch=max_batch))
-        gold_layer = self._hop_layer(gold, num_sites=num_sites, hopping=hopping, time=delta)
-        if gold_layer is not None:
-            body.append(gold_layer)
-        body.extend(self._diagonal_layer(diagonal, delta * 0.5, max_batch=max_batch))
-        if identity_angle:
-            body.append(ExponentiatedPauliTerm(pauli_term={}, angle=identity_angle * delta))
-        pink_layer = self._hop_layer(pink, num_sites=num_sites, hopping=hopping, time=delta)
-        if pink_layer is not None:
-            body.append(pink_layer)
-
-        # The one-time P^(1/2) boundary the merge leaves outside the repetitions.
-        opening = self._hop_layer(pink, num_sites=num_sites, hopping=hopping, time=delta * 0.5)
-
         return UnitaryRepresentation(
-            container=PauliProductFormulaContainer(
-                step_terms=body,
+            container=HubbardPlaquetteContainer(
+                width=width,
+                height=height,
+                interaction_angle=pair_z * delta,
+                onsite_angle=single_z * delta,
+                identity_angle=identity * delta,
+                hopping_angle=2.0 * hopping * delta,
                 step_reps=num_divisions * power_repetitions,
-                num_qubits=2 * num_sites,
                 scale=time,
-                conjugating_terms=[opening] if opening is not None else [],
             )
         )
 
     def _uniform_hopping(self, lattice, atol: float) -> tuple[float, set[frozenset[int]]]:
         """Return the uniform hopping amplitude and the lattice's bonds.
-
-        Each lattice edge carries the ``t`` setting scaled by its edge weight, so the
-        weights must agree for the plaquette evolutions to be exact.
 
         Args:
             lattice: The lattice graph supplying the bonds.
@@ -456,129 +417,6 @@ class HubbardPlaquetteTrotter(Trotter):
                     )
         return section_a, section_b
 
-    def _hop_layer(
-        self,
-        section: list[tuple[int, ...]],
-        *,
-        num_sites: int,
-        hopping: float,
-        time: float,
-    ) -> ConjugatedExponentiatedPauliTerm | None:
-        r"""Evolve every plaquette of *section* for both spin sectors.
-
-        Each plaquette evolution is the conjugation :math:`U_V D U_V^\dagger`.
-        Campbell's Appendix E absorbs the innermost Fourier-transform butterfly
-        into the two eigenvalue phases, leaving four fixed factors on each side
-        and two synthesized rotations in the middle (Eqs. (E11)--(E14)). The
-        structural blocks are hoisted across each vertex-disjoint section so its
-        equal-angle phase families can use Hamming-weight phasing.
-
-        Args:
-            section: One pink or gold tiling's four-cycles, or empty for the 2x2 lattice.
-            num_sites: Number of sites in one spin sector.
-            hopping: Uniform hopping amplitude.
-            time: Duration of this section evolution.
-
-        Returns:
-            The hopping tiling as a structured basis-change conjugation, or ``None`` when empty.
-
-        """
-        heads: list[ExponentiatedPauliTerm] = []
-        phases: list[ExponentiatedPauliTerm] = []
-        for spin_offset in (0, num_sites):
-            for cycle in section:
-                sites = tuple(site + spin_offset for site in cycle)
-                head: list[ExponentiatedPauliTerm] = []
-
-                # These are the two remaining radix-2 butterflies after Campbell's
-                # innermost one is fused into the phase layer. Their Jordan-Wigner
-                # strings allow nonadjacent modes without a fermionic swap network.
-                for local_i, local_j in ((0, 2), (1, 3)):
-                    mode_i, mode_j = sites[local_i], sites[local_j]
-                    low, high = min(mode_i, mode_j), max(mode_i, mode_j)
-                    string = dict.fromkeys(range(low + 1, high), "Z")
-                    half = math.pi / 8.0 if mode_i < mode_j else -math.pi / 8.0
-                    head += [
-                        ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "Y"}, angle=-half),
-                        ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "X"}, angle=half),
-                    ]
-
-                # G_01^dagger exp(i alpha n_0) exp(-i alpha n_1) G_01 becomes
-                # the two equal-angle XX/YY rotations on the plaquette's first bond.
-                kappa = 2.0 * hopping * time
-                low, high = min(sites[0], sites[1]), max(sites[0], sites[1])
-                string = dict.fromkeys(range(low + 1, high), "Z")
-                middle = [
-                    ExponentiatedPauliTerm(pauli_term={**string, low: "X", high: "X"}, angle=-kappa / 2.0),
-                    ExponentiatedPauliTerm(pauli_term={**string, low: "Y", high: "Y"}, angle=-kappa / 2.0),
-                ]
-                heads += head
-                phases += middle
-        if not heads:
-            return None
-        return ConjugatedExponentiatedPauliTerm(
-            within_terms=heads,
-            apply_terms=self._batch_equal_angles(phases, max_batch=self._settings.get("max_batch")),
-        )
-
-    @classmethod
-    def _diagonal_layer(
-        cls,
-        diagonal: list[ExponentiatedPauliTerm],
-        fraction: float,
-        max_batch: int = 0,
-    ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]:
-        """Rescale mapped :math:`H_I` terms and group equal-angle rotations."""
-        scaled = [
-            ExponentiatedPauliTerm(pauli_term=dict(term.pauli_term), angle=term.angle * fraction) for term in diagonal
-        ]
-        return cls._batch_equal_angles(scaled, max_batch=max_batch)
-
-    @staticmethod
-    def _batch_equal_angles(
-        terms: list[ExponentiatedPauliTerm],
-        max_batch: int = 0,
-    ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm]:
-        """Group disjoint equal-angle terms for Hamming-weight phasing."""
-        families: dict[tuple[float, int], list[ExponentiatedPauliTerm]] = {}
-        loose: list[ExponentiatedPauliTerm] = []
-        for term in terms:
-            if not term.pauli_term:
-                loose.append(term)
-                continue
-            key = (round(term.angle, 12), len(term.pauli_term))
-            families.setdefault(key, []).append(term)
-
-        batched: list[BatchedExponentiatedPauliTerm] = []
-        for _, family in sorted(families.items()):
-            groups: list[list[ExponentiatedPauliTerm]] = []
-            supports: list[set[int]] = []
-            for term in family:
-                support = set(term.pauli_term)
-                for index, taken in enumerate(supports):
-                    if not (taken & support):
-                        groups[index].append(term)
-                        supports[index] = taken | support
-                        break
-                else:
-                    groups.append([term])
-                    supports.append(support)
-
-            for group in groups:
-                width = len(group) if max_batch <= 0 else min(max_batch, len(group))
-                for start in range(0, len(group), width):
-                    chunk = group[start : start + width]
-                    if len(chunk) < 2:
-                        loose.extend(chunk)
-                        continue
-                    batched.append(
-                        BatchedExponentiatedPauliTerm(
-                            pauli_terms=[term.pauli_term for term in chunk],
-                            angle=chunk[0].angle,
-                        )
-                    )
-        return batched + loose
-
 
 class HubbardPlaquetteTrotterSettings(TrotterSettings):
     """Settings for the plaquette Trotter builder."""
@@ -593,14 +431,4 @@ class HubbardPlaquetteTrotterSettings(TrotterSettings):
             "float",
             0.0,
             "Uniform on-site energy; use -U/2 for the particle-hole-shifted model.",
-        )
-        self._set_default(
-            "max_batch",
-            "int",
-            0,
-            "Largest Hamming-weight phasing batch, or 0 for unbounded, or 1 to phase every "
-            "term individually. A batch of m equal-angle terms on disjoint qubits costs "
-            "ceil(log2(m+1)) rotations and about m ancillas, so capping it trades rotations "
-            "for width. Campbell's Table II budgets L^2/2 ancillas (arXiv:2012.09238v4); pass "
-            "that to reproduce his qubit counts rather than the cheaper rotation count.",
         )
