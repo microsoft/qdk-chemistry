@@ -267,9 +267,12 @@ Fermionic low-rank BLISS symmetry shifter.
 
 Computes the block-invariant symmetry shift (BLISS) parameters (mu1, mu2, xi)
 with the fermionic low-rank method of Patel et al. (arXiv:2409.18277): the
-physical two-electron coefficient 1/2 g is double-factorized, each fragment
-receives the closed-form median shift, and the one-electron shift is optimized
-against the resulting effective one-electron operator.
+fragments of an already double-factorized Hamiltonian each receive the
+closed-form median shift, and the one-electron shift is optimized against the
+resulting effective one-electron operator.
+
+The input must be backed by a ``FactorizedHamiltonianContainer``; the shifted
+Hamiltonian that comes back is a canonical four-center one.
 
 Typical usage:
 
@@ -277,12 +280,10 @@ Typical usage:
 
     import qdk_chemistry.algorithms as alg
 
+    factorized = alg.DoubleFactorization().run(hamiltonian)
+
     shifter = alg.FermionicLowRankShifter()
-
-    # Optionally truncate the double factorization
-    shifter.settings().set("df_truncation_threshold", 1e-8)
-
-    shifted = shifter.run(hamiltonian, n_alpha, n_beta)
+    shifted = shifter.run(factorized, n_alpha, n_beta)
 
 See Also:
     :class:`SymmetryShifter`
@@ -292,8 +293,7 @@ See Also:
       .def(py::init<>(), R"(
 Default constructor.
 
-Initializes a fermionic low-rank symmetry shifter with default settings
-(df_truncation_threshold = 0.0).
+Initializes a fermionic low-rank symmetry shifter. It has no settings.
 
 )")
       .def("__repr__", [](const microsoft::FermionicLowRankShifter &) {

@@ -5,6 +5,4 @@ target_sources(chemistry PRIVATE
     orbital_rotation.cpp
     golden_section.cpp
     logger.cpp
-    double_factorization.cpp
-    hamiltonian_one_norm.cpp
 )

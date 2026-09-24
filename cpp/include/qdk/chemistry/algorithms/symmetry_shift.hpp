@@ -109,8 +109,8 @@ std::shared_ptr<data::Hamiltonian> rebuild_shifted_hamiltonian(
  * @see SymmetryShift
  * @see rebuild_shifted_hamiltonian
  * @see SymmetryShifterFactory for creating instances of symmetry shifters
- * @see qdk::chemistry::utils::hamiltonian_one_norm to inspect a Hamiltonian's
- *      fermionic 1-norm without running a shifter.
+ * @see data::FactorizedHamiltonianContainer::get_lambda to inspect a
+ *      factorized Hamiltonian's fermionic 1-norm without running a shifter.
  */
 class SymmetryShifter
     : public Algorithm<SymmetryShifter, std::shared_ptr<data::Hamiltonian>,
@@ -194,8 +194,7 @@ class SymmetryShifter
  * ```
  * using qdk::chemistry::algorithms::SymmetryShifterFactory;
  * auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
- * shifter->settings().set("df_truncation_threshold", 1e-8);
- * auto shifted = shifter->run(hamiltonian, n_alpha, n_beta);
+ * auto shifted = shifter->run(factorized_hamiltonian, n_alpha, n_beta);
  * ```
  *
  * @see SymmetryShifter

@@ -4,20 +4,39 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
+
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/symmetry_shift.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian_factorization.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/settings.hpp>
-#include <qdk/chemistry/utils/hamiltonian_one_norm.hpp>
 #include <string>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/symmetry_shift/fermionic_low_rank.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
-using qdk::chemistry::utils::DoubleFactorizationMethod;
+using qdk::chemistry::data::FactorizedHamiltonianContainer;
+
+namespace {
+
+/// The shifter consumes an already double-factorized Hamiltonian, so every
+/// test that runs it has to factorize first.
+std::shared_ptr<qdk::chemistry::data::Hamiltonian> double_factorize(
+    std::shared_ptr<qdk::chemistry::data::Hamiltonian> hamiltonian) {
+  return HamiltonianFactorizationFactory::create("double_factorization")
+      ->run(std::move(hamiltonian));
+}
+
+/// Recorded from a local run; see Water_STO3G_OneNormRegression.
+constexpr double kWaterLambdaDfBaseline = 11.531420411934715;
+constexpr double kWaterLambdaDfShifted = 4.522496176156583;
+
+}  // namespace
 
 class SymmetryShiftTest : public ::testing::Test {};
 
@@ -37,26 +56,31 @@ TEST_F(SymmetryShiftTest, FactoryHygiene) {
                std::runtime_error);
 }
 
-TEST_F(SymmetryShiftTest, DefaultTruncationThresholdIsZero) {
+/**
+ * @brief The shifter consumes whatever factorization it is handed, so it has
+ * no settings of its own. Truncation and the choice of decomposition belong to
+ * the double_factorization algorithm.
+ */
+TEST_F(SymmetryShiftTest, HasNoSettings) {
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-  EXPECT_DOUBLE_EQ(shifter->settings().get<double>("df_truncation_threshold"),
-                   0.0);
+  EXPECT_TRUE(shifter->settings().keys().empty());
 }
 
 /**
- * @brief df_truncation_threshold is compared against |eigenvalue|, so a
- * negative value can never truncate anything and is silently meaningless
- * without a constraint. Its BoundConstraint must reject it.
+ * @brief A Hamiltonian that has not been double-factorized carries no
+ * fragments to shift, so it must be rejected rather than silently mishandled.
  */
-TEST_F(SymmetryShiftTest, NegativeTruncationThresholdIsRejected) {
+TEST_F(SymmetryShiftTest, RejectsNonFactorizedHamiltonian) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto ham = HamiltonianConstructorFactory::create()->run(
+      wfn_HF->get_orbitals());
+  ASSERT_FALSE(ham->has_container_type<FactorizedHamiltonianContainer>());
+
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-
-  EXPECT_THROW(shifter->settings().set("df_truncation_threshold", -1.0e-8),
-               std::invalid_argument);
-
-  // The boundary value and ordinary positive values remain valid.
-  EXPECT_NO_THROW(shifter->settings().set("df_truncation_threshold", 0.0));
-  EXPECT_NO_THROW(shifter->settings().set("df_truncation_threshold", 1.0e-8));
+  EXPECT_THROW(shifter->run(ham, 5, 5), std::invalid_argument);
 }
 
 /**
@@ -71,7 +95,6 @@ TEST_F(SymmetryShiftTest, ResolvesAlgorithmDefaults) {
   ASSERT_NE(settings, nullptr)
       << "symmetry_shifter is missing from the REGISTER_FACTORY_SETTINGS_INIT "
          "block in algorithms/algorithm_defaults.cpp";
-  EXPECT_DOUBLE_EQ(settings->get<double>("df_truncation_threshold"), 0.0);
 
   // The path that actually bites: a nested reference must self-resolve.
   const qdk::chemistry::data::AlgorithmRef ref("symmetry_shifter",
@@ -111,105 +134,103 @@ TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto mc = MultiConfigurationCalculatorFactory::create();
   auto [E_before, wfn_before] = mc->run(ham, 5, 5);
 
-  for (const double threshold : {0.0, 1e-6}) {
-    auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-    shifter->settings().set("df_truncation_threshold", threshold);
-    auto shifted_ham = shifter->run(ham, 5, 5);
-    ASSERT_NE(shifted_ham, nullptr);
-
-    auto mc_after = MultiConfigurationCalculatorFactory::create();
-    auto [E_after, wfn_after] = mc_after->run(shifted_ham, 5, 5);
-
-    EXPECT_NEAR(E_before, E_after, testing::ci_energy_tolerance)
-        << "Energy not invariant at df_truncation_threshold=" << threshold;
-  }
-}
-
-/**
- * @brief An empty fragment list must still produce a correctly sized xi.
- *
- * xi used to be sized from the fragments themselves, so no fragments meant a
- * 0x0 xi and an out-of-bounds read downstream.
- */
-TEST_F(SymmetryShiftTest, AccumulatesEmptyFragmentListIntoZeroShift) {
-  constexpr Eigen::Index norb = 7;
-  auto shift = microsoft::accumulate_fragment_shifts({}, norb);
-
-  EXPECT_EQ(shift.xi.rows(), norb);
-  EXPECT_EQ(shift.xi.cols(), norb);
-  EXPECT_TRUE(shift.xi.isZero());
-  EXPECT_DOUBLE_EQ(shift.mu2, 0.0);
-}
-
-/**
- * @brief A df_truncation_threshold above every fragment eigenvalue must be
- * handled gracefully rather than crashing, and must keep the energy invariant.
- */
-TEST_F(SymmetryShiftTest, Water_STO3G_SurvivesAllFragmentsTruncated) {
-  auto water = testing::create_water_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
-
-  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
-
-  auto mc = MultiConfigurationCalculatorFactory::create();
-  auto [E_before, wfn_before] = mc->run(ham, 5, 5);
-
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-  shifter->settings().set("df_truncation_threshold", 1.0e6);
-
-  auto [h_alpha, h_beta] = ham->get_one_body_integrals();
-  auto shift = shifter->compute_shift(*ham, 5, 5);
-  EXPECT_EQ(shift.xi.rows(), h_alpha.rows());
-  EXPECT_TRUE(shift.xi.isZero());
-  EXPECT_DOUBLE_EQ(shift.mu2, 0.0);
-
-  auto shifted_ham = shifter->run(ham, 5, 5);
+  auto shifted_ham = shifter->run(double_factorize(ham), 5, 5);
   ASSERT_NE(shifted_ham, nullptr);
+
+  // The shift is applied to the dense integrals, so what comes back is a
+  // canonical four-center Hamiltonian, not a factorized one.
+  EXPECT_FALSE(shifted_ham->has_container_type<FactorizedHamiltonianContainer>());
 
   auto mc_after = MultiConfigurationCalculatorFactory::create();
   auto [E_after, wfn_after] = mc_after->run(shifted_ham, 5, 5);
+
   EXPECT_NEAR(E_before, E_after, testing::ci_energy_tolerance);
 }
 
 /**
- * @brief Regression test pinning the fermionic double-factorization 1-norm of
- * the shifted water/STO-3G Hamiltonian to a value recorded from a local run.
+ * @brief A factorization whose weights are all zero carries no shift, but must
+ * still produce a correctly sized xi. xi used to be sized from the fragments
+ * themselves, so no fragments meant a 0x0 xi and an out-of-bounds read
+ * downstream.
+ */
+TEST_F(SymmetryShiftTest, AccumulatesZeroWeightFactorizationIntoZeroShift) {
+  constexpr size_t norb = 7;
+  constexpr size_t R = 1;
+  constexpr size_t B = norb;
+  constexpr size_t C = 1;
+
+  // U^0 = identity, so every basis row is normalized as the container demands.
+  Eigen::VectorXd u = Eigen::VectorXd::Zero(R * B * norb);
+  for (size_t b = 0; b < B; ++b) {
+    u(b * norb + b) = 1.0;
+  }
+
+  FactorizedHamiltonianContainer container(
+      Eigen::MatrixXd::Zero(norb, norb), u, Eigen::VectorXd::Zero(R * B * C),
+      Eigen::MatrixXd::Zero(R, C),
+      std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
+      Eigen::MatrixXd::Zero(0, 0));
+
+  auto shift = microsoft::accumulate_fragment_shifts(container);
+
+  EXPECT_EQ(shift.xi.rows(), static_cast<Eigen::Index>(norb));
+  EXPECT_EQ(shift.xi.cols(), static_cast<Eigen::Index>(norb));
+  EXPECT_TRUE(shift.xi.isZero());
+  EXPECT_DOUBLE_EQ(shift.mu2, 0.0);
+}
+
+/**
+ * @brief Regression test pinning the fermionic 1-norm reduction achieved on
+ * water/STO-3G.
+ *
+ * The shifted Hamiltonian is canonical four-center, so it has no get_lambda()
+ * of its own, and its two-body tensor is generally indefinite and cannot be
+ * re-factorized. lambda is therefore observed where it is actually computed:
+ * on the shift's own before/after bookkeeping.
  */
 TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
-  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
-  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+  auto ham = HamiltonianConstructorFactory::create()->run(
+      wfn_HF->get_orbitals());
+  auto factorized = double_factorize(ham);
+  const auto& container =
+      factorized->get_container<FactorizedHamiltonianContainer>();
 
-  // The reported two-body 1-norm depends on which double factorization was
-  // used, because lambda is not invariant under the M = X X^T gauge freedom.
-  // The BLISS shift is also derived from the fragments, so both the shift and
-  // the reported norm move with the method. Pin all four combinations.
-  auto shifted_one_norm = [&](const std::string& shift_method,
-                              DoubleFactorizationMethod report_method) {
-    auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-    shifter->settings().set("df_method", shift_method);
-    auto shifted_ham = shifter->run(ham, 5, 5);
-    return qdk::chemistry::utils::hamiltonian_one_norm(*shifted_ham, 0.0,
-                                                       report_method)
-        .total;
-  };
+  auto global_shift = microsoft::accumulate_fragment_shifts(container);
 
-  // Default path: Cholesky shift reported in the Cholesky gauge.
-  EXPECT_NEAR(shifted_one_norm("cholesky", DoubleFactorizationMethod::Cholesky),
-              27.482617251, 1e-6);
-  EXPECT_NEAR(shifted_one_norm("eigen", DoubleFactorizationMethod::Cholesky),
-              27.436391399, 1e-6);
-  EXPECT_NEAR(shifted_one_norm("cholesky", DoubleFactorizationMethod::Eigen),
-              27.549852521, 1e-6);
-  // Historical value: this is the number the eigen-only implementation
-  // reported, and it must not move.
-  EXPECT_NEAR(shifted_one_norm("eigen", DoubleFactorizationMethod::Eigen),
-              27.590504297, 1e-6);
+  // Independent check of the sqrt(2) convention: the container stores the
+  // eigenvalues W of fragments of g, while BLISS works with eps = W/sqrt(2)
+  // drawn from V = 1/2 g. The baseline sum_a 1/2 (sum|eps|)^2 must therefore
+  // reproduce the two-body half of Eq. 33, 1/4 sum_rc (sum_b |W_b|)^2. Getting
+  // the scale wrong changes this by a factor of two.
+  const auto& w = container.get_w_matrices();
+  const size_t R = container.get_num_ranks();
+  const size_t B = container.get_num_bases();
+  const size_t C = container.get_num_copies();
+  double two_body_lambda = 0.0;
+  for (size_t r = 0; r < R; ++r) {
+    for (size_t c = 0; c < C; ++c) {
+      double sum_abs_w = 0.0;
+      for (size_t b = 0; b < B; ++b) {
+        sum_abs_w += std::abs(w(r * B * C + b * C + c));
+      }
+      two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
+    }
+  }
+  EXPECT_NEAR(global_shift.lambda_df_baseline, two_body_lambda, 1e-10);
+
+  // The container's own Lambda adds the one-body norm on top.
+  EXPECT_GT(container.get_lambda(), global_shift.lambda_df_baseline);
+
+  // The per-fragment median shift must not increase the two-body 1-norm.
+  EXPECT_LE(global_shift.lambda_df_shifted, global_shift.lambda_df_baseline);
+
+  EXPECT_NEAR(global_shift.lambda_df_baseline, kWaterLambdaDfBaseline, 1e-6);
+  EXPECT_NEAR(global_shift.lambda_df_shifted, kWaterLambdaDfShifted, 1e-6);
 }
 
 /**
@@ -225,13 +246,15 @@ TEST_F(SymmetryShiftTest, ComputeShiftThenRebuildMatchesRun) {
   auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
   auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
 
+  auto factorized = double_factorize(ham);
+
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-  auto shifted_run = shifter->run(ham, 5, 5);
+  auto shifted_run = shifter->run(factorized, 5, 5);
   ASSERT_NE(shifted_run, nullptr);
 
   auto shifter2 = SymmetryShifterFactory::create("fermionic_low_rank");
-  auto shift = shifter2->compute_shift(*ham, 5, 5);
-  auto shifted_manual = rebuild_shifted_hamiltonian(*ham, shift, 10u);
+  auto shift = shifter2->compute_shift(*factorized, 5, 5);
+  auto shifted_manual = rebuild_shifted_hamiltonian(*factorized, shift, 10u);
   ASSERT_NE(shifted_manual, nullptr);
 
   auto [h_run, h_run_beta] = shifted_run->get_one_body_integrals();
@@ -253,10 +276,10 @@ TEST_F(SymmetryShiftTest, ComputeShiftThenRebuildMatchesRun) {
 }
 
 /**
- * @brief A Hamiltonian storing three-center integrals is shifted through the
- * factored path, which never builds the norb^4 tensor. The shift is a
- * symmetry, so the resulting Hamiltonian must be spectrally equivalent to the
- * unshifted one in the target particle-number sector.
+ * @brief A Hamiltonian storing three-center integrals must survive the whole
+ * pipeline: double_factorization accepts it directly, and the shift is a
+ * symmetry, so the result stays spectrally equivalent in the target
+ * particle-number sector.
  */
 TEST_F(SymmetryShiftTest, CholeskyContainerIsShiftedThroughTheFactoredPath) {
   auto water = testing::create_water_structure();
@@ -266,12 +289,15 @@ TEST_F(SymmetryShiftTest, CholeskyContainerIsShiftedThroughTheFactoredPath) {
   auto ham = HamiltonianConstructorFactory::create("qdk_cholesky")
                  ->run(wfn_HF->get_orbitals());
 
+  auto mc = MultiConfigurationCalculatorFactory::create();
+  auto [E_before, wfn_before] = mc->run(ham, 5, 5);
+
+  auto factorized = double_factorize(ham);
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
-  auto shifted = shifter->run(ham, 5, 5);
+  auto shifted = shifter->run(factorized, 5, 5);
   ASSERT_NE(shifted, nullptr);
 
-  auto norm_before = qdk::chemistry::utils::hamiltonian_one_norm(*ham, 0.0);
-  auto norm_after = qdk::chemistry::utils::hamiltonian_one_norm(*shifted, 0.0);
-  EXPECT_GT(norm_before.total, 0.0);
-  EXPECT_LE(norm_after.total, norm_before.total);
+  auto mc_after = MultiConfigurationCalculatorFactory::create();
+  auto [E_after, wfn_after] = mc_after->run(shifted, 5, 5);
+  EXPECT_NEAR(E_before, E_after, testing::ci_energy_tolerance);
 }

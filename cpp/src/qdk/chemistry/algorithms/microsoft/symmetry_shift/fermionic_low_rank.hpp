@@ -10,8 +10,8 @@
 #include <memory>
 #include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/settings.hpp>
-#include <qdk/chemistry/utils/double_factorization.hpp>
 #include <string>
 #include <vector>
 
@@ -20,7 +20,10 @@
 // qdk::chemistry::algorithms::SymmetryShifter -- together with its internal
 // building blocks. They run in the order used by
 // compute_fermionic_low_rank_shift():
-//   1. double_factorize() (external, see double_factorization.hpp)
+//   1. The caller supplies an ALREADY double-factorized Hamiltonian, i.e. one
+//      backed by data::FactorizedHamiltonianContainer. Producing it is the job
+//      of the "double_factorization" hamiltonian_factorization algorithm; this
+//      shifter never factorizes anything itself.
 //   2. accumulate_fragment_shifts() -- per-fragment median shift (Eq. 27),
 //      aggregated into a single global two-electron shift (mu2, xi).
 //   3. solve_one_electron_shift() -- optimal one-electron shift mu1
@@ -71,19 +74,24 @@ struct GlobalTwoBodyShift {
 };
 
 /// Apply the fermionic low-rank BLISS per-fragment median shift (Eq. 27) to
-/// every fragment and accumulate the resulting global (mu_2, xi) BLISS shift
-/// parameters (Eq. 24, summed over fragments and rotated back into the
-/// original orbital basis). Fragments are expected to come from
-/// double-factorizing the PHYSICAL two-electron coefficient 1/2 g, so the
-/// aggregated (mu2, xi) are directly usable by
-/// rebuild_shifted_hamiltonian().
+/// every (rank, copy) fragment of `container` and accumulate the resulting
+/// global (mu_2, xi) BLISS shift parameters (Eq. 24, summed over fragments and
+/// rotated back into the original orbital basis).
 ///
-/// `norb` is taken from the Hamiltonian rather than from `fragments`, so an
-/// empty fragment list (every fragment truncated away) yields a well-formed
-/// zero shift instead of an unsized xi.
+/// The container stores the fragments of the RAW tensor g, as
+///   g_pqrs = Sum_rc M^rc_pq M^rc_rs,  M^rc_pq = Sum_b W^rc_b U^r_bp U^r_bq,
+/// whereas BLISS is formulated for the PHYSICAL coefficient V = 1/2 g. The
+/// two differ by an overall sqrt(2) on the fragment eigenvalues, so this
+/// function uses eps = W / sqrt(2) throughout; that is what puts the
+/// aggregated (mu2, xi) on the scale rebuild_shifted_hamiltonian() expects.
+///
+/// Note also that `U` is stored flattened [R,B,N] in ROW-major order, so row
+/// b of U^r is eigenvector b -- not column b.
+///
+/// A container with no ranks or no copies yields a well-formed zero shift
+/// rather than an unsized xi.
 GlobalTwoBodyShift accumulate_fragment_shifts(
-    const std::vector<qdk::chemistry::utils::TwoBodyFragment>& fragments,
-    Eigen::Index norb);
+    const qdk::chemistry::data::FactorizedHamiltonianContainer& container);
 
 /// Result of solve_one_electron_shift(): the optimal one-electron BLISS
 /// shift mu1 and the resulting fermionic 1-norm of the shifted effective
@@ -117,85 +125,67 @@ struct OneElectronShiftResult {
 /// with mu1 = median{eig(Heff0)} and lambda_1e = sum_i |eig_i - mu1|.
 ///
 /// @param h Bare one-electron integrals (norb x norb).
-/// @param two_body_integrals Flattened ORIGINAL g_ijkl tensor (norb^4).
+/// @param coulomb Coulomb contraction of the ORIGINAL g, i.e.
+///        coulomb_ij = sum_k g[i,j,k,k]. Taken by value and consumed: the
+///        shifted contraction is folded in place.
+/// @param exchange Exchange contraction of the ORIGINAL g, i.e.
+///        exchange_ij = sum_k g[i,k,k,j]. Also consumed in place.
 /// @param mu2 Aggregated two-electron BLISS shift (GlobalTwoBodyShift::mu2).
 /// @param xi Aggregated two-electron BLISS shift matrix
 ///        (GlobalTwoBodyShift::xi).
 /// @param num_electrons Target number of active electrons (Ne).
 OneElectronShiftResult solve_one_electron_shift(
-    const Eigen::MatrixXd& h, const Eigen::VectorXd& two_body_integrals,
+    const Eigen::MatrixXd& h, Eigen::MatrixXd coulomb, Eigen::MatrixXd exchange,
     double mu2, const Eigen::MatrixXd& xi, double num_electrons);
 
 /// Compute the fermionic low-rank BLISS shift (mu1, mu2, xi) for `hamiltonian`
 /// in the (n_alpha, n_beta)-electron sector (Patel et al., arXiv:2409.18277).
 ///
-/// Pipeline: double-factorize the physical two-electron coefficient 1/2 g,
-/// accumulate the per-fragment median shift into a global (mu2, xi), then
-/// solve for the optimal one-electron shift mu1. The result is returned as a
-/// SymmetryShift ready for rebuild_shifted_hamiltonian(). The Hamiltonian
-/// must be restricted.
+/// Pipeline: read the already-computed double factorization off the
+/// Hamiltonian, accumulate the per-fragment median shift into a global
+/// (mu2, xi), then solve for the optimal one-electron shift mu1. The result is
+/// returned as a SymmetryShift ready for rebuild_shifted_hamiltonian(). The
+/// Hamiltonian must be restricted.
+///
+/// The factorization is READ-ONLY input: the shift is expressed entirely as
+/// the global (mu1, mu2, xi), and rebuild_shifted_hamiltonian() applies it to
+/// the dense integrals, yielding a canonical four-center Hamiltonian. Nothing
+/// is ever written back into the factorization coefficients.
 ///
 /// The two 1-norms are minimized sequentially, not jointly, so the total is not
 /// guaranteed to decrease; if it would increase, a zero shift is returned with
 /// a warning, leaving the Hamiltonian unchanged.
 ///
-/// @param hamiltonian The Hamiltonian to analyze (restricted).
+/// @param hamiltonian The Hamiltonian to analyze. Must be restricted and
+///        backed by a data::FactorizedHamiltonianContainer.
 /// @param n_alpha_electrons Target number of alpha electrons.
 /// @param n_beta_electrons Target number of beta electrons.
-/// @param df_truncation_threshold Fragments below this cutoff are dropped
-///        (0.0 = no truncation). Units are method-dependent; see
-///        qdk::chemistry::utils::double_factorize().
-/// @param method Supermatrix decomposition used for the double factorization.
-///        Not merely a cost knob: the BLISS parameters (mu2, xi) are derived
-///        from the gauge-dependent fragments, so different methods yield
-///        different (individually valid) shifts. Defaults to Cholesky.
 /// @return The computed shift, or a zero (norb x norb) shift if the computed
 ///         one would not reduce the fermionic 1-norm.
+/// @throws std::invalid_argument if `hamiltonian` is unrestricted, is not
+///         backed by a FactorizedHamiltonianContainer, or carries a nonzero
+///         identity weight wB.
 SymmetryShift compute_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
-    unsigned int n_alpha_electrons, unsigned int n_beta_electrons,
-    double df_truncation_threshold,
-    qdk::chemistry::utils::DoubleFactorizationMethod method =
-        qdk::chemistry::utils::DoubleFactorizationMethod::Cholesky);
+    unsigned int n_alpha_electrons, unsigned int n_beta_electrons);
 
 /**
  * @class FermionicLowRankShifterSettings
  * @brief Settings container for the fermionic low-rank symmetry shifter.
  *
- * Default settings:
- * - df_truncation_threshold: 0.0 - drop double-factorization fragments below
- *   this cutoff. Must be non-negative. The default of 0.0 performs no
- *   truncation (exact double factorization).
- * - df_method: "cholesky" - which decomposition of the two-electron
- *   supermatrix to use ("cholesky" or "eigen").
+ * The shifter has no tunable settings: it consumes whatever double
+ * factorization the caller already computed, so truncation and the choice of
+ * decomposition are settings of the "double_factorization"
+ * hamiltonian_factorization algorithm instead.
  *
  * @see qdk::chemistry::algorithms::microsoft::FermionicLowRankShifter
  */
 class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  public:
   /**
-   * @brief Constructor that initializes the default settings.
+   * @brief Constructor. There are no settings to initialize.
    */
-  FermionicLowRankShifterSettings() {
-    set_default<double>(
-        "df_truncation_threshold", 0.0,
-        "Drop double-factorization fragments below this cutoff. Must be "
-        "non-negative; 0.0 performs no truncation (exact double "
-        "factorization). The units depend on df_method: a supermatrix "
-        "eigenvalue magnitude for \"eigen\", a residual diagonal for "
-        "\"cholesky\".",
-        qdk::chemistry::data::BoundConstraint<double>{
-            0.0, std::numeric_limits<double>::max()});
-    set_default<std::string>(
-        "df_method", "cholesky",
-        "Decomposition used for the two-electron supermatrix. \"cholesky\" "
-        "(pivoted Cholesky) costs O(R norb^4) and usually yields a tighter "
-        "1-norm; \"eigen\" costs O(norb^6), matches the DF literature "
-        "convention, and supports indefinite supermatrices. The choice "
-        "changes the resulting shift, not just its cost.",
-        qdk::chemistry::data::ListConstraint<std::string>{
-            {std::vector<std::string>{"cholesky", "eigen"}}});
-  }
+  FermionicLowRankShifterSettings() = default;
 };
 
 /**
@@ -203,18 +193,25 @@ class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  * @brief Fermionic low-rank BLISS implementation of SymmetryShifter [1,2].
  *
  * Computes the symmetry shift (mu1, mu2, xi) with the fermionic low-rank
- * BLISS method of Patel et al. (arXiv:2409.18277): double-factorize the
- * physical two-electron coefficient 1/2 g, take the closed-form per-fragment
+ * BLISS method of Patel et al. (arXiv:2409.18277): read the fragments off an
+ * already double-factorized Hamiltonian, take the closed-form per-fragment
  * median shift, and solve for the optimal one-electron shift against the
  * effective one-electron operator.
  *
+ * The input must be backed by a data::FactorizedHamiltonianContainer; the
+ * output is a canonical four-center Hamiltonian.
+ *
  * Typical usage:
  * ```cpp
+ * auto factorizer =
+ *   qdk::chemistry::algorithms::HamiltonianFactorizationFactory::create(
+ *       "double_factorization");
+ * auto factorized = factorizer->run(hamiltonian);
+ *
  * auto shifter =
  *   qdk::chemistry::algorithms::SymmetryShifterFactory::create(
  *       "fermionic_low_rank");
- * shifter->settings().set("df_truncation_threshold", 1e-8);
- * auto shifted = shifter->run(hamiltonian, n_alpha, n_beta);
+ * auto shifted = shifter->run(factorized, n_alpha, n_beta);
  * ```
  *
  * @see qdk::chemistry::algorithms::SymmetryShifter
