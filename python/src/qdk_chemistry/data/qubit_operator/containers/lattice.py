@@ -2,7 +2,7 @@
 
 Represents a lattice model operator by the geometry it lives on rather than by an
 enumerated list of Pauli terms. Algorithms that are defined in terms of the lattice --
-:class:`~qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.plaquette_trotter.PlaquetteTrotter`
+:class:`~qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter.HubbardPlaquetteTrotter`
 tiles it into plaquettes, for example -- read the connectivity directly and never pay
 to materialize the Pauli decomposition, which grows with the lattice.
 
@@ -83,8 +83,8 @@ class LatticeContainer(QubitOperatorContainer):
                 "LatticeContainer stores lattice geometry and fixes no fermion mode ordering, "
                 f"so 'fermion_mode_order' would be ignored; drop it (got {fermion_mode_order!r})."
             )
-        super().__init__(None, None)
         self.lattice = lattice
+        super().__init__(None, None)
 
     @property
     def type(self) -> str:
