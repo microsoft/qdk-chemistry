@@ -5,11 +5,18 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any, cast
+
 from qdk import qsharp
 
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    BatchedExponentiatedPauliTerm,
+    ConjugatedExponentiatedPauliTerm,
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
@@ -30,6 +37,9 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; \text{CRZ}(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
 
+    Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
+    indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
+
     Notes:
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
@@ -47,6 +57,62 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     def type_name(self) -> str:
         """Return controlled_circuit_mapper as the algorithm type name."""
         return "controlled_circuit_mapper"
+
+    @staticmethod
+    def _encode_pauli_terms(
+        pauli_terms: list[dict[int, str]],
+    ) -> tuple[list[list[int]], list[list[qsharp.Pauli]]]:
+        """Encode sparse Pauli maps as parallel Q# index and axis arrays."""
+        pauli_indices: list[list[int]] = []
+        pauli_ops: list[list[qsharp.Pauli]] = []
+        for pauli_term in pauli_terms:
+            indices: list[int] = []
+            ops: list[qsharp.Pauli] = []
+            for index, pauli in pauli_term.items():
+                indices.append(index)
+                ops.append(getattr(qsharp.Pauli, pauli))
+            pauli_indices.append(indices)
+            pauli_ops.append(ops)
+        return pauli_indices, pauli_ops
+
+    @classmethod
+    def _encode_flat_terms(cls, terms: list[ExponentiatedPauliTerm], repetitions: int) -> Any:
+        """Encode an unstructured repeated Pauli sequence."""
+        pauli_indices, pauli_ops = cls._encode_pauli_terms([term.pauli_term for term in terms])
+        return QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+            pauliIndices=pauli_indices,
+            pauliOps=pauli_ops,
+            pauliCoefficients=[term.angle for term in terms],
+            repetitions=repetitions,
+        )
+
+    @classmethod
+    def _encode_group(cls, term: ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm) -> Any:
+        """Encode one plain exponential or equal-angle batch."""
+        pauli_terms = [term.pauli_term] if isinstance(term, ExponentiatedPauliTerm) else list(term.pauli_terms)
+        pauli_indices, pauli_ops = cls._encode_pauli_terms(pauli_terms)
+        return QSHARP_UTILS.PauliExp.SparsePauliExpGroupParams(
+            pauliIndices=pauli_indices,
+            pauliOps=pauli_ops,
+            angle=term.angle,
+        )
+
+    @classmethod
+    def _encode_block(
+        cls,
+        term: ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm,
+    ) -> Any:
+        """Encode a direct group or a structured Q# ``within``/``apply`` block."""
+        if isinstance(term, ConjugatedExponentiatedPauliTerm):
+            within_groups = [cls._encode_group(group) for group in term.within_terms]
+            apply_groups = [cls._encode_group(group) for group in term.apply_terms]
+        else:
+            within_groups = []
+            apply_groups = [cls._encode_group(term)]
+        return QSHARP_UTILS.PauliExp.ConjugatedSparsePauliExpParams(
+            withinGroups=within_groups,
+            applyGroups=apply_groups,
+        )
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled unitary.
@@ -78,28 +144,26 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        angles: list[float] = []
-        for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
-            for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
-            angles.append(term.angle)
-
-        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
-            pauliExponents=pauli_terms,
-            pauliCoefficients=angles,
-            repetitions=unitary_container.step_reps,
-            control=control_indices[0],
-            systems=target_indices,
+        structured = bool(unitary_container.conjugating_terms) or any(
+            not isinstance(term, ExponentiatedPauliTerm) for term in unitary_container.step_terms
         )
+        if structured:
+            mapped_params = QSHARP_UTILS.PauliExp.StructuredSparseRepPauliExpParams(
+                conjugatingGroups=[self._encode_block(term) for term in unitary_container.conjugating_terms],
+                stepBlocks=[self._encode_block(term) for term in unitary_container.step_terms],
+                repetitions=unitary_container.step_reps,
+            )
+            program = QSHARP_UTILS.ControlledPauliExp.MakeStructuredRepControlledPauliExpCircuit
+            controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeStructuredRepControlledPauliExpOp(mapped_params)
+        else:
+            terms = cast("list[ExponentiatedPauliTerm]", unitary_container.step_terms)
+            mapped_params = self._encode_flat_terms(terms, unitary_container.step_reps)
+            program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+            controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(mapped_params)
 
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            parameter=vars(controlled_evo_params),
+            program=program,
+            parameter={"params": mapped_params, "control": control_indices[0], "systems": target_indices},
         )
-
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
