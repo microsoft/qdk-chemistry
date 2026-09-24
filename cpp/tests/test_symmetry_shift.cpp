@@ -5,13 +5,12 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
-
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian_factorization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/symmetry_shift.hpp>
-#include <qdk/chemistry/algorithms/hamiltonian_factorization.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
@@ -75,8 +74,8 @@ TEST_F(SymmetryShiftTest, RejectsNonFactorizedHamiltonian) {
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
-  auto ham = HamiltonianConstructorFactory::create()->run(
-      wfn_HF->get_orbitals());
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
   ASSERT_FALSE(ham->has_container_type<FactorizedHamiltonianContainer>());
 
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
@@ -140,7 +139,8 @@ TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
 
   // The shift is applied to the dense integrals, so what comes back is a
   // canonical four-center Hamiltonian, not a factorized one.
-  EXPECT_FALSE(shifted_ham->has_container_type<FactorizedHamiltonianContainer>());
+  EXPECT_FALSE(
+      shifted_ham->has_container_type<FactorizedHamiltonianContainer>());
 
   auto mc_after = MultiConfigurationCalculatorFactory::create();
   auto [E_after, wfn_after] = mc_after->run(shifted_ham, 5, 5);
@@ -194,8 +194,8 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   auto scf_solver = ScfSolverFactory::create();
   auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
 
-  auto ham = HamiltonianConstructorFactory::create()->run(
-      wfn_HF->get_orbitals());
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
   auto factorized = double_factorize(ham);
   const auto& container =
       factorized->get_container<FactorizedHamiltonianContainer>();

@@ -31,8 +31,8 @@ namespace {
 ///   M^{rc}_{pq} = Sum_b W^{rc}_b U^r_{bp} U^r_{bq}
 /// `Ur` is [B,N] with eigenvectors in ROWS; the returned matrix is [N,N].
 Eigen::MatrixXd leaf_matrix(
-    const Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic,
-                                         Eigen::Dynamic, Eigen::RowMajor>>& Ur,
+    const Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                         Eigen::RowMajor>>& Ur,
     const Eigen::VectorXd& w, size_t r, size_t c, size_t B, size_t C,
     size_t norb) {
   Eigen::MatrixXd scaled(B, norb);
