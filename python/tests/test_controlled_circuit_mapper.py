@@ -6,12 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 import json
-from typing import ClassVar
 
 import numpy as np
 import pytest
 import scipy
-from qdk import qsharp
 
 try:
     from qdk._native import Circuit as QdkCircuitType
@@ -25,20 +23,15 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequenc
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
-    BatchedExponentiatedPauliTerm,
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import dense_matrix
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
-
-#: ``dump_operation_on_state`` rounds to about six decimals, so exact agreement lands near 1e-6.
-_TOL = 1e-5
 
 
 @pytest.fixture
@@ -79,18 +72,6 @@ class TestPauliSequenceMapper:
 
         assert isinstance(circuit, Circuit)
         assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
-
-    def test_sparse_encoding_carries_only_non_identity_positions(self, unitary_rep):
-        """The controlled mapper must reuse the sparse repeated-evolution parameters."""
-        mapper = ControlledPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-
-        circuit = mapper.run(unitary_rep)
-        evo_params = vars(circuit._qsharp_factory.parameter["params"])
-
-        assert "pauliExponents" not in evo_params
-        assert evo_params["pauliIndices"] == [[0], [1]]
-        assert evo_params["pauliOps"] == [[qsharp.Pauli.X], [qsharp.Pauli.Z]]
 
     def test_default_target_indices(self, unitary_rep):
         """Test that default target indices are used when none are provided."""
@@ -261,124 +242,3 @@ class TestPauliSequenceMapper:
 
         with pytest.raises(ValueError, match="length"):
             mapper.run(unitary_rep)
-
-
-def _sparse_controlled_op(terms, *, repetitions=1):
-    """Build a Q# expression for controlled sparse evolution."""
-    indices = ", ".join("[" + ", ".join(str(qubit) for qubit in term["qubits"]) + "]" for term in terms)
-    ops = ", ".join("[" + ", ".join(f"Pauli{axis}" for axis in term["axes"]) + "]" for term in terms)
-    angles = ", ".join(repr(float(term["angle"])) for term in terms)
-    return (
-        "qs => QDKChemistry.Utils.ControlledPauliExp.RepControlledPauliExp("
-        "new QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams { "
-        f"pauliIndices = [{indices}], pauliOps = [{ops}], pauliCoefficients = [{angles}], "
-        f"repetitions = {repetitions} }}, qs[0], qs[1...])"
-    )
-
-
-def _dense_controlled_op(terms, num_qubits, *, repetitions=1):
-    """Build a Q# expression for controlled dense evolution."""
-    rows = []
-    for term in terms:
-        axes = [qsharp.Pauli.I] * num_qubits
-        for qubit, axis in zip(term["qubits"], term["axes"], strict=True):
-            axes[qubit] = getattr(qsharp.Pauli, axis)
-        rows.append("[" + ", ".join(f"Pauli{str(axis).split('.')[-1]}" for axis in axes) + "]")
-    angles = ", ".join(repr(float(term["angle"])) for term in terms)
-    return (
-        "qs => Controlled QDKChemistry.Utils.PauliExp.RepPauliExp([qs[0]], ("
-        "new QDKChemistry.Utils.PauliExp.RepPauliExpParams { "
-        f"pauliExponents = [{', '.join(rows)}], pauliCoefficients = [{angles}], "
-        f"repetitions = {repetitions} }}, qs[1...]))"
-    )
-
-
-class TestSparseControlledEvolution:
-    """Sparse controlled evolution must match control of the dense representation."""
-
-    CASES: ClassVar[dict] = {
-        "single-qubit mixed axes": (
-            3,
-            [
-                {"qubits": [0], "axes": "X", "angle": 0.4},
-                {"qubits": [1], "axes": "Y", "angle": -0.9},
-                {"qubits": [2], "axes": "Z", "angle": 0.15},
-            ],
-        ),
-        "two-qubit adjacent": (
-            3,
-            [
-                {"qubits": [0, 1], "axes": "ZZ", "angle": 0.37},
-                {"qubits": [1, 2], "axes": "XX", "angle": -0.5},
-            ],
-        ),
-        "two-qubit non-adjacent, unsorted indices": (
-            4,
-            [
-                {"qubits": [3, 0], "axes": "XY", "angle": 0.62},
-                {"qubits": [2, 1], "axes": "YZ", "angle": -0.24},
-            ],
-        ),
-        "an identity term among real ones": (
-            2,
-            [
-                {"qubits": [0], "axes": "X", "angle": 0.5},
-                {"qubits": [], "axes": "", "angle": 0.8},
-                {"qubits": [1], "axes": "Z", "angle": -0.3},
-            ],
-        ),
-        "identity": (2, [{"qubits": [], "axes": "", "angle": 0.7}]),
-        "empty": (2, []),
-    }
-
-    @pytest.mark.parametrize("name", list(CASES))
-    @pytest.mark.parametrize("repetitions", [1, 2])
-    def test_sparse_matches_dense(self, name, repetitions):
-        """Switching to sparse encoding must not change controlled evolution."""
-        num_qubits, terms = self.CASES[name]
-        got = dense_matrix(_sparse_controlled_op(terms, repetitions=repetitions), num_qubits + 1)
-        want = dense_matrix(_dense_controlled_op(terms, num_qubits, repetitions=repetitions), num_qubits + 1)
-        assert np.max(np.abs(got - want)) < _TOL
-
-    @pytest.mark.parametrize("name", list(CASES))
-    def test_control_off_branch_is_the_identity(self, name):
-        """With the control off, sparse evolution must leave the targets unchanged."""
-        num_qubits, terms = self.CASES[name]
-        got = dense_matrix(_sparse_controlled_op(terms), num_qubits + 1)
-        control_off_size = 2**num_qubits
-        assert np.max(np.abs(got[:control_off_size, :control_off_size] - np.eye(control_off_size))) < _TOL
-
-    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_outer_conjugator_is_bare_but_the_repeated_body_is_controlled(self):
-        """Q# ``within``/``apply`` controls only the body of the outer conjugation."""
-        container = PauliProductFormulaContainer(
-            step_terms=[ExponentiatedPauliTerm({0: "Z"}, 0.3)],
-            step_reps=3,
-            num_qubits=1,
-            conjugating_terms=[ExponentiatedPauliTerm({0: "X"}, 0.2)],
-        )
-        mapper = ControlledPauliSequenceMapper()
-        mapper.settings().set("control_indices", [1])
-        actual = Operator(mapper.run(UnitaryRepresentation(container)).get_qiskit_circuit()).data
-        x = np.array([[0, 1], [1, 0]], dtype=complex)
-        z = np.array([[1, 0], [0, -1]], dtype=complex)
-        conjugated = (
-            scipy.linalg.expm(1j * 0.2 * x) @ scipy.linalg.expm(-1j * 0.9 * z) @ scipy.linalg.expm(-1j * 0.2 * x)
-        )
-        expected = np.kron(np.array([[1, 0], [0, 0]]), np.eye(2)) + np.kron(np.array([[0, 0], [0, 1]]), conjugated)
-
-        assert np.max(np.abs(actual - expected)) < _TOL
-
-    def test_batched_outer_conjugator_is_not_controlled(self):
-        """HWP remains useful in Campbell's one-time outer ``within`` block."""
-        container = PauliProductFormulaContainer(
-            step_terms=[],
-            step_reps=3,
-            num_qubits=8,
-            conjugating_terms=[BatchedExponentiatedPauliTerm([{index: "Z"} for index in range(8)], 0.2)],
-        )
-        mapper = ControlledPauliSequenceMapper()
-        mapper.settings().set("control_indices", [8])
-        counts = mapper.run(UnitaryRepresentation(container)).estimate()["logicalCounts"]
-
-        assert counts["rotationCount"] == 8

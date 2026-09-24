@@ -934,6 +934,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )
+    from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (  # noqa: PLC0415
+        ControlledHubbardPlaquetteMapper,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (  # noqa: PLC0415
         HubbardPlaquetteTrotter,
     )
@@ -992,6 +995,7 @@ def _register_python_algorithms():
     register(lambda: VacuumAnnihilatingTermGrouper())
     register(lambda: Trotter())
     register(lambda: HubbardPlaquetteTrotter())
+    register(lambda: ControlledHubbardPlaquetteMapper())
     register(lambda: Zassenhaus())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
