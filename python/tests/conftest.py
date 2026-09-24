@@ -78,6 +78,19 @@ if build_dir.exists():
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 
+@pytest.fixture(scope="session", autouse=True)
+def isolate_worker_temporary_directory(tmp_path_factory):
+    """Keep native archive extraction private to each Windows xdist worker."""
+    if sys.platform == "win32" and os.getenv("PYTEST_XDIST_WORKER"):
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            worker_temp = str(tmp_path_factory.mktemp("native"))
+            monkeypatch.setenv("TMP", worker_temp)
+            monkeypatch.setenv("TEMP", worker_temp)
+            yield
+    else:
+        yield
+
+
 def pytest_collection_modifyitems(items):
     """Gate ``@pytest.mark.slow`` on QDK_CHEMISTRY_RUN_SLOW_TESTS.
 

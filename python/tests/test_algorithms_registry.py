@@ -482,6 +482,8 @@ class TestRegistryAvailable:
                 continue
             if algorithm_type == "geometry_optimizer" and not algorithms:
                 continue  # geomeTRIC-backed optimizer is optional
+            if algorithm_type == "multi_configuration_scf" and not PYSCF_AVAILABLE:
+                continue
             assert len(algorithms) > 0, f"No algorithms available for {algorithm_type}"
 
     def test_available_algorithms_can_be_created(self):
