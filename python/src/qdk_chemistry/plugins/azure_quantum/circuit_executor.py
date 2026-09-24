@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 __all__: list[str] = ["AzureQuantumBackend", "AzureQuantumBackendSettings"]
 
-_WORKSPACE_SETTINGS = ("subscription_id", "resource_group", "workspace_name", "location", "target_name")
+_WORKSPACE_SETTINGS = ("subscription_id", "resource_group", "workspace_name", "target_name")
 
 
 def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, int]]:
@@ -187,7 +187,7 @@ class AzureQuantumBackend(CircuitExecutor):
             subscription_id=coordinates["subscription_id"],
             resource_group=coordinates["resource_group"],
             name=coordinates["workspace_name"],
-            location=coordinates["location"],
+            location=self._settings.get("location") or None,
             credential=create_credential(self._settings.get("auth_mode")),
         )
         target = workspace.get_targets(name=coordinates["target_name"])
@@ -210,8 +210,9 @@ class AzureQuantumBackend(CircuitExecutor):
         Logger.debug(f"Job submitted: {job.id}")
 
         timeout = self._settings.get("timeout_secs")
-        raw_results = job.get_results_histogram(timeout_secs=timeout)
+        job.wait_until_completed(timeout_secs=timeout)
         Logger.debug("Job completed")
+        raw_results = job.get_results_histogram()
 
         saved_attachments = self._save_attachments(job)
 

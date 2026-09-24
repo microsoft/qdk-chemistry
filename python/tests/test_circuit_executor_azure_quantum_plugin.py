@@ -141,10 +141,16 @@ class _FakeJob:
         self.id = "fake-job-id"
         self.submit_kwargs = submit_kwargs
         self.requested_attachments: list[str] = []
+        self.calls: list[str] = []
 
-    def get_results_histogram(self, timeout_secs: int) -> dict:
-        """Return a fixed two-qubit histogram."""
+    def wait_until_completed(self, timeout_secs: int) -> None:
+        """Record the explicit wait and its timeout."""
         self.timeout_secs = timeout_secs
+        self.calls.append("wait_until_completed")
+
+    def get_results_histogram(self) -> dict:
+        """Return a fixed two-qubit histogram."""
+        self.calls.append("get_results_histogram")
         return {"[0, 0]": {"outcome": [0, 0], "count": 6}, "[1, 1]": {"outcome": [1, 1], "count": 4}}
 
     def download_attachment(self, name: str) -> bytes:
@@ -255,9 +261,14 @@ class TestAzureQuantumBackendSubmission:
     def test_results_and_metadata(
         self, fake_workspace, configured_executor: AzureQuantumBackend, test_circuit_1: Circuit
     ):
-        """Histogram counts are converted and the job id is surfaced."""
+        """Wait before retrieving the histogram, converting counts, and surfacing the job id."""
+        configured_executor.settings().set("timeout_secs", 42)
+
         result = configured_executor.run(test_circuit_1, shots=10)
 
+        job = fake_workspace.last.target.job
+        assert job.timeout_secs == 42
+        assert job.calls == ["wait_until_completed", "get_results_histogram"]
         assert result.bitstring_counts == {"00": 6, "11": 4}
         assert result.total_shots == 10
         metadata = result.get_executor_metadata()
