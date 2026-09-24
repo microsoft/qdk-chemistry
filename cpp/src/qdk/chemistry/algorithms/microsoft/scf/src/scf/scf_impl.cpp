@@ -50,6 +50,8 @@
 
 namespace qdk::chemistry::scf {
 
+SCFImpl::~SCFImpl() = default;
+
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                  std::shared_ptr<BasisSet> basis_set,
                  std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri,

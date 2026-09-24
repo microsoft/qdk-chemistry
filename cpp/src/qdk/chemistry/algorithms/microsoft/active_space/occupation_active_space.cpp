@@ -13,6 +13,10 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+OccupationActiveSpaceSettings::OccupationActiveSpaceSettings() {
+  set_default("occupation_threshold", 0.1);
+}
+
 std::shared_ptr<data::Wavefunction> OccupationActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();

@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
+#include <qdk/chemistry/scf/fwd.h>
 
 #include <memory>
 #include <vector>

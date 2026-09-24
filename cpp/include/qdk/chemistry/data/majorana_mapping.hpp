@@ -3,13 +3,14 @@
 // license information.
 
 #pragma once
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
 #include <complex>
 #include <cstdint>
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
 #include <string>
@@ -17,10 +18,6 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-class Hamiltonian;
-
-class LatticeGraph;
 
 /**
  * @brief Data class describing a fermion-to-qubit encoding.

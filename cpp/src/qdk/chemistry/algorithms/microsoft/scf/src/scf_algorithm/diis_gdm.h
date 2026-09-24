@@ -7,15 +7,12 @@
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
+#include <qdk/chemistry/scf/fwd.h>
 
 #include <memory>
 #include <vector>
 
 namespace qdk::chemistry::scf {
-
-// Forward declarations
-class DIIS;
-class GDM;
 
 /**
  * @brief Composite DIIS-GDM SCF algorithm class

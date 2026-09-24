@@ -6,13 +6,9 @@
 
 #include <Eigen/Core>
 #include <memory>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <string>
 #include <vector>
-
-namespace qdk::chemistry::data {
-class BasisSet;
-class Orbitals;
-}  // namespace qdk::chemistry::data
 
 namespace qdk::chemistry::utils {
 

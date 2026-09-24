@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
 #include <vector>
@@ -18,11 +19,7 @@ namespace qdk::chemistry::algorithms {
  */
 class PopulationAnalysisSettings : public data::Settings {
  public:
-  PopulationAnalysisSettings() {
-    set_default("method", std::string("mulliken"),
-                "Particle-population analysis method",
-                data::ListConstraint<std::string>{{"mulliken"}});
-  }
+  PopulationAnalysisSettings();
 };
 
 /**

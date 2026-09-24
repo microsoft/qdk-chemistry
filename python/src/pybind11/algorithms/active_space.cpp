@@ -5,7 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/active_space.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/active_space/autocas_active_space.hpp"

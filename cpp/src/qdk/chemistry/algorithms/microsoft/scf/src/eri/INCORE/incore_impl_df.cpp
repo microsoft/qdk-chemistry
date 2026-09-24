@@ -9,7 +9,6 @@
 
 #include <blas.hh>
 #include <lapack.hh>
-#include <libint2.hpp>
 #include <stdexcept>
 
 #include "incore_impl.h"
@@ -58,7 +57,8 @@ void ERI_DF::generate_eri_() {
   const size_t eri_sz = num_atomic_orbitals2 * (loc_i_en_ - loc_i_st_);
 
   if (!mpi_.world_rank) QDK_LOGGER().trace("Generating DF-ERIs via Libint2");
-  h_eri_ = libint2_util::eri_df(basis_mode_, obs_, abs_, loc_i_st_, loc_i_en_);
+  h_eri_ = libint2_util::eri_df(basis_mode_, obs_.get(), abs_.get(), loc_i_st_,
+                                loc_i_en_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   if (!gpu()) {
@@ -302,12 +302,13 @@ void ERI_DF::get_gradients(const double* P, double* dJ, double* dK,
 #endif
 
   // Form part 1 of dJ^x: \Sum_{pqI} P(p,q) * (pq|I)^x * Y(I)
-  libint2_util::eri_df_grad(dJ, P_use, X.data(), basis_mode_, obs_, abs_,
-                            obs_sh2atom_, abs_sh2atom_, n_atoms, mpi_);
+  libint2_util::eri_df_grad(dJ, P_use, X.data(), basis_mode_, obs_.get(),
+                            abs_.get(), obs_sh2atom_, abs_sh2atom_, n_atoms,
+                            mpi_);
 
   // Form part 2 of dJ^x: -1/2 \Sum_{IJ}(I|J)^x * Y(I) * Y(J)
-  libint2_util::metric_df_grad(dJ, X.data(), basis_mode_, abs_, abs_sh2atom_,
-                               n_atoms, mpi_);
+  libint2_util::metric_df_grad(dJ, X.data(), basis_mode_, abs_.get(),
+                               abs_sh2atom_, n_atoms, mpi_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi_.world_size > 1) {

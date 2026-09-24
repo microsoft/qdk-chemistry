@@ -7,7 +7,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.hpp"

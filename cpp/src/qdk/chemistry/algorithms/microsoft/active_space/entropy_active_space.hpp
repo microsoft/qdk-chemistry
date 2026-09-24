@@ -39,11 +39,7 @@ class AutocasEosSettings : public data::Settings {
    * settings
    *
    */
-  AutocasEosSettings() {
-    set_default<bool>("normalize_entropies", true);
-    set_default<double>("diff_threshold", 0.1);
-    set_default<double>("entropy_threshold", 0.14);
-  }
+  AutocasEosSettings();
 };
 
 /**

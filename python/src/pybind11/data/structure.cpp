@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
 #include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>

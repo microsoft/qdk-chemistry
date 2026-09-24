@@ -145,6 +145,7 @@ if(QDK_CHEMISTRY_ENABLE_GPU)
 endif()
 
 # Create library
+include(cmake/qdk-unity.cmake)
 add_library(chemistry)
 add_subdirectory(src/qdk/chemistry/data)
 add_subdirectory(src/qdk/chemistry/algorithms)

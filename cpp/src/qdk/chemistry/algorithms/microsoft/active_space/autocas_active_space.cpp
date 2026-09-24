@@ -5,12 +5,27 @@
 #include "autocas_active_space.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <numeric>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 #include <sstream>
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+AutocasActiveSpaceSettings::AutocasActiveSpaceSettings() {
+  set_default<int64_t>(
+      "num_bins", 100, "Number of bins for entropy discretization",
+      data::BoundConstraint<int64_t>{2, std::numeric_limits<int64_t>::max()});
+  set_default<int64_t>(
+      "min_plateau_size", 10,
+      "Minimum size of entropy plateau to be considered",
+      data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+  set_default<double>(
+      "entropy_threshold", 0.14,
+      "Minimum absolute entropy value the plateau has to be above");
+  set_default<bool>("normalize_entropies", true);
+}
 
 std::shared_ptr<data::Wavefunction> AutocasActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {

@@ -7,14 +7,12 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/core/types.h>
+#include <qdk/chemistry/scf/fwd.h>
 
 #include <memory>
 #include <vector>
 
 namespace qdk::chemistry::scf {
-
-// Forward declarations
-class SCFImpl;
 
 /**
  * @brief Self-Consistent Field (SCF) solver

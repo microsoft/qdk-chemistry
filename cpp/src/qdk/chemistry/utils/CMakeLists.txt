@@ -6,3 +6,6 @@ target_sources(chemistry PRIVATE
     golden_section.cpp
     logger.cpp
 )
+
+qdk_unity_group(chemistry utilities
+    valence_space.cpp orbital_rotation.cpp golden_section.cpp logger.cpp)

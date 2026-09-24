@@ -6,6 +6,7 @@
 
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/core/types.h>
+#include <qdk/chemistry/scf/fwd.h>
 
 #include <limits>
 #include <memory>
@@ -14,8 +15,6 @@
 
 namespace qdk::chemistry::scf {
 
-// Forward declaration
-class SCFImpl;
 /**
  * @brief Base class for SCF iteration algorithms
  *

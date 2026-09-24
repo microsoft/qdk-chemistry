@@ -5,11 +5,8 @@
 #pragma once
 
 #include <memory>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <string>
-
-namespace qdk::chemistry::data {
-class Settings;
-}
 
 namespace qdk::chemistry::algorithms::detail {
 

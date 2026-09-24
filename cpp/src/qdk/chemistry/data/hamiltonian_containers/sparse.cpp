@@ -9,6 +9,7 @@
 #include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>

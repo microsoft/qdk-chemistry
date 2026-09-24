@@ -4,31 +4,30 @@
 
 #pragma once
 
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
-#include <any>
+#include <algorithm>
 #include <concepts>
-#include <fstream>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <map>
 #include <memory>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <set>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+#include <utility>
 #include <variant>
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-// Forward declaration for recursive AlgorithmRef
-class Settings;
 
 /**
  * @brief Declarative reference to a nested algorithm to be created via the
@@ -989,51 +988,40 @@ class Settings : public DataClass,
     if (!has(key)) {
       // If the type is directly in the variant, use it as-is
       if constexpr (VariantMember<T, SettingValue>) {
-        settings_[key] = value;
-        if (description.has_value()) {
-          descriptions_[key] = *description;
-        }
-        if (limit.has_value()) {
+        _default_value(key) = value;
+      }
+      // Handle integral types - store as int64_t (signed)
+      else if constexpr (NonBoolIntegral<T>) {
+        _default_value(key) = static_cast<int64_t>(value);
+      }
+      // Handle integer vector types
+      else if constexpr (NonBoolIntegralVector<T>) {
+        _default_value(key) = _convert_to_int64_vector(value);
+      } else {
+        _default_value(key) = value;
+      }
+      _set_default_description(key, description);
+      if (limit.has_value()) {
+        if constexpr (VariantMember<T, SettingValue>) {
           // Convert template limit variant to Constraint variant
           std::visit(
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
-                // Convert to the appropriate Constraint type
-                if constexpr (std::same_as<LimitValType,
-                                           BoundConstraint<int64_t>>) {
-                  limits_[key] = limit_val;
-                } else if constexpr (std::same_as<LimitValType,
-                                                  ListConstraint<int64_t>>) {
-                  limits_[key] = limit_val;
-                } else if constexpr (std::same_as<LimitValType,
-                                                  BoundConstraint<double>>) {
-                  limits_[key] = limit_val;
-                } else if constexpr (std::same_as<
-                                         LimitValType,
-                                         ListConstraint<std::string>>) {
-                  limits_[key] = limit_val;
+                if constexpr (VariantMember<LimitValType, Constraint>) {
+                  _default_limit(key) = limit_val;
                 } else {
                   throw std::invalid_argument(
                       "Unsupported limit type for this value type");
                 }
               },
               *limit);
-        }
-        documented_[key] = documented;
-      }
-      // Handle integral types - store as int64_t (signed)
-      else if constexpr (NonBoolIntegral<T>) {
-        settings_[key] = static_cast<int64_t>(value);
-        if (description.has_value()) {
-          descriptions_[key] = *description;
-        }
-        if (limit.has_value()) {
+        } else if constexpr (NonBoolIntegral<T>) {
           std::visit(
               [this, &key](const auto& limit_val) {
                 using LimitValType = std::decay_t<decltype(limit_val)>;
                 if constexpr (std::same_as<LimitValType, BoundConstraint<T>>) {
                   // Convert T to int64_t for storage
-                  limits_[key] = BoundConstraint<int64_t>{
+                  _default_limit(key) = BoundConstraint<int64_t>{
                       static_cast<int64_t>(limit_val.min),
                       static_cast<int64_t>(limit_val.max)};
                 } else if constexpr (std::same_as<LimitValType,
@@ -1046,7 +1034,7 @@ class Settings : public DataClass,
                     constraint.allowed_values.push_back(
                         static_cast<int64_t>(val));
                   }
-                  limits_[key] = std::move(constraint);
+                  _default_limit(key) = std::move(constraint);
                 } else {
                   // Unsupported limit type for this value type
                   throw std::invalid_argument(
@@ -1054,34 +1042,17 @@ class Settings : public DataClass,
                 }
               },
               *limit);
-        }
-        documented_[key] = documented;
-      }
-      // Handle integer vector types
-      else if constexpr (NonBoolIntegralVector<T>) {
-        // All integer vectors -> vector<int64_t>
-        settings_[key] = _convert_to_int64_vector(value);
-        if (description.has_value()) {
-          descriptions_[key] = *description;
-        }
-        if (limit.has_value()) {
+        } else if constexpr (NonBoolIntegralVector<T>) {
           throw std::invalid_argument(
               "Limits are not supported for integral vector defaults when "
               "implicit conversions are required. Use SettingValue types "
               "directly instead.");
-        }
-        documented_[key] = documented;
-      } else {
-        settings_[key] = value;
-        if (description.has_value()) {
-          descriptions_[key] = *description;
-        }
-        if (limit.has_value()) {
+        } else {
           throw std::invalid_argument(
               "Unsupported limit type for the provided default value");
         }
-        documented_[key] = documented;
       }
+      _set_default_documented(key, documented);
     }
   }
 
@@ -1106,6 +1077,14 @@ class Settings : public DataClass,
                    bool documented = true);
 
  private:
+  // Keep map insertion out of the adapters without moving typed assignments
+  // or metadata writes across constraint checks and their partial updates.
+  SettingValue& _default_value(const std::string& key);
+  Constraint& _default_limit(const std::string& key);
+  void _set_default_description(const std::string& key,
+                                const std::optional<std::string>& description);
+  void _set_default_documented(const std::string& key, bool documented);
+
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 

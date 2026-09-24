@@ -9,7 +9,6 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <utility>
@@ -94,7 +93,6 @@ void bind_deprecated_getter_as_property(ClassBinding &cls,
 }  // namespace
 
 void bind_orbitals(py::module &data) {
-  using namespace qdk::chemistry::algorithms;
   using namespace qdk::chemistry::data;
   using qdk::chemistry::python::utils::bind_getter_as_property;
 

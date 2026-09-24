@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <qdk/chemistry/utils/hash.hpp>
 #include <string>
 #include <type_traits>
@@ -87,11 +88,6 @@ struct SparsePauliWordPairHash {
     return utils::hash_combine(h1, h2);
   }
 };
-
-// Forward declarations
-class PauliOperator;
-class ProductPauliOperatorExpression;
-class SumPauliOperatorExpression;
 
 /**
  * @brief Base interface for Pauli operator expressions.

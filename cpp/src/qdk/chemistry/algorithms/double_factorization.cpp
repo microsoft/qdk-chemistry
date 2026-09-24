@@ -22,6 +22,18 @@
 
 namespace qdk::chemistry::algorithms {
 
+DoubleFactorizationSettings::DoubleFactorizationSettings() {
+  set_default<double>(
+      "truncation_threshold", 1e-12,
+      "Cutoff for the pivoted Cholesky decomposition of the two-electron "
+      "supermatrix: pivoting stops once the largest remaining residual "
+      "diagonal drops to it. Must be non-negative; 0.0 keeps every "
+      "numerically resolvable fragment. Ignored when the input Hamiltonian "
+      "is backed by a CholeskyHamiltonianContainer.",
+      qdk::chemistry::data::BoundConstraint<double>{
+          0.0, std::numeric_limits<double>::max()});
+}
+
 namespace {
 
 using RowMajorMatrix =

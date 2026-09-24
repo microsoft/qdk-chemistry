@@ -5,7 +5,7 @@
 #pragma once
 #include <H5Cpp.h>
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 #include <complex>
 #include <memory>
 #include <string>

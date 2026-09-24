@@ -6,3 +6,6 @@ target_sources(chemistry PRIVATE
   gdm.cpp
   asahf.cpp
 )
+
+qdk_unity_group(chemistry scf_iteration
+    scf_algorithm.cpp diis.cpp diis_gdm.cpp)

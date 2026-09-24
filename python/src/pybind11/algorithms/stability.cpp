@@ -5,8 +5,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry.hpp>
 #include <qdk/chemistry/algorithms/microsoft/stability.hpp>
+#include <qdk/chemistry/algorithms/stability.hpp>
 
 #include "factory_bindings.hpp"
 
@@ -15,7 +15,6 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::python;
 
-using ReturnType = std::pair<bool, std::shared_ptr<StabilityResult>>;
 // Trampoline class for enabling Python inheritance
 class StabilityCheckerBase : public StabilityChecker,
                              public pybind11::trampoline_self_life_support {
@@ -35,6 +34,8 @@ class StabilityCheckerBase : public StabilityChecker,
   }
 
  protected:
+  using ReturnType = std::pair<bool, std::shared_ptr<StabilityResult>>;
+
   ReturnType _run_impl(
       std::shared_ptr<Wavefunction> wavefunction) const override {
     PYBIND11_OVERRIDE_PURE(ReturnType, StabilityChecker, _run_impl,

@@ -8,7 +8,7 @@
 #include <mpi.h>
 #endif
 
-#include <libint2.hpp>
+#include <libint2/initialize.h>
 
 using namespace qdk::chemistry::scf;
 

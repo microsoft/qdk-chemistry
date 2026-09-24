@@ -4,7 +4,11 @@
 
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <algorithm>
+#include <cmath>
 #include <qdk/chemistry/utils/logger.hpp>
+
+#include "util/libint2_engine.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -12,34 +16,11 @@
 
 namespace qdk::chemistry::scf::libint2_util {
 
-libint2::Shell convert_to_libint_shell(const Shell& o, bool pure) {
-  QDK_LOG_TRACE_ENTERING();
-  libint2::Shell sh;
-  sh.O = o.O;
-  sh.contr.resize(1);
-  sh.contr[0].l = o.angular_momentum;
-  sh.contr[0].pure = (pure && o.angular_momentum >= 2);
-
-  for (uint64_t i = 0; i < o.contraction; i++) {
-    sh.alpha.push_back(o.exponents[i]);
-    sh.contr[0].coeff.push_back(o.coefficients[i]);
-  }
-  return libint2::Shell(sh.alpha, sh.contr, sh.O, false);
-}
-
-libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
-  QDK_LOG_TRACE_ENTERING();
-  std::vector<libint2::Shell> shells;
-  for (auto& sh : o.shells) {
-    shells.push_back(convert_to_libint_shell(sh, o.pure));
-  }
-  return libint2::BasisSet(shells);
-}
-
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
-                                    const libint2::BasisSet& obs, double omega,
-                                    size_t i_lo, size_t i_hi) {
+                                    const ::libint2::BasisSet& native_obs,
+                                    double omega, size_t i_lo, size_t i_hi) {
   QDK_LOG_TRACE_ENTERING();
+  const BasisView obs(native_obs);
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t num_atomic_orbitals3 =
@@ -71,15 +52,13 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 
   bool is_erf = std::abs(omega) > 1e-12;
 
-  libint2::Engine engine;
+  Engine engine;
 
   if (is_erf) {
-    engine = libint2::Engine(libint2::Operator::erf_coulomb, obs.max_nprim(),
-                             obs.max_l(), 0);
+    engine = Engine(Operator::erf_coulomb, obs.max_nprim(), obs.max_l(), 0);
     engine.set_params(omega);
   } else {
-    engine = libint2::Engine(libint2::Operator::coulomb, obs.max_nprim(),
-                             obs.max_l(), 0);
+    engine = Engine(Operator::coulomb, obs.max_nprim(), obs.max_l(), 0);
   }
 
   for (size_t i = ish_st; i < ish_en; ++i)
@@ -87,12 +66,11 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
       for (size_t k = 0; k < nshells; ++k)
         for (size_t l = 0; l < nshells; ++l) {
           if (is_erf)
-            engine.compute2<libint2::Operator::erf_coulomb,
-                            libint2::BraKet::xx_xx, 0>(obs[i], obs[j], obs[k],
-                                                       obs[l]);
+            engine.compute2<Operator::erf_coulomb, ::libint2::BraKet::xx_xx, 0>(
+                obs[i], obs[j], obs[k], obs[l]);
           else
-            engine.compute2<libint2::Operator::coulomb, libint2::BraKet::xx_xx,
-                            0>(obs[i], obs[j], obs[k], obs[l]);
+            engine.compute2<Operator::coulomb, ::libint2::BraKet::xx_xx, 0>(
+                obs[i], obs[j], obs[k], obs[l]);
 
           auto data = engine.results()[0];
           if (data) {
@@ -126,9 +104,10 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 }
 
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
-                                  const libint2::BasisSet& obs, double omega,
-                                  size_t i_lo, size_t i_hi) {
+                                  const ::libint2::BasisSet& native_obs,
+                                  double omega, size_t i_lo, size_t i_hi) {
   QDK_LOG_TRACE_ENTERING();
+  const BasisView obs(native_obs);
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t num_atomic_orbitals3 =
@@ -144,15 +123,14 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 
   bool is_erf = std::abs(omega) > 1e-12;
 
-  libint2::Engine base_engine;
+  Engine base_engine;
 
   if (is_erf) {
-    base_engine = libint2::Engine(libint2::Operator::erf_coulomb,
-                                  obs.max_nprim(), obs.max_l(), 0);
+    base_engine =
+        Engine(Operator::erf_coulomb, obs.max_nprim(), obs.max_l(), 0);
     base_engine.set_params(omega);
   } else {
-    base_engine = libint2::Engine(libint2::Operator::coulomb, obs.max_nprim(),
-                                  obs.max_l(), 0);
+    base_engine = Engine(Operator::coulomb, obs.max_nprim(), obs.max_l(), 0);
   }
 
 #ifdef _OPENMP
@@ -160,7 +138,7 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 #else
   int nthreads = 1;
 #endif
-  std::vector<libint2::Engine> engines(nthreads, base_engine);
+  std::vector<Engine> engines(nthreads, base_engine);
 
   auto range_intersect = [](int x_st, int x_en, int y_st, int y_en) {
     return x_st <= (y_en - 1) and y_st <= (x_en - 1);
@@ -201,13 +179,11 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 
             if (ijkl % nthreads == thread_id) {
               if (is_erf)
-                engine.compute2<libint2::Operator::erf_coulomb,
-                                libint2::BraKet::xx_xx, 0>(obs[i], obs[j],
-                                                           obs[k], obs[l]);
+                engine.compute2<Operator::erf_coulomb, ::libint2::BraKet::xx_xx,
+                                0>(obs[i], obs[j], obs[k], obs[l]);
               else
-                engine.compute2<libint2::Operator::coulomb,
-                                libint2::BraKet::xx_xx, 0>(obs[i], obs[j],
-                                                           obs[k], obs[l]);
+                engine.compute2<Operator::coulomb, ::libint2::BraKet::xx_xx, 0>(
+                    obs[i], obs[j], obs[k], obs[l]);
 
               auto data = buf[0];
               if (data) {
@@ -308,10 +284,12 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 }
 
 std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
-                                 const libint2::BasisSet& obs,
-                                 const libint2::BasisSet& abs, size_t i_lo,
-                                 size_t i_hi) {
+                                 const ::libint2::BasisSet& native_obs,
+                                 const ::libint2::BasisSet& native_abs,
+                                 size_t i_lo, size_t i_hi) {
   QDK_LOG_TRACE_ENTERING();
+  const BasisView obs(native_obs);
+  const BasisView abs(native_abs);
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t naux = abs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
@@ -342,18 +320,18 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
     }
   }
 
-  libint2::Engine base_engine(libint2::Operator::coulomb,
-                              std::max(abs.max_nprim(), obs.max_nprim()),
-                              std::max(abs.max_l(), obs.max_l()), 0);
-  base_engine.set(libint2::BraKet::xs_xx);
+  Engine base_engine(Operator::coulomb,
+                     std::max(abs.max_nprim(), obs.max_nprim()),
+                     std::max(abs.max_l(), obs.max_l()), 0);
+  base_engine.set(::libint2::BraKet::xs_xx);
 
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
   int nthreads = 1;
 #endif
-  std::vector<libint2::Engine> engines(nthreads, base_engine);
-  const auto& unitshell = libint2::Shell::unit();
+  std::vector<Engine> engines(nthreads, base_engine);
+  const auto& unitshell = ::libint2::Shell::unit();
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -378,9 +356,8 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
 
           const size_t q_st = shell2bf_obs[q];
           const size_t nq = obs[q].size();
-          engine
-              .compute2<libint2::Operator::coulomb, libint2::BraKet::xs_xx, 0>(
-                  abs[i], unitshell, obs[p], obs[q]);
+          engine.compute2<Operator::coulomb, ::libint2::BraKet::xs_xx, 0>(
+              abs[i], unitshell, obs[p], obs[q]);
           auto data = engine.results()[0];
           if (data) {
             auto* h_eri_loc_pq = h_eri_ptr +
@@ -410,8 +387,9 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
 }
 
 std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
-                                    const libint2::BasisSet& abs) {
+                                    const ::libint2::BasisSet& native_abs) {
   QDK_LOG_TRACE_ENTERING();
+  const BasisView abs(native_abs);
   const size_t naux = abs.nbf();
   const size_t met_sz = naux * naux;
 
@@ -422,17 +400,16 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
   const size_t nshells = abs.size();
   auto shell2bf = abs.shell2bf();
 
-  libint2::Engine base_engine(libint2::Operator::coulomb, abs.max_nprim(),
-                              abs.max_l(), 0);
-  base_engine.set(libint2::BraKet::xs_xs);
+  Engine base_engine(Operator::coulomb, abs.max_nprim(), abs.max_l(), 0);
+  base_engine.set(::libint2::BraKet::xs_xs);
 
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
   int nthreads = 1;
 #endif
-  std::vector<libint2::Engine> engines(nthreads, base_engine);
-  const auto& unitshell = libint2::Shell::unit();
+  std::vector<Engine> engines(nthreads, base_engine);
+  const auto& unitshell = ::libint2::Shell::unit();
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -454,7 +431,7 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
         const size_t j_st = shell2bf[j];
         const size_t nj = abs[j].size();
 
-        engine.compute2<libint2::Operator::coulomb, libint2::BraKet::xs_xs, 0>(
+        engine.compute2<Operator::coulomb, ::libint2::BraKet::xs_xs, 0>(
             abs[i], unitshell, abs[j], unitshell);
         auto data = engine.results()[0];
         if (data) {
@@ -475,12 +452,14 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
 }
 
 void eri_df_grad(double* dJ, const double* P, const double* X,
-                 BasisMode basis_mode, const libint2::BasisSet& obs,
-                 const libint2::BasisSet& abs,
+                 BasisMode basis_mode, const ::libint2::BasisSet& native_obs,
+                 const ::libint2::BasisSet& native_abs,
                  const std::vector<int>& obs_sh2atom,
                  const std::vector<int>& abs_sh2atom, size_t n_atoms,
                  ParallelConfig mpi) {
   QDK_LOG_TRACE_ENTERING();
+  const BasisView obs(native_obs);
+  const BasisView abs(native_abs);
   const size_t num_atomic_orbitals = obs.nbf();
   const size_t naux = abs.nbf();
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
@@ -489,19 +468,19 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
   auto shell2bf_obs = obs.shell2bf();
   auto shell2bf_abs = abs.shell2bf();
 
-  libint2::Engine base_engine(libint2::Operator::coulomb,
-                              std::max(abs.max_nprim(), obs.max_nprim()),
-                              std::max(abs.max_l(), obs.max_l()), 1);
-  base_engine.set(libint2::BraKet::xs_xx);
+  Engine base_engine(Operator::coulomb,
+                     std::max(abs.max_nprim(), obs.max_nprim()),
+                     std::max(abs.max_l(), obs.max_l()), 1);
+  base_engine.set(::libint2::BraKet::xs_xx);
 
-  const auto& unitshell = libint2::Shell::unit();
+  const auto& unitshell = ::libint2::Shell::unit();
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
   int nthreads = 1;
 #endif
   int total_threads = mpi.world_size * nthreads;
-  std::vector<libint2::Engine> engines(nthreads, base_engine);
+  std::vector<Engine> engines(nthreads, base_engine);
 #ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
 #endif
@@ -530,9 +509,8 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
           const size_t q_st = shell2bf_obs[q];
           const size_t nq = obs[q].size();
           shell_atoms[2] = obs_sh2atom[q];
-          engine
-              .compute2<libint2::Operator::coulomb, libint2::BraKet::xs_xx, 1>(
-                  abs[i], unitshell, obs[p], obs[q]);
+          engine.compute2<Operator::coulomb, ::libint2::BraKet::xs_xx, 1>(
+              abs[i], unitshell, obs[p], obs[q]);
           auto& buf = engine.results();
           if (buf[0] == nullptr)
             continue;  // if all integrals screened out, skip to next quartet
@@ -560,17 +538,17 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
 }
 
 void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
-                    const libint2::BasisSet& abs,
+                    const ::libint2::BasisSet& native_abs,
                     const std::vector<int>& abs_sh2atom, size_t n_atoms,
                     ParallelConfig mpi) {
   QDK_LOG_TRACE_ENTERING();
+  const BasisView abs(native_abs);
   const size_t naux = abs.nbf();
   const size_t nshells = abs.size();
   auto shell2bf = abs.shell2bf();
 
-  libint2::Engine base_engine(libint2::Operator::coulomb, abs.max_nprim(),
-                              abs.max_l(), 1);
-  base_engine.set(libint2::BraKet::xs_xs);
+  Engine base_engine(Operator::coulomb, abs.max_nprim(), abs.max_l(), 1);
+  base_engine.set(::libint2::BraKet::xs_xs);
 
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
@@ -578,8 +556,8 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
   int nthreads = 1;
 #endif
   int total_threads = mpi.world_size * nthreads;
-  std::vector<libint2::Engine> engines(nthreads, base_engine);
-  const auto& unitshell = libint2::Shell::unit();
+  std::vector<Engine> engines(nthreads, base_engine);
+  const auto& unitshell = ::libint2::Shell::unit();
 #ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
 #endif
@@ -602,7 +580,7 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
         const size_t j_st = shell2bf[j];
         const size_t nj = abs[j].size();
 
-        engine.compute2<libint2::Operator::coulomb, libint2::BraKet::xs_xs, 1>(
+        engine.compute2<Operator::coulomb, ::libint2::BraKet::xs_xs, 1>(
             abs[i], unitshell, abs[j], unitshell);
         if (buf[0] == nullptr)
           continue;  // if all integrals screened out, skip to next quartet

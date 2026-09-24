@@ -3,10 +3,10 @@
 // license information.
 
 #pragma once
-#include <Eigen/Dense>
+#include <Eigen/Core>
 #include <cstddef>
 #include <memory>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <string>

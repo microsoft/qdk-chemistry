@@ -12,7 +12,6 @@
 #include <algorithm>
 #include <nlohmann/json.hpp>
 #include <numeric>
-#include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -118,7 +117,6 @@ qdk::chemistry::data::OrbitalEntropies parse_entropies(const py::object& obj) {
 }
 
 void bind_wavefunction(pybind11::module& data) {
-  using namespace qdk::chemistry::algorithms;
   using namespace qdk::chemistry::data;
   using qdk::chemistry::python::utils::bind_getter_as_property;
 

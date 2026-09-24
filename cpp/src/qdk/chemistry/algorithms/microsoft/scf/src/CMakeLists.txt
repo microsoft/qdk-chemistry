@@ -45,10 +45,17 @@ target_sources(chemistry PRIVATE
   util/blas_threads.cpp
   util/gauxc_util.cpp
   util/int1e.cpp
+  util/libint2_engine.cpp
   util/libint2_util.cpp
   util/matrix_exp.cpp
   util/similarity_transform.cpp
 )
+# Keep the full Libint2 implementation out of the lightweight shell-loop groups.
+if(QDK_CHEMISTRY_UNITY_BUILD)
+  set_source_files_properties(util/libint2_engine.cpp TARGET_DIRECTORY chemistry PROPERTIES
+    SKIP_UNITY_BUILD_INCLUSION ON
+  )
+endif()
 if(QDK_CHEMISTRY_ENABLE_MPI)
   target_sources(chemistry PRIVATE util/mpi_util.cpp)
 endif()
@@ -86,6 +93,13 @@ target_sources(chemistry PRIVATE
   scf/ks_impl.cpp
   scf/scf_solver.cpp
 )
+
+qdk_unity_group(chemistry scf_core core/basis_set.cpp core/scf.cpp)
+qdk_unity_group(chemistry scf_utilities
+  util/blas_threads.cpp util/gauxc_util.cpp
+  util/matrix_exp.cpp util/similarity_transform.cpp)
+qdk_unity_group(chemistry scf_guess scf/soad.cpp scf/guess.cpp scf/scf_solver.cpp)
+qdk_unity_group(chemistry scf_solvers scf/scf_impl.cpp scf/ks_impl.cpp scf/cpscf.cpp)
 
 # Install Resources
 if(NOT DEFINED QDK_RESOURCE_PREFIX)

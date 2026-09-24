@@ -31,10 +31,7 @@ class ValenceActiveSpaceSettings : public qdk::chemistry::data::Settings {
    * - num_active_electrons: -1 (invalid, must be set by user)
    * - num_active_orbitals: -1 (invalid, must be set by user)
    */
-  ValenceActiveSpaceSettings() {
-    set_default("num_active_electrons", -1);
-    set_default("num_active_orbitals", -1);
-  }
+  ValenceActiveSpaceSettings();
 };
 
 /**

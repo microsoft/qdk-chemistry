@@ -3,10 +3,10 @@
 // license information.
 
 #pragma once
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
 #include <memory>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <stdexcept>

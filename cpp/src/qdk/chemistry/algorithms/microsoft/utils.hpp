@@ -8,7 +8,6 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 
 #include <cstdint>
-#include <libint2.hpp>  // for Shell class
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 

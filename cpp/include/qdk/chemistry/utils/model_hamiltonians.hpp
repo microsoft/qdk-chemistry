@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
 #include <stdexcept>
 #include <string>
 #include <tuple>

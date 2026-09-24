@@ -4,6 +4,7 @@
 
 #include <qdk/chemistry/scf/core/moeri.h>
 #include <qdk/chemistry/scf/exc/gauxc_impl.h>
+#include <qdk/chemistry/scf/util/int1e.h>
 
 #include <blas.hh>
 #include <lapack.hh>

@@ -11,6 +11,12 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+AutocasEosSettings::AutocasEosSettings() {
+  set_default<bool>("normalize_entropies", true);
+  set_default<double>("diff_threshold", 0.1);
+  set_default<double>("entropy_threshold", 0.14);
+}
+
 std::shared_ptr<data::Wavefunction> AutocasEosActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();

@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include <libint2/basis.h>
 #include <qdk/chemistry/scf/config.h>
 
 #include "eri/eri_df_base.h"
@@ -34,7 +33,7 @@ class ERI {
   ParallelConfig mpi_;
 
   /// Orbital basis set in libint2 format for integral engine
-  libint2::BasisSet obs_;
+  libint2_util::Basis obs_;
 
   /// Host memory storage for 4-center ERIs (N⁴ doubles, may be NULL on GPU-only
   /// builds)

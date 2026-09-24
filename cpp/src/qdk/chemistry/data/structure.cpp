@@ -10,6 +10,7 @@
 #include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/element_data.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>

@@ -2,13 +2,17 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
+
 #include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/data/settings.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 
@@ -876,16 +880,33 @@ void Settings::update(const Settings& other_settings) {
   update(other_map);
 }
 
+SettingValue& Settings::_default_value(const std::string& key) {
+  return settings_[key];
+}
+
+Constraint& Settings::_default_limit(const std::string& key) {
+  return limits_[key];
+}
+
+void Settings::_set_default_description(
+    const std::string& key, const std::optional<std::string>& description) {
+  if (description.has_value()) {
+    descriptions_[key] = *description;
+  }
+}
+
+void Settings::_set_default_documented(const std::string& key,
+                                       bool documented) {
+  documented_[key] = documented;
+}
+
 void Settings::set_default(const std::string& key, const SettingValue& value,
                            std::optional<std::string> description,
                            std::optional<Constraint> limit, bool documented) {
   QDK_LOG_TRACE_ENTERING();
   if (!has(key)) {
-    settings_[key] = value;  // Direct assignment for set_default - this is
-                             // allowed to create new keys
-    if (description.has_value()) {
-      descriptions_[key] = *description;
-    }
+    _default_value(key) = value;
+    _set_default_description(key, description);
     if (std::holds_alternative<bool>(value) && limit.has_value()) {
       throw std::invalid_argument("Limit cannot be set for boolean settings");
     }
@@ -922,9 +943,9 @@ void Settings::set_default(const std::string& key, const SettingValue& value,
       }
     }
     if (limit.has_value()) {
-      limits_[key] = *limit;
+      _default_limit(key) = *limit;
     }
-    documented_[key] = documented;
+    _set_default_documented(key, documented);
   }
 }
 

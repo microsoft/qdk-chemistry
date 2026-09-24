@@ -8,6 +8,7 @@
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>

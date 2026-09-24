@@ -4,6 +4,7 @@
 
 #include <pybind11/pybind11.h>
 
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/exceptions.hpp>
 

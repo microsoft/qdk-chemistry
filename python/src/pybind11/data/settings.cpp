@@ -2,13 +2,11 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <pybind11/complex.h>
-#include <pybind11/eigen.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry.hpp>
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 

@@ -98,6 +98,25 @@ TEST(int1e, kinetic_integral) { test_integral("kinetic_integral"); }
 TEST(int1e, nuclear_integral) { test_integral("nuclear_integral", 1e-8); }
 TEST(int1e, ecp_integral) { test_integral("ecp_integral", 1e-8); }
 
+TEST(int1e, copied_calculator_retains_basis) {
+  auto json = read_json("int1e");
+  auto mol = make_molecule(json["mol"].get<std::string>());
+  auto basis = BasisSet::from_database_json(mol, json["basis"], BasisMode::PSI4,
+                                            false, false);
+  auto copy = [&]() {
+    OneBodyIntegral original(basis.get(), mol.get(),
+                             ParallelConfig{1, 0, 1, 0});
+    return OneBodyIntegral(original);
+  }();
+  auto reference =
+      read_mat(json, "overlap_integral", basis->num_atomic_orbitals,
+               basis->num_atomic_orbitals);
+  RowMajorMatrix result = RowMajorMatrix::Zero(basis->num_atomic_orbitals,
+                                               basis->num_atomic_orbitals);
+  copy.overlap_integral(result.data());
+  EXPECT_NEAR((reference - result).array().abs().maxCoeff(), 0.0, 1e-9);
+}
+
 // Gradients are only fully supported if GPUs are enabled
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 TEST(int1e, overlap_graident) { test_gradient("overlap_gradient"); }

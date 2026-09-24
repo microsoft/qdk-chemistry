@@ -7,15 +7,20 @@
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/types.h>
+#include <qdk/chemistry/scf/fwd.h>
+#include <qdk/chemistry/scf/util/libint2_fwd.h>
 
 #include <Eigen/Dense>
+#include <array>
+#include <cstddef>
 #include <functional>
+#include <memory>
+#include <utility>
 #include <vector>
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
 #include <qdk/chemistry/scf/core/qmmm.h>
 #endif
 #include <qdk/chemistry/scf/core/scf.h>
-#include <qdk/chemistry/scf/util/libint2_util.h>
 
 #include <libecpint.hpp>
 
@@ -301,8 +306,7 @@ class OneBodyIntegral {
   std::vector<std::pair<int, int>>
       shell_pairs_;  ///< Significant shell pairs from Schwarz screening of the
                      ///< overlap
-  libint2::BasisSet
-      obs_;    ///< Basis set in libint2 format for integral evaluation
+  std::shared_ptr<const libint2::BasisSet> obs_;  ///< Immutable orbital basis
   bool pure_;  ///< True for spherical harmonics (pure), false for Cartesian
                ///< functions
   std::vector<std::pair<double, std::array<double, 3>>>

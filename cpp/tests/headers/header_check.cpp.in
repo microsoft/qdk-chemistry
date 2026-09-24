@@ -1,0 +1,10 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+@HEADER_CHECK_INCLUDES@
+
+template <typename T>
+concept QdkHeaderCheckComplete = requires { sizeof(T); };
+
+@HEADER_CHECK_ASSERTIONS@

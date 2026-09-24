@@ -3,11 +3,11 @@
 // license information.
 
 #pragma once
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 #include <memory>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/element_data.hpp>
 #include <string>

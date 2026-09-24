@@ -5,12 +5,10 @@
 
 #include <cstddef>
 #include <memory>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-class SymmetryBlockedIndexSet;
-class SpinValue;
 
 /**
  * @brief (Internal) Read one spin channel's stored indices from an index set.

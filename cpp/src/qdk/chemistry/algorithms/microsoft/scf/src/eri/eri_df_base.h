@@ -12,7 +12,7 @@
 #include <qdk/chemistry/scf/util/gpu/cutensor_utils.h>
 #endif
 
-#include <libint2/basis.h>
+#include "util/libint2_engine.h"
 namespace qdk::chemistry::scf {
 
 /**
@@ -28,8 +28,8 @@ class DensityFittingBase {
   BasisMode basis_mode_;  ///< atomic orbital convention
   ParallelConfig mpi_;    ///< MPI configuration
 
-  libint2::BasisSet obs_;  ///< Orbital basis set in libint2 format
-  libint2::BasisSet abs_;  ///< Auxiliary basis set in libint2 format
+  libint2_util::Basis obs_;  ///< Orbital basis set in libint2 format
+  libint2_util::Basis abs_;  ///< Auxiliary basis set in libint2 format
 
   std::vector<int> obs_sh2atom_;  ///< Orbital basis shell to atom mapping
   std::vector<int> abs_sh2atom_;  ///< Auxiliary basis shell to atom mapping

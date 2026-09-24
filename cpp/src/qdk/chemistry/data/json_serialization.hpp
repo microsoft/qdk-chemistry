@@ -3,7 +3,7 @@
 // license information.
 
 #pragma once
-#include <Eigen/Dense>
+#include <Eigen/Core>
 #include <complex>
 #include <memory>
 #include <nlohmann/json.hpp>
