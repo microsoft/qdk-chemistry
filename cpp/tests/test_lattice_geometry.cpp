@@ -67,7 +67,7 @@ TEST_F(LatticeGeometryTest, CartesianConstructionAndValidation) {
   EXPECT_EQ(geometry.mth_nearest_neighbors(2), (std::vector<Edge>{{1, 2}}));
   EXPECT_EQ(geometry.mth_nearest_neighbors(3), (std::vector<Edge>{{0, 2}}));
 
-  EXPECT_THROW(LatticeGeometry(Eigen::MatrixXd::Zero(2, 3)),
+  EXPECT_THROW(LatticeGeometry(Eigen::MatrixXd::Zero(2, 0)),
                std::invalid_argument);
   for (double invalid : {std::numeric_limits<double>::infinity(),
                          std::numeric_limits<double>::quiet_NaN()}) {
@@ -206,7 +206,7 @@ TEST_F(LatticeGeometryTest, PeriodicImagesRemainDistinctAndCanonical) {
   const auto connections =
       LatticeGeometry::chain(2, true).neighbor_connections({1});
   ASSERT_EQ(connections.size(), 2);
-  std::set<std::array<std::int64_t, 2>> images;
+  std::set<std::vector<std::int64_t>> images;
   for (const auto& connection : connections) {
     EXPECT_EQ(connection.site_i, 0);
     EXPECT_EQ(connection.site_j, 1);
@@ -216,7 +216,7 @@ TEST_F(LatticeGeometryTest, PeriodicImagesRemainDistinctAndCanonical) {
     EXPECT_FALSE(connection.flavor.has_value());
     images.insert(connection.image_shift);
   }
-  EXPECT_EQ(images, (std::set<std::array<std::int64_t, 2>>{{-1, 0}, {0, 0}}));
+  EXPECT_EQ(images, (std::set<std::vector<std::int64_t>>{{-1, 0}, {0, 0}}));
 
   const LatticeGeometry single(Eigen::MatrixXd::Zero(1, 2),
                                Eigen::MatrixXd::Identity(2, 2));
@@ -230,7 +230,7 @@ TEST_F(LatticeGeometryTest, PeriodicImagesRemainDistinctAndCanonical) {
         connection.image_shift[0], connection.image_shift[1])));
     images.insert(connection.image_shift);
   }
-  EXPECT_EQ(images, (std::set<std::array<std::int64_t, 2>>{{0, 1}, {1, 0}}));
+  EXPECT_EQ(images, (std::set<std::vector<std::int64_t>>{{0, 1}, {1, 0}}));
 }
 
 TEST_F(LatticeGeometryTest, BuiltInConnectionsScaleToLargeLattices) {
@@ -434,6 +434,64 @@ TEST_F(LatticeGeometryTest, EmptyAndCoincidentGeometryRoundTrips) {
       EXPECT_EQ(restored.content_hash(), geometry.content_hash());
       EXPECT_TRUE(restored.neighbor_connections({1}).empty());
     }
+  }
+}
+
+TEST_F(LatticeGeometryTest, NonPlanarGeometryIsDataOnly) {
+  Eigen::MatrixXd positions(2, 3);
+  positions << 0.0, 0.0, 0.0, 0.5, 0.25, 1.0;
+  Eigen::MatrixXd periods(2, 3);
+  periods << 2.0, 0.0, 0.0, 0.0, 0.0, 3.0;
+  const LatticeGeometry geometry(positions, periods);
+  EXPECT_EQ(geometry.dimension(), 3);
+  const LatticeGeometry line(Eigen::MatrixXd::Ones(2, 1),
+                             Eigen::MatrixXd::Constant(1, 1, 4.0));
+  EXPECT_EQ(line.dimension(), 1);
+  const std::string filename = "test_non_planar.lattice_geometry.h5";
+  for (const auto& source :
+       {geometry, line, LatticeGeometry(Eigen::MatrixXd::Zero(0, 3))}) {
+    source.to_hdf5_file(filename);
+    const auto hdf5 = LatticeGeometry::from_hdf5_file(filename);
+    std::filesystem::remove(filename);
+    for (const auto& restored :
+         {LatticeGeometry::from_json(
+              nlohmann::json::parse(source.to_json().dump())),
+          hdf5}) {
+      EXPECT_EQ(restored.dimension(), source.dimension());
+      EXPECT_EQ(restored.positions().rows(), source.positions().rows());
+      EXPECT_EQ(restored.content_hash(), source.content_hash());
+    }
+    EXPECT_THROW(source.neighbor_connections({1}), std::runtime_error);
+  }
+  const LatticeGeometry open(positions);
+  EXPECT_THROW(open.nearest_neighbor_shells({1}), std::runtime_error);
+  EXPECT_THROW(open.mth_nearest_neighbors(1), std::runtime_error);
+  const auto permuted = LatticeGeometry::permute(geometry, {1, 0});
+  EXPECT_TRUE(permuted.positions().row(0).isApprox(positions.row(1)));
+  EXPECT_TRUE(permuted.periods()->isApprox(periods));
+
+  // Hand-written JSON may omit the dimension only when a row determines it.
+  EXPECT_EQ(LatticeGeometry::from_json({{"positions", nlohmann::json::array()},
+                                        {"periods", {{1.0, 0.0, 0.0}}}})
+                .dimension(),
+            3);
+  EXPECT_THROW(
+      LatticeGeometry::from_json({{"positions", nlohmann::json::array()}}),
+      std::invalid_argument);
+  for (const auto& dimension : std::vector<nlohmann::json>{0, -1, 1.5, "3"}) {
+    auto malformed = geometry.to_json();
+    malformed["dimension"] = dimension;
+    EXPECT_THROW(LatticeGeometry::from_json(malformed), std::invalid_argument);
+  }
+  auto narrow = geometry.to_json();
+  narrow["dimension"] = 2;
+  EXPECT_THROW(LatticeGeometry::from_json(narrow), std::invalid_argument);
+
+  Eigen::MatrixXd dependent(3, 3);
+  dependent << 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0;
+  for (const auto& invalid : {Eigen::MatrixXd::Identity(4, 3).eval(), dependent,
+                              Eigen::MatrixXd::Identity(1, 2).eval()}) {
+    EXPECT_THROW(LatticeGeometry(positions, invalid), std::invalid_argument);
   }
 }
 

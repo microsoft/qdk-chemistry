@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
+from qdk_chemistry.constants import BOHR_MAGNETON, ELEMENTARY_CHARGE
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -49,6 +50,7 @@ if TYPE_CHECKING:
 
 DEFAULT_KITAEV_COUPLINGS = {1: -13.3, 2: -0.67, 3: 0.1}
 DEFAULT_HEISENBERG_COUPLINGS = {1: -1.3, 3: 1.0}
+BOHR_MAGNETON_MEV_PER_TESLA = BOHR_MAGNETON / ELEMENTARY_CHARGE * 1.0e3
 
 
 def create_lattice(
@@ -87,7 +89,7 @@ def create_hamiltonian(
     gamma_prime_z: float | np.ndarray | None = None,
     magnetic_field_abc: Sequence[float] = (0.0, 10.0, 0.0),
     g_factors_abc: Sequence[float] = (2.3, 2.3, 1.3),
-    bohr_magneton: float = 5.988e-2,
+    bohr_magneton: float = BOHR_MAGNETON_MEV_PER_TESLA,
     crystallographic_transform: np.ndarray | None = None,
     spin_basis_transform: np.ndarray | None = None,
 ) -> QubitOperator:
@@ -315,7 +317,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--bohr-magneton",
         type=float,
-        default=5.988e-2,
+        default=BOHR_MAGNETON_MEV_PER_TESLA,
         help="Field-to-exchange conversion (meV/T by default).",
     )
     parser.add_argument(

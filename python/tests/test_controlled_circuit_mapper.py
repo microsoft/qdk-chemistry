@@ -368,28 +368,6 @@ def test_wide_controlled_transport_stays_sparse(sparse: bool, layered: bool) -> 
     assert payload["layerOffsets"] == ([0, 2, 3] if layered else [])
 
 
-def test_packed_controlled_transport_preserves_duplicate_dict_semantics() -> None:
-    """Repeated legacy packed indices keep the last Pauli and original dictionary order."""
-    container = PauliProductFormulaContainer.from_json(
-        {
-            "version": "0.3.0",
-            "term_offsets": [0, 3],
-            "qubit_indices": [1, 0, 1],
-            "pauli_codes": [1, 3, 2],
-            "angles": [-0.2],
-            "step_reps": 1,
-            "num_qubits": 2,
-        }
-    )
-    mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    mapper.settings().set("control_indices", [2])
-    circuit = mapper.run(UnitaryRepresentation(container=container))
-    assert circuit._qsharp_factory is not None
-    params = vars(circuit._qsharp_factory.parameter["params"])
-    assert params["pauliIndices"] == [[1, 0]]
-    assert params["pauliOps"] == [[qsharp.Pauli.Y, qsharp.Pauli.Z]]
-
-
 def test_declared_layers_reduce_rotation_depth_without_changing_default() -> None:
     """Declared layers reduce rotation rounds without adding qubits or rotations."""
     assert create("controlled_circuit_mapper").name() == "pauli_sequence"

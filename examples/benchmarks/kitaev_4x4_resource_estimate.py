@@ -10,6 +10,7 @@ from qdk.qre import estimate
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
+from qdk_chemistry.constants import BOHR_MAGNETON, ELEMENTARY_CHARGE
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -58,7 +59,7 @@ def create_hamiltonian(graph: LatticeGraph) -> QubitOperator:
         gamma_prime=-2.3,  # meV
         magnetic_field_abc=(0.0, 10.0, 0.0),  # tesla; H_b = 10 T
         g_factors_abc=(2.3, 2.3, 1.3),
-        bohr_magneton=5.988e-2,  # meV/T
+        bohr_magneton=BOHR_MAGNETON / ELEMENTARY_CHARGE * 1.0e3,  # meV/T
         crystallographic_transform=crystallographic_transform,
         include_term_groups=True,
     )

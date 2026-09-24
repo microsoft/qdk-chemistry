@@ -32,7 +32,7 @@ using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 /** @brief Optional semantic label for one shell and geometric bond axis. */
 struct BondFlavorDefinition {
   std::uint64_t shell;
-  Eigen::RowVector2d axis;
+  Eigen::RowVectorXd axis;
   BondFlavorId flavor;
 };
 
@@ -174,7 +174,9 @@ class LatticeGraph : public DataClass {
    * Duplicate canonical endpoint/image records are rejected across all shells.
    * Orientation IDs are unsigned shell-local labels, not necessarily contiguous
    * in a selected subset. Axes must be finite unit vectors and displacements
-   * finite and nonzero. Images may have different weights and flavors.
+   * finite and nonzero. Axes, displacements, and image shifts share one
+   * dimension across records, matching the geometry when present. Images may
+   * have different weights and flavors.
    * Distinct non-self site pairs are colored once, including zero-weight and
    * cancelling-image pairs, using greedy coloring with seed 0 and 32 trials.
    *
@@ -550,10 +552,10 @@ class LatticeGraph : public DataClass {
   /**
    * @brief Serialize the graph's connectivity and optional geometry to JSON.
    *
-   * Adjacency-only graphs use sparse triplets. Explicit graphs store resolved
-   * records, selected shells, nested geometry, and a checked adjacency cache
-   * retaining exact factory weights and zero entries. Empty connections remain
-   * distinct from absent connection metadata.
+   * Adjacency-only graphs use sparse triplets. Graphs with connection records
+   * or selected shells also store those records and shells, and the adjacency
+   * becomes a checked cache retaining exact factory weights and zero entries.
+   * Nested geometry is stored whenever present.
    *
    * @return JSON representation of the graph.
    */
@@ -628,7 +630,7 @@ class LatticeGraph : public DataClass {
       std::optional<EdgeColoring> coloring);
 
   // Preserve legacy factory topology while distributing each pair's weight
-  // over its shell-one physical images (also used for legacy deserialization).
+  // over its shell-one physical images.
   static LatticeGraph _with_geometry(
       Eigen::SparseMatrix<double> adjacency,
       std::optional<EdgeColoring> coloring,
@@ -658,8 +660,6 @@ class LatticeGraph : public DataClass {
   std::shared_ptr<const LatticeGeometry> _geometry;
   std::vector<std::uint64_t> _selected_shells;
   std::vector<NeighborConnection> _connections;
-  /// Distinguishes an explicitly empty selection from an adjacency-only graph.
-  bool _has_connections = false;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,

@@ -377,10 +377,10 @@ Serialization
 
 The :class:`~qdk_chemistry.data.LatticeGraph` class supports serialization to and from JSON and HDF5 formats.
 Explicit graphs persist resolved connection records, selected shells, optional geometry, stored edge colors, and a checked adjacency cache.
-Weights, flavors, and image multiplicity are retained; an explicitly empty selection is distinct from adjacency-only input.
-Older explicit-connection files without stored colors recompute them on load using the :ref:`constructor coloring policy <lattice-edge-coloring>`.
-Legacy adjacency files retain their topology and optional coordinates without inferring connection records.
-To use their geometry in a shell- or flavor-dependent model, construct a selected graph with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` after loading.
+Weights, flavors, and image multiplicity are retained. A graph with no connection records and no selected shells is stored in adjacency-only form.
+Explicit-connection files without stored colors recompute them on load using the :ref:`constructor coloring policy <lattice-edge-coloring>`.
+Adjacency-only files, including those written before connection records existed, retain their topology without inferring connection records.
+To use such a lattice in a shell- or flavor-dependent model, construct a selected graph with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation.
 
 .. note::

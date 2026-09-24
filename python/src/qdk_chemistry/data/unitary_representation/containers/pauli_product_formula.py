@@ -44,22 +44,25 @@ class ExponentiatedPauliTerm:
 
 
 def _commute(terms: Sequence[ExponentiatedPauliTerm]) -> bool:
-    """Certify QWC groups in sparse linear time, falling back to general commutation."""
-    maps = [{q: p for q, p in term.pauli_term.items() if p != "I"} for term in terms]
-    axes: dict[int, str] = {}
-    qwc = True
-    for word in maps:
-        for qubit, axis in word.items():
+    """Certify a commuting group, comparing only terms that share a qubit."""
+    factors_by_qubit: dict[int, list[tuple[int, str]]] = {}
+    for index, term in enumerate(terms):
+        for qubit, axis in term.pauli_term.items():
+            if axis == "I":
+                continue
             if axis not in ("X", "Y", "Z"):
                 raise ValueError(f"Invalid Pauli axis {axis!r} in commuting group.")
-            if axes.setdefault(qubit, axis) != axis:
-                qwc = False
-    if qwc:
-        return True
-    # The public utility imports data classes through utils.__init__.
-    from qdk_chemistry.utils.pauli_commutation import do_pauli_maps_commute  # noqa: PLC0415
-
-    return all(do_pauli_maps_commute(a, b) for i, a in enumerate(maps) for b in maps[i + 1 :])
+            factors_by_qubit.setdefault(qubit, []).append((index, axis))
+    # Two words commute iff their axes differ on an even number of shared qubits.
+    odd: dict[tuple[int, int], bool] = {}
+    for factors in factors_by_qubit.values():
+        if len({axis for _, axis in factors}) == 1:
+            continue
+        for position, (first, first_axis) in enumerate(factors):
+            for second, second_axis in factors[position + 1 :]:
+                if first_axis != second_axis:
+                    odd[first, second] = not odd.get((first, second), False)
+    return not any(odd.values())
 
 
 def _validate_groups(terms: Sequence[ExponentiatedPauliTerm], offsets: tuple[int, ...]) -> None:
@@ -128,37 +131,6 @@ def _merge_groups(
     for word, term in zip(words, chain(left, right), strict=True):
         angles[word] = _finite(angles.get(word, 0.0) + _finite(term.angle))
     return [ExponentiatedPauliTerm(dict(word), angle) for word, angle in angles.items() if abs(angle) > atol]
-
-
-def _read_legacy_step_terms(
-    num_qubits: int,
-    term_offsets: np.ndarray,
-    qubit_indices: np.ndarray,
-    pauli_codes: np.ndarray,
-    angles: np.ndarray,
-) -> list[ExponentiatedPauliTerm]:
-    """Convert the old packed 0.3.0 payload at the JSON/HDF5 loader boundary."""
-    if (
-        num_qubits <= 0
-        or any(a.ndim != 1 or (a.size and a.dtype.kind not in "iu") for a in (term_offsets, qubit_indices, pauli_codes))
-        or angles.ndim != 1
-        or len(term_offsets) != len(angles) + 1
-        or len(qubit_indices) != len(pauli_codes)
-        or term_offsets[0] != 0
-        or term_offsets[-1] != len(qubit_indices)
-        or np.any(term_offsets[1:] < term_offsets[:-1])
-        or np.any((qubit_indices < 0) | (qubit_indices >= num_qubits))
-        or np.any((pauli_codes < 1) | (pauli_codes > 3))
-    ):
-        raise ValueError("Invalid packed product-formula arrays.")
-    # Legacy terms used a dict: repeated indices retain their first position and last axis.
-    return [
-        ExponentiatedPauliTerm(
-            {int(qubit_indices[i]): "IXYZ"[int(pauli_codes[i])] for i in range(int(begin), int(end))},
-            float(angle),
-        )
-        for begin, end, angle in zip(term_offsets[:-1], term_offsets[1:], angles, strict=True)
-    ]
 
 
 class PauliProductFormulaContainer(UnitaryContainer):
@@ -628,25 +600,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         """
         version = json_data.get("version", "")
-        expected_version = cls._serialization_version
-        if version.startswith(("0.2.", "0.3.")):
-            expected_version = ".".join(version.split(".")[:2]) + ".0"
+        # 0.2.x files predate endpoints and offsets, which default to empty.
+        expected_version = "0.2.0" if version.startswith("0.2.") else cls._serialization_version
         cls._validate_json_version(expected_version, json_data)
         if "segments" in json_data:
             raise ValueError("Recursive segments are not a supported product-formula format.")
-        if expected_version == "0.3.0":
-            return cls(
-                _read_legacy_step_terms(
-                    json_data["num_qubits"],
-                    np.asarray(json_data["term_offsets"]),
-                    np.asarray(json_data["qubit_indices"]),
-                    np.asarray(json_data["pauli_codes"]),
-                    np.asarray(json_data["angles"], dtype=float),
-                ),
-                step_reps=json_data["step_reps"],
-                num_qubits=json_data["num_qubits"],
-                scale=json_data.get("scale", 1.0),
-            )
         lists: dict[str, list[ExponentiatedPauliTerm]] = {}
         for name in ("step_terms", "beginning", "end"):
             step_terms = []
@@ -694,28 +652,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
         """
         version = group.attrs.get("version", "")
-        expected_version = cls._serialization_version
-        if version.startswith(("0.2.", "0.3.")):
-            expected_version = ".".join(version.split(".")[:2]) + ".0"
+        # 0.2.x files predate endpoints and offsets, which default to empty.
+        expected_version = "0.2.0" if version.startswith("0.2.") else cls._serialization_version
         cls._validate_hdf5_version(expected_version, group)
         if "segments" in group:
             raise ValueError("Recursive segments are not a supported product-formula format.")
         step_reps = group.attrs["step_reps"]
         num_qubits = group.attrs["num_qubits"]
-
-        if expected_version == "0.3.0":
-            return cls(
-                _read_legacy_step_terms(
-                    num_qubits,
-                    np.array(group["term_offsets"]),
-                    np.array(group["qubit_indices"]),
-                    np.array(group["pauli_codes"]),
-                    np.array(group["angles"], dtype=float),
-                ),
-                step_reps=step_reps,
-                num_qubits=num_qubits,
-                scale=float(group.attrs.get("scale", 1.0)),
-            )
 
         lists: dict[str, list[ExponentiatedPauliTerm]] = {}
         for name in ("step_terms", "beginning", "end"):

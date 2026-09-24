@@ -374,7 +374,9 @@ def create_kitaev_hamiltonian(
         \mu_B \sum_i (g_a H_a S_i^a + g_b H_b S_i^b + g_c H_c S_i^c).
 
     ``bohr_magneton`` converts the field units to the energy units used by the exchange parameters and defaults to
-    one for reduced-unit calculations. ``crystallographic_transform`` must be supplied for a nonzero field and
+    one for reduced-unit calculations. For fields in tesla and exchange parameters in meV, pass
+    ``BOHR_MAGNETON / ELEMENTARY_CHARGE * 1e3`` from :mod:`qdk_chemistry.constants`.
+    ``crystallographic_transform`` must be supplied for a nonzero field and
     defines :math:`\mathbf{S}_{abc}=D\mathbf{S}_{xyz}` for the lattice-specific crystallographic frame.
     The returned operator uses Pauli matrices, so two-body coefficients include
     :math:`S_i^\mu S_j^\nu=\sigma_i^\mu\sigma_j^\nu/4`, while field coefficients include

@@ -406,6 +406,7 @@ Thus applying :math:`D^{\mathsf T}` to the coefficients is not a transformation 
 More generally, if ``spin_basis_transform`` is :math:`C` with :math:`\boldsymbol{S}_{\mathrm{out}}=C\boldsymbol{S}_{xyz}`, the emitted coefficient vector is :math:`CD^{\mathsf T}\boldsymbol{h}_{abc}/2` because :math:`S^\mu=\sigma^\mu/2`.
 Passing :math:`C=D` expresses both exchange and field terms directly in the crystallographic frame.
 ``bohr_magneton`` converts the supplied field units into the energy units of the exchange parameters and defaults to one for reduced-unit calculations.
+For fields in tesla and exchange parameters in meV, pass ``BOHR_MAGNETON / ELEMENTARY_CHARGE * 1e3`` from :mod:`qdk_chemistry.constants`, the CODATA Bohr magneton in meV/T.
 
 .. tab:: Python API
 

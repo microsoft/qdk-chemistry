@@ -154,7 +154,7 @@ class TestLatticeGeometry:
     @pytest.mark.parametrize(
         ("positions", "periods", "message"),
         [
-            (np.zeros((2, 3)), None, "positions"),
+            (np.zeros((2, 0)), None, "positions"),
             (np.array([[np.nan, 0.0]]), None, "finite"),
             (np.zeros((1, 2)), np.zeros((1, 2)), "nonzero"),
             (np.zeros((1, 2)), np.ones((3, 2)), "Periodic vectors"),
@@ -165,6 +165,24 @@ class TestLatticeGeometry:
         """Geometry rejects invalid coordinates and malformed or degenerate periodic vectors."""
         with pytest.raises(ValueError, match=message):
             LatticeGeometry(positions, periods=periods)
+
+    def test_non_planar_geometry_is_data_only(self) -> None:
+        """Geometry and records accept any positive dimension, while neighbor searches stay two-dimensional."""
+        axis = np.array([0.0, 0.0, 1.0])
+        geometry = LatticeGeometry(np.array([[0.0, 0.0, 0.0], axis]), periods=np.array([[0.0, 0.0, 2.0]]))
+        assert geometry.dimension == 3
+        restored = LatticeGeometry.from_json(geometry.to_json())
+        np.testing.assert_array_equal(restored.positions, geometry.positions)
+        assert restored.content_hash() == geometry.content_hash()
+        with pytest.raises(RuntimeError, match="two-dimensional"):
+            geometry.neighbor_connections([1])
+
+        record = NeighborConnection(0, 1, BondClass(1, 0, axis), axis, [0, 0, 0])
+        graph = LatticeGraph.from_connections(2, [record], geometry=geometry)
+        assert list(graph.connections[0].image_shift) == [0, 0, 0]
+        np.testing.assert_array_equal(graph.connections[0].displacement, axis)
+        with pytest.raises(ValueError, match="dimension"):
+            LatticeGraph.from_connections(2, [record], geometry=LatticeGeometry(np.zeros((2, 2))))
 
     @pytest.mark.parametrize("periodic", [False, True])
     def test_permuted_builtin_and_cartesian_queries_agree(self, periodic: bool) -> None:
@@ -263,9 +281,6 @@ class TestSelectedLatticeGraph:
         ):
             assert not hasattr(graph, removed)
         adjacency_only = LatticeGraph.from_dense_matrix(graph.adjacency_matrix())
-        assert not adjacency_only.has_connections
-        assert graph.has_connections
-        assert LatticeGraph.from_connections(graph.num_sites, []).has_connections
         assert adjacency_only.geometry is None
         assert adjacency_only.connections == []
         assert adjacency_only.selected_shells == []

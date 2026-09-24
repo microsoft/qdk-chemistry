@@ -21,14 +21,14 @@ void bind_lattice_geometry(py::module& m) {
 
   py::class_<BondClass, py::smart_holder>(
       m, "BondClass", "Geometric shell and bond-axis class.")
-      .def(py::init<std::uint64_t, std::uint32_t, Eigen::RowVector2d>(),
+      .def(py::init<std::uint64_t, std::uint32_t, Eigen::RowVectorXd>(),
            py::arg("shell"), py::arg("orientation"), py::arg("axis"), R"(
 Describe a radial shell and an unoriented bond axis.
 
 Args:
     shell (int): One-based radial shell index.
     orientation (int): Zero-based orientation index within the shell.
-    axis (numpy.ndarray): Two-component canonical unit axis.
+    axis (numpy.ndarray): Canonical unit axis with one component per spatial dimension.
 )")
       .def_property_readonly("shell",
                              [](const BondClass& self) { return self.shell; })
@@ -44,8 +44,8 @@ The displacement runs from ``site_i`` to the specified image of ``site_j``.
 :class:`LatticeGeometry` queries return unit weight and no semantic flavor;
 interaction graphs can assign weights and labels to these same records.
 )")
-      .def(py::init<std::uint64_t, std::uint64_t, BondClass, Eigen::RowVector2d,
-                    std::array<std::int64_t, 2>, std::optional<BondFlavorId>,
+      .def(py::init<std::uint64_t, std::uint64_t, BondClass, Eigen::RowVectorXd,
+                    std::vector<std::int64_t>, std::optional<BondFlavorId>,
                     double>(),
            py::arg("site_i"), py::arg("site_j"), py::arg("bond_class"),
            py::arg("displacement"), py::arg("image_shift"),
@@ -56,8 +56,8 @@ Args:
     site_i (int): Source site index.
     site_j (int): Target site index.
     bond_class (BondClass): Radial shell and unoriented axis class.
-    displacement (numpy.ndarray): Two-component Cartesian displacement.
-    image_shift (tuple[int, int]): Image coefficients in periodic-vector order, padded with zero.
+    displacement (numpy.ndarray): Cartesian displacement with one component per spatial dimension.
+    image_shift (list[int]): One image coefficient per spatial dimension, in periodic-vector order, padded with zeros.
     flavor (int | None, optional): Semantic label, if assigned. Defaults to None.
     weight (float, optional): Interaction weight. Defaults to 1.0.
 )")
@@ -83,9 +83,11 @@ Args:
       m, "LatticeGeometry", R"(
 Immutable Cartesian lattice geometry, independent of interactions.
 
-Positions are always a two-column matrix, including for chains and empty
-geometries. Optional periodic vectors specify physical images. Built-in
-factories retain compact integer coordinates for stencil-based neighbor queries.
+Positions form a ``(num_sites, d)`` matrix for any positive dimension ``d``,
+including empty geometries. Optional periodic vectors specify physical images.
+Neighbor searches currently support two-dimensional geometries only. Built-in
+factories are two-dimensional and retain compact integer coordinates for
+stencil-based neighbor queries.
 No adjacency matrix, semantic flavor assignment, or edge coloring is stored.
 )");
 
@@ -96,14 +98,16 @@ No adjacency matrix, semantic flavor assignment, or edge coloring is stored.
 Construct geometry from Cartesian positions and optional supercell vectors.
 
 Args:
-    positions (numpy.ndarray): Finite ``(num_sites, 2)`` matrix; ``(0, 2)`` is valid.
-    periods (numpy.ndarray | None, optional): One or two independent, finite, nonzero row vectors. Defaults to None.
+    positions (numpy.ndarray): Finite ``(num_sites, d)`` matrix with ``d > 0``; ``num_sites`` may be zero.
+    periods (numpy.ndarray | None, optional): At most ``d`` independent, finite, nonzero row vectors of length ``d``. Defaults to None.
 
 Raises:
     ValueError: If the position or periodic-vector matrix is invalid.
 )")
       .def_property_readonly("num_sites", &LatticeGeometry::num_sites,
                              "Number of lattice sites.")
+      .def_property_readonly("dimension", &LatticeGeometry::dimension,
+                             "Number of Cartesian components per position.")
       .def_property_readonly(
           "positions",
           [](const LatticeGeometry& self) {
@@ -114,7 +118,7 @@ Raises:
 Cartesian positions in site-index order.
 
 Returns:
-    numpy.ndarray: Independent copy of the ``(num_sites, 2)`` position matrix.
+    numpy.ndarray: Independent copy of the ``(num_sites, dimension)`` position matrix.
 )")
       .def_property_readonly(
           "periods", [](const LatticeGeometry& self) { return self.periods(); },
@@ -142,6 +146,7 @@ Returns:
 
 Raises:
     ValueError: If a shell is zero or tolerance is not finite and positive.
+    RuntimeError: If the geometry is not two-dimensional.
     OverflowError: If an integer stencil, periodic image, or displacement exceeds the supported range.
 )")
       .def("nearest_neighbor_shells", &LatticeGeometry::nearest_neighbor_shells,
@@ -161,7 +166,7 @@ Returns:
 
 Raises:
     ValueError: If a shell is zero or tolerance is not finite and positive.
-    RuntimeError: If periodic vectors are present.
+    RuntimeError: If periodic vectors are present or the geometry is not two-dimensional.
 )")
       .def("mth_nearest_neighbors", &LatticeGeometry::mth_nearest_neighbors,
            py::arg("m"), py::arg("tolerance") = 1.0e-9,
@@ -177,7 +182,7 @@ Returns:
 
 Raises:
     ValueError: If m is zero or tolerance is not finite and positive.
-    RuntimeError: If periodic vectors are present.
+    RuntimeError: If periodic vectors are present or the geometry is not two-dimensional.
 )")
       .def_static("chain", &LatticeGeometry::chain, py::arg("n"),
                   py::arg("periodic") = false,

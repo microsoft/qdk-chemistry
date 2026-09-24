@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
+from qdk_chemistry.constants import BOHR_MAGNETON, ELEMENTARY_CHARGE
 from qdk_chemistry.data import (
     BondClass,
     BondFlavorDefinition,
@@ -1058,7 +1059,7 @@ class TestModelHamiltonians:
         gamma_prime = -2.3
         field_abc = np.array([0.0, 10.0, 0.0])
         g_factors = np.array([2.3, 2.3, 1.3])
-        bohr_magneton = 5.988e-2
+        bohr_magneton = BOHR_MAGNETON / ELEMENTARY_CHARGE * 1.0e3  # meV/T
 
         actual = create_kitaev_hamiltonian(
             graph,
@@ -1134,8 +1135,8 @@ class TestModelHamiltonians:
 
         np.testing.assert_allclose(actual.to_matrix(), expected, atol=1e-12, rtol=0.0)
         eigenvalues = np.linalg.eigvalsh(expected)
-        assert eigenvalues[0] == pytest.approx(-31.590058786230344, abs=1e-12)
-        assert eigenvalues[1] - eigenvalues[0] == pytest.approx(4.214007173911412, abs=1e-12)
+        assert eigenvalues[0] == pytest.approx(-31.58122422066271, abs=1e-12)
+        assert eigenvalues[1] - eigenvalues[0] == pytest.approx(4.256994998983597, abs=1e-12)
 
     @pytest.mark.parametrize("include_term_groups", [False, True])
     @pytest.mark.parametrize("as_array", [False, True])
@@ -1206,8 +1207,7 @@ class TestModelHamiltonians:
 
     def test_legacy_adjacency_requires_explicit_kitaev_selection(self) -> None:
         graph = LatticeGraph.from_json(
-            '{"num_sites": 2, "is_symmetric": true, '
-            '"adjacency_sparse": [[0, 1, 1.0], [1, 0, 1.0]], "positions": [[0.0, 0.0], [1.0, 0.0]]}'
+            '{"num_sites": 2, "is_symmetric": true, "adjacency_sparse": [[0, 1, 1.0], [1, 0, 1.0]]}'
         )
         with pytest.raises(ValueError, match="metadata"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 4.0)

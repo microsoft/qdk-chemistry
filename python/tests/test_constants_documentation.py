@@ -123,6 +123,7 @@ class TestConstantInfo:
             "ev_to_hartree",
             "planck_constant",
             "speed_of_light",
+            "bohr_magneton",
         }
 
         for const_name in expected_constants:

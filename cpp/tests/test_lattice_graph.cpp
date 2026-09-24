@@ -27,6 +27,8 @@ class LatticeGraphTest : public ::testing::Test {};
 
 namespace {
 using Edge = std::pair<std::uint64_t, std::uint64_t>;
+// Dynamic-size record vectors need an explicit type for two-component literals.
+using Vec2 = Eigen::RowVector2d;
 constexpr BondFlavorId flavor_x = 10;
 constexpr BondFlavorId flavor_y = 20;
 constexpr BondFlavorId flavor_z = 30;
@@ -34,15 +36,15 @@ constexpr BondFlavorId flavor_z = 30;
 std::vector<BondFlavorDefinition> honeycomb_flavor_ids() {
   const double root_three = std::sqrt(3.0);
   return {
-      {1, {0.5, root_three / 2.0}, flavor_x},
-      {1, {0.5, -root_three / 2.0}, flavor_y},
-      {1, {1.0, 0.0}, flavor_z},
-      {2, {1.5, -root_three / 2.0}, flavor_x},
-      {2, {1.5, root_three / 2.0}, flavor_y},
-      {2, {0.0, root_three}, flavor_z},
-      {3, {1.0, root_three}, flavor_x},
-      {3, {1.0, -root_three}, flavor_y},
-      {3, {2.0, 0.0}, flavor_z},
+      {1, Vec2(0.5, root_three / 2.0), flavor_x},
+      {1, Vec2(0.5, -root_three / 2.0), flavor_y},
+      {1, Vec2(1.0, 0.0), flavor_z},
+      {2, Vec2(1.5, -root_three / 2.0), flavor_x},
+      {2, Vec2(1.5, root_three / 2.0), flavor_y},
+      {2, Vec2(0.0, root_three), flavor_z},
+      {3, Vec2(1.0, root_three), flavor_x},
+      {3, Vec2(1.0, -root_three), flavor_y},
+      {3, Vec2(2.0, 0.0), flavor_z},
   };
 }
 
@@ -309,14 +311,32 @@ TEST_F(LatticeGraphTest, ResolvedRecordsSurviveDataOperations) {
   // Labels deliberately differ from geometric shell/orientation indices.
   const auto graph = LatticeGraph::from_connections(
       4,
-      {{1, 0, {7, 41, {1.0, 0.0}}, {-1.0, 0.0}, {0, 0}, flavor_x, 2.5},
-       {0, 1, {9, 99, {1.0, 0.0}}, {-1.0, 0.0}, {-1, 0}, flavor_y, -0.75},
-       {2, 2, {7, 3, {0.0, 1.0}}, {0.0, -2.0}, {0, -1}, std::nullopt, 4.0}},
+      {{1, 0, {7, 41, Vec2(1.0, 0.0)}, Vec2(-1.0, 0.0), {0, 0}, flavor_x, 2.5},
+       {0,
+        1,
+        {9, 99, Vec2(1.0, 0.0)},
+        Vec2(-1.0, 0.0),
+        {-1, 0},
+        flavor_y,
+        -0.75},
+       {2,
+        2,
+        {7, 3, Vec2(0.0, 1.0)},
+        Vec2(0.0, -2.0),
+        {0, -1},
+        std::nullopt,
+        4.0}},
       geometry, {11, 7, 11});
   const std::vector<NeighborConnection> expected = {
-      {2, 2, {7, 3, {0.0, 1.0}}, {0.0, 2.0}, {0, 1}, std::nullopt, 4.0},
-      {0, 1, {7, 41, {1.0, 0.0}}, {1.0, 0.0}, {0, 0}, flavor_x, 2.5},
-      {0, 1, {9, 99, {1.0, 0.0}}, {-1.0, 0.0}, {-1, 0}, flavor_y, -0.75}};
+      {2, 2, {7, 3, Vec2(0.0, 1.0)}, Vec2(0.0, 2.0), {0, 1}, std::nullopt, 4.0},
+      {0, 1, {7, 41, Vec2(1.0, 0.0)}, Vec2(1.0, 0.0), {0, 0}, flavor_x, 2.5},
+      {0,
+       1,
+       {9, 99, Vec2(1.0, 0.0)},
+       Vec2(-1.0, 0.0),
+       {-1, 0},
+       flavor_y,
+       -0.75}};
   expect_same_connections(graph.connections(), expected);
   EXPECT_EQ(graph.selected_shells(), (std::vector<std::uint64_t>{7, 9, 11}));
   EXPECT_TRUE(graph.is_symmetric());
@@ -343,9 +363,9 @@ TEST_F(LatticeGraphTest, ResolvedRecordsSurviveDataOperations) {
   const std::vector<std::uint64_t> path = {1, 2, 0, 3};
   const auto permuted = LatticeGraph::permute(graph, path);
   const std::vector<NeighborConnection> expected_permuted = {
-      {1, 1, {7, 3, {0.0, 1.0}}, {0.0, 2.0}, {0, 1}, std::nullopt, 4.0},
-      {0, 2, {7, 41, {1.0, 0.0}}, {-1.0, 0.0}, {0, 0}, flavor_x, 2.5},
-      {0, 2, {9, 99, {1.0, 0.0}}, {1.0, 0.0}, {1, 0}, flavor_y, -0.75}};
+      {1, 1, {7, 3, Vec2(0.0, 1.0)}, Vec2(0.0, 2.0), {0, 1}, std::nullopt, 4.0},
+      {0, 2, {7, 41, Vec2(1.0, 0.0)}, Vec2(-1.0, 0.0), {0, 0}, flavor_x, 2.5},
+      {0, 2, {9, 99, Vec2(1.0, 0.0)}, Vec2(1.0, 0.0), {1, 0}, flavor_y, -0.75}};
   expect_same_connections(permuted.connections(), expected_permuted);
   EXPECT_EQ(permuted.selected_shells(), graph.selected_shells());
   ASSERT_TRUE(permuted.geometry());
@@ -370,9 +390,10 @@ TEST_F(LatticeGraphTest, ResolvedRecordsSurviveDataOperations) {
 
 TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
   const auto square = LatticeGraph::square(2, 2);
-  const auto expected = square.with_bond_flavors({{1, {1.0, 0.0}, 1000}});
+  const auto expected = square.with_bond_flavors({{1, Vec2(1.0, 0.0), 1000}});
   for (double scale : {1.0e-200, 1.0e200, -1.0e-200, -1.0e200}) {
-    const auto flavored = square.with_bond_flavors({{1, {scale, 0.0}, 1000}});
+    const auto flavored =
+        square.with_bond_flavors({{1, Vec2(scale, 0.0), 1000}});
     expect_same_connections(flavored.connections(), expected.connections());
     EXPECT_EQ(
         std::count_if(
@@ -386,12 +407,29 @@ TEST_F(LatticeGraphTest, CancellingWeightsSurvivePermutationAndSerialization) {
   const auto geometry =
       std::make_shared<LatticeGeometry>(LatticeGeometry::chain(2, true));
   const double maximum = std::numeric_limits<double>::max();
-  const auto graph = LatticeGraph::from_connections(
-      2,
-      {{0, 1, {1, 0, {1.0, 0.0}}, {1.0, 0.0}, {0, 0}, flavor_x, maximum},
-       {0, 1, {3, 0, {1.0, 0.0}}, {-3.0, 0.0}, {-2, 0}, flavor_x, -maximum},
-       {0, 1, {3, 0, {1.0, 0.0}}, {3.0, 0.0}, {1, 0}, flavor_x, maximum}},
-      geometry);
+  const auto graph = LatticeGraph::from_connections(2,
+                                                    {{0,
+                                                      1,
+                                                      {1, 0, Vec2(1.0, 0.0)},
+                                                      Vec2(1.0, 0.0),
+                                                      {0, 0},
+                                                      flavor_x,
+                                                      maximum},
+                                                     {0,
+                                                      1,
+                                                      {3, 0, Vec2(1.0, 0.0)},
+                                                      Vec2(-3.0, 0.0),
+                                                      {-2, 0},
+                                                      flavor_x,
+                                                      -maximum},
+                                                     {0,
+                                                      1,
+                                                      {3, 0, Vec2(1.0, 0.0)},
+                                                      Vec2(3.0, 0.0),
+                                                      {1, 0},
+                                                      flavor_x,
+                                                      maximum}},
+                                                    geometry);
   const auto permuted = LatticeGraph::permute(graph, {1, 0});
   EXPECT_DOUBLE_EQ(permuted.weight(0, 1), maximum);
   EXPECT_EQ(LatticeGraph::from_json(permuted.to_json()).content_hash(),
@@ -403,8 +441,15 @@ TEST_F(LatticeGraphTest, CancellingWeightsSurvivePermutationAndSerialization) {
   std::filesystem::remove(filename);
 
   const auto cancelling = LatticeGraph::from_connections(
-      2, {{0, 1, {1, 0, {1.0, 0.0}}, {1.0, 0.0}, {0, 0}, flavor_x, 1.0e16},
-          {0, 1, {1, 0, {1.0, 0.0}}, {-1.0, 0.0}, {-1, 0}, flavor_y, -1.0e16}});
+      2,
+      {{0, 1, {1, 0, Vec2(1.0, 0.0)}, Vec2(1.0, 0.0), {0, 0}, flavor_x, 1.0e16},
+       {0,
+        1,
+        {1, 0, Vec2(1.0, 0.0)},
+        Vec2(-1.0, 0.0),
+        {-1, 0},
+        flavor_y,
+        -1.0e16}});
   auto malformed = cancelling.to_json();
   malformed["adjacency_sparse"] = {{0, 1, 1.0}};
   EXPECT_THROW(LatticeGraph::from_json(malformed), std::invalid_argument);
@@ -416,18 +461,30 @@ TEST_F(LatticeGraphTest, ConnectionPersistencePreservesIntegerTypes) {
   constexpr std::int64_t image = (std::int64_t{1} << 53) + 1;
   constexpr auto orientation = std::numeric_limits<std::uint32_t>::max();
   constexpr BondFlavorId flavor = std::numeric_limits<BondFlavorId>::max();
-  const auto graph = LatticeGraph::from_connections(
-      3,
-      {{0,
-        1,
-        {shell, orientation, {1.0, 0.0}},
-        {1.0, 0.0},
-        {image, -image},
-        flavor,
-        2.5},
-       {0, 1, {2, 0, {1.0, 0.0}}, {-1.0, 0.0}, {0, 0}, BondFlavorId{0}, -2.5},
-       {2, 2, {2, 99, {0.0, 1.0}}, {0.0, 1.0}, {0, 1}, std::nullopt, 0.125}},
-      nullptr, {empty_shell});
+  const auto graph =
+      LatticeGraph::from_connections(3,
+                                     {{0,
+                                       1,
+                                       {shell, orientation, Vec2(1.0, 0.0)},
+                                       Vec2(1.0, 0.0),
+                                       {image, -image},
+                                       flavor,
+                                       2.5},
+                                      {0,
+                                       1,
+                                       {2, 0, Vec2(1.0, 0.0)},
+                                       Vec2(-1.0, 0.0),
+                                       {0, 0},
+                                       BondFlavorId{0},
+                                       -2.5},
+                                      {2,
+                                       2,
+                                       {2, 99, Vec2(0.0, 1.0)},
+                                       Vec2(0.0, 1.0),
+                                       {0, 1},
+                                       std::nullopt,
+                                       0.125}},
+                                     nullptr, {empty_shell});
   const auto json = graph.to_json();
   const auto& record = json.at("connections").back();
   EXPECT_TRUE(record.is_object());
@@ -548,7 +605,8 @@ TEST_F(LatticeGraphTest, FromGeometrySelectsShellsAndWeights) {
   const auto geometry = LatticeGeometry::chain(4);
   const auto graph = LatticeGraph::from_geometry(
       geometry, {3, 1, 5, 3},
-      {{1, {1.0, 0.0}, flavor_x}, {2, {1.0, 0.0}, flavor_y}}, -2.5, 1.0e-9);
+      {{1, Vec2(1.0, 0.0), flavor_x}, {2, Vec2(1.0, 0.0), flavor_y}}, -2.5,
+      1.0e-9);
   EXPECT_EQ(graph.selected_shells(), (std::vector<std::uint64_t>{1, 3, 5}));
   ASSERT_EQ(graph.connections().size(), 4);
   for (const auto& connection : graph.connections()) {
@@ -571,10 +629,10 @@ TEST_F(LatticeGraphTest, FromGeometrySelectsShellsAndWeights) {
 
 TEST_F(LatticeGraphTest, BondFlavorsOnlyRelabelExistingConnections) {
   const auto square = LatticeGraph::square(2, 2, false, false, 2.5)
-                          .with_bond_flavors({{1, {1.0, 0.0}, flavor_x}});
+                          .with_bond_flavors({{1, Vec2(1.0, 0.0), flavor_x}});
   const auto original_hash = square.content_hash();
   const auto relabeled = square.with_bond_flavors(
-      {{1, {0.0, 1.0}, flavor_y}, {2, {1.0, 1.0}, flavor_z}});
+      {{1, Vec2(0.0, 1.0), flavor_y}, {2, Vec2(1.0, 1.0), flavor_z}});
   EXPECT_EQ(relabeled.selected_shells(), (std::vector<std::uint64_t>{1}));
   EXPECT_EQ(relabeled.edge_coloring(), square.edge_coloring());
   EXPECT_TRUE(relabeled.adjacency_matrix().isApprox(square.adjacency_matrix()));
@@ -609,21 +667,25 @@ TEST_F(LatticeGraphTest, FromGeometryRejectsInvalidInputs) {
     EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1}, {}, 1.0, tolerance),
                  std::invalid_argument);
   }
-  EXPECT_THROW(
-      LatticeGraph::from_geometry(geometry, {1}, {{0, {1.0, 0.0}, flavor_x}}),
-      std::invalid_argument);
-  EXPECT_THROW(
-      LatticeGraph::from_geometry(geometry, {1}, {{1, {0.0, 0.0}, flavor_x}}),
-      std::invalid_argument);
-  EXPECT_THROW(LatticeGraph::from_geometry(
-                   geometry, {1},
-                   {{1, {1.0, 0.0}, flavor_x}, {1, {-2.0, 0.0}, flavor_y}}),
+  EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
+                                           {{0, Vec2(1.0, 0.0), flavor_x}}),
                std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
+                                           {{1, Vec2(0.0, 0.0), flavor_x}}),
+               std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
+                                           {{1, Vec2(1.0, 0.0), flavor_x},
+                                            {1, Vec2(-2.0, 0.0), flavor_y}}),
+               std::invalid_argument);
+  EXPECT_THROW(
+      LatticeGraph::from_geometry(
+          geometry, {1}, {{1, Eigen::RowVector3d(1.0, 0.0, 0.0), flavor_x}}),
+      std::invalid_argument);
 }
 
 TEST_F(LatticeGraphTest, FromConnectionsRejectsInvalidRecords) {
   const NeighborConnection valid{
-      0, 1, {7, 29, {1.0, 0.0}}, {1.0, 0.0}, {0, 0}, flavor_x, 1.0};
+      0, 1, {7, 29, Vec2(1.0, 0.0)}, Vec2(1.0, 0.0), {0, 0}, flavor_x, 1.0};
   const auto expect_invalid = [&](const auto& mutate) {
     auto record = valid;
     mutate(record);
@@ -641,6 +703,23 @@ TEST_F(LatticeGraphTest, FromConnectionsRejectsInvalidRecords) {
   expect_invalid([](auto& record) {
     record.displacement.x() = std::numeric_limits<double>::quiet_NaN();
   });
+  expect_invalid([](auto& record) { record.image_shift = {0}; });
+  expect_invalid([](auto& record) {
+    record.displacement = Eigen::RowVector3d(1.0, 0.0, 0.0);
+  });
+  expect_invalid([](auto& record) {
+    record.bond_class.axis = Eigen::RowVector3d(1.0, 0.0, 0.0);
+  });
+  auto spatial_record = valid;
+  spatial_record.bond_class.axis = Eigen::RowVector3d(1.0, 0.0, 0.0);
+  spatial_record.displacement = Eigen::RowVector3d(1.0, 0.0, 0.0);
+  spatial_record.image_shift = {0, 0, 0};
+  EXPECT_THROW(LatticeGraph::from_connections(2, {valid, spatial_record}),
+               std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::from_connections(2, {valid},
+                                              std::make_shared<LatticeGeometry>(
+                                                  Eigen::MatrixXd::Zero(2, 3))),
+               std::invalid_argument);
   EXPECT_THROW(LatticeGraph::from_connections(2, {valid, valid}),
                std::invalid_argument);
   auto reversed = valid;
@@ -671,7 +750,7 @@ TEST_F(LatticeGraphTest, FromConnectionsRejectsInvalidRecords) {
                std::overflow_error);
 }
 
-TEST_F(LatticeGraphTest, EmptySelectionRemainsDistinctFromAbsentMetadata) {
+TEST_F(LatticeGraphTest, EmptyConnectionsUseAdjacencyOnlyForm) {
   const auto absent =
       LatticeGraph::from_dense_matrix(Eigen::MatrixXd::Zero(1, 1));
   const auto empty = LatticeGraph::from_connections(1, {});
@@ -679,11 +758,12 @@ TEST_F(LatticeGraphTest, EmptySelectionRemainsDistinctFromAbsentMetadata) {
   const auto finite =
       LatticeGraph::from_geometry(LatticeGeometry::chain(1), {9, 1, 9});
   EXPECT_FALSE(absent.to_json().contains("connections"));
-  EXPECT_TRUE(empty.to_json().at("connections").empty());
+  EXPECT_FALSE(empty.to_json().contains("connections"));
+  EXPECT_TRUE(selected.to_json().at("connections").empty());
   EXPECT_TRUE(empty.selected_shells().empty());
   EXPECT_EQ(selected.selected_shells(), (std::vector<std::uint64_t>{64}));
   EXPECT_EQ(finite.selected_shells(), (std::vector<std::uint64_t>{1, 9}));
-  EXPECT_NE(empty.content_hash(), absent.content_hash());
+  EXPECT_EQ(empty.content_hash(), absent.content_hash());
   EXPECT_NE(empty.content_hash(), selected.content_hash());
   const std::string filename = "test_empty_connections.lattice_graph.h5";
   for (const auto& graph : {absent, empty, selected, finite}) {
@@ -764,36 +844,73 @@ TEST_F(LatticeGraphTest, DirectedAdjacencyConstructorsAndRoundTrips) {
   EXPECT_THROW((LatticeGraph(edges, 2)), std::invalid_argument);
 }
 
-TEST_F(LatticeGraphTest, LegacyGeometryPreservesAdjacencyAndCoordinates) {
-  const nlohmann::json legacy = {
-      {"num_sites", 3},
-      {"is_symmetric", false},
-      {"adjacency_sparse", {{0, 2, 2.5}, {1, 0, -1.0}}},
-      {"positions", {{0.0, 0.0}, {1.0, 0.0}, {2.0, 0.0}}},
-      {"periods", {{10.0, 0.0}}}};
-  Eigen::MatrixXd positions(3, 2);
-  positions << 0.0, 0.0, 1.0, 0.0, 2.0, 0.0;
-  Eigen::MatrixXd periods(1, 2);
-  periods << 10.0, 0.0;
-  const LatticeGeometry geometry(positions, periods);
-  const LatticeGraph adjacency({{{0, 2}, 2.5}, {{1, 0}, -1.0}}, 3);
-  const std::string filename = "test_legacy_geometry.lattice_graph.h5";
-  adjacency.to_hdf5_file(filename);
-  {
-    H5::H5File file(filename, H5F_ACC_RDWR);
-    auto root = file.openGroup("/");
-    geometry.to_hdf5(root);
+TEST_F(LatticeGraphTest, NonPlanarConnectionsSurviveDataOperations) {
+  Eigen::MatrixXd positions(2, 3);
+  positions << 0.0, 0.0, 0.0, 0.0, 0.0, 1.0;
+  const auto geometry = std::make_shared<LatticeGeometry>(
+      positions, Eigen::MatrixXd(Eigen::RowVector3d(0.0, 0.0, 2.0)));
+  using Vec3 = Eigen::RowVector3d;
+  const auto graph =
+      LatticeGraph::from_connections(2,
+                                     {{1,
+                                       0,
+                                       {1, 0, Vec3(0.0, 0.0, 1.0)},
+                                       Vec3(0.0, 0.0, -1.0),
+                                       {0, 0, 0},
+                                       std::nullopt,
+                                       1.5},
+                                      {0,
+                                       1,
+                                       {1, 0, Vec3(0.0, 0.0, 1.0)},
+                                       Vec3(0.0, 0.0, -1.0),
+                                       {-1, 0, 0},
+                                       std::nullopt,
+                                       -0.5}},
+                                     geometry);
+  const std::vector<NeighborConnection> expected = {
+      {0,
+       1,
+       {1, 0, Vec3(0.0, 0.0, 1.0)},
+       Vec3(0.0, 0.0, -1.0),
+       {-1, 0, 0},
+       std::nullopt,
+       -0.5},
+      {0,
+       1,
+       {1, 0, Vec3(0.0, 0.0, 1.0)},
+       Vec3(0.0, 0.0, 1.0),
+       {0, 0, 0},
+       std::nullopt,
+       1.5}};
+  expect_same_connections(graph.connections(), expected);
+  EXPECT_DOUBLE_EQ(graph.weight(0, 1), 1.0);
+
+  const auto flavored =
+      graph.with_bond_flavors({{1, Vec3(0.0, 0.0, -4.0), flavor_z}});
+  for (const auto& connection : flavored.connections()) {
+    EXPECT_EQ(connection.flavor, std::optional<BondFlavorId>(flavor_z));
   }
+  EXPECT_THROW(graph.with_bond_flavors({{1, Vec2(1.0, 0.0), flavor_x}}),
+               std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::from_geometry(*geometry, {1}), std::runtime_error);
+
+  const std::string filename = "test_non_planar.lattice_graph.h5";
+  flavored.to_hdf5_file(filename);
   const auto hdf5 = LatticeGraph::from_hdf5_file(filename);
   std::filesystem::remove(filename);
-  for (const auto& restored : {LatticeGraph::from_json(legacy), hdf5}) {
-    EXPECT_TRUE(
-        restored.adjacency_matrix().isApprox(adjacency.adjacency_matrix()));
-    EXPECT_FALSE(restored.is_symmetric());
-    ASSERT_TRUE(restored.geometry());
-    EXPECT_TRUE(restored.geometry()->positions().isApprox(positions));
-    ASSERT_TRUE(restored.geometry()->periods().has_value());
-    EXPECT_TRUE(restored.geometry()->periods()->isApprox(periods));
+  for (const auto& restored : {LatticeGraph::from_json(nlohmann::json::parse(
+                                   flavored.to_json().dump())),
+                               hdf5}) {
+    expect_same_connections(restored.connections(), flavored.connections());
+    EXPECT_EQ(restored.geometry()->dimension(), 3);
+    EXPECT_EQ(restored.content_hash(), flavored.content_hash());
+  }
+  const auto permuted = LatticeGraph::permute(flavored, {1, 0});
+  ASSERT_EQ(permuted.connections().size(), 2);
+  for (const auto& connection : permuted.connections()) {
+    EXPECT_EQ(connection.site_i, 0);
+    EXPECT_EQ(connection.site_j, 1);
+    EXPECT_EQ(connection.image_shift.size(), 3);
   }
 }
 

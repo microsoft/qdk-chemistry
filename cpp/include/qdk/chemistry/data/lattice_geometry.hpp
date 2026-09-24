@@ -5,7 +5,6 @@
 #pragma once
 
 #include <Eigen/Core>
-#include <array>
 #include <cstdint>
 #include <map>
 #include <optional>
@@ -20,20 +19,29 @@ namespace qdk::chemistry::data {
 /** @brief Opaque semantic label assigned to a geometric bond class. */
 using BondFlavorId = std::uint32_t;
 
-/** @brief A radial shell and unoriented geometric bond-axis class. */
+/**
+ * @brief A radial shell and unoriented geometric bond-axis class.
+ *
+ * The axis is a unit vector with one component per spatial dimension.
+ */
 struct BondClass {
   std::uint64_t shell;
   std::uint32_t orientation;
-  Eigen::RowVector2d axis;
+  Eigen::RowVectorXd axis;
 };
 
-/** @brief One physical lattice connection, including its periodic image. */
+/**
+ * @brief One physical lattice connection, including its periodic image.
+ *
+ * The displacement and image shift have one entry per spatial dimension.
+ * Image coefficients follow periodic-vector order, padded with zeros.
+ */
 struct NeighborConnection {
   std::uint64_t site_i;
   std::uint64_t site_j;
   BondClass bond_class;
-  Eigen::RowVector2d displacement;
-  std::array<std::int64_t, 2> image_shift;
+  Eigen::RowVectorXd displacement;
+  std::vector<std::int64_t> image_shift;
   std::optional<BondFlavorId> flavor;
   double weight = 1.0;
 };
@@ -41,16 +49,17 @@ struct NeighborConnection {
 /**
  * @brief Immutable Cartesian lattice geometry, independent of connectivity.
  *
- * Stores two-dimensional site positions and optional periodic supercell
- * vectors. Geometric queries retain distinct periodic images; they do not
- * assign interaction weights, semantic flavors, or edge colors.
+ * Stores site positions in any positive spatial dimension and optional
+ * periodic supercell vectors. Geometric queries retain distinct periodic
+ * images; they do not assign interaction weights, semantic flavors, or edge
+ * colors. Neighbor searches currently support two-dimensional geometries only.
  */
 class LatticeGeometry : public DataClass {
  public:
   /**
    * @brief Construct geometry from Cartesian positions and supercell vectors.
-   * @param positions Finite (num_sites, 2) matrix, including an empty matrix.
-   * @param periods One or two finite, nonzero, independent vectors, or absent.
+   * @param positions Finite (num_sites, d) matrix with d > 0, possibly empty.
+   * @param periods Finite, nonzero, independent (k, d) vectors with k <= d.
    * @throws std::invalid_argument If the geometry is invalid.
    */
   explicit LatticeGeometry(
@@ -66,6 +75,9 @@ class LatticeGeometry : public DataClass {
   /** @brief Number of sites, including isolated or coincident sites. */
   std::uint64_t num_sites() const;
 
+  /** @brief Number of Cartesian components per position. */
+  std::uint64_t dimension() const;
+
   /**
    * @brief Return physical connections by positive distance shell and axis.
    *
@@ -78,6 +90,7 @@ class LatticeGeometry : public DataClass {
    * @param tolerance Positive finite relative distance and axis tolerance.
    * @return Canonical physical connections in the requested shells.
    * @throws std::invalid_argument If a shell or tolerance is invalid.
+   * @throws std::runtime_error If the geometry is not two-dimensional.
    * @throws std::overflow_error If an image or displacement is out of range.
    */
   std::vector<NeighborConnection> neighbor_connections(
@@ -89,7 +102,8 @@ class LatticeGeometry : public DataClass {
    * @param shells One-based shell indices; unavailable shells map to empties.
    * @param tolerance Positive finite relative distance and axis tolerance.
    * @return Requested shells mapped to canonical pairs with i < j.
-   * @throws std::runtime_error If periodic vectors are present.
+   * @throws std::runtime_error If periodic vectors are present or the geometry
+   * is not two-dimensional.
    */
   std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
   nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
@@ -100,7 +114,8 @@ class LatticeGeometry : public DataClass {
    * @param m One-based shell index.
    * @param tolerance Positive finite relative distance and axis tolerance.
    * @return Canonical site pairs, or empty if the shell is unavailable.
-   * @throws std::runtime_error If periodic vectors are present.
+   * @throws std::runtime_error If periodic vectors are present or the geometry
+   * is not two-dimensional.
    */
   std::vector<std::pair<std::uint64_t, std::uint64_t>> mth_nearest_neighbors(
       std::uint64_t m, double tolerance = 1.0e-9) const;

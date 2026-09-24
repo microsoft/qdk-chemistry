@@ -67,13 +67,13 @@ void bind_lattice_graph(pybind11::module &m) {
 
   py::class_<BondFlavorDefinition, py::smart_holder>(
       m, "BondFlavorDefinition", "Semantic label for a shell-axis class.")
-      .def(py::init<std::uint64_t, Eigen::RowVector2d, BondFlavorId>(),
+      .def(py::init<std::uint64_t, Eigen::RowVectorXd, BondFlavorId>(),
            py::arg("shell"), py::arg("axis"), py::arg("flavor"), R"(
 Define a semantic label to resolve onto connection records.
 
 Args:
     shell (int): One-based radial shell index.
-    axis (numpy.ndarray): Finite nonzero two-component axis, normalized when labels are resolved.
+    axis (numpy.ndarray): Finite nonzero axis matching the connection dimension, normalized when labels are resolved.
     flavor (int): Opaque non-negative semantic label.
 )")
       .def_property_readonly(

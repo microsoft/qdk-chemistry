@@ -4,7 +4,6 @@
 
 #include <Eigen/Sparse>
 #include <algorithm>
-#include <array>
 #include <blas.hh>
 #include <cmath>
 #include <cstdint>
@@ -58,17 +57,31 @@ static bool connection_less(const NeighborConnection& lhs,
 }
 
 static void canonicalize_connection(NeighborConnection& connection) {
-  const auto& image = connection.image_shift;
+  auto& image = connection.image_shift;
+  const auto first_shift =
+      std::find_if(image.begin(), image.end(),
+                   [](std::int64_t shift) { return shift != 0; });
   if (connection.site_i > connection.site_j ||
-      (connection.site_i == connection.site_j &&
-       (image[0] < 0 || (image[0] == 0 && image[1] < 0)))) {
-    if (image[0] == std::numeric_limits<std::int64_t>::min() ||
-        image[1] == std::numeric_limits<std::int64_t>::min()) {
+      (connection.site_i == connection.site_j && first_shift != image.end() &&
+       *first_shift < 0)) {
+    if (std::find(image.begin(), image.end(),
+                  std::numeric_limits<std::int64_t>::min()) != image.end()) {
       throw std::overflow_error("Connection image shift cannot be reversed.");
     }
     std::swap(connection.site_i, connection.site_j);
     connection.displacement = -connection.displacement;
-    connection.image_shift = {-image[0], -image[1]};
+    for (auto& shift : image) shift = -shift;
+  }
+}
+
+// An axis and its negation describe one unoriented bond class. The first
+// component exceeding the tolerance selects the representative sign.
+static void orient_axis(Eigen::RowVectorXd& axis, double tolerance) {
+  for (Eigen::Index k = 0; k < axis.size(); ++k) {
+    if (std::abs(axis[k]) > tolerance) {
+      if (axis[k] < 0.0) axis = -axis;
+      return;
+    }
   }
 }
 
@@ -78,36 +91,43 @@ static void label_connections(std::vector<NeighborConnection>& connections,
   if (!std::isfinite(tolerance) || tolerance <= 0.0) {
     throw std::invalid_argument("Bond-flavor tolerance must be positive.");
   }
+  const Eigen::Index dimension =
+      !connections.empty()   ? connections.front().bond_class.axis.size()
+      : !definitions.empty() ? definitions.front().axis.size()
+                             : 0;
   for (auto& definition : definitions) {
-    if (definition.shell == 0 || !definition.axis.allFinite() ||
+    if (definition.shell == 0 || definition.axis.size() == 0 ||
+        !definition.axis.allFinite() ||
         definition.axis.cwiseAbs().maxCoeff() == 0.0) {
       throw std::invalid_argument(
           "Bond flavors require a positive shell and a finite nonzero axis.");
     }
-    definition.axis /= blas::nrm2(2, definition.axis.data(), 1);
+    if (definition.axis.size() != dimension) {
+      throw std::invalid_argument(
+          "Bond-flavor axes must match the connection dimension.");
+    }
+    definition.axis /=
+        blas::nrm2(definition.axis.size(), definition.axis.data(), 1);
     if (!definition.axis.allFinite() ||
         std::abs(definition.axis.squaredNorm() - 1.0) > tolerance) {
       throw std::invalid_argument("Bond-flavor axis normalization failed.");
     }
-    if (definition.axis.x() < -tolerance ||
-        (std::abs(definition.axis.x()) <= tolerance &&
-         definition.axis.y() < 0.0)) {
-      definition.axis = -definition.axis;
-    }
+    orient_axis(definition.axis, tolerance);
   }
   std::sort(definitions.begin(), definitions.end(),
             [](const auto& lhs, const auto& rhs) {
               if (lhs.shell != rhs.shell) return lhs.shell < rhs.shell;
-              return std::atan2(lhs.axis.y(), lhs.axis.x()) <
-                     std::atan2(rhs.axis.y(), rhs.axis.x());
+              return std::lexicographical_compare(
+                  lhs.axis.data(), lhs.axis.data() + lhs.axis.size(),
+                  rhs.axis.data(), rhs.axis.data() + rhs.axis.size());
             });
   for (std::size_t i = 0; i < definitions.size(); ++i) {
     for (std::size_t j = i + 1;
          j < definitions.size() && definitions[j].shell == definitions[i].shell;
          ++j) {
-      const Eigen::RowVector2d difference =
+      const Eigen::RowVectorXd difference =
           definitions[i].axis - definitions[j].axis;
-      if (blas::nrm2(2, difference.data(), 1) <= tolerance) {
+      if (blas::nrm2(difference.size(), difference.data(), 1) <= tolerance) {
         throw std::invalid_argument(
             "Each shell-axis class may have only one bond flavor.");
       }
@@ -115,15 +135,12 @@ static void label_connections(std::vector<NeighborConnection>& connections,
   }
   for (auto& connection : connections) {
     connection.flavor.reset();
-    Eigen::RowVector2d axis = connection.bond_class.axis;
-    if (axis.x() < -tolerance ||
-        (std::abs(axis.x()) <= tolerance && axis.y() < 0.0)) {
-      axis = -axis;
-    }
+    Eigen::RowVectorXd axis = connection.bond_class.axis;
+    orient_axis(axis, tolerance);
     for (const auto& definition : definitions) {
       if (definition.shell != connection.bond_class.shell) continue;
-      const Eigen::RowVector2d difference = definition.axis - axis;
-      if (blas::nrm2(2, difference.data(), 1) <= tolerance) {
+      const Eigen::RowVectorXd difference = definition.axis - axis;
+      if (blas::nrm2(difference.size(), difference.data(), 1) <= tolerance) {
         connection.flavor = definition.flavor;
         break;
       }
@@ -327,7 +344,7 @@ LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
       throw std::overflow_error("Bidirectional connection weight overflowed.");
     }
   }
-  if (result._has_connections) {
+  if (!result._connections.empty()) {
     for (int k = 0; k < result.adjacency_.outerSize(); ++k) {
       for (Eigen::SparseMatrix<double>::InnerIterator it(result.adjacency_, k);
            it; ++it) {
@@ -428,23 +445,36 @@ LatticeGraph LatticeGraph::_from_connections(
   if (geometry && geometry->num_sites() != num_sites) {
     throw std::invalid_argument("Graph and geometry site counts must match.");
   }
-  std::set<std::tuple<std::uint64_t, std::uint64_t, std::int64_t, std::int64_t>>
+  const Eigen::Index dimension = geometry ? geometry->positions().cols()
+                                 : connections.empty()
+                                     ? 0
+                                     : connections.front().displacement.size();
+  std::set<std::tuple<std::uint64_t, std::uint64_t, std::vector<std::int64_t>>>
       seen;
   for (auto& connection : connections) {
     const auto& axis = connection.bond_class.axis;
+    const auto& image = connection.image_shift;
+    if (connection.displacement.size() == 0 ||
+        connection.displacement.size() != dimension ||
+        axis.size() != dimension ||
+        static_cast<Eigen::Index>(image.size()) != dimension) {
+      throw std::invalid_argument(
+          "Connection vectors must match the lattice dimension.");
+    }
     if (connection.site_i >= num_sites || connection.site_j >= num_sites ||
         connection.bond_class.shell == 0 || !std::isfinite(connection.weight) ||
         !connection.displacement.allFinite() ||
         connection.displacement.cwiseAbs().maxCoeff() == 0.0 ||
         !axis.allFinite() ||
-        std::abs(blas::nrm2(2, axis.data(), 1) - 1.0) > 1.0e-9 ||
+        std::abs(blas::nrm2(axis.size(), axis.data(), 1) - 1.0) > 1.0e-9 ||
         (connection.site_i == connection.site_j &&
-         connection.image_shift == std::array<std::int64_t, 2>{0, 0})) {
+         std::all_of(image.begin(), image.end(),
+                     [](std::int64_t shift) { return shift == 0; }))) {
       throw std::invalid_argument("Invalid physical lattice connection.");
     }
     detail::canonicalize_connection(connection);
     if (!seen.emplace(connection.site_i, connection.site_j,
-                      connection.image_shift[0], connection.image_shift[1])
+                      connection.image_shift)
              .second) {
       throw std::invalid_argument("Duplicate canonical lattice connection.");
     }
@@ -502,7 +532,6 @@ LatticeGraph LatticeGraph::_from_connections(
   result._geometry = std::move(geometry);
   result._selected_shells = std::move(selected_shells);
   result._connections = std::move(connections);
-  result._has_connections = true;
   return result;
 }
 
@@ -1185,7 +1214,10 @@ nlohmann::json LatticeGraph::to_json() const {
     j["edge_coloring"] = coloring_json;
   }
 
-  if (_has_connections) {
+  if (!_connections.empty() || !_selected_shells.empty()) {
+    const auto components = [](const Eigen::RowVectorXd& values) {
+      return std::vector<double>(values.data(), values.data() + values.size());
+    };
     j["selected_shells"] = _selected_shells;
     j["connections"] = nlohmann::json::array();
     for (const auto& connection : _connections) {
@@ -1196,9 +1228,8 @@ nlohmann::json LatticeGraph::to_json() const {
            {"bond_class",
             {{"shell", bond.shell},
              {"orientation", bond.orientation},
-             {"axis", {bond.axis.x(), bond.axis.y()}}}},
-           {"displacement",
-            {connection.displacement.x(), connection.displacement.y()}},
+             {"axis", components(bond.axis)}}},
+           {"displacement", components(connection.displacement)},
            {"image_shift", connection.image_shift},
            {"flavor", connection.flavor ? nlohmann::json(*connection.flavor)
                                         : nlohmann::json(nullptr)},
@@ -1281,18 +1312,24 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
       if (!cbuf.empty()) cds.write(cbuf.data(), H5::PredType::NATIVE_DOUBLE);
     }
 
-    if (_has_connections) {
+    if (!_connections.empty() || !_selected_shells.empty()) {
       save_vector_to_group(group, "selected_shells",
                            std::vector<std::size_t>(_selected_shells.begin(),
                                                     _selected_shells.end()));
       auto records = group.createGroup("connections");
       const auto count = _connections.size();
+      // Empty record matrices take the geometry width, or two without one.
+      const Eigen::Index dimension =
+          !_connections.empty() ? _connections.front().displacement.size()
+          : _geometry           ? _geometry->positions().cols()
+                                : 2;
+      const auto width = static_cast<std::size_t>(dimension);
       std::vector<std::size_t> site_i(count), site_j(count), shells(count),
           orientations(count), flavors(count);
-      std::vector<std::int64_t> images(2 * count);
+      std::vector<std::int64_t> images(width * count);
       std::vector<double> weights(count);
-      Eigen::MatrixXd axes(count, 2);
-      Eigen::MatrixXd displacements(count, 2);
+      Eigen::MatrixXd axes(count, dimension);
+      Eigen::MatrixXd displacements(count, dimension);
       for (std::size_t i = 0; i < count; ++i) {
         const auto& connection = _connections[i];
         site_i[i] = connection.site_i;
@@ -1302,8 +1339,8 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
         axes.row(static_cast<Eigen::Index>(i)) = connection.bond_class.axis;
         displacements.row(static_cast<Eigen::Index>(i)) =
             connection.displacement;
-        images[2 * i] = connection.image_shift[0];
-        images[2 * i + 1] = connection.image_shift[1];
+        std::copy(connection.image_shift.begin(), connection.image_shift.end(),
+                  images.begin() + static_cast<std::ptrdiff_t>(width * i));
         // UINT64_MAX is outside BondFlavorId, preserving all uint32 labels.
         flavors[i] = connection.flavor
                          ? static_cast<std::uint64_t>(*connection.flavor)
@@ -1318,7 +1355,7 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
       save_matrix_to_group(records, "axes", axes);
       save_matrix_to_group(records, "displacements", displacements);
       save_stl_to_group(records, "weights", weights);
-      hsize_t image_dims[2] = {count, 2};
+      hsize_t image_dims[2] = {count, width};
       H5::DataSpace image_space(2, image_dims);
       auto image_dataset = records.createDataSet(
           "image_shifts", H5::PredType::NATIVE_INT64, image_space);
@@ -1389,10 +1426,7 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
   if (!explicit_connections && !j.contains("adjacency_sparse")) {
     throw std::runtime_error("JSON missing required 'adjacency_sparse' field");
   }
-  if ((!explicit_connections && j.contains("selected_shells")) ||
-      (explicit_connections &&
-       (j.contains("positions") || j.contains("periods") ||
-        j.contains("bond_flavor_definitions")))) {
+  if (!explicit_connections && j.contains("selected_shells")) {
     throw std::invalid_argument(
         "Incomplete or mixed lattice connection metadata.");
   }
@@ -1449,20 +1483,19 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
   if (j.contains("geometry")) {
     geometry = std::make_shared<LatticeGeometry>(
         LatticeGeometry::from_json(j.at("geometry")));
-  } else if (j.contains("positions")) {
-    geometry = std::make_shared<LatticeGeometry>(LatticeGeometry::from_json(j));
-  } else if (j.contains("periods")) {
-    throw std::invalid_argument("Periodic vectors require lattice positions.");
   }
 
   if (explicit_connections) {
-    const auto read_axis =
-        [](const nlohmann::json& value) -> Eigen::RowVector2d {
-      if (!value.is_array() || value.size() != 2) {
-        throw std::invalid_argument(
-            "Connection vectors require two components.");
+    const auto read_vector =
+        [](const nlohmann::json& value) -> Eigen::RowVectorXd {
+      if (!value.is_array()) {
+        throw std::invalid_argument("Connection vectors must be arrays.");
       }
-      return {value[0].get<double>(), value[1].get<double>()};
+      Eigen::RowVectorXd result(static_cast<Eigen::Index>(value.size()));
+      for (std::size_t k = 0; k < value.size(); ++k) {
+        result[static_cast<Eigen::Index>(k)] = value[k].get<double>();
+      }
+      return result;
     };
     std::vector<std::uint64_t> shells;
     if (j.contains("selected_shells")) {
@@ -1482,9 +1515,14 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
     for (const auto& entry : j.at("connections")) {
       const auto& bond = entry.at("bond_class");
       const auto& image = entry.at("image_shift");
-      if (!image.is_array() || image.size() != 2) {
+      if (!image.is_array()) {
         throw std::invalid_argument(
-            "Connection images require two integer shifts.");
+            "Connection images must be integer arrays.");
+      }
+      std::vector<std::int64_t> image_shift;
+      image_shift.reserve(image.size());
+      for (const auto& shift : image) {
+        image_shift.push_back(detail::json_integer<std::int64_t>(shift));
       }
       std::optional<BondFlavorId> flavor;
       if (entry.contains("flavor") && !entry.at("flavor").is_null()) {
@@ -1495,10 +1533,9 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
            detail::json_integer<std::uint64_t>(entry.at("site_j")),
            {detail::json_integer<std::uint64_t>(bond.at("shell")),
             detail::json_integer<std::uint32_t>(bond.at("orientation")),
-            read_axis(bond.at("axis"))},
-           read_axis(entry.at("displacement")),
-           {detail::json_integer<std::int64_t>(image[0]),
-            detail::json_integer<std::int64_t>(image[1])},
+            read_vector(bond.at("axis"))},
+           read_vector(entry.at("displacement")),
+           std::move(image_shift),
            flavor,
            entry.at("weight").get<double>()});
     }
@@ -1512,33 +1549,13 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
     return graph;
   }
 
-  std::vector<BondFlavorDefinition> bond_flavors;
-  if (j.contains("bond_flavor_definitions")) {
-    if (!j.at("bond_flavor_definitions").is_array()) {
-      throw std::invalid_argument("Bond-flavor definitions must be an array.");
-    }
-    for (const auto& entry : j.at("bond_flavor_definitions")) {
-      if (!entry.is_array() || entry.size() != 4) {
-        throw std::invalid_argument("Invalid legacy bond-flavor definition.");
-      }
-      bond_flavors.push_back({detail::json_integer<std::uint64_t>(entry[0]),
-                              {entry[1].get<double>(), entry[2].get<double>()},
-                              detail::json_integer<BondFlavorId>(entry[3])});
-    }
-  }
-  if (!geometry && !bond_flavors.empty()) {
-    throw std::invalid_argument(
-        "Legacy bond flavors require lattice positions.");
-  }
-  // Legacy adjacency need not agree with any geometric shell. Preserve it
-  // without inferring interactions; shell selection is explicit in the new API.
+  // Adjacency need not agree with any geometric shell. Preserve it without
+  // inferring interactions; shell selection is explicit in the record API.
   LatticeGraph graph(std::move(sparse), std::move(coloring));
   if (geometry && geometry->num_sites() != n) {
     throw std::invalid_argument("Graph and geometry site counts must match.");
   }
   graph._geometry = std::move(geometry);
-  detail::label_connections(graph._connections, std::move(bond_flavors),
-                            1.0e-9);
   return graph;
 }
 
@@ -1568,16 +1585,18 @@ LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
 LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
+    // Rank-two datasets without a fixed column count accept any width.
     const auto row_count = [](const H5::DataSet& dataset, int rank,
-                              hsize_t columns = 1) {
+                              std::optional<hsize_t> columns = 1) {
       const auto space = dataset.getSpace();
       if (space.getSimpleExtentNdims() != rank) {
         throw std::invalid_argument("Invalid lattice dataset rank.");
       }
       hsize_t dimensions[2] = {};
       space.getSimpleExtentDims(dimensions);
-      if ((rank == 2 && dimensions[1] != columns) ||
-          dimensions[0] > std::numeric_limits<int>::max()) {
+      if ((rank == 2 && columns && dimensions[1] != *columns) ||
+          dimensions[0] > std::numeric_limits<int>::max() ||
+          dimensions[1] > std::numeric_limits<int>::max()) {
         throw std::invalid_argument("Invalid lattice dataset dimensions.");
       }
       return dimensions[0];
@@ -1595,7 +1614,7 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
     };
     const auto read_matrix = [&](H5::Group& source, const std::string& name) {
       const auto dataset = source.openDataSet(name);
-      row_count(dataset, 2, 2);
+      row_count(dataset, 2, std::nullopt);
       if (dataset.getTypeClass() != H5T_FLOAT) {
         throw std::invalid_argument("Expected floating-point matrix: " + name);
       }
@@ -1633,10 +1652,7 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
           "Lattice site count exceeds the sparse index range.");
     }
     const bool explicit_connections = group.nameExists("connections");
-    if ((!explicit_connections && group.nameExists("selected_shells")) ||
-        (explicit_connections &&
-         (group.nameExists("positions") || group.nameExists("periods") ||
-          group.nameExists("bond_flavor_definitions")))) {
+    if (!explicit_connections && group.nameExists("selected_shells")) {
       throw std::invalid_argument(
           "Incomplete or mixed lattice connection metadata.");
     }
@@ -1690,12 +1706,6 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
       auto geometry_group = group.openGroup("geometry");
       geometry = std::make_shared<LatticeGeometry>(
           LatticeGeometry::from_hdf5(geometry_group));
-    } else if (group.nameExists("positions")) {
-      geometry =
-          std::make_shared<LatticeGeometry>(LatticeGeometry::from_hdf5(group));
-    } else if (group.nameExists("periods")) {
-      throw std::invalid_argument(
-          "Periodic vectors require lattice positions.");
     }
 
     if (explicit_connections) {
@@ -1715,11 +1725,13 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
       const auto image_dataset = records.openDataSet("image_shifts");
       const auto weight_dataset = records.openDataSet("weights");
       const auto count = site_i.size();
+      const auto width = static_cast<std::size_t>(axes.cols());
       if (site_j.size() != count || shells.size() != count ||
           orientations.size() != count || flavors.size() != count ||
           static_cast<std::size_t>(axes.rows()) != count ||
           static_cast<std::size_t>(displacements.rows()) != count ||
-          row_count(image_dataset, 2, 2) != count ||
+          displacements.cols() != axes.cols() ||
+          row_count(image_dataset, 2, width) != count ||
           image_dataset.getTypeClass() != H5T_INTEGER ||
           image_dataset.getIntType().getSign() != H5T_SGN_2 ||
           image_dataset.getIntType().getSize() > sizeof(std::int64_t) ||
@@ -1728,7 +1740,7 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
         throw std::invalid_argument(
             "Invalid connection dataset shape or type.");
       }
-      std::vector<std::int64_t> images(2 * count);
+      std::vector<std::int64_t> images(width * count);
       if (!images.empty()) {
         image_dataset.read(images.data(), H5::PredType::NATIVE_INT64);
       }
@@ -1747,13 +1759,16 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
         if (flavors[i] != std::numeric_limits<std::uint64_t>::max()) {
           flavor = static_cast<BondFlavorId>(flavors[i]);
         }
+        const auto image =
+            images.begin() + static_cast<std::ptrdiff_t>(width * i);
         connections.push_back(
             {site_i[i],
              site_j[i],
              {shells[i], static_cast<std::uint32_t>(orientations[i]),
               axes.row(i)},
              displacements.row(i),
-             {images[2 * i], images[2 * i + 1]},
+             std::vector<std::int64_t>(
+                 image, image + static_cast<std::ptrdiff_t>(width)),
              flavor,
              weights[i]});
       }
@@ -1767,36 +1782,11 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
       return graph;
     }
 
-    std::vector<BondFlavorDefinition> bond_flavors;
-    if (group.nameExists("bond_flavor_definitions")) {
-      auto definitions = group.openGroup("bond_flavor_definitions");
-      const auto shells = read_unsigned(definitions, "shells");
-      const auto flavors = read_unsigned(definitions, "flavors");
-      const auto axes = read_matrix(definitions, "axes");
-      if (flavors.size() != shells.size() ||
-          static_cast<std::size_t>(axes.rows()) != shells.size()) {
-        throw std::invalid_argument(
-            "Invalid legacy bond-flavor dataset shape.");
-      }
-      for (std::size_t i = 0; i < shells.size(); ++i) {
-        if (flavors[i] > std::numeric_limits<BondFlavorId>::max()) {
-          throw std::invalid_argument("Legacy bond flavor is out of range.");
-        }
-        bond_flavors.push_back(
-            {shells[i], axes.row(i), static_cast<BondFlavorId>(flavors[i])});
-      }
-    }
-    if (!geometry && !bond_flavors.empty()) {
-      throw std::invalid_argument(
-          "Legacy bond flavors require lattice positions.");
-    }
     LatticeGraph graph(std::move(sparse), std::move(coloring));
     if (geometry && geometry->num_sites() != n) {
       throw std::invalid_argument("Graph and geometry site counts must match.");
     }
     graph._geometry = std::move(geometry);
-    detail::label_connections(graph._connections, std::move(bond_flavors),
-                              1.0e-9);
     return graph;
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGraph::from_hdf5: " +
@@ -1810,21 +1800,18 @@ void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   // Scalar adjacency consumers observe exact factory weights, even when
   // splitting a subnormal weight among images rounds a connection to zero.
   hash_value(ctx, adjacency_);
-  hash_value(ctx, _has_connections);
-  if (_has_connections) {
-    hash_value(ctx, _selected_shells);
-    hash_value(ctx, static_cast<std::uint64_t>(_connections.size()));
-    for (const auto& connection : _connections) {
-      hash_value(ctx, connection.site_i);
-      hash_value(ctx, connection.site_j);
-      hash_value(ctx, connection.bond_class.shell);
-      hash_value(ctx, connection.bond_class.orientation);
-      hash_value(ctx, connection.bond_class.axis);
-      hash_value(ctx, connection.displacement);
-      for (const auto shift : connection.image_shift) hash_value(ctx, shift);
-      hash_value(ctx, connection.flavor);
-      hash_value(ctx, connection.weight);
-    }
+  hash_value(ctx, _selected_shells);
+  hash_value(ctx, static_cast<std::uint64_t>(_connections.size()));
+  for (const auto& connection : _connections) {
+    hash_value(ctx, connection.site_i);
+    hash_value(ctx, connection.site_j);
+    hash_value(ctx, connection.bond_class.shell);
+    hash_value(ctx, connection.bond_class.orientation);
+    hash_value(ctx, connection.bond_class.axis);
+    hash_value(ctx, connection.displacement);
+    for (const auto shift : connection.image_shift) hash_value(ctx, shift);
+    hash_value(ctx, connection.flavor);
+    hash_value(ctx, connection.weight);
   }
   hash_value(ctx, static_cast<bool>(_geometry));
   if (_geometry) {
@@ -1874,7 +1861,6 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     result._geometry = std::make_shared<LatticeGeometry>(
         LatticeGeometry::permute(*graph._geometry, path));
   }
-  result._has_connections = graph._has_connections;
   result._selected_shells = graph._selected_shells;
   result._connections = graph._connections;
   for (auto& connection : result._connections) {

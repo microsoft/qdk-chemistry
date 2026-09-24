@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <Eigen/LU>
 #include <algorithm>
+#include <array>
 #include <blas.hh>
 #include <cmath>
 #include <fstream>
@@ -61,15 +63,16 @@ void validate_dimensions(const std::string& name, std::uint64_t nx,
 LatticeGeometry::LatticeGeometry(Eigen::MatrixXd positions,
                                  std::optional<Eigen::MatrixXd> periods)
     : _positions(std::move(positions)), _periods(std::move(periods)) {
-  if (_positions.cols() != 2 || !_positions.allFinite()) {
+  if (_positions.cols() == 0 || !_positions.allFinite()) {
     throw std::invalid_argument(
-        "Lattice positions must be a finite (num_sites, 2) matrix.");
+        "Lattice positions must be a finite (num_sites, d) matrix with d > 0.");
   }
   if (!_periods.has_value()) return;
-  if ((_periods->rows() != 1 && _periods->rows() != 2) ||
-      _periods->cols() != 2 || !_periods->allFinite()) {
+  if (_periods->rows() == 0 || _periods->rows() > _positions.cols() ||
+      _periods->cols() != _positions.cols() || !_periods->allFinite()) {
     throw std::invalid_argument(
-        "Periodic vectors must be a finite (1, 2) or (2, 2) matrix.");
+        "Periodic vectors must be a finite (k, d) matrix with 0 < k <= d, "
+        "where d is the position dimension.");
   }
   const double position_scale =
       _positions.size() == 0 ? 0.0 : _positions.cwiseAbs().maxCoeff();
@@ -79,7 +82,8 @@ LatticeGeometry::LatticeGeometry(Eigen::MatrixXd positions,
     if (_periods->row(i).cwiseAbs().maxCoeff() == 0.0) {
       throw std::invalid_argument("Periodic vectors must be nonzero.");
     }
-    if (!std::isfinite(std::hypot((*_periods)(i, 0), (*_periods)(i, 1)))) {
+    if (!std::isfinite(blas::nrm2(_periods->cols(), _periods->row(i).data(),
+                                  _periods->outerStride()))) {
       throw std::invalid_argument("Periodic vector lengths must be finite.");
     }
     if ((_periods->row(i) / geometry_scale).cwiseAbs().maxCoeff() == 0.0) {
@@ -87,14 +91,16 @@ LatticeGeometry::LatticeGeometry(Eigen::MatrixXd positions,
           "Periodic vectors must be representable at the geometry scale.");
     }
   }
-  if (_periods->rows() == 2) {
-    const Eigen::RowVector2d p0 =
-        _periods->row(0) / _periods->row(0).cwiseAbs().maxCoeff();
-    const Eigen::RowVector2d p1 =
-        _periods->row(1) / _periods->row(1).cwiseAbs().maxCoeff();
-    if (p0.x() * p1.y() - p0.y() * p1.x() == 0.0) {
+  if (_periods->rows() > 1) {
+    Eigen::MatrixXd directions = *_periods;
+    for (Eigen::Index i = 0; i < directions.rows(); ++i) {
+      directions.row(i) /= directions.row(i).cwiseAbs().maxCoeff();
+    }
+    Eigen::FullPivLU<Eigen::MatrixXd> decomposition(directions);
+    decomposition.setThreshold(0.0);
+    if (decomposition.rank() != directions.rows()) {
       throw std::invalid_argument(
-          "Two periodic vectors must be linearly independent.");
+          "Periodic vectors must be linearly independent.");
     }
   }
 }
@@ -107,6 +113,10 @@ const std::optional<Eigen::MatrixXd>& LatticeGeometry::periods() const {
 
 std::uint64_t LatticeGeometry::num_sites() const {
   return static_cast<std::uint64_t>(_positions.rows());
+}
+
+std::uint64_t LatticeGeometry::dimension() const {
+  return static_cast<std::uint64_t>(_positions.cols());
 }
 
 std::vector<std::pair<std::uint64_t, std::uint64_t>>
@@ -337,7 +347,7 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
                           static_cast<std::uint64_t>(site_j),
                           {stencil.shell, stencil.orientation, stencil.axis},
                           displacement,
-                          image_shift,
+                          {image_shift.begin(), image_shift.end()},
                           std::nullopt,
                           1.0});
       }
@@ -359,6 +369,10 @@ std::vector<NeighborConnection> LatticeGeometry::neighbor_connections(
       throw std::invalid_argument("Neighbor shell index must be > 0.");
     }
     requested_shells.insert(shell);
+  }
+  if (dimension() != 2) {
+    throw std::runtime_error(
+        "Neighbor searches support two-dimensional geometries only.");
   }
   const std::uint64_t n = num_sites();
   if (requested_shells.empty() || n == 0) return {};
@@ -542,13 +556,14 @@ std::vector<NeighborConnection> LatticeGeometry::neighbor_connections(
       throw std::overflow_error(
           "Neighbor connection displacement exceeds the supported range.");
     }
-    result.push_back({candidate.site_i,
-                      candidate.site_j,
-                      {candidate.shell, orientation, axes[orientation]},
-                      displacement,
-                      candidate.image_shift,
-                      std::nullopt,
-                      1.0});
+    result.push_back(
+        {candidate.site_i,
+         candidate.site_j,
+         {candidate.shell, orientation, axes[orientation]},
+         displacement,
+         {candidate.image_shift.begin(), candidate.image_shift.end()},
+         std::nullopt,
+         1.0});
   }
   std::sort(result.begin(), result.end(), connection_less);
   return result;
@@ -682,7 +697,8 @@ LatticeGeometry LatticeGeometry::permute(
     throw std::invalid_argument("Permutation must contain every lattice site.");
   }
   std::vector<std::uint64_t> inverse(n, n);
-  Eigen::MatrixXd positions(static_cast<Eigen::Index>(n), 2);
+  Eigen::MatrixXd positions(static_cast<Eigen::Index>(n),
+                            geometry._positions.cols());
   for (std::uint64_t i = 0; i < n; ++i) {
     if (path[i] >= n || inverse[path[i]] != n) {
       throw std::invalid_argument(
@@ -724,6 +740,8 @@ void LatticeGeometry::to_file(const std::string& filename,
 nlohmann::json LatticeGeometry::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
+  // Empty position arrays do not otherwise record their width.
+  j["dimension"] = dimension();
   j["positions"] = matrix_to_json(_positions);
   if (_periods.has_value()) j["periods"] = matrix_to_json(*_periods);
   return j;
@@ -773,23 +791,50 @@ LatticeGeometry LatticeGeometry::from_file(const std::string& filename,
 
 LatticeGeometry LatticeGeometry::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
-  const auto read_matrix = [](const nlohmann::json& value) -> Eigen::MatrixXd {
-    if (!value.is_array() || value.size() > std::numeric_limits<int>::max()) {
+  if (!j.is_object() || !j.contains("positions")) {
+    throw std::runtime_error("JSON missing required 'positions' field.");
+  }
+  std::size_t width = 0;
+  if (j.contains("dimension")) {
+    const auto& value = j.at("dimension");
+    if (!value.is_number_integer() || value.get<std::int64_t>() <= 0 ||
+        value.get<std::int64_t>() > std::numeric_limits<int>::max()) {
       throw std::invalid_argument(
-          "Geometry matrices require arrays of two-column rows.");
+          "Geometry dimension must be a positive integer.");
     }
-    // The shared converter rejects empty arrays; geometry has a fixed width.
-    if (value.empty()) return Eigen::MatrixXd(0, 2);
+    width = value.get<std::size_t>();
+  } else {
+    // Hand-written payloads may omit the dimension when a row determines it.
+    for (const char* name : {"positions", "periods"}) {
+      if (j.contains(name) && j.at(name).is_array() && !j.at(name).empty() &&
+          j.at(name).front().is_array()) {
+        width = j.at(name).front().size();
+        break;
+      }
+    }
+    if (width == 0) {
+      throw std::invalid_argument(
+          "Geometry JSON requires a positive 'dimension' when no row "
+          "determines it.");
+    }
+  }
+  const auto read_matrix =
+      [width](const nlohmann::json& value) -> Eigen::MatrixXd {
+    if (!value.is_array() || value.size() > std::numeric_limits<int>::max()) {
+      throw std::invalid_argument("Geometry matrices require arrays of rows.");
+    }
+    // The shared converter rejects empty arrays; the dimension fixes the width.
+    if (value.empty()) {
+      return Eigen::MatrixXd(0, static_cast<Eigen::Index>(width));
+    }
     for (const auto& row : value) {
-      if (!row.is_array() || row.size() != 2) {
-        throw std::invalid_argument("Geometry matrices must have two columns.");
+      if (!row.is_array() || row.size() != width) {
+        throw std::invalid_argument(
+            "Geometry matrix rows must match the geometry dimension.");
       }
     }
     return json_to_matrix(value);
   };
-  if (!j.is_object() || !j.contains("positions")) {
-    throw std::runtime_error("JSON missing required 'positions' field.");
-  }
   std::optional<Eigen::MatrixXd> periods;
   if (j.contains("periods")) periods = read_matrix(j.at("periods"));
   return LatticeGeometry(read_matrix(j.at("positions")), std::move(periods));
@@ -822,7 +867,8 @@ LatticeGeometry LatticeGeometry::from_hdf5(H5::Group& group) {
       }
       hsize_t dimensions[2];
       space.getSimpleExtentDims(dimensions);
-      if (dimensions[1] != 2 ||
+      if (dimensions[1] == 0 ||
+          dimensions[1] > std::numeric_limits<int>::max() ||
           dimensions[0] > std::numeric_limits<int>::max() ||
           (dataset.getTypeClass() != H5T_FLOAT &&
            dataset.getTypeClass() != H5T_INTEGER)) {

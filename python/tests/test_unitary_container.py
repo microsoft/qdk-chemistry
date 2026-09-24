@@ -151,77 +151,30 @@ class TestPauliProductFormulaContainer:
         assert restored.type == container.type
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
-    def test_old_packed_load_writes_canonical(self, tmp_path, file_format):
-        """Convert old 0.3.0 arrays, retaining identity, last-axis-wins factors, angles and scale."""
-        payload = {
-            "version": "0.3.0",
-            "container_type": "pauli_product_formula",
-            "term_offsets": [0, 3, 3, 4],
-            "qubit_indices": [1, 0, 1, 0],
-            "pauli_codes": [1, 2, 3, 1],
-            "angles": [0.5, -0.25, 0.0],
-            "step_reps": 3,
-            "num_qubits": 2,
-            "scale": 1.7,
-        }
+    def test_version_0_2_layout_loads_in_order(self, tmp_path, file_format):
+        """Main's 0.2.0 layout loads in order, including double-digit HDF5 term indices."""
+        expected = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm({i % 3: "XYZ"[i % 3]}, 0.1 * (i + 1)) for i in range(12)], 3, 3, scale=1.7
+        )
+        step_terms = [
+            {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
+            for term in expected.step_terms
+        ]
+        header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": 3, "num_qubits": 3}
         if file_format == "json":
+            payload = {**header, "step_terms": step_terms, "scale": 1.7}
             restored = PauliProductFormulaContainer.from_json(json.loads(json.dumps(payload)))
         else:
-            with h5py.File(tmp_path / "old.h5", "w") as group:
-                for key in ("version", "container_type", "step_reps", "num_qubits", "scale"):
-                    group.attrs[key] = payload[key]
-                for key in ("term_offsets", "qubit_indices", "pauli_codes", "angles"):
-                    group.create_dataset(key, data=payload[key])
+            with h5py.File(tmp_path / "version_0_2.h5", "w") as group:
+                group.attrs.update({**header, "scale": 1.7})
+                terms_group = group.create_group("step_terms")
+                for i, term in enumerate(expected.step_terms):
+                    term_group = terms_group.create_group(f"term_{i}")
+                    term_group.attrs["angle"] = term.angle
+                    term_group.create_group("pauli_term").attrs.update({str(k): v for k, v in term.pauli_term.items()})
                 restored = PauliProductFormulaContainer.from_hdf5(group)
-        expected = PauliProductFormulaContainer(
-            [
-                ExponentiatedPauliTerm({1: "Z", 0: "Y"}, 0.5),
-                ExponentiatedPauliTerm({}, -0.25),
-                ExponentiatedPauliTerm({0: "X"}, 0.0),
-            ],
-            3,
-            2,
-            scale=1.7,
-        )
         assert restored.to_json() == expected.to_json()
-        assert list(restored.step_terms[0].pauli_term.items()) == [(1, "Z"), (0, "Y")]
         assert restored.content_hash() == expected.content_hash()
-        path = tmp_path / f"canonical.pauli_product_formula_container.{file_format}"
-        restored.to_file(path, file_format)
-        if file_format == "json":
-            written = json.loads(path.read_text())
-            assert written == expected.to_json()
-            assert not {"term_offsets", "qubit_indices", "pauli_codes", "angles"} & written.keys()
-        else:
-            with h5py.File(path, "r") as group:
-                assert group.attrs["version"] == PauliProductFormulaContainer._serialization_version
-                assert "step_terms" in group
-                assert not {"term_offsets", "qubit_indices", "pauli_codes", "angles"} & group.keys()
-        assert PauliProductFormulaContainer.from_file(path, file_format).content_hash() == expected.content_hash()
-
-    @pytest.mark.parametrize(
-        ("key", "value"),
-        [
-            ("term_offsets", [0, 2, 1]),
-            ("qubit_indices", [-1]),
-            ("pauli_codes", [1.5]),
-            ("angles", [[0.5]]),
-        ],
-    )
-    def test_old_packed_rejects_invalid_arrays(self, key, value):
-        """Malformed packed payloads must fail before constructing ordinary terms."""
-        payload = {
-            "version": "0.3.0",
-            "num_qubits": 2,
-            "step_reps": 3,
-            "term_offsets": [0, 1],
-            "qubit_indices": [0],
-            "pauli_codes": [1],
-            "angles": [0.5],
-        }
-        payload[key] = value
-        with pytest.raises(ValueError, match="packed product-formula"):
-            PauliProductFormulaContainer.from_json(payload)
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
     @pytest.mark.parametrize("with_endpoints", [False, True])

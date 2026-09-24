@@ -16,12 +16,16 @@ Properties
 ``num_sites``
    Number of indexed sites, including isolated or coincident positions.
 
+``dimension``
+   Number of Cartesian components per position.
+
 ``positions``
-   Finite Cartesian ``(num_sites, 2)`` matrix in site-index order, including for a chain.
+   Finite Cartesian ``(num_sites, dimension)`` matrix in site-index order, for any positive dimension.
+   Built-in factories are two-dimensional, including for a chain.
    In Python, reading this property returns an independent copy.
 
 ``periods``
-   Optional matrix with one or two finite, nonzero, independent row vectors, in image-shift order.
+   Optional matrix with at most ``dimension`` finite, nonzero, independent row vectors of length ``dimension``, in image-shift order.
    ``None`` denotes an open geometry. Python returns a copy when periods are present.
 
 Creating geometry
@@ -53,7 +57,7 @@ Each open direction gains a boundary cell. Fully open patches omit the first A a
 With both axes periodic, plaquette and unit-cell sizing coincide.
 
 For custom embeddings, construct :class:`~qdk_chemistry.data.LatticeGeometry` directly from positions and optional periods.
-An empty position matrix with shape ``(0, 2)`` is valid.
+An empty position matrix with shape ``(0, dimension)`` is valid.
 
 .. tab:: Python API
 
@@ -83,6 +87,7 @@ The following queries accept a finite, positive ``tolerance`` (default ``1e-9``)
 * :meth:`~qdk_chemistry.data.LatticeGeometry.neighbor_connections` returns physical connections classified by shell and axis, retaining periodic images.
 
 Shell indices are positive integers; duplicate requests are ignored.
+Neighbor queries currently require a two-dimensional geometry and raise ``RuntimeError`` otherwise.
 Unavailable finite shells have no connections and map to empty lists in the pair-query result.
 The pair-only methods reject periodic geometries because projecting to a pair would discard physical image multiplicity.
 Queries do not modify any graph's selected connectivity, and geometric records have unit weight and no flavor.
@@ -136,7 +141,7 @@ If the rows of ``periods`` are :math:`\boldsymbol{P}_p`, a connection's displace
    \boldsymbol{d}_{ij}=\boldsymbol{r}_j-\boldsymbol{r}_i+
    \sum_p n_p\boldsymbol{P}_p,
 
-where ``image_shift`` stores the integer coefficients :math:`n_p` in row order, padded with zero when only one period is present.
+where ``image_shift`` stores the integer coefficients :math:`n_p` in row order, with one entry per spatial dimension, padded with zeros when fewer periods are present.
 Distinct images are not merged even when their finite-lattice endpoints coincide.
 A record may also connect a site to its own nonzero periodic image; individual consumers may reject such interactions.
 

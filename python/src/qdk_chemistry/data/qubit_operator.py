@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import re
 import warnings
-from itertools import pairwise
 from typing import TYPE_CHECKING, Any
 
 import h5py
@@ -48,29 +47,6 @@ if TYPE_CHECKING:
     import scipy
 
 __all__: list[str] = []
-
-
-def _read_legacy_sparse_terms(
-    num_qubits: int, term_offsets: np.ndarray, qubit_indices: np.ndarray, pauli_codes: np.ndarray
-) -> SparsePauliTerms:
-    """Convert the old packed 0.2.0 payload at the JSON/HDF5 loader boundary."""
-    if (
-        any(a.ndim != 1 or (a.size and a.dtype.kind not in "iu") for a in (term_offsets, qubit_indices, pauli_codes))
-        or len(term_offsets) < 2
-        or len(qubit_indices) != len(pauli_codes)
-        or term_offsets[0] != 0
-        or term_offsets[-1] != len(qubit_indices)
-        or np.any(term_offsets[1:] < term_offsets[:-1])
-        or np.any((pauli_codes < 1) | (pauli_codes > 3))
-    ):
-        raise ValueError("Invalid packed sparse Pauli arrays.")
-    return SparsePauliTerms(
-        num_qubits,
-        (
-            ((qubit_indices[i], "IXYZ"[int(pauli_codes[i])]) for i in range(int(begin), int(end)))
-            for begin, end in pairwise(term_offsets)
-        ),
-    )
 
 
 def _merge_term_partitions(p0: TermPartition, p1: TermPartition) -> TermPartition:
@@ -323,7 +299,7 @@ class QubitOperator(DataClass):
             The operator matrix (dense or sparse).
 
         """
-        labels = list(self.pauli_strings)
+        labels = list(self.pauli_strings) if self.has_sparse_terms else self.pauli_strings
         if sparse:
             return pauli_to_sparse_matrix(labels, self.coefficients)
         return np.asarray(pauli_to_dense_matrix(labels, self.coefficients))
@@ -642,7 +618,7 @@ class QubitOperator(DataClass):
             RuntimeError: If version field is missing or incompatible.
 
         """
-        sparse = "pauli_terms" in json_data or "term_offsets" in json_data
+        sparse = "pauli_terms" in json_data
         expected_version = cls._sparse_serialization_version if sparse else cls._serialization_version
         cls._validate_json_version(expected_version, json_data)
         coeff_data = json_data["coefficients"]
@@ -662,13 +638,6 @@ class QubitOperator(DataClass):
         terms: list[str] | SparsePauliTerms
         if "pauli_terms" in json_data:
             terms = SparsePauliTerms(json_data["num_qubits"], json_data["pauli_terms"])
-        elif "term_offsets" in json_data:
-            terms = _read_legacy_sparse_terms(
-                json_data["num_qubits"],
-                np.asarray(json_data["term_offsets"]),
-                np.asarray(json_data["qubit_indices"]),
-                np.asarray(json_data["pauli_codes"]),
-            )
         else:
             terms = json_data["pauli_strings"]
         return cls(
@@ -694,7 +663,7 @@ class QubitOperator(DataClass):
             RuntimeError: If version attribute is missing or incompatible.
 
         """
-        sparse = "pauli_terms" in group or "term_offsets" in group
+        sparse = "pauli_terms" in group
         expected_version = cls._sparse_serialization_version if sparse else cls._serialization_version
         cls._validate_hdf5_version(expected_version, group)
         coefficients = np.array(group["coefficients"])
@@ -717,13 +686,6 @@ class QubitOperator(DataClass):
         if "pauli_terms" in group:
             terms = SparsePauliTerms(
                 group.attrs["num_qubits"], (json.loads(word) for word in group["pauli_terms"].asstr())
-            )
-        elif "term_offsets" in group:
-            terms = _read_legacy_sparse_terms(
-                group.attrs["num_qubits"],
-                np.array(group["term_offsets"]),
-                np.array(group["qubit_indices"]),
-                np.array(group["pauli_codes"]),
             )
         else:
             terms = [s.decode() for s in group["pauli_strings"][:]]

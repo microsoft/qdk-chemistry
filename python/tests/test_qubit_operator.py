@@ -10,7 +10,6 @@ import random as stdlib_random
 import re
 from unittest.mock import Mock
 
-import h5py
 import numpy as np
 import pytest
 import scipy.sparse
@@ -504,82 +503,25 @@ class TestQubitHamiltonianSerialization:
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
     @pytest.mark.parametrize("identity_only", [False, True])
-    def test_old_packed_load_writes_canonical(self, tmp_path, file_format, identity_only):
-        """Old 0.2.0 arrays become canonical words, preserving width, coefficients and metadata."""
-        partition = LayeredPartition(strategy="legacy", groups=(((2, 0),), ((1,),)))
+    def test_sparse_roundtrip_preserves_metadata(self, tmp_path, file_format, identity_only):
+        """Sparse words round-trip with width, coefficients, partition, tapering and encoding metadata."""
+        partition = LayeredPartition(strategy="declared", groups=(((2, 0),), ((1,),)))
         tapering = TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1))
-        coefficients = np.array([1.0, -0.5j, 0.25])
-        payload = {
-            "version": "0.2.0",
-            "num_qubits": 4,
-            "term_offsets": [0, 0, 0, 0] if identity_only else [0, 2, 2, 3],
-            "qubit_indices": [] if identity_only else [0, 3, 1],
-            "pauli_codes": [] if identity_only else [1, 3, 2],
-            "coefficients": {"real": coefficients.real.tolist(), "imag": coefficients.imag.tolist()},
-            "encoding": "jordan-wigner",
-            "fermion_mode_order": "blocked",
-            "term_partition": partition.to_json(),
-            "tapering": tapering.to_json(),
-        }
-        if file_format == "json":
-            restored = QubitOperator.from_json(json.loads(json.dumps(payload)))
-        else:
-            with h5py.File(tmp_path / "old.h5", "w") as group:
-                for key in ("version", "num_qubits", "encoding", "fermion_mode_order"):
-                    group.attrs[key] = payload[key]
-                for key in ("term_partition", "tapering"):
-                    group.attrs[key] = json.dumps(payload[key])
-                for key in ("term_offsets", "qubit_indices", "pauli_codes"):
-                    group.create_dataset(key, data=payload[key])
-                group.create_dataset("coefficients", data=coefficients)
-                restored = QubitOperator.from_hdf5(group)
         expected = QubitOperator.from_sparse_terms(
             4,
             [{}, {}, {}] if identity_only else [{0: "X", 3: "Z"}, {}, {1: "Y"}],
-            coefficients,
+            np.array([1.0, -0.5j, 0.25]),
             encoding="jordan-wigner",
             fermion_mode_order="blocked",
             term_partition=partition,
             tapering=tapering,
         )
+        filename = tmp_path / f"canonical.qubit_hamiltonian.{file_format}"
+        expected.to_file(filename, file_format)
+        restored = QubitOperator.from_file(filename, file_format)
         assert isinstance(restored.pauli_strings, SparsePauliTerms)
         assert restored.to_json() == expected.to_json()
         assert restored.content_hash(0) == expected.content_hash(0)
-        filename = tmp_path / f"canonical.qubit_hamiltonian.{file_format}"
-        restored.to_file(filename, file_format)
-        if file_format == "json":
-            written = json.loads(filename.read_text())
-            assert written == expected.to_json()
-            assert "term_offsets" not in written
-        else:
-            with h5py.File(filename, "r") as group:
-                assert group.attrs["version"] == "0.2.0"
-                assert "pauli_terms" in group
-                assert not {"term_offsets", "qubit_indices", "pauli_codes", "pauli_strings"} & group.keys()
-        assert QubitOperator.from_file(filename, file_format).content_hash(0) == expected.content_hash(0)
-
-    @pytest.mark.parametrize(
-        ("key", "value"),
-        [
-            ("term_offsets", [0, 2, 1]),
-            ("qubit_indices", [[0]]),
-            ("qubit_indices", [0.5]),
-            ("pauli_codes", [4]),
-        ],
-    )
-    def test_old_packed_rejects_invalid_arrays(self, key, value):
-        """Malformed packed payloads must fail rather than truncate or reinterpret factors."""
-        payload = {
-            "version": "0.2.0",
-            "num_qubits": 2,
-            "term_offsets": [0, 1],
-            "qubit_indices": [0],
-            "pauli_codes": [1],
-            "coefficients": [1.0],
-        }
-        payload[key] = value
-        with pytest.raises(ValueError, match="packed sparse Pauli"):
-            QubitOperator.from_json(payload)
 
     def test_json_file_roundtrip_complex_coefficients(self, tmp_path):
         """Test JSON file roundtrip with complex coefficients."""

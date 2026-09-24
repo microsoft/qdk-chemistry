@@ -126,8 +126,8 @@ class TestTrotter:
         assert list(sparse_container.step_terms) == list(dense_container.step_terms)
 
     @pytest.mark.parametrize("sparse", [False, True])
-    def test_fourth_order_preserves_angle_rounding(self, sparse):
-        """Calibration fingerprints retain each input representation's multiplication order."""
+    def test_fourth_order_angle_rounding_matches_across_storage(self, sparse):
+        """Dense and sparse storage share one multiplication order, so angles match bit for bit."""
         coefficients = np.array([0.8, -0.4])
         hamiltonian = (
             QubitOperator.from_sparse_terms(1, [{0: "X"}, {0: "Z"}], coefficients)
@@ -152,10 +152,7 @@ class TestTrotter:
         ]
         dt = -0.7 / 3
         expected = [
-            ExponentiatedPauliTerm(
-                {0: "X" if i % 2 == 0 else "Z"},
-                float(coefficients[i % 2]) * dt * fraction if sparse else float(coefficients[i % 2]) * (dt * fraction),
-            )
+            ExponentiatedPauliTerm({0: "X" if i % 2 == 0 else "Z"}, float(coefficients[i % 2]) * (dt * fraction))
             for i, fraction in enumerate(fractions)
         ]
         assert [(term.pauli_term, term.angle.hex()) for term in terms] == [
@@ -969,8 +966,8 @@ class TestPartitionGrouping:
     """Tests for Trotter behavior when term_partition groups commuting terms."""
 
     @pytest.mark.parametrize("sparse", [False, True])
-    def test_empty_layers_preserve_feature_group_order(self, sparse):
-        """Sparse groups count empty layers; dense groups discard them before stable sorting."""
+    def test_empty_layers_do_not_affect_group_order(self, sparse):
+        """Both storages discard empty layers before stably sorting groups by layer count."""
         partition = LayeredPartition(strategy="commuting", groups=(((0,), (), ()), ((1,), (2,)), ((),)))
         coefficients = np.ones(3)
         hamiltonian = (
@@ -979,8 +976,31 @@ class TestPartitionGrouping:
             else QubitOperator(["IIX", "IYI", "ZII"], coefficients, term_partition=partition)
         )
         terms = Trotter(time=1.0).run(hamiltonian).get_container().step_terms
-        expected = [{1: "Y"}, {2: "Z"}, {0: "X"}] if sparse else [{0: "X"}, {1: "Y"}, {2: "Z"}]
-        assert [term.pauli_term for term in terms] == expected
+        assert [term.pauli_term for term in terms] == [{0: "X"}, {1: "Y"}, {2: "Z"}]
+
+    @pytest.mark.parametrize("order", [2, 4])
+    def test_minimize_rotations_requires_a_strict_reduction(self, order):
+        """Tied group sizes keep the declared order; a larger first group moves to the center."""
+
+        def step_terms(hamiltonian: QubitOperator, minimize: bool) -> list[ExponentiatedPauliTerm]:
+            builder = Trotter(order=order, time=1.0, minimize_rotations=minimize)
+            return builder.run(hamiltonian).get_container().step_terms
+
+        tied = QubitOperator.from_sparse_terms(
+            3,
+            [{0: "X"}, {1: "Y"}, {2: "Z"}],
+            np.ones(3),
+            term_partition=LayeredPartition(strategy="commuting", groups=(((0,),), ((1,),), ((2,),))),
+        )
+        assert step_terms(tied, True) == step_terms(tied, False)
+
+        larger_first = QubitOperator.from_sparse_terms(
+            4,
+            [{0: "X"}, {1: "X"}, {2: "Z"}, {3: "Y"}],
+            np.ones(4),
+            term_partition=LayeredPartition(strategy="commuting", groups=(((0, 1),), ((2,),), ((3,),))),
+        )
+        assert len(step_terms(larger_first, True)) < len(step_terms(larger_first, False))
 
     def test_flat_partition_groups_commuting_terms(self):
         """Test that a FlatPartition groups commuting terms into parallelizable layers."""

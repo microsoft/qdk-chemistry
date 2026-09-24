@@ -195,8 +195,8 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return [[_make(layer) for layer in group] for group in self._partition_indices(partition)]
 
     @staticmethod
-    def _partition_indices(partition: TermPartition, *, keep_empty_layers: bool = False) -> list[list[tuple[int, ...]]]:
-        """Return index layers stably ordered by group size, retaining legacy sparse empty layers when requested."""
+    def _partition_indices(partition: TermPartition) -> list[list[tuple[int, ...]]]:
+        """Return nonempty index layers, with groups stably ordered by layer count."""
         if isinstance(partition, LayeredPartition):
             layered_groups = partition.groups
         elif isinstance(partition, FlatPartition):
@@ -207,7 +207,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 "Expected FlatPartition or LayeredPartition."
             )
 
-        groups = [[layer for layer in layers if layer or keep_empty_layers] for layers in layered_groups]
+        groups = [[layer for layer in layers if layer] for layers in layered_groups]
         return sorted((group for group in groups if group), key=len)
 
     def _exponentiate_commuting(

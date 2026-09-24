@@ -146,8 +146,9 @@ class Trotter(TimeEvolutionBuilder):
         is exponentiated as its own group.
 
         With ``minimize_rotations=True``, even-order formulas place the group with
-        the most active Pauli terms centrally and the second-largest group outside.
-        Remaining groups keep their relative order; ties use the existing order.
+        the most active Pauli terms centrally and the second-largest group outside
+        when that strictly reduces emitted Pauli factors; otherwise, including ties,
+        the declared order is kept. Remaining groups keep their relative order.
         This minimizes emitted Pauli factors for a fixed partition and step count,
         not angle-dependent synthesis cost or simulation error. It does not fuse
         repetition boundaries. First-order formulas retain their original ordering.
@@ -325,22 +326,20 @@ class Trotter(TimeEvolutionBuilder):
 
         # Convert each active word once, reusing maps throughout the Suzuki schedule.
         labels = qubit_hamiltonian.pauli_strings
-        sparse = isinstance(labels, SparsePauliTerms)
         coefficients = [complex(c).real for c in qubit_hamiltonian.coefficients]
         maps = {
             index: dict(labels.factors(index))
             if isinstance(labels, SparsePauliTerms)
             else self._pauli_label_to_map(labels[index])
             for index, coefficient in enumerate(coefficients)
-            # Preserve the sparse rejection predicate, including its NaN behavior.
-            if (not abs(coefficient) <= atol if sparse else abs(coefficient) > atol)
+            if abs(coefficient) > atol
         }
         if not maps:
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
             return terms, (0,), None if layer_offsets is None else (0,)
 
         groups: list[list[tuple[int, ...]]] = (
-            self._partition_indices(partition, keep_empty_layers=sparse)
+            self._partition_indices(partition)
             if partition is not None
             else [[(i,)] for i in range(qubit_hamiltonian.num_terms)]
         )
@@ -348,29 +347,29 @@ class Trotter(TimeEvolutionBuilder):
             Logger.warn("Term partition produced no groups; returning empty term list.")
             return terms, (0,), None if layer_offsets is None else (0,)
 
-        first_order = self._settings.get("order") == 1
-        if not first_order and self._settings.get("minimize_rotations") and len(groups) > 1:
-            # For order 2k, f=5**(k-1): endpoint multiplicities are f and f+1,
-            # versus 2f internally. Count after filtering, not by layer count.
+        order = self._settings.get("order")
+        if order > 1 and self._settings.get("minimize_rotations") and len(groups) > 1:
+            # For order 2k, f=5**(k-1): endpoint multiplicities are f+1 (outer) and f
+            # (central), versus 2f internally, saving (f-1)*w_outer + f*w_central.
+            # Count after filtering, not by layer count.
+            multiplicity = 5 ** (order // 2 - 1)
             weights = [sum(i in maps for layer in group for i in layer) for group in groups]
             central, outer = sorted(range(len(groups)), key=lambda i: weights[i], reverse=True)[:2]
-            groups = [
-                groups[outer],
-                *(group for i, group in enumerate(groups) if i not in (outer, central)),
-                groups[central],
-            ]
+
+            def savings(outer_index: int, central_index: int) -> int:
+                return (multiplicity - 1) * weights[outer_index] + multiplicity * weights[central_index]
+
+            # Reorder only for a strict reduction; ties keep the declared order and error.
+            if savings(outer, central) > savings(0, len(groups) - 1):
+                groups = [
+                    groups[outer],
+                    *(group for i, group in enumerate(groups) if i not in (outer, central)),
+                    groups[central],
+                ]
         for fraction, group_index in self._trotter_schedule(len(groups)):
-            # Native calibration fingerprints require the historical multiplication
-            # order: sparse uses (coefficient * time) * fraction, dense time * fraction first.
-            stage_time = time if sparse or first_order else time * fraction
+            stage_time = time * fraction
             for layer in groups[group_index]:
-                terms.extend(
-                    ExponentiatedPauliTerm(
-                        maps[i], coefficients[i] * time * fraction if sparse else coefficients[i] * stage_time
-                    )
-                    for i in layer
-                    if i in maps
-                )
+                terms.extend(ExponentiatedPauliTerm(maps[i], coefficients[i] * stage_time) for i in layer if i in maps)
                 if layer_offsets is not None and len(terms) != layer_offsets[-1]:
                     layer_offsets.append(len(terms))
             if len(terms) != offsets[-1]:

@@ -224,7 +224,8 @@ This ordering does not generally minimize the number of individual Pauli exponen
 
 Set ``minimize_rotations=True`` on the ``"trotter"`` algorithm to place the group with the most active terms centrally and the second-largest group outside the Strang/Suzuki splitting.
 Group sizes are counted after ``weight_threshold`` filtering, rather than by their number of disjoint layers.
-Other groups retain their relative order, and ties are resolved stably from the existing order.
+Groups are moved only when this strictly lowers the structural count below; otherwise, including ties, the declared order and its Trotter error are kept.
+Other groups retain their relative order, and ties between group sizes are resolved stably from the existing order.
 Neither the input partition nor the layers within its groups are mutated.
 
 For order :math:`2k`, let :math:`f=5^{k-1}`, :math:`M` be the number of active terms, and :math:`a,c` the sizes of the outer and central groups.
@@ -238,6 +239,8 @@ This is an algorithm :class:`~qdk_chemistry.data.Settings` option: it can be sup
 
 Independently, ``fuse_group_boundaries=True`` retains ``group_offsets`` after ordering and ``weight_threshold`` filtering, with each group spanning all its layers, and calls :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` with ``atol=0.0``.
 This preserves group order, requested time, and the Trotter approximation apart from floating-point rounding; see :ref:`compact-product-formulas` and :ref:`mapper compatibility <compact-formula-mappers>`.
+Fusion trades storage for executed rotations: the rewritten formula stores the interior of the step twice, roughly doubling :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms`, while saving about one boundary group per repetition in :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials`.
+The relative saving is small when the boundary group is small compared with the step, as in higher-order Suzuki steps whose internal boundaries are already merged.
 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
