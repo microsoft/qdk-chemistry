@@ -278,7 +278,7 @@ jobs:
     - name: Run C++ tests
       env:
         OMP_NUM_THREADS: ${{ matrix.cpp-omp-threads }}
-        CTEST_TIMEOUT: ${{ matrix.enable-coverage && '600' || '300' }}
+        CTEST_TIMEOUT: ${{ matrix.enable-coverage && '400' || '300' }}
       run: |
         mkdir -p test-results
         cd "$BUILD_DIR"
