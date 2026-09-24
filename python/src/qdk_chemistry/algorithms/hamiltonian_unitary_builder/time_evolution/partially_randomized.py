@@ -23,16 +23,21 @@ See Also:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
-from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
+
+if TYPE_CHECKING:
+    from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 
 __all__: list[str] = ["PartiallyRandomized", "PartiallyRandomizedSettings"]
 
@@ -211,7 +216,7 @@ class PartiallyRandomized(QDrift):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         r"""Construct the unitary representation using partially randomized product formula.
 
         The algorithm:
@@ -226,7 +231,11 @@ class PartiallyRandomized(QDrift):
             UnitaryRepresentation: The unitary representation built by the
                 partially randomized method.
 
+        Raises:
+            TypeError: If given a lattice Hamiltonian rather than a qubit Hamiltonian.
+
         """
+        qubit_hamiltonian = self._require_qubit_hamiltonian(qubit_hamiltonian)
         effective_time, power_repetitions = self._resolve_power()
         time: float = effective_time
         tolerance: float = self._settings.get("tolerance")

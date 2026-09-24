@@ -9,10 +9,10 @@ from abc import abstractmethod
 from contextlib import contextmanager
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput, system_num_qubits
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    QubitOperator,
     Settings,
     UnitaryRepresentation,
 )
@@ -88,13 +88,13 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The lattice or qubit Hamiltonian for which to build circuits.
 
         Returns:
             A list of quantum circuits for phase estimation.
@@ -103,7 +103,7 @@ class QpeCircuitBuilder(Algorithm):
 
     def _create_controlled_circuit(
         self,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
         power: int,
     ) -> tuple[Circuit, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
@@ -112,7 +112,7 @@ class QpeCircuitBuilder(Algorithm):
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            qubit_hamiltonian: The lattice or qubit Hamiltonian to evolve under.
             power: The power to which the unitary should be raised.
 
         Returns:
@@ -122,7 +122,7 @@ class QpeCircuitBuilder(Algorithm):
 
         """
         unitary_rep = self._powered_unitary(qubit_hamiltonian, power)
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
+        num_ancilla_qubits = unitary_rep.get_num_qubits() - system_num_qubits(qubit_hamiltonian)
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
@@ -138,7 +138,7 @@ class QpeCircuitBuilder(Algorithm):
         finally:
             self._share_base_unitary, self._shared_base_unitary = previous_flag, previous_rep
 
-    def _powered_unitary(self, qubit_hamiltonian: QubitOperator, power: int) -> UnitaryRepresentation:
+    def _powered_unitary(self, qubit_hamiltonian: HamiltonianInput, power: int) -> UnitaryRepresentation:
         r"""Return :math:`U^{\\text{power}}`, reusing a shared base step where that is exact.
 
         A ``"repeat"`` power strategy leaves the evolution time, and therefore every
@@ -148,7 +148,7 @@ class QpeCircuitBuilder(Algorithm):
         work for every phase-estimation bit.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            qubit_hamiltonian: The lattice or qubit Hamiltonian to evolve under.
             power: The power to which the unitary should be raised.
 
         Returns:

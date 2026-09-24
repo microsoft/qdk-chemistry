@@ -11,7 +11,8 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput, system_num_qubits
+from qdk_chemistry.data import AlgorithmRef, Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -77,7 +78,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -126,7 +127,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
         *,
         iteration: int,
         total_iterations: int,
@@ -147,7 +148,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
-        num_system_qubits = qubit_hamiltonian.num_qubits
+        num_system_qubits = system_num_qubits(qubit_hamiltonian)
         power = 2 ** (total_iterations - iteration - 1)
 
         ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)

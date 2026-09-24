@@ -14,6 +14,7 @@ References:
 
 import numpy as np
 
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     HamiltonianUnitaryBuilder,
     HamiltonianUnitaryBuilderSettings,
@@ -100,7 +101,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         """Construct the unitary representation using LCU block encoding.
 
         Computes normalized amplitudes, signs, and controlled operations from the
@@ -113,7 +114,11 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         Returns:
             UnitaryRepresentation: The unitary representation wrapping the built LCUContainer.
 
+        Raises:
+            TypeError: If given a lattice Hamiltonian rather than a qubit Hamiltonian.
+
         """
+        qubit_hamiltonian = self._require_qubit_hamiltonian(qubit_hamiltonian)
         power: int = self._settings.get("power")
         quantum_walk: bool = self._settings.get("quantum_walk")
 

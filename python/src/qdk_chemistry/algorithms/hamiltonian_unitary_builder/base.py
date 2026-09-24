@@ -11,6 +11,10 @@ from abc import abstractmethod
 import numpy as np
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms.hamiltonian_input import (
+    HamiltonianInput,
+    validate_hamiltonian_input,
+)
 from qdk_chemistry.data import (
     FlatPartition,
     LayeredPartition,
@@ -34,23 +38,90 @@ _NON_IDENTITY = re.compile(r"[^I]")
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
-    """Base class for Hamiltonian unitary builders in QDK/Chemistry algorithms."""
+    """Base class for Hamiltonian unitary builders in QDK/Chemistry algorithms.
+
+    A builder accepts either a **qubit Hamiltonian**
+    (:class:`~qdk_chemistry.data.QubitOperator`) or an unmapped **lattice Hamiltonian**
+    (:class:`~qdk_chemistry.data.Hamiltonian`). Only builders that override
+    :meth:`accepts_lattice` understand the lattice form; every other builder rejects it
+    with a :class:`TypeError` before :meth:`_run_impl` is reached.
+
+    """
 
     def __init__(self):
         """Initialize the HamiltonianUnitaryBuilder."""
         super().__init__()
 
-    @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def accepts_lattice(self) -> bool:
+        """Return whether this builder can consume an unmapped lattice Hamiltonian.
+
+        Builders that read the lattice connectivity and model parameters directly
+        override this to return ``True``. The default is ``False``, meaning the builder
+        only understands a :class:`~qdk_chemistry.data.QubitOperator`.
+
+        Returns:
+            bool: ``False``, unless a subclass declares lattice support.
+
+        """
+        return False
+
+    def run(self, hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            hamiltonian: The lattice Hamiltonian or qubit Hamiltonian to represent.
+
+        Returns:
+            UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
+
+        Raises:
+            TypeError: If a lattice Hamiltonian is given to a builder that only accepts a qubit Hamiltonian.
+
+        """
+        validate_hamiltonian_input(
+            hamiltonian,
+            accepts_lattice=self.accepts_lattice(),
+            algorithm_name=self.name(),
+            algorithm_kind="unitary builder",
+        )
+        self._settings.lock()
+        return self._run_impl(hamiltonian)
+
+    @abstractmethod
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation for the given Hamiltonian.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian, or a lattice Hamiltonian when the builder accepts one.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
 
         """
+
+    def _require_qubit_hamiltonian(self, hamiltonian: HamiltonianInput) -> QubitOperator:
+        """Return *hamiltonian* as a qubit Hamiltonian, rejecting an unmapped lattice Hamiltonian.
+
+        Qubit-only builders call this at the top of ``_run_impl`` so the check also
+        applies when ``_run_impl`` is invoked directly rather than through :meth:`run`.
+
+        Args:
+            hamiltonian: The Hamiltonian handed to the builder.
+
+        Returns:
+            QubitOperator: The validated qubit Hamiltonian.
+
+        Raises:
+            TypeError: If *hamiltonian* is a lattice Hamiltonian or an unsupported type.
+
+        """
+        validate_hamiltonian_input(
+            hamiltonian,
+            accepts_lattice=False,
+            algorithm_name=self.name(),
+            algorithm_kind="unitary builder",
+        )
+        return hamiltonian
 
     @staticmethod
     def _pauli_label_to_map(label: str) -> dict[int, str]:
@@ -135,14 +206,14 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian, or a lattice Hamiltonian when the builder accepts one.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given Hamiltonian.
 
         """
 

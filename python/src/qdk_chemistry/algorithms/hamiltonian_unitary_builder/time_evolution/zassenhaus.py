@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 from itertools import product
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -45,6 +46,9 @@ from qdk_chemistry.utils.pauli_commutation import (
     pauli_map_to_label,
 )
 from qdk_chemistry.utils.zassenhaus_generation import PlanTerm, zassenhaus_commutator_plan
+
+if TYPE_CHECKING:
+    from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 
@@ -138,7 +142,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         if term_grouper is not None:
             self._settings.set("term_grouper", term_grouper)
 
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         """Construct the unitary representation using Zassenhaus decomposition.
 
         Args:
@@ -147,7 +151,11 @@ class Zassenhaus(TimeEvolutionBuilder):
         Returns:
             UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
 
+        Raises:
+            TypeError: If given a lattice Hamiltonian rather than a qubit Hamiltonian.
+
         """
+        qubit_hamiltonian = self._require_qubit_hamiltonian(qubit_hamiltonian)
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
 

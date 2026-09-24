@@ -19,11 +19,11 @@ References:
 # --------------------------------------------------------------------------------------------
 import numpy as np
 
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -73,7 +73,7 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -81,11 +81,14 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The lattice or qubit Hamiltonian for which to estimate the phase.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
             QpeResult: The result of the phase estimation.
+
+        Raises:
+            TypeError: If the nested unitary builder cannot consume the Hamiltonian input form.
 
         """
         # Create nested algorithms from settings
@@ -99,7 +102,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         # Resolve container before running iterations
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        unitary_rep = self._build_unitary(unitary_builder, qubit_hamiltonian)
         container = unitary_rep.get_container()
 
         num_bits = circuit_builder.settings().get("num_bits")

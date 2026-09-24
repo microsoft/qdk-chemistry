@@ -11,7 +11,8 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput, system_num_qubits
+from qdk_chemistry.data import AlgorithmRef, Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -87,7 +88,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
@@ -110,7 +111,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
-        num_system_qubits = qubit_hamiltonian.num_qubits
+        num_system_qubits = system_num_qubits(qubit_hamiltonian)
 
         # Build one controlled circuit per ancilla with power=2^k,
         # respecting the unitary builder's power_strategy (e.g. "rescale").

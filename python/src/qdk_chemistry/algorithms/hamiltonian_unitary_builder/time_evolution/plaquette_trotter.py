@@ -37,7 +37,14 @@ import math
 from typing import TYPE_CHECKING
 
 import numpy as np
+import scipy.sparse
 
+from qdk_chemistry.algorithms.hamiltonian_input import (
+    HamiltonianInput,
+    is_lattice_hamiltonian,
+    system_num_qubits,
+    validate_hamiltonian_input,
+)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter, TrotterSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -50,7 +57,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitOperator
+    from qdk_chemistry.data import Hamiltonian
 
 __all__: list[str] = [
     "PlaquetteTrotter",
@@ -61,16 +68,20 @@ __all__: list[str] = [
 class PlaquetteTrotter(Trotter):
     """Build a second-order product formula from exact plaquette evolutions.
 
-    The builder derives :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g` from a normal
-    :class:`~qdk_chemistry.data.QubitOperator`.
-    The declared lattice is checked against the Hamiltonian before the
-    pink and gold plaquette tilings are constructed.
+    The builder derives :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g` from either input
+    form. Given a **lattice Hamiltonian** (:class:`~qdk_chemistry.data.Hamiltonian`, as
+    built by :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian`)
+    it reads the hopping and interaction straight from the sparse one- and two-body
+    integrals, skipping the fermion-to-qubit mapping entirely. Given a **qubit
+    Hamiltonian** (:class:`~qdk_chemistry.data.QubitOperator`) it recovers the same
+    quantities from the Jordan-Wigner Pauli strings. Either way the declared lattice is
+    checked against the operator before the pink and gold plaquette tilings are built.
 
     Note:
-        This expects a Jordan-Wigner encoded, spin-blocked uniform Fermi-Hubbard
-        model on a periodic square lattice whose sides are even and either both at
-        least four or exactly 2x2, with spin-up modes first. Incompatible geometry,
-        ordering, or hopping raises a :class:`ValueError`.
+        This expects a uniform Fermi-Hubbard model on a periodic square lattice whose
+        sides are even and either both at least four or exactly 2x2. A qubit Hamiltonian
+        must additionally be Jordan-Wigner encoded and spin-blocked, with spin-up modes
+        first. Incompatible geometry, ordering, or hopping raises a :class:`ValueError`.
 
     """
 
@@ -138,8 +149,43 @@ class PlaquetteTrotter(Trotter):
         """Return ``plaquette`` as the algorithm name."""
         return "plaquette"
 
+    def accepts_lattice(self) -> bool:
+        """Return ``True``; this builder reads a lattice Hamiltonian directly.
+
+        Returns:
+            bool: Always ``True``.
+
+        """
+        return True
+
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
+        """Construct the plaquette product formula for a lattice or qubit Hamiltonian.
+
+        Args:
+            qubit_hamiltonian: The lattice Hamiltonian or Jordan-Wigner qubit Hamiltonian.
+
+        Returns:
+            UnitaryRepresentation: The segmented plaquette product formula.
+
+        Raises:
+            TypeError: If the input is neither a lattice nor a qubit Hamiltonian.
+            NotImplementedError: If the configured Trotter order is not 2.
+
+        """
+        validate_hamiltonian_input(
+            qubit_hamiltonian,
+            accepts_lattice=True,
+            algorithm_name=self.name(),
+            algorithm_kind="unitary builder",
+        )
+        order = self._settings.get("order")
+        if order != 2:
+            raise NotImplementedError(f"PlaquetteTrotter supports order 2 only, got {order}.")
+        effective_time, power_repetitions = self._resolve_power()
+        return self._trotter(qubit_hamiltonian, effective_time, power_repetitions)
+
     def _trotter(
-        self, qubit_hamiltonian: QubitOperator, time: float, power_repetitions: int = 1
+        self, qubit_hamiltonian: HamiltonianInput, time: float, power_repetitions: int = 1
     ) -> UnitaryRepresentation:
         r"""Build Campbell's segmented plaquette product formula.
 
@@ -171,7 +217,7 @@ class PlaquetteTrotter(Trotter):
             atol=self._settings.get("weight_threshold"),
         )
         num_sites = self._settings.get("lattice_width") * self._settings.get("lattice_height")
-        hopping, _, _ = self._split_hopping(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
+        hopping, _, _ = self._split_terms(qubit_hamiltonian, num_sites, self._settings.get("weight_threshold"))
         section_a, _ = self._plaquette_sections(
             self._settings.get("lattice_width"), self._settings.get("lattice_height")
         )
@@ -182,7 +228,7 @@ class PlaquetteTrotter(Trotter):
             container=PauliProductFormulaContainer(
                 step_terms=step_terms,
                 step_reps=num_divisions * power_repetitions,
-                num_qubits=qubit_hamiltonian.num_qubits,
+                num_qubits=system_num_qubits(qubit_hamiltonian),
                 scale=time,
                 conjugating_terms=boundary,
             )
@@ -216,19 +262,11 @@ class PlaquetteTrotter(Trotter):
                 "error bound; set them, or set num_divisions and leave target_accuracy at 0."
             )
 
-        hopping, _, _ = self._split_hopping(qubit_hamiltonian, width * height, self._settings.get("weight_threshold"))
+        hopping, _, _ = self._split_terms(qubit_hamiltonian, width * height, self._settings.get("weight_threshold"))
         hopping = abs(hopping)
         num_sites = width * height
 
-        # Reverse-engineers the Hubbard interaction magnitude (|U|) from the Jordan-Wigner-mapped Hamiltonian.
-        interaction = 0.0
-        for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=1e-12):
-            positions = [index for index, axis in enumerate(reversed(label)) if axis != "I"]
-            if len(positions) == 2 and all(label[::-1][position] == "Z" for position in positions):
-                low, high = positions
-                if high - low == num_sites:
-                    interaction = abs(coeff) * 4.0
-                    break
+        interaction = self._interaction_strength(qubit_hamiltonian, num_sites)
 
         # R_p and R_g are the one-spin, unit-hopping matrices for the pink and gold tilings.
         # Evaluate their trace norms exactly through 1600 sites; beyond that use the
@@ -282,7 +320,7 @@ class PlaquetteTrotter(Trotter):
 
     def _decompose_trotter_step(
         self,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
         time: float,
         atol: float = 1e-12,
     ) -> list[ExponentiatedPauliTerm | BatchedExponentiatedPauliTerm | ConjugatedExponentiatedPauliTerm]:
@@ -316,10 +354,11 @@ class PlaquetteTrotter(Trotter):
             )
 
         num_sites = width * height
-        if qubit_hamiltonian.num_qubits != 2 * num_sites:
+        num_qubits = system_num_qubits(qubit_hamiltonian)
+        if num_qubits != 2 * num_sites:
             raise ValueError(
                 f"A {width}x{height} spinful lattice needs {2 * num_sites} qubits, but the "
-                f"Hamiltonian has {qubit_hamiltonian.num_qubits}."
+                f"Hamiltonian has {num_qubits}."
             )
 
         declared_order = getattr(qubit_hamiltonian, "fermion_mode_order", None)
@@ -330,7 +369,7 @@ class PlaquetteTrotter(Trotter):
                 f"{FermionModeOrder.BLOCKED!s} ordering before building the unitary."
             )
 
-        hopping, diagonal, observed_bonds = self._split_hopping(qubit_hamiltonian, num_sites, atol)
+        hopping, diagonal, observed_bonds = self._split_terms(qubit_hamiltonian, num_sites, atol)
         section_a, section_b = self._plaquette_sections(width, height)
         order = self._settings.get("order")
         if order != 2:
@@ -391,6 +430,203 @@ class PlaquetteTrotter(Trotter):
         if hop_a is not None:
             body.append(hop_a)
         return body
+
+    def _split_terms(self, hamiltonian: HamiltonianInput, num_sites: int, atol: float):
+        """Separate uniform hopping, the :math:`H_I` terms, and the bond graph.
+
+        Dispatches to the lattice-integral reader or the Jordan-Wigner Pauli reader
+        depending on the input form. Both return the same triple, so everything
+        downstream is shared.
+
+        Args:
+            hamiltonian: The lattice Hamiltonian or qubit Hamiltonian to inspect.
+            num_sites: Number of lattice sites, used to fold the two spin blocks together.
+            atol: Threshold below which coefficients are dropped.
+
+        Returns:
+            ``(hopping, diagonal, bonds)`` as described in :meth:`_split_hopping`.
+
+        """
+        if is_lattice_hamiltonian(hamiltonian):
+            return self._split_hopping_from_lattice(hamiltonian, num_sites, atol)
+        return self._split_hopping(hamiltonian, num_sites, atol)
+
+    def _interaction_strength(self, hamiltonian: HamiltonianInput, num_sites: int) -> float:
+        r"""Return the onsite interaction magnitude :math:`|U|` used by the error bound.
+
+        Args:
+            hamiltonian: The lattice Hamiltonian or qubit Hamiltonian to inspect.
+            num_sites: Number of lattice sites.
+
+        Returns:
+            float: The uniform interaction magnitude, or ``0.0`` when there is none.
+
+        """
+        if is_lattice_hamiltonian(hamiltonian):
+            return abs(self._uniform_interaction(hamiltonian, num_sites, atol=1e-12))
+        # Reverse-engineers the Hubbard interaction magnitude (|U|) from the Jordan-Wigner-mapped Hamiltonian.
+        for label, coeff in hamiltonian.get_real_coefficients(tolerance=1e-12):
+            positions = [index for index, axis in enumerate(reversed(label)) if axis != "I"]
+            if len(positions) == 2 and all(label[::-1][position] == "Z" for position in positions):
+                low, high = positions
+                if high - low == num_sites:
+                    return abs(coeff) * 4.0
+        return 0.0
+
+    @staticmethod
+    def _lattice_one_body(hamiltonian: Hamiltonian, num_sites: int) -> scipy.sparse.csr_matrix:
+        """Return the one-body integrals of a lattice Hamiltonian as a CSR matrix.
+
+        Args:
+            hamiltonian: The lattice Hamiltonian.
+            num_sites: Expected number of lattice sites.
+
+        Returns:
+            scipy.sparse.csr_matrix: The one-body integrals, shape ``(num_sites, num_sites)``.
+
+        Raises:
+            ValueError: If the Hamiltonian is spin-unrestricted, carries no one-body
+                integrals, or its size disagrees with the declared lattice.
+
+        """
+        if not hamiltonian.has_one_body_integrals():
+            raise ValueError("The lattice Hamiltonian carries no one-body integrals; there is no hopping to tile.")
+        if not hamiltonian.is_restricted():
+            raise ValueError(
+                "PlaquetteTrotter applies the same tiling to both spin sectors, so it requires a "
+                "spin-restricted lattice Hamiltonian."
+            )
+
+        alpha, _ = hamiltonian.get_one_body_integrals()
+        one_body = scipy.sparse.csr_matrix(np.asarray(alpha))
+        if one_body.shape != (num_sites, num_sites):
+            raise ValueError(
+                f"The declared lattice has {num_sites} sites, but the Hamiltonian's one-body "
+                f"integrals are {one_body.shape[0]}x{one_body.shape[1]}."
+            )
+        return one_body
+
+    @staticmethod
+    def _uniform_interaction(
+        hamiltonian: Hamiltonian,
+        num_sites: int,
+        *,
+        atol: float,
+        bonds: set[frozenset[int]] | None = None,
+    ) -> float:
+        r"""Return the uniform onsite interaction :math:`U` of a lattice Hamiltonian.
+
+        Intersite two-body integrals are detected on the bonded pairs, which is where a
+        density-density potential such as the PPP :math:`V_{ij}` always shows up first.
+
+        Args:
+            hamiltonian: The lattice Hamiltonian.
+            num_sites: Number of lattice sites.
+            atol: Threshold below which interaction values are treated as zero.
+            bonds: Bonded site pairs to screen for intersite terms, or ``None`` to skip.
+
+        Returns:
+            float: The uniform onsite interaction, or ``0.0`` when there are no two-body integrals.
+
+        Raises:
+            ValueError: If the two-body integrals are not purely onsite, or the onsite
+                interaction is not uniform across sites.
+
+        """
+        if not hamiltonian.has_two_body_integrals():
+            return 0.0
+
+        for bond in bonds or ():
+            site_a, site_b = sorted(bond)
+            if abs(hamiltonian.get_two_body_element(site_a, site_a, site_b, site_b)) > atol:
+                raise ValueError(
+                    f"PlaquetteTrotter models a Hubbard onsite interaction, but the Hamiltonian "
+                    f"carries an off-site two-body integral at ({site_a}, {site_a}, {site_b}, {site_b}). "
+                    "Intersite terms such as the PPP potential cannot be folded into the interaction layer."
+                )
+
+        values = {round(hamiltonian.get_two_body_element(site, site, site, site), 12) for site in range(num_sites)}
+        if len(values) > 1:
+            raise ValueError(
+                f"PlaquetteTrotter requires a uniform onsite interaction, but found "
+                f"{len(values)} distinct values: {sorted(values)}."
+            )
+        return next(iter(values)) if values else 0.0
+
+    def _split_hopping_from_lattice(self, hamiltonian: Hamiltonian, num_sites: int, atol: float):
+        r"""Read the plaquette inputs straight from a lattice Hamiltonian's integrals.
+
+        The Jordan-Wigner image of the model is constructed analytically rather than by
+        mapping the operator. With spin-blocked modes (spin-up ``0..n-1``, spin-down
+        ``n..2n-1``) and :math:`n_p = (I - Z_p)/2`, the onsite part of site :math:`i`
+        with energy :math:`e_i` and interaction :math:`U_i` is
+
+        .. math::
+            e_i (n_{i\uparrow} + n_{i\downarrow}) + U_i n_{i\uparrow} n_{i\downarrow}
+            = \Bigl(e_i + \tfrac{U_i}{4}\Bigr) I
+            - \Bigl(\tfrac{e_i}{2} + \tfrac{U_i}{4}\Bigr) (Z_i + Z_{i+n})
+            + \tfrac{U_i}{4} Z_i Z_{i+n},
+
+        while an off-diagonal integral :math:`h_{ij}` becomes a Jordan-Wigner
+        :math:`XZ\cdots ZX` / :math:`YZ\cdots ZY` pair of weight :math:`h_{ij}/2`, i.e.
+        a hopping amplitude :math:`t = -h_{ij}` in the convention of
+        :meth:`_split_hopping`.
+
+        Args:
+            hamiltonian: The lattice Hamiltonian to read.
+            num_sites: Number of lattice sites.
+            atol: Threshold below which coefficients are dropped.
+
+        Returns:
+            ``(hopping, diagonal, bonds)`` matching :meth:`_split_hopping`.
+
+        Raises:
+            ValueError: If the Hamiltonian carries no hopping or its hopping is not uniform.
+
+        """
+        one_body = self._lattice_one_body(hamiltonian, num_sites)
+
+        offdiagonal = scipy.sparse.triu(one_body, k=1, format="coo")
+        bonds: set[frozenset[int]] = set()
+        amplitudes: set[float] = set()
+        for row, col, value in zip(offdiagonal.row, offdiagonal.col, offdiagonal.data, strict=True):
+            if abs(value) <= atol:
+                continue
+            bonds.add(frozenset((int(row), int(col))))
+            amplitudes.add(round(float(value), 12))
+
+        if not bonds:
+            raise ValueError("The Hamiltonian carries no hopping terms; nothing to tile into plaquettes.")
+        if len(amplitudes) > 1:
+            raise ValueError(
+                f"PlaquetteTrotter requires a uniform hopping amplitude, but found "
+                f"{len(amplitudes)} distinct one-body couplings: {sorted(amplitudes)}."
+            )
+
+        hopping = -next(iter(amplitudes))
+        interaction = self._uniform_interaction(hamiltonian, num_sites, atol=atol, bonds=bonds)
+
+        diagonal: list[ExponentiatedPauliTerm] = []
+        constant = hamiltonian.get_core_energy()
+        onsite_energies = one_body.diagonal()
+        single_z = -0.5 * onsite_energies - 0.25 * interaction
+        pair_z = 0.25 * interaction
+        constant += float(onsite_energies.sum()) + 0.25 * interaction * num_sites
+        for site in range(num_sites):
+            weight = float(single_z[site])
+            if abs(weight) > atol:
+                diagonal.append(ExponentiatedPauliTerm(pauli_term={site: "Z"}, angle=weight))
+                diagonal.append(ExponentiatedPauliTerm(pauli_term={site + num_sites: "Z"}, angle=weight))
+            if abs(pair_z) > atol:
+                diagonal.append(ExponentiatedPauliTerm(pauli_term={site: "Z", site + num_sites: "Z"}, angle=pair_z))
+        if abs(constant) > atol:
+            diagonal.append(ExponentiatedPauliTerm(pauli_term={}, angle=constant))
+
+        Logger.debug(
+            f"PlaquetteTrotter: lattice hopping t={hopping}, U={interaction}, "
+            f"{len(bonds)} bonds per spin, {len(diagonal)} diagonal terms."
+        )
+        return hopping, diagonal, bonds
 
     def _split_hopping(self, qubit_hamiltonian, num_sites, atol):
         """Separate uniform hopping, the :math:`H_I` terms, and the bond graph.

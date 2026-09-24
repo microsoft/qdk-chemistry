@@ -7,12 +7,12 @@ r"""Unary-iteration phase estimation with a number of walk queries."""
 
 from collections.abc import Callable
 
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -135,7 +135,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -143,7 +143,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            qubit_hamiltonian: The lattice or qubit Hamiltonian for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -151,7 +151,8 @@ class UnaryPhaseEstimation(PhaseEstimation):
 
         Raises:
             TypeError: If the configured circuit builder is not a unary-iteration builder,
-                or if the configured circuit executor is not the sparse-state simulator.
+                if the configured circuit executor is not the sparse-state simulator,
+                or if the nested unitary builder cannot consume the Hamiltonian input form.
 
         """
         Logger.trace_entering()
@@ -170,7 +171,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
 
         # Resolve container before running the circuit
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        unitary_rep = self._build_unitary(unitary_builder, qubit_hamiltonian)
         container = unitary_rep.get_container()
 
         _, num_bits = circuit_builder.resolve_num_queries()

@@ -20,6 +20,8 @@ References:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
@@ -34,6 +36,9 @@ from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_f
     SparsePauliTerms,
 )
 from qdk_chemistry.utils import Logger
+
+if TYPE_CHECKING:
+    from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 
 __all__: list[str] = ["Trotter", "TrotterSettings"]
 
@@ -151,7 +156,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
 
         Args:
@@ -160,7 +165,11 @@ class Trotter(TimeEvolutionBuilder):
         Returns:
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
+        Raises:
+            TypeError: If given a lattice Hamiltonian rather than a qubit Hamiltonian.
+
         """
+        qubit_hamiltonian = self._require_qubit_hamiltonian(qubit_hamiltonian)
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
         if order in {1, 2} or (order > 2 and order % 2 == 0):

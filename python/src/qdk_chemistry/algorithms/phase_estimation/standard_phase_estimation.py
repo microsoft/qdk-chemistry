@@ -13,12 +13,12 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -67,7 +67,7 @@ class StandardPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianInput,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -75,11 +75,14 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            qubit_hamiltonian: The lattice or qubit Hamiltonian for which to estimate eigenvalues.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
             A QpeResult object containing the results of the phase estimation.
+
+        Raises:
+            TypeError: If the nested unitary builder cannot consume the Hamiltonian input form.
 
         """
         Logger.trace_entering()
@@ -93,7 +96,7 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         # Resolve container before running the circuit
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        unitary_rep = self._build_unitary(unitary_builder, qubit_hamiltonian)
         container = unitary_rep.get_container()
 
         num_bits = circuit_builder.settings().get("num_bits")

@@ -18,6 +18,7 @@ References:
 
 import numpy as np
 
+from qdk_chemistry.algorithms.hamiltonian_input import HamiltonianInput
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     HamiltonianUnitaryBuilder,
     TimeEvolutionBuilder,
@@ -214,7 +215,7 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianInput) -> UnitaryRepresentation:
         r"""Construct the unitary representation using qDRIFT randomized sampling.
 
         The qDRIFT method approximates :math:`e^{-iHt}` by:
@@ -229,7 +230,11 @@ class QDrift(TimeEvolutionBuilder):
         Returns:
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 
+        Raises:
+            TypeError: If given a lattice Hamiltonian rather than a qubit Hamiltonian.
+
         """
+        qubit_hamiltonian = self._require_qubit_hamiltonian(qubit_hamiltonian)
         effective_time, power_repetitions = self._resolve_power()
         time: float = effective_time
         seed: int = self._settings.get("seed")
