@@ -28,10 +28,11 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
-from qdk_chemistry.data import AlgorithmRef, LatticeGraph, MajoranaMapping
+from qdk_chemistry.data import AlgorithmRef, LatticeGraph
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.qsharp import (
@@ -67,12 +68,61 @@ TROTTER_ORDER = 2
 HWP_MAX_BATCH = 0
 
 
-def traced_step_counts(context, operator, step_time: float, size: int, num_divisions: int):
+def jordan_wigner_profile(hamiltonian, size: int) -> tuple[int, float]:
+    r"""Return the Pauli term count and one-norm of the mapped uniform Hubbard model.
+
+    Both are read from the Hamiltonian's own integrals, so the benchmark reports them
+    without paying for a fermion-to-qubit mapping that the plaquette builder no longer
+    needs. With spin-blocked Jordan-Wigner modes and :math:`n_p = (I - Z_p)/2`:
+
+    * each off-diagonal integral :math:`h_{ij}` becomes an ``XZ...ZX`` and a
+      ``YZ...ZY`` string per spin, of magnitude :math:`|h_{ij}|/2`, giving four terms
+      of weight :math:`2|h_{ij}|`;
+    * site :math:`i` with on-site energy :math:`e_i` and interaction :math:`U_i`
+      contributes :math:`Z_\uparrow` and :math:`Z_\downarrow` of magnitude
+      :math:`|e_i/2 + U_i/4|`, one :math:`Z_\uparrow Z_\downarrow` of magnitude
+      :math:`U_i/4`, and an identity share :math:`e_i + U_i/4`.
+
+    Reading the integrals rather than re-deriving them from ``HOPPING_T`` keeps this
+    correct on the 2x2 torus, where the two wrap-around edges of each axis coincide and
+    so carry twice the weight. Checked against ``qubit_mapper`` for ``L = 2`` to ``16``.
+
+    Args:
+        hamiltonian: The lattice Hamiltonian being sampled.
+        size: Lattice side length.
+
+    Returns:
+        The number of Pauli terms and the coefficient one-norm.
+
+    """
+    num_sites = size * size
+    one_body, _ = hamiltonian.get_one_body_integrals()
+
+    hopping = np.triu(np.abs(np.asarray(one_body)), k=1)
+    num_bonds = int(np.count_nonzero(hopping))
+    hopping_weight = 2.0 * float(hopping.sum())
+
+    energies = np.asarray(one_body).diagonal()
+    interactions = np.array(
+        [hamiltonian.get_two_body_element(i, i, i, i) for i in range(num_sites)]
+    )
+    single_z = np.abs(0.5 * energies + 0.25 * interactions)
+    pair_z = np.abs(0.25 * interactions)
+    identity = float(np.sum(energies + 0.25 * interactions))
+
+    num_terms = 4 * num_bonds + 3 * num_sites + 1
+    one_norm = (
+        hopping_weight + 2.0 * float(single_z.sum()) + float(pair_z.sum()) + abs(identity)
+    )
+    return num_terms, one_norm
+
+
+def traced_step_counts(context, hamiltonian, step_time: float, size: int, num_divisions: int):
     """Return logical counts for a controlled evolution of ``num_divisions`` Trotter steps.
 
     Args:
         context: Q# context to build in.
-        operator: The qubit Hamiltonian.
+        hamiltonian: The lattice Hamiltonian being evolved.
         step_time: Evolution time of a single step.
         size: Lattice side length.
         num_divisions: Number of Trotter steps to materialize.
@@ -92,7 +142,7 @@ def traced_step_counts(context, operator, step_time: float, size: int, num_divis
             max_batch=HWP_MAX_BATCH,
             num_divisions=num_divisions,
             target_accuracy=0.0,
-        ).run(operator)
+        ).run(hamiltonian)
         circuit = create("controlled_circuit_mapper", "pauli_sequence").run(unitary)
         application = circuit.get_qre_application()
         return dict(
@@ -123,10 +173,11 @@ def run_sampling(
     hamiltonian = create_hubbard_hamiltonian(
         lattice, epsilon=0.0, t=HOPPING_T, U=U_OVER_T * HOPPING_T
     )
-    operator = create("qubit_mapper").run(
-        hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * num_sites)
-    )
-    one_norm = operator.schatten_norm
+    # The plaquette builder reads this lattice Hamiltonian's integrals directly, so the
+    # Jordan-Wigner mapping is never materialized. That mapping was the one step whose
+    # cost grew with the lattice rather than with the circuit being traced.
+    num_qubits = 2 * num_sites
+    num_terms, one_norm = jordan_wigner_profile(hamiltonian, size)
 
     # The total budget splits as eps = eps_QPE + eps_T. A sine-windowed register of
     # N = 2^bits - 1 queries has phase spread tan(pi / (N + 2)), so requiring eps_QPE * tau
@@ -156,12 +207,12 @@ def run_sampling(
             max_batch=HWP_MAX_BATCH,
             **trotter_settings,
         )
-        steps_per_bit.append(builder._resolve_num_divisions(operator, evolution_time))
+        steps_per_bit.append(builder._resolve_num_divisions(hamiltonian, evolution_time))
     total_steps = sum(steps_per_bit)
     step_time = base_time * 2 ** (resolution_bits - 1) / steps_per_bit[-1]
 
     circuit_started = time.monotonic()
-    step_counts = traced_step_counts(context, operator, step_time, size, 1)
+    step_counts = traced_step_counts(context, hamiltonian, step_time, size, 1)
     if one_step_scaled:
         # Every count is multiplied by the step total. This ignores boundary merging
         # between adjacent second-order steps, so it overestimates the ladder rather than
@@ -208,8 +259,8 @@ def run_sampling(
         # Matches the Holevo spread used to size base_time above.
         circuit_builder.settings().set("phase_window", "sine")
         with use_qsharp_context(context):
-            state_prep = identity_state_prep(num_qubits=operator.num_qubits)
-            circuit = circuit_builder.run(state_prep, operator)[0]
+            state_prep = identity_state_prep(num_qubits=num_qubits)
+            circuit = circuit_builder.run(state_prep, hamiltonian)[0]
         logical_counts = dict(circuit.estimate().logical_counts)
     circuit_elapsed = time.monotonic() - circuit_started
 
@@ -222,8 +273,8 @@ def run_sampling(
             {
                 "L": size,
                 "sites": num_sites,
-                "system_qubits": operator.num_qubits,
-                "terms": len(operator.pauli_strings),
+                "system_qubits": num_qubits,
+                "terms": num_terms,
                 "electrons": round(FILLING * num_sites),
                 "lambda": one_norm,
                 "target_precision": energy_budget,
