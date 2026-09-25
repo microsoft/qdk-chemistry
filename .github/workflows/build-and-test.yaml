@@ -479,6 +479,17 @@ jobs:
 
         cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
+    - name: Retain coverage XML for benchmarks
+      if: always() && matrix.enable-coverage && github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: cobertura-xml-linux-py${{ matrix.python-version }}
+        path: |
+          coverage-reports/cpp_coverage.cobertura.xml
+          coverage-reports/pybind11_coverage.cobertura.xml
+          coverage-reports/python_coverage.xml
+        retention-days: 7
+
     # Fork PRs are skipped by the action itself (no write access), not by this condition.
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
