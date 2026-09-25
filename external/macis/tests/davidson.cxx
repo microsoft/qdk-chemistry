@@ -9,6 +9,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/solvers/davidson.hpp>
