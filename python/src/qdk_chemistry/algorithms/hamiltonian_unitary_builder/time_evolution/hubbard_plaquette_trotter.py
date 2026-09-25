@@ -1,20 +1,4 @@
-r"""Second-order plaquette Trotterization for the uniform Fermi-Hubbard model.
-
-The plaquette decomposition, its error constant, and the exact four-mode plaquette
-evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
-rule follow the later compilation of the same algorithm in :cite:`Apel2026`, which
-deviates from Campbell where noted in the methods below.
-
-References:
-    Campbell, E. T. "Early fault-tolerant simulations of the Hubbard model."
-    *Quantum Science & Technology* 7.1 (2022): 015007. arXiv:2012.09238v4.
-    :cite:`Campbell2022`
-
-    Apel, H. et al. "Compiling the 2D Fermi-Hubbard ground-state energy estimation
-    algorithm for active volume quantum architectures." arXiv:2609.05316 (2026).
-    :cite:`Apel2026`
-
-"""
+"""Second-order plaquette Trotterization for the uniform Fermi-Hubbard model."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -47,16 +31,15 @@ class HubbardPlaquetteTrotter(Trotter):
 
     The builder takes a :class:`~qdk_chemistry.data.QubitOperator` wrapping a
     :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`, which
-    carries the lattice geometry. The model parameters
-    ``t``, ``U``, and ``epsilon`` are settings.
+    carries the lattice geometry. The model parameters ``t``, ``u``, and ``epsilon`` are settings.
 
-    :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g` are derived from the lattice bonds and
-    construct the Jordan-Wigner image.
+    The plaquette decomposition, its error constant, and the exact four-mode plaquette
+    evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
+    rule follow the later compilation of the same algorithm in :cite:`Apel2026`.
 
     Note:
-        This expects a periodic square lattice whose sides are even and either both at
-        least four or exactly 2x2, with uniform edge weights. Incompatible geometry
-        raises a :class:`ValueError`.
+        This expects a periodic square lattice whose sides are even with uniform edge weights.
+        Incompatible geometry raises a :class:`ValueError`.
 
     """
 
@@ -65,7 +48,7 @@ class HubbardPlaquetteTrotter(Trotter):
         order: int = 2,
         *,
         t: float = 1.0,
-        U: float = 0.0,  # noqa: N803  (standard Hubbard symbol, as in create_hubbard_hamiltonian)
+        u: float = 0.0,
         epsilon: float = 0.0,
         time: float = 0.0,
         target_accuracy: float = 0.0,
@@ -80,8 +63,8 @@ class HubbardPlaquetteTrotter(Trotter):
         Args:
             order: Trotter-Suzuki order. Only 2 is supported.
             t: Uniform hopping amplitude of the Fermi-Hubbard model.
-            U: Uniform on-site interaction of the Fermi-Hubbard model.
-            epsilon: Uniform on-site energy. Use ``-U/2`` for the particle-hole-shifted model.
+            u: Uniform on-site interaction of the Fermi-Hubbard model.
+            epsilon: Uniform on-site energy. Use ``-u/2`` for the particle-hole-shifted model.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto step computation. Use 0.0 to disable.
             num_divisions: Divisions per Trotter step. Max of this and the auto value is used.
@@ -96,6 +79,7 @@ class HubbardPlaquetteTrotter(Trotter):
         """
         if order != 2:
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
+
         super().__init__(
             order,
             time=time,
@@ -116,48 +100,92 @@ class HubbardPlaquetteTrotter(Trotter):
         settings.set("error_bound", error_bound)
         settings.set("weight_threshold", weight_threshold)
         settings.set("t", t)
-        settings.set("U", U)
+        settings.set("u", u)
         settings.set("epsilon", epsilon)
         self._settings = settings
 
     def name(self) -> str:
-        """Return ``plaquette`` as the algorithm name."""
-        return "plaquette"
+        """Return ``hubbard_plaquette`` as the algorithm name."""
+        return "hubbard_plaquette"
 
-    @staticmethod
-    def _lattice_geometry(qubit_hamiltonian: QubitOperator):
-        """Return the lattice and its rectangular shape from a lattice-backed operator.
+    def _lattice_geometry(self, qubit_hamiltonian: QubitOperator):
+        """Return the lattice, its shape, its edge weight, and its plaquette tilings.
+
+        The bond graph is validated here, in the single pass that also reads the edge
+        weights: the bonds must match the plaquette tiling the circuit applies, and their
+        weights must be uniform, since Campbell's formula is derived for a single hopping
+        amplitude on every bond.
+
+        The returned weight is the value the lattice carries on each of those bonds, the
+        ``t`` a :meth:`~qdk_chemistry.data.LatticeGraph.square` lattice was built with
+        (1.0 by default). It is a per-bond multiplier on the model's ``t`` setting, not
+        an amplitude in itself; the caller forms ``t * weight`` to get the hopping.
 
         Args:
             qubit_hamiltonian: The operator to inspect.
 
+        The tilings are resolved from Q# to run the check, so they are handed back rather
+        than evaluated a second time by the caller that needs them for the error bound.
+
         Returns:
-            A tuple of the :class:`~qdk_chemistry.data.LatticeGraph` and its ``(width, height)``.
+            A tuple of the lattice, its ``(width, height)``, its edge weight, and its pink and gold tilings.
 
         Raises:
             TypeError: If the operator does not wrap a
                 :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`.
-            ValueError: If the lattice is not a periodic square grid with both sides above one.
+            ValueError: If the lattice is not a periodic square grid tiled by plaquettes with uniform edge weights.
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
             raise TypeError("HubbardPlaquetteTrotter requires a QubitOperator containing a LatticeContainer")
+
         container = qubit_hamiltonian.get_container()
         if not isinstance(container, LatticeContainer):
             raise TypeError(
                 f"HubbardPlaquetteTrotter requires a QubitOperator containing a LatticeContainer, but the "
-                f"operator wraps a {container.type!r} container. Build it with "
-                f"QubitOperator(container=LatticeContainer(LatticeGraph.square(width, height)))."
+                f"operator wraps a {container.type!r} container."
             )
         dims = tuple(int(d) for d in container.lattice.dims)
         if len(dims) != 2:
             raise ValueError(
                 f"HubbardPlaquetteTrotter tiles a two-dimensional lattice, but the lattice reports "
-                f"{list(dims) or 'no'} generating extents. Build it from "
-                "LatticeGraph.square(width, height)."
+                f"{list(dims) or 'no'}."
             )
         width, height = dims
-        return container.lattice, width, height
+
+        lattice = container.lattice
+        atol = self._settings.get("weight_threshold")
+        upper = scipy.sparse.triu(lattice.sparse_adjacency_matrix(), k=1, format="coo")
+        bonds: set[frozenset[int]] = set()
+        weights: set[float] = set()
+        for row, col, value in zip(upper.row, upper.col, upper.data, strict=True):
+            if abs(value) <= atol:
+                continue
+            bonds.add(frozenset((int(row), int(col))))
+            weights.add(round(float(value), 12))
+
+        if not bonds:
+            raise ValueError("The lattice carries no bonds; nothing to tile into plaquettes.")
+        if len(weights) > 1:
+            raise ValueError(
+                f"HubbardPlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
+                f"{len(weights)} distinct edge weights: {sorted(weights)}."
+            )
+
+        sections = self._plaquette_sections(width, height)
+        pink, gold = sections
+        tiled = {frozenset((cycle[i], cycle[(i + 1) % 4])) for cycle in pink + gold for i in range(4)}
+        if bonds != tiled:
+            raise ValueError(
+                f"The lattice's bond graph does not match a periodic {width}x{height} "
+                f"square lattice: {len(tiled - bonds)} lattice bond(s) absent from the graph and "
+                f"{len(bonds - tiled)} graph bond(s) outside the tiling. Check the lattice "
+                "dimensions, the boundary conditions, and that sites are numbered row-major."
+            )
+
+        weight = next(iter(weights))
+        Logger.debug(f"HubbardPlaquetteTrotter: edge weight {weight} over {len(bonds)} bonds per spin.")
+        return lattice, width, height, weight, sections
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         r"""Build Campbell's segmented plaquette product formula.
@@ -206,41 +234,28 @@ class HubbardPlaquetteTrotter(Trotter):
 
         Raises:
             NotImplementedError: If the configured Trotter order is not 2.
-            ValueError: If the lattice's bonds do not match a periodic square tiling.
+            ValueError: If the lattice's bonds do not match a periodic square tiling with uniform hopping.
 
         """
         order = self._settings.get("order")
         if order != 2:
-            raise NotImplementedError(
-                f"HubbardPlaquetteTrotter supports order 2 only, got {order}. Campbell's W_PLAQ is a "
-                "second-order constant and would understate a first-order product's error."
-            )
-        atol = self._settings.get("weight_threshold")
+            raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
 
-        # 1. Geometry, and the on-site angles the model settings imply.
-        lattice, width, height = self._lattice_geometry(qubit_hamiltonian)
-        num_sites = width * height
-        interaction = float(self._settings.get("U"))
+        # 1. Geometry, and the model angles the settings imply. The lattice's edge weight
+        # scales the hopping the settings carry.
+        lattice, width, height, weight, sections = self._lattice_geometry(qubit_hamiltonian)
+        num_sites = lattice.num_sites
+        hopping = float(self._settings.get("t")) * weight
+
+        interaction = float(self._settings.get("u"))
         epsilon = float(self._settings.get("epsilon"))
         single_z = -(0.5 * epsilon + 0.25 * interaction)
         pair_z = 0.25 * interaction
         identity = (epsilon + 0.25 * interaction) * num_sites
 
-        # 2. Hopping amplitude; the tilings themselves are derived in Q# from the shape.
-        hopping, bonds = self._uniform_hopping(lattice, atol)
-        pink, gold = self._plaquette_sections(width, height)
-        tiled = {frozenset((cycle[i], cycle[(i + 1) % 4])) for cycle in pink + gold for i in range(4)}
-        if bonds != tiled:
-            raise ValueError(
-                f"The lattice's bond graph does not match a periodic {width}x{height} "
-                f"square lattice: {len(tiled - bonds)} lattice bond(s) absent from the graph and "
-                f"{len(bonds - tiled)} graph bond(s) outside the tiling. Check the lattice "
-                "dimensions, the boundary conditions, and that sites are numbered row-major."
-            )
-
-        # 3. Step count, reusing the hopping amplitude and tilings resolved above.
+        # 2. Step count, reusing the hopping amplitude and tilings resolved above.
         time, power_repetitions = self._resolve_power()
-        num_divisions = self._step_count(hopping, (pink, gold), width, height, time)
+        num_divisions = self._step_count(hopping, sections, width, height, time)
         delta = time / num_divisions
 
         return UnitaryRepresentation(
@@ -256,41 +271,6 @@ class HubbardPlaquetteTrotter(Trotter):
             )
         )
 
-    def _uniform_hopping(self, lattice, atol: float) -> tuple[float, set[frozenset[int]]]:
-        """Return the uniform hopping amplitude and the lattice's bonds.
-
-        Args:
-            lattice: The lattice graph supplying the bonds.
-            atol: Edge weights with magnitude at or below this are treated as absent.
-
-        Returns:
-            The hopping amplitude and the set of site pairs it connects.
-
-        Raises:
-            ValueError: If the lattice carries no bonds or its edge weights differ.
-
-        """
-        upper = scipy.sparse.triu(lattice.sparse_adjacency_matrix(), k=1, format="coo")
-        bonds: set[frozenset[int]] = set()
-        weights: set[float] = set()
-        for row, col, value in zip(upper.row, upper.col, upper.data, strict=True):
-            if abs(value) <= atol:
-                continue
-            bonds.add(frozenset((int(row), int(col))))
-            weights.add(round(float(value), 12))
-
-        if not bonds:
-            raise ValueError("The lattice carries no bonds; nothing to tile into plaquettes.")
-        if len(weights) > 1:
-            raise ValueError(
-                f"HubbardPlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
-                f"{len(weights)} distinct edge weights: {sorted(weights)}."
-            )
-
-        hopping = float(self._settings.get("t")) * next(iter(weights))
-        Logger.debug(f"HubbardPlaquetteTrotter: hopping t={hopping} over {len(bonds)} bonds per spin.")
-        return hopping, bonds
-
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
         """Return the step count the builder would use for this operator and duration.
 
@@ -302,9 +282,8 @@ class HubbardPlaquetteTrotter(Trotter):
             The number of Trotter steps, at least one.
 
         """
-        lattice, width, height = self._lattice_geometry(qubit_hamiltonian)
-        hopping, _ = self._uniform_hopping(lattice, self._settings.get("weight_threshold"))
-        sections = self._plaquette_sections(width, height)
+        _, width, height, weight, sections = self._lattice_geometry(qubit_hamiltonian)
+        hopping = float(self._settings.get("t")) * weight
         return self._step_count(hopping, sections, width, height, time)
 
     def _step_count(
@@ -368,7 +347,7 @@ class HubbardPlaquetteTrotter(Trotter):
 
         num_sites = width * height
         hopping = abs(hopping)
-        interaction = abs(self._settings.get("U"))
+        interaction = abs(self._settings.get("u"))
 
         # R_p and R_g are the one-spin, unit-hopping matrices for the pink and gold tilings.
         # Evaluate their trace norms exactly through 1600 sites; beyond that fall back on
@@ -421,15 +400,7 @@ class HubbardPlaquetteTrotter(Trotter):
         # Eq. (F1) of :cite:`Campbell2022`. Summing r steps of size s = T/r by subadditivity
         # gives W_PLAQ T^3 / r^2; that accumulation step is not itself stated by Campbell,
         # who works per-step. The induced error in the estimated *energy* then satisfies
-        # |Delta E| <= (2/T) arcsin(||Delta U|| / 2). The eigenvalue-difference step is
-        # Bhatia and Davis :cite:`Bhatia1984`, which is the source Eq. (57) of
-        # :cite:`Kivlichan2020` cites for it. Kivlichan Eq. (58) then states the energy
-        # bound as arctan(D sqrt(4 - D^2) / (2 - D^2)) for D = ||Delta U|| with D^2 <= 2,
-        # and Eqs. (34)-(35) of :cite:`Apel2026` state it as the arcsine. The two are the
-        # same function: substituting D = 2 sin(phi) makes the arctangent argument
-        # tan(2 phi), so the expression equals 2 arcsin(D / 2), and D^2 <= 2 is exactly the
-        # condition that keeps 2 - D^2 > 0, i.e. that picks the principal branch.
-        # Inverting for a target energy error eps_TS gives
+        # |Delta E| <= (2/T) arcsin(||Delta U|| / 2).
         #
         #     r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
         #
@@ -503,10 +474,10 @@ class HubbardPlaquetteTrotterSettings(TrotterSettings):
         """Initialize the settings, adding the model parameters to the Trotter defaults."""
         super().__init__()
         self._set_default("t", "float", 1.0, "Uniform hopping amplitude of the Fermi-Hubbard model.")
-        self._set_default("U", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
+        self._set_default("u", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
         self._set_default(
             "epsilon",
             "float",
             0.0,
-            "Uniform on-site energy; use -U/2 for the particle-hole-shifted model.",
+            "Uniform on-site energy; use -u/2 for the particle-hole-shifted model.",
         )
