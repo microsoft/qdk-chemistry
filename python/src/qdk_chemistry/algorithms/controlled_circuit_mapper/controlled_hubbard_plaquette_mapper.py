@@ -5,17 +5,60 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_mapper.hubbard_plaquette_mapper import (
-    plaquette_parameters,
-    require_plaquette_container,
-)
 from qdk_chemistry.data import Circuit, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
-__all__: list[str] = ["ControlledHubbardPlaquetteMapper"]
+__all__: list[str] = ["ControlledHubbardPlaquetteMapper", "plaquette_parameters", "require_plaquette_container"]
+
+
+def plaquette_parameters(container: HubbardPlaquetteContainer):
+    """Lower a plaquette container to its Q# parameter struct.
+
+    Only the lattice shape and the layer angles cross the boundary; the tilings and spin
+    pairings are derived in Q# from the shape.
+
+    Args:
+        container: The evolution to lower.
+
+    Returns:
+        The Q# ``HubbardPlaquetteParams`` describing the evolution.
+
+    """
+    return QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
+        width=container.width,
+        height=container.height,
+        interactionAngle=container.interaction_angle,
+        onsiteAngle=container.onsite_angle,
+        identityAngle=container.identity_angle,
+        hoppingAngle=container.hopping_angle,
+        repetitions=container.step_reps,
+    )
+
+
+def require_plaquette_container(evolution: UnitaryRepresentation) -> HubbardPlaquetteContainer:
+    """Return the evolution's container, rejecting any other representation.
+
+    Args:
+        evolution: The unitary representation to lower.
+
+    Returns:
+        HubbardPlaquetteContainer: The wrapped container.
+
+    Raises:
+        TypeError: If the representation is not a plaquette evolution.
+
+    """
+    container = evolution.get_container()
+    if not isinstance(container, HubbardPlaquetteContainer):
+        raise TypeError(
+            f"The plaquette mapper requires a HubbardPlaquetteContainer, but the representation "
+            f"wraps a {type(container).__name__}."
+        )
+    return container
 
 
 class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):

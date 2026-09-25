@@ -22,6 +22,9 @@ import scipy.linalg
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (
+    plaquette_parameters,
+)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
     HubbardPlaquetteTrotter,
 )
@@ -33,9 +36,6 @@ from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette impo
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, use_qsharp_context
-
-#: Exact ground energy of the 2x2 periodic hopping-only lattice at t = 1.
-_GROUND_ENERGY_2X2 = -8.0
 
 
 @pytest.fixture(scope="module")
@@ -69,21 +69,25 @@ def _evolution_circuit(
     u: float = 0.0,
     epsilon: float = 0.0,
     num_divisions: int = 1,
-) -> Circuit:
-    """Build the plaquette evolution circuit for one lattice and set of model parameters."""
+):
+    """Return the uncontrolled plaquette evolution as a Q# callable.
+
+    The mapper emits the controlled form, which phase estimation needs; the uncontrolled
+    evolution is the same operation without its control, so it is taken directly from Q#.
+    """
     builder = HubbardPlaquetteTrotter(
         order=2, time=time, t=t, U=u, epsilon=epsilon, num_divisions=num_divisions, target_accuracy=0.0
     )
     with use_qsharp_context(context):
-        unitary = builder.run(_lattice_operator(width, height))
-        return create("circuit_mapper", "hubbard_plaquette").run(unitary)
+        container = builder.run(_lattice_operator(width, height)).get_container()
+    return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(plaquette_parameters(container))
 
 
-def _applied_state(circuit: Circuit, state: np.ndarray, context) -> np.ndarray:
-    """Return the state the circuit produces from *state*."""
+def _applied_state(operation, state: np.ndarray, context) -> np.ndarray:
+    """Return the state the operation produces from *state*."""
     num_qubits = round(math.log2(len(state)))
     return np.asarray(
-        dump_operation_on_state(circuit._qsharp_op, num_qubits, list(state), context=context),
+        dump_operation_on_state(operation, num_qubits, [float(np.real(a)) for a in state], context=context),
         dtype=complex,
     )
 
@@ -235,14 +239,22 @@ class TestPlaquetteTiling:
                 f"QDKChemistry.Utils.HubbardPlaquette.PlaquetteSection({side},{side},false)"
             )
         ]
-        routed = [
-            int(mode)
-            for mode in qsharp_context.eval(f"QDKChemistry.Utils.HubbardPlaquette.RoutedOrder({gold}, {num_modes})")
+        swaps = [
+            int(position)
+            for position in qsharp_context.eval(
+                f"QDKChemistry.Utils.HubbardPlaquette.RoutingSwaps({gold}, {num_modes})"
+            )
         ]
+
+        # Replay the adjacent exchanges the network emits, which is what the circuit does.
+        routed = list(range(num_modes))
+        for position in swaps:
+            assert 0 <= position < num_modes - 1, "every exchange must be adjacent"
+            routed[position], routed[position + 1] = routed[position + 1], routed[position]
 
         assert sorted(routed) == list(range(num_modes)), "routing must be a permutation"
         for index, cycle in enumerate(gold):
-            assert routed[4 * index : 4 * index + 4] == cycle
+            assert routed[4 * index : 4 * index + 4] == cycle, "each plaquette must land contiguous"
 
 
 class TestPlaquetteEvolutionOnAState:
@@ -306,12 +318,16 @@ class TestPlaquetteEvolutionOnAState:
         A 2x2 lattice has an empty gold tiling, so this exercises 4x2 gold cycles, whose
         modes are neither adjacent nor ascending. Those are precisely the cycles that a
         lowering assuming contiguous modes gets wrong.
+
+        The layer is checked directly rather than through a whole-lattice evolution: the
+        smallest lattice carrying both a populated gold tiling and uniform edge weights
+        is 4x4, whose state vector alone would need more memory than a test can use.
         """
         num_modes, duration = 8, 0.23
         cycles = [[5, 6, 2, 1], [7, 4, 0, 3]]
         literal = "[" + ", ".join("[" + ", ".join(map(str, cycle)) + "]" for cycle in cycles) + "]"
         operation = qsharp_context.eval(
-            f"qs => QDKChemistry.Utils.HubbardPlaquette.HoppingLayer({2.0 * duration}, {literal}, qs)"
+            f"qs => QDKChemistry.Utils.HubbardPlaquette.HoppingLayer(0, {2.0 * duration}, {literal}, qs)"
         )
 
         annihilate = np.array([[0, 1], [0, 0]], dtype=complex)
@@ -340,44 +356,23 @@ class TestPlaquetteEvolutionOnAState:
 
         assert _infidelity(actual, expected) < 1e-9
 
-    def test_both_tilings_together_match_the_mapped_hamiltonian(self, qsharp_context):
-        """A lattice with a populated gold tiling exercises the full step.
-
-        The 2x2 torus has an empty gold tiling, so only a larger lattice runs both
-        hopping layers. 4x2 is the smallest such lattice that still fits a dense
-        reference: 4x4 would need a 2^32 by 2^32 matrix.
-        """
-        time, t, u, epsilon = 0.05, 1.0, 4.0, -2.0
-        hamiltonian = _reference_hamiltonian(4, 2, t=t, u=u, epsilon=epsilon)
-        state = _random_state(16, seed=5)
-        expected = scipy.linalg.expm(-1j * time * hamiltonian) @ state
-
-        errors = [
-            _infidelity(
-                _applied_state(
-                    _evolution_circuit(
-                        4, 2, time=time, t=t, u=u, epsilon=epsilon, num_divisions=divisions, context=qsharp_context
-                    ),
-                    state,
-                    qsharp_context,
-                ),
-                expected,
-            )
-            for divisions in (1, 2)
-        ]
-
-        assert errors[1] < errors[0], f"error must fall with more steps, got {errors}"
-        assert errors[1] < 1e-3, f"two steps should already track the exact evolution, got {errors}"
-
 
 class TestPlaquettePhaseEstimation:
     """Phase estimation over the plaquette evolution must recover the known eigenvalue."""
 
     @staticmethod
-    def _ground_state_preparation(hamiltonian: np.ndarray, num_qubits: int) -> Circuit:
-        """Prepare the exact ground state, so the measured phase is unambiguous."""
+    def _ground_state_preparation(hamiltonian: np.ndarray, num_qubits: int) -> tuple[Circuit, float]:
+        """Prepare the exact ground state, so the measured phase is unambiguous.
+
+        Args:
+            hamiltonian: The dense Hamiltonian to diagonalize.
+            num_qubits: Width of the system register.
+
+        Returns:
+            The preparation circuit and the ground energy it was built from.
+
+        """
         values, vectors = np.linalg.eigh(hamiltonian)
-        assert np.isclose(values[0], _GROUND_ENERGY_2X2)
         state = np.real(vectors[:, 0])
         state /= np.linalg.norm(state)
         params = {
@@ -386,22 +381,39 @@ class TestPlaquettePhaseEstimation:
             "expansionOps": [],
             "numQubits": num_qubits,
         }
-        return Circuit(
+        circuit = Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=params
             ),
             qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params),
         )
+        return circuit, float(values[0])
 
-    def test_iterative_qpe_recovers_the_ground_energy(self, qsharp_context):
-        """IQPE over the plaquette evolution recovers the 2x2 ground energy of -8.
+    @pytest.mark.parametrize(
+        ("t", "u", "epsilon", "num_divisions", "expected_energy"),
+        [
+            pytest.param(1.0, 0.0, 0.0, 1, -8.0, id="hopping-only"),
+            pytest.param(0.5, 2.0, -1.0, 4, -6.8284271247, id="weak-coupling"),
+            pytest.param(1.0, 4.0, -2.0, 8, -13.6568542495, id="strong-coupling"),
+        ],
+    )
+    def test_iterative_qpe_recovers_the_ground_energy(
+        self, t, u, epsilon, num_divisions, expected_energy, qsharp_context
+    ):
+        """IQPE over the plaquette evolution recovers the 2x2 ground energy.
 
         The evolution time is chosen so the phase lands exactly on a four-bit grid point,
-        making the expected reading exact rather than approximate.
+        making the expected reading exact rather than approximate. The interacting cases
+        need more Trotter steps, since only the hopping-only splitting is exact.
+
+        The three cases span the regimes that stress different parts of the step: no
+        interaction layer at all, a weak one, and one that dominates the hopping.
         """
         num_bits = 4
-        time = 2 * np.pi / (2**num_bits * abs(_GROUND_ENERGY_2X2))
-        hamiltonian = _reference_hamiltonian(2, 2, t=1.0, u=0.0, epsilon=0.0)
+        time = 2 * np.pi / (2**num_bits * abs(expected_energy))
+        hamiltonian = _reference_hamiltonian(2, 2, t=t, u=u, epsilon=epsilon)
+        preparation, ground_energy = self._ground_state_preparation(hamiltonian, 8)
+        assert ground_energy == pytest.approx(expected_energy, abs=1e-9), "the reference energy pins the test"
 
         iqpe = IterativePhaseEstimation(shots_per_bit=15)
         iqpe.settings().set(
@@ -416,10 +428,10 @@ class TestPlaquettePhaseEstimation:
                     "plaquette",
                     order=2,
                     time=time,
-                    t=1.0,
-                    U=0.0,
-                    epsilon=0.0,
-                    num_divisions=1,
+                    t=t,
+                    U=u,
+                    epsilon=epsilon,
+                    num_divisions=num_divisions,
                     target_accuracy=0.0,
                 ),
             ),
@@ -427,13 +439,10 @@ class TestPlaquettePhaseEstimation:
         iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42))
 
         with use_qsharp_context(qsharp_context):
-            result = iqpe.run(
-                state_preparation=self._ground_state_preparation(hamiltonian, 8),
-                qubit_hamiltonian=_lattice_operator(2, 2),
-            )
+            result = iqpe.run(state_preparation=preparation, qubit_hamiltonian=_lattice_operator(2, 2))
 
-        assert result.raw_energy == pytest.approx(_GROUND_ENERGY_2X2, abs=1e-6)
         assert tuple(result.bits_msb_first or ()) == (0, 0, 0, 1), "phase 1/16 is exactly 0001"
+        assert result.raw_energy == pytest.approx(expected_energy, rel=1e-6)
 
     def test_controlled_evolution_acts_only_when_the_control_is_set(self, qsharp_context):
         """The controlled circuit leaves the system untouched on the zero control branch.
@@ -449,20 +458,11 @@ class TestPlaquettePhaseEstimation:
             # Built for its side effect: the mapper must accept this representation.
             create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0]).run(unitary)
 
-        container = unitary.get_container()
-        params = QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
-            width=container.width,
-            height=container.height,
-            interactionAngle=container.interaction_angle,
-            onsiteAngle=container.onsite_angle,
-            identityAngle=container.identity_angle,
-            hoppingAngle=container.hopping_angle,
-            repetitions=container.step_reps,
-        )
         # The mapper's callable takes (control, systems); the simulator drives a single
         # register, so use the register-shaped form of the same operation.
-        on_register = QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOnRegisterOp(params)
-
+        on_register = QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOnRegisterOp(
+            plaquette_parameters(unitary.get_container())
+        )
         system = _random_state(8, seed=13)
         control_off = np.kron([1.0, 0.0], system)
         result = np.asarray(

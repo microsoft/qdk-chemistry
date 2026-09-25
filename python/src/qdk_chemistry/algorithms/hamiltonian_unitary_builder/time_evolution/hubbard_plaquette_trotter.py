@@ -1,26 +1,5 @@
 r"""Second-order plaquette Trotterization for the uniform Fermi-Hubbard model.
 
-The builder reads a :class:`~qdk_chemistry.data.QubitOperator` backed by a
-:class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`
-and follows Campbell's decomposition :math:`H=H_I+H_h^p+H_h^g`, where
-:math:`H_I` is the particle-hole-shifted onsite interaction and :math:`p` and
-:math:`g` denote the pink and gold hopping tilings. One step applies
-
-.. math::
-    e^{-isH_I/2} e^{-isH_h^p/2} e^{-isH_h^g} e^{-isH_h^p/2} e^{-isH_I/2}.
-
-Each plaquette hopping evolution is exact. The builder diagonalizes its
-single-particle matrix, :math:`T = V \Lambda V^\dagger`, and applies
-
-.. math::
-    e^{-isH_\square} = U_V e^{-is\sum_m \lambda_m n_m} U_V^\dagger.
-
-Thus the circuit switches to the plaquette momentum basis, applies two nonzero
-eigenvalue phases, and switches back. Trotter error comes only from splitting
-:math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`. The lattice dimensions are supplied as settings; the
-builder derives the plaquettes from them and verifies that they match the input
-Hamiltonian.
-
 References:
     Campbell, E. T. "Early fault-tolerant simulations of the Hubbard model."
     *Quantum Science & Technology* 7.1 (2022): 015007. arXiv:2012.09238v4.
@@ -45,6 +24,7 @@ from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContaine
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 __all__: list[str] = [
     "HubbardPlaquetteTrotter",
@@ -172,20 +152,24 @@ class HubbardPlaquetteTrotter(Trotter):
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         r"""Build Campbell's segmented plaquette product formula.
 
-        The pipeline runs in four stages:
+        The builder reads a :class:`~qdk_chemistry.data.QubitOperator` backed by a
+        :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`
+        and follows Campbell's decomposition :math:`H=H_I+H_h^p+H_h^g`, where
+        :math:`H_I` is the particle-hole-shifted onsite interaction and :math:`p` and
+        :math:`g` denote the pink and gold hopping tilings. One step applies
 
-        1. Read the lattice and its extents from the container, and derive the on-site
-           layer :math:`H_I` from the ``U`` and ``epsilon`` settings.
-        2. Read the uniform hopping from ``t``, tile the lattice into the pink and gold
-           plaquette sections, and check that those tilings reproduce its bonds.
-        3. Size the Trotter step count, reusing the hopping amplitude from stage 2.
-        4. Assemble the merged formula. With :math:`D=e^{-isH_I}`, :math:`P=e^{-isH_h^p}`,
-           and :math:`G=e^{-isH_h^g}`, repeated symmetric steps
-           :math:`P^{1/2} D^{1/2} G D^{1/2} P^{1/2}` merge across repetitions into
-           :math:`P^{-1/2}(D^{1/2} G D^{1/2} P)^r P^{1/2}` (arXiv:2609.05316
-           Eqs. (16a)--(16b)). Merging the hopping layer rather than the interaction is
-           what saves: the repeated body then carries two hopping layers instead of
-           three, and hopping dominates the layer cost.
+        .. math::
+            e^{-isH_I/2} e^{-isH_h^p/2} e^{-isH_h^g} e^{-isH_h^p/2} e^{-isH_I/2}.
+
+        Each plaquette hopping evolution is exact. The builder diagonalizes its
+        single-particle matrix, :math:`T = V \Lambda V^\dagger`, and applies
+
+        .. math::
+            e^{-isH_\square} = U_V e^{-is\sum_m \lambda_m n_m} U_V^\dagger.
+
+        Thus the circuit switches to the plaquette momentum basis, applies two nonzero
+        eigenvalue phases, and switches back. Trotter error comes only from splitting
+        :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`.
 
         Args:
             qubit_hamiltonian: Qubit operator wrapping a ``LatticeContainer``.
@@ -206,12 +190,7 @@ class HubbardPlaquetteTrotter(Trotter):
             )
         atol = self._settings.get("weight_threshold")
 
-        # 1. Geometry, and the on-site angles the model settings imply. With spin-blocked
-        # modes and n_p = (I - Z_p)/2, site i with energy eps and interaction U gives
-        #   eps (n_up + n_dn) + U n_up n_dn
-        #     = (eps + U/4) I - (eps/2 + U/4)(Z_i + Z_{i+n}) + (U/4) Z_i Z_{i+n},
-        # so eps = -U/2 cancels the single-mode family and leaves one equal-angle pair
-        # family. Angles here are per unit time; the step duration scales them below.
+        # 1. Geometry, and the on-site angles the model settings imply.
         lattice, width, height = self._lattice_geometry(qubit_hamiltonian)
         num_sites = width * height
         interaction = float(self._settings.get("U"))
@@ -366,15 +345,6 @@ class HubbardPlaquetteTrotter(Trotter):
         # 3. The complete plaquette error constant from Eq. (D6).
         w_plaquette = w_so2 + w_extra2
 
-        # Campbell derives W_PLAQ for his own factor order, which puts the interaction
-        # outside; this builder puts a hopping tiling outside instead (arXiv:2609.05316
-        # Eq. (16a)) to merge the expensive layer across repetitions. Reusing his
-        # constant is therefore an approximation. Measured on the periodic 2x2 lattice
-        # over U/t in [1, 16], the swap changes the empirical constant by a factor of
-        # 0.50x to 1.01x, i.e. it is more accurate everywhere except the strongest
-        # coupling, where it is 0.6% worse; at the U/t = 8 benchmark point it is 0.965x.
-        # Larger lattices, where the two tilings no longer commute, were not measured.
-
         # 4. Eq. (F2) gives epsilon_TS <= W s^2. Requiring this upper bound to
         # meet target_accuracy gives s <= sqrt(target_accuracy / W).
         if w_plaquette <= 0.0 or time == 0.0:
@@ -387,7 +357,24 @@ class HubbardPlaquetteTrotter(Trotter):
 
     @staticmethod
     def _plaquette_sections(width: int, height: int) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
-        """Tile a periodic square lattice with Campbell's pink and gold four-cycles."""
+        """Return Campbell's pink and gold four-cycle tilings of a periodic square lattice.
+
+        The cycles are read from the Q# implementation that executes them, so the bond
+        validation and the error bound are derived from the same tiling the circuit
+        applies rather than a second copy of the construction.
+
+        Args:
+            width: Number of lattice columns.
+            height: Number of lattice rows.
+
+        Returns:
+            The pink and gold tilings, each a list of four-cycles in cycle order, for one
+            spin sector.
+
+        Raises:
+            ValueError: If the lattice cannot be tiled into vertex-disjoint four-cycles.
+
+        """
         if width % 2 or height % 2:
             raise ValueError(f"Plaquette tiling requires even side lengths, got {width}x{height}.")
         if (width < 4 or height < 4) and (width, height) != (2, 2):
@@ -397,25 +384,15 @@ class HubbardPlaquetteTrotter(Trotter):
                 "onto themselves and cannot be tiled."
             )
 
-        section_a: list[tuple[int, ...]] = []
-        section_b: list[tuple[int, ...]] = []
-        shifted_sections = ((section_a, 0),) if (width, height) == (2, 2) else ((section_a, 0), (section_b, 1))
-        for section, shift in shifted_sections:
-            for row in range(0, height, 2):
-                for col in range(0, width, 2):
-                    top = (row + shift) % height
-                    bottom = (row + shift + 1) % height
-                    left = (col + shift) % width
-                    right = (col + shift + 1) % width
-                    section.append(
-                        (
-                            top * width + left,
-                            top * width + right,
-                            bottom * width + right,
-                            bottom * width + left,
-                        )
-                    )
-        return section_a, section_b
+        sites = width * height
+        sections = []
+        for pink in ("true", "false"):
+            cycles = get_qsharp_context().eval(
+                f"QDKChemistry.Utils.HubbardPlaquette.PlaquetteSection({width}, {height}, {pink})"
+            )
+            # Q# emits both spin sectors; the caller works in one and offsets the other.
+            sections.append([tuple(int(mode) for mode in cycle) for cycle in cycles if int(cycle[0]) < sites])
+        return sections[0], sections[1]
 
 
 class HubbardPlaquetteTrotterSettings(TrotterSettings):

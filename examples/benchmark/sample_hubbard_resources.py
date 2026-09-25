@@ -29,6 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
+from qdk import qsharp
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import AlgorithmRef, LatticeGraph, QubitOperator
@@ -64,7 +65,9 @@ QPE_BUDGET_FRACTION = 2.0 / 3.0
 TROTTER_ORDER = 2
 
 
-def traced_step_counts(context, operator, step_time: float, size: int, num_divisions: int):
+def traced_step_counts(
+    context, operator, step_time: float, size: int, num_divisions: int
+):
     """Return logical counts for a controlled evolution of ``num_divisions`` Trotter steps.
 
     Args:
@@ -92,7 +95,9 @@ def traced_step_counts(context, operator, step_time: float, size: int, num_divis
         circuit = create("controlled_circuit_mapper", "hubbard_plaquette").run(unitary)
         application = circuit.get_qre_application()
         return dict(
-            get_qsharp_context().logical_counts(application.entry_expr, *application.args)
+            get_qsharp_context().logical_counts(
+                application.entry_expr, *application.args
+            )
         )
 
 
@@ -135,27 +140,30 @@ def run_sampling(
     trotter_settings: dict[str, float | int | str] = {"target_accuracy": trotter_budget}
 
     # Bit k evolves for base_time * 2^k, so each bit resolves its own step count from the
-    # builder's error bound. The schedule is reported in both modes, and its sum is the
-    # ladder multiplier in one-step mode.
-    steps_per_bit = []
-    for bit in range(resolution_bits):
-        evolution_time = base_time * 2**bit
-        builder = create(
-            "hamiltonian_unitary_builder",
-            "plaquette",
-            order=TROTTER_ORDER,
-            time=evolution_time,
-            t=HOPPING_T,
-            U=U_OVER_T * HOPPING_T,
-            **trotter_settings,
-        )
-        steps_per_bit.append(builder._resolve_num_divisions(operator, evolution_time))
-    total_steps = sum(steps_per_bit)
-    step_time = base_time * 2 ** (resolution_bits - 1) / steps_per_bit[-1]
-
-    circuit_started = time.monotonic()
-    step_counts = traced_step_counts(context, operator, step_time, size, 1)
+    # builder's error bound. In full-circuit mode the QPE builder resolves that schedule
+    # itself while lowering each bit, so neither the schedule nor a sampled step is
+    # needed here; both are computed only for the ladder multiplier of one-step mode.
     if one_step_scaled:
+        steps_per_bit = []
+        for bit in range(resolution_bits):
+            evolution_time = base_time * 2**bit
+            builder = create(
+                "hamiltonian_unitary_builder",
+                "plaquette",
+                order=TROTTER_ORDER,
+                time=evolution_time,
+                t=HOPPING_T,
+                U=U_OVER_T * HOPPING_T,
+                **trotter_settings,
+            )
+            steps_per_bit.append(
+                builder._resolve_num_divisions(operator, evolution_time)
+            )
+        total_steps = sum(steps_per_bit)
+        step_time = base_time * 2 ** (resolution_bits - 1) / steps_per_bit[-1]
+
+        circuit_started = time.monotonic()
+        step_counts = traced_step_counts(context, operator, step_time, size, 1)
         # Every count is multiplied by the step total. This ignores boundary merging
         # between adjacent second-order steps, so it overestimates the ladder rather than
         # inferring a lower cost from a multi-step trace. The traced block carries one
@@ -177,6 +185,7 @@ def run_sampling(
             },
         }
     else:
+        circuit_started = time.monotonic()
         unitary_builder = AlgorithmRef(
             "hamiltonian_unitary_builder",
             "plaquette",
@@ -202,13 +211,33 @@ def run_sampling(
         with use_qsharp_context(context):
             state_prep = identity_state_prep(num_qubits=num_qubits)
             circuit = circuit_builder.run(state_prep, operator)[0]
-        logical_counts = dict(circuit.estimate().logical_counts)
+        qsharp_factory = circuit._qsharp_factory
+        if qsharp_factory is None:
+            raise RuntimeError("The QPE circuit does not have Q# factory data.")
+        qsharp_context = getattr(qsharp_factory.program, "_qdk_context", qsharp)
+        logical_counts = dict(
+            qsharp_context.logical_counts(
+                qsharp_factory.program,
+                *qsharp_factory.parameter.values(),
+            )
+        )
     circuit_elapsed = time.monotonic() - circuit_started
 
     ccz_count = int(logical_counts.get("cczCount", 0))
     ccix_count = int(logical_counts.get("ccixCount", 0))
-    step_ccz_count = int(step_counts.get("cczCount", 0))
-    step_ccix_count = int(step_counts.get("ccixCount", 0))
+    # The sampled step and its schedule only exist in one-step mode, so the columns
+    # describing them are omitted entirely from a full-circuit table.
+    step_columns: dict[str, object] = {}
+    if one_step_scaled:
+        step_ccz_count = int(step_counts.get("cczCount", 0))
+        step_ccix_count = int(step_counts.get("ccixCount", 0))
+        step_columns = {
+            "trotter_steps_per_qpe_bit": str(steps_per_bit),
+            "one_trotter_step_time": step_time,
+            "one_trotter_step_ccz_count": step_ccz_count,
+            "one_trotter_step_ccix_count": step_ccix_count,
+            "one_trotter_step_toffolis": step_ccz_count + step_ccix_count,
+        }
     return pd.DataFrame(
         [
             {
@@ -231,11 +260,7 @@ def run_sampling(
                     if one_step_scaled
                     else "standard-full-circuit"
                 ),
-                "trotter_steps_per_qpe_bit": str(steps_per_bit),
-                "one_trotter_step_time": step_time,
-                "one_trotter_step_ccz_count": step_ccz_count,
-                "one_trotter_step_ccix_count": step_ccix_count,
-                "one_trotter_step_toffolis": step_ccz_count + step_ccix_count,
+                **step_columns,
                 "logical_qubits": int(logical_counts["numQubits"]),
                 "rotations": int(logical_counts.get("rotationCount", 0)),
                 "rotation_depth": int(logical_counts.get("rotationDepth", 0)),

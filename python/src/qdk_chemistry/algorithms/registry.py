@@ -920,6 +920,9 @@ def _register_python_algorithms():
         ControlledPSPMapper,
         ControlledSwapPauliSequenceMapper,
     )
+    from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (  # noqa: PLC0415
+        ControlledHubbardPlaquetteMapper,
+    )
     from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
         QdkHadamardTestCircuitBuilder,
@@ -931,14 +934,11 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import (  # noqa: PLC0415
         SOSSABuilder,
     )
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
-        PartiallyRandomized,
-    )
-    from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (  # noqa: PLC0415
-        ControlledHubbardPlaquetteMapper,
-    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (  # noqa: PLC0415
         HubbardPlaquetteTrotter,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
+        PartiallyRandomized,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
