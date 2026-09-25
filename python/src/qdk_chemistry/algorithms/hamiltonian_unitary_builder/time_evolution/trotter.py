@@ -26,12 +26,11 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_naive,
 )
 from qdk_chemistry.data import LayeredPartition, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
-)
-from qdk_chemistry.data.unitary_representation.containers.sparse_pauli_product_formula import (
-    SparsePauliProductFormulaContainer,
-    SparsePauliTerms,
+    PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils import Logger
 
@@ -189,6 +188,13 @@ class Trotter(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
+        container_type = qubit_hamiltonian.get_container_type()
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
+            raise ValueError(
+                f"Trotter time evolution requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
         if order in {1, 2} or (order > 2 and order % 2 == 0):
@@ -235,7 +241,7 @@ class Trotter(TimeEvolutionBuilder):
 
         num_qubits = qubit_hamiltonian.num_qubits
 
-        container = SparsePauliProductFormulaContainer(
+        container = PauliProductFormulaContainer(
             step_terms=terms,
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
@@ -339,9 +345,7 @@ class Trotter(TimeEvolutionBuilder):
             return terms, (0,), None if layer_offsets is None else (0,)
 
         groups: list[list[tuple[int, ...]]] = (
-            self._partition_indices(partition)
-            if partition is not None
-            else [[(i,)] for i in range(qubit_hamiltonian.num_terms)]
+            self._partition_indices(partition) if partition is not None else [[(i,)] for i in range(len(coefficients))]
         )
         if not groups:
             Logger.warn("Term partition produced no groups; returning empty term list.")

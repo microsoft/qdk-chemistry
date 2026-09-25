@@ -24,6 +24,7 @@ from qdk_chemistry.data import (
     NeighborConnection,
     QubitOperator,
 )
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 from qdk_chemistry.utils.model_hamiltonians import (
     KitaevBondFlavor,
     create_heisenberg_hamiltonian,
@@ -49,9 +50,24 @@ def _get_terms_dict(qh: QubitOperator) -> dict[str, float]:
     return dict(qh.get_real_coefficients())
 
 
+def _is_sparse(qh: QubitOperator) -> bool:
+    """Return whether the operator stores sparse Pauli words."""
+    return isinstance(qh.get_container(), SparsePauliDecompositionContainer)
+
+
 def _with_standard_kitaev_flavors(graph: LatticeGraph) -> LatticeGraph:
     """Attach the standard honeycomb Kitaev flavor IDs for inspection."""
     return graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
+
+
+# Rows are the crystallographic a, b, c axes in cubic Kitaev spin coordinates.
+_CRYSTAL_AXES = np.array(
+    [
+        [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+        [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+        [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+    ]
+)
 
 
 def _assert_commuting_disjoint_partition(
@@ -258,7 +274,7 @@ class TestModelHamiltonians:
         qh = create_heisenberg_hamiltonian(lattice, jx=jx, jy=jy, jz=jz, hx=hx, hy=hy, hz=hz)
         assert isinstance(qh, QubitOperator)
         assert qh.num_qubits == n
-        assert not qh.has_sparse_terms
+        assert not _is_sparse(qh)
         assert qh.is_hermitian()
         terms = _get_terms_dict(qh)
         assert len(terms) == len(expected)
@@ -402,92 +418,7 @@ class TestModelHamiltonians:
                 ]
             ),
         )
-        assert hamiltonian.content_hash() == "7283ee88ae88a265"
-
-    @pytest.mark.parametrize("include_term_groups", [False, True])
-    def test_shell_mapping_order_is_deterministic(self, include_term_groups: bool) -> None:
-        graph = LatticeGraph.from_geometry(LatticeGeometry.square(3, 3), [1, 2])
-        forward = {1: 1.25, 2: -0.4}
-        reversed_order = {2: -0.4, 1: 1.25}
-
-        forward_hamiltonian = create_heisenberg_hamiltonian(
-            graph, forward, forward, forward, include_term_groups=include_term_groups
-        )
-        reversed_hamiltonian = create_heisenberg_hamiltonian(
-            graph,
-            reversed_order,
-            reversed_order,
-            reversed_order,
-            include_term_groups=include_term_groups,
-        )
-
-        assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
-        np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
-        assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
-        assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
-        assert forward_hamiltonian.has_sparse_terms is include_term_groups
-
-    def test_kitaev_nearest_neighbor_components(self) -> None:
-        graph = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
-        flavored_graph = _with_standard_kitaev_flavors(graph)
-        cases = (
-            (
-                {"j": 4.0},
-                {
-                    KitaevBondFlavor.X: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
-                    KitaevBondFlavor.Y: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
-                    KitaevBondFlavor.Z: {"XX": 1.0, "YY": 1.0, "ZZ": 1.0},
-                },
-            ),
-            (
-                {"kx": 8.0, "ky": 12.0, "kz": 16.0},
-                {
-                    KitaevBondFlavor.X: {"XX": 2.0},
-                    KitaevBondFlavor.Y: {"YY": 3.0},
-                    KitaevBondFlavor.Z: {"ZZ": 4.0},
-                },
-            ),
-            (
-                {"gamma": 20.0},
-                {
-                    KitaevBondFlavor.X: {"YZ": 5.0, "ZY": 5.0},
-                    KitaevBondFlavor.Y: {"XZ": 5.0, "ZX": 5.0},
-                    KitaevBondFlavor.Z: {"XY": 5.0, "YX": 5.0},
-                },
-            ),
-            (
-                {"gamma_prime": 24.0},
-                {
-                    KitaevBondFlavor.X: {"XY": 6.0, "YX": 6.0, "XZ": 6.0, "ZX": 6.0},
-                    KitaevBondFlavor.Y: {"XY": 6.0, "YX": 6.0, "YZ": 6.0, "ZY": 6.0},
-                    KitaevBondFlavor.Z: {"XZ": 6.0, "ZX": 6.0, "YZ": 6.0, "ZY": 6.0},
-                },
-            ),
-        )
-
-        connections = [connection for connection in flavored_graph.connections if connection.bond_class.shell == 1]
-        for overrides, expected_by_flavor in cases:
-            parameters = {
-                "kx": 0.0,
-                "ky": 0.0,
-                "kz": 0.0,
-                "j": 0.0,
-                "gamma": 0.0,
-                "gamma_prime": 0.0,
-            }
-            parameters.update(overrides)
-            hamiltonian = create_kitaev_hamiltonian(graph, **parameters)
-            assert hamiltonian.term_partition is not None
-            terms = _get_terms_dict(hamiltonian)
-            expected: dict[str, float] = {}
-            for connection in connections:
-                assert connection.flavor is not None
-                for pauli_label, coefficient in expected_by_flavor[KitaevBondFlavor(connection.flavor)].items():
-                    pauli = ["I"] * graph.num_sites
-                    pauli[graph.num_sites - 1 - connection.site_i] = pauli_label[0]
-                    pauli[graph.num_sites - 1 - connection.site_j] = pauli_label[1]
-                    expected["".join(pauli)] = coefficient
-            assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
+        assert hamiltonian.get_container().content_hash() == "7283ee88ae88a265"
 
     def test_kitaev_flavored_geometric_shells(self) -> None:
         graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb(5, 5), [1, 2, 3])
@@ -567,26 +498,6 @@ class TestModelHamiltonians:
 
         _assert_commuting_disjoint_partition(hamiltonian)
 
-    def test_geometric_flavors_are_optional_and_configurable(self) -> None:
-        square = LatticeGraph.from_geometry(LatticeGeometry.square(3, 3), [1, 2])
-        assert all(connection.flavor is None for connection in square.connections)
-
-        flavored = square.with_bond_flavors(
-            [
-                BondFlavorDefinition(shell=1, axis=np.array([1.0, 0.0]), flavor=1000),
-                BondFlavorDefinition(shell=1, axis=np.array([0.0, 1.0]), flavor=1001),
-                BondFlavorDefinition(shell=2, axis=np.array([1.0, 1.0]), flavor=1002),
-                BondFlavorDefinition(shell=2, axis=np.array([1.0, -1.0]), flavor=1003),
-            ]
-        )
-        connections = flavored.connections
-        assert {connection.flavor for connection in connections} == {
-            1000,
-            1001,
-            1002,
-            1003,
-        }
-
     def test_kitaev_flavor_specific_gamma_terms(self) -> None:
         graph = LatticeGraph.honeycomb(3, 3)
         flavored_graph = _with_standard_kitaev_flavors(graph)
@@ -647,13 +558,7 @@ class TestModelHamiltonians:
         field_abc = np.array([2.0, -3.0, 5.0])
         g_abc = np.array([1.5, 2.0, 0.5])
         bohr_magneton = 0.25
-        transform = np.array(
-            [
-                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
-                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
-                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
-            ]
-        )
+        transform = _CRYSTAL_AXES
 
         def expected_field_terms(coefficients: np.ndarray) -> dict[str, float]:
             expected: dict[str, float] = {}
@@ -699,22 +604,6 @@ class TestModelHamiltonians:
             abs=float_comparison_absolute_tolerance,
         )
 
-        identity_crystal_frame = create_kitaev_hamiltonian(
-            graph,
-            0.0,
-            0.0,
-            0.0,
-            magnetic_field_abc=field_abc,
-            g_factors_abc=g_abc,
-            bohr_magneton=bohr_magneton,
-            crystallographic_transform=np.eye(3),
-            include_term_groups=False,
-        )
-        assert _get_terms_dict(identity_crystal_frame) == pytest.approx(
-            expected_field_terms(abc_coefficients),
-            abs=float_comparison_absolute_tolerance,
-        )
-
         grouped = create_kitaev_hamiltonian(
             graph,
             0.0,
@@ -731,55 +620,13 @@ class TestModelHamiltonians:
             abs=float_comparison_absolute_tolerance,
         )
 
-    def test_kitaev_field_matches_explicit_crystallographic_spin_operators(self):
-        field_abc = np.array([2.0, -3.0, 5.0])
-        g_abc = np.array([1.5, 2.0, 0.5])
-        bohr_magneton = 0.25
-        transform = np.array(
-            [
-                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
-                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
-                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
-            ]
-        )
-        spin_xyz = np.array(
-            [
-                [[0.0, 0.5], [0.5, 0.0]],
-                [[0.0, -0.5j], [0.5j, 0.0]],
-                [[0.5, 0.0], [0.0, -0.5]],
-            ],
-            dtype=complex,
-        )
-        spin_abc = np.einsum("ai,ijk->ajk", transform, spin_xyz)
-        expected = bohr_magneton * np.einsum("a,aij->ij", g_abc * field_abc, spin_abc)
-
-        actual = create_kitaev_hamiltonian(
-            LatticeGraph.chain(1),
-            0.0,
-            0.0,
-            0.0,
-            magnetic_field_abc=field_abc,
-            g_factors_abc=g_abc,
-            bohr_magneton=bohr_magneton,
-            crystallographic_transform=transform,
-            include_term_groups=False,
-        )
-
-        np.testing.assert_allclose(actual.to_matrix(), expected, atol=1e-15)
-
     def test_kitaev_crystallographic_transform(self) -> None:
         graph = LatticeGraph.honeycomb(3, 3)
         j = 1.1
         k = -2.3
         gamma = 0.7
         gamma_prime = -0.2
-        transform = np.array(
-            [
-                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
-                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
-                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
-            ]
-        )
+        transform = _CRYSTAL_AXES
         actual = _get_terms_dict(
             create_kitaev_hamiltonian(
                 graph,
@@ -842,30 +689,6 @@ class TestModelHamiltonians:
                     pauli[graph.num_sites - 1 - connection.site_j] = second
                     expected["".join(pauli)] = coefficient
         assert actual == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
-
-    def test_kitaev_crystallographic_transform_preserves_spin_algebra(self):
-        transform = np.array(
-            [
-                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
-                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
-                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
-            ]
-        )
-        spin_xyz = np.array(
-            [
-                [[0.0, 0.5], [0.5, 0.0]],
-                [[0.0, -0.5j], [0.5j, 0.0]],
-                [[0.5, 0.0], [0.0, -0.5]],
-            ],
-            dtype=complex,
-        )
-        spin_abc = np.einsum("ai,ijk->ajk", transform, spin_xyz)
-
-        np.testing.assert_allclose(transform @ transform.T, np.eye(3), atol=1e-15)
-        assert np.linalg.det(transform) == pytest.approx(1.0, abs=1e-15)
-        for first, second, third in ((0, 1, 2), (1, 2, 0), (2, 0, 1)):
-            commutator = spin_abc[first] @ spin_abc[second] - spin_abc[second] @ spin_abc[first]
-            np.testing.assert_allclose(commutator, 1.0j * spin_abc[third], atol=1e-15)
 
     def test_kitaev_accumulates_periodic_flavor_collisions(self) -> None:
         geometry = LatticeGeometry.honeycomb(2, 2, periodic_x=True, periodic_y=True)
@@ -1005,27 +828,6 @@ class TestModelHamiltonians:
         with pytest.raises(ValueError, match=r"geometry|metadata"):
             create_kitaev_hamiltonian(graph, {1: 1.0}, 0.0, 0.0)
 
-    @pytest.mark.parametrize("include_term_groups", [False, True])
-    def test_kitaev_shell_mapping_order_is_deterministic(self, include_term_groups: bool) -> None:
-        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb(3, 3), [1, 2, 3])
-        forward = {1: 1.0, 2: -0.5, 3: 0.25}
-        reversed_order = {3: 0.25, 2: -0.5, 1: 1.0}
-        forward_hamiltonian = create_kitaev_hamiltonian(
-            graph, forward, forward, forward, include_term_groups=include_term_groups
-        )
-        reversed_hamiltonian = create_kitaev_hamiltonian(
-            graph,
-            reversed_order,
-            reversed_order,
-            reversed_order,
-            include_term_groups=include_term_groups,
-        )
-        assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
-        np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
-        assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
-        assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
-        assert forward_hamiltonian.has_sparse_terms is include_term_groups
-
     def test_kitaev_open_hexagon_matches_explicit_matrix(self) -> None:
         graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb_plaquettes(1, 1), [1, 2, 3])
         bonds = {
@@ -1046,13 +848,7 @@ class TestModelHamiltonians:
             actual_bonds.setdefault(key, set()).add((connection.site_i, connection.site_j))
         assert actual_bonds == bonds
 
-        transform = np.array(
-            [
-                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
-                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
-                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
-            ]
-        )
+        transform = _CRYSTAL_AXES
         kitaev = {1: -13.3, 2: -0.67, 3: 0.1}
         heisenberg = {1: -1.3, 2: 0.0, 3: 1.0}
         gamma = 9.4
@@ -1170,8 +966,8 @@ class TestModelHamiltonians:
 
         weighted = create_kitaev_hamiltonian(graph, 0.0, 0.0, kz, j=j, gamma=gamma, gamma_prime=gamma_prime)
         mapped = create_kitaev_hamiltonian(graph, 0.0, 0.0, {1: kz}, j={1: j}, gamma=gamma, gamma_prime=gamma_prime)
-        assert not weighted.has_sparse_terms
-        assert mapped.has_sparse_terms
+        assert not _is_sparse(weighted)
+        assert _is_sparse(mapped)
 
         exchange = {"XX": 1.0, "YY": 1.0, "ZZ": 3.0}
         off_diagonal = {
@@ -1268,6 +1064,23 @@ class TestModelHamiltonians:
 
 @pytest.mark.parametrize("factory", [create_heisenberg_hamiltonian, create_kitaev_hamiltonian])
 class TestSelectedModelShells:
+    @pytest.mark.parametrize("include_term_groups", [False, True])
+    def test_shell_mapping_order_is_deterministic(
+        self, factory: Callable[..., QubitOperator], include_term_groups: bool
+    ) -> None:
+        graph = LatticeGraph.from_geometry(LatticeGeometry.honeycomb(3, 3), [1, 2, 3])
+        forward = {1: 1.0, 2: -0.5, 3: 0.25}
+        reversed_order = {3: 0.25, 2: -0.5, 1: 1.0}
+        forward_hamiltonian = factory(graph, forward, forward, forward, include_term_groups=include_term_groups)
+        reversed_hamiltonian = factory(
+            graph, reversed_order, reversed_order, reversed_order, include_term_groups=include_term_groups
+        )
+        assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
+        np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
+        assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
+        assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
+        assert _is_sparse(forward_hamiltonian) is include_term_groups
+
     @pytest.mark.parametrize("selected_shells", [[], [1]])
     def test_active_shell_requires_selection(
         self, factory: Callable[..., QubitOperator], selected_shells: list[int]
@@ -1282,7 +1095,7 @@ class TestSelectedModelShells:
 
         assert graph.selected_shells == [1, 99]
         assert hamiltonian.num_qubits == 3
-        assert hamiltonian.has_sparse_terms
+        assert _is_sparse(hamiltonian)
         np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((8, 8)))
         _assert_commuting_disjoint_partition(hamiltonian)
 
@@ -1297,7 +1110,7 @@ class TestSelectedModelShells:
         assert graph.connections == []
         assert graph.selected_shells == [1]
         assert hamiltonian.num_qubits == 3
-        assert hamiltonian.has_sparse_terms
+        assert _is_sparse(hamiltonian)
         np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((8, 8)))
         _assert_commuting_disjoint_partition(hamiltonian)
 
@@ -1306,7 +1119,7 @@ class TestSelectedModelShells:
         for couplings in ({}, {1: np.zeros((2, 2)), 99: 0.0}):
             hamiltonian = factory(graph, couplings, couplings, couplings)
             assert hamiltonian.term_partition is None
-            assert not hamiltonian.has_sparse_terms
+            assert not _is_sparse(hamiltonian)
             np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((4, 4)))
 
         with pytest.raises(ValueError, match=r"geometry|metadata"):

@@ -17,6 +17,7 @@ from qdk_chemistry.data import (
     QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_string_to_masks
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -223,6 +224,12 @@ class QdkExpectationEstimator(ExpectationEstimator):
 
         """
         Logger.trace_entering()
+        container_type = qubit_hamiltonian.get_container_type()
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
+            raise ValueError(
+                f"Expectation estimation requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
         circuit_executor = self._create_nested("circuit_executor")
 
         qubit_hamiltonians = self._resolve_measurement_groups(qubit_hamiltonian)

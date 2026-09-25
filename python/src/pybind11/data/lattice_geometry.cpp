@@ -93,8 +93,7 @@ No adjacency matrix, semantic flavor assignment, or edge coloring is stored.
 
   geometry
       .def(py::init<Eigen::MatrixXd, std::optional<Eigen::MatrixXd>>(),
-           py::arg("positions"), py::arg("periods") = py::none(),
-           py::call_guard<py::gil_scoped_release>(), R"(
+           py::arg("positions"), py::arg("periods") = py::none(), R"(
 Construct geometry from Cartesian positions and optional supercell vectors.
 
 Args:
@@ -110,10 +109,7 @@ Raises:
                              "Number of Cartesian components per position.")
       .def_property_readonly(
           "positions",
-          [](const LatticeGeometry& self) {
-            py::gil_scoped_release release;
-            return self.positions();
-          },
+          [](const LatticeGeometry& self) { return self.positions(); },
           R"(
 Cartesian positions in site-index order.
 
@@ -129,8 +125,7 @@ Returns:
     numpy.ndarray | None: Independent copy of the periodic-vector matrix, or None for an open geometry.
 )")
       .def("neighbor_connections", &LatticeGeometry::neighbor_connections,
-           py::arg("shells"), py::arg("tolerance") = 1.0e-9,
-           py::call_guard<py::gil_scoped_release>(), R"(
+           py::arg("shells"), py::arg("tolerance") = 1.0e-9, R"(
 Return physical connections classified by radial shell and unoriented axis.
 
 Distinct periodic images remain separate, including self-image connections.
@@ -150,8 +145,7 @@ Raises:
     OverflowError: If an integer stencil, periodic image, or displacement exceeds the supported range.
 )")
       .def("nearest_neighbor_shells", &LatticeGeometry::nearest_neighbor_shells,
-           py::arg("shells"), py::arg("tolerance") = 1.0e-9,
-           py::call_guard<py::gil_scoped_release>(), R"(
+           py::arg("shells"), py::arg("tolerance") = 1.0e-9, R"(
 Project open-geometry connections onto sorted, unique site pairs.
 
 Shell numbering uses the positive distances actually present in the geometry,
@@ -169,8 +163,7 @@ Raises:
     RuntimeError: If periodic vectors are present or the geometry is not two-dimensional.
 )")
       .def("mth_nearest_neighbors", &LatticeGeometry::mth_nearest_neighbors,
-           py::arg("m"), py::arg("tolerance") = 1.0e-9,
-           py::call_guard<py::gil_scoped_release>(), R"(
+           py::arg("m"), py::arg("tolerance") = 1.0e-9, R"(
 Return the sorted, unique site pairs in one open-geometry neighbor shell.
 
 Args:
@@ -185,8 +178,7 @@ Raises:
     RuntimeError: If periodic vectors are present or the geometry is not two-dimensional.
 )")
       .def_static("chain", &LatticeGeometry::chain, py::arg("n"),
-                  py::arg("periodic") = false,
-                  py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("periodic") = false, R"(
 Create a unit-spaced chain with positions ``(i, 0)``.
 
 Args:
@@ -198,8 +190,7 @@ Returns:
 )")
       .def_static("square", &LatticeGeometry::square, py::arg("nx"),
                   py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false,
-                  py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("periodic_y") = false, R"(
 Create a square lattice with site index ``y * nx + x`` and unit spacing.
 
 Args:
@@ -213,8 +204,7 @@ Returns:
 )")
       .def_static("triangular", &LatticeGeometry::triangular, py::arg("nx"),
                   py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false,
-                  py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("periodic_y") = false, R"(
 Create a triangular lattice with unit bond length and index ``y * nx + x``.
 
 Args:
@@ -228,8 +218,7 @@ Returns:
 )")
       .def_static("honeycomb", &LatticeGeometry::honeycomb, py::arg("nx"),
                   py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false,
-                  py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("periodic_y") = false, R"(
 Create honeycomb geometry sized by two-site unit cells.
 
 Site indices are ``2 * (y * nx + x) + sublattice``, with A before B.
@@ -246,8 +235,7 @@ Returns:
       .def_static("honeycomb_plaquettes",
                   &LatticeGeometry::honeycomb_plaquettes, py::arg("nx"),
                   py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false,
-                  py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("periodic_y") = false, R"(
 Create a honeycomb patch sized by complete hexagonal plaquettes.
 
 Open directions gain a boundary cell. Only fully open patches omit the first A
@@ -265,8 +253,7 @@ Returns:
 )")
       .def_static("kagome", &LatticeGeometry::kagome, py::arg("nx"),
                   py::arg("ny"), py::arg("periodic_x") = false,
-                  py::arg("periodic_y") = false,
-                  py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("periodic_y") = false, R"(
 Create kagome geometry with three sites per cell and unit bond length.
 
 Site indices are ``3 * (y * nx + x) + sublattice``.
@@ -281,7 +268,7 @@ Returns:
     LatticeGeometry: Kagome geometry with ``3 * nx * ny`` sites.
 )")
       .def_static("permute", &LatticeGeometry::permute, py::arg("geometry"),
-                  py::arg("path"), py::call_guard<py::gil_scoped_release>(), R"(
+                  py::arg("path"), R"(
 Relabel sites so new site i is original site ``path[i]``.
 
 Args:
@@ -316,14 +303,13 @@ Raises:
       .def(
           "to_json",
           [](const LatticeGeometry& self) { return self.to_json().dump(); },
-          py::call_guard<py::gil_scoped_release>(),
           "Serialize positions and optional periods to a JSON string.")
       .def_static(
           "from_json",
           [](const std::string& json_str) {
             return LatticeGeometry::from_json(nlohmann::json::parse(json_str));
           },
-          py::arg("json_str"), py::call_guard<py::gil_scoped_release>(), R"(
+          py::arg("json_str"), R"(
 Load geometry from a JSON string.
 
 Args:
@@ -336,9 +322,7 @@ Returns:
           "to_file",
           [](const LatticeGeometry& self, const py::object& filename,
              const std::string& format_type) {
-            const auto path = to_string_path(filename);
-            py::gil_scoped_release release;
-            self.to_file(path, format_type);
+            self.to_file(to_string_path(filename), format_type);
           },
           py::arg("filename"), py::arg("format_type"), R"(
 Save geometry to a JSON or HDF5 file.
@@ -350,9 +334,8 @@ Args:
       .def_static(
           "from_file",
           [](const py::object& filename, const std::string& format_type) {
-            const auto path = to_string_path(filename);
-            py::gil_scoped_release release;
-            return LatticeGeometry::from_file(path, format_type);
+            return LatticeGeometry::from_file(to_string_path(filename),
+                                              format_type);
           },
           py::arg("filename"), py::arg("format_type"), R"(
 Load geometry from a JSON or HDF5 file.
@@ -367,9 +350,7 @@ Returns:
       .def(
           "to_json_file",
           [](const LatticeGeometry& self, const py::object& filename) {
-            const auto path = to_string_path(filename);
-            py::gil_scoped_release release;
-            self.to_json_file(path);
+            self.to_json_file(to_string_path(filename));
           },
           py::arg("filename"), R"(
 Save geometry to a JSON file.
@@ -380,9 +361,7 @@ Args:
       .def_static(
           "from_json_file",
           [](const py::object& filename) {
-            const auto path = to_string_path(filename);
-            py::gil_scoped_release release;
-            return LatticeGeometry::from_json_file(path);
+            return LatticeGeometry::from_json_file(to_string_path(filename));
           },
           py::arg("filename"), R"(
 Load geometry from a JSON file.
@@ -396,9 +375,7 @@ Returns:
       .def(
           "to_hdf5_file",
           [](const LatticeGeometry& self, const py::object& filename) {
-            const auto path = to_string_path(filename);
-            py::gil_scoped_release release;
-            self.to_hdf5_file(path);
+            self.to_hdf5_file(to_string_path(filename));
           },
           py::arg("filename"), R"(
 Save positions and optional periods as numeric HDF5 matrices.
@@ -409,9 +386,7 @@ Args:
       .def_static(
           "from_hdf5_file",
           [](const py::object& filename) {
-            const auto path = to_string_path(filename);
-            py::gil_scoped_release release;
-            return LatticeGeometry::from_hdf5_file(path);
+            return LatticeGeometry::from_hdf5_file(to_string_path(filename));
           },
           py::arg("filename"), R"(
 Load geometry from an HDF5 file.
@@ -423,12 +398,8 @@ Returns:
     LatticeGeometry: Restored geometry.
 )")
       .def(py::pickle(
-          [](const LatticeGeometry& self) {
-            py::gil_scoped_release release;
-            return self.to_json().dump();
-          },
+          [](const LatticeGeometry& self) { return self.to_json().dump(); },
           [](const std::string& json_str) {
-            py::gil_scoped_release release;
             return LatticeGeometry::from_json(nlohmann::json::parse(json_str));
           }));
 }

@@ -1,4 +1,4 @@
-"""Tests for the bundled Azure AI Discovery backend."""
+"""Tests for the bundled Microsoft Discovery backend."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -59,7 +59,7 @@ class _SharedCache:
 
 
 class _Tools:
-    """Capture one Discovery tool submission."""
+    """Capture one Microsoft Discovery tool submission."""
 
     def __init__(self) -> None:
         """Initialize without a captured submission."""
@@ -96,7 +96,7 @@ class _Container:
 
 
 def _backend(**kwargs: Any) -> DiscoveryBackend:
-    """Create a backend with required Discovery identifiers."""
+    """Create a backend with required Microsoft Discovery identifiers."""
     config = {
         "workspace_endpoint": "https://workspace.discovery.azure.com",
         "project_name": "project",
@@ -178,7 +178,7 @@ def test_cache_transport_seeds_inputs_and_submits_inline_manifest() -> None:
 
 
 def test_blob_transport_submits_discovery_storage_mounts() -> None:
-    """Blob mode requests input and output mounts from Discovery."""
+    """Blob mode requests input and output mounts from Microsoft Discovery."""
     tools = _Tools()
     container = _Container()
     backend = _backend(
@@ -246,7 +246,7 @@ def test_partial_upload_failure_removes_uploaded_inputs(tmp_path, monkeypatch: p
 
 
 def test_submission_failure_removes_uploaded_inputs() -> None:
-    """A failed Discovery submission removes inputs before job state is returned."""
+    """A failed Microsoft Discovery submission removes inputs before job state is returned."""
     container = _Container()
     backend = _backend(
         transport="blob",

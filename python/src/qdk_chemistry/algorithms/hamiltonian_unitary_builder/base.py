@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
 from abc import abstractmethod
 
 import numpy as np
@@ -29,8 +28,6 @@ __all__: list[str] = [
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
 ]
-
-_NON_IDENTITY = re.compile(r"[^I]")
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
@@ -63,9 +60,11 @@ class HamiltonianUnitaryBuilder(Algorithm):
             Dictionary assigning each non-identity qubit index to its Pauli axis.
 
         """
-        # Skip identity runs in the regex engine rather than stepping over them in Python.
-        last = len(label) - 1
-        return {last - match.start(): match[0] for match in reversed(list(_NON_IDENTITY.finditer(label)))}
+        mapping: dict[int, str] = {}
+        for index, char in enumerate(reversed(label)):  # reversed: right-most char -> qubit 0
+            if char != "I":
+                mapping[index] = char
+        return mapping
 
 
 class HamiltonianUnitaryBuilderSettings(Settings):

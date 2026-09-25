@@ -148,7 +148,7 @@ def _ensure_local_marketplace(root: Path, marketplace_name: str, *, home: Path) 
     _run_copilot(["plugin", "marketplace", "add", str(root)], home=home)
 
 
-def _installed_plugin_dir(home: Path, plugin_name: str) -> Path:
+def _installed_plugin_dir(home: Path, plugin_name: str, *, live_plugin_dir: Path | None = None) -> Path:
     root = home / "installed-plugins"
     matches: list[Path] = []
     if root.is_dir():
@@ -165,6 +165,10 @@ def _installed_plugin_dir(home: Path, plugin_name: str) -> Path:
                 if manifest.get("name") == plugin_name:
                     matches.append(plugin_dir.absolute())
     if not matches:
+        if live_plugin_dir is not None:
+            manifest = _load_object(_manifest_path(live_plugin_dir))
+            if manifest.get("name") == plugin_name:
+                return live_plugin_dir.resolve()
         raise PluginInstallError(f"Copilot did not install {plugin_name!r} beneath {root}")
     if len(matches) > 1:
         locations = ", ".join(str(path) for path in matches)
@@ -199,6 +203,20 @@ def _commands_for_current_environment(plugin_name: str) -> dict[str, str]:
         server_name: str(_script_path(scripts_dir, script_name))
         for server_name, script_name in _PLUGIN_SERVER_SCRIPTS[plugin_name].items()
     }
+
+
+def _validate_commands(plugin_name: str, commands: object, state_root: Path) -> dict[str, str]:
+    if not isinstance(commands, dict):
+        raise PluginInstallError(f"invalid command binding for {plugin_name!r} beneath {state_root}")
+    for server_name in _PLUGIN_SERVER_SCRIPTS[plugin_name]:
+        command = commands.get(server_name)
+        if not isinstance(command, str):
+            raise PluginInstallError(
+                f"command binding for required MCP server {server_name!r} is missing; rebind from the intended venv"
+            )
+        if not Path(command).is_file():
+            raise PluginInstallError(f"bound MCP command no longer exists: {command}; rebind from the intended venv")
+    return commands
 
 
 def _mcp_config_path(plugin_dir: Path) -> Path:
@@ -365,7 +383,9 @@ def _copy_component_directories(sources: list[Path], destination: Path) -> list[
     return copied
 
 
-def _workspace_server_configs(plugin_dir: Path, plugin_name: str) -> tuple[dict[str, Any], dict[str, Any]]:
+def _workspace_server_configs(
+    plugin_dir: Path, plugin_name: str, commands: dict[str, str]
+) -> tuple[dict[str, Any], dict[str, Any]]:
     config_path = _mcp_config_path(plugin_dir)
     config = _load_object(config_path)
     plugin_servers = config.get("mcpServers")
@@ -377,16 +397,35 @@ def _workspace_server_configs(plugin_dir: Path, plugin_name: str) -> tuple[dict[
         server = plugin_servers.get(server_name)
         if not isinstance(server, dict):
             raise PluginInstallError(f"required MCP server {server_name!r} is missing from the plugin")
+        command = commands.get(server_name)
+        if not isinstance(command, str):
+            raise PluginInstallError(
+                f"command binding for required MCP server {server_name!r} is missing; rebind from the intended venv"
+            )
         vscode_entry = deepcopy(server)
         vscode_entry["type"] = "stdio"
+        vscode_entry["command"] = command
         vscode_entry.pop("tools", None)
         vscode_servers[server_name] = vscode_entry
 
         github_entry = deepcopy(server)
         github_entry["type"] = "local"
+        github_entry["command"] = command
         github_entry["tools"] = ["*"]
         github_servers[server_name] = github_entry
     return vscode_servers, github_servers
+
+
+def _live_plugin_dir(record: dict[str, Any] | None, state_root: Path) -> Path | None:
+    if not isinstance(record, dict) or record.get("live_plugin") is not True:
+        return None
+    plugin_dir = record.get("plugin_dir")
+    if not isinstance(plugin_dir, str):
+        raise PluginInstallError(f"invalid live plugin binding beneath {state_root}; reinstall the plugin")
+    resolved = Path(plugin_dir).expanduser().resolve()
+    if not resolved.is_dir():
+        raise PluginInstallError(f"invalid live plugin binding beneath {state_root}; reinstall the plugin")
+    return resolved
 
 
 def _ignore_workspace_state(workspace: Path) -> None:
@@ -400,7 +439,7 @@ def _ignore_workspace_state(workspace: Path) -> None:
     path.write_text("\n".join([*existing, *missing]) + "\n", encoding="utf-8")
 
 
-def _deploy_workspace(plugin_dir: Path, plugin_name: str, workspace: Path) -> dict[str, Any]:
+def _deploy_workspace(plugin_dir: Path, plugin_name: str, workspace: Path, commands: dict[str, str]) -> dict[str, Any]:
     manifest = _load_object(_manifest_path(plugin_dir))
     workspace.mkdir(parents=True, exist_ok=True)
     agents = []
@@ -411,7 +450,7 @@ def _deploy_workspace(plugin_dir: Path, plugin_name: str, workspace: Path) -> di
     skills = _copy_component_directories(
         _component_directories(plugin_dir, manifest, "skills"), workspace / ".github" / "skills"
     )
-    vscode_servers, github_servers = _workspace_server_configs(plugin_dir, plugin_name)
+    vscode_servers, github_servers = _workspace_server_configs(plugin_dir, plugin_name, commands)
     vscode_mcp = workspace / ".vscode" / "mcp.json"
     github_mcp = workspace / ".github" / "mcp.json"
     _write_workspace_config(vscode_mcp, "servers", vscode_servers)
@@ -473,14 +512,21 @@ def install_plugin(source: str, *, name: str | None = None, target_dir: str | Pa
     state_root = _state_root(target_dir, home)
     install_source = source
     local_marketplace = _local_marketplace(source, plugin_name)
+    live_plugin_dir = None
     if local_marketplace is not None:
         marketplace_root, marketplace_name, install_source = local_marketplace
+        live_plugin_dir = Path(source).expanduser().resolve()
         _ensure_local_marketplace(marketplace_root, marketplace_name, home=home)
     _run_copilot(["plugin", "install", install_source], home=home)
-    plugin_dir = _installed_plugin_dir(home, plugin_name)
-    plugin_config = _bind_mcp_commands(plugin_dir, plugin_name, commands)
+    plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
     workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
-    deployment = _deploy_workspace(plugin_dir, plugin_name, workspace) if workspace is not None else {}
+    live_plugin = live_plugin_dir is not None and plugin_dir == live_plugin_dir
+    plugin_config = (
+        _mcp_config_path(plugin_dir)
+        if live_plugin and workspace is not None
+        else _bind_mcp_commands(plugin_dir, plugin_name, commands)
+    )
+    deployment = _deploy_workspace(plugin_dir, plugin_name, workspace, commands) if workspace is not None else {}
     _write_binding(
         state_root,
         plugin_name,
@@ -489,6 +535,7 @@ def install_plugin(source: str, *, name: str | None = None, target_dir: str | Pa
             "plugin_dir": str(plugin_dir),
             "source": source,
             "update_spec": _update_spec(install_source, plugin_name),
+            "live_plugin": live_plugin,
             **deployment,
         },
     )
@@ -532,18 +579,19 @@ def update_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
     record = state["plugins"].get(plugin_name)
     if not isinstance(record, dict):
         raise PluginInstallError(f"{plugin_name!r} has no QDK Chemistry binding beneath {state_root}")
-    commands = record.get("commands")
-    if not isinstance(commands, dict) or any(not isinstance(value, str) for value in commands.values()):
-        raise PluginInstallError(f"invalid command binding for {plugin_name!r} beneath {state_root}")
-    for command in commands.values():
-        if not Path(command).is_file():
-            raise PluginInstallError(f"bound MCP command no longer exists: {command}; rebind from the intended venv")
+    commands = _validate_commands(plugin_name, record.get("commands"), state_root)
     _run_copilot(["plugin", "update", str(record.get("update_spec") or plugin_name)], home=home)
-    plugin_dir = _installed_plugin_dir(home, plugin_name)
-    plugin_config = _bind_mcp_commands(plugin_dir, plugin_name, commands)
+    live_plugin_dir = _live_plugin_dir(record, state_root)
+    plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
+    is_live = live_plugin_dir is not None and plugin_dir == live_plugin_dir
     workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
-    deployment = _deploy_workspace(plugin_dir, plugin_name, workspace) if workspace is not None else {}
-    record.update({"plugin_dir": str(plugin_dir), **deployment})
+    plugin_config = (
+        _mcp_config_path(plugin_dir)
+        if is_live and workspace is not None
+        else _bind_mcp_commands(plugin_dir, plugin_name, commands)
+    )
+    deployment = _deploy_workspace(plugin_dir, plugin_name, workspace, commands) if workspace is not None else {}
+    record.update({"plugin_dir": str(plugin_dir), "live_plugin": is_live, **deployment})
     _write_binding(state_root, plugin_name, record)
     result = {
         "status": "updated",
@@ -604,12 +652,18 @@ def rebind_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
         raise PluginInstallError(f"unsupported QDK Chemistry plugin: {plugin_name}")
     home = _copilot_home(target_dir)
     state_root = _state_root(target_dir, home)
-    plugin_dir = _installed_plugin_dir(home, plugin_name)
-    commands = _commands_for_current_environment(plugin_name)
-    plugin_config = _bind_mcp_commands(plugin_dir, plugin_name, commands)
-    workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
-    deployment = _deploy_workspace(plugin_dir, plugin_name, workspace) if workspace is not None else {}
     previous = _load_bindings(state_root)["plugins"].get(plugin_name)
+    live_plugin_dir = _live_plugin_dir(previous if isinstance(previous, dict) else None, state_root)
+    plugin_dir = _installed_plugin_dir(home, plugin_name, live_plugin_dir=live_plugin_dir)
+    is_live = live_plugin_dir is not None and plugin_dir == live_plugin_dir
+    commands = _commands_for_current_environment(plugin_name)
+    workspace = Path(target_dir).expanduser().absolute() if target_dir is not None else None
+    plugin_config = (
+        _mcp_config_path(plugin_dir)
+        if is_live and workspace is not None
+        else _bind_mcp_commands(plugin_dir, plugin_name, commands)
+    )
+    deployment = _deploy_workspace(plugin_dir, plugin_name, workspace, commands) if workspace is not None else {}
     if isinstance(previous, dict):
         source = str(previous.get("source") or plugin_name)
         update_spec = str(previous.get("update_spec") or plugin_name)
@@ -625,6 +679,7 @@ def rebind_plugin(plugin_name: str, *, target_dir: str | Path | None = None) -> 
             "plugin_dir": str(plugin_dir),
             "source": source,
             "update_spec": update_spec,
+            "live_plugin": is_live,
             **deployment,
         },
     )

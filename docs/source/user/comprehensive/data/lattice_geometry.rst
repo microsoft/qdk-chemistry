@@ -201,5 +201,4 @@ Related documentation
 ---------------------
 
 * :doc:`LatticeGraph <lattice_graph>` — selecting connectivity, assigning flavors, and reusing stored edge colors
-* :ref:`lattice-geometry-migration` — migrating graph-owned coordinate and shell queries
 * :doc:`Model Hamiltonians <../model_hamiltonians>` — applying interactions to an explicit graph

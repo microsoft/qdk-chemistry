@@ -5,21 +5,55 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 import tempfile
 from pathlib import Path
 
 import h5py
 import numpy as np
 import pytest
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.data import QubitOperator
+from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _reverse_bits(value: int, num_bits: int) -> int:
+    """Reverse the bit order of *value* within a *num_bits* field."""
+    reversed_value = 0
+    for bit in range(num_bits):
+        reversed_value |= ((value >> bit) & 1) << (num_bits - 1 - bit)
+    return reversed_value
+
+
+def _block_encoding_action(circuit, num_system_qubits: int, system_amplitudes: np.ndarray) -> np.ndarray:
+    r"""Apply ``circuit`` to :math:`|\psi\rangle|0\rangle_\mathrm{anc}` and project back on the ancillas.
+
+    Returns :math:`(\langle 0|_\mathrm{anc} \otimes I) B[H] (|0\rangle_\mathrm{anc} \otimes I) |\psi\rangle`,
+    which the block encoding identity makes :math:`H |\psi\rangle / \lambda`.
+
+    ``PSPMapper`` lays the register out as ``[system | ancilla]`` while
+    :func:`dump_operation_on_state` numbers basis states big-endian, so the system register takes
+    the high bits and its own index runs the other way -- hence the bit reversal on both ends.
+    """
+    stride = 2 ** (circuit.num_qubits - num_system_qubits)
+    dimension = 2**num_system_qubits
+
+    initial_state = [0.0] * ((dimension - 1) * stride + 1)
+    for index, amplitude in enumerate(system_amplitudes):
+        initial_state[_reverse_bits(index, num_system_qubits) * stride] = amplitude
+
+    statevector = dump_operation_on_state(
+        circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
+    )
+    return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
 
 
 class TestLCUBuilder:
@@ -159,6 +193,76 @@ class TestLCUBuilder:
         builder = LCUBuilder()
         with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
+
+    def test_prepare_select_prepare_with_alias_sampling(self):
+        """Verify alias sampling supplies its entangled scratch register to PREPARE."""
+        hamiltonian = QubitOperator(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, 0.5, 0.1]),
+        )
+        unitary = LCUBuilder().run(hamiltonian)
+        mapper = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=4),
+        )
+
+        circuit = mapper.run(unitary)
+
+        assert circuit.num_qubits == 15
+        assert circuit._qsharp_factory.parameter["numSelectQubits"] == 2
+        assert circuit._qsharp_factory.parameter["numBlockAncillaQubits"] == 13
+
+    def test_alias_sampling_block_encodes_the_hamiltonian(self):
+        r"""Verify :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda`."""
+        coefficients = np.array([0.25, 0.5, 0.1])
+        bits_precision = 4
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=coefficients)
+        circuit = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=bits_precision),
+        ).run(LCUBuilder().run(hamiltonian))
+
+        num_system_qubits = hamiltonian.num_qubits
+        dimension = 2**num_system_qubits
+        expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
+        alias_tolerance = 2.0**-bits_precision
+
+        inputs = [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]
+        for system_state in inputs:
+            actual = _block_encoding_action(circuit, num_system_qubits, system_state)
+            expected = expected_block @ system_state
+
+            assert np.abs(actual.imag).max() < alias_tolerance, f"unexpected phase in {actual}"
+            sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
+            assert np.allclose(sign * actual, expected, rtol=0.0, atol=alias_tolerance), (
+                f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
+            )
+
+
+class TestPSPMapperPrepareGuards:
+    """Tests for PSPMapper's checks on the PREPARE circuit it is handed."""
+
+    @staticmethod
+    def _unitary():
+        """Build a three-term LCU, whose PREPARE indexes two qubits."""
+        hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 0.1]))
+        return LCUBuilder().run(hamiltonian)
+
+    def test_rejects_a_prepare_that_wants_a_phase_gradient(self):
+        """QROM state prep declares shared ancilla this mapper never allocates.
+
+        Only when it is asked to share one: left to its default the callable allocates and
+        prepares its own gradient internally, declares none, and embeds fine.
+        """
+        mapper = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=False),
+        )
+        with pytest.raises(ValueError, match="phase gradient ancilla"):
+            mapper.run(self._unitary())
 
 
 class TestLCUContainer:

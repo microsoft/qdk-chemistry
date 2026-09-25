@@ -166,7 +166,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         return "pauli_product_formula_container"
 
     # Serialization version for this class
-    _serialization_version = "0.4.0"
+    _serialization_version = "0.2.0"
 
     def __init__(
         self,
@@ -599,10 +599,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        version = json_data.get("version", "")
-        # 0.2.x files predate endpoints and offsets, which default to empty.
-        expected_version = "0.2.0" if version.startswith("0.2.") else cls._serialization_version
-        cls._validate_json_version(expected_version, json_data)
+        cls._validate_json_version(cls._serialization_version, json_data)
         if "segments" in json_data:
             raise ValueError("Recursive segments are not a supported product-formula format.")
         lists: dict[str, list[ExponentiatedPauliTerm]] = {}
@@ -651,10 +648,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             PauliProductFormulaContainer
 
         """
-        version = group.attrs.get("version", "")
-        # 0.2.x files predate endpoints and offsets, which default to empty.
-        expected_version = "0.2.0" if version.startswith("0.2.") else cls._serialization_version
-        cls._validate_hdf5_version(expected_version, group)
+        cls._validate_hdf5_version(cls._serialization_version, group)
         if "segments" in group:
             raise ValueError("Recursive segments are not a supported product-formula format.")
         step_reps = group.attrs["step_reps"]

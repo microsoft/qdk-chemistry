@@ -29,6 +29,11 @@ Prebuilt wheels are published for the following platforms:
 | macOS | arm64 (Apple Silicon) | |
 | Windows | x86_64, arm64 | See [Windows notes](#notes-for-windows-users) |
 
+Native Windows installations require the current
+[Microsoft Visual C++ v14 Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist).
+The [x64 installer](https://aka.ms/vc14/vc_redist.x64.exe) includes both x64 and ARM64 runtimes.
+Install it once before importing QDK/Chemistry. Microsoft centrally services the installed runtime.
+
 On Windows you can either install natively or work inside the
 [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install). Both are
 supported: WSL uses the Linux wheels and the Linux instructions throughout this document, and is the
@@ -87,7 +92,7 @@ python3 -m pip install qdk-chemistry
 
 > **NOTE:** On Python 3.14, `qiskit-aer` is omitted from the `qiskit-extras` and `all` extras on Linux ARM64 (aarch64), because Qiskit does not yet publish a Python 3.14 wheel for that platform. See the [Optional Extras](#optional-extras) table below for details.
 >
-> **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane, RDKit and the Discovery backend are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
+> **NOTE:** On Windows, PySCF is skipped from the `plugins` extra because it publishes no Windows wheels; on Windows arm64 the Qiskit stack, PennyLane, RDKit and the Microsoft Discovery backend are skipped as well. See [Notes for Windows users](#notes-for-windows-users).
 > The MCP extra is also omitted from `[all]` and `[test]` on Windows arm64.
 
 ### Step 3: Verify the installation
@@ -104,10 +109,10 @@ The examples and test suite live in the source repository. Clone it and check ou
 pip show qdk-chemistry          # check your installed version
 git clone https://github.com/microsoft/qdk-chemistry.git
 cd qdk-chemistry
-git checkout stable/1.1          # match major.minor to your version
+git checkout v2.2.0              # match the tag to your installed version
 ```
 
-> **NOTE:** The `main` branch is the active development branch and may be incompatible with the released pip package. Always use the `stable/major.minor` branch for examples.
+> **NOTE:** The `main` branch is the active development branch and may be incompatible with the released pip package. Check out the release tag matching the exact version reported by `pip show qdk-chemistry`.
 
 Some examples require additional packages not included in any extra. See the [examples README](examples/README.md) for per-example requirements.
 
@@ -118,17 +123,18 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
 | `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
+| `discovery` | Microsoft Discovery remote backend | azure-ai-discovery, azure-identity, azure-storage-blob |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
 | `mcp` | MCP server, transports, workspace binding, and MCP Apps integration | mcp |
-| `plugins` | Third-party quantum chemistry backends | PySCF (no Windows wheels) |
+| `plugins` | Third-party quantum chemistry backends | geomeTRIC, PySCF (no Windows wheels) |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
-| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.30.0 |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.31.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
-| `all` | Union of all defined extras | coverage, dev, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
+| `all` | Union of all defined extras | coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
 To build the documentation, install the `docs` extra (for example,
 `python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
@@ -169,8 +175,9 @@ to native Windows installs; none of them apply under
 
 | Topic | Detail |
 |-------|--------|
+| Visual C++ runtime | Install the current [Microsoft Visual C++ v14 Redistributable x64 package](https://aka.ms/vc14/vc_redist.x64.exe), which includes both x64 and ARM64 runtimes. It is a machine-level prerequisite and may require administrator approval. |
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
-| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
+| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
 ---
@@ -391,7 +398,7 @@ pytest tests/
 cd ..
 ```
 
-**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, `1` performs a single-threaded C++ library build:
+**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilation units, especially Libint2 under MSVC, require several GiB of RAM. As a conservative default, reserve at least 8 GiB of available memory per compile job. Set `CMAKE_BUILD_PARALLEL_LEVEL=1` when that cannot be guaranteed:
 
 ```bash
 # Linux / macOS

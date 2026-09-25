@@ -13,13 +13,11 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
-from numbers import Integral
 from typing import Any
 
 import h5py
-import numpy as np
 from qdk import TargetProfile, qsharp
 from qdk.estimator import EstimatorParams, EstimatorResult
 from qdk.openqasm import OutputSemantics
@@ -39,7 +37,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
-__all__: list[str] = ["QsharpFactoryData"]
+__all__: list[str] = ["CircuitMetadata", "QsharpFactoryData"]
 
 
 @dataclass(frozen=True)
@@ -51,6 +49,26 @@ class QsharpFactoryData:
 
     parameter: dict[str, Any]
     """The parameter to be passed to the Q# Callable when creating the circuit."""
+
+
+@dataclass(frozen=True)
+class CircuitMetadata:
+    """Metadata specific to the subroutines a circuit is built from."""
+
+    num_phase_gradient_ancillas: int = 0
+    """The phase gradient ancillas that should be initialized once and reused in multiple subroutines."""
+
+    def __post_init__(self) -> None:
+        """Reject invalid metadata.
+
+        Raises:
+            ValueError: If ``num_phase_gradient_ancillas`` is negative.
+
+        """
+        if self.num_phase_gradient_ancillas < 0:
+            raise ValueError(
+                f"num_phase_gradient_ancillas must be non-negative. Got {self.num_phase_gradient_ancillas}."
+            )
 
 
 class Circuit(DataClass):
@@ -67,7 +85,7 @@ class Circuit(DataClass):
         return "circuit"
 
     # Serialization version for this class.
-    _serialization_version = "0.1.1"
+    _serialization_version = "0.1.2"
 
     # Use keyword arguments to be future-proof
     def __init__(
@@ -79,6 +97,7 @@ class Circuit(DataClass):
         qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
         num_qubits: int | None = None,
+        metadata: CircuitMetadata | None = None,
     ) -> None:
         """Initialize a Circuit.
 
@@ -94,6 +113,8 @@ class Circuit(DataClass):
             num_qubits: The width of the register ``qsharp_op`` acts on, when the producer
                 knows it. Scratch qubits a circuit allocates internally are not counted.
                 Defaults to None.
+            metadata: Metadata specific to the subroutines this circuit is built from.
+                Defaults to None.
 
         Notes:
             At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.
@@ -104,7 +125,8 @@ class Circuit(DataClass):
             - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
 
         Raises:
-            ValueError: If ``num_qubits`` is negative.
+            ValueError: If ``num_qubits`` is negative, or if a metadata declaration is
+                inconsistent with ``num_qubits``.
 
         """
         Logger.trace_entering()
@@ -116,7 +138,17 @@ class Circuit(DataClass):
         self.encoding = encoding
         if num_qubits is not None and num_qubits < 0:
             raise ValueError(f"num_qubits must be non-negative. Got {num_qubits}.")
+        metadata = metadata or CircuitMetadata()
+        if metadata.num_phase_gradient_ancillas > 0:
+            if num_qubits is None:
+                raise ValueError("num_qubits must be declared when num_phase_gradient_ancillas is non-zero.")
+            if metadata.num_phase_gradient_ancillas > num_qubits:
+                raise ValueError(
+                    f"num_phase_gradient_ancillas ({metadata.num_phase_gradient_ancillas}) "
+                    f"cannot exceed num_qubits ({num_qubits})."
+                )
         self.num_qubits = num_qubits
+        self.metadata = metadata
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if not any([self.qasm, self.qsharp, self.qir, self._qsharp_factory]):
@@ -155,9 +187,7 @@ class Circuit(DataClass):
         try:
             from qiskit import qasm3  # noqa: PLC0415
 
-            from qdk_chemistry.plugins.qiskit._interop.qir import (  # noqa: PLC0415
-                qir_ir_to_qiskit,
-            )
+            from qdk_chemistry.plugins.qiskit._interop.qir import qir_ir_to_qiskit  # noqa: PLC0415
 
         except ImportError as err:
             raise RuntimeError("Qiskit is not available. Cannot convert circuit to QASM format.") from err
@@ -189,9 +219,7 @@ class Circuit(DataClass):
             return compiled_qir
         if self.qasm:
             return openqasm_compile(
-                self.qasm,
-                output_semantics=OutputSemantics.OpenQasm,
-                target_profile=TargetProfile.Base,
+                self.qasm, output_semantics=OutputSemantics.OpenQasm, target_profile=TargetProfile.Base
             )
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
@@ -261,11 +289,11 @@ class Circuit(DataClass):
 
         estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
-            Logger.warn(
+            Logger.info(
                 f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
-                f"{estimated_num_qubits}; num_qubits is updated to {estimated_num_qubits}."
+                f"{estimated_num_qubits}; there could be ancillary qubits allocated and deallocated "
+                "within the circuit."
             )
-            object.__setattr__(self, "num_qubits", estimated_num_qubits)
         return result
 
     def get_qre_application(self):
@@ -282,11 +310,7 @@ class Circuit(DataClass):
 
         """
         try:
-            from qdk.qre.application import (  # noqa: PLC0415
-                OpenQASMApplication,
-                QIRApplication,
-                QSharpApplication,
-            )
+            from qdk.qre.application import OpenQASMApplication, QIRApplication, QSharpApplication  # noqa: PLC0415
         except ImportError as err:
             raise RuntimeError(
                 "qdk.qre is not available. Install QRE dependencies with: pip install 'qdk-chemistry[qre]'"
@@ -350,108 +374,6 @@ class Circuit(DataClass):
         object.__setattr__(self, "_qiskit_circuit", result)
         return result
 
-    def with_uniform_spin_basis_rotation(
-        self,
-        direction: Sequence[float],
-        *,
-        num_qubits: int | None = None,
-    ) -> "Circuit":
-        r"""Return a circuit rotated for a uniform spin-direction measurement.
-
-        The returned circuit applies the original circuit followed by
-        :math:`R_z(-\phi)R_y(-\theta)` on every qubit, where the normalized
-        direction is
-
-        .. math::
-
-            \boldsymbol{n} = (\sin\theta\cos\phi,
-            \sin\theta\sin\phi, \cos\theta).
-
-        A subsequent Z-basis measurement therefore measures
-        :math:`\boldsymbol{n}\cdot\boldsymbol{\sigma}`. This method does not
-        append measurements.
-
-        Args:
-            direction: Finite, nonzero Cartesian spin direction shared by all qubits.
-            num_qubits: Circuit width when it is not already recorded on the circuit. Defaults to ``None``.
-
-        Returns:
-            A new circuit with the uniform spin-basis rotation appended.
-
-        Raises:
-            ValueError: If the direction or explicit circuit width is invalid, or widths disagree.
-            RuntimeError: If width or a composable representation is unavailable, or measurements already exist.
-
-        """
-        vector = np.asarray(direction, dtype=float)
-        if vector.shape != (3,) or not np.all(np.isfinite(vector)):
-            raise ValueError("The spin direction must be a finite length-3 vector.")
-        scale = float(np.max(np.abs(vector)))
-        if scale == 0.0:
-            raise ValueError("The spin direction must be nonzero.")
-        scaled = vector / scale
-        unit_direction = scaled / np.linalg.norm(scaled)
-        theta = float(np.atan2(np.hypot(unit_direction[0], unit_direction[1]), unit_direction[2]))
-        phi = float(np.atan2(unit_direction[1], unit_direction[0]))
-
-        if num_qubits is not None:
-            if isinstance(num_qubits, bool) or not isinstance(num_qubits, Integral) or num_qubits <= 0:
-                raise ValueError("num_qubits must be a positive integer.")
-            num_qubits = int(num_qubits)
-        if self.num_qubits is not None and num_qubits is not None and self.num_qubits != num_qubits:
-            raise ValueError("The explicit circuit width does not match circuit.num_qubits.")
-        resolved_num_qubits = self.num_qubits if num_qubits is None else num_qubits
-
-        if self._qsharp_op is not None:
-            if self._qsharp_factory is None:
-                raise RuntimeError("The Q# circuit does not record its owning context.")
-            context = getattr(self._qsharp_factory.program, "_qdk_context", None)
-            if context is None:
-                raise RuntimeError("The Q# circuit does not record its owning context.")
-            if resolved_num_qubits is None:
-                raise RuntimeError("num_qubits is required when the circuit width is unknown.")
-            measurement_basis = context.code.QDKChemistry.Utils.MeasurementBasis
-            rotation_op = measurement_basis.MakeUniformBasisRotationOp(theta, phi)
-            return Circuit(
-                qsharp_factory=QsharpFactoryData(
-                    program=measurement_basis.MakeUniformBasisRotationCircuit,
-                    parameter={
-                        "baseCircuit": self._qsharp_op,
-                        "theta": theta,
-                        "phi": phi,
-                        "numQubits": resolved_num_qubits,
-                    },
-                ),
-                qsharp_op=context.code.QDKChemistry.Utils.CircuitComposition.MakeSequentialOp(
-                    self._qsharp_op, rotation_op
-                ),
-                encoding=self.encoding,
-                num_qubits=resolved_num_qubits,
-            )
-
-        try:
-            from qiskit import qasm3  # noqa: PLC0415
-        except ImportError as err:
-            raise RuntimeError("Qiskit is required to rotate this circuit representation.") from err
-
-        qiskit_circuit = self.get_qiskit_circuit().copy()
-        if any(instruction.operation.name == "measure" for instruction in qiskit_circuit.data):
-            raise RuntimeError("Spin-basis rotation cannot be appended after measurements.")
-        if resolved_num_qubits is None:
-            resolved_num_qubits = qiskit_circuit.num_qubits
-        elif resolved_num_qubits != qiskit_circuit.num_qubits:
-            raise ValueError("The circuit width does not match the circuit representation.")
-        if resolved_num_qubits <= 0:
-            raise ValueError("num_qubits must be a positive integer.")
-        for qubit in range(resolved_num_qubits):
-            qiskit_circuit.rz(-phi, qubit)
-            qiskit_circuit.ry(-theta, qubit)
-        return Circuit(
-            qasm=qasm3.dumps(qiskit_circuit),
-            encoding=self.encoding,
-            num_qubits=resolved_num_qubits,
-        )
-
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the Circuit.
@@ -487,6 +409,9 @@ class Circuit(DataClass):
             _hash_str(h, str(self.get_qir()))
         _hash_optional(h, self.encoding, _hash_str)
         _hash_optional(h, self.num_qubits, _hash_uint)
+        # Only fed when non-zero, so circuits without a phase gradient keep their digest.
+        if self.metadata.num_phase_gradient_ancillas:
+            _hash_uint(h, self.metadata.num_phase_gradient_ancillas)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Circuit to a dictionary for JSON serialization.
@@ -504,6 +429,8 @@ class Circuit(DataClass):
             data["encoding"] = self.encoding
         if self.num_qubits is not None:
             data["num_qubits"] = self.num_qubits
+        if self.metadata.num_phase_gradient_ancillas:
+            data["metadata"] = {"num_phase_gradient_ancillas": self.metadata.num_phase_gradient_ancillas}
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -522,6 +449,9 @@ class Circuit(DataClass):
             group.attrs["encoding"] = self.encoding
         if self.num_qubits is not None:
             group.attrs["num_qubits"] = self.num_qubits
+        if self.metadata.num_phase_gradient_ancillas:
+            metadata_group = group.create_group("metadata")
+            metadata_group.attrs["num_phase_gradient_ancillas"] = self.metadata.num_phase_gradient_ancillas
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
@@ -543,6 +473,7 @@ class Circuit(DataClass):
             qir=json_data.get("qir"),
             encoding=json_data.get("encoding"),
             num_qubits=json_data.get("num_qubits"),
+            metadata=CircuitMetadata(**json_data.get("metadata", {})),
         )
 
     @classmethod
@@ -565,9 +496,11 @@ class Circuit(DataClass):
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
         num_qubits = group.attrs.get("num_qubits")
+        num_gradient = group["metadata"].attrs.get("num_phase_gradient_ancillas", 0) if "metadata" in group else 0
         return cls(
             qasm=group.attrs.get("qasm"),
             qir=group.attrs.get("qir"),
             encoding=encoding,
             num_qubits=None if num_qubits is None else int(num_qubits),
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=int(num_gradient)),
         )

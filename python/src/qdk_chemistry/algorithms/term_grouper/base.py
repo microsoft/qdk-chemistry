@@ -8,7 +8,9 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitOperator, Settings
+from qdk_chemistry.data import QubitOperator, Settings, TaperingSpecification, TermPartition
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 
 __all__ = ["TermGrouper", "TermGrouperFactory", "TermGrouperSettings"]
 
@@ -42,6 +44,52 @@ class TermGrouper(Algorithm):
     def type_name(self) -> str:
         """Return ``term_grouper`` as the algorithm type name."""
         return "term_grouper"
+
+    def run(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
+        """Reject non-Pauli representations, then run the grouping strategy.
+
+        Args:
+            qubit_hamiltonian: Hamiltonian whose Pauli terms should be partitioned.
+
+        Returns:
+            QubitOperator: A copy of the input with its term partition populated.
+
+        Raises:
+            ValueError: If the operator is not a Pauli decomposition.
+
+        """
+        container_type = qubit_hamiltonian.get_container_type()
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
+            raise ValueError(
+                f"Term grouping requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+        return super().run(qubit_hamiltonian)
+
+    @staticmethod
+    def _with_partition(
+        qubit_hamiltonian: QubitOperator, partition: TermPartition, tapering: TaperingSpecification | None = None
+    ) -> QubitOperator:
+        """Copy the terms, coefficients, encoding and mode order with *partition*, keeping sparse storage sparse."""
+        if isinstance(qubit_hamiltonian.get_container(), SparsePauliDecompositionContainer):
+            return QubitOperator(
+                container=SparsePauliDecompositionContainer(
+                    qubit_hamiltonian.pauli_strings,
+                    qubit_hamiltonian.coefficients,
+                    qubit_hamiltonian.encoding,
+                    qubit_hamiltonian.fermion_mode_order,
+                    partition,
+                    tapering,
+                )
+            )
+        return QubitOperator(
+            pauli_strings=list(qubit_hamiltonian.pauli_strings),
+            coefficients=qubit_hamiltonian.coefficients.copy(),
+            encoding=qubit_hamiltonian.encoding,
+            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+            term_partition=partition,
+            tapering=tapering,
+        )
 
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:

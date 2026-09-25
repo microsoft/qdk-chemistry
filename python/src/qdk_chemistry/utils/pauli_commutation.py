@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from qdk_chemistry.data import PauliTermAccumulator
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -53,6 +54,24 @@ __all__: list[str] = [
 ]
 
 
+def _require_pauli_decomposition(operator: QubitOperator) -> None:
+    """Reject qubit operators that do not expose explicit Pauli terms.
+
+    Args:
+        operator: Operator to validate.
+
+    Raises:
+        ValueError: If the operator is not a Pauli decomposition.
+
+    """
+    container_type = operator.get_container_type()
+    if not isinstance(operator.get_container(), PauliDecompositionContainer):
+        raise ValueError(
+            f"Pauli commutation requires a Pauli decomposition qubit operator; "
+            f"got the {container_type!r} representation."
+        )
+
+
 def commutator(h_a: QubitOperator, h_b: QubitOperator) -> QubitOperator:
     r"""Compute the commutator :math:`[H_a, H_b] = H_a H_b - H_b H_a`.
 
@@ -68,6 +87,9 @@ def commutator(h_a: QubitOperator, h_b: QubitOperator) -> QubitOperator:
 
     """
     from qdk_chemistry.data import QubitOperator as _QubitOperator  # noqa: PLC0415
+
+    _require_pauli_decomposition(h_a)
+    _require_pauli_decomposition(h_b)
 
     num_qubits = max(h_a.num_qubits, h_b.num_qubits)
     acc = PauliTermAccumulator()
@@ -340,6 +362,7 @@ def commutator_bound_first_order(
         The sum of commutator norms over all unique pairs.
 
     """
+    _require_pauli_decomposition(hamiltonian)
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     pauli_labels = [label for label, _ in real_terms]
     coefficients = [coeff for _, coeff in real_terms]
@@ -367,6 +390,7 @@ def commutator_bound_second_order(
         The commutator bound term multiplying :math:`t^{3} / 12`.
 
     """
+    _require_pauli_decomposition(hamiltonian)
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     pauli_labels = [label for label, _ in real_terms]
     coefficients = [coeff for _, coeff in real_terms]
@@ -404,6 +428,7 @@ def commutator_bound_higher_order(
         The commutator bound term :math:`\alpha` multiplying :math:`t^{order+1}` in Theorem 6 of Childs et. al (2021).
 
     """
+    _require_pauli_decomposition(hamiltonian)
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     pauli_labels = [label for label, _ in real_terms]
     coefficients = [coeff for _, coeff in real_terms]

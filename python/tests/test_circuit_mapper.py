@@ -22,7 +22,6 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )
-from qdk_chemistry.data import SparsePauliProductFormulaContainer, SparsePauliTerms
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -74,17 +73,6 @@ class TestPauliSequenceMapperNonControlled:
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
-
-    def test_run_builds_sparse_term_circuit(self):
-        container = SparsePauliProductFormulaContainer.from_sparse_terms(
-            SparsePauliTerms(2, [{0: "X"}, {1: "Z"}]),
-            [0.5, 0.25],
-            step_reps=2,
-        )
-        circuit = PauliSequenceMapper().run(UnitaryRepresentation(container=container))
-
-        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
-        assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == 2
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):

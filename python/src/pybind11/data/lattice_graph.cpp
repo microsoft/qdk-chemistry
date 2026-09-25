@@ -19,45 +19,37 @@ namespace py = pybind11;
 void lattice_graph_to_file_wrapper(
     const qdk::chemistry::data::LatticeGraph &self, const py::object &filename,
     const std::string &format_type) {
-  const auto path = qdk::chemistry::python::utils::to_string_path(filename);
-  py::gil_scoped_release release;
-  self.to_file(path, format_type);
+  self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
+               format_type);
 }
 qdk::chemistry::data::LatticeGraph lattice_graph_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
-  const auto path = qdk::chemistry::python::utils::to_string_path(filename);
-  py::gil_scoped_release release;
-  return qdk::chemistry::data::LatticeGraph::from_file(path, format_type);
+  return qdk::chemistry::data::LatticeGraph::from_file(
+      qdk::chemistry::python::utils::to_string_path(filename), format_type);
 }
 
 void lattice_graph_to_json_file_wrapper(
     const qdk::chemistry::data::LatticeGraph &self,
     const py::object &filename) {
-  const auto path = qdk::chemistry::python::utils::to_string_path(filename);
-  py::gil_scoped_release release;
-  self.to_json_file(path);
+  self.to_json_file(qdk::chemistry::python::utils::to_string_path(filename));
 }
 
 qdk::chemistry::data::LatticeGraph lattice_graph_from_json_file_wrapper(
     const py::object &filename) {
-  const auto path = qdk::chemistry::python::utils::to_string_path(filename);
-  py::gil_scoped_release release;
-  return qdk::chemistry::data::LatticeGraph::from_json_file(path);
+  return qdk::chemistry::data::LatticeGraph::from_json_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
 }
 
 void lattice_graph_to_hdf5_file_wrapper(
     const qdk::chemistry::data::LatticeGraph &self,
     const py::object &filename) {
-  const auto path = qdk::chemistry::python::utils::to_string_path(filename);
-  py::gil_scoped_release release;
-  self.to_hdf5_file(path);
+  self.to_hdf5_file(qdk::chemistry::python::utils::to_string_path(filename));
 }
 
 qdk::chemistry::data::LatticeGraph lattice_graph_from_hdf5_file_wrapper(
     const py::object &filename) {
-  const auto path = qdk::chemistry::python::utils::to_string_path(filename);
-  py::gil_scoped_release release;
-  return qdk::chemistry::data::LatticeGraph::from_hdf5_file(path);
+  return qdk::chemistry::data::LatticeGraph::from_hdf5_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
 }
 
 void bind_lattice_graph(pybind11::module &m) {
@@ -84,7 +76,18 @@ Args:
         return self.flavor;
       });
 
-  m.def("trivial_edge_coloring", &trivial_edge_coloring, R"(
+  // Module-level free function: trivial_edge_coloring
+  m.def(
+      "trivial_edge_coloring",
+      [](const Eigen::SparseMatrix<double> &adj) -> py::dict {
+        auto coloring = trivial_edge_coloring(adj);
+        py::dict out;
+        for (const auto &[edge, color] : coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
+      },
+      R"(
 Trivial edge coloring where every edge receives a unique color.
 
 Useful as a fallback when no topology-aware coloring is available.
@@ -93,9 +96,10 @@ Args:
     adj (scipy.sparse matrix): Sparse adjacency matrix of the graph.
 
 Returns:
-    dict[tuple[int, int], int]: Mapping of canonical edges to distinct color labels in iteration order.
+    dict[tuple[int, int], int]: Mapping of canonical edges to distinct
+    color labels 0, 1, 2, ... in iteration order.
 )",
-        py::arg("adj"), py::call_guard<py::gil_scoped_release>());
+      py::arg("adj"));
 
   py::class_<LatticeGraph, DataClass, py::smart_holder> lattice_graph(
       m, "LatticeGraph", R"(
@@ -133,25 +137,27 @@ Examples:
 Construct a lattice graph from a dictionary of edge weights.
 
 Args:
-    edge_weights (dict[tuple[int, int], float]): Directed (i, j) pairs mapped to edge weights.
-    num_sites (int, optional): Number of sites; if 0, inferred from edge indices. Defaults to 0.
+    edge_weights (dict[tuple[int, int], float]): Dictionary mapping (i, j) pairs
+        to edge weights.
+    num_sites (int, optional): Number of sites. If 0, inferred from edge indices.
+        Defaults to 0.
 )",
-      py::arg("edge_weights"), py::arg("num_sites") = 0,
-      py::call_guard<py::gil_scoped_release>());
+      py::arg("edge_weights"), py::arg("num_sites") = 0);
 
   // Static factories for matrix input
-  lattice_graph.def_static(
-      "from_dense_matrix", &LatticeGraph::from_dense_matrix,
-      R"(
+  lattice_graph.def_static("from_dense_matrix",
+                           &LatticeGraph::from_dense_matrix,
+                           R"(
 Create a lattice graph from a dense adjacency matrix.
 
 Args:
-    adjacency_matrix (numpy.ndarray): Dense square adjacency matrix; nonzero entries give directed edge weights.
+    adjacency_matrix (numpy.ndarray): Dense adjacency matrix [n x n]. Non-zero
+        entries indicate edges with that weight.
 
 Returns:
     LatticeGraph: A new lattice graph.
 )",
-      py::arg("adjacency_matrix"), py::call_guard<py::gil_scoped_release>());
+                           py::arg("adjacency_matrix"));
 
   lattice_graph.def_static("from_sparse_matrix",
                            &LatticeGraph::from_sparse_matrix,
@@ -164,8 +170,7 @@ Args:
 Returns:
     LatticeGraph: A new lattice graph.
 )",
-                           py::arg("sparse_adjacency_matrix"),
-                           py::call_guard<py::gil_scoped_release>());
+                           py::arg("sparse_adjacency_matrix"));
 
   lattice_graph.def_static(
       "from_geometry", &LatticeGraph::from_geometry,
@@ -187,8 +192,7 @@ Returns:
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},
-      py::arg("weight") = 1.0, py::arg("tolerance") = 1.0e-9,
-      py::call_guard<py::gil_scoped_release>());
+      py::arg("weight") = 1.0, py::arg("tolerance") = 1.0e-9);
 
   lattice_graph.def_static(
       "from_connections", &LatticeGraph::from_connections,
@@ -213,8 +217,7 @@ Raises:
 )",
       py::arg("num_sites"), py::arg("connections"),
       py::arg("geometry") = py::none(),
-      py::arg("selected_shells") = std::vector<std::uint64_t>{},
-      py::call_guard<py::gil_scoped_release>());
+      py::arg("selected_shells") = std::vector<std::uint64_t>{});
 
   lattice_graph.def_static("permute", &LatticeGraph::permute, R"(
 Relabel sites, physical connections, geometry, and topology colors together.
@@ -229,16 +232,17 @@ Returns:
 Raises:
         ValueError: If path is not a permutation of every site.
 )",
-                           py::arg("graph"), py::arg("path"),
-                           py::call_guard<py::gil_scoped_release>());
+                           py::arg("graph"), py::arg("path"));
 
-  lattice_graph.def_static(
-      "make_bidirectional", &LatticeGraph::make_bidirectional,
-      R"(
+  lattice_graph.def_static("make_bidirectional",
+                           &LatticeGraph::make_bidirectional,
+                           R"(
 Return a new lattice graph with reverse edges added.
 
-Computes ``A + A.T``, doubling existing symmetric weights and resolved
-connection weights. Stored topology coloring is cleared.
+For each directed edge (i,j) with weight w, ensures (j,i) also
+exists with the same weight. Computes A_out = A + A^T, so this
+should be called on graphs where edges are specified in one
+direction only. Resolved connection weights are doubled.
 
 Args:
     graph (LatticeGraph): The (possibly directed) lattice graph.
@@ -246,7 +250,7 @@ Args:
 Returns:
     LatticeGraph: A new lattice graph with bidirectional edges.
 )",
-      py::arg("graph"), py::call_guard<py::gil_scoped_release>());
+                           py::arg("graph"));
 
   // Properties / accessors
   lattice_graph.def_property_readonly("num_sites", &LatticeGraph::num_sites, R"(
@@ -255,26 +259,20 @@ Number of lattice sites.
 Returns:
     int: Number of sites in the lattice.
 )");
-  lattice_graph.def_property_readonly(
-      "num_edges",
-      [](const LatticeGraph &self) {
-        py::gil_scoped_release release;
-        return self.num_edges();
-      },
-      R"(
-Number of stored upper-triangular adjacency entries.
+  lattice_graph.def_property_readonly("num_edges", &LatticeGraph::num_edges, R"(
+Number of unique edges in the lattice.
 
 Returns:
-        int: Count of entries with ``i < j``, excluding self-image diagonal entries.
+    int: Number of edges.
 )");
   lattice_graph.def_property_readonly("num_nonzeros",
                                       &LatticeGraph::num_nonzeros, R"(
-Number of stored entries in the sparse adjacency matrix.
+Number of non-zero entries in the adjacency matrix.
 
-For a symmetric graph without diagonal entries this is twice the edge count.
+For a symmetric graph this is twice the number of edges.
 
 Returns:
-        int: Number of stored adjacency entries, including retained zero weights.
+    int: Number of non-zero adjacency entries.
 )");
   lattice_graph.def_property_readonly("is_symmetric",
                                       &LatticeGraph::is_symmetric, R"(
@@ -301,11 +299,7 @@ Returns:
 )");
   lattice_graph.def_property_readonly(
       "connections",
-      [](const LatticeGraph &self) {
-        py::gil_scoped_release release;
-        return self.connections();
-      },
-      R"(
+      [](const LatticeGraph &self) { return self.connections(); }, R"(
 Resolved physical connections with weights and optional semantic labels.
 
 Returns:
@@ -324,15 +318,13 @@ Args:
 Returns:
     LatticeGraph: Graph sharing geometry with unchanged selection, weights, and topology.
 )",
-                    py::arg("definitions"), py::arg("tolerance") = 1.0e-9,
-                    py::call_guard<py::gil_scoped_release>());
+                    py::arg("definitions"), py::arg("tolerance") = 1.0e-9);
   lattice_graph.def("adjacency_matrix", &LatticeGraph::adjacency_matrix, R"(
 Return the dense adjacency matrix.
 
 Returns:
     numpy.ndarray: Dense adjacency matrix [n x n].
-)",
-                    py::call_guard<py::gil_scoped_release>());
+)");
   lattice_graph.def("sparse_adjacency_matrix",
                     &LatticeGraph::sparse_adjacency_matrix,
                     R"(
@@ -369,9 +361,16 @@ Returns:
 
   lattice_graph.def_property_readonly(
       "edge_coloring",
-      [](const LatticeGraph &self) {
-        py::gil_scoped_release release;
-        return self.edge_coloring();
+      [](const LatticeGraph &self) -> std::optional<py::dict> {
+        const auto &coloring = self.edge_coloring();
+        if (!coloring.has_value()) {
+          return std::nullopt;
+        }
+        py::dict out;
+        for (const auto &[edge, color] : *coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
       },
       R"(
 Edge coloring stored at construction time, or ``None``.
@@ -380,7 +379,8 @@ Factory methods and explicit physical-connection constructors pre-populate this 
 Returns ``None`` for lattices constructed without a coloring.
 
 Returns:
-    dict[tuple[int, int], int] | None: Independent mapping of canonical edges to non-negative color labels, or None.
+    dict[tuple[int, int], int] | None: Mapping of canonical edges (``i < j``)
+    to non-negative color labels, or ``None``.
 )");
 
   // Static factory methods
@@ -398,9 +398,9 @@ With periodic boundary condition:
 
 Args:
     n (int): Number of sites.
-    periodic (bool, optional): If True and n > 2, connect the first and last sites. Defaults to False.
+    periodic (bool, optional): If True, add an edge between the first and
+        last site (ring topology). Requires n > 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
-    dfs_ordering (bool, optional): Relabel sites in a Hamiltonian path found by depth-first search. Defaults to False.
 
 Returns:
     LatticeGraph: Chain lattice with n sites.
@@ -413,8 +413,7 @@ Examples:
     >>> ring = LatticeGraph.chain(6, periodic=True)
 )",
                            py::arg("n"), py::arg("periodic") = false,
-                           py::arg("t") = 1.0, py::arg("dfs_ordering") = false,
-                           py::call_guard<py::gil_scoped_release>());
+                           py::arg("t") = 1.0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static("square", &LatticeGraph::square, R"(
 Create a two-dimensional square lattice.
@@ -437,10 +436,11 @@ With periodic boundary conditions (using the 4x3 example above):
 Args:
     nx (int): Number of sites along x.
     ny (int): Number of sites along y.
-    periodic_x (bool, optional): Apply periodic boundary conditions along x; requires nx >= 2. Defaults to False.
-    periodic_y (bool, optional): Apply periodic boundary conditions along y; requires ny >= 2. Defaults to False.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
-    dfs_ordering (bool, optional): Relabel sites in a Hamiltonian path found by depth-first search. Defaults to False.
 
 Returns:
     LatticeGraph: Square lattice with nx * ny sites.
@@ -451,8 +451,7 @@ Raises:
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
                            py::arg("periodic_y") = false, py::arg("t") = 1.0,
-                           py::arg("dfs_ordering") = false,
-                           py::call_guard<py::gil_scoped_release>());
+                           py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static(
       "triangular", &LatticeGraph::triangular, R"(
@@ -479,11 +478,12 @@ With periodic boundary conditions (using the 3x3 example above):
 Args:
     nx (int): Number of sites along x.
     ny (int): Number of sites along y.
-    periodic_x (bool, optional): Apply periodic boundary conditions along x; requires nx >= 2. Defaults to False.
-    periodic_y (bool, optional): Apply periodic boundary conditions along y; requires ny >= 2. Defaults to False.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
     coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
-    dfs_ordering (bool, optional): Relabel sites in a Hamiltonian path found by depth-first search. Defaults to False.
 
 Returns:
     LatticeGraph: Triangular lattice with nx * ny sites.
@@ -493,18 +493,19 @@ Raises:
 )",
       py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
       py::arg("periodic_y") = false, py::arg("t") = 1.0,
-      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false,
-      py::call_guard<py::gil_scoped_release>());
+      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
-  lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb,
-                           R"(
-Create a two-dimensional honeycomb lattice sized by unit cells.
+  lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb, R"(
+Create a two-dimensional honeycomb lattice.
 
 The honeycomb lattice has two sites per unit cell (A and B sublattices).
 Unit cells are arranged on a rectangular grid of size nx x ny, giving a
-total of ``2 * nx * ny`` sites.
+total of 2 * nx * ny sites. Sites are indexed as:
 
-Example: 3x4 honeycomb lattice::
+    - A-sublattice: 2 * (y * nx + x)
+    - B-sublattice: 2 * (y * nx + x) + 1
+
+Example: 3x4 honeycomb (brick-wall representation)::
 
               18-19-20-21-22-23
                |     |     |
@@ -514,16 +515,21 @@ Example: 3x4 honeycomb lattice::
          |     |     |
       0--1--2--3--4--5
 
+With periodic boundary conditions (using the 3x4 example above):
+    - periodic_x wraps right to left: 5 -- 0, 11 -- 6, 17 -- 12, 23 -- 18
+    - periodic_y wraps top to bottom: 19 -- 0, 21 -- 2, 23 -- 4
+
 Args:
     nx (int): Number of unit cells along x.
     ny (int): Number of unit cells along y.
-    periodic_x (bool, optional): If True, apply periodic boundary conditions along x. Requires nx > 1. Defaults to False.
-    periodic_y (bool, optional): If True, apply periodic boundary conditions along y. Requires ny > 1. Defaults to False.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
-    dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
 
 Returns:
-    LatticeGraph: Honeycomb lattice with ``2 * nx * ny`` sites.
+    LatticeGraph: Honeycomb lattice with 2 * nx * ny sites.
 
 Raises:
     ValueError: If nx or ny is 0.
@@ -531,8 +537,7 @@ Raises:
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
                            py::arg("periodic_y") = false, py::arg("t") = 1.0,
-                           py::arg("dfs_ordering") = false,
-                           py::call_guard<py::gil_scoped_release>());
+                           py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static(
       "honeycomb_plaquettes", &LatticeGraph::honeycomb_plaquettes,
@@ -566,8 +571,7 @@ Raises:
 )",
       py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
       py::arg("periodic_y") = false, py::arg("t") = 1.0,
-      py::arg("dfs_ordering") = false,
-      py::call_guard<py::gil_scoped_release>());
+      py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static(
       "kagome", &LatticeGraph::kagome, R"(
@@ -605,11 +609,12 @@ With periodic boundary conditions (using the 3x2 example above):
 Args:
     nx (int): Number of unit cells along x.
     ny (int): Number of unit cells along y.
-    periodic_x (bool, optional): Apply periodic boundary conditions along x; requires nx >= 2. Defaults to False.
-    periodic_y (bool, optional): Apply periodic boundary conditions along y; requires ny >= 2. Defaults to False.
+    periodic_x (bool, optional): If True, apply periodic boundary conditions
+        along x. Requires nx >= 2. Defaults to False.
+    periodic_y (bool, optional): If True, apply periodic boundary conditions
+        along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
     coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
-    dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
 
 Returns:
     LatticeGraph: Kagome lattice with 3 * nx * ny sites.
@@ -619,8 +624,7 @@ Raises:
 )",
       py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
       py::arg("periodic_y") = false, py::arg("t") = 1.0,
-      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false,
-      py::call_guard<py::gil_scoped_release>());
+      py::arg("coloring_seed") = 0, py::arg("dfs_ordering") = false);
 
   lattice_graph.def("__repr__", [](const LatticeGraph &self) {
     return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
@@ -650,12 +654,11 @@ Examples:
       [](const LatticeGraph &self) -> std::string {
         return self.to_json().dump();
       },
-      py::call_guard<py::gil_scoped_release>(),
       R"(
 Convert the lattice graph to a JSON string.
 
 Returns:
-        str: JSON preserving connectivity, resolved records, selected shells, and optional geometry.
+    str: JSON preserving connectivity, resolved records, selected shells, and optional geometry.
 )");
   lattice_graph.def_static(
       "from_json",
@@ -671,7 +674,7 @@ Args:
 Returns:
     LatticeGraph: New LatticeGraph instance.
 )",
-      py::arg("json_str"), py::call_guard<py::gil_scoped_release>());
+      py::arg("json_str"));
   lattice_graph.def("to_file", lattice_graph_to_file_wrapper, R"(
 Save the lattice graph to a file.
 
@@ -764,11 +767,11 @@ Examples:
   // Pickling support using JSON serialization
   lattice_graph.def(py::pickle(
       [](const LatticeGraph &lg) -> std::string {
-        py::gil_scoped_release release;
+        // Return JSON string for pickling
         return lg.to_json().dump();
       },
       [](const std::string &json_str) -> LatticeGraph {
-        py::gil_scoped_release release;
+        // Reconstruct from JSON string
         return LatticeGraph::from_json(nlohmann::json::parse(json_str));
       }));
 
@@ -778,7 +781,7 @@ Examples:
 Return the wire-format identifier for lattice graphs.
 
 Returns:
-    str: ``"lattice_graph"``
+        str: ``"lattice_graph"``
 
 )");
 }

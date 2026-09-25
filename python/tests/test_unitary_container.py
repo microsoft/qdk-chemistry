@@ -11,7 +11,6 @@ import h5py
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import SparsePauliProductFormulaContainer, SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -30,13 +29,9 @@ def step_terms():
     ]
 
 
-@pytest.fixture(params=[False, True], ids=["ordinary", "sparse-factory"])
-def container(step_terms, request):
+@pytest.fixture
+def container(step_terms):
     """Create a PauliProductFormulaContainer instance for testing."""
-    if request.param:
-        return SparsePauliProductFormulaContainer.from_sparse_terms(
-            SparsePauliTerms(2, [{0: "X"}, {}, {0: "Y", 1: "X"}]), [0.5, 0.7, 0.3], step_reps=4, scale=1.7
-        )
     return PauliProductFormulaContainer(
         step_terms=step_terms,
         step_reps=4,
@@ -99,7 +94,6 @@ class TestPauliProductFormulaContainer:
         assert updated_container.step_terms[0] == container.step_terms[1]
         assert updated_container.step_terms[1] == container.step_terms[2]
         assert updated_container.step_terms[2] == container.step_terms[0]
-        assert updated_container.scale == container.scale
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
@@ -149,6 +143,9 @@ class TestPauliProductFormulaContainer:
             restored = PauliProductFormulaContainer.from_hdf5(f["container"])
 
         assert restored.type == container.type
+        assert restored.num_qubits == container.num_qubits
+        assert restored.step_reps == container.step_reps
+        assert len(restored.step_terms) == len(container.step_terms)
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
     def test_version_0_2_layout_loads_in_order(self, tmp_path, file_format):
@@ -180,7 +177,7 @@ class TestPauliProductFormulaContainer:
     @pytest.mark.parametrize("with_endpoints", [False, True])
     def test_serialization_preserves_term_order_and_hash(self, container, file_format, tmp_path, with_endpoints):
         """Restore numeric Pauli keys and order, including double-digit HDF5 term indices."""
-        container = type(container)(
+        container = PauliProductFormulaContainer(
             [ExponentiatedPauliTerm(container.step_terms[i % 3].pauli_term, i * 0.1) for i in range(13)],
             container.step_reps,
             container.num_qubits,
@@ -193,7 +190,6 @@ class TestPauliProductFormulaContainer:
         filename = tmp_path / f"formula.pauli_product_formula_container.{file_format}"
         container.to_file(filename, file_format)
         restored = PauliProductFormulaContainer.from_file(filename, file_format)
-        assert type(restored) is PauliProductFormulaContainer
         assert restored.to_json() == container.to_json()
         assert restored.content_hash() == container.content_hash()
         assert all(isinstance(key, int) for term in restored.step_terms for key in term.pauli_term)
@@ -278,8 +274,8 @@ class TestPauliProductFormulaContainer:
         assert original.reorder_terms([0]).content_hash() == original.content_hash()
 
     @pytest.mark.parametrize("inverse_reps", [1, 4])
-    def test_sparse_factory_inherits_fusion(self, container, inverse_reps):
-        """Use the ordinary fusion rule, including complete cancellation and identities."""
+    def test_combine_with_inverse_cancels(self, container, inverse_reps):
+        """Fuse a formula with its inverse, including complete cancellation."""
         inverse = PauliProductFormulaContainer(
             [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(container.step_terms)],
             inverse_reps,

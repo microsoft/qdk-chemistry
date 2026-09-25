@@ -17,8 +17,8 @@ parameters:
 
 steps:
 # Windows ARM64 tests in a venv on the agent's own interpreter; every other
-# target uses the policy-default conda path, and conda brings its own Python.
-# See the note in build-pip-wheels-windows.yml for why ARM64 cannot use
+# target uses the policy-default ms-ensureconda path, and conda brings its own
+# Python. See the note in build-pip-wheels-windows.yml for why ARM64 cannot use
 # UsePythonVersion@0.
 - ${{ if eq(parameters.arch, 'arm64') }}:
   - pwsh: >-
@@ -36,7 +36,7 @@ steps:
       -PythonEnv $pythonEnv `
       -Triplet '$(VCPKG_TRIPLET)' `
       -RunSlowTests '${{ parameters.runSlowTests }}'
-  displayName: Test wheel (Windows, Python ${{ parameters.pythonVersion }})
+  displayName: Audit and test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}
   env:
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)

@@ -26,6 +26,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
     ControlledOperation,
     LCUContainer,
@@ -116,6 +117,13 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         """
         power: int = self._settings.get("power")
         quantum_walk: bool = self._settings.get("quantum_walk")
+
+        container_type = qubit_hamiltonian.get_container_type()
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
+            raise ValueError(
+                f"LCU block encoding requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
 
         if not qubit_hamiltonian.is_hermitian():
             raise ValueError("LCU block encoding requires a Hermitian Hamiltonian.")

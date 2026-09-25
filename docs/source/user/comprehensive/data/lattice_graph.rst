@@ -437,49 +437,6 @@ Different families can use different subsets of the stored colors, even on the s
 
 The :ref:`spin model builders <model-term-partition>` perform this filtering automatically when ``include_term_groups=True`` and a stored coloring is available, then store the resulting layers on :attr:`~qdk_chemistry.data.QubitOperator.term_partition`.
 
-.. _lattice-geometry-migration:
-
-Migrating geometry-aware code
------------------------------
-
-Existing nearest-neighbor graph factories and adjacency-based model calls retain their behavior.
-Code that used a graph as a geometry container, or relied on a model to discover additional shells, needs the following changes:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 40 60
-
-   * - Previous access
-     - Explicit geometry/graph access
-   * - ``LatticeGraph.square(nx, ny)`` for coordinates or shell discovery
-     - ``LatticeGeometry.square(nx, ny)``; select connectivity separately with ``LatticeGraph.from_geometry``.
-   * - ``graph.positions``
-     - ``graph.geometry.positions`` when ``graph.geometry is not None``.
-   * - ``graph.mth_nearest_neighbors(m)``
-     - ``graph.geometry.mth_nearest_neighbors(m)`` for an open geometry.
-   * - ``graph.nearest_neighbor_shells(shells)``
-     - ``graph.geometry.nearest_neighbor_shells(shells)`` for open-geometry queries, not graph selection.
-   * - ``graph.neighbor_connections(shells)``
-     - ``graph.geometry.neighbor_connections(shells)`` for geometric discovery; ``graph.connections`` for already-selected weighted/flavored records.
-   * - ``graph.bond_flavor_definitions``
-     - Supply definitions when constructing or relabeling a graph; inspect each stored connection's integer ``flavor`` instead of a retained definition recipe.
-
-Select the union of nonzero requested interaction shells **before** constructing a :doc:`model Hamiltonian <../model_hamiltonians>`.
-For example, a first- and second-neighbor Heisenberg model needs ``shells=[1, 2]``; a mapping ``{2: J2}`` on a nearest-neighbor-only graph no longer adds second-neighbor edges.
-An active mapped shell absent from ``selected_shells`` raises an error, whereas a selected but geometrically unavailable shell contributes no terms.
-Zero or empty mappings do not require selecting extra shells.
-
-On an open graph, count distinct shell-1 pairs when reporting nearest-neighbor bonds; ``num_edges`` now describes the selected union:
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
-      :language: python
-      :start-after: # start-cell-count-shell-edges
-      :end-before: # end-cell-count-shell-edges
-
-Do not use pair-only counts to identify physical edges under periodic boundaries; retain the image shift in each :class:`~qdk_chemistry.data.NeighborConnection`.
-
 Related classes
 ---------------
 

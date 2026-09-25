@@ -196,9 +196,9 @@ class LatticeGraph : public DataClass {
   /**
    * @brief Return a new lattice graph with reverse edges added.
    *
-   * Computes A_out = A + A^T, doubling weights already present symmetrically.
-   * Explicit connection weights are doubled, including self-images, and any
-   * stored topology coloring is cleared.
+   * For each directed edge (i,j) with weight w, ensures (j,i) also exists
+   * with the same weight. Computes A_out = A + A^T. Explicit connection
+   * weights are doubled, including self-images.
    *
    * @param graph The (possibly directed) lattice graph.
    * @return A new LatticeGraph with bidirectional edges.
@@ -394,7 +394,7 @@ class LatticeGraph : public DataClass {
    *
    * The honeycomb lattice has two sites per unit cell (A and B sublattices).
    * Unit cells are arranged on a rectangular grid of size nx x ny, giving a
-   * total of 2 * nx * ny sites. Sites are indexed as:
+   * total of 2 * nx * ny sites.  Sites are indexed as:
    *   - A-sublattice: 2 * (y * nx + x)
    *   - B-sublattice: 2 * (y * nx + x) + 1
    *
@@ -411,12 +411,16 @@ class LatticeGraph : public DataClass {
    *
    * @endcode
    *
+   * With periodic boundary conditions (using the 3x4 example above):
+   *   - periodic_x wraps right to left: 5 -- 0, 11 -- 6, 17 -- 12, 23 -- 18
+   *   - periodic_y wraps top to bottom: 19 -- 0, 21 -- 2, 23 -- 4
+   *
    * @param nx         Number of unit cells along the x-axis.
    * @param ny         Number of unit cells along the y-axis.
    * @param periodic_x If true, apply periodic boundary conditions along x.
-   * Requires nx > 1. Default: false.
+   * Requires nx >= 2. Default: false.
    * @param periodic_y If true, apply periodic boundary conditions along y.
-   * Requires ny > 1. Default: false.
+   * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
    * @param dfs_ordering Reserved for API compatibility; currently ignored.
    *                     Default: false.
@@ -619,6 +623,15 @@ class LatticeGraph : public DataClass {
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
+  /**
+   * @brief Private constructor from a sparse adjacency matrix.
+   *
+   * Used internally by factory methods, deserialization, and
+   * make_bidirectional().
+   *
+   * @param adjacency Sparse square adjacency matrix (moved in).
+   * @param coloring  Optional edge coloring (moved in).
+   */
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
                         std::optional<EdgeColoring> coloring = std::nullopt);
 

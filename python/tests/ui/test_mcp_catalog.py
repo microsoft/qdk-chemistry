@@ -133,6 +133,11 @@ def test_live_mcp_catalog_has_compact_descriptions():
 
 
 @requires_mcp
+def test_live_mcp_server_advertises_apps_extension():
+    assert app._lowlevel_server.extensions["io.modelcontextprotocol/ui"] == {}
+
+
+@requires_mcp
 def test_compact_descriptions_identify_tool_operations():
     descriptions = {tool.name: (tool.description or "").lower() for tool in _compact_catalog()}
     required_terms = {

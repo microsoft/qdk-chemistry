@@ -191,18 +191,6 @@ print(f"Adjacency matrix:\n{adj_matrix}")
 ################################################################################
 
 ################################################################################
-# start-cell-count-shell-edges
-nearest_neighbor_pairs = {
-    (connection.site_i, connection.site_j)
-    for connection in graph.connections
-    if connection.bond_class.shell == 1
-}
-print(f"Nearest-neighbor pairs: {len(nearest_neighbor_pairs)}")
-print(f"All selected interaction edges: {graph.num_edges}")
-# end-cell-count-shell-edges
-################################################################################
-
-################################################################################
 # start-cell-serialization
 lattice = flavored_graph
 

@@ -13,8 +13,8 @@ Sparse Pauli representation
 ---------------------------
 
 :meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` stores non-identity factors using
-:class:`~qdk_chemistry.data.SparsePauliTerms`, with owned, read-only coefficients.
-Use :meth:`~qdk_chemistry.data.QubitOperator.iter_sparse_terms` to traverse these factors without
+:class:`~qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition.SparsePauliTerms`, with owned, read-only coefficients.
+Use :meth:`~qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition.SparsePauliDecompositionContainer.iter_sparse_terms` to traverse these factors without
 expanding full-width labels. Indexing or iterating ``pauli_strings`` explicitly materializes labels.
 Product formulas use :class:`~qdk_chemistry.data.PauliProductFormulaContainer` and symbolic repetitions;
 there is no separate packed runtime representation.
@@ -260,7 +260,6 @@ For example, a physical-spin first- and second-neighbor Heisenberg model can be 
 The :ref:`Kitaev builder <model-kitaev>` also needs shell 1 for nonzero effective Gamma or Gamma-prime interactions.
 Resolve each flavor override before deciding whether that shell is active: setting every override to zero disables a nonzero shared default.
 Magnetic fields are single-site terms and do not require graph edges.
-See :ref:`lattice-geometry-migration` for coordinate-query, connection-record, and edge-count migration details.
 
 .. _model-heisenberg:
 
@@ -406,7 +405,6 @@ Thus applying :math:`D^{\mathsf T}` to the coefficients is not a transformation 
 More generally, if ``spin_basis_transform`` is :math:`C` with :math:`\boldsymbol{S}_{\mathrm{out}}=C\boldsymbol{S}_{xyz}`, the emitted coefficient vector is :math:`CD^{\mathsf T}\boldsymbol{h}_{abc}/2` because :math:`S^\mu=\sigma^\mu/2`.
 Passing :math:`C=D` expresses both exchange and field terms directly in the crystallographic frame.
 ``bohr_magneton`` converts the supplied field units into the energy units of the exchange parameters and defaults to one for reduced-unit calculations.
-For fields in tesla and exchange parameters in meV, pass ``BOHR_MAGNETON / ELEMENTARY_CHARGE * 1e3`` from :mod:`qdk_chemistry.constants`, the CODATA Bohr magneton in meV/T.
 
 .. tab:: Python API
 

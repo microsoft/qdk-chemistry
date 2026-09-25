@@ -57,11 +57,11 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
             t: The time at which to evaluate the Hamiltonian.
 
         Returns:
-            The qubit operator at the given time.
+            The qubit operator at the given time, or H0 unchanged when f(t) is zero.
 
         """
         scale = self._drive(t)
-        if scale == 0.0 and self._base_hamiltonian.term_partition is not None:
+        if scale == 0.0:
             return self._base_hamiltonian
         return self._base_hamiltonian + scale * self._drive_hamiltonian
 
