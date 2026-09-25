@@ -15,6 +15,18 @@ on:
         required: false
         default: false
         type: boolean
+      ctest_workers:
+        description: CTest workers on Linux and Windows
+        required: false
+        default: '1'
+        type: choice
+        options: ['1', '2', '4', '8']
+      macos_ctest_workers:
+        description: CTest workers on macOS
+        required: false
+        default: '1'
+        type: choice
+        options: ['1', '2', '3']
       rebuild_dep_cache:
         description: Rebuild dependency cache from scratch (ignore existing cache)
         required: false
@@ -273,6 +285,7 @@ jobs:
     - name: Run C++ tests
       env:
         OMP_NUM_THREADS: ${{ matrix.cpp-omp-threads }}
+        CTEST_WORKERS: ${{ matrix.os-name == 'macOS' && (inputs.macos_ctest_workers || '1') || (inputs.ctest_workers || '1') }}
       run: |
         mkdir -p test-results
         cd "$BUILD_DIR"
@@ -280,9 +293,9 @@ jobs:
         echo "=== Running C++ Tests ==="
         set +e
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
@@ -707,11 +720,12 @@ jobs:
       shell: pwsh
       env:
         OMP_NUM_THREADS: '2'
+        CTEST_WORKERS: ${{ inputs.ctest_workers || '1' }}
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Skip the vendored libint2's own tests: they build the dependency at
         # test time rather than exercising qdk. MACIS_SERIAL_TEST is excluded as on Linux.
-        ctest --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit|libint2/eritest"
         $code = $LASTEXITCODE
@@ -976,10 +990,11 @@ jobs:
       timeout-minutes: 75
       env:
         OMP_NUM_THREADS: '2'
+        CTEST_WORKERS: ${{ inputs.ctest_workers || '1' }}
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Same exclusions as the x86_64 Windows job.
-        ctest --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit"
         $code = $LASTEXITCODE
