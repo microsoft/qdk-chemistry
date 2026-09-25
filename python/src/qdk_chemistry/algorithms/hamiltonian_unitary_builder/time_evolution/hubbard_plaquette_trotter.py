@@ -190,41 +190,61 @@ class HubbardPlaquetteTrotter(Trotter):
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         r"""Build Campbell's segmented plaquette product formula.
 
-        The builder reads a :class:`~qdk_chemistry.data.QubitOperator` backed by a
-        :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`
-        and follows Campbell's decomposition :math:`H=H_I+H_h^p+H_h^g`, where
-        :math:`H_I` is the particle-hole-shifted onsite interaction and :math:`p` and
-        :math:`g` denote the pink and gold hopping tilings. One step applies
+        For a periodic :math:`w \times h` square lattice of :math:`M = wh` sites. Writing :math:`\langle ij \rangle`
+        for its bonds, :math:`\sigma \in \{\uparrow, \downarrow\}` for spin, :math:`a_{i\sigma}` for the
+        fermionic annihilation operator on site :math:`i` with spin :math:`\sigma`, and
+        :math:`n_{i\sigma} = a^\dagger_{i\sigma} a_{i\sigma}` for its number operator, the Fermi-Hubbard
+        Hamiltonian is
 
         .. math::
-            e^{-isH_h^p/2} e^{-isH_I/2} e^{-isH_h^g} e^{-isH_I/2} e^{-isH_h^p/2},
+            H = -t \sum_{\langle ij \rangle, \sigma} \left( a^\dagger_{i\sigma} a_{j\sigma}
+                + a^\dagger_{j\sigma} a_{i\sigma} \right)
+              + U \sum_i n_{i\uparrow} n_{i\downarrow}
+              + \varepsilon \sum_{i\sigma} n_{i\sigma},
 
-        so adjacent steps merge their outer half-layers into one full-angle
-        :math:`e^{-isH_h^p}`, and the whole evolution collapses to a single
-        :math:`e^{-isH_h^p/2}` boundary wrapped around the merged bodies:
+        where :math:`t` is the hopping amplitude, :math:`U` the on-site interaction, and :math:`\varepsilon`
+        the on-site energy.
+        :math:`H_I` collects the diagonal on-site terms above and :math:`H_h^p`, :math:`H_h^g` are the pink
+        and gold tilings: two sets of vertex-disjoint four-cycles that together cover every bond exactly
+        once. 
 
-        .. math::
-            e^{-isH_h^p/2}
-            \left( e^{-isH_I/2} e^{-isH_h^g} e^{-isH_I/2} e^{-isH_h^p} \right)^{r-1}
-            e^{-isH_I/2} e^{-isH_h^g} e^{-isH_I/2} e^{-isH_h^p/2}.
-
-        Placing a hopping tiling outermost is the "PIG" ordering of Eqs. (16a)-(16b) of
-        :cite:`Apel2026`. It is a deliberate deviation from Campbell's own Eq. (D2)
-        :cite:`Campbell2022`, which puts :math:`H_I` outermost ("IPG"): PIG merges the
-        more resource-intensive hopping layers across step boundaries, where IPG merges
-        the cheaper interaction layers.
-
-        Each plaquette hopping evolution is exact. The builder diagonalizes its
-        single-particle matrix, :math:`T = V \Lambda V^\dagger`, and applies
+        The :math:`2M` spin orbitals are numbered :math:`m = i + \sigma M`  so the two spin sectors are
+        contiguous blocks and a site's two orbitals sit a fixed stride :math:`M` apart. Under
+        :math:`n_m = (1 - Z_m)/2` the on-site terms are diagonal,
 
         .. math::
-            e^{-isH_\square} = U_V e^{-is\sum_m \lambda_m n_m} U_V^\dagger.
+            U \sum_i n_{i\uparrow} n_{i\downarrow} + \varepsilon \sum_{i\sigma} n_{i\sigma}
+            = \underbrace{\frac{U}{4} \sum_i Z_{i} Z_{i+M}}_{\text{pair}}
+            - \underbrace{\left( \frac{\varepsilon}{2} + \frac{U}{4} \right) \sum_m Z_m}_{\text{single mode}}
+            + \underbrace{\left( \varepsilon + \frac{U}{4} \right) M}_{\text{scalar}},
 
-        Thus the circuit switches to the plaquette momentum basis, applies two nonzero
-        eigenvalue phases, and switches back; the four-cycle hopping matrix has only two
-        non-trivial eigenvalues, so two phase rotations suffice (App. E, Eqs. (E6)-(E10)
-        of :cite:`Campbell2022`). Trotter error comes only from splitting
-        :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`.
+        while a hopping bond becomes a two-local term dressed by a Jordan-Wigner string of :math:`Z`
+        operators between its endpoints,
+
+        .. math::
+            -t \left( a^\dagger_m a_n + a^\dagger_n a_m \right)
+            = -\frac{t}{2} \left( X_m Z_{m+1} \cdots Z_{n-1} X_n + Y_m Z_{m+1} \cdots Z_{n-1} Y_n \right).
+
+        To avoid the Z strings, the ``HoppingLayer`` first routes every four-cycle of the tiling onto four 
+        contiguous modes with a network of fermionic swaps, so the whole layer is one batch of equal-angle 
+        two-local rotations that can be applied in parallel.
+
+        The hopping term is also diagnolized: its single-particle matrix :math:`K = t A = V \Lambda V^\dagger`, with 
+        :math:`A` the adjacency matrix of a four-cycle, is diagonalized by the discrete Fourier transform :math:`V`,
+        whose eigenvalues are :math:`\Lambda = \mathrm{diag}(2t, 0, -2t, 0)`,
+        so the hopping term has a fswap routing, basis change, two nonzero eigenvalue phases, and the inverse.
+
+        Over a total evolution time
+        :math:`T` split into :math:`r` steps of duration :math:`\delta = T/r`, one second-order step is
+
+        .. math::
+            e^{-i\delta H_h^p/2}
+            \left( e^{-i\delta H_I/2} e^{-i\delta H_h^g} e^{-i\delta H_I/2} e^{-i\delta H_h^p} \right)^{r-1}
+            e^{-i\delta H_I/2} e^{-i\delta H_h^g} e^{-i\delta H_I/2} e^{-i\delta H_h^p/2}.
+
+        Placing a hopping tiling outermost is the "PIG" ordering of Eqs. (16a)-(16b) of :cite:`Apel2026`.
+        Trotter error comes only from splitting :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`; each layer
+        is applied exactly.
 
         Args:
             qubit_hamiltonian: Qubit operator wrapping a ``LatticeContainer``.
