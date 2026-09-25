@@ -11,6 +11,7 @@
 #include <set>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 
 // MACIS Headers
 #include <macis/mcscf/fock_matrices.hpp>
@@ -89,7 +90,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
   // Convert to libint2 basis set
   const qcs::libint2_util::Basis obs(basis_set);
-  auto shell2bf = obs.shell2bf();
+  const auto& shell2bf = obs.shell2bf();
 
   // Compute Schwarz screening matrix
   const size_t num_shells_schwarz = obs.size();
@@ -139,12 +140,12 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 #else
   const int nthreads = 1;
 #endif
-  std::vector<qcs::libint2_util::Engine> engines_coulomb(nthreads);
-  engines_coulomb[0] = qcs::libint2_util::Engine(
-      qcs::libint2_util::Operator::coulomb, obs.max_nprim(), obs.max_l(), 0);
-  engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-  engines_coulomb[0].set_precision(engine_precision);
-  for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+  qcs::libint2_util::Engine base_engine(qcs::libint2_util::Operator::coulomb,
+                                        obs.max_nprim(), obs.max_l(), 0);
+  base_engine.set(::libint2::ScreeningMethod::Original);
+  base_engine.set_precision(engine_precision);
+  auto engines_coulomb =
+      qcs::libint2_util::Engine::make_pool(nthreads, std::move(base_engine));
 
   // index of current cholesky vector
   size_t current_col = 0;

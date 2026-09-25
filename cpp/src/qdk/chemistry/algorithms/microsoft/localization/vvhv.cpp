@@ -399,8 +399,8 @@ void VVHVLocalization::initialize() {
         std::max(ori_bs_libs.max_nprim(), minimal_bs_libs.max_nprim()),
         std::max(ori_bs_libs.max_l(), minimal_bs_libs.max_l()), 0);
 
-    auto shell2bf_ori = ori_bs_libs.shell2bf();
-    auto shell2bf_min = minimal_bs_libs.shell2bf();
+    const auto& shell2bf_ori = ori_bs_libs.shell2bf();
+    const auto& shell2bf_min = minimal_bs_libs.shell2bf();
 
     for (auto i = 0; i < ori_bs_libs.size(); ++i)
       for (auto j = 0; j < minimal_bs_libs.size(); ++j) {

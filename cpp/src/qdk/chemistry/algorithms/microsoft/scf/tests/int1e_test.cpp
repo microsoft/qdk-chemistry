@@ -97,6 +97,7 @@ TEST(int1e, overlap_integral) { test_integral("overlap_integral"); }
 TEST(int1e, kinetic_integral) { test_integral("kinetic_integral"); }
 TEST(int1e, nuclear_integral) { test_integral("nuclear_integral", 1e-8); }
 TEST(int1e, ecp_integral) { test_integral("ecp_integral", 1e-8); }
+TEST(int1e, ecp_gradient_cpu) { test_gradient("ecp_gradient", 1e-8); }
 
 TEST(int1e, copied_calculator_retains_basis) {
   auto json = read_json("int1e");

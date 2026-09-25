@@ -19,21 +19,25 @@ namespace qdk::chemistry::scf::libint2_util {
   sh.contr.resize(1);
   sh.contr[0].l = o.angular_momentum;
   sh.contr[0].pure = (pure && o.angular_momentum >= 2);
+  sh.alpha.reserve(o.contraction);
+  sh.contr[0].coeff.reserve(o.contraction);
 
   for (uint64_t i = 0; i < o.contraction; i++) {
     sh.alpha.push_back(o.exponents[i]);
     sh.contr[0].coeff.push_back(o.coefficients[i]);
   }
-  return ::libint2::Shell(sh.alpha, sh.contr, sh.O, false);
+  return ::libint2::Shell(std::move(sh.alpha), std::move(sh.contr), sh.O,
+                          false);
 }
 
 ::libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
   QDK_LOG_TRACE_ENTERING();
   std::vector<::libint2::Shell> shells;
+  shells.reserve(o.shells.size());
   for (auto& sh : o.shells) {
     shells.push_back(convert_to_libint_shell(sh, o.pure));
   }
-  return ::libint2::BasisSet(shells);
+  return ::libint2::BasisSet(std::move(shells));
 }
 
 std::vector<size_t> shell_to_basis_function(const BasisSet& obs) {
@@ -91,16 +95,21 @@ Engine::Engine(Operator op, size_t max_nprim, int max_l, int deriv_order,
   update_results();
 }
 
-Engine::Engine(const Engine& other)
-    : engine_(std::make_unique<::libint2::Engine>(*other.engine_)) {
-  update_results();
-}
+Engine::Engine(const Engine& other) { *this = other; }
 
 Engine::Engine(Engine&& other) noexcept = default;
 
 Engine& Engine::operator=(const Engine& other) {
   if (this != &other) {
-    engine_ = std::make_unique<::libint2::Engine>(*other.engine_);
+    if (!other.engine_ ||
+        other.engine_->oper() == ::libint2::Operator::invalid) {
+      throw ::libint2::Engine::using_default_initialized();
+    }
+    auto engine = std::move(engine_);
+    results_ = {};
+    if (!engine) engine = std::make_unique<::libint2::Engine>();
+    *engine = *other.engine_;
+    engine_ = std::move(engine);
     update_results();
   }
   return *this;
@@ -109,6 +118,21 @@ Engine& Engine::operator=(const Engine& other) {
 Engine& Engine::operator=(Engine&& other) noexcept = default;
 
 Engine::~Engine() = default;
+
+std::vector<Engine> Engine::make_pool(size_t count, Engine&& prototype) {
+  std::vector<Engine> engines;
+  if (count == 0) return engines;
+  if (!prototype.engine_ ||
+      prototype.engine_->oper() == ::libint2::Operator::invalid) {
+    throw ::libint2::Engine::using_default_initialized();
+  }
+  engines.reserve(count);
+  engines.emplace_back(std::move(prototype));
+  for (size_t i = 1; i < count; ++i) {
+    engines.emplace_back(engines.front());
+  }
+  return engines;
+}
 
 Engine& Engine::set(::libint2::BraKet braket) {
   engine_->set(braket);

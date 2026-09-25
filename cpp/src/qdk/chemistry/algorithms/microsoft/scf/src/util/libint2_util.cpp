@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <utility>
 
 #include "util/libint2_engine.h"
 
@@ -32,7 +33,7 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
   std::fill_n(h_eri_ptr, eri_sz, 0.0);
 
   const size_t nshells = obs.size();
-  auto shell2bf = obs.shell2bf();
+  const auto& shell2bf = obs.shell2bf();
 
   // Find i-shells that need to be computed
   size_t ish_st = 0;
@@ -52,13 +53,11 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 
   bool is_erf = std::abs(omega) > 1e-12;
 
-  Engine engine;
+  Engine engine(is_erf ? Operator::erf_coulomb : Operator::coulomb,
+                obs.max_nprim(), obs.max_l(), 0);
 
   if (is_erf) {
-    engine = Engine(Operator::erf_coulomb, obs.max_nprim(), obs.max_l(), 0);
     engine.set_params(omega);
-  } else {
-    engine = Engine(Operator::coulomb, obs.max_nprim(), obs.max_l(), 0);
   }
 
   for (size_t i = ish_st; i < ish_en; ++i)
@@ -119,18 +118,15 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
   std::fill_n(h_eri_ptr, eri_sz, 0.0);
 
   const size_t nshells = obs.size();
-  auto shell2bf = obs.shell2bf();
+  const auto& shell2bf = obs.shell2bf();
 
   bool is_erf = std::abs(omega) > 1e-12;
 
-  Engine base_engine;
+  Engine base_engine(is_erf ? Operator::erf_coulomb : Operator::coulomb,
+                     obs.max_nprim(), obs.max_l(), 0);
 
   if (is_erf) {
-    base_engine =
-        Engine(Operator::erf_coulomb, obs.max_nprim(), obs.max_l(), 0);
     base_engine.set_params(omega);
-  } else {
-    base_engine = Engine(Operator::coulomb, obs.max_nprim(), obs.max_l(), 0);
   }
 
 #ifdef _OPENMP
@@ -138,7 +134,7 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
 #else
   int nthreads = 1;
 #endif
-  std::vector<Engine> engines(nthreads, base_engine);
+  auto engines = Engine::make_pool(nthreads, std::move(base_engine));
 
   auto range_intersect = [](int x_st, int x_en, int y_st, int y_en) {
     return x_st <= (y_en - 1) and y_st <= (x_en - 1);
@@ -301,8 +297,8 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
 
   const size_t nshells_obs = obs.size();
   const size_t nshells_abs = abs.size();
-  auto shell2bf_obs = obs.shell2bf();
-  auto shell2bf_abs = abs.shell2bf();
+  const auto& shell2bf_obs = obs.shell2bf();
+  const auto& shell2bf_abs = abs.shell2bf();
 
   // Find aux i-shells that need to be computed
   size_t ish_st = 0;
@@ -330,7 +326,7 @@ std::unique_ptr<double[]> eri_df(BasisMode basis_mode,
 #else
   int nthreads = 1;
 #endif
-  std::vector<Engine> engines(nthreads, base_engine);
+  auto engines = Engine::make_pool(nthreads, std::move(base_engine));
   const auto& unitshell = ::libint2::Shell::unit();
 
 #ifdef _OPENMP
@@ -398,7 +394,7 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
   std::fill_n(h_metric_ptr, met_sz, 0.0);
 
   const size_t nshells = abs.size();
-  auto shell2bf = abs.shell2bf();
+  const auto& shell2bf = abs.shell2bf();
 
   Engine base_engine(Operator::coulomb, abs.max_nprim(), abs.max_l(), 0);
   base_engine.set(::libint2::BraKet::xs_xs);
@@ -408,7 +404,7 @@ std::unique_ptr<double[]> metric_df(BasisMode basis_mode,
 #else
   int nthreads = 1;
 #endif
-  std::vector<Engine> engines(nthreads, base_engine);
+  auto engines = Engine::make_pool(nthreads, std::move(base_engine));
   const auto& unitshell = ::libint2::Shell::unit();
 #ifdef _OPENMP
 #pragma omp parallel
@@ -465,8 +461,8 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t nshells_obs = obs.size();
   const size_t nshells_abs = abs.size();
-  auto shell2bf_obs = obs.shell2bf();
-  auto shell2bf_abs = abs.shell2bf();
+  const auto& shell2bf_obs = obs.shell2bf();
+  const auto& shell2bf_abs = abs.shell2bf();
 
   Engine base_engine(Operator::coulomb,
                      std::max(abs.max_nprim(), obs.max_nprim()),
@@ -480,7 +476,7 @@ void eri_df_grad(double* dJ, const double* P, const double* X,
   int nthreads = 1;
 #endif
   int total_threads = mpi.world_size * nthreads;
-  std::vector<Engine> engines(nthreads, base_engine);
+  auto engines = Engine::make_pool(nthreads, std::move(base_engine));
 #ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])
 #endif
@@ -545,7 +541,7 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
   const BasisView abs(native_abs);
   const size_t naux = abs.nbf();
   const size_t nshells = abs.size();
-  auto shell2bf = abs.shell2bf();
+  const auto& shell2bf = abs.shell2bf();
 
   Engine base_engine(Operator::coulomb, abs.max_nprim(), abs.max_l(), 1);
   base_engine.set(::libint2::BraKet::xs_xs);
@@ -556,7 +552,7 @@ void metric_df_grad(double* dJ, const double* X, BasisMode basis_mode,
   int nthreads = 1;
 #endif
   int total_threads = mpi.world_size * nthreads;
-  std::vector<Engine> engines(nthreads, base_engine);
+  auto engines = Engine::make_pool(nthreads, std::move(base_engine));
   const auto& unitshell = ::libint2::Shell::unit();
 #ifdef _OPENMP
 #pragma omp parallel reduction(+ : dJ[ : 3 * n_atoms])

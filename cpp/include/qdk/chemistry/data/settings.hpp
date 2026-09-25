@@ -1077,12 +1077,37 @@ class Settings : public DataClass,
                    bool documented = true);
 
  private:
-  // Keep map insertion out of the adapters without moving typed assignments
-  // or metadata writes across constraint checks and their partial updates.
+  /**
+   * @brief Access a default-value entry, inserting it if absent.
+   * @param key Setting key to look up or insert
+   * @return Mutable reference to the stored value
+   * @note A new entry contains a value-initialized SettingValue. This does not
+   * check locking or constraints, or update the setting's metadata.
+   */
   SettingValue& _default_value(const std::string& key);
+
+  /**
+   * @brief Access a constraint entry, inserting it if absent.
+   * @param key Setting key whose constraint is accessed
+   * @return Mutable reference to the stored constraint
+   * @note A new entry contains a value-initialized Constraint. The caller must
+   * validate compatibility with the setting's value before assigning it.
+   */
   Constraint& _default_limit(const std::string& key);
+
+  /**
+   * @brief Store a provided description for a default setting.
+   * @param key Setting key whose description is updated
+   * @param description Description to store; nullopt leaves the entry unchanged
+   */
   void _set_default_description(const std::string& key,
                                 const std::optional<std::string>& description);
+
+  /**
+   * @brief Set whether a default setting is included in documentation.
+   * @param key Setting key whose documentation flag is inserted or updated
+   * @param documented Flag reported by is_documented() and used by as_table()
+   */
   void _set_default_documented(const std::string& key, bool documented);
 
   /// Serialization version

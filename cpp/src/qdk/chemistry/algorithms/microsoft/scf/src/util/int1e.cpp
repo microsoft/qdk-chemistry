@@ -52,8 +52,6 @@ namespace qdk::chemistry::scf {
  * @note This class is thread-safe when used with separate instances per thread
  */
 class Libint2Engine : public OneBodyIntegralEngine {
-  using EigenVector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
-
  public:
   /**
    * @brief Constructor for Libint2Engine
@@ -72,8 +70,6 @@ class Libint2Engine : public OneBodyIntegralEngine {
         engine_(op, obs_.max_nprim(), obs_.max_l(), deriv),
         basis_mode_(basis_mode) {
     QDK_LOG_TRACE_ENTERING();
-    auto maxBF = (obs_.max_l() + 1) * (obs_.max_l() + 2) / 2;
-    buf_ = std::vector<EigenVector>(1, EigenVector(maxBF * maxBF));
   }
 
   /**
@@ -107,19 +103,17 @@ class Libint2Engine : public OneBodyIntegralEngine {
    *
    * @param i Index of first shell
    * @param j Index of second shell
-   * @return Vector of pointers to integral matrices (one per operator)
+   * @return Borrowed pointers to integral matrices, valid until the next call
    */
-  std::vector<const double*> compute(int i, int j) override {
+  Results compute(int i, int j) override {
     QDK_LOG_TRACE_ENTERING();
-    auto& res = engine_.compute1(obs_[i], obs_[j]);
-    return std::vector<const double*>(res.begin(), res.end());
+    return engine_.compute1(obs_[i], obs_[j]);
   }
 
  private:
   libint2_util::BasisView obs_;   ///< View of the shared Libint2 basis set
   libint2_util::Engine engine_;   ///< Libint2 integral engine for computation
   BasisMode basis_mode_;          ///< Spherical vs Cartesian basis mode
-  std::vector<EigenVector> buf_;  ///< Buffer for storing computed integrals
 };
 
 /**
@@ -174,7 +168,11 @@ class ECPIntEngine : public OneBodyIntegralEngine {
 
     auto maxBF = (maxLB + 1) * (maxLB + 2) / 2;
     auto count = deriv == 0 ? 1 : (deriv == 1 ? 3 * natom : 45);
-    buf_ = std::vector<EigenVector>(count, EigenVector(maxBF * maxBF));
+    buf_.reserve(count);
+    for (int i = 0; i < count; ++i) {
+      buf_.emplace_back(maxBF * maxBF);
+    }
+    results_.resize(count);
   }
 
   /**
@@ -196,9 +194,10 @@ class ECPIntEngine : public OneBodyIntegralEngine {
    *
    * @param i Index of first shell
    * @param j Index of second shell
-   * @return Vector of pointers to integral/derivative matrices
+   * @return Borrowed pointers to integral/derivative matrices until the next
+   * call
    */
-  std::vector<const double*> compute(int i, int j) override {
+  Results compute(int i, int j) override {
     QDK_LOG_TRACE_ENTERING();
     std::for_each(buf_.begin(), buf_.end(), [](auto& v) { v.setZero(); });
 
@@ -214,10 +213,9 @@ class ECPIntEngine : public OneBodyIntegralEngine {
       VERIFY(false && "not implemented");
     }
 
-    std::vector<const double*> res(buf_.size());
-    std::transform(buf_.begin(), buf_.end(), res.begin(),
+    std::transform(buf_.begin(), buf_.end(), results_.begin(),
                    [](auto& v) { return v.data(); });
-    return res;
+    return results_;
   }
 
  private:
@@ -345,6 +343,8 @@ class ECPIntEngine : public OneBodyIntegralEngine {
 
   std::vector<EigenVector>
       buf_;  ///< Buffers for storing computed integrals/derivatives
+  std::vector<const double*>
+      results_;  ///< Reused pointer table for result views
 };
 
 void OneBodyIntegral::convert_to_libecp_shells_(const BasisSet& obs) {
@@ -410,6 +410,7 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
   QDK_LOG_TRACE_ENTERING();
   AutoTimer __timer("int1e::prepare shell pairs");
   std::vector<::libint2::Shell> shs;
+  shs.reserve(shells.size());
   for (auto& sh : shells) {
     shs.push_back(libint2_util::convert_to_libint_shell(sh, true));
   }
@@ -425,7 +426,7 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
 #else
   int nthreads = 1;
 #endif
-  std::vector<libint2_util::Engine> engines(nthreads, engine_fn());
+  auto engines = libint2_util::Engine::make_pool(nthreads, engine_fn());
 #ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
 #endif

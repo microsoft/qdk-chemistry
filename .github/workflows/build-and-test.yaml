@@ -49,7 +49,6 @@ jobs:
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.10'
-          unity-build: 'OFF'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
@@ -83,7 +82,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
       ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
-      QDK_CHEMISTRY_UNITY_BUILD: ${{ matrix.unity-build || 'ON' }}
+      QDK_CHEMISTRY_UNITY_BUILD: 'ON'
     steps:
     - name: Free up disk space (Linux)
       if: matrix.os-name == 'Linux'

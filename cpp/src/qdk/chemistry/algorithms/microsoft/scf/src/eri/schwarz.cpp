@@ -40,9 +40,9 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
   int nthreads = 1;
 #endif
   RowMajorMatrix S = RowMajorMatrix::Zero(obs.size(), obs.size());
-  std::vector<Engine> engines(
-      nthreads, Engine(libint2_util::Operator::coulomb, obs.max_nprim(),
-                       obs.max_l(), 0, 0.0));
+  auto engines =
+      Engine::make_pool(nthreads, Engine(libint2_util::Operator::coulomb,
+                                         obs.max_nprim(), obs.max_l(), 0, 0.0));
 #ifdef _OPENMP
 #pragma omp parallel
 #endif

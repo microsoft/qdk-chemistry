@@ -15,6 +15,7 @@
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <span>
 #include <utility>
 #include <vector>
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
@@ -34,6 +35,9 @@ namespace qdk::chemistry::scf {
  */
 class OneBodyIntegralEngine {
  public:
+  /// @brief Borrowed pointers to per-operator integral buffers.
+  using Results = std::span<const double* const>;
+
   /**
    * @brief Virtual destructor for proper cleanup of derived classes
    */
@@ -43,14 +47,14 @@ class OneBodyIntegralEngine {
    * @brief Compute integrals for a shell pair
    *
    * Evaluates integrals between atomic orbitals in two shells. The returned
-   * pointers point to internal buffers that are valid until the next call.
+   * pointer table and integral buffers are owned by the engine. The view is
+   * valid until the next computation, parameter change, or engine destruction.
    *
    * @param shellA First shell index (bra)
    * @param shellB Second shell index (ket)
-   * @return std::vector<const double*> Vector of pointers to integral buffers,
-   *         one per operator component (e.g., 3 for dipole x,y,z)
+   * @return Borrowed buffer pointers, one per operator component
    */
-  virtual std::vector<const double*> compute(int shellA, int shellB) = 0;
+  virtual Results compute(int shellA, int shellB) = 0;
 
   /**
    * @brief Get number of operator components
