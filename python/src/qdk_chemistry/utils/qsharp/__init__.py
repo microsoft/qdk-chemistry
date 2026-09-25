@@ -14,7 +14,7 @@ from functools import cache
 from pathlib import Path
 
 import qdk
-from qdk import TargetProfile
+from qdk import TargetProfile, qsharp
 
 __all__ = [
     "QSHARP_UTILS",

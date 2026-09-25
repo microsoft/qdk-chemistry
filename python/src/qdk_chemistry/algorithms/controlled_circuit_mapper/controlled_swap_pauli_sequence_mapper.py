@@ -199,6 +199,15 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
+        # This mapper serializes only step_terms/step_reps, so one-time endpoint terms
+        # (produced e.g. by Trotter's fuse_group_boundaries) would be silently dropped
+        # and the realized unitary would differ from the container's.
+        if unitary_container.beginning or unitary_container.end:
+            raise ValueError(
+                "ControlledSwapPauliSequenceMapper does not support formulas with beginning/end terms; "
+                "build the container without fuse_group_boundaries, or use pauli_sequence instead."
+            )
+
         target_indices = self._get_target_indices(unitary)
 
         vacuum_phase = self._vacuum_phase(unitary_container)

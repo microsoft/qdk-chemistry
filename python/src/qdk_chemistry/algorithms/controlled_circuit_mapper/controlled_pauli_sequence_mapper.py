@@ -5,11 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk import qsharp
-
+from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import _pauli_evolution_parameters
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
@@ -29,6 +30,9 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     3. A controlled :math:`R_z` rotation implements
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; \text{CRZ}(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
+
+    Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
+    indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
@@ -78,28 +82,16 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
         target_indices = self._get_target_indices(unitary)
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        angles: list[float] = []
-        for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
-            for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
-            angles.append(term.angle)
+        evo_params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
+        layer_offsets = list(unitary_container.layer_offsets or ())
+        program = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params, layer_offsets)
+        parameters = {"params": evo_params, "layerOffsets": layer_offsets}
 
-        controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
-            pauliExponents=pauli_terms,
-            pauliCoefficients=angles,
-            repetitions=unitary_container.step_reps,
-            control=control_indices[0],
-            systems=target_indices,
-        )
-
+        parameters.update(control=control_indices[0], systems=target_indices)
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
-            parameter=vars(controlled_evo_params),
+            program=program,
+            parameter=parameters,
         )
-
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

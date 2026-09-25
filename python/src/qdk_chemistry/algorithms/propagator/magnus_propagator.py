@@ -208,6 +208,8 @@ class MagnusPropagator(Propagator):
         Partitions from :math:`H_0` and :math:`H_1` are preserved via
         :meth:`~qdk_chemistry.data.QubitOperator.__mul__` and
         :meth:`~qdk_chemistry.data.QubitOperator.__add__`.
+        An exactly zero drive average returns the partitioned :math:`H_0`
+        unchanged, without expanding its sparse representation.
 
         Returns the effective time-independent Hamiltonian
         :math:`H_\text{eff}`.
@@ -217,6 +219,8 @@ class MagnusPropagator(Propagator):
         h0, h1, drive = container.base_hamiltonian, container.drive_hamiltonian, container.drive
         f_avg = integrate.quad(drive, t_start, t_end)[0] / dt
 
+        if f_avg == 0.0 and h0.term_partition is not None:
+            return h0
         return h0 + f_avg * h1
 
     def name(self) -> str:

@@ -6,19 +6,27 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+from typing import ClassVar
 
 import numpy as np
 import pytest
 import scipy
+from qdk import TargetProfile, qsharp
+from qdk.test_utils import dump_operation_on_state
 
 try:
     from qdk._native import Circuit as QdkCircuitType
+    from qdk._native import QSharpError
 except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._native import QSharpError
 
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
+)
+from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
+    ControlledPauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -27,11 +35,16 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context, use_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .test_helpers import dense_matrix
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
+
+#: ``dump_operation_on_state`` rounds to about six decimals, so exact agreement lands near 1e-6.
+_TOL = 1e-5
 
 
 @pytest.fixture
@@ -71,6 +84,33 @@ class TestPauliSequenceMapperNonControlled:
         num_qubits = len(qsc_json["qubits"])
         assert num_qubits == 2
 
+    def test_sparse_encoding_carries_only_non_identity_positions(self, sparse_mapper):
+        """Both mappers retain ordered supports, identity phases and symbolic repetitions on wide registers."""
+        word = {2: "I", 80_799: "Z", 0: "X"}
+        container = PauliProductFormulaContainer(
+            [
+                ExponentiatedPauliTerm(word, 0.5),
+                ExponentiatedPauliTerm({0: "I"}, 0.25),
+                ExponentiatedPauliTerm(word, -0.2),
+            ],
+            1_000_000_000,
+            80_800,
+        )
+        factory = sparse_mapper.run(UnitaryRepresentation(container))._qsharp_factory.parameter
+        params = (
+            vars(factory["params"])
+            if isinstance(sparse_mapper, ControlledPauliSequenceMapper)
+            else factory["evo_params"]
+        )
+        assert params == {
+            "pauliIndices": [[80_799, 0], [], [80_799, 0]],
+            "pauliOps": [[qsharp.Pauli.Z, qsharp.Pauli.X], [], [qsharp.Pauli.Z, qsharp.Pauli.X]],
+            "pauliCoefficients": [0.5, 0.25, -0.2],
+            "repetitions": 1_000_000_000,
+            "beginning": 0,
+            "end": 0,
+        }
+
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
         """Test that the constructed unitary circuit has the expected matrix."""
@@ -99,3 +139,194 @@ class TestPauliSequenceMapperNonControlled:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+@pytest.mark.parametrize("profile", [TargetProfile.Base, TargetProfile.Adaptive_RIF])
+@pytest.mark.parametrize("order", [2, 4])
+def test_fused_formula_matrix(profile: TargetProfile, order: int, sparse_mapper) -> None:
+    """Second- and fourth-order fused endpoints retain order, layers, and controlled identity phases."""
+    xx = ExponentiatedPauliTerm({0: "X", 1: "X"}, 0.13)
+    yy = ExponentiatedPauliTerm({0: "Y", 1: "Y"}, -0.21)
+    phase = ExponentiatedPauliTerm({}, 0.07)
+    symmetric_step = [xx, yy, phase, ExponentiatedPauliTerm({0: "Z"}, 0.32), phase, yy, xx]
+    p = 1 / (4 - 4 ** (1 / 3))
+    weights = [1.0] if order == 2 else [p, p, 1 - 4 * p, p, p]
+    terms = [
+        ExponentiatedPauliTerm(term.pauli_term, weight * term.angle) for weight in weights for term in symmetric_step
+    ]
+    group_offsets = (0, *(7 * i + offset for i in range(len(weights)) for offset in (3, 4, 7)))
+    layer_offsets = (0, *(7 * i + offset for i in range(len(weights)) for offset in (1, 3, 4, 6, 7)))
+    formula = PauliProductFormulaContainer(terms, 3, 2, group_offsets=group_offsets, layer_offsets=layer_offsets)
+    fused = formula.combine(atol=0.0)
+    assert fused.beginning
+    assert fused.end
+    assert fused.layer_offsets is not None
+    controlled = isinstance(sparse_mapper, ControlledPauliSequenceMapper)
+    if controlled:
+        sparse_mapper.settings().update({"control_indices": [2], "target_indices": [0, 1]})
+    with use_qsharp_context(create_qsharp_context(profile)):
+        actual = Operator(sparse_mapper.run(UnitaryRepresentation(fused)).get_qiskit_circuit()).data
+    axes = {
+        "I": np.eye(2),
+        "X": np.array([[0, 1], [1, 0]]),
+        "Y": np.array([[0, -1j], [1j, 0]]),
+        "Z": np.diag([1, -1]),
+    }
+    expected = np.eye(8 if controlled else 4, dtype=complex)
+    for term in terms * 3:
+        generator = np.kron(axes[term.pauli_term.get(1, "I")], axes[term.pauli_term.get(0, "I")])
+        if controlled:
+            generator = np.kron(np.diag([0, 1]), generator)
+        expected = scipy.linalg.expm(-1j * term.angle * generator) @ expected
+    if controlled:
+        actual /= actual[0, 0]  # Control-off amplitude fixes global phase, not relative phase.
+    else:
+        pivot = np.unravel_index(np.argmax(np.abs(expected)), expected.shape)
+        actual *= expected[pivot] / actual[pivot]  # QIR may omit the circuit-global phase.
+    np.testing.assert_allclose(
+        actual, expected, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+    )
+
+
+def _sparse_op(terms, *, repetitions=1):
+    """Build sparse evolution using typed Q# parameters."""
+    params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+        pauliIndices=[term["qubits"] for term in terms],
+        pauliOps=[[getattr(qsharp.Pauli, axis) for axis in term["axes"]] for term in terms],
+        pauliCoefficients=[term["angle"] for term in terms],
+        repetitions=repetitions,
+        beginning=0,
+        end=0,
+    )
+    return QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
+
+
+def _dense_op(terms, num_qubits, *, repetitions=1):
+    """Build dense evolution using typed Q# parameters."""
+    rows = []
+    for term in terms:
+        axes = [qsharp.Pauli.I] * num_qubits
+        for qubit, axis in zip(term["qubits"], term["axes"], strict=True):
+            axes[qubit] = getattr(qsharp.Pauli, axis)
+        rows.append(axes)
+    params = QSHARP_UTILS.PauliExp.RepPauliExpParams(
+        pauliExponents=rows,
+        pauliCoefficients=[term["angle"] for term in terms],
+        repetitions=repetitions,
+    )
+    return QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(params)
+
+
+class TestSparseUncontrolledEvolution:
+    """The sparse dispatch must be indistinguishable from the dense one it replaces."""
+
+    CASES: ClassVar[dict] = {
+        "single-qubit mixed axes": (
+            3,
+            [
+                {"qubits": [0], "axes": "X", "angle": 0.4},
+                {"qubits": [1], "axes": "Y", "angle": -0.9},
+                {"qubits": [2], "axes": "Z", "angle": 0.15},
+            ],
+        ),
+        "two-qubit adjacent": (
+            3,
+            [
+                {"qubits": [0, 1], "axes": "ZZ", "angle": 0.37},
+                {"qubits": [1, 2], "axes": "XX", "angle": -0.5},
+            ],
+        ),
+        "two-qubit non-adjacent, unsorted indices": (
+            4,
+            [
+                {"qubits": [3, 0], "axes": "XY", "angle": 0.62},
+                {"qubits": [2, 1], "axes": "YZ", "angle": -0.24},
+            ],
+        ),
+        "an identity term among real ones": (
+            2,
+            [
+                {"qubits": [0], "axes": "X", "angle": 0.5},
+                {"qubits": [], "axes": "", "angle": 0.8},
+                {"qubits": [1], "axes": "Z", "angle": -0.3},
+            ],
+        ),
+        "identity": (2, [{"qubits": [], "axes": "", "angle": 0.7}]),
+        "empty": (2, []),
+    }
+
+    @pytest.mark.parametrize("name", list(CASES))
+    @pytest.mark.parametrize("repetitions", [1, 2])
+    def test_sparse_matches_dense(self, name, repetitions):
+        """Switching to the sparse encoding must not change the unitary."""
+        num_qubits, terms = self.CASES[name]
+        got = dense_matrix(_sparse_op(terms, repetitions=repetitions), num_qubits)
+        want = dense_matrix(_dense_op(terms, num_qubits, repetitions=repetitions), num_qubits)
+        if not any(term["qubits"] for term in terms):
+            np.testing.assert_allclose(
+                want, np.exp(-1j * repetitions * sum(t["angle"] for t in terms)) * np.eye(4), atol=_TOL
+            )
+        assert np.max(np.abs(got - want)) < _TOL
+
+    @pytest.mark.parametrize(
+        ("indices", "ops", "coefficients"),
+        [
+            pytest.param([[0]], [[qsharp.Pauli.X]], [], id="coefficients-shorter"),
+            pytest.param([], [[qsharp.Pauli.X]], [0.1], id="indices-shorter"),
+            pytest.param([[0]], [], [0.1], id="ops-shorter"),
+        ],
+    )
+    def test_rejects_mismatched_term_array_lengths(self, indices, ops, coefficients):
+        """Sparse evolution requires one support, axis row and angle per term."""
+        params = QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(
+            pauliIndices=indices,
+            pauliOps=ops,
+            pauliCoefficients=coefficients,
+            repetitions=1,
+            beginning=0,
+            end=0,
+        )
+        op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(params)
+
+        with pytest.raises(QSharpError, match="inconsistent array lengths"):
+            dump_operation_on_state(op, 1, [1.0, 0.0], context=get_qsharp_context())
+
+    def test_sparse_encoding_applies_the_container_sign_convention(self):
+        """A single Z rotation must realise exp(-i theta Z), not its conjugate."""
+        angle = 0.37
+        got = dense_matrix(_sparse_op([{"qubits": [0], "axes": "Z", "angle": angle}]), 1)
+        want = scipy.linalg.expm(-1j * angle * np.array([[1, 0], [0, -1]], dtype=complex))
+        assert np.max(np.abs(got - want)) < _TOL
+
+
+@pytest.fixture(params=[PauliSequenceMapper, ControlledPauliSequenceMapper], ids=["regular", "controlled"])
+def sparse_mapper(request):
+    """Exercise both production mappers with the same sparse cases."""
+    return request.param()
+
+
+class TestSparsePauliMappers:
+    """The existing sparse payload stays independent of register width and repetitions."""
+
+    @pytest.mark.parametrize("layered", [False, True])
+    def test_resource_estimates_include_all_repetitions(self, sparse_mapper, layered):
+        """Resource estimates repeat only the body, counting compact endpoints once without adding qubits."""
+        counts = []
+        for repetitions in (1, 2, 17):
+            container = PauliProductFormulaContainer(
+                [ExponentiatedPauliTerm({0: "X", 1: "Z"}, 0.137)],
+                repetitions,
+                2,
+                beginning=[ExponentiatedPauliTerm({0: "Z"}, 0.19)],
+                end=[ExponentiatedPauliTerm({1: "Y"}, -0.23)],
+                layer_offsets=(0, 1, 2, 3) if layered else None,
+            )
+            circuit = sparse_mapper.run(UnitaryRepresentation(container))
+            counts.append(circuit.estimate()["logicalCounts"])
+        body_rotations = counts[1]["rotationCount"] - counts[0]["rotationCount"]
+        assert 0 < body_rotations < counts[0]["rotationCount"]
+        assert counts[2]["rotationCount"] == counts[0]["rotationCount"] + 16 * body_rotations
+        assert counts[2]["numQubits"] == counts[1]["numQubits"] == counts[0]["numQubits"]
+        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
+        assert "define" in str(circuit.get_qir())
