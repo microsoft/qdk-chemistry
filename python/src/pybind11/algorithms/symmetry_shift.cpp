@@ -29,13 +29,6 @@ class SymmetryShifterBase : public SymmetryShifter,
     PYBIND11_OVERRIDE(std::vector<std::string>, SymmetryShifter, aliases);
   }
 
-  SymmetryShift compute_shift(const Hamiltonian &hamiltonian,
-                              unsigned int n_alpha_electrons,
-                              unsigned int n_beta_electrons) const override {
-    PYBIND11_OVERRIDE_PURE(SymmetryShift, SymmetryShifter, compute_shift,
-                           hamiltonian, n_alpha_electrons, n_beta_electrons);
-  }
-
   // Helper method to expose _settings for Python binding
   void replace_settings(
       std::unique_ptr<qdk::chemistry::data::Settings> new_settings) {
@@ -61,8 +54,8 @@ Bundles the three quantities (mu1, mu2, xi) that define the symmetry-shift
 operator subtracted from a Hamiltonian to reduce its fermionic 1-norm while
 leaving the target electron-number sector's energy invariant. A SymmetryShift
 carries only the *result* of a shift computation, so it can come from
-:meth:`SymmetryShifter.compute_shift` or from an external source. Applying
-one is :meth:`SymmetryShifter.run`'s job.
+:meth:`SymmetryShifter.last_shift` or from an external source. Applying one
+is :meth:`SymmetryShifter.run`'s job.
 )")
       .def(py::init<>())
       .def_readwrite("mu1", &SymmetryShift::mu1, "One-electron shift.")
@@ -87,20 +80,19 @@ alpha/beta electrons, to a new Hamiltonian that is energetically equivalent
 within the target electron-number sector but whose LCU/qubitization
 coefficients (e.g. the fermionic 1-norm lambda) may be reduced.
 
-:meth:`run` computes the shift and applies it in one step.
-:meth:`compute_shift` is the inspect-only half, reporting the parameters
-(mu1, mu2, xi) that :meth:`run` would use -- this is what distinguishes one
-implementation from another. Applying a shift is deliberately not exposed on
-its own, because how it folds into the Hamiltonian depends on the
-representation the implementation consumes.
+:meth:`run` computes the shift and applies it in one step; computing one
+without applying it is deliberately not exposed, since how a shift folds into
+the Hamiltonian depends on the representation the implementation consumes.
+The parameters that were applied can be read back afterwards from
+:meth:`last_shift`.
 
 Concrete implementations should inherit from this class.
 
 Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> shifter = alg.FermionicLowRankShifter()
-    >>> shift = shifter.compute_shift(hamiltonian, n_alpha, n_beta)
-    >>> shifted = alg.FermionicLowRankShifter().run(hamiltonian, n_alpha, n_beta)
+    >>> shifted = shifter.run(hamiltonian, n_alpha, n_beta)
+    >>> shift = shifter.last_shift()
 
 )");
 
@@ -125,27 +117,20 @@ Raises:
               py::arg("hamiltonian"), py::arg("n_alpha_electrons"),
               py::arg("n_beta_electrons"));
 
-  shifter.def("compute_shift", &SymmetryShifter::compute_shift,
+  shifter.def("last_shift", &SymmetryShifter::last_shift,
               R"(
-Compute the symmetry shift (mu1, mu2, xi) for a target electron count.
-
-Returns the resulting parameters *without* rebuilding the Hamiltonian, so a
-caller can inspect or compare shifts. Use :meth:`run` to apply one.
-
-Args:
-    hamiltonian (qdk_chemistry.data.Hamiltonian): The Hamiltonian to analyze. Must be restricted.
-    n_alpha_electrons (int): The target number of alpha electrons
-    n_beta_electrons (int): The target number of beta electrons
+The symmetry shift (mu1, mu2, xi) applied by the most recent :meth:`run`.
 
 Returns:
-    qdk_chemistry.algorithms.SymmetryShift: The computed shift parameters.
+    qdk_chemistry.algorithms.SymmetryShift | None: The shift the last
+    :meth:`run` on this instance applied, or None if it has not been run or
+    the implementation does not report one.
 
-Raises:
-    ValueError: If the Hamiltonian is unrestricted.
+Note:
+    Not synchronized. Use one shifter instance per thread if you intend to
+    read this back.
 
-)",
-              py::arg("hamiltonian"), py::arg("n_alpha_electrons"),
-              py::arg("n_beta_electrons"));
+)");
 
   shifter.def("settings", &SymmetryShifter::settings,
               R"(
@@ -238,10 +223,15 @@ fragments of an already double-factorized Hamiltonian each receive the
 closed-form median shift, and the one-electron shift is optimized against the
 resulting effective one-electron operator.
 
-The input must be backed by a ``FactorizedHamiltonianContainer`` whose
-rotations are complete orthogonal ones, and so is the output: the shift is
-absorbed into the fragment eigenvalues, so the result can be block-encoded
-without being refactorized. Call ``get_two_body_integrals()`` for dense ones.
+The input must be restricted (spin-restricted) and backed by a
+``FactorizedHamiltonianContainer`` whose identity weight is zero and whose
+rotations are complete orthogonal ones; anything else raises ``ValueError``.
+The output is backed by the same container type: the shift is absorbed into
+the fragment eigenvalues, so the result can be block-encoded without being
+refactorized. Call ``get_two_body_integrals()`` for dense ones.
+
+Only the total electron count ``n_alpha + n_beta`` enters the shift; this
+method does not use Sz, so (5, 5) and (6, 4) give the same result.
 
 Typical usage:
 
@@ -253,6 +243,7 @@ Typical usage:
 
     shifter = alg.FermionicLowRankShifter()
     shifted = shifter.run(factorized, n_alpha, n_beta)
+    shift = shifter.last_shift()
 
 See Also:
     :class:`SymmetryShifter`

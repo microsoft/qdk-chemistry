@@ -16,7 +16,6 @@
 #include <string>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/symmetry_shift/fermionic_low_rank.hpp"
-#include "../src/qdk/chemistry/algorithms/symmetry_shift_detail.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
@@ -30,6 +29,36 @@ std::shared_ptr<qdk::chemistry::data::Hamiltonian> double_factorize(
     std::shared_ptr<qdk::chemistry::data::Hamiltonian> hamiltonian) {
   return HamiltonianFactorizationFactory::create("double_factorization")
       ->run(std::move(hamiltonian));
+}
+
+/// Independent oracle for the two-body correction dg that the shift
+/// (mu2, xi) adds to the raw tensor g:
+///   dg_ijkl = -2*mu2*d_ij*d_kl - xi_ij*d_kl - d_ij*xi_kl
+/// Written out from the closed form with no reference to the factorization,
+/// so it can catch a sign, scale or index-order error in the production path
+/// that folds the shift into the fragment eigenvalues. `g` is the flattened
+/// tensor ((i*norb+j)*norb+k)*norb+l.
+void add_two_body_correction(Eigen::VectorXd& g, Eigen::Index norb, double mu2,
+                             const Eigen::MatrixXd& xi) {
+  const auto index = [norb](Eigen::Index i, Eigen::Index j, Eigen::Index k,
+                            Eigen::Index l) {
+    return ((i * norb + j) * norb + k) * norb + l;
+  };
+
+  for (Eigen::Index i = 0; i < norb; ++i) {
+    for (Eigen::Index j = 0; j < norb; ++j) {
+      for (Eigen::Index k = 0; k < norb; ++k) {
+        for (Eigen::Index l = 0; l < norb; ++l) {
+          double dg = -xi(i, j) * (k == l ? 1.0 : 0.0) -
+                      (i == j ? 1.0 : 0.0) * xi(k, l);
+          if (i == j && k == l) {
+            dg -= 2.0 * mu2;
+          }
+          g[index(i, j, k, l)] += dg;
+        }
+      }
+    }
+  }
 }
 
 /// Recorded from a local run; see Water_STO3G_OneNormRegression.
@@ -120,8 +149,7 @@ TEST_F(SymmetryShiftTest, ThrowsOnUnrestrictedHamiltonian) {
  * @brief The strongest correctness check: BLISS shifts should not change the
  * physical energy of the target electron-number sector. Run exact FCI before
  * and after applying the fermionic low-rank BLISS shift and confirm the
- * energies agree to within the standard CI energy tolerance, both at the
- * default (no-truncation) setting and with an explicit truncation threshold.
+ * energies agree to within the standard CI energy tolerance.
  */
 TEST_F(SymmetryShiftTest, Water_STO3G_EnergyInvariantUnderShift) {
   auto water = testing::create_water_structure();
@@ -173,8 +201,11 @@ TEST_F(SymmetryShiftTest, AccumulatesZeroWeightFactorizationIntoZeroShift) {
       std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
       Eigen::MatrixXd::Zero(0, 0));
 
-  auto shift = microsoft::accumulate_fragment_shifts(container);
+  const auto accumulation = microsoft::accumulate_fragment_shifts(container);
 
+  EXPECT_TRUE(accumulation.coulomb.isZero());
+  EXPECT_TRUE(accumulation.exchange.isZero());
+  const auto& shift = accumulation.shift;
   EXPECT_EQ(shift.xi.rows(), static_cast<Eigen::Index>(norb));
   EXPECT_EQ(shift.xi.cols(), static_cast<Eigen::Index>(norb));
   EXPECT_TRUE(shift.xi.isZero());
@@ -200,12 +231,14 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   const auto& container =
       factorized->get_container<FactorizedHamiltonianContainer>();
 
-  auto global_shift = microsoft::accumulate_fragment_shifts(container);
+  // norb is 7 here, so B is odd and the median interval is a point.
+  const auto accumulation = microsoft::accumulate_fragment_shifts(container);
+  const auto& global_shift = accumulation.shift;
 
   // Independent check of the sqrt(2) convention: the container stores the
   // eigenvalues W of fragments of g, while BLISS works with eps = W/sqrt(2)
   // drawn from V = 1/2 g. The baseline sum_a 1/2 (sum|eps|)^2 must therefore
-  // reproduce the two-body half of Eq. 33, 1/4 sum_rc (sum_b |W_b|)^2. Getting
+  // reproduce the two-body half of Eq. 17, 1/4 sum_rc (sum_b |W_b|)^2. Getting
   // the scale wrong changes this by a factor of two.
   const auto& w = container.get_w_matrices();
   const size_t R = container.get_num_ranks();
@@ -221,7 +254,10 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
       two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
     }
   }
-  EXPECT_NEAR(global_shift.lambda_df_baseline, two_body_lambda, 1e-10);
+  // Relative: lambda is extensive, so a fixed absolute bound would turn into
+  // a size limit once the accumulation error grows with the system.
+  EXPECT_NEAR(global_shift.lambda_df_baseline, two_body_lambda,
+              1e-12 * two_body_lambda);
 
   // The container's own Lambda adds the one-body norm on top.
   EXPECT_GT(container.get_lambda(), global_shift.lambda_df_baseline);
@@ -238,7 +274,7 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
  * the fragment eigenvalues must reproduce the integrals that the closed-form
  * definition of the shift prescribes.
  *
- * detail::add_two_body_correction() is the independent oracle, folding dg into
+ * add_two_body_correction() is the independent oracle, folding dg into
  * the original tensor with no reference to the factorization. If the in-place
  * shift (W~ = W - sqrt(2)*phi, U untouched) were wrong in sign, scale or index
  * order, the two would disagree.
@@ -257,8 +293,8 @@ TEST_F(SymmetryShiftTest, ShiftedFactorizationReproducesDenseShiftedIntegrals) {
   ASSERT_NE(shifted, nullptr);
   ASSERT_TRUE(shifted->has_container_type<FactorizedHamiltonianContainer>());
 
-  auto shift = SymmetryShifterFactory::create("fermionic_low_rank")
-                   ->compute_shift(*factorized, 5, 5);
+  ASSERT_TRUE(shifter->last_shift().has_value());
+  const SymmetryShift shift = *shifter->last_shift();
 
   auto [h0, h0_beta] = factorized->get_one_body_integrals();
   (void)h0_beta;
@@ -272,7 +308,7 @@ TEST_F(SymmetryShiftTest, ShiftedFactorizationReproducesDenseShiftedIntegrals) {
   (void)g0_ab;
   (void)g0_bb;
   Eigen::VectorXd g_expected = g0;
-  detail::add_two_body_correction(g_expected, norb, shift.mu2, shift.xi);
+  add_two_body_correction(g_expected, norb, shift.mu2, shift.xi);
 
   auto [h_got, h_got_beta] = shifted->get_one_body_integrals();
   (void)h_got_beta;
@@ -349,13 +385,14 @@ TEST_F(SymmetryShiftTest, Water_STO3G_ShiftedLambdaClosure) {
   auto factorized = double_factorize(ham);
   const auto& before =
       factorized->get_container<FactorizedHamiltonianContainer>();
-  const auto global_shift = microsoft::accumulate_fragment_shifts(before);
+  const auto accumulation = microsoft::accumulate_fragment_shifts(before);
+  const auto& global_shift = accumulation.shift;
 
   auto shifted = SymmetryShifterFactory::create("fermionic_low_rank")
                      ->run(factorized, 5, 5);
   const auto& after = shifted->get_container<FactorizedHamiltonianContainer>();
 
-  // Two-body half of Eq. 33, recomputed from the shifted eigenvalues alone.
+  // Two-body half of Eq. 17, recomputed from the shifted eigenvalues alone.
   const Eigen::VectorXd& w = after.get_w_matrices();
   const size_t R = after.get_num_ranks();
   const size_t B = after.get_num_bases();
@@ -370,7 +407,8 @@ TEST_F(SymmetryShiftTest, Water_STO3G_ShiftedLambdaClosure) {
       two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
     }
   }
-  EXPECT_NEAR(two_body_lambda, global_shift.lambda_df_shifted, 1e-10);
+  EXPECT_NEAR(two_body_lambda, global_shift.lambda_df_shifted,
+              1e-12 * global_shift.lambda_df_shifted);
   EXPECT_LT(after.get_lambda(), before.get_lambda());
 }
 
@@ -440,4 +478,136 @@ TEST_F(SymmetryShiftTest, CholeskyContainerIsShiftedThroughTheFactoredPath) {
   auto mc_after = MultiConfigurationCalculatorFactory::create();
   auto [E_after, wfn_after] = mc_after->run(shifted, 5, 5);
   EXPECT_NEAR(E_before, E_after, testing::ci_energy_tolerance);
+}
+
+/**
+ * @brief The two 1-norms are minimized sequentially, not jointly, so the
+ * total can come out worse than the baseline. When it does, the shifter must
+ * fall back to a zero shift and leave the Hamiltonian untouched rather than
+ * ship a regression.
+ *
+ * A single fragment with eigenvalues (-3, -3, -3, 3) at half filling is one
+ * such case: the total goes from 99 to at least 117.
+ */
+TEST_F(SymmetryShiftTest, FallsBackToZeroShiftWhenLambdaWouldIncrease) {
+  constexpr Eigen::Index norb = 4;
+
+  Eigen::VectorXd u = Eigen::VectorXd::Zero(norb * norb);
+  for (Eigen::Index b = 0; b < norb; ++b) {
+    u(b * norb + b) = 1.0;
+  }
+  Eigen::VectorXd w(norb);
+  w << -3.0, -3.0, -3.0, 3.0;
+
+  auto container = std::make_unique<FactorizedHamiltonianContainer>(
+      Eigen::MatrixXd::Zero(norb, norb), u, w, Eigen::MatrixXd::Zero(1, 1),
+      std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
+      Eigen::MatrixXd::Zero(0, 0));
+  auto hamiltonian = std::make_shared<qdk::chemistry::data::Hamiltonian>(
+      std::move(container));
+
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+  auto shifted = shifter->run(hamiltonian, 4, 4);
+
+  ASSERT_TRUE(shifter->last_shift().has_value());
+  const SymmetryShift shift = *shifter->last_shift();
+  EXPECT_EQ(shift.mu1, 0.0);
+  EXPECT_EQ(shift.mu2, 0.0);
+  EXPECT_EQ(shift.xi.cwiseAbs().maxCoeff(), 0.0);
+
+  const auto& after = shifted->get_container<FactorizedHamiltonianContainer>();
+  EXPECT_TRUE(after.get_w_matrices().isApprox(w));
+  EXPECT_NEAR(shifted->get_core_energy(), hamiltonian->get_core_energy(),
+              1e-14);
+}
+
+/**
+ * @brief The W array is strided [R,B,C], so a container with more than one
+ * copy per rank is the only thing that exercises the `c` stride. Reading it
+ * with the wrong stride would silently mix fragments together, which the
+ * single-copy containers that double_factorization produces cannot detect.
+ */
+TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreReadWithTheCorrectStride) {
+  constexpr Eigen::Index norb = 2;
+  constexpr Eigen::Index R = 1;
+  constexpr Eigen::Index C = 2;
+
+  Eigen::VectorXd u(R * norb * norb);
+  u << 1.0, 0.0, 0.0, 1.0;
+
+  // W[r,b,c] flattened as r*B*C + b*C + c: copy 0 is {1, 3}, copy 1 is {2, 8}.
+  Eigen::VectorXd w(R * norb * C);
+  w << 1.0, 2.0, 3.0, 8.0;
+
+  auto container = std::make_unique<FactorizedHamiltonianContainer>(
+      Eigen::MatrixXd::Identity(norb, norb), u, w, Eigen::MatrixXd::Zero(R, C),
+      std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
+      Eigen::MatrixXd::Zero(0, 0));
+
+  const auto accumulation = microsoft::accumulate_fragment_shifts(*container);
+  const auto& global_shift = accumulation.shift;
+
+  // 1/4 * ((1+3)^2 + (2+8)^2) = 29. Transposing the stride would read the
+  // copies as {1, 2} and {3, 8}, giving 1/4 * (9 + 121) = 32.5.
+  EXPECT_NEAR(global_shift.lambda_df_baseline, 29.0, 1e-12);
+
+  // Upper endpoint of each copy's median interval, on the eps = W/sqrt(2)
+  // scale. Transposing the stride would read copy 0 as {1, 2} and report
+  // 2/sqrt(2) here.
+  EXPECT_NEAR(global_shift.phi(0, 0), 3.0 / std::sqrt(2.0), 1e-12);
+  EXPECT_NEAR(global_shift.phi(0, 1), 8.0 / std::sqrt(2.0), 1e-12);
+}
+
+/**
+ * @brief For an even number of bases the Eq. 27 objective is flat across the
+ * whole median interval. phi takes the upper endpoint, which is an actual
+ * eps_i -- that is what drops a unitary from the one-electron LCU -- and,
+ * because the objective is flat, costs nothing in the two-body norm.
+ */
+TEST_F(SymmetryShiftTest, EvenBasisCountUsesTheMedianIntervalEndpoint) {
+  // LiH/STO-3G has 6 orbitals, so the median interval is a real interval.
+  auto lih = testing::create_lih_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(lih, 0, 1, "sto-3g");
+
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
+  auto factorized = double_factorize(ham);
+  const auto& container =
+      factorized->get_container<FactorizedHamiltonianContainer>();
+  ASSERT_EQ(container.get_num_bases() % 2, 0u);
+
+  const auto accumulation = microsoft::accumulate_fragment_shifts(container);
+
+  const auto& w = container.get_w_matrices();
+  const size_t R = container.get_num_ranks();
+  const size_t B = container.get_num_bases();
+  const size_t C = container.get_num_copies();
+  const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
+
+  double lambda_df_midpoint = 0.0;
+  bool saw_real_interval = false;
+  for (size_t r = 0; r < R; ++r) {
+    for (size_t c = 0; c < C; ++c) {
+      Eigen::VectorXd eps(B);
+      for (size_t b = 0; b < B; ++b) {
+        eps(b) = inv_sqrt2 * w(r * B * C + b * C + c);
+      }
+
+      const auto [lo, hi] = microsoft::median_interval(eps);
+      saw_real_interval = saw_real_interval || hi > lo;
+
+      const double phi = accumulation.shift.phi(static_cast<Eigen::Index>(r),
+                                                static_cast<Eigen::Index>(c));
+      EXPECT_NEAR(phi, hi, 1e-12);
+      EXPECT_NEAR((eps.array() - phi).abs().minCoeff(), 0.0, 1e-12);
+
+      const double shifted = (eps.array() - 0.5 * (lo + hi)).abs().sum();
+      lambda_df_midpoint += 0.5 * shifted * shifted;
+    }
+  }
+  EXPECT_TRUE(saw_real_interval);
+
+  EXPECT_NEAR(accumulation.shift.lambda_df_shifted, lambda_df_midpoint,
+              1e-10 * lambda_df_midpoint);
 }

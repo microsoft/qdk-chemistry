@@ -17,12 +17,11 @@
 #include <utility>
 #include <vector>
 
-#include "../../symmetry_shift_detail.hpp"
-
 namespace qdk::chemistry::algorithms::microsoft {
 
 // ---------------------------------------------------------------------------
-// Step 2: per-fragment median shift, aggregated into a global (mu2, xi).
+// Step 2: one pass over the fragments producing the mean-field contractions
+// of g and the global (mu2, xi).
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -78,18 +77,43 @@ bool fragments_span_full_rotation(
   return true;
 }
 
+// The two-body correction the aggregated shift (mu2, xi) adds to g:
+//   dg_ijkl = -2*mu2*d_ij*d_kl - xi_ij*d_kl - d_ij*xi_kl
+// This is the normal-ordered, raw-g transcription of Patel et al. Eq. 7, not a
+// verbatim copy: that paper omits normal ordering and uses V = 1/2 g, so the
+// mu2 term carries an extra factor 2 here. Only dg's Coulomb and exchange
+// contractions are ever needed, never dg itself.
+
+/// coul(g~) = coul(g) + Sum_k dg_ijkk, folded in place; nothing is allocated.
+///   Sum_k dg_ijkk = -(2*mu2*norb + tr(xi))*d_ij - norb*xi_ij
+void add_coulomb_contraction(Eigen::MatrixXd& coulomb, double mu2,
+                             const Eigen::MatrixXd& xi) {
+  const double norb = static_cast<double>(coulomb.rows());
+  coulomb -= norb * xi;
+  coulomb.diagonal().array() -= 2.0 * mu2 * norb + xi.trace();
+}
+
+/// exch(g~) = exch(g) + Sum_k dg_ikkj, folded in place.
+///   Sum_k dg_ikkj = -2*mu2*d_ij - 2*xi_ij
+void add_exchange_contraction(Eigen::MatrixXd& exchange, double mu2,
+                              const Eigen::MatrixXd& xi) {
+  exchange -= 2.0 * xi;
+  exchange.diagonal().array() -= 2.0 * mu2;
+}
+
 }  // namespace
 
-GlobalTwoBodyShift accumulate_fragment_shifts(
+FragmentAccumulation accumulate_fragment_shifts(
     const qdk::chemistry::data::FactorizedHamiltonianContainer& container) {
   const size_t norb = container.get_num_orbitals();
   const size_t R = container.get_num_ranks();
   const size_t B = container.get_num_bases();
   const size_t C = container.get_num_copies();
 
-  GlobalTwoBodyShift result(static_cast<Eigen::Index>(norb),
-                            static_cast<Eigen::Index>(R),
-                            static_cast<Eigen::Index>(C));
+  FragmentAccumulation result(static_cast<Eigen::Index>(norb),
+                              static_cast<Eigen::Index>(R),
+                              static_cast<Eigen::Index>(C));
+  GlobalTwoBodyShift& shift = result.shift;
 
   const Eigen::VectorXd& u = container.get_u_matrices();
   const Eigen::VectorXd& w = container.get_w_matrices();
@@ -105,44 +129,54 @@ GlobalTwoBodyShift accumulate_fragment_shifts(
         Ur(u.data() + r * B * norb, B, norb);
 
     for (size_t c = 0; c < C; ++c) {
+      // The single matrix product this fragment needs. It serves the
+      // mean-field contractions
+      //   coulomb_ij  = Sum_k g[i,j,k,k] = Sum_rc tr(M^rc) M^rc
+      //   exchange_ij = Sum_k g[i,k,k,j] = Sum_rc (M^rc M^rc)_ij
+      // and, scaled, xi.
+      const Eigen::MatrixXd M = leaf_matrix(Ur, w, r, c, B, C, norb);
+      result.coulomb += M.trace() * M;
+      result.exchange.noalias() += M * M;
+
       Eigen::VectorXd eps(B);
       for (size_t b = 0; b < B; ++b) {
         eps(b) = kInvSqrt2 * w(r * B * C + b * C + c);
       }
 
       const double eps_abs_sum = eps.array().abs().sum();
-      result.lambda_df_baseline += 0.5 * eps_abs_sum * eps_abs_sum;
+      const double lambda_baseline = 0.5 * eps_abs_sum * eps_abs_sum;
 
-      // Eq. 27's LP has a closed-form solution: phi^(alpha) = median{eps_i}.
-      const double phi = median(eps);
-      result.phi(static_cast<Eigen::Index>(r), static_cast<Eigen::Index>(c)) =
+      // Eq. 27's LP is minimized by every point of median_interval(eps). Take
+      // the upper endpoint: it is an actual eps_i, which drops a unitary from
+      // the one-electron LCU (text after Eq. 27).
+      const double phi = median_interval(eps).second;
+      shift.phi(static_cast<Eigen::Index>(r), static_cast<Eigen::Index>(c)) =
           phi;
-      const Eigen::VectorXd eps_shifted = eps.array() - phi;
 
-      const double eps_shifted_abs_sum = eps_shifted.array().abs().sum();
-      result.lambda_df_shifted +=
+      shift.lambda_df_baseline += lambda_baseline;
+      const double eps_shifted_abs_sum = (eps.array() - phi).abs().sum();
+      shift.lambda_df_shifted +=
           0.5 * eps_shifted_abs_sum * eps_shifted_abs_sum;
 
       // Eq. 24's per-fragment BLISS operator parameters.
-      const double mu2_alpha = phi * phi;
-      const Eigen::VectorXd theta_alpha = -2.0 * phi * eps;
+      //
+      // SIGN: the DF+LRPS optimal-fragment identity (Patel et al., Eq. C3,
+      // packaged as Eqs. C5-C6) writes the low-1-norm shifted fragment as
+      // H^(a) + K^(a) (plus a 1-electron term and a constant), i.e. the
+      // per-fragment BLISS operator is *added*. The global operator is
+      // *subtracted* from H (H - K, Eq. 5), so the aggregated (mu2, xi) are
+      // the NEGATED sum of the per-fragment K^(a) parameters. Any container
+      // in the M (x) M form has fragment coefficient +1 by construction --
+      // a negative fragment is not representable with a real M -- so there
+      // is no per-fragment sign to carry. (The individual W_b within a
+      // fragment are of course not all positive.)
+      shift.mu2 -= phi * phi;
 
-      // SIGN: the DF+LRPS optimal-fragment identity (Patel et al., Eq. 36)
-      // writes the low-1-norm shifted fragment as H^(a) + K^(a) (plus a
-      // 1-electron term and a constant), i.e. the per-fragment BLISS operator
-      // is *added*. The global operator is *subtracted* from H (H - K, Eq. 5),
-      // so the aggregated (mu2, xi) that the rebuild applies are the
-      // NEGATED sum of the per-fragment K^(a) parameters. Cholesky
-      // fragments are all positive, so there is no per-fragment sign to carry.
-      result.mu2 -= mu2_alpha;
-
-      // theta is expressed in the rotated basis; rotate it back. Ur has
-      // eigenvectors in rows, so the transform is Ur^T diag(theta) Ur.
-      Eigen::MatrixXd scaled(B, norb);
-      for (size_t b = 0; b < B; ++b) {
-        scaled.row(b) = theta_alpha(b) * Ur.row(b);
-      }
-      result.xi.noalias() -= Ur.transpose() * scaled;
+      // theta = -2*phi*eps is expressed in the rotated basis; rotating it
+      // back would be U^T diag(theta) U, but with eps = W/sqrt(2) that is
+      // exactly -sqrt(2)*phi*M, so M above is all this needs. Negating for
+      // H - K gives the += below.
+      shift.xi.noalias() += std::sqrt(2.0) * phi * M;
     }
   }
 
@@ -181,10 +215,9 @@ OneElectronShiftResult solve_one_electron_shift(
   result.lambda_1e_baseline = eigenvalues_baseline.array().abs().sum();
 
   // In-place: coulomb/exchange now hold the shifted contractions coul(g~)/
-  // exch(g~). See symmetry_shift_detail.hpp for the g~ definition and why this
-  // stays consistent with the full tensor.
-  detail::add_coulomb_contraction(coulomb, mu2, xi);
-  detail::add_exchange_contraction(exchange, mu2, xi);
+  // exch(g~) for the g~ defined above.
+  add_coulomb_contraction(coulomb, mu2, xi);
+  add_exchange_contraction(exchange, mu2, xi);
 
   // Effective one-electron operator of H - K with mu1 = 0 (see header).
   const Eigen::MatrixXd h0 = h + (num_electrons - 1.0) * xi - mu2 * identity;
@@ -201,7 +234,10 @@ OneElectronShiftResult solve_one_electron_shift(
         "effective one-body operator (info=" +
         std::to_string(shifted_info) + ").");
   }
-  result.mu1 = median(eigenvalues);
+  // lambda_1e is flat across the whole median interval, so take an endpoint:
+  // that makes mu1 an actual eigenvalue, which zeroes a term of the shifted
+  // operator and drops a unitary from its LCU (text after Eq. 27).
+  result.mu1 = median_interval(eigenvalues).second;
   result.lambda_1e = (eigenvalues.array() - result.mu1).abs().sum();
 
   return result;
@@ -268,41 +304,20 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
       norb, num_electrons, container.get_num_ranks(),
       container.get_num_copies());
 
-  // The mean-field contractions of the ORIGINAL g, taken straight from the
-  // factorization instead of the norb^4 tensor:
-  //   coulomb_ij  = Sum_k g[i,j,k,k] = Sum_rc tr(M^rc) M^rc_ij
-  //   exchange_ij = Sum_k g[i,k,k,j] = Sum_rc (M^rc M^rc)_ij
-  Eigen::MatrixXd coulomb = Eigen::MatrixXd::Zero(norb, norb);
-  Eigen::MatrixXd exchange = Eigen::MatrixXd::Zero(norb, norb);
-  {
-    const Eigen::VectorXd& u = container.get_u_matrices();
-    const Eigen::VectorXd& w = container.get_w_matrices();
-    const size_t R = container.get_num_ranks();
-    const size_t B = container.get_num_bases();
-    const size_t C = container.get_num_copies();
+  // One pass over the fragments produces both the mean-field contractions of
+  // the ORIGINAL g and the global (mu2, xi).
+  FragmentAccumulation accumulation = accumulate_fragment_shifts(container);
 
-    for (size_t r = 0; r < R; ++r) {
-      Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                     Eigen::RowMajor>>
-          Ur(u.data() + r * B * norb, B, norb);
-      for (size_t c = 0; c < C; ++c) {
-        const Eigen::MatrixXd M = leaf_matrix(Ur, w, r, c, B, C, norb);
-        coulomb += M.trace() * M;
-        exchange.noalias() += M * M;
-      }
-    }
-  }
-
-  auto global_shift = accumulate_fragment_shifts(container);
-
-  auto one_electron = solve_one_electron_shift(
-      h_alpha, std::move(coulomb), std::move(exchange), global_shift.mu2,
+  GlobalTwoBodyShift& global_shift = accumulation.shift;
+  const OneElectronShiftResult one_electron = solve_one_electron_shift(
+      h_alpha, accumulation.coulomb, accumulation.exchange, global_shift.mu2,
       global_shift.xi, num_electrons);
+
+  const double lambda_total_after =
+      global_shift.lambda_df_shifted + one_electron.lambda_1e;
 
   const double lambda_total_before =
       global_shift.lambda_df_baseline + one_electron.lambda_1e_baseline;
-  const double lambda_total_after =
-      global_shift.lambda_df_shifted + one_electron.lambda_1e;
 
   QDK_LOGGER().debug(
       "solve_fermionic_low_rank_shift: lambda_total before={} ({} + {}), "
@@ -338,14 +353,6 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
   shift.mu2 = global_shift.mu2;
   shift.xi = global_shift.xi;
   return {shift, std::move(global_shift.phi)};
-}
-
-SymmetryShift compute_fermionic_low_rank_shift(
-    const qdk::chemistry::data::Hamiltonian& hamiltonian,
-    unsigned int n_alpha_electrons, unsigned int n_beta_electrons) {
-  return solve_fermionic_low_rank_shift(hamiltonian, n_alpha_electrons,
-                                        n_beta_electrons)
-      .shift;
 }
 
 // ---------------------------------------------------------------------------
@@ -427,21 +434,6 @@ rebuild_shifted_factorized_hamiltonian(
 // FermionicLowRankShifter: the SymmetryShifter implementation.
 // ---------------------------------------------------------------------------
 
-SymmetryShift FermionicLowRankShifter::compute_shift(
-    const data::Hamiltonian& hamiltonian, unsigned int n_alpha_electrons,
-    unsigned int n_beta_electrons) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  if (!hamiltonian.is_restricted()) {
-    throw std::invalid_argument(
-        "FermionicLowRankShifter currently only supports restricted "
-        "(spin-restricted) Hamiltonians.");
-  }
-
-  return compute_fermionic_low_rank_shift(hamiltonian, n_alpha_electrons,
-                                          n_beta_electrons);
-}
-
 std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons) const {
@@ -459,6 +451,7 @@ std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(
 
   const FermionicLowRankSolution solution = solve_fermionic_low_rank_shift(
       *hamiltonian, n_alpha_electrons, n_beta_electrons);
+  _record_shift(solution.shift);
 
   // solve_fermionic_low_rank_shift() has already validated the container.
   const auto& container = hamiltonian->get_container<

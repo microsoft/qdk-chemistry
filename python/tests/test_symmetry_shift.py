@@ -129,5 +129,25 @@ class TestSymmetryShifterCorrectness:
         assert after.get_num_ranks() == before.get_num_ranks()
         assert after.get_num_bases() == before.get_num_bases()
         assert after.get_num_copies() == before.get_num_copies()
-        assert np.allclose(after.get_u_matrices(), before.get_u_matrices(), atol=1e-15)
-        assert not np.allclose(after.get_w_matrices(), before.get_w_matrices(), atol=1e-12)
+        # rtol=0: the rotations must be bitwise-carried-through, so the
+        # default relative term would swamp the absolute bound being asserted.
+        assert np.allclose(after.get_u_matrices(), before.get_u_matrices(), rtol=0, atol=1e-15)
+        assert not np.allclose(after.get_w_matrices(), before.get_w_matrices(), rtol=0, atol=1e-12)
+
+    def test_last_shift_reports_the_applied_parameters(self, water_factorized):
+        """run() applies a shift; last_shift() is how a caller reads it back."""
+        shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
+        assert shifter.last_shift() is None
+
+        shifted = shifter.run(water_factorized, 5, 5)
+        shift = shifter.last_shift()
+        assert shift is not None
+
+        # The reported parameters must be the ones that were actually folded
+        # in: h~ = h + (Ne-1)*xi - (mu1+mu2)*I.
+        h_before = water_factorized.get_one_body_integrals()[0]
+        h_after = shifted.get_one_body_integrals()[0]
+        h_expected = h_before + 9.0 * shift.xi - (shift.mu1 + shift.mu2) * np.eye(
+            h_before.shape[0]
+        )
+        assert np.allclose(h_after, h_expected, rtol=0, atol=1e-12)
