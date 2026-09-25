@@ -118,6 +118,32 @@ class QubitOperator(DataClass):
         _hash_str(h, "qubit_operator")
         _hash_str(h, self._container.content_hash())
 
+    @classmethod
+    def from_sparse_terms(
+        cls,
+        num_qubits: int,
+        terms: Any,
+        coefficients: np.ndarray,
+        **kwargs: Any,
+    ) -> QubitOperator:
+        """Build a packed Pauli decomposition from ``(qubit, X/Y/Z)`` factors.
+
+        ``__getattr__`` only forwards instance attributes, so this constructor is
+        forwarded explicitly to :class:`PauliDecompositionContainer`.
+
+        Args:
+            num_qubits (int): Register width.
+            terms: Per-term mappings or iterables of ``(qubit, axis)`` pairs.
+            coefficients (numpy.ndarray): One coefficient per term.
+            **kwargs (Any): Optional ``encoding``, ``fermion_mode_order``,
+                ``term_partition`` and ``tapering`` metadata.
+
+        Returns:
+            QubitOperator: Operator wrapping the packed decomposition.
+
+        """
+        return cls(container=PauliDecompositionContainer.from_sparse_terms(num_qubits, terms, coefficients, **kwargs))
+
     def __getattr__(self, name: str) -> Any:
         """Forward attribute access to the wrapped container.
 

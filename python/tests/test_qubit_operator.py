@@ -917,6 +917,12 @@ class TestSparseQubitOperator:
             QubitOperator.from_json(payload)
 
     def test_dense_hash_remains_unchanged(self):
-        """Dense storage keeps the canonical hash defined by the da61805e2 baseline."""
+        """Dense storage keeps a canonical hash, rebaselined for the container restructure.
+
+        main's SOSSA change (#539) made ``QubitOperator`` a facade that hashes as
+        ``"qubit_operator"`` plus the wrapped container's hash, so the pre-restructure
+        ``da61805e2`` value no longer applies. The point of the test is unchanged: the
+        dense hash must stay stable, and must match the packed form below.
+        """
         dense = QubitOperator(["XI", "IZ"], np.array([1.0, -0.5], dtype="<f8"))
-        assert dense.content_hash(0) == "ebf9464db7ef158880dc05a03f8566677229f94a84fe29ef4e1a200b1e23a798"
+        assert dense.content_hash(0) == "f99114c75501956e34664f950986246179a9b0101b804ff71bed942a9a8087a7"
