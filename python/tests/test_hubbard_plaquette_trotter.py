@@ -327,7 +327,7 @@ class TestPlaquetteEvolutionOnAState:
         cycles = [[5, 6, 2, 1], [7, 4, 0, 3]]
         literal = "[" + ", ".join("[" + ", ".join(map(str, cycle)) + "]" for cycle in cycles) + "]"
         operation = qsharp_context.eval(
-            f"qs => QDKChemistry.Utils.HubbardPlaquette.HoppingLayer(0, {2.0 * duration}, {literal}, qs)"
+            f"qs => QDKChemistry.Utils.HubbardPlaquette.HoppingLayer({2.0 * duration}, {literal}, qs)"
         )
 
         annihilate = np.array([[0, 1], [0, 0]], dtype=complex)
