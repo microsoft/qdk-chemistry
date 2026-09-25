@@ -49,14 +49,14 @@ def require_plaquette_container(evolution: UnitaryRepresentation) -> HubbardPlaq
         HubbardPlaquetteContainer: The wrapped container.
 
     Raises:
-        TypeError: If the representation is not a plaquette evolution.
+        ValueError: If the unitary container type is not supported.
 
     """
     container = evolution.get_container()
     if not isinstance(container, HubbardPlaquetteContainer):
-        raise TypeError(
-            f"The plaquette mapper requires a HubbardPlaquetteContainer, but the representation "
-            f"wraps a {type(container).__name__}."
+        raise ValueError(
+            f"The {evolution.get_container_type()} container type is not supported. "
+            "ControlledHubbardPlaquetteMapper only supports HubbardPlaquette container for the unitary."
         )
     return container
 
