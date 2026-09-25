@@ -15,12 +15,6 @@ on:
         required: false
         default: false
         type: boolean
-      python_test_workers:
-        description: Override pytest workers for a timing comparison
-        required: false
-        default: matrix
-        type: choice
-        options: [matrix, '1', '2']
       rebuild_dep_cache:
         description: Rebuild dependency cache from scratch (ignore existing cache)
         required: false
@@ -75,6 +69,7 @@ jobs:
           cpp-omp-threads: 4
           python-omp-threads: 4
           python-test-workers: 8
+          build-documentation: true
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
@@ -320,7 +315,7 @@ jobs:
 
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
-        if [ "${{ matrix.python-version }}" = "3.13" ]; then
+        if [ "${{ matrix.build-documentation }}" = "true" ]; then
           python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
         else
           python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
@@ -513,7 +508,7 @@ jobs:
         fail-on-error: false
 
     - name: Build documentation
-      if: matrix.python-version == '3.13'
+      if: matrix.build-documentation
       working-directory: docs
       run: |
         set +e
@@ -1124,7 +1119,7 @@ jobs:
       env:
         CMAKE_BUILD_TYPE: Release
       run: |
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
+        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
