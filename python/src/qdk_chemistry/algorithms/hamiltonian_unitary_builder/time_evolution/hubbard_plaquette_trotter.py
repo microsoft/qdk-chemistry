@@ -1,8 +1,18 @@
 r"""Second-order plaquette Trotterization for the uniform Fermi-Hubbard model.
 
+The plaquette decomposition, its error constant, and the exact four-mode plaquette
+evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
+rule follow the later compilation of the same algorithm in :cite:`Apel2026`, which
+deviates from Campbell where noted in the methods below.
+
 References:
     Campbell, E. T. "Early fault-tolerant simulations of the Hubbard model."
     *Quantum Science & Technology* 7.1 (2022): 015007. arXiv:2012.09238v4.
+    :cite:`Campbell2022`
+
+    Apel, H. et al. "Compiling the 2D Fermi-Hubbard ground-state energy estimation
+    algorithm for active volume quantum architectures." arXiv:2609.05316 (2026).
+    :cite:`Apel2026`
 
 """
 
@@ -159,7 +169,22 @@ class HubbardPlaquetteTrotter(Trotter):
         :math:`g` denote the pink and gold hopping tilings. One step applies
 
         .. math::
-            e^{-isH_I/2} e^{-isH_h^p/2} e^{-isH_h^g} e^{-isH_h^p/2} e^{-isH_I/2}.
+            e^{-isH_h^p/2} e^{-isH_I/2} e^{-isH_h^g} e^{-isH_I/2} e^{-isH_h^p/2},
+
+        so adjacent steps merge their outer half-layers into one full-angle
+        :math:`e^{-isH_h^p}`, and the whole evolution collapses to a single
+        :math:`e^{-isH_h^p/2}` boundary wrapped around the merged bodies:
+
+        .. math::
+            e^{-isH_h^p/2}
+            \left( e^{-isH_I/2} e^{-isH_h^g} e^{-isH_I/2} e^{-isH_h^p} \right)^{r-1}
+            e^{-isH_I/2} e^{-isH_h^g} e^{-isH_I/2} e^{-isH_h^p/2}.
+
+        Placing a hopping tiling outermost is the "PIG" ordering of Eqs. (16a)-(16b) of
+        :cite:`Apel2026`. It is a deliberate deviation from Campbell's own Eq. (D2)
+        :cite:`Campbell2022`, which puts :math:`H_I` outermost ("IPG"): PIG merges the
+        more resource-intensive hopping layers across step boundaries, where IPG merges
+        the cheaper interaction layers.
 
         Each plaquette hopping evolution is exact. The builder diagonalizes its
         single-particle matrix, :math:`T = V \Lambda V^\dagger`, and applies
@@ -168,7 +193,9 @@ class HubbardPlaquetteTrotter(Trotter):
             e^{-isH_\square} = U_V e^{-is\sum_m \lambda_m n_m} U_V^\dagger.
 
         Thus the circuit switches to the plaquette momentum basis, applies two nonzero
-        eigenvalue phases, and switches back. Trotter error comes only from splitting
+        eigenvalue phases, and switches back; the four-cycle hopping matrix has only two
+        non-trivial eigenvalues, so two phase rotations suffice (App. E, Eqs. (E6)-(E10)
+        of :cite:`Campbell2022`). Trotter error comes only from splitting
         :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`.
 
         Args:
@@ -290,7 +317,36 @@ class HubbardPlaquetteTrotter(Trotter):
     ) -> int:
         """Determine the step count from Campbell's plaquette-specific error constant.
 
-        Derived for this exact splitting (Eq. (20) and App. D).
+        The error constant ``W_PLAQ`` is derived for this exact splitting in
+        :cite:`Campbell2022`: Eq. (20) states it in the main text as
+        ``W_PLAQ <= W_SO2 + (3/24) ||[[H_h^p, H_h^g], H_h^g]||``, and App. D carries the
+        derivation, restating the same result as Eq. (D6). The energy budget is converted
+        into a step count with the exact form retained by Algorithm 1 of :cite:`Apel2026`
+        rather than its small-angle limit; see the comments on the conversion below.
+
+        The bound deliberately ignores the single-mode term ``single_z``, which is nonzero
+        whenever ``epsilon != -U/2``. That term is a *uniform* on-site energy, so under the
+        Jordan-Wigner image it is proportional to ``M - 2 N``, where ``N`` is the total
+        number operator. Hopping and interaction both conserve particle number, so this
+        layer commutes with every other factor and contributes no Trotter error at any
+        ordering; only its scalar part matters, and that is carried by ``identity_angle``.
+
+        Warning:
+            ``W_PLAQ`` below is Campbell's closed form, which is derived for the "IPG"
+            factor ordering (interaction outermost, Eq. (D2) of :cite:`Campbell2022`).
+            The circuit this builder emits uses the "PIG" ordering instead, and Sec. 4.8.2
+            of :cite:`Apel2026` states that changing the ordering requires recomputing the
+            commutator bound: under PIG the pure-hopping block ``[[H_h^p, H_h^g], .]``
+            that Campbell evaluates as ``W_extra2`` is replaced by a mixed
+            interaction-hopping block, and the accumulated operator following the first
+            factor is no longer purely hopping, so the ``W_SO2 + W_extra2`` split does not
+            transfer. Apel report the PIG constant to be larger than Campbell's IPG value
+            at every lattice size they plot (their Fig. 18, even ``L`` from 4 to 20; by
+            about 10% for ``L >= 10`` and about 20% at ``L = 4``). Since ``r`` scales as
+            ``sqrt(W_PLAQ)``, reusing the IPG constant here under-counts the steps by
+            roughly 5% for ``L >= 10``, in the optimistic direction. Apel give no closed
+            form for the PIG constant -- they evaluate it numerically (their Eq. (29) and
+            App. C.1) and publish no table of values -- so it is not reproduced here.
 
         Args:
             hopping: Uniform hopping amplitude.
@@ -315,8 +371,15 @@ class HubbardPlaquetteTrotter(Trotter):
         interaction = abs(self._settings.get("U"))
 
         # R_p and R_g are the one-spin, unit-hopping matrices for the pink and gold tilings.
-        # Evaluate their trace norms exactly through 1600 sites; beyond that use the
-        # thermodynamic limits 16/pi^2 and 3.229 per site, respectively.
+        # Evaluate their trace norms exactly through 1600 sites; beyond that fall back on
+        # per-site asymptotic values, 16/pi^2 for ||R_p + R_g||_1 and 3.229 for
+        # ||[[R_p, R_g], R_g]||_1. These two constants are NOT tabulated by Campbell: App. D
+        # of Campbell2022 states only the cruder bounds (3/2) L^2 and (10/3) L^2, and its
+        # Table III tabulates extensive norms for L <= 32 rather than per-site limits.
+        # 16/pi^2 = 1.62114 is the exact thermodynamic limit of ||R_p + R_g||_1 / L^2, since
+        # the mean of |cos k_x + cos k_y| over the Brillouin zone is 8/pi^2. 3.229 is an
+        # empirical per-site value for the nested commutator; it is accurate near L = 40 but
+        # slightly below the limiting value (~3.24), so it is mildly optimistic as L grows.
         if num_sites <= 1600:
             section_matrices: list[np.ndarray] = []
             for cycles in sections:
@@ -336,22 +399,54 @@ class HubbardPlaquetteTrotter(Trotter):
             hopping_norm = 16.0 / math.pi**2 * num_sites * hopping
             commutator_norm = 3.229 * num_sites * hopping**3
 
-        # 1. W_SO2 from Eq. (C3), in the dimensionful R convention of Eq. (10).
+        # 1. W_SO2, the split-operator error constant, from Eq. (10) of :cite:`Campbell2022`.
+        # "SO2" indexes Campbell's second split-operator *ordering*, not the Trotter order:
+        # both SO1 and SO2 are second-order formulas. Eq. (10) is the main-text statement;
+        # its appendix restatement Eq. (C3) carries a spurious hopping factor in the
+        # u^2/24 term, so Eq. (10) is the form reproduced here.
         w_so2 = (
             interaction * hopping**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + interaction**2 / 24.0 * hopping_norm
         )
-        # 2. The extra plaquette-splitting contribution from Eq. (D10).
+        # 2. The extra plaquette-splitting contribution, Eq. (D10) of :cite:`Campbell2022`.
         w_extra2 = 3.0 / 24.0 * commutator_norm
-        # 3. The complete plaquette error constant from Eq. (D6).
+        # 3. The complete plaquette error constant, Eq. (D6) of :cite:`Campbell2022`.
         w_plaquette = w_so2 + w_extra2
 
-        # 4. Eq. (F2) gives epsilon_TS <= W s^2. Requiring this upper bound to
-        # meet target_accuracy gives s <= sqrt(target_accuracy / W).
-        if w_plaquette <= 0.0 or time == 0.0:
+        # 4. Convert the energy budget into a step count.
+        #
+        # Write T for the total evolution time. (Campbell reserves tau for the hopping
+        # amplitude, which appears inside W_PLAQ itself; Apel use tau for this duration.)
+        #
+        # A single step of size s carries unitary error ||Delta U|| <= W_PLAQ s^3, which is
+        # Eq. (F1) of :cite:`Campbell2022`. Summing r steps of size s = T/r by subadditivity
+        # gives W_PLAQ T^3 / r^2; that accumulation step is not itself stated by Campbell,
+        # who works per-step. The induced error in the estimated *energy* then satisfies
+        # |Delta E| <= (2/T) arcsin(||Delta U|| / 2), the effective-Hamiltonian bound of
+        # Bhatia and Davis :cite:`Bhatia1984`, used as Eqs. (34)-(35) of :cite:`Apel2026`
+        # and by :cite:`Kivlichan2020`. Inverting it for a target energy error eps_TS gives
+        #
+        #     r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
+        #
+        # which is the form retained by Algorithm 1 of :cite:`Apel2026`.
+        #
+        # Campbell Eq. (F2) instead states the linearized bound Delta_TS <= W s^2, giving
+        # s <= sqrt(eps_TS / W). That is the small-angle limit of the above, since
+        # 2 sin(x/2) -> x as x -> 0. The two differ by a factor sqrt(x / (2 sin(x / 2)))
+        # in r, where x = eps_TS T is the angle for that round. Because sin x <= x the
+        # linearized rule is always the optimistic one, so the exact form is used here.
+        # For the QPE ladder in examples/benchmark/sample_hubbard_resources.py the largest
+        # round runs at x ~ 0.78, worth about 1.3% on that round, and the change in the
+        # summed step count is between 0 and 0.74% depending on lattice size -- largest for
+        # small lattices and absorbed entirely by the integer ceiling for L >= 40.
+        duration = abs(time)
+        if w_plaquette <= 0.0 or duration == 0.0:
             automatic = 1
         else:
-            max_step_size = math.sqrt(target_accuracy / w_plaquette)
-            automatic = max(1, math.ceil(abs(time) / max_step_size))
+            # ||Delta U|| can never exceed 2, so the arcsine saturates at eps_TS T = pi.
+            # Clamping there keeps the step count monotonic in the accuracy target; a looser
+            # target than that is certified by any step count and simply yields the floor.
+            phase = min(target_accuracy * duration, math.pi)
+            automatic = max(1, math.ceil(math.sqrt(w_plaquette * duration**3 / (2.0 * math.sin(phase / 2.0)))))
         Logger.debug(f"HubbardPlaquetteTrotter: bound gives r={automatic}, manual is {manual}.")
         return max(manual, automatic)
 

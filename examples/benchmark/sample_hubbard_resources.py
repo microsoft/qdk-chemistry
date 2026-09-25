@@ -39,17 +39,24 @@ U_OVER_T = 8.0
 #: Electrons per SITE
 FILLING = 0.875
 
-#: Per-site ground-state energy accuracy.
+#: Per-site ground-state energy accuracy, in units of the hopping amplitude t.
+#: Campbell (arXiv:2012.09238v4) uses an additive error eps = 0.0051 * L^2 in the FIG. 2
+#: caption -- i.e. 0.0051 per site at t = 1 -- quoted there as roughly half a percent of the
+#: total system energy. This is the *total* budget: it covers phase estimation, Trotter, and
+#: gate synthesis together. Campbell states it for u/t = 4, whereas this sweep runs at
+#: u/t = 8, where the ground-state energy per site differs; the coefficient is reused as is.
 TARGET_PRECISION_PER_SITE = 0.0051
 
 #: Number of phase-register precision bits.
 QPE_PRECISION_BITS = 10
 
-#: Share of the energy budget allocated to phase estimation. Minimizing the total
-#: Trotter step count sum_k r_k, which scales as 1 / (delta * sqrt(1 - delta)), gives
-#: delta = 2/3; this reproduces the analytic optimum of Campbell (arXiv:2012.09238,
-#: App. F), whose Eqs. (F5)-(F7) split the combined budget as Delta_PE = 2/3 and
-#: Delta_TS = 1/3.
+#: Share of the energy budget allocated to phase estimation. Minimizing the total Trotter
+#: step count sum_k r_k, which scales as 1 / (f * sqrt(1 - f)) in the phase-estimation share
+#: f, gives f = 2/3. Campbell (arXiv:2012.09238v4, App. F) reaches the same optimum by
+#: minimizing over the step size instead; the sentence immediately following Eq. (F6)
+#: records it as Delta_TS = (1/3) delta and Delta_PE = (2/3) delta. Campbell's delta there is
+#: the combined phase-estimation-plus-Trotter budget in energy units, not a fraction, and the
+#: 1:2 ratio is forced by minimizing a*t^2 + b/t rather than chosen freely.
 QPE_BUDGET_FRACTION = 2.0 / 3.0
 
 # Plaquette Trotter order.
@@ -81,6 +88,10 @@ def run_sampling(context, size: int) -> pd.DataFrame:
     # to equal that spread fixes the base evolution time. The remainder is handed to the
     # plaquette builder, which sizes its own step count against it.
     # Eqn. 8 in https://arxiv.org/pdf/2609.05316.
+    #
+    # Note that the step count the builder derives is knowingly optimistic: it reuses
+    # Campbell's IPG commutator bound for a PIG-ordered circuit. See the warning on
+    # HubbardPlaquetteTrotter._step_count for the size and direction of the bias.
     energy_budget = TARGET_PRECISION_PER_SITE * num_sites
     resolution_bits = QPE_PRECISION_BITS
     qpe_budget = QPE_BUDGET_FRACTION * energy_budget
