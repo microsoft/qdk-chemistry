@@ -63,6 +63,7 @@ _HUBBARD_L2_FULL_CIRCUIT = {
     "measurements": 606126,
 }
 
+
 @pytest.fixture(scope="module")
 def script() -> Any:
     """Load the sampling script as a module."""
