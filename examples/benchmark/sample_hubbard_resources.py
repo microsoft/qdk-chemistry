@@ -87,7 +87,11 @@ def run_sampling(context, size: int) -> pd.DataFrame:
     # N = 2^bits - 1 queries has phase spread tan(pi / (N + 2)), so requiring eps_QPE * tau
     # to equal that spread fixes the base evolution time. The remainder is handed to the
     # plaquette builder, which sizes its own step count against it.
-    # Eqn. 8 in https://arxiv.org/pdf/2609.05316.
+    #
+    # The N + 2 denominator is the one carried by the window this code actually prepares:
+    # see ``cosine_window_state``, which follows Eq. (17) of Babbush et al. (PRX 8, 041015).
+    # Eq. (8) of arXiv:2609.05316 states the same spread with an N + 1 denominator, which
+    # appears to be a typo; do not propagate it.
     #
     # Note that the step count the builder derives is knowingly optimistic: it reuses
     # Campbell's IPG commutator bound for a PIG-ordered circuit. See the warning on
