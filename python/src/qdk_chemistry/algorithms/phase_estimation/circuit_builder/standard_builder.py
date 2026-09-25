@@ -43,7 +43,7 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "phase_state",
             "string",
             "uniform",
-            "Phase-register state. 'uniform' prepares a Hadamard superposition. " \
+            "Phase-register state. 'uniform' prepares a Hadamard superposition. "
             "'sine' prepares the Heisenberg-limited sine window state.",
         )
 

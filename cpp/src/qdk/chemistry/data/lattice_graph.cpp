@@ -1101,8 +1101,7 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     new_coloring = std::move(coloring);
   }
 
-  return LatticeGraph(std::move(new_adj), std::move(new_coloring),
-                      graph._dims);
+  return LatticeGraph(std::move(new_adj), std::move(new_coloring), graph._dims);
 }
 
 }  // namespace qdk::chemistry::data
