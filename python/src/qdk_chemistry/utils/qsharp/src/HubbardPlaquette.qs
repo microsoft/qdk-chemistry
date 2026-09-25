@@ -13,10 +13,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     import Std.Intrinsic.AND;
     import Std.Math.BitSizeI;
     import Std.Math.PI;
-    import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EndEstimateCaching;
     import Std.ResourceEstimation.IsResourceEstimating;
-    import Std.ResourceEstimation.SingleVariant;
     import Std.ResourceEstimation.RepeatEstimates;
 
     /// # Summary
@@ -36,21 +33,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         hoppingAngle : Double,
         /// Number of repetitions of the body.
         repetitions : Int,
-    }
-
-    /// # Summary
-    /// Cache key for an equal-angle batch.
-    ///
-    /// # Description
-    /// A batch's cost is fixed by its axes, its group width and its term count, none of
-    /// which depend on the angle, so equal-angle families in different tilings share an
-    /// entry. The context separates controlled calls, whose cost differs.
-    internal function BatchVariant(axes : Pauli[], width : Int, count : Int, context : Int) : Int {
-        mutable word = 1;
-        for axis in axes {
-            set word = word * 4 + (axis == PauliI ? 0 | (axis == PauliX ? 1 | (axis == PauliY ? 2 | 3)));
-        }
-        return ((word * 1024 + width) * 1048576 + count) * 2 + context;
     }
 
     /// # Summary
@@ -215,7 +197,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
 
     /// Applies one equal-angle batch, selecting HWP only at its measured break-even size.
     internal operation HammingWeightPhaseTerms(
-        contextVariant : Int,
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][]
@@ -228,16 +209,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 Exp(pauliOps[t], -theta, targets[t]);
             }
         } else {
-            let variant = BatchVariant(pauliOps[0], Length(targets[0]), Length(targets), contextVariant);
-            if BeginEstimateCaching("HubbardPlaquette.HammingWeightPhaseTerms", variant) {
-                within {
-                    for t in 0..Length(targets) - 1 {
-                        MapPauliTermToSingleZ(pauliOps[t], targets[t]);
-                    }
-                } apply {
-                    HammingWeightPhase(theta, Mapped(term -> Tail(term), targets));
+            within {
+                for t in 0..Length(targets) - 1 {
+                    MapPauliTermToSingleZ(pauliOps[t], targets[t]);
                 }
-                EndEstimateCaching();
+            } apply {
+                HammingWeightPhase(theta, Mapped(term -> Tail(term), targets));
             }
         }
     }
@@ -283,17 +260,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         sites : Int,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        // Both calls in a step share this one cache entry: they pass the same angles on
-        // the same register from the same control context, so their costs are identical.
-        // A new call site with a different context must not reuse this name.
-        if BeginEstimateCaching("HubbardPlaquette.InteractionLayer", SingleVariant()) {
-            if onsite != 0.0 {
-                HammingWeightPhaseTerms(1, onsite, [[PauliZ], size = Length(systems)], StridedGroups(Length(systems), 1, 1, 1, systems));
-            }
-            if angle != 0.0 {
-                HammingWeightPhaseTerms(1, angle, [[PauliZ, PauliZ], size = sites], StridedGroups(sites, 2, 1, sites, systems));
-            }
-            EndEstimateCaching();
+        if onsite != 0.0 {
+            HammingWeightPhaseTerms(onsite, [[PauliZ], size = Length(systems)], StridedGroups(Length(systems), 1, 1, 1, systems));
+        }
+        if angle != 0.0 {
+            HammingWeightPhaseTerms(angle, [[PauliZ, PauliZ], size = sites], StridedGroups(sites, 2, 1, sites, systems));
         }
     }
 
@@ -389,50 +360,37 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Four-cycles of the tiling, in cycle order.
     /// ## systems
     /// The system register.
-    /// ## cacheVariant
-    /// Distinguishes call sites whose cost differs, for estimate caching. Two calls may
-    /// share a variant only if they agree on both the tiling, since pink and gold route
-    /// with different swap counts, and on whether the call is controlled, since only the
-    /// phases inside the conjugation pick up the control.
-    operation HoppingLayer(
-        cacheVariant : Int,
-        kappa : Double,
-        blocks : Int[][],
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        if BeginEstimateCaching("HubbardPlaquette.HoppingLayer", cacheVariant) {
-            within {
-                if IsResourceEstimating() {
-                    // Every routing swap is the same Clifford pair on a different pair of
-                    // modes, so the estimator only needs how many there are. Emitting one
-                    // and repeating its cost keeps the O(sites^1.5) gates out of the trace,
-                    // and the inversion count keeps the O(sites^2) sort out with them.
-                    let swapCount = RoutingSwapCount(blocks, Length(systems));
-                    if swapCount > 0 {
-                        within {
-                            RepeatEstimates(swapCount);
-                        } apply {
-                            SWAP(systems[0], systems[1]);
-                            CZ(systems[0], systems[1]);
-                        }
-                    }
-                } else {
-                    for position in RoutingSwaps(blocks, Length(systems)) {
-                        SWAP(systems[position], systems[position + 1]);
-                        CZ(systems[position], systems[position + 1]);
+    operation HoppingLayer(kappa : Double, blocks : Int[][], systems : Qubit[]) : Unit is Adj + Ctl {
+        within {
+            if IsResourceEstimating() {
+                // Every routing swap is the same Clifford pair on a different pair of
+                // modes, so the estimator only needs how many there are. Emitting one
+                // and repeating its cost keeps the O(sites^1.5) gates out of the trace,
+                // and the inversion count keeps the O(sites^2) sort out with them.
+                let swapCount = RoutingSwapCount(blocks, Length(systems));
+                if swapCount > 0 {
+                    within {
+                        RepeatEstimates(swapCount);
+                    } apply {
+                        SWAP(systems[0], systems[1]);
+                        CZ(systems[0], systems[1]);
                     }
                 }
-                for index in 0..Length(blocks) - 1 {
-                    let base = 4 * index;
-                    TwoModeFFFT(base + 0, base + 2, systems);
-                    TwoModeFFFT(base + 1, base + 3, systems);
+            } else {
+                for position in RoutingSwaps(blocks, Length(systems)) {
+                    SWAP(systems[position], systems[position + 1]);
+                    CZ(systems[position], systems[position + 1]);
                 }
-            } apply {
-                let pairs = StridedGroups(Length(blocks), 2, 4, 1, systems);
-                HammingWeightPhaseTerms(cacheVariant == 0 ? 0 | 1, -kappa / 2.0, [[PauliX, PauliX], size = Length(pairs)], pairs);
-                HammingWeightPhaseTerms(cacheVariant == 0 ? 0 | 1, -kappa / 2.0, [[PauliY, PauliY], size = Length(pairs)], pairs);
             }
-            EndEstimateCaching();
+            for index in 0..Length(blocks) - 1 {
+                let base = 4 * index;
+                TwoModeFFFT(base + 0, base + 2, systems);
+                TwoModeFFFT(base + 1, base + 3, systems);
+            }
+        } apply {
+            let pairs = StridedGroups(Length(blocks), 2, 4, 1, systems);
+            HammingWeightPhaseTerms(-kappa / 2.0, [[PauliX, PauliX], size = Length(pairs)], pairs);
+            HammingWeightPhaseTerms(-kappa / 2.0, [[PauliY, PauliY], size = Length(pairs)], pairs);
         }
     }
 
@@ -455,14 +413,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
         InteractionLayer(params.interactionAngle / 2.0, params.onsiteAngle / 2.0, sites, systems);
-        HoppingLayer(1, params.hoppingAngle, gold, systems);
+        HoppingLayer(params.hoppingAngle, gold, systems);
         InteractionLayer(params.interactionAngle / 2.0, params.onsiteAngle / 2.0, sites, systems);
         if params.identityAngle != 0.0 {
             // R(PauliI, theta) is the global phase exp(-i theta / 2), so theta =
             // 2 * identityAngle realizes the step's exp(-i * identityAngle) factor.
             R(PauliI, 2.0 * params.identityAngle, systems[0]);
         }
-        HoppingLayer(2, params.hoppingAngle, pink, systems);
+        HoppingLayer(params.hoppingAngle, pink, systems);
     }
 
     /// # Summary
@@ -476,7 +434,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     operation RepPlaquetteExp(params : HubbardPlaquetteParams, systems : Qubit[]) : Unit is Adj + Ctl {
         within {
             HoppingLayer(
-                0,
                 params.hoppingAngle / 2.0,
                 PlaquetteSection(params.width, params.height, true),
                 systems
