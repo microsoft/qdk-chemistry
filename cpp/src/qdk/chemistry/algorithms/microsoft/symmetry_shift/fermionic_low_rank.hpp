@@ -57,17 +57,27 @@ inline std::pair<double, double> median_interval(
   return {sorted[n / 2 - 1], sorted[n / 2]};
 }
 
-/// Aggregated global BLISS two-electron shift parameters (Patel et al.,
-/// arXiv:2409.18277, Eq. 4/24, summed over fragments), in the ORIGINAL
-/// orbital basis. These parametrize the operator K that is SUBTRACTED from H,
-/// so they are the negated sum of the per-fragment K^(a) (Eq. C6 adds them).
-struct GlobalTwoBodyShift {
-  /// The sizes are required so xi and phi are well-formed even with no
+/// Everything a single pass over the fragments produces: the mean-field
+/// contractions of the ORIGINAL g, and the aggregated global BLISS
+/// two-electron shift they imply (Patel et al., arXiv:2409.18277, Eq. 4/24,
+/// summed over fragments) in the ORIGINAL orbital basis. (mu2, xi)
+/// parametrize the operator K that is SUBTRACTED from H, so they are the
+/// negated sum of the per-fragment K^(a) (Eq. C6 adds them).
+struct FragmentAccumulation {
+  /// The sizes are required so the matrices are well-formed even with no
   /// fragments to accumulate.
-  GlobalTwoBodyShift(Eigen::Index norb, Eigen::Index num_ranks,
-                     Eigen::Index num_copies)
-      : xi(Eigen::MatrixXd::Zero(norb, norb)),
+  FragmentAccumulation(Eigen::Index norb, Eigen::Index num_ranks,
+                       Eigen::Index num_copies)
+      : coulomb(Eigen::MatrixXd::Zero(norb, norb)),
+        exchange(Eigen::MatrixXd::Zero(norb, norb)),
+        xi(Eigen::MatrixXd::Zero(norb, norb)),
         phi(Eigen::MatrixXd::Zero(num_ranks, num_copies)) {}
+
+  /// coulomb_ij = sum_k g[i,j,k,k], taken from the factorization as
+  /// sum_rc tr(M^rc) M^rc -- never from a dense norb^4 tensor.
+  Eigen::MatrixXd coulomb;
+  /// exchange_ij = sum_k g[i,k,k,j] = sum_rc (M^rc M^rc)_ij.
+  Eigen::MatrixXd exchange;
 
   double mu2 = 0.0;    ///< Aggregated mu_2 (for H - K).
   Eigen::MatrixXd xi;  ///< Aggregated xi_ij (for H - K), norb x norb.
@@ -76,23 +86,6 @@ struct GlobalTwoBodyShift {
   Eigen::MatrixXd phi;
   double lambda_df_baseline = 0.0;  ///< Sum of pre-shift fragment 1-norms.
   double lambda_df_shifted = 0.0;   ///< Sum of post-shift fragment 1-norms.
-};
-
-/// Everything a single pass over the fragments produces: the mean-field
-/// contractions of the ORIGINAL g, and the global shift they imply.
-struct FragmentAccumulation {
-  FragmentAccumulation(Eigen::Index norb, Eigen::Index num_ranks,
-                       Eigen::Index num_copies)
-      : coulomb(Eigen::MatrixXd::Zero(norb, norb)),
-        exchange(Eigen::MatrixXd::Zero(norb, norb)),
-        shift(norb, num_ranks, num_copies) {}
-
-  /// coulomb_ij = sum_k g[i,j,k,k], taken from the factorization as
-  /// sum_rc tr(M^rc) M^rc -- never from a dense norb^4 tensor.
-  Eigen::MatrixXd coulomb;
-  /// exchange_ij = sum_k g[i,k,k,j] = sum_rc (M^rc M^rc)_ij.
-  Eigen::MatrixXd exchange;
-  GlobalTwoBodyShift shift;
 };
 
 /// Walk every (rank, copy) fragment of `container` ONCE, accumulating the
@@ -153,9 +146,10 @@ struct OneElectronShiftResult {
 ///        folded in place.
 /// @param exchange Exchange contraction of the ORIGINAL g,
 ///        exchange_ij = sum_k g[i,k,k,j]. Also consumed in place.
-/// @param mu2 Aggregated two-electron BLISS shift (GlobalTwoBodyShift::mu2).
+/// @param mu2 Aggregated two-electron BLISS shift
+///        (FragmentAccumulation::mu2).
 /// @param xi Aggregated two-electron BLISS shift matrix
-///        (GlobalTwoBodyShift::xi).
+///        (FragmentAccumulation::xi).
 /// @param num_electrons Target number of active electrons (Ne).
 OneElectronShiftResult solve_one_electron_shift(
     const Eigen::MatrixXd& h, Eigen::MatrixXd coulomb, Eigen::MatrixXd exchange,

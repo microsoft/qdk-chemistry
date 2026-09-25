@@ -205,11 +205,10 @@ TEST_F(SymmetryShiftTest, AccumulatesZeroWeightFactorizationIntoZeroShift) {
 
   EXPECT_TRUE(accumulation.coulomb.isZero());
   EXPECT_TRUE(accumulation.exchange.isZero());
-  const auto& shift = accumulation.shift;
-  EXPECT_EQ(shift.xi.rows(), static_cast<Eigen::Index>(norb));
-  EXPECT_EQ(shift.xi.cols(), static_cast<Eigen::Index>(norb));
-  EXPECT_TRUE(shift.xi.isZero());
-  EXPECT_DOUBLE_EQ(shift.mu2, 0.0);
+  EXPECT_EQ(accumulation.xi.rows(), static_cast<Eigen::Index>(norb));
+  EXPECT_EQ(accumulation.xi.cols(), static_cast<Eigen::Index>(norb));
+  EXPECT_TRUE(accumulation.xi.isZero());
+  EXPECT_DOUBLE_EQ(accumulation.mu2, 0.0);
 }
 
 /**
@@ -233,7 +232,6 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
 
   // norb is 7 here, so B is odd and the median interval is a point.
   const auto accumulation = microsoft::accumulate_fragment_shifts(container);
-  const auto& global_shift = accumulation.shift;
 
   // Independent check of the sqrt(2) convention: the container stores the
   // eigenvalues W of fragments of g, while BLISS works with eps = W/sqrt(2)
@@ -256,17 +254,17 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   }
   // Relative: lambda is extensive, so a fixed absolute bound would turn into
   // a size limit once the accumulation error grows with the system.
-  EXPECT_NEAR(global_shift.lambda_df_baseline, two_body_lambda,
+  EXPECT_NEAR(accumulation.lambda_df_baseline, two_body_lambda,
               1e-12 * two_body_lambda);
 
   // The container's own Lambda adds the one-body norm on top.
-  EXPECT_GT(container.get_lambda(), global_shift.lambda_df_baseline);
+  EXPECT_GT(container.get_lambda(), accumulation.lambda_df_baseline);
 
   // The per-fragment median shift must not increase the two-body 1-norm.
-  EXPECT_LE(global_shift.lambda_df_shifted, global_shift.lambda_df_baseline);
+  EXPECT_LE(accumulation.lambda_df_shifted, accumulation.lambda_df_baseline);
 
-  EXPECT_NEAR(global_shift.lambda_df_baseline, kWaterLambdaDfBaseline, 1e-6);
-  EXPECT_NEAR(global_shift.lambda_df_shifted, kWaterLambdaDfShifted, 1e-6);
+  EXPECT_NEAR(accumulation.lambda_df_baseline, kWaterLambdaDfBaseline, 1e-6);
+  EXPECT_NEAR(accumulation.lambda_df_shifted, kWaterLambdaDfShifted, 1e-6);
 }
 
 /**
@@ -386,7 +384,6 @@ TEST_F(SymmetryShiftTest, Water_STO3G_ShiftedLambdaClosure) {
   const auto& before =
       factorized->get_container<FactorizedHamiltonianContainer>();
   const auto accumulation = microsoft::accumulate_fragment_shifts(before);
-  const auto& global_shift = accumulation.shift;
 
   auto shifted = SymmetryShifterFactory::create("fermionic_low_rank")
                      ->run(factorized, 5, 5);
@@ -407,8 +404,8 @@ TEST_F(SymmetryShiftTest, Water_STO3G_ShiftedLambdaClosure) {
       two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
     }
   }
-  EXPECT_NEAR(two_body_lambda, global_shift.lambda_df_shifted,
-              1e-12 * global_shift.lambda_df_shifted);
+  EXPECT_NEAR(two_body_lambda, accumulation.lambda_df_shifted,
+              1e-12 * accumulation.lambda_df_shifted);
   EXPECT_LT(after.get_lambda(), before.get_lambda());
 }
 
@@ -545,17 +542,16 @@ TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreReadWithTheCorrectStride) {
       Eigen::MatrixXd::Zero(0, 0));
 
   const auto accumulation = microsoft::accumulate_fragment_shifts(*container);
-  const auto& global_shift = accumulation.shift;
 
   // 1/4 * ((1+3)^2 + (2+8)^2) = 29. Transposing the stride would read the
   // copies as {1, 2} and {3, 8}, giving 1/4 * (9 + 121) = 32.5.
-  EXPECT_NEAR(global_shift.lambda_df_baseline, 29.0, 1e-12);
+  EXPECT_NEAR(accumulation.lambda_df_baseline, 29.0, 1e-12);
 
   // Upper endpoint of each copy's median interval, on the eps = W/sqrt(2)
   // scale. Transposing the stride would read copy 0 as {1, 2} and report
   // 2/sqrt(2) here.
-  EXPECT_NEAR(global_shift.phi(0, 0), 3.0 / std::sqrt(2.0), 1e-12);
-  EXPECT_NEAR(global_shift.phi(0, 1), 8.0 / std::sqrt(2.0), 1e-12);
+  EXPECT_NEAR(accumulation.phi(0, 0), 3.0 / std::sqrt(2.0), 1e-12);
+  EXPECT_NEAR(accumulation.phi(0, 1), 8.0 / std::sqrt(2.0), 1e-12);
 }
 
 /**
@@ -597,7 +593,7 @@ TEST_F(SymmetryShiftTest, EvenBasisCountUsesTheMedianIntervalEndpoint) {
       const auto [lo, hi] = microsoft::median_interval(eps);
       saw_real_interval = saw_real_interval || hi > lo;
 
-      const double phi = accumulation.shift.phi(static_cast<Eigen::Index>(r),
+      const double phi = accumulation.phi(static_cast<Eigen::Index>(r),
                                                 static_cast<Eigen::Index>(c));
       EXPECT_NEAR(phi, hi, 1e-12);
       EXPECT_NEAR((eps.array() - phi).abs().minCoeff(), 0.0, 1e-12);
@@ -608,6 +604,6 @@ TEST_F(SymmetryShiftTest, EvenBasisCountUsesTheMedianIntervalEndpoint) {
   }
   EXPECT_TRUE(saw_real_interval);
 
-  EXPECT_NEAR(accumulation.shift.lambda_df_shifted, lambda_df_midpoint,
+  EXPECT_NEAR(accumulation.lambda_df_shifted, lambda_df_midpoint,
               1e-10 * lambda_df_midpoint);
 }
