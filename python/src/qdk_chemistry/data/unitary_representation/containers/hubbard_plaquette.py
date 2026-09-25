@@ -30,6 +30,31 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     of a tiling in parallel and phase the whole tiling through one Hamming-weight
     register.
 
+    Every angle below is a :math:`\theta` entering as :math:`e^{-i\theta P}` for its Pauli
+    word :math:`P`, quoted at its full-layer value; Q# halves the interaction angles where
+    the formula calls for a half layer. They are written in terms of the Fermi-Hubbard
+    parameters the builder was configured with -- hopping :math:`t`, on-site interaction
+    :math:`U`, and on-site energy :math:`\varepsilon` -- together with the per-step
+    duration :math:`\delta = T / r` for a total evolution time :math:`T` over :math:`r`
+    steps, and the site count :math:`M = \text{width} \times \text{height}`:
+
+    * ``interaction_angle`` is :math:`(U/4)\delta`, the :math:`Z_i Z_{i+M}` angle of one
+      full :math:`e^{-i\delta I}` layer, applied once per site.
+    * ``onsite_angle`` is :math:`-(\varepsilon/2 + U/4)\delta`, the single-mode :math:`Z`
+      angle, applied once per spin orbital. It vanishes under the particle-hole shift
+      :math:`\varepsilon = -U/2`.
+    * ``identity_angle`` is :math:`(\varepsilon + U/4)M\delta`, the scalar phase of one
+      step. It is unobservable for the bare evolution but not for the controlled one,
+      where it becomes a relative phase on the control and hence a shift of the estimated
+      energy.
+    * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. It is an
+      eigenphase, not a term coefficient: a plaquette's hopping matrix is diagonalized
+      exactly, and :math:`\pm 2t` are its nonzero eigenvalues, so the factor of two is the
+      four-cycle's spectrum rather than a convention.
+    * ``step_reps`` is :math:`r` times the repetition count of a ``"repeat"`` power
+      strategy, and ``scale`` records the total time :math:`T` the step count was
+      certified for.
+
     Args:
         width: Number of lattice columns.
         height: Number of lattice rows.
