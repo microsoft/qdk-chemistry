@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from qdk_chemistry.utils import Logger
+
 pandas = pytest.importorskip("pandas", reason="the sample script writes its table with pandas")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -72,10 +74,14 @@ def script() -> Any:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
+    # ``main`` silences the logger process-wide; restore the level so that later
+    # test modules still observe Logger output.
+    previous_level = Logger.get_global_level()
     try:
         spec.loader.exec_module(module)
         yield module
     finally:
+        Logger.set_global_level(previous_level)
         sys.modules.pop(spec.name, None)
 
 
