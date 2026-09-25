@@ -55,13 +55,18 @@ class LatticeContainer(QubitOperatorContainer):
 
     """
 
-    _data_type_name = "qubit_hamiltonian"
+    _data_type_name = "lattice_container"
     _serialization_version = "0.1.0"
 
     @staticmethod
     def data_type_name() -> str:
-        """Return the wire-format identifier for qubit operators."""
-        return "qubit_hamiltonian"
+        """Return the wire-format identifier for lattice containers.
+
+        Returns:
+            ``"lattice_container"``.
+
+        """
+        return "lattice_container"
 
     def __init__(
         self,

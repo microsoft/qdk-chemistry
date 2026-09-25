@@ -42,13 +42,17 @@ class HubbardPlaquetteContainer(UnitaryContainer):
 
     """
 
-    _data_type_name = "unitary_representation"
     _serialization_version = "0.1.0"
 
     @staticmethod
     def data_type_name() -> str:
-        """Return the wire-format identifier for unitary representations."""
-        return "unitary_representation"
+        """Return the wire-format identifier for plaquette evolution containers.
+
+        Returns:
+            ``"hubbard_plaquette_container"``.
+
+        """
+        return "hubbard_plaquette_container"
 
     def __init__(
         self,
