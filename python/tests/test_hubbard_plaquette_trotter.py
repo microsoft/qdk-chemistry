@@ -29,7 +29,14 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard
     HubbardPlaquetteTrotter,
 )
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
-from qdk_chemistry.data import AlgorithmRef, Circuit, LatticeGraph, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    LatticeGraph,
+    MajoranaMapping,
+    QubitOperator,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
@@ -149,6 +156,17 @@ class TestHubbardPlaquetteContainer:
         )
 
         assert HubbardPlaquetteContainer.from_json(container.to_json()).to_json() == container.to_json()
+
+    def test_representation_round_trips_through_the_generic_loader(self):
+        """``UnitaryRepresentation.from_json`` must recognize the plaquette container."""
+        unitary = HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, U=8.0, epsilon=-4.0, num_divisions=2).run(
+            _lattice_operator(4, 4)
+        )
+
+        restored = UnitaryRepresentation.from_json(unitary.to_json())
+
+        assert isinstance(restored.get_container(), HubbardPlaquetteContainer)
+        assert restored.get_container().to_json() == unitary.get_container().to_json()
 
     @pytest.mark.parametrize("order", [1, 3, 4])
     def test_rejects_unsupported_order(self, order):
@@ -471,3 +489,154 @@ class TestPlaquettePhaseEstimation:
         )
 
         assert _infidelity(result, control_off) < 1e-9
+
+
+def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> float:
+    """Recompute Campbell's W_PLAQ independently of the builder.
+
+    Follows Eq. (10) of Campbell arXiv:2012.09238v4 for W_SO2, Eq. (D10) for the
+    plaquette-splitting term, and Eq. (D6) for their sum.
+    """
+    num_sites = width * height
+    matrices = []
+    for cycles in HubbardPlaquetteTrotter._plaquette_sections(width, height):
+        matrix = np.zeros((num_sites, num_sites))
+        for cycle in cycles:
+            for index in range(4):
+                site_a, site_b = cycle[index], cycle[(index + 1) % 4]
+                matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
+        matrices.append(matrix)
+    matrix_p, matrix_g = matrices
+
+    inner = matrix_p @ matrix_g - matrix_g @ matrix_p
+    outer = inner @ matrix_g - matrix_g @ inner
+    hopping_norm = float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum()) * t
+    commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * t**3
+
+    w_so2 = u * t**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + u**2 / 24.0 * hopping_norm
+    return w_so2 + 3.0 / 24.0 * commutator_norm
+
+
+def _auto_step_count(width: int, height: int, *, t: float, u: float, time: float, target_accuracy: float) -> int:
+    """Ask the builder for the step count it derives from an accuracy target."""
+    builder = HubbardPlaquetteTrotter(
+        order=2,
+        time=time,
+        t=t,
+        U=u,
+        epsilon=-u / 2.0,
+        num_divisions=1,
+        target_accuracy=target_accuracy,
+    )
+    sections = HubbardPlaquetteTrotter._plaquette_sections(width, height)
+    return builder._step_count(t, sections, width, height, time)
+
+
+class TestAutomaticStepCount:
+    """The ``target_accuracy`` path, which sizes the step count from the error bound."""
+
+    @pytest.mark.parametrize(("width", "height"), [(2, 2), (4, 4), (6, 6)])
+    @pytest.mark.parametrize("phase", [1e-6, 0.25, 1.0, math.pi / 2])
+    def test_matches_the_exact_rule_of_apel_algorithm_1(self, width, height, phase):
+        """Reproduce r = ceil(sqrt(W_PLAQ tau^3 / (2 sin(eps tau / 2)))) against an independent W."""
+        t, u, time = 1.0, 8.0, 3.0
+        target_accuracy = phase / time
+
+        count = _auto_step_count(width, height, t=t, u=u, time=time, target_accuracy=target_accuracy)
+
+        w_plaquette = _reference_w_plaquette(width, height, t=t, u=u)
+        expected = math.ceil(math.sqrt(w_plaquette * time**3 / (2.0 * math.sin(phase / 2.0))))
+        assert count == expected
+
+    def test_reduces_to_campbells_linearization_at_small_angle(self):
+        """2 sin(x/2) -> x, so Campbell Eq. (F2) and Apel Algorithm 1 agree as eps tau -> 0."""
+        t, u, time = 1.0, 8.0, 3.0
+        phase = 1e-7
+        target_accuracy = phase / time
+
+        count = _auto_step_count(4, 4, t=t, u=u, time=time, target_accuracy=target_accuracy)
+
+        w_plaquette = _reference_w_plaquette(4, 4, t=t, u=u)
+        linearized = math.ceil(math.sqrt(w_plaquette * time**2 / target_accuracy))
+        assert count == linearized
+
+    def test_exceeds_the_linearized_count_at_large_angle(self):
+        """At eps tau = pi/2 the linearized rule is 5.4% optimistic; the exact one is not."""
+        t, u, time = 1.0, 8.0, 3.0
+        phase = math.pi / 2
+        target_accuracy = phase / time
+
+        count = _auto_step_count(4, 4, t=t, u=u, time=time, target_accuracy=target_accuracy)
+
+        w_plaquette = _reference_w_plaquette(4, 4, t=t, u=u)
+        exact = math.sqrt(w_plaquette * time**3 / (2.0 * math.sin(phase / 2.0)))
+        linearized = math.sqrt(w_plaquette * time**2 / target_accuracy)
+
+        assert count == math.ceil(exact)
+        # The ratio is sqrt(phase / (2 sin(phase / 2))), independent of W_PLAQ and of size.
+        assert exact > linearized
+        assert 1.0538 < exact / linearized < 1.0540
+
+    def test_saturates_once_the_accuracy_target_exceeds_a_half_turn(self):
+        """||Delta U|| <= 2 caps the arcsine, so the count stops falling at eps tau = pi."""
+        t, u, time = 1.0, 8.0, 3.0
+
+        at_pi = _auto_step_count(4, 4, t=t, u=u, time=time, target_accuracy=math.pi / time)
+        beyond_pi = _auto_step_count(4, 4, t=t, u=u, time=time, target_accuracy=3.0 * math.pi / time)
+
+        assert beyond_pi == at_pi
+
+    def test_count_falls_as_the_accuracy_target_loosens(self):
+        t, u, time = 1.0, 8.0, 3.0
+        counts = [
+            _auto_step_count(4, 4, t=t, u=u, time=time, target_accuracy=accuracy / time)
+            for accuracy in (0.01, 0.1, 0.5, 1.0)
+        ]
+        assert counts == sorted(counts, reverse=True)
+
+    def test_manual_division_count_is_a_floor(self):
+        """``num_divisions`` never lowers the count the bound demands."""
+        t, u, time = 1.0, 8.0, 3.0
+        target_accuracy = (math.pi / 2) / time
+        automatic = _auto_step_count(4, 4, t=t, u=u, time=time, target_accuracy=target_accuracy)
+
+        builder = HubbardPlaquetteTrotter(
+            order=2,
+            time=time,
+            t=t,
+            U=u,
+            epsilon=-u / 2.0,
+            num_divisions=automatic + 25,
+            target_accuracy=target_accuracy,
+        )
+        sections = HubbardPlaquetteTrotter._plaquette_sections(4, 4)
+        assert builder._step_count(t, sections, 4, 4, time) == automatic + 25
+
+    def test_a_disabled_target_leaves_the_manual_count_alone(self):
+        builder = HubbardPlaquetteTrotter(
+            order=2, time=3.0, t=1.0, U=8.0, epsilon=-4.0, num_divisions=7, target_accuracy=0.0
+        )
+        sections = HubbardPlaquetteTrotter._plaquette_sections(4, 4)
+        assert builder._step_count(1.0, sections, 4, 4, 3.0) == 7
+
+    def test_a_zero_duration_needs_a_single_step(self):
+        assert _auto_step_count(4, 4, t=1.0, u=8.0, time=0.0, target_accuracy=0.1) == 1
+
+    @pytest.mark.parametrize("epsilon", [0.0, -4.0, 1.5])
+    def test_the_uniform_onsite_layer_commutes_with_the_hamiltonian(self, epsilon):
+        """Justifies omitting ``single_z`` from the error bound for any ``epsilon``."""
+        width = height = 2
+        num_qubits = 2 * width * height
+        hamiltonian = _reference_hamiltonian(width, height, t=1.0, u=8.0, epsilon=epsilon)
+
+        total_z = np.zeros((2**num_qubits, 2**num_qubits))
+        for mode in range(num_qubits):
+            factors = [np.eye(2)] * num_qubits
+            factors[mode] = np.diag([1.0, -1.0])
+            term = factors[0]
+            for factor in factors[1:]:
+                term = np.kron(term, factor)
+            total_z = total_z + term
+
+        commutator = hamiltonian @ total_z - total_z @ hamiltonian
+        assert np.max(np.abs(commutator)) < 1e-10
