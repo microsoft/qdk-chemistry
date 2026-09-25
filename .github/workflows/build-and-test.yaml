@@ -82,7 +82,7 @@ jobs:
           python-version: '3.13'
           cpp-omp-threads: 4
           python-omp-threads: 2
-          python-test-workers: 2
+          python-test-workers: 3
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
