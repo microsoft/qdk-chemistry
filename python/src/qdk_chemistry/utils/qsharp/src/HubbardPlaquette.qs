@@ -112,6 +112,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     }
 
     /// Plans an optimal adder tree for a Hamming-weight computation.
+    /// See `HammingWeightPhase` for the technique and its attribution.
     internal function HammingWeightSchedule(count : Int) : ((Int, Int, Int, Int)[], Int[], Int) {
         if count <= 0 {
             return ([], [], 0);
@@ -170,6 +171,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
 
     /// Computes a Hamming weight in place across `inputs + scratch`.
     /// Applies equal-angle Z phases using logarithmically many rotations.
+    ///
+    /// Hamming weight phasing replaces `count` equal-angle rotations with `O(log count)`
+    /// of them: an adder tree computes the Hamming weight of the inputs, and each output
+    /// bit is phased by its place-value-scaled angle. The technique is due to
+    /// :cite:`Gidney2019`, and was applied to fermionic simulation in :cite:`Kivlichan2020`;
+    /// Sec. 4.4 of :cite:`Apel2026` uses it for this Hubbard plaquette circuit.
     internal operation HammingWeightPhase(theta : Double, inputs : Qubit[]) : Unit is Adj + Ctl {
         let count = Length(inputs);
         let (schedule, finalBits, _) = HammingWeightSchedule(count);
@@ -425,6 +432,13 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
 
     /// # Summary
     /// The whole evolution: the repeated body inside its one-time hopping boundary.
+    ///
+    /// Each step is the symmetric product `pink(s/2) I(s/2) gold(s) I(s/2) pink(s/2)`, so
+    /// the adjacent half-angle pink layers of neighbouring steps merge into one full-angle
+    /// layer. Only a single half-angle pink boundary survives at each end, which is what
+    /// the `within` block applies. This is the "PIG" ordering of Eqs. (16a)-(16b) in
+    /// :cite:`Apel2026`, which merges the more expensive hopping layers; it deviates from
+    /// Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost instead.
     ///
     /// # Input
     /// ## params

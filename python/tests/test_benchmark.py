@@ -43,6 +43,10 @@ _PINNED_COLUMNS = (
 
 
 #: Default mode: the whole standard QPE circuit is built and traced.
+#: The gate counts scale with the Trotter step count, which follows the exact rule of
+#: Algorithm 1 of Apel et al. (arXiv:2609.05316) rather than its small-angle linearization;
+#: see ``HubbardPlaquetteTrotter._step_count``. ``logical_qubits`` is independent of the
+#: step count and so does not move when that rule changes.
 _HUBBARD_L2_FULL_CIRCUIT = {
     "L": 2,
     "sites": 4,
@@ -54,13 +58,13 @@ _HUBBARD_L2_FULL_CIRCUIT = {
     "qpe_bits": 10,
     "base_time": 0.2253660323553513,
     "logical_qubits": 25,
-    "rotations": 2208717,
-    "rotation_depth": 1472602,
-    "t_gates": 693051,
-    "ccz_count": 606116,
+    "rotations": 2224986,
+    "rotation_depth": 1483448,
+    "t_gates": 698155,
+    "ccz_count": 610582,
     "ccix_count": 0,
-    "toffolis": 606116,
-    "measurements": 606126,
+    "toffolis": 610582,
+    "measurements": 610592,
 }
 
 

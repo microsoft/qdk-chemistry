@@ -14,6 +14,7 @@ from qdk_chemistry.data.base import DataClass
 
 from .containers.base import UnitaryContainer
 from .containers.block_encoding import LCUContainer
+from .containers.hubbard_plaquette import HubbardPlaquetteContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
 from .containers.quantum_walk import LCUWalkContainer
 from .containers.sossa import SOSSABlockEncodingContainer
@@ -129,6 +130,8 @@ class UnitaryRepresentation(DataClass):
             container = LCUWalkContainer.from_json(json_data)
         elif container_type == "sossa_block_encoding":
             container = SOSSABlockEncodingContainer.from_json(json_data)
+        elif container_type == "hubbard_plaquette":
+            container = HubbardPlaquetteContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
 
@@ -156,6 +159,8 @@ class UnitaryRepresentation(DataClass):
             container = LCUWalkContainer.from_hdf5(group)
         elif container_type == "sossa_block_encoding":
             container = SOSSABlockEncodingContainer.from_hdf5(group)
+        elif container_type == "hubbard_plaquette":
+            container = HubbardPlaquetteContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
         return cls(container=container)
