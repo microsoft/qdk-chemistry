@@ -449,6 +449,7 @@ jobs:
         PYTHON_COVERAGE=${PYTHON_COVERAGE:-0}
         PYBIND11_COVERAGE=$(extract_coverage coverage-reports/pybind11_coverage.txt)
         PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
+        grep -E '^(TOTAL|\|[[:space:]]*\*{0,2}TOTAL\*{0,2}[[:space:]]*\|)' coverage-reports/python_coverage.md
 
         report=coverage-reports/coverage-report.md
         echo "## 📊 Coverage Summary" > "$report"
