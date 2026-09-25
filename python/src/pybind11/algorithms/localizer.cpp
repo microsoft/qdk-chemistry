@@ -6,7 +6,7 @@
 #include <pybind11/stl.h>
 
 #include <memory>
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/localization.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/active_space_qio.hpp"

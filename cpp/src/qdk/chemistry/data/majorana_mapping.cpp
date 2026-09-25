@@ -9,6 +9,7 @@
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>

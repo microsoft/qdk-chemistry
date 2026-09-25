@@ -5,8 +5,8 @@
 #pragma once
 #include <H5Cpp.h>
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>

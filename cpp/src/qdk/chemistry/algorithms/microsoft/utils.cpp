@@ -12,7 +12,8 @@
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
 
-#include <libint2.hpp>
+#include <libint2/initialize.h>
+
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>

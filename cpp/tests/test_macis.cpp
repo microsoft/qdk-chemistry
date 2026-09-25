@@ -189,6 +189,29 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   EXPECT_NEAR(energy, -75.945290197648532, macis_params::energy_tol);
 }
 
+TEST_F(MacisAsciTest, HamiltonianBuildAlgorithmsAgree) {
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  for (const std::string algorithm :
+       {"sorted_double_loop", "residue_arrays", "dynamic_bit_masking"}) {
+    SCOPED_TRACE(algorithm);
+    auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+    auto& settings = calculator->settings();
+    settings.set("hamiltonian_build_algorithm", algorithm);
+    settings.set("ntdets_max", macis_params::ntdets_max_large);
+    settings.set("ntdets_min", macis_params::ntdets_min);
+    settings.set("max_refine_iter", macis_params::refine_on);
+    settings.set("grow_factor", macis_params::grow_factor);
+    settings.set("constraint_level", 0);
+    settings.set("search_matel_tol", 1e-14);
+    settings.set("rv_prune_tol", 1e-14);
+    settings.set("core_selection_strategy", "fixed");
+
+    const auto [energy, wavefunction] = calculator->run(hamiltonian, 3, 3);
+    EXPECT_NEAR(energy, -75.945290197648532, macis_params::energy_tol);
+    EXPECT_GT(wavefunction->size(), 0);
+  }
+}
+
 TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
   auto previous_level = Logger::get_global_level();
 

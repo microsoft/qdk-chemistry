@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked.hpp>
 #include <span>

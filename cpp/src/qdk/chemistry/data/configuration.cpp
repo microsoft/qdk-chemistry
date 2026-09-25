@@ -2,9 +2,12 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
+
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
 #include <qdk/chemistry/scf/config.h>
 
 #include <algorithm>
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
 #include <sstream>

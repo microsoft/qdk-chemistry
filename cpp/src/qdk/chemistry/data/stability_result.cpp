@@ -7,6 +7,7 @@
 #include <limits>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>

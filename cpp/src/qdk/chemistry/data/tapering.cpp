@@ -10,6 +10,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <string>

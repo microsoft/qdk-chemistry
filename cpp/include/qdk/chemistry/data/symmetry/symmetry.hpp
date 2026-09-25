@@ -11,6 +11,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <string>
 #include <type_traits>
 #include <vector>

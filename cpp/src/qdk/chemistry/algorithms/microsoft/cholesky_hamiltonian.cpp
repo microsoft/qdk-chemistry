@@ -11,6 +11,7 @@
 #include <set>
 #include <tuple>
 #include <unordered_set>
+#include <utility>
 
 // MACIS Headers
 #include <macis/mcscf/fock_matrices.hpp>
@@ -28,6 +29,7 @@
 
 // Schwarz screening
 #include "scf/src/eri/schwarz.h"
+#include "scf/src/util/libint2_engine.h"
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -42,6 +44,18 @@
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+CholeskyHamiltonianSettings::CholeskyHamiltonianSettings() {
+  set_default("cholesky_tolerance", 1e-8);
+  set_default("eri_threshold", 1e-12,
+              "ERI screening threshold for skipping negligible shell "
+              "quartets during Cholesky decomposition",
+              qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
+  set_default("store_ao_cholesky_vectors", false);
+  set_default("cholesky_gemm_batch_cols", static_cast<size_t>(20),
+              "Target number of GEMM columns per batched orthogonalization "
+              "call during Cholesky decomposition");
+}
 
 namespace qcs = qdk::chemistry::scf;
 
@@ -75,9 +89,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   using qdk::chemistry::scf::RowMajorMatrix;
 
   // Convert to libint2 basis set
-  auto obs =
-      qdk::chemistry::scf::libint2_util::convert_to_libint_basisset(basis_set);
-  auto shell2bf = obs.shell2bf();
+  const qcs::libint2_util::Basis obs(basis_set);
+  const auto& shell2bf = obs.shell2bf();
 
   // Compute Schwarz screening matrix
   const size_t num_shells_schwarz = obs.size();
@@ -127,12 +140,12 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 #else
   const int nthreads = 1;
 #endif
-  std::vector<::libint2::Engine> engines_coulomb(nthreads);
-  engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                         obs.max_nprim(), obs.max_l(), 0);
-  engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-  engines_coulomb[0].set_precision(engine_precision);
-  for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+  qcs::libint2_util::Engine base_engine(qcs::libint2_util::Operator::coulomb,
+                                        obs.max_nprim(), obs.max_l(), 0);
+  base_engine.set(::libint2::ScreeningMethod::Original);
+  base_engine.set_precision(engine_precision);
+  auto engines_coulomb =
+      qcs::libint2_util::Engine::make_pool(nthreads, std::move(base_engine));
 
   // index of current cholesky vector
   size_t current_col = 0;
@@ -180,8 +193,9 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         }
 
         // compute diagonal block (s1,s2|s1,s2)
-        engine.compute2<::libint2::Operator::coulomb, ::libint2::BraKet::xx_xx,
-                        0>(obs[s1], obs[s2], obs[s1], obs[s2]);
+        engine.compute2<qcs::libint2_util::Operator::coulomb,
+                        ::libint2::BraKet::xx_xx, 0>(obs[s1], obs[s2], obs[s1],
+                                                     obs[s2]);
         const auto& res = buf[0];
         if (res == nullptr) {
           continue;
@@ -321,7 +335,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
             const size_t n4 = obs[s4].size();
             const size_t bf4_st = shell2bf[s4];
 
-            engine.compute2<::libint2::Operator::coulomb,
+            engine.compute2<qcs::libint2_util::Operator::coulomb,
                             ::libint2::BraKet::xx_xx, 0>(obs[be.s1], obs[be.s2],
                                                          obs[s3], obs[s4]);
             const auto& res = buf[0];

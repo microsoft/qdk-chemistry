@@ -8,11 +8,11 @@
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/enums.h>
 #include <qdk/chemistry/scf/core/scf.h>
+#include <qdk/chemistry/scf/fwd.h>
 
 #include <stdexcept>
 
 namespace qdk::chemistry::scf {
-class ERIMultiplexer;  // Forward declaration
 
 /**
  * @brief Base class for Electron Repulsion Integral (ERI) engines

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstdint>
 #include <lapack.hh>
+#include <limits>
 #include <macis/util/transform.hpp>
 #include <numbers>
 #include <numeric>
@@ -23,6 +24,27 @@
 #include <variant>
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+GaugeFixingLocalizerSettings::GaugeFixingLocalizerSettings() {
+  set_default("hamiltonian_constructor",
+              data::AlgorithmRef("hamiltonian_constructor", "qdk"),
+              "Hamiltonian constructor used to define the mapped "
+              "coefficient-norm objective");
+  set_default("degeneracy_tolerance", 1e-6,
+              "Maximum occupation-number spread within one degenerate block");
+  set_default(
+      "angle_samples", 32,
+      "Uniform samples over [0, pi) used to bracket each plane "
+      "rotation",
+      data::BoundConstraint<int64_t>{4, std::numeric_limits<int64_t>::max()});
+  set_default(
+      "max_sweeps", 3,
+      "Maximum coordinate-descent passes; 0 applies AO anchoring only",
+      data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
+  set_default("improvement_tolerance", 1e-10,
+              "Minimum coefficient-norm reduction, in Hartree, required to "
+              "accept a rotation");
+}
 
 std::shared_ptr<data::Wavefunction> GaugeFixingLocalizer::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction,

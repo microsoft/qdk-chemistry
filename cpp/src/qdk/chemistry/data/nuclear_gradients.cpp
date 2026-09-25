@@ -6,6 +6,7 @@
 
 #include <fstream>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>

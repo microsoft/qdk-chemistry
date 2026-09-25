@@ -15,11 +15,14 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
+#include <cstring>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <vector>
 
+#include "util/libint2_engine.h"
 #include "util/timer.h"
 
 namespace qdk::chemistry::scf {
@@ -28,18 +31,18 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
   QDK_LOG_TRACE_ENTERING();
 
   AutoTimer timer("schwarz_integral");
-  auto obs = libint2_util::convert_to_libint_basisset(*iobs);
+  const libint2_util::Basis obs(*iobs);
 
-  using libint2::Engine;
+  using libint2_util::Engine;
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
   int nthreads = 1;
 #endif
   RowMajorMatrix S = RowMajorMatrix::Zero(obs.size(), obs.size());
-  std::vector<Engine> engines(
-      nthreads,
-      Engine(libint2::Operator::coulomb, obs.max_nprim(), obs.max_l(), 0, 0.0));
+  auto engines =
+      Engine::make_pool(nthreads, Engine(libint2_util::Operator::coulomb,
+                                         obs.max_nprim(), obs.max_l(), 0, 0.0));
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -57,7 +60,9 @@ void schwarz_integral(const BasisSet* iobs, const ParallelConfig& mpi,
     for (size_t i = 0; i < obs.size(); i++) {
       for (size_t j = 0; j <= i; j++) {
         if (job_id++ % world_thread_size != world_thread_id) continue;
-        auto buf = engine.compute(obs[i], obs[j], obs[i], obs[j]);
+        auto buf = engine.compute2<libint2_util::Operator::coulomb,
+                                   ::libint2::BraKet::xx_xx, 0>(obs[i], obs[j],
+                                                                obs[i], obs[j]);
         assert(buf[0] != nullptr);
         size_t n1 = obs[i].size(), n2 = obs[j].size();
         Eigen::Map<const RowMajorMatrix> buf_mat(buf[0], n1 * n1, n2 * n2);

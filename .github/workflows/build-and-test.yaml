@@ -82,6 +82,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
       ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
+      QDK_CHEMISTRY_UNITY_BUILD: 'ON'
     steps:
     - name: Free up disk space (Linux)
       if: matrix.os-name == 'Linux'
@@ -259,6 +260,7 @@ jobs:
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
+          -DQDK_CHEMISTRY_UNITY_BUILD="$QDK_CHEMISTRY_UNITY_BUILD" \
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
 
@@ -311,9 +313,11 @@ jobs:
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         if [ "${{ matrix.python-version }}" = "3.13" ]; then
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" \
+            -C cmake.define.QDK_CHEMISTRY_UNITY_BUILD="$QDK_CHEMISTRY_UNITY_BUILD" -v .[test,docs]
         else
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" \
+            -C cmake.define.QDK_CHEMISTRY_UNITY_BUILD="$QDK_CHEMISTRY_UNITY_BUILD" -v .[test]
         fi
 
         # Print installed packages for debugging

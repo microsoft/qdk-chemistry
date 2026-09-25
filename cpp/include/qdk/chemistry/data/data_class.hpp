@@ -4,17 +4,17 @@
 
 #pragma once
 
-namespace H5 {
-class Group;
-}
+#include <H5Classes.h>
 
 #include <concepts>
+#include <cstddef>
 #include <memory>
-#include <nlohmann/json.hpp>
-#include <qdk/chemistry/utils/hash_context.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <qdk/chemistry/utils/fwd.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <type_traits>
+#include <utility>
 
 namespace qdk::chemistry::data {
 
@@ -95,11 +95,7 @@ class DataClass {
    * @param truncate_chars Number of hex characters in the result (default 16)
    * @return Hex string content hash
    */
-  virtual std::string content_hash(size_t truncate_chars = 16) const {
-    qdk::chemistry::utils::HashContext ctx;
-    hash_update(ctx);
-    return ctx.hexdigest(truncate_chars);
-  }
+  virtual std::string content_hash(size_t truncate_chars = 16) const;
 
  protected:
   /**
@@ -152,10 +148,8 @@ class DataClass {
  * @param ctx Hash context to update
  * @param value Data object to hash
  */
-inline void hash_value(qdk::chemistry::utils::HashContext& ctx,
-                       const DataClass& value) {
-  qdk::chemistry::utils::hash_value(ctx, value.content_hash());
-}
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const DataClass& value);
 
 /**
  * @brief Concept to enforce inheritance of DataClass and presence of

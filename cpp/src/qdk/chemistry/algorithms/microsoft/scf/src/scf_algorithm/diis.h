@@ -6,13 +6,12 @@
 
 #include <qdk/chemistry/scf/core/scf_algorithm.h>
 #include <qdk/chemistry/scf/core/types.h>
+#include <qdk/chemistry/scf/fwd.h>
 
 #include <memory>
 #include <utility>
 
 namespace qdk::chemistry::scf {
-
-class SCFImpl;
 
 namespace impl {
 class DIIS;

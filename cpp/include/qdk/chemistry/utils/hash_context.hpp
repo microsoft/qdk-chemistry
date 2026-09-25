@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
 #include <array>
 #include <complex>
 #include <concepts>
@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <qdk/chemistry/utils/fwd.hpp>
 #include <string>
 #include <string_view>
 #include <tuple>

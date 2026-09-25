@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <numeric>
 #include <qdk/chemistry/data/lattice_graph.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <random>
 #include <set>

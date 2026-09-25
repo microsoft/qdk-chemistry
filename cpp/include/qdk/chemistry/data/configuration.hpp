@@ -3,7 +3,7 @@
 // license information.
 
 #pragma once
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
 #include <bitset>
 #include <cstdint>

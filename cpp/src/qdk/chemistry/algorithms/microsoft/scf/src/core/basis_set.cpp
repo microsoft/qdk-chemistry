@@ -8,13 +8,13 @@
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
+#include <libint2/initialize.h>
 #include <qdk/chemistry/scf/util/env_helper.h>
 
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
-#include <libint2.hpp>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>

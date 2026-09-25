@@ -5,9 +5,10 @@
 #pragma once
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/scf.h>
+#include <qdk/chemistry/scf/util/libint2_fwd.h>
 
-#include <libint2.hpp>
 #include <memory>
+#include <vector>
 
 namespace qdk::chemistry::scf::libint2_util {
 
@@ -21,6 +22,13 @@ using qdk::chemistry::scf::Shell;
  * @return Libint2 basis set
  */
 ::libint2::BasisSet convert_to_libint_basisset(const BasisSet& obs);
+
+/**
+ * @brief First basis-function index of each shell in Libint2 ordering
+ * @param obs QDK/Chemistry-SCF basis set
+ * @return Shell-to-basis-function offsets
+ */
+std::vector<size_t> shell_to_basis_function(const BasisSet& obs);
 
 /**
  * @brief Convert QDK/Chemistry-SCF shell to libint2 format

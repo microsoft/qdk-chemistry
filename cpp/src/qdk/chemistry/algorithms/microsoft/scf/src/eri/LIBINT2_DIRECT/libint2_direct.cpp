@@ -14,11 +14,17 @@
 #ifdef _OPENMP
 #include <omp.h>
 #endif
+
 #include <blas.hh>
+#include <cmath>
 #include <stdexcept>
+#include <tuple>
+#include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include "util/libint2_engine.h"
 #include "util/timer.h"
 
 namespace qdk::chemistry::scf {
@@ -40,11 +46,11 @@ const auto max_engine_precision = std::numeric_limits<double>::epsilon() / 1e10;
  * @param LDA Leading dimension of matrix A
  * @return Matrix of shell block norms for screening
  */
-RowMajorMatrix compute_shellblock_norm(const ::libint2::BasisSet& obs,
+RowMajorMatrix compute_shellblock_norm(const libint2_util::BasisView& obs,
                                        const double* A, size_t LDA) {
   QDK_LOG_TRACE_ENTERING();
 
-  auto shell2bf = obs.shell2bf();
+  const auto& shell2bf = obs.shell2bf();
   const size_t nsh = obs.size();
   RowMajorMatrix shnrms(nsh, nsh);
   Eigen::Map<const RowMajorMatrix> A_map(A, obs.nbf(), LDA);
@@ -81,7 +87,7 @@ using shellpair_data_t = std::vector<
  * @note ShellPair objects contain logarithmic precision bounds for screening
  */
 std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
-    const ::libint2::BasisSet& obs, double threshold) {
+    const libint2_util::BasisView& obs, double threshold) {
   QDK_LOG_TRACE_ENTERING();
 
   const auto ln_max_engine_precision = std::log(max_engine_precision);
@@ -91,9 +97,9 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
 #else
   const int nthreads = 1;
 #endif
-  std::vector<::libint2::Engine> engines(
-      nthreads, ::libint2::Engine(::libint2::Operator::overlap, obs.max_nprim(),
-                                  obs.max_l(), 0));
+  auto engines = libint2_util::Engine::make_pool(
+      nthreads, libint2_util::Engine(libint2_util::Operator::overlap,
+                                     obs.max_nprim(), obs.max_l(), 0));
   for (auto& e : engines) e.set_precision(0.);
 
   shellpair_list_t splist;
@@ -124,7 +130,7 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
         bool on_same_center = (obs[s1].O == obs[s2].O);
         bool significant = on_same_center;
         if (not on_same_center) {
-          engine.compute(obs[s1], obs[s2]);
+          engine.compute1(obs[s1], obs[s2]);
           Eigen::Map<const RowMajorMatrix> buf_map(buf[0], n1, n2);
           const auto norm = buf_map.norm();
           significant = (norm >= threshold);
@@ -172,7 +178,7 @@ class ERI {
                                    ///< atomic ops (false)
   double eri_threshold_;           ///< Integral screening threshold
   size_t n_atoms_;                 ///< Number of atoms in the molecule
-  ::libint2::BasisSet obs_;        ///< Libint2 orbital basis set representation
+  libint2_util::Basis obs_;        ///< Libint2 orbital basis set representation
   std::vector<size_t>
       shell2bf_;  ///< Mapping from shell index to first atomic orbital
   std::vector<int> sh2atom_;  ///< Mapping from shell index to atom index
@@ -207,7 +213,7 @@ class ERI {
         use_thread_local_buffers_(!use_atomics),
         eri_threshold_(eri_threshold),
         n_atoms_(basis_set.mol->n_atoms),
-        obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
+        obs_(basis_set) {
     QDK_LOG_TRACE_ENTERING();
 
     shell2bf_ = obs_.shell2bf();
@@ -292,22 +298,22 @@ class ERI {
 #else
     const int nthreads = 1;
 #endif
-    std::vector<::libint2::Engine> engines_coulomb(nthreads);
-    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                           obs_.max_nprim(), obs_.max_l(), 0);
-    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-    engines_coulomb[0].set_precision(engine_precision);
-    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+    libint2_util::Engine base_engine(libint2_util::Operator::coulomb,
+                                     obs_.max_nprim(), obs_.max_l(), 0);
+    base_engine.set(::libint2::ScreeningMethod::Original);
+    base_engine.set_precision(engine_precision);
+    auto engines_coulomb =
+        libint2_util::Engine::make_pool(nthreads, std::move(base_engine));
 
-    std::vector<::libint2::Engine> engines_erf;
+    std::vector<libint2_util::Engine> engines_erf;
     if (need_erf_exchange) {
-      engines_erf.resize(nthreads);
-      engines_erf[0] = ::libint2::Engine(::libint2::Operator::erf_coulomb,
-                                         obs_.max_nprim(), obs_.max_l(), 0);
-      engines_erf[0].set_params(omega);
-      engines_erf[0].set(::libint2::ScreeningMethod::Original);
-      engines_erf[0].set_precision(engine_precision);
-      for (int i = 1; i < nthreads; ++i) engines_erf[i] = engines_erf[0];
+      libint2_util::Engine erf_engine(libint2_util::Operator::erf_coulomb,
+                                      obs_.max_nprim(), obs_.max_l(), 0);
+      erf_engine.set_params(omega);
+      erf_engine.set(::libint2::ScreeningMethod::Original);
+      erf_engine.set_precision(engine_precision);
+      engines_erf =
+          libint2_util::Engine::make_pool(nthreads, std::move(erf_engine));
     }
 
     if (J) std::memset(J, 0, mat_size * sizeof(double));
@@ -411,7 +417,7 @@ class ERI {
               auto s1234_deg = s12_deg * s34_deg * s12_34_deg;
 
               // Compute the integral shell quartet
-              engine.compute2<::libint2::Operator::coulomb,
+              engine.compute2<libint2_util::Operator::coulomb,
                               ::libint2::BraKet::xx_xx, 0>(
                   obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
 
@@ -419,7 +425,7 @@ class ERI {
               const auto* buf_1234 = buf[0];
               const double* buf_erf_1234 = nullptr;
               if (need_erf_exchange) {
-                engine_erf->compute2<::libint2::Operator::erf_coulomb,
+                engine_erf->compute2<libint2_util::Operator::erf_coulomb,
                                      ::libint2::BraKet::xx_xx, 0>(
                     obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data,
                     sp34_data);
@@ -724,25 +730,25 @@ class ERI {
 #else
     const int nthreads = 1;
 #endif
-    std::vector<::libint2::Engine> engines(
-        nthreads, ::libint2::Engine(::libint2::Operator::coulomb,
-                                    obs_.max_nprim(), obs_.max_l(), 1));
+    auto engines = libint2_util::Engine::make_pool(
+        nthreads, libint2_util::Engine(libint2_util::Operator::coulomb,
+                                       obs_.max_nprim(), obs_.max_l(), 1));
     for (auto& engine : engines) {
       engine.set(::libint2::BraKet::xx_xx);
       engine.set(::libint2::ScreeningMethod::Original);
       engine.set_precision(max_engine_precision);
     }
 
-    std::vector<::libint2::Engine> engines_erf;
+    std::vector<libint2_util::Engine> engines_erf;
     if (need_erf_exchange) {
-      engines_erf.resize(nthreads);
-      engines_erf[0] = ::libint2::Engine(::libint2::Operator::erf_coulomb,
-                                         obs_.max_nprim(), obs_.max_l(), 1);
-      engines_erf[0].set_params(omega);
-      engines_erf[0].set(::libint2::BraKet::xx_xx);
-      engines_erf[0].set(::libint2::ScreeningMethod::Original);
-      engines_erf[0].set_precision(max_engine_precision);
-      for (int i = 1; i < nthreads; ++i) engines_erf[i] = engines_erf[0];
+      libint2_util::Engine erf_engine(libint2_util::Operator::erf_coulomb,
+                                      obs_.max_nprim(), obs_.max_l(), 1);
+      erf_engine.set_params(omega);
+      erf_engine.set(::libint2::BraKet::xx_xx);
+      erf_engine.set(::libint2::ScreeningMethod::Original);
+      erf_engine.set_precision(max_engine_precision);
+      engines_erf =
+          libint2_util::Engine::make_pool(nthreads, std::move(erf_engine));
     }
 
 #ifdef _OPENMP
@@ -800,12 +806,12 @@ class ERI {
           continue;
 
         if (need_coulomb) {
-          engine.compute2<::libint2::Operator::coulomb,
+          engine.compute2<libint2_util::Operator::coulomb,
                           ::libint2::BraKet::xx_xx, 1>(
               obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
         }
         if (need_erf_exchange) {
-          engine_erf->compute2<::libint2::Operator::erf_coulomb,
+          engine_erf->compute2<libint2_util::Operator::erf_coulomb,
                                ::libint2::BraKet::xx_xx, 1>(
               obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
         }
@@ -935,12 +941,12 @@ class ERI {
 #else
     const int nthreads = 1;
 #endif
-    std::vector<::libint2::Engine> engines_coulomb(nthreads);
-    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                           obs_.max_nprim(), obs_.max_l(), 0);
-    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-    engines_coulomb[0].set_precision(engine_precision);
-    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+    libint2_util::Engine base_engine(libint2_util::Operator::coulomb,
+                                     obs_.max_nprim(), obs_.max_l(), 0);
+    base_engine.set(::libint2::ScreeningMethod::Original);
+    base_engine.set_precision(engine_precision);
+    auto engines_coulomb =
+        libint2_util::Engine::make_pool(nthreads, std::move(base_engine));
 
     // Thread-local accumulation buffers for reproducibility
     std::vector<std::vector<double>> out_local(0);
@@ -1010,7 +1016,7 @@ class ERI {
               const auto n4 = obs_[s4].size();
 
               // Compute the integral shell quartet
-              engine.compute2<::libint2::Operator::coulomb,
+              engine.compute2<libint2_util::Operator::coulomb,
                               ::libint2::BraKet::xx_xx, 0>(
                   obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
 

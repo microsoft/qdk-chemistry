@@ -144,6 +144,8 @@ if(NOT pybind11_DIR)
 endif()
 find_package(pybind11 REQUIRED)
 
+include("${CMAKE_CURRENT_SOURCE_DIR}/../cpp/cmake/qdk-unity.cmake")
+
 # Create the Python extension module
 pybind11_add_module(_core
     src/pybind11/data/data_class.cpp
@@ -195,6 +197,43 @@ pybind11_add_module(_core
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp
 )
+
+qdk_unity_group(_core binding_symmetry
+    src/pybind11/data/symmetry/symmetry.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_scalar.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_index_set.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp)
+qdk_unity_group(_core binding_structure
+    src/pybind11/data/data_class.cpp src/pybind11/data/element_data.cpp
+    src/pybind11/data/structure.cpp src/pybind11/data/basis_set.cpp)
+qdk_unity_group(_core binding_configurations
+    src/pybind11/data/configuration.cpp src/pybind11/data/configuration_set.cpp
+    src/pybind11/data/ansatz.cpp src/pybind11/data/serialization.cpp)
+qdk_unity_group(_core binding_derivatives
+    src/pybind11/data/stability_result.cpp src/pybind11/data/nuclear_gradients.cpp
+    src/pybind11/data/nuclear_hessian.cpp)
+qdk_unity_group(_core binding_operators
+    src/pybind11/data/pauli_operator.cpp src/pybind11/data/majorana_mapping.cpp
+    src/pybind11/data/lattice_graph.cpp)
+qdk_unity_group(_core binding_configuration_interaction
+    src/pybind11/algorithms/mc.cpp src/pybind11/algorithms/pmc.cpp
+    src/pybind11/algorithms/mcscf.cpp src/pybind11/algorithms/dynamical_correlation_calculator.cpp)
+qdk_unity_group(_core binding_orbitals
+    src/pybind11/algorithms/localizer.cpp src/pybind11/algorithms/stability.cpp
+    src/pybind11/algorithms/scf.cpp src/pybind11/algorithms/active_space.cpp)
+qdk_unity_group(_core binding_hamiltonians
+    src/pybind11/algorithms/hamiltonian.cpp src/pybind11/algorithms/effective_hamiltonian.cpp
+    src/pybind11/algorithms/hamiltonian_factorization.cpp src/pybind11/algorithms/double_factorization.cpp)
+qdk_unity_group(_core binding_geometry
+    src/pybind11/algorithms/nuclear_derivative.cpp src/pybind11/algorithms/population_analysis.cpp
+    src/pybind11/algorithms/geometry_optimization.cpp)
+qdk_unity_group(_core binding_utilities
+    src/pybind11/utils/logger.cpp src/pybind11/utils/valence_space.cpp
+    src/pybind11/utils/orbital_rotation.cpp src/pybind11/utils/model_hamiltonians.cpp)
+qdk_unity_group(_core binding_solvers
+    src/pybind11/algorithms/davidson_solver.cpp src/pybind11/algorithms/syev_solver.cpp)
+qdk_unity_group(_core binding_module
+    src/pybind11/constants.cpp src/pybind11/qdk_scf_config.cpp src/pybind11/module.cpp)
 
 # Link against the qdk::chemistry library
 target_link_libraries(_core PRIVATE qdk::chemistry)

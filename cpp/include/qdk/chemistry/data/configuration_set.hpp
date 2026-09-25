@@ -3,7 +3,7 @@
 // license information.
 
 #pragma once
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
 #include <memory>
 #include <nlohmann/json_fwd.hpp>
@@ -14,8 +14,6 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-
-class Wavefunction;  // forward declaration for DEFAULT_SECTOR
 
 /**
  * @class ConfigurationSet

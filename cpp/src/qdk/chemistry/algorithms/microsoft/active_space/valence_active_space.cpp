@@ -13,6 +13,11 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+ValenceActiveSpaceSettings::ValenceActiveSpaceSettings() {
+  set_default("num_active_electrons", -1);
+  set_default("num_active_orbitals", -1);
+}
+
 std::shared_ptr<data::Wavefunction> ValenceActiveSpaceSelector::_run_impl(
     std::shared_ptr<data::Wavefunction> wavefunction) const {
   QDK_LOG_TRACE_ENTERING();

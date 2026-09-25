@@ -2,12 +2,11 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <pybind11/eigen.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
 #include <memory>
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/double_factorization.hpp>
 
 #include "factory_bindings.hpp"
 

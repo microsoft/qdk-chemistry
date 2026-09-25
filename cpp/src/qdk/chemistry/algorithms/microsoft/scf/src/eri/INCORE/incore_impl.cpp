@@ -31,7 +31,7 @@ ERI::ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
   QDK_LOG_TRACE_ENTERING();
 
   spin_density_factor_ = spin_density_factor;
-  obs_ = libint2_util::convert_to_libint_basisset(basis);
+  obs_ = libint2_util::Basis(basis);
   omega_ = omega;
   basis_mode_ = basis.mode;
   mpi_ = mpi;
@@ -63,16 +63,17 @@ void ERI::generate_eri_() {
     QDK_LOGGER().debug("Generating ERIs via Libint2 {}",
                        is_rsx ? "omega = " + std::to_string(omega_) : "");
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_GEN_DEBUG) > 0
-  h_eri_ =
-      libint2_util::debug_eri(basis_mode_, obs_, 0.0, loc_i_st_, loc_i_en_);
+  h_eri_ = libint2_util::debug_eri(basis_mode_, obs_.get(), 0.0, loc_i_st_,
+                                   loc_i_en_);
   if (is_rsx)
-    h_eri_erf_ = libint2_util::debug_eri(basis_mode_, obs_, omega_, loc_i_st_,
-                                         loc_i_en_);
+    h_eri_erf_ = libint2_util::debug_eri(basis_mode_, obs_.get(), omega_,
+                                         loc_i_st_, loc_i_en_);
 #else
-  h_eri_ = libint2_util::opt_eri(basis_mode_, obs_, 0.0, loc_i_st_, loc_i_en_);
+  h_eri_ =
+      libint2_util::opt_eri(basis_mode_, obs_.get(), 0.0, loc_i_st_, loc_i_en_);
   if (is_rsx)
-    h_eri_erf_ =
-        libint2_util::opt_eri(basis_mode_, obs_, omega_, loc_i_st_, loc_i_en_);
+    h_eri_erf_ = libint2_util::opt_eri(basis_mode_, obs_.get(), omega_,
+                                       loc_i_st_, loc_i_en_);
 #endif
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0 || \

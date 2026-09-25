@@ -31,8 +31,8 @@ DensityFittingBase::DensityFittingBase(bool unr, const BasisSet& obs,
 
   unrestricted_ = unr;
   n_atoms_ = obs.mol->n_atoms;
-  obs_ = libint2_util::convert_to_libint_basisset(obs);
-  abs_ = libint2_util::convert_to_libint_basisset(abs);
+  obs_ = libint2_util::Basis(obs);
+  abs_ = libint2_util::Basis(abs);
   basis_mode_ = obs.mode;
   mpi_ = mpi;
   gpu_ = gpu;
@@ -58,7 +58,7 @@ void DensityFittingBase::generate_metric() {
   const size_t metric_sz = naux * naux;
 
   if (!mpi_.world_rank) QDK_LOGGER().trace("Generating DF Metric via Libint2");
-  h_metric_ = libint2_util::metric_df(basis_mode_, abs_);
+  h_metric_ = libint2_util::metric_df(basis_mode_, abs_.get());
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   cublasHandle_ = std::make_unique<cublas::ManagedcuBlasHandle>();
 #endif

@@ -6,13 +6,14 @@
 
 #include <H5Cpp.h>
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse>
+#include <Eigen/Core>
+#include <Eigen/SparseCore>
 #include <cstdint>
 #include <map>
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <stdexcept>
 #include <utility>
 #include <vector>

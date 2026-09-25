@@ -8,7 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <optional>
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/scf.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/stabilized_scf.hpp"
@@ -18,7 +18,6 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::python;
 
-using ReturnType = std::pair<double, std::shared_ptr<Wavefunction>>;
 // Trampoline class for enabling Python inheritance
 class ScfSolverBase : public ScfSolver,
                       public pybind11::trampoline_self_life_support {
@@ -38,6 +37,8 @@ class ScfSolverBase : public ScfSolver,
   }
 
  protected:
+  using ReturnType = std::pair<double, std::shared_ptr<Wavefunction>>;
+
   ReturnType _run_impl(std::shared_ptr<Structure> structure, int charge,
                        int spin_multiplicity,
                        BasisOrGuessType basis_or_guess) const override {

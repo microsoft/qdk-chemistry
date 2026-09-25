@@ -5,7 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/finite_difference_nuclear_derivative.hpp"

@@ -5,7 +5,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/mc.hpp>
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/macis_asci.hpp"
@@ -15,7 +15,6 @@ namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-using ReturnType = std::pair<double, std::shared_ptr<Wavefunction>>;
 // Trampoline class for enabling Python inheritance
 class MultiConfigurationCalculatorBase
     : public MultiConfigurationCalculator,
@@ -37,6 +36,8 @@ class MultiConfigurationCalculatorBase
   }
 
  protected:
+  using ReturnType = std::pair<double, std::shared_ptr<Wavefunction>>;
+
   ReturnType _run_impl(std::shared_ptr<Hamiltonian> hamiltonian,
                        unsigned int n_active_alpha_electrons,
                        unsigned int n_active_beta_electrons) const override {

@@ -3,13 +3,14 @@
 // license information.
 
 #pragma once
-#include <H5Cpp.h>
+#include <H5Classes.h>
 
-#include <Eigen/Dense>
+#include <Eigen/Core>
 #include <initializer_list>
 #include <memory>
-#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/fwd.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <stdexcept>
@@ -20,9 +21,6 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
-// Forward declaration
-class Structure;
-
 /// @brief Maximum angular momentum for atomic orbitals supported in
 /// QDK/Chemistry
 inline static constexpr size_t MAX_ORBITAL_ANGULAR_MOMENTUM =

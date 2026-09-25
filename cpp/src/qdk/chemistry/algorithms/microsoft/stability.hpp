@@ -40,17 +40,7 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
    *
    * Creates a stability checker settings object with the following defaults
    */
-  StabilityCheckerSettings() : qdk::chemistry::data::Settings() {
-    set_default("internal", true);
-    set_default("external", false);
-    set_default("max_subspace", 80);
-    set_default("davidson_tolerance", 1e-8);
-    set_default("stability_tolerance", -1e-4);
-    set_default(
-        "method", "hf",
-        "SCF method: 'hf' for Hartree-Fock, or a DFT functional name. "
-        "See the user manual for the complete list of available options.");
-  }
+  StabilityCheckerSettings();
 };
 
 /**

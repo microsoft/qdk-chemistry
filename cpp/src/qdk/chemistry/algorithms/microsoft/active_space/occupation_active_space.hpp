@@ -38,7 +38,7 @@ class OccupationActiveSpaceSettings : public qdk::chemistry::data::Settings {
    * - occupation_threshold: 0.1 - Orbitals with occupation deviating from 0 or
    * 2 by at least this amount will be included in the active space
    */
-  OccupationActiveSpaceSettings() { set_default("occupation_threshold", 0.1); }
+  OccupationActiveSpaceSettings();
 };
 
 /**

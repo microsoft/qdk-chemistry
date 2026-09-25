@@ -1,6 +1,8 @@
 # Enable testing with CTest
 include(CTest)
 
+add_subdirectory(headers)
+
 # Try to find Google Test, if not found, fetch it
 find_package(GTest QUIET)
 

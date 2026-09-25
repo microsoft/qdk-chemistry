@@ -10,14 +10,17 @@
 #include <mpi.h>
 #endif
 #include <array>
+#include <cstring>
 #include <functional>
 #include <iostream>
+#include <memory>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #ifdef ENABLE_NVTX3
 #include <nvtx3/nvtx3.hpp>
 #endif
+#include <libint2/solidharmonics.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
 #include <qdk/chemistry/utils/logger.hpp>
@@ -27,7 +30,7 @@
 
 #include "Eigen/Dense"
 #include "libecpint.hpp"
-#include "libint2.hpp"
+#include "util/libint2_engine.h"
 #include "util/macros.h"
 #include "util/mpi_vars.h"
 #include "util/timer.h"
@@ -49,8 +52,6 @@ namespace qdk::chemistry::scf {
  * @note This class is thread-safe when used with separate instances per thread
  */
 class Libint2Engine : public OneBodyIntegralEngine {
-  using EigenVector = Eigen::Matrix<double, Eigen::Dynamic, 1>;
-
  public:
   /**
    * @brief Constructor for Libint2Engine
@@ -63,14 +64,12 @@ class Libint2Engine : public OneBodyIntegralEngine {
    * @param deriv Derivative order (0=integrals, 1=gradients, 2=hessians)
    * @param basis_mode Spherical or Cartesian atomic orbital mode
    */
-  Libint2Engine(libint2::Operator op, const libint2::BasisSet& obs, int deriv,
-                BasisMode basis_mode)
+  Libint2Engine(libint2_util::Operator op, const ::libint2::BasisSet& obs,
+                int deriv, BasisMode basis_mode)
       : obs_(obs),
-        engine_(op, obs.max_nprim(), obs.max_l(), deriv),
+        engine_(op, obs_.max_nprim(), obs_.max_l(), deriv),
         basis_mode_(basis_mode) {
     QDK_LOG_TRACE_ENTERING();
-    auto maxBF = (obs.max_l() + 1) * (obs.max_l() + 2) / 2;
-    buf_ = std::vector<EigenVector>(1, EigenVector(maxBF * maxBF));
   }
 
   /**
@@ -80,9 +79,9 @@ class Libint2Engine : public OneBodyIntegralEngine {
 
   /**
    * @brief Get reference to underlying libint2 engine
-   * @return Reference to libint2::Engine for parameter setting
+   * @return Reference to the compiled Libint2 engine for parameter setting
    */
-  libint2::Engine& get() {
+  libint2_util::Engine& get() {
     QDK_LOG_TRACE_ENTERING();
     return engine_;
   }
@@ -104,19 +103,17 @@ class Libint2Engine : public OneBodyIntegralEngine {
    *
    * @param i Index of first shell
    * @param j Index of second shell
-   * @return Vector of pointers to integral matrices (one per operator)
+   * @return Borrowed pointers to integral matrices, valid until the next call
    */
-  std::vector<const double*> compute(int i, int j) override {
+  Results compute(int i, int j) override {
     QDK_LOG_TRACE_ENTERING();
-    auto& res = engine_.compute(obs_[i], obs_[j]);
-    return std::vector<const double*>(res.begin(), res.end());
+    return engine_.compute1(obs_[i], obs_[j]);
   }
 
  private:
-  const libint2::BasisSet& obs_;  ///< Reference to basis set in libint2 format
-  libint2::Engine engine_;        ///< Libint2 integral engine for computation
+  libint2_util::BasisView obs_;   ///< View of the shared Libint2 basis set
+  libint2_util::Engine engine_;   ///< Libint2 integral engine for computation
   BasisMode basis_mode_;          ///< Spherical vs Cartesian basis mode
-  std::vector<EigenVector> buf_;  ///< Buffer for storing computed integrals
 };
 
 /**
@@ -171,7 +168,11 @@ class ECPIntEngine : public OneBodyIntegralEngine {
 
     auto maxBF = (maxLB + 1) * (maxLB + 2) / 2;
     auto count = deriv == 0 ? 1 : (deriv == 1 ? 3 * natom : 45);
-    buf_ = std::vector<EigenVector>(count, EigenVector(maxBF * maxBF));
+    buf_.reserve(count);
+    for (int i = 0; i < count; ++i) {
+      buf_.emplace_back(maxBF * maxBF);
+    }
+    results_.resize(count);
   }
 
   /**
@@ -193,9 +194,10 @@ class ECPIntEngine : public OneBodyIntegralEngine {
    *
    * @param i Index of first shell
    * @param j Index of second shell
-   * @return Vector of pointers to integral/derivative matrices
+   * @return Borrowed pointers to integral/derivative matrices until the next
+   * call
    */
-  std::vector<const double*> compute(int i, int j) override {
+  Results compute(int i, int j) override {
     QDK_LOG_TRACE_ENTERING();
     std::for_each(buf_.begin(), buf_.end(), [](auto& v) { v.setZero(); });
 
@@ -211,10 +213,9 @@ class ECPIntEngine : public OneBodyIntegralEngine {
       VERIFY(false && "not implemented");
     }
 
-    std::vector<const double*> res(buf_.size());
-    std::transform(buf_.begin(), buf_.end(), res.begin(),
+    std::transform(buf_.begin(), buf_.end(), results_.begin(),
                    [](auto& v) { return v.data(); });
-    return res;
+    return results_;
   }
 
  private:
@@ -234,11 +235,11 @@ class ECPIntEngine : public OneBodyIntegralEngine {
     QDK_LOG_TRACE_ENTERING();
     int n1 = l1 * 2 + 1, n2 = l2 * 2 + 1;
     if (l1 >= 2 && l2 >= 2) {
-      libint2::solidharmonics::tform(l1, l2, cart_ints, sph_ints);
+      ::libint2::solidharmonics::tform(l1, l2, cart_ints, sph_ints);
     } else if (l1 >= 2) {
-      libint2::solidharmonics::tform_rows(l1, n2, cart_ints, sph_ints);
+      ::libint2::solidharmonics::tform_rows(l1, n2, cart_ints, sph_ints);
     } else if (l2 >= 2) {
-      libint2::solidharmonics::tform_cols(n1, l2, cart_ints, sph_ints);
+      ::libint2::solidharmonics::tform_cols(n1, l2, cart_ints, sph_ints);
     } else {
       std::copy(cart_ints, cart_ints + n1 * n2, sph_ints);
     }
@@ -342,6 +343,8 @@ class ECPIntEngine : public OneBodyIntegralEngine {
 
   std::vector<EigenVector>
       buf_;  ///< Buffers for storing computed integrals/derivatives
+  std::vector<const double*>
+      results_;  ///< Reused pointer table for result views
 };
 
 void OneBodyIntegral::convert_to_libecp_shells_(const BasisSet& obs) {
@@ -385,7 +388,7 @@ OneBodyIntegral::OneBodyIntegral(const BasisSet* basis_set, const Molecule* mol,
                                  ParallelConfig mpi)
     : mpi_(mpi) {
   QDK_LOG_TRACE_ENTERING();
-  obs_ = libint2_util::convert_to_libint_basisset(*basis_set);
+  obs_ = libint2_util::Basis(*basis_set).storage();
   basis_mode_ = basis_set->mode;
   pure_ = basis_set->pure;
   if (basis_set->ecp_shells.size() > 0) {
@@ -406,23 +409,24 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
     const std::vector<Shell>& shells, const double threshold) {
   QDK_LOG_TRACE_ENTERING();
   AutoTimer __timer("int1e::prepare shell pairs");
-  std::vector<libint2::Shell> shs;
+  std::vector<::libint2::Shell> shs;
+  shs.reserve(shells.size());
   for (auto& sh : shells) {
     shs.push_back(libint2_util::convert_to_libint_shell(sh, true));
   }
-  auto obs = libint2::BasisSet(shs);
+  const libint2_util::Basis obs(std::move(shs));
 
   RowMajorMatrix S = RowMajorMatrix::Zero(obs.size(), obs.size());
   auto engine_fn = [&]() {
-    return libint2::Engine(libint2::Operator::overlap, obs.max_nprim(),
-                           obs.max_l(), 0);
+    return libint2_util::Engine(libint2_util::Operator::overlap,
+                                obs.max_nprim(), obs.max_l(), 0);
   };
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
   int nthreads = 1;
 #endif
-  std::vector<libint2::Engine> engines(nthreads, engine_fn());
+  auto engines = libint2_util::Engine::make_pool(nthreads, engine_fn());
 #ifdef _OPENMP
 #pragma omp parallel num_threads(nthreads)
 #endif
@@ -434,7 +438,7 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
 #endif
     int world_thread_size = mpi::get_world_size() * nthreads;
     int world_thread_id = mpi::get_world_rank() * nthreads + local_thread_id;
-    libint2::Engine& engine = engines[local_thread_id];
+    libint2_util::Engine& engine = engines[local_thread_id];
 
     for (size_t i = 0, job_idx = 0; i < obs.size(); i++) {
       for (size_t j = 0; j <= i; j++, job_idx++) {
@@ -446,7 +450,7 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
           continue;
         }
         size_t n1 = obs[i].size(), n2 = obs[j].size();
-        auto& buf = engine.compute(obs[i], obs[j]);
+        auto& buf = engine.compute1(obs[i], obs[j]);
         Eigen::Map<const RowMajorMatrix> mat(buf[0], n1, n2);
         S(i, j) = mat.norm();
       }
@@ -473,7 +477,8 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
 void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
                                 RowMajorMatrix* res) {
   QDK_LOG_TRACE_ENTERING();
-  const auto& shell2bf = obs_.shell2bf();
+  const libint2_util::BasisView obs(*obs_);
+  const auto& shell2bf = obs.shell2bf();
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
@@ -502,7 +507,7 @@ void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
          p += world_thread_size) {
       auto [i, j] = shell_pairs_[p];
       size_t bf1 = shell2bf[i], bf2 = shell2bf[j];
-      size_t n1 = obs_[i].size(), n2 = obs_[j].size();
+      size_t n1 = obs[i].size(), n2 = obs[j].size();
       auto buf = engine->compute(i, j);
       for (auto k = 0; k < nopers; ++k) {
         Eigen::Map<const RowMajorMatrix> mat(buf[k], n1, n2);
@@ -517,13 +522,14 @@ void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
 
 void OneBodyIntegral::overlap_integral(double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
-  RowMajorMatrix mat = RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf());
+  RowMajorMatrix mat = RowMajorMatrix::Zero(obs.nbf(), obs.nbf());
   auto engine_fn = [&]() {
-    return std::make_unique<Libint2Engine>(libint2::Operator::overlap, obs_, 0,
-                                           basis_mode_);
+    return std::make_unique<Libint2Engine>(libint2_util::Operator::overlap,
+                                           *obs_, 0, basis_mode_);
   };
   integral_(1, engine_fn, &mat);
   memcpy(res, mat.data(), sizeof(double) * mat.size());
@@ -537,13 +543,14 @@ void OneBodyIntegral::overlap_integral(double* res) {
 
 void OneBodyIntegral::kinetic_integral(double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
-  RowMajorMatrix mat = RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf());
+  RowMajorMatrix mat = RowMajorMatrix::Zero(obs.nbf(), obs.nbf());
   auto engine_fn = [&]() {
-    return std::make_unique<Libint2Engine>(libint2::Operator::kinetic, obs_, 0,
-                                           basis_mode_);
+    return std::make_unique<Libint2Engine>(libint2_util::Operator::kinetic,
+                                           *obs_, 0, basis_mode_);
   };
   integral_(1, engine_fn, &mat);
   memcpy(res, mat.data(), sizeof(double) * mat.size());
@@ -557,13 +564,14 @@ void OneBodyIntegral::kinetic_integral(double* res) {
 
 void OneBodyIntegral::nuclear_integral(double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
-  RowMajorMatrix mat = RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf());
+  RowMajorMatrix mat = RowMajorMatrix::Zero(obs.nbf(), obs.nbf());
   auto engine_fn = [&]() {
-    auto engine = std::make_unique<Libint2Engine>(libint2::Operator::nuclear,
-                                                  obs_, 0, basis_mode_);
+    auto engine = std::make_unique<Libint2Engine>(
+        libint2_util::Operator::nuclear, *obs_, 0, basis_mode_);
     engine->get().set_params(atoms_);
     return engine;
   };
@@ -579,14 +587,15 @@ void OneBodyIntegral::nuclear_integral(double* res) {
 
 void OneBodyIntegral::dipole_integral(double* res, std::array<double, 3> cen) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat(4,
-                                  RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf()));
+                                  RowMajorMatrix::Zero(obs.nbf(), obs.nbf()));
   auto engine_fn = [&]() {
     auto engine = std::make_unique<Libint2Engine>(
-        libint2::Operator::emultipole1, obs_, 0, basis_mode_);
+        libint2_util::Operator::emultipole1, *obs_, 0, basis_mode_);
     engine->get().set_params(cen);
     return engine;
   };
@@ -609,14 +618,15 @@ void OneBodyIntegral::dipole_integral(double* res, std::array<double, 3> cen) {
 void OneBodyIntegral::quadrupole_integral(double* res,
                                           std::array<double, 3> cen) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat(10,
-                                  RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf()));
+                                  RowMajorMatrix::Zero(obs.nbf(), obs.nbf()));
   auto engine_fn = [&]() {
     auto engine = std::make_unique<Libint2Engine>(
-        libint2::Operator::emultipole2, obs_, 0, basis_mode_);
+        libint2_util::Operator::emultipole2, *obs_, 0, basis_mode_);
     engine->get().set_params(cen);
     return engine;
   };
@@ -647,13 +657,14 @@ void OneBodyIntegral::quadrupole_integral(double* res,
 void OneBodyIntegral::point_charge_integral(const PointCharges* charges,
                                             double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
-  RowMajorMatrix mat = RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf());
+  RowMajorMatrix mat = RowMajorMatrix::Zero(obs.nbf(), obs.nbf());
   auto engine_fn = [&]() {
-    auto engine = std::make_unique<Libint2Engine>(libint2::Operator::nuclear,
-                                                  obs_, 0, basis_mode_);
+    auto engine = std::make_unique<Libint2Engine>(
+        libint2_util::Operator::nuclear, *obs_, 0, basis_mode_);
     // engine->get().set_params(atoms_);
     std::vector<std::pair<double, std::array<double, 3>>> q;
     for (int i = 0; i < charges->n_points; i++) {
@@ -677,13 +688,14 @@ void OneBodyIntegral::point_charge_integral(const PointCharges* charges,
 
 void OneBodyIntegral::ecp_integral(double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
-  RowMajorMatrix mat = RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf());
+  RowMajorMatrix mat = RowMajorMatrix::Zero(obs.nbf(), obs.nbf());
   auto engine_fn = [&]() {
     return std::make_unique<ECPIntEngine>(libecp_shells_, libecp_ecps_,
-                                          obs_.max_l(), max_ecp_am_,
+                                          obs.max_l(), max_ecp_am_,
                                           atoms_.size(), 0, pure_, basis_mode_);
   };
   integral_(1, engine_fn, &mat);
@@ -700,7 +712,8 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
                                       const RowMajorMatrix& coeff,
                                       AtomCenterFn center_fn, double* res) {
   QDK_LOG_TRACE_ENTERING();
-  const auto& shell2bf = obs_.shell2bf();
+  const libint2_util::BasisView obs(*obs_);
+  const auto& shell2bf = obs.shell2bf();
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
@@ -727,7 +740,7 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
       auto [i, j] = shell_pairs_[p];
 
       size_t bf1 = shell2bf[i], bf2 = shell2bf[j];
-      size_t n1 = obs_[i].size(), n2 = obs_[j].size();
+      size_t n1 = obs[i].size(), n2 = obs[j].size();
       auto buf = engine->compute(i, j);
 
       auto centers = center_fn(i, j);
@@ -756,18 +769,19 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
 
 void OneBodyIntegral::kinetic_integral_deriv(const double* D, double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat;
   auto engine_fn = [&]() {
-    return std::make_unique<Libint2Engine>(libint2::Operator::kinetic, obs_, 1,
-                                           basis_mode_);
+    return std::make_unique<Libint2Engine>(libint2_util::Operator::kinetic,
+                                           *obs_, 1, basis_mode_);
   };
   auto center_fn = [&](int i, int j) {
     return std::vector<std::pair<int, int>>{{sh2atom_[i], 0}, {sh2atom_[j], 1}};
   };
-  Eigen::Map<const RowMajorMatrix> coeff(D, obs_.nbf(), obs_.nbf());
+  Eigen::Map<const RowMajorMatrix> coeff(D, obs.nbf(), obs.nbf());
   integral_deriv_(engine_fn, coeff, center_fn, res);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -781,18 +795,19 @@ void OneBodyIntegral::kinetic_integral_deriv(const double* D, double* res) {
 
 void OneBodyIntegral::overlap_integral_deriv(const double* W, double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat;
   auto engine_fn = [&]() {
-    return std::make_unique<Libint2Engine>(libint2::Operator::overlap, obs_, 1,
-                                           basis_mode_);
+    return std::make_unique<Libint2Engine>(libint2_util::Operator::overlap,
+                                           *obs_, 1, basis_mode_);
   };
   auto center_fn = [&](int i, int j) {
     return std::vector<std::pair<int, int>>{{sh2atom_[i], 0}, {sh2atom_[j], 1}};
   };
-  Eigen::Map<const RowMajorMatrix> coeff(W, obs_.nbf(), obs_.nbf());
+  Eigen::Map<const RowMajorMatrix> coeff(W, obs.nbf(), obs.nbf());
   integral_deriv_(engine_fn, coeff, center_fn, res);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -806,13 +821,14 @@ void OneBodyIntegral::overlap_integral_deriv(const double* W, double* res) {
 
 void OneBodyIntegral::nuclear_integral_deriv(const double* D, double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat;
   auto engine_fn = [&]() {
-    auto engine = std::make_unique<Libint2Engine>(libint2::Operator::nuclear,
-                                                  obs_, 1, basis_mode_);
+    auto engine = std::make_unique<Libint2Engine>(
+        libint2_util::Operator::nuclear, *obs_, 1, basis_mode_);
     engine->get().set_params(atoms_);
     return engine;
   };
@@ -825,7 +841,7 @@ void OneBodyIntegral::nuclear_integral_deriv(const double* D, double* res) {
     }
     return centers;
   };
-  Eigen::Map<const RowMajorMatrix> coeff(D, obs_.nbf(), obs_.nbf());
+  Eigen::Map<const RowMajorMatrix> coeff(D, obs.nbf(), obs.nbf());
   integral_deriv_(engine_fn, coeff, center_fn, res);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
@@ -842,13 +858,14 @@ void OneBodyIntegral::pointcharge_integral_deriv(const double* D, double* res,
                                                  double* pointcharges_res,
                                                  const PointCharges* charges) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat;
   auto engine_fn = [&]() {
-    auto engine = std::make_unique<Libint2Engine>(libint2::Operator::nuclear,
-                                                  obs_, 1, basis_mode_);
+    auto engine = std::make_unique<Libint2Engine>(
+        libint2_util::Operator::nuclear, *obs_, 1, basis_mode_);
     std::vector<std::pair<double, std::array<double, 3>>> q;
     for (int i = 0; i < charges->n_points; i++) {
       q.push_back({charges->charges[i],
@@ -867,8 +884,8 @@ void OneBodyIntegral::pointcharge_integral_deriv(const double* D, double* res,
     }
     return centers;
   };
-  Eigen::Map<const RowMajorMatrix> coeff(D, obs_.nbf(), obs_.nbf());
-  const auto& shell2bf = obs_.shell2bf();
+  Eigen::Map<const RowMajorMatrix> coeff(D, obs.nbf(), obs.nbf());
+  const auto& shell2bf = obs.shell2bf();
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
 #else
@@ -894,7 +911,7 @@ void OneBodyIntegral::pointcharge_integral_deriv(const double* D, double* res,
          p += world_thread_size) {
       auto [i, j] = shell_pairs_[p];
       size_t bf1 = shell2bf[i], bf2 = shell2bf[j];
-      size_t n1 = obs_[i].size(), n2 = obs_[j].size();
+      size_t n1 = obs[i].size(), n2 = obs[j].size();
       auto buf = engine->compute(i, j);
       auto centers = center_fn(i, j);
       for (auto& [atom_or_pcidx, idx] : centers) {
@@ -940,13 +957,14 @@ void OneBodyIntegral::pointcharge_integral_deriv(const double* D, double* res,
 
 void OneBodyIntegral::ecp_integral_deriv(const double* D, double* res) {
   QDK_LOG_TRACE_ENTERING();
+  const libint2_util::BasisView obs(*obs_);
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
   std::vector<RowMajorMatrix> mat;
   auto engine_fn = [&]() {
     return std::make_unique<ECPIntEngine>(libecp_shells_, libecp_ecps_,
-                                          obs_.max_l(), max_ecp_am_,
+                                          obs.max_l(), max_ecp_am_,
                                           atoms_.size(), 1, pure_, basis_mode_);
   };
   std::set<int> ecp_centers;
@@ -963,7 +981,7 @@ void OneBodyIntegral::ecp_integral_deriv(const double* D, double* res) {
     }
     return centers;
   };
-  Eigen::Map<const RowMajorMatrix> coeff(D, obs_.nbf(), obs_.nbf());
+  Eigen::Map<const RowMajorMatrix> coeff(D, obs.nbf(), obs.nbf());
   integral_deriv_(engine_fn, coeff, center_fn, res);
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI

@@ -6,7 +6,6 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 

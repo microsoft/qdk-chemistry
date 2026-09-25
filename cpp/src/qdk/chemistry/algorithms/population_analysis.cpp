@@ -14,6 +14,13 @@
 #include <vector>
 
 namespace qdk::chemistry::algorithms {
+
+PopulationAnalysisSettings::PopulationAnalysisSettings() {
+  set_default("method", std::string("mulliken"),
+              "Particle-population analysis method",
+              data::ListConstraint<std::string>{{"mulliken"}});
+}
+
 namespace {
 
 const Eigen::MatrixXd& real_one_rdm(

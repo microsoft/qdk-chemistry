@@ -26,12 +26,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  */
 class MacisSettings : public MultiConfigurationSettings {
  public:
-  MacisSettings() {
-    macis::MCSCFSettings defaults;
-    set_default<double>("ci_matel_tol", defaults.ci_matel_tol,
-                        "Hamiltonian matrix element sparsification threshold",
-                        data::BoundConstraint<double>{0.0, 1.0});
-  }
+  MacisSettings();
   ~MacisSettings() override = default;
 };
 

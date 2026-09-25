@@ -21,11 +21,20 @@
 #include <stdexcept>
 #include <tuple>
 
+#include "../scf/src/util/libint2_engine.h"
 #include "../utils.hpp"
 #include "iterative_localizer_base.hpp"
 #include "pipek_mezey.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+VVHVLocalizerSettings::VVHVLocalizerSettings() {
+  set_default("minimal_basis", std::string("sto-3g"),
+              "Minimal basis set for VVHV partitioning",
+              data::ListConstraint<std::string>{
+                  {std::vector<std::string>{"sto-3g", "sto-3g*"}}});
+  set_default("weighted_orthogonalization", true);
+}
 
 namespace qcs = qdk::chemistry::scf;
 
@@ -381,18 +390,17 @@ void VVHVLocalization::initialize() {
 
   // Compute the mixed overlap matrix overlap_mix
   {
-    auto ori_bs_libs = qcs::libint2_util::convert_to_libint_basisset(*ori_bs);
-    auto minimal_bs_libs =
-        qcs::libint2_util::convert_to_libint_basisset(*minimal_bs);
+    const qcs::libint2_util::Basis ori_bs_libs(*ori_bs);
+    const qcs::libint2_util::Basis minimal_bs_libs(*minimal_bs);
     auto basis_mode_bra = ori_bs->mode;
 
-    libint2::Engine engine(
-        libint2::Operator::overlap,
+    qcs::libint2_util::Engine engine(
+        qcs::libint2_util::Operator::overlap,
         std::max(ori_bs_libs.max_nprim(), minimal_bs_libs.max_nprim()),
         std::max(ori_bs_libs.max_l(), minimal_bs_libs.max_l()), 0);
 
-    auto shell2bf_ori = ori_bs_libs.shell2bf();
-    auto shell2bf_min = minimal_bs_libs.shell2bf();
+    const auto& shell2bf_ori = ori_bs_libs.shell2bf();
+    const auto& shell2bf_min = minimal_bs_libs.shell2bf();
 
     for (auto i = 0; i < ori_bs_libs.size(); ++i)
       for (auto j = 0; j < minimal_bs_libs.size(); ++j) {
@@ -405,7 +413,7 @@ void VVHVLocalization::initialize() {
         const auto bra_st = shell2bf_ori[i];
         const auto ket_st = shell2bf_min[j];
 
-        engine.compute(bra, ket);
+        engine.compute1(bra, ket);
         auto* buf = engine.results()[0];
         if (buf) {
           Eigen::Map<const qcs::RowMajorMatrix> buf_map(buf, nbra, nket);

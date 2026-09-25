@@ -292,10 +292,8 @@ ScfCalculationResult ScfSolver::_run_with_options(
   Eigen::MatrixXd qdk_raw_basis_map(num_atomic_orbitals, num_atomic_orbitals);
   qdk_raw_basis_map.setZero();
 
-  // Convert internal to libint2 basis
-  auto libint_basis =
-      qcs::libint2_util::convert_to_libint_basisset(*scf->context().basis_set);
-  auto libint_sh2bf = libint_basis.shell2bf();
+  auto libint_sh2bf =
+      qcs::libint2_util::shell_to_basis_function(*scf->context().basis_set);
 
   for (size_t i = 0, ibf = 0; i < qdk_raw_basis_set->get_num_shells(); ++i) {
     const auto& shell = shells[i];

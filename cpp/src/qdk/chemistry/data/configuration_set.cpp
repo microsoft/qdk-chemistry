@@ -2,12 +2,15 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
+
 #include <algorithm>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
