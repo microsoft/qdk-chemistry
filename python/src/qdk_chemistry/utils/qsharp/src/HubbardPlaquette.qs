@@ -174,8 +174,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     ///
     /// Hamming weight phasing replaces `count` equal-angle rotations with `O(log count)`
     /// of them: an adder tree computes the Hamming weight of the inputs, and each output
-    /// bit is phased by its place-value-scaled angle. The technique is due to
-    /// :cite:`Gidney2019`, and was applied to fermionic simulation in :cite:`Kivlichan2020`;
+    /// bit is phased by its place-value-scaled angle.
     /// Sec. 4.4 of :cite:`Apel2026` uses it for this Hubbard plaquette circuit.
     internal operation HammingWeightPhase(theta : Double, inputs : Qubit[]) : Unit is Adj + Ctl {
         let count = Length(inputs);

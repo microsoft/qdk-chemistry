@@ -157,11 +157,11 @@ class LatticeGraph : public DataClass {
   std::uint64_t num_sites() const;
 
   /**
-   * @brief Return the extents the generating factory was called with.
+   * @brief Return the dimensions the lattice was created with.
    *
    * chain() records {n} and the two-dimensional factories record {nx, ny}.
    * A graph built from an adjacency matrix or edge map has no generating
-   * shape and returns an empty vector, since a rectangle cannot be recovered
+   * shape and returns an empty vector, since the shape cannot be recovered
    * from connectivity alone.
    */
   const std::vector<std::uint64_t>& dims() const;
@@ -550,7 +550,7 @@ class LatticeGraph : public DataClass {
   bool _is_symmetric;
   /// Edge coloring, populated at construction for recognised topologies.
   std::optional<EdgeColoring> _edge_coloring;
-  /// Extents the generating factory was called with; empty when unknown.
+  /// dimensions the lattice was created with; empty when unknown.
   std::vector<std::uint64_t> _dims;
 };
 

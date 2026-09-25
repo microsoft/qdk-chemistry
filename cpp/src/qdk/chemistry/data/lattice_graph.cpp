@@ -822,7 +822,6 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
         "is_symmetric", H5::PredType::NATIVE_HBOOL, scalar_space);
     sym_attr.write(H5::PredType::NATIVE_HBOOL, &sym_val);
 
-    // Generating extents, when the graph came from a factory.
     if (!_dims.empty()) {
       hsize_t dims_extent[1] = {static_cast<hsize_t>(_dims.size())};
       H5::DataSpace dims_space(1, dims_extent);

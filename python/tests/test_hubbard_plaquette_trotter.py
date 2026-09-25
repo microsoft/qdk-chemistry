@@ -22,9 +22,6 @@ import scipy.linalg
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (
-    plaquette_parameters,
-)
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
     HubbardPlaquetteTrotter,
 )
@@ -66,6 +63,19 @@ def _reference_hamiltonian(width: int, height: int, *, t: float, u: float, epsil
     return pauli_to_dense_matrix(list(labels), list(coefficients))
 
 
+def _plaquette_parameters(container):
+    """Return the Q# parameter struct for a plaquette container."""
+    return QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
+        width=container.width,
+        height=container.height,
+        interactionAngle=container.interaction_angle,
+        onsiteAngle=container.onsite_angle,
+        identityAngle=container.identity_angle,
+        hoppingAngle=container.hopping_angle,
+        repetitions=container.step_reps,
+    )
+
+
 def _evolution_circuit(
     width: int,
     height: int,
@@ -83,11 +93,11 @@ def _evolution_circuit(
     evolution is the same operation without its control, so it is taken directly from Q#.
     """
     builder = HubbardPlaquetteTrotter(
-        order=2, time=time, t=t, U=u, epsilon=epsilon, num_divisions=num_divisions, target_accuracy=0.0
+        order=2, time=time, t=t, u=u, epsilon=epsilon, num_divisions=num_divisions, target_accuracy=0.0
     )
     with use_qsharp_context(context):
         container = builder.run(_lattice_operator(width, height)).get_container()
-    return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(plaquette_parameters(container))
+    return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(_plaquette_parameters(container))
 
 
 def _applied_state(operation, state: np.ndarray, context) -> np.ndarray:
@@ -122,7 +132,7 @@ class TestHubbardPlaquetteContainer:
     def test_builder_emits_a_plaquette_container(self):
         """The builder's representation is the plaquette container."""
         unitary = HubbardPlaquetteTrotter(
-            order=2, time=0.1, t=1.0, U=4.0, epsilon=-2.0, num_divisions=3, target_accuracy=0.0
+            order=2, time=0.1, t=1.0, u=4.0, epsilon=-2.0, num_divisions=3, target_accuracy=0.0
         ).run(_lattice_operator(2, 2))
         container = unitary.get_container()
 
@@ -138,7 +148,7 @@ class TestHubbardPlaquetteContainer:
         spell out one Pauli string per term, and the term count grows with the lattice.
         """
         payloads = [
-            HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, U=4.0, epsilon=-2.0, num_divisions=1)
+            HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, epsilon=-2.0, num_divisions=1)
             .run(_lattice_operator(side, side))
             .get_container()
             .to_json()
@@ -150,7 +160,7 @@ class TestHubbardPlaquetteContainer:
     def test_container_round_trips_through_json(self):
         """Serialization preserves every field the Q# lowering reads."""
         container = (
-            HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, U=8.0, epsilon=-4.0, num_divisions=2)
+            HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, epsilon=-4.0, num_divisions=2)
             .run(_lattice_operator(4, 4))
             .get_container()
         )
@@ -159,7 +169,7 @@ class TestHubbardPlaquetteContainer:
 
     def test_representation_round_trips_through_the_generic_loader(self):
         """``UnitaryRepresentation.from_json`` must recognize the plaquette container."""
-        unitary = HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, U=8.0, epsilon=-4.0, num_divisions=2).run(
+        unitary = HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, epsilon=-4.0, num_divisions=2).run(
             _lattice_operator(4, 4)
         )
 
@@ -179,7 +189,7 @@ class TestHubbardPlaquetteContainer:
         open_lattice = QubitOperator(
             container=LatticeContainer(LatticeGraph.square(4, 4, periodic_x=False, periodic_y=False))
         )
-        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, U=4.0, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
 
         with pytest.raises(ValueError, match="bond graph does not match"):
             builder.run(open_lattice)
@@ -191,7 +201,7 @@ class TestHubbardPlaquetteContainer:
             create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=4.0),
             mapping=MajoranaMapping.jordan_wigner(8),
         )
-        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, U=4.0, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
 
         with pytest.raises(TypeError, match="LatticeContainer"):
             builder.run(mapped)
@@ -443,11 +453,11 @@ class TestPlaquettePhaseEstimation:
                 controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
                 unitary_builder=AlgorithmRef(
                     "hamiltonian_unitary_builder",
-                    "plaquette",
+                    "hubbard_plaquette",
                     order=2,
                     time=time,
                     t=t,
-                    U=u,
+                    u=u,
                     epsilon=epsilon,
                     num_divisions=num_divisions,
                     target_accuracy=0.0,
@@ -469,7 +479,7 @@ class TestPlaquettePhaseEstimation:
         the control is off, or the ancilla would pick up a phase from the wrong branch.
         """
         builder = HubbardPlaquetteTrotter(
-            order=2, time=0.19, t=1.0, U=4.0, epsilon=-2.0, num_divisions=1, target_accuracy=0.0
+            order=2, time=0.19, t=1.0, u=4.0, epsilon=-2.0, num_divisions=1, target_accuracy=0.0
         )
         with use_qsharp_context(qsharp_context):
             unitary = builder.run(_lattice_operator(2, 2))
@@ -479,7 +489,7 @@ class TestPlaquettePhaseEstimation:
         # The mapper's callable takes (control, systems); the simulator drives a single
         # register, so use the register-shaped form of the same operation.
         on_register = QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOnRegisterOp(
-            plaquette_parameters(unitary.get_container())
+            _plaquette_parameters(unitary.get_container())
         )
         system = _random_state(8, seed=13)
         control_off = np.kron([1.0, 0.0], system)
@@ -523,7 +533,7 @@ def _auto_step_count(width: int, height: int, *, t: float, u: float, time: float
         order=2,
         time=time,
         t=t,
-        U=u,
+        u=u,
         epsilon=-u / 2.0,
         num_divisions=1,
         target_accuracy=target_accuracy,
@@ -604,7 +614,7 @@ class TestAutomaticStepCount:
             order=2,
             time=time,
             t=t,
-            U=u,
+            u=u,
             epsilon=-u / 2.0,
             num_divisions=automatic + 25,
             target_accuracy=target_accuracy,
@@ -614,7 +624,7 @@ class TestAutomaticStepCount:
 
     def test_a_disabled_target_leaves_the_manual_count_alone(self):
         builder = HubbardPlaquetteTrotter(
-            order=2, time=3.0, t=1.0, U=8.0, epsilon=-4.0, num_divisions=7, target_accuracy=0.0
+            order=2, time=3.0, t=1.0, u=8.0, epsilon=-4.0, num_divisions=7, target_accuracy=0.0
         )
         sections = HubbardPlaquetteTrotter._plaquette_sections(4, 4)
         assert builder._step_count(1.0, sections, 4, 4, 3.0) == 7
