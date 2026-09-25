@@ -14,6 +14,8 @@ from typing import Any
 
 import pytest
 
+from qdk_chemistry.utils import Logger
+
 pandas = pytest.importorskip("pandas", reason="the sample script writes its table with pandas")
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,6 +42,13 @@ _PINNED_COLUMNS = (
     "toffolis",
     "measurements",
 )
+
+
+#: Rotation synthesis rounds transcendental angles, so these two counts drift by a few
+#: units out of millions across platforms (Linux matches exactly, macOS is +1, Windows
+#: ARM64 is +5). They are pinned to a relative tolerance; every other column stays exact.
+_PLATFORM_SENSITIVE_COLUMNS = frozenset({"rotations", "rotation_depth"})
+_PLATFORM_RELATIVE_TOLERANCE = 1e-4
 
 
 #: Default mode: the whole standard QPE circuit is built and traced.
@@ -76,10 +85,14 @@ def script() -> Any:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
+    # ``main`` silences the logger process-wide; restore the level so that later
+    # test modules still observe Logger output.
+    previous_level = Logger.get_global_level()
     try:
         spec.loader.exec_module(module)
         yield module
     finally:
+        Logger.set_global_level(previous_level)
         sys.modules.pop(spec.name, None)
 
 
@@ -101,7 +114,12 @@ def test_sample_hubbard_L2(  # noqa: N802 - L is the lattice side
     for column, want in _HUBBARD_L2_FULL_CIRCUIT.items():
         got = row[column]
         got = got.item() if hasattr(got, "item") else got
-        matches = got == pytest.approx(want) if isinstance(want, float) else got == want
+        if column in _PLATFORM_SENSITIVE_COLUMNS:
+            matches = got == pytest.approx(want, rel=_PLATFORM_RELATIVE_TOLERANCE)
+            tolerance = f" (rel={_PLATFORM_RELATIVE_TOLERANCE})"
+        else:
+            matches = got == pytest.approx(want) if isinstance(want, float) else got == want
+            tolerance = ""
         if not matches:
-            mismatches.append(f"  {column}: expected {want}, got {got}")
+            mismatches.append(f"  {column}: expected {want}{tolerance}, got {got}")
     assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
