@@ -278,7 +278,6 @@ jobs:
     - name: Run C++ tests
       env:
         OMP_NUM_THREADS: ${{ matrix.cpp-omp-threads }}
-        CTEST_TIMEOUT: ${{ matrix.enable-coverage && '400' || '300' }}
       run: |
         mkdir -p test-results
         cd "$BUILD_DIR"
@@ -286,9 +285,9 @@ jobs:
         echo "=== Running C++ Tests ==="
         set +e
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout "$CTEST_TIMEOUT" --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest --output-on-failure --verbose --timeout "$CTEST_TIMEOUT" --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
