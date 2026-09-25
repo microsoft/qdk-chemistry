@@ -421,9 +421,15 @@ class HubbardPlaquetteTrotter(Trotter):
         # Eq. (F1) of :cite:`Campbell2022`. Summing r steps of size s = T/r by subadditivity
         # gives W_PLAQ T^3 / r^2; that accumulation step is not itself stated by Campbell,
         # who works per-step. The induced error in the estimated *energy* then satisfies
-        # |Delta E| <= (2/T) arcsin(||Delta U|| / 2), the effective-Hamiltonian bound of
-        # Bhatia and Davis :cite:`Bhatia1984`, used as Eqs. (34)-(35) of :cite:`Apel2026`
-        # and by :cite:`Kivlichan2020`. Inverting it for a target energy error eps_TS gives
+        # |Delta E| <= (2/T) arcsin(||Delta U|| / 2). The eigenvalue-difference step is
+        # Bhatia and Davis :cite:`Bhatia1984`, which is the source Eq. (57) of
+        # :cite:`Kivlichan2020` cites for it. Kivlichan Eq. (58) then states the energy
+        # bound as arctan(D sqrt(4 - D^2) / (2 - D^2)) for D = ||Delta U|| with D^2 <= 2,
+        # and Eqs. (34)-(35) of :cite:`Apel2026` state it as the arcsine. The two are the
+        # same function: substituting D = 2 sin(phi) makes the arctangent argument
+        # tan(2 phi), so the expression equals 2 arcsin(D / 2), and D^2 <= 2 is exactly the
+        # condition that keeps 2 - D^2 > 0, i.e. that picks the principal branch.
+        # Inverting for a target energy error eps_TS gives
         #
         #     r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
         #
