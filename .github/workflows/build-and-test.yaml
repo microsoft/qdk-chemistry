@@ -529,6 +529,14 @@ jobs:
           exit $MAKE_EXIT_CODE
         fi
 
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
+        path: test-results/*.xml
+        retention-days: 7
+
   coverage-windows:
     name: ${{ matrix.compiler }} - Build & test (Windows)
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=windows-2025-1espt, 'JobId=qdk_chemistry-win-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
@@ -736,15 +744,26 @@ jobs:
         OMP_NUM_THREADS: ${{ env.PYTHON_OMP_THREADS }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
         Push-Location python
         $xdistArgs = @()
         if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
           $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
         }
-        pytest @xdistArgs -v --tb=short
+        pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
+
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: junit-windows-x64-${{ matrix.compiler }}
+        path: |
+          cpp\build-${{ matrix.compiler }}\ctest_results.xml
+          test-results\pytest_report.xml
+        retention-days: 7
 
   coverage-windows-arm64:
     name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
@@ -994,15 +1013,26 @@ jobs:
         OMP_NUM_THREADS: ${{ env.PYTHON_OMP_THREADS }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
         Push-Location python
         $xdistArgs = @()
         if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
           $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
         }
-        pytest @xdistArgs -v --tb=short
+        pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
+
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: junit-windows-arm64-${{ matrix.compiler }}
+        path: |
+          cpp\build-${{ matrix.compiler }}\ctest_results.xml
+          test-results\pytest_report.xml
+        retention-days: 7
 
   test-with-qdk-branch:
     name: Full Test with QDK Branch
@@ -1150,3 +1180,4 @@ jobs:
       with:
         name: qdk-branch-test-results
         path: test-results/
+        retention-days: 7
