@@ -20,7 +20,13 @@ on:
         required: false
         default: matrix
         type: choice
-        options: [matrix, '1', '2']
+        options: [matrix, '1', '2', '4', '12', '16']
+      macos_test_workers:
+        description: Override macOS pytest workers independently
+        required: false
+        default: inherit
+        type: choice
+        options: [inherit, '1', '2', '3', '4']
       rebuild_dep_cache:
         description: Rebuild dependency cache from scratch (ignore existing cache)
         required: false
@@ -341,11 +347,16 @@ jobs:
       env:
         OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
         PYTHON_TEST_WORKERS: ${{ github.event_name == 'workflow_dispatch' && inputs.python_test_workers != 'matrix' && inputs.python_test_workers || matrix.python-test-workers }}
+        MACOS_TEST_WORKERS: ${{ matrix.os-name == 'macOS' && inputs.macos_test_workers || 'inherit' }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
         mkdir -p ../test-results
+
+        if [ "$MACOS_TEST_WORKERS" != "inherit" ]; then
+          PYTHON_TEST_WORKERS="$MACOS_TEST_WORKERS"
+        fi
 
         XDIST_ARGS=()
         if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
