@@ -5,23 +5,22 @@
 namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
-    import Std.Arrays.SequenceI;
+    import Std.Arrays.Mapped;
     import Std.Arrays.Subarray;
+    import Std.Arrays.Tail;
     import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
     import Std.Math.BitSizeI;
     import Std.Math.PI;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
     import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.SingleVariant;
     import Std.ResourceEstimation.RepeatEstimates;
 
     /// # Summary
     /// Parameters of a repeated plaquette evolution.
-    ///
-    /// # Description
-    /// Only the lattice shape and the layer angles cross from Python. Which modes each
-    /// layer acts on is a function of the shape, so the tilings and spin pairings are
-    /// derived here rather than shipped as index lists that grow with the lattice.
     struct HubbardPlaquetteParams {
         /// Number of lattice columns.
         width : Int,
@@ -37,6 +36,21 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         hoppingAngle : Double,
         /// Number of repetitions of the body.
         repetitions : Int,
+    }
+
+    /// # Summary
+    /// Cache key for an equal-angle batch.
+    ///
+    /// # Description
+    /// A batch's cost is fixed by its axes, its group width and its term count, none of
+    /// which depend on the angle, so equal-angle families in different tilings share an
+    /// entry. The context separates controlled calls, whose cost differs.
+    internal function BatchVariant(axes : Pauli[], width : Int, count : Int, context : Int) : Int {
+        mutable word = 1;
+        for axis in axes {
+            set word = word * 4 + (axis == PauliI ? 0 | (axis == PauliX ? 1 | (axis == PauliY ? 2 | 3)));
+        }
+        return ((word * 1024 + width) * 1048576 + count) * 2 + context;
     }
 
     /// # Summary
@@ -76,22 +90,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return cycles;
     }
 
-    /// # Summary
     /// The Pauli word of a Jordan-Wigner two-mode operator.
-    ///
-    /// # Description
-    /// The endpoints carry `first` and `last`; every mode between them carries the
-    /// parity `Z`. A pure function, so adjointable operations may call it.
-    ///
-    /// # Input
-    /// ## lo
-    /// The lower mode index.
-    /// ## hi
-    /// The higher mode index.
-    /// ## first
-    /// Pauli on the lower endpoint.
-    /// ## last
-    /// Pauli on the higher endpoint.
     internal function JordanWignerWord(lo : Int, hi : Int, first : Pauli, last : Pauli) : Pauli[] {
         mutable word = [first];
         for _ in lo + 1..hi - 1 {
@@ -100,88 +99,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return word + [last];
     }
 
-    /// # Summary
-    /// The qubits a Jordan-Wigner two-mode operator acts on, endpoints included.
-    ///
-    /// # Input
-    /// ## lo
-    /// The lower mode index.
-    /// ## hi
-    /// The higher mode index.
-    /// ## systems
-    /// The system register.
-    internal function JordanWignerQubits(lo : Int, hi : Int, systems : Qubit[]) : Qubit[] {
-        mutable qs = [];
-        for mode in lo..hi {
-            set qs += [systems[mode]];
-        }
-        return qs;
-    }
-
-    /// # Summary
-    /// Fermionic swap of two adjacent Jordan-Wigner modes.
-    ///
-    /// # Input
-    /// ## a
-    /// The first mode.
-    /// ## b
-    /// The second mode, adjacent to `a`.
-    operation FSwap(a : Qubit, b : Qubit) : Unit is Adj + Ctl {
-        SWAP(a, b);
-        CZ(a, b);
-    }
-
-    /// # Summary
     /// One radix-2 butterfly of the fermionic fast Fourier transform.
-    ///
-    /// # Description
-    /// The Givens rotation mixing two modes into their symmetric and antisymmetric
-    /// combinations, carrying the parity string of the modes between them.
-    ///
-    /// # Input
-    /// ## a
-    /// The first mode index.
-    /// ## b
-    /// The second mode index.
-    /// ## systems
-    /// The system register.
     operation TwoModeFFFT(a : Int, b : Int, systems : Qubit[]) : Unit is Adj + Ctl {
         let lo = a < b ? a | b;
         let hi = a < b ? b | a;
         let half = (a < b ? 1.0 | -1.0) * PI() / 8.0;
-        let qs = JordanWignerQubits(lo, hi, systems);
+        let qs = systems[lo..hi];
         Exp(JordanWignerWord(lo, hi, PauliX, PauliY), half, qs);
         Exp(JordanWignerWord(lo, hi, PauliY, PauliX), -half, qs);
-    }
-
-    /// # Summary
-    /// The equal-angle hopping phase on one bond of a plaquette.
-    ///
-    /// # Input
-    /// ## kappa
-    /// Twice the hopping amplitude times the step duration.
-    /// ## a
-    /// The first mode index.
-    /// ## b
-    /// The second mode index.
-    /// ## systems
-    /// The system register.
-    operation HoppingPhase(kappa : Double, a : Int, b : Int, systems : Qubit[]) : Unit is Adj + Ctl {
-        let lo = a < b ? a | b;
-        let hi = a < b ? b | a;
-        let qs = JordanWignerQubits(lo, hi, systems);
-        Exp(JordanWignerWord(lo, hi, PauliX, PauliX), kappa / 2.0, qs);
-        Exp(JordanWignerWord(lo, hi, PauliY, PauliY), kappa / 2.0, qs);
-    }
-
-
-    /// Returns the qubit carrying each mapped term's phase.
-    internal function HammingWeightRepresentatives(targets : Qubit[][]) : Qubit[] {
-        mutable representatives : Qubit[] = [];
-        for term in targets {
-            set representatives += [term[Length(term) - 1]];
-        }
-        return representatives;
     }
 
     /// Rotates one nonempty Pauli string onto a single Z representative.
@@ -262,21 +187,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     }
 
     /// Computes a Hamming weight in place across `inputs + scratch`.
-    internal operation ComputeHammingWeight(
-        inputs : Qubit[],
-        scratch : Qubit[]
-    ) : Unit is Adj {
-        let (schedule, _, _) = HammingWeightSchedule(Length(inputs));
-        let work = inputs + scratch;
-        for (a, b, c, carry) in schedule {
-            if c < 0 {
-                HalfAdderStep(work[a], work[b], work[carry]);
-            } else {
-                FullAdderStep(work[a], work[b], work[c], work[carry]);
-            }
-        }
-    }
-
     /// Applies equal-angle Z phases using logarithmically many rotations.
     internal operation HammingWeightPhase(theta : Double, inputs : Qubit[]) : Unit is Adj + Ctl {
         let count = Length(inputs);
@@ -284,7 +194,13 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         use scratch = Qubit[Length(schedule)];
         let work = inputs + scratch;
         within {
-            ComputeHammingWeight(inputs, scratch);
+            for (a, b, c, carry) in schedule {
+                if c < 0 {
+                    HalfAdderStep(work[a], work[b], work[carry]);
+                } else {
+                    FullAdderStep(work[a], work[b], work[c], work[carry]);
+                }
+            }
         } apply {
             for k in 0..Length(finalBits) - 1 {
                 if finalBits[k] >= 0 {
@@ -299,6 +215,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
 
     /// Applies one equal-angle batch, selecting HWP only at its measured break-even size.
     internal operation HammingWeightPhaseTerms(
+        contextVariant : Int,
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][]
@@ -311,75 +228,45 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 Exp(pauliOps[t], -theta, targets[t]);
             }
         } else {
-            within {
-                for t in 0..Length(targets) - 1 {
-                    MapPauliTermToSingleZ(pauliOps[t], targets[t]);
+            let variant = BatchVariant(pauliOps[0], Length(targets[0]), Length(targets), contextVariant);
+            if BeginEstimateCaching("HubbardPlaquette.HammingWeightPhaseTerms", variant) {
+                within {
+                    for t in 0..Length(targets) - 1 {
+                        MapPauliTermToSingleZ(pauliOps[t], targets[t]);
+                    }
+                } apply {
+                    HammingWeightPhase(theta, Mapped(term -> Tail(term), targets));
                 }
-            } apply {
-                HammingWeightPhase(theta, HammingWeightRepresentatives(targets));
+                EndEstimateCaching();
             }
         }
     }
 
     /// # Summary
-    /// Each system qubit as its own single-mode group.
+    /// Groups of qubits at a fixed stride, one group per term of an equal-angle family.
     ///
-    /// # Input
-    /// ## systems
-    /// The system register.
-    internal function SingleModes(systems : Qubit[]) : Qubit[][] {
-        mutable groups = [];
-        for q in systems {
-            set groups += [[q]];
-        }
-        return groups;
-    }
-
-    /// # Summary
-    /// The spin-up and spin-down qubit of every site.
-    ///
-    /// # Input
-    /// ## sites
-    /// Number of lattice sites.
-    /// ## systems
-    /// The system register.
-    internal function SpinPairQubits(sites : Int, systems : Qubit[]) : Qubit[][] {
-        mutable groups = [];
-        for site in 0..sites - 1 {
-            set groups += [[systems[site], systems[site + sites]]];
-        }
-        return groups;
-    }
-
-    /// # Summary
-    /// The phase pair of every block of a routed tiling.
-    ///
-    /// # Description
-    /// Routing leaves block `i` on positions `4i .. 4i+3`, so its momentum-basis phase
-    /// acts on the adjacent pair `(4i, 4i+1)`. Adjacent modes carry no Jordan-Wigner
-    /// string, and distinct blocks occupy disjoint positions, so the whole tiling is one
-    /// equal-angle family that can share a single Hamming-weight register.
-    ///
-    /// # Input
-    /// ## count
-    /// Number of blocks in the tiling.
-    /// ## systems
-    /// The routed system register.
-    internal function BlockPhaseQubits(count : Int, systems : Qubit[]) : Qubit[][] {
+    /// The on-site pair family takes stride `sites` (a site and its spin partner), the
+    /// single-mode family stride 0 with width 1, and a routed hopping tiling stride 1
+    /// with the groups spaced four modes apart.
+    internal function StridedGroups(
+        count : Int,
+        width : Int,
+        step : Int,
+        stride : Int,
+        systems : Qubit[]
+    ) : Qubit[][] {
         mutable groups = [];
         for index in 0..count - 1 {
-            set groups += [[systems[4 * index], systems[4 * index + 1]]];
+            mutable group = [];
+            for offset in 0..width - 1 {
+                set group += [systems[index * step + offset * stride]];
+            }
+            set groups += [group];
         }
         return groups;
     }
 
-    /// # Summary
     /// The on-site layer, phased through Hamming-weight registers.
-    ///
-    /// # Description
-    /// After the particle-hole shift every on-site term is the same angle on a disjoint
-    /// qubit pair, so the whole lattice shares one register. The single-mode family is
-    /// applied only when the shift leaves it nonzero.
     ///
     /// # Input
     /// ## angle
@@ -396,38 +283,32 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         sites : Int,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        if onsite != 0.0 {
-            HammingWeightPhaseTerms(onsite, [[PauliZ], size = Length(systems)], SingleModes(systems));
-        }
-        if angle != 0.0 {
-            HammingWeightPhaseTerms(angle, [[PauliZ, PauliZ], size = sites], SpinPairQubits(sites, systems));
+        // Both calls in a step share this one cache entry: they pass the same angles on
+        // the same register from the same control context, so their costs are identical.
+        // A new call site with a different context must not reuse this name.
+        if BeginEstimateCaching("HubbardPlaquette.InteractionLayer", SingleVariant()) {
+            if onsite != 0.0 {
+                HammingWeightPhaseTerms(1, onsite, [[PauliZ], size = Length(systems)], StridedGroups(Length(systems), 1, 1, 1, systems));
+            }
+            if angle != 0.0 {
+                HammingWeightPhaseTerms(1, angle, [[PauliZ, PauliZ], size = sites], StridedGroups(sites, 2, 1, sites, systems));
+            }
+            EndEstimateCaching();
         }
     }
 
     /// # Summary
-    /// The mode ordering that makes every plaquette of a tiling contiguous.
+    /// The routing permutation: where the mode at each position must end up.
     ///
     /// # Description
-    /// Concatenating the tiling's four-cycles gives a permutation of all modes in which
-    /// plaquette k occupies positions 4k..4k+3 in cycle order. Routing into this frame
-    /// is what makes each plaquette's operators act on adjacent modes, so their
-    /// Jordan-Wigner strings collapse from O(L^2) to length one and every plaquette in
-    /// the tiling becomes mutually disjoint (arXiv:2609.05316, Sec. 4.5.2).
-    ///
-    /// # Input
-    /// ## blocks
-    /// Four-cycles of the tiling, in cycle order.
-    /// ## count
-    /// Total number of modes.
-    ///
-    /// # Output
-    /// `target[position]` is the mode that should end up at that position.
-    internal function RoutedOrder(blocks : Int[][], count : Int) : Int[] {
+    /// Concatenating the tiling's four-cycles and appending the modes it leaves alone
+    /// gives the frame the routing network has to reach, so sorting this permutation
+    /// with adjacent transpositions is exactly the routing problem.
+    internal function RoutingOrder(blocks : Int[][], count : Int) : Int[] {
         mutable target = [];
         for block in blocks {
             set target += block;
         }
-        // Modes the tiling does not touch keep their relative order at the tail.
         mutable placed = [false, size = count];
         for mode in target {
             set placed w/= mode <- true;
@@ -437,35 +318,19 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 set target += [mode];
             }
         }
-        return target;
+
+        // order[position] is where the mode currently at that position must end up.
+        mutable order = [0, size = count];
+        for position in 0..count - 1 {
+            set order w/= target[position] <- position;
+        }
+        return order;
     }
 
     /// # Summary
-    /// The adjacent transpositions sorting `current` into `target`, as position pairs.
-    ///
-    /// # Description
-    /// An odd-even transposition sort. Only adjacent modes are exchanged, which is what
-    /// keeps each swap a two-qubit fermionic operation rather than a long-range one.
-    ///
-    /// # Input
-    /// ## current
-    /// The present mode ordering.
-    /// ## target
-    /// The desired mode ordering.
-    ///
-    /// # Output
-    /// Positions to exchange, in application order.
-    internal function TranspositionNetwork(current : Int[], target : Int[]) : Int[] {
-        let count = Length(current);
-        // rank[mode] is where the mode must end up.
-        mutable rank = [0, size = count];
-        for position in 0..count - 1 {
-            set rank w/= target[position] <- position;
-        }
-        mutable order = [];
-        for mode in current {
-            set order += [rank[mode]];
-        }
+    /// Adjacent swaps routing each plaquette of a tiling onto contiguous modes.
+    internal function RoutingSwaps(blocks : Int[][], count : Int) : Int[] {
+        mutable order = RoutingOrder(blocks, count);
         mutable swaps = [];
         for round in 0..count - 1 {
             for position in round % 2..2..count - 2 {
@@ -481,17 +346,32 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     }
 
     /// # Summary
-    /// Applies a network of adjacent fermionic swaps.
+    /// How many adjacent swaps the routing network performs.
     ///
-    /// # Input
-    /// ## swaps
-    /// Positions to exchange with their right neighbour, in order.
-    /// ## systems
-    /// The system register.
-    operation ApplySwapNetwork(swaps : Int[], systems : Qubit[]) : Unit is Adj + Ctl {
-        for position in swaps {
-            FSwap(systems[position], systems[position + 1]);
+    /// # Description
+    /// Each adjacent transposition removes exactly one inversion, so the length of
+    /// RoutingSwaps is the inversion count of the routing permutation. A Fenwick tree
+    /// counts those in O(count log count) instead of running the O(count^2) sort that
+    /// would otherwise produce them, which is what keeps large lattices tractable.
+    internal function RoutingSwapCount(blocks : Int[][], count : Int) : Int {
+        let order = RoutingOrder(blocks, count);
+        mutable tree = [0, size = count + 1];
+        mutable inversions = 0;
+        // Walking right to left, each element meets the already-inserted elements to its
+        // right; those smaller than it are precisely the inversions it takes part in.
+        for index in count - 1..-1..0 {
+            mutable lower = order[index];
+            while lower > 0 {
+                set inversions += tree[lower];
+                set lower -= (lower &&& -lower);
+            }
+            mutable node = order[index] + 1;
+            while node <= count {
+                set tree w/= node <- tree[node] + 1;
+                set node += (node &&& -node);
+            }
         }
+        return inversions;
     }
 
     /// # Summary
@@ -509,27 +389,50 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Four-cycles of the tiling, in cycle order.
     /// ## systems
     /// The system register.
-    operation HoppingLayer(kappa : Double, blocks : Int[][], systems : Qubit[]) : Unit is Adj + Ctl {
-        let count = Length(systems);
-        let identity = SequenceI(0, count - 1);
-        let swaps = TranspositionNetwork(identity, RoutedOrder(blocks, count));
-        // An empty tiling yields no swaps and no blocks, so this reduces to identity.
-        within {
-            // Route the tiling into its contiguous frame, then change basis there.
-            ApplySwapNetwork(swaps, systems);
-            for index in 0..Length(blocks) - 1 {
-                let base = 4 * index;
-                TwoModeFFFT(base + 0, base + 2, systems);
-                TwoModeFFFT(base + 1, base + 3, systems);
+    /// ## cacheVariant
+    /// Distinguishes call sites whose cost differs, for estimate caching. Two calls may
+    /// share a variant only if they agree on both the tiling, since pink and gold route
+    /// with different swap counts, and on whether the call is controlled, since only the
+    /// phases inside the conjugation pick up the control.
+    operation HoppingLayer(
+        cacheVariant : Int,
+        kappa : Double,
+        blocks : Int[][],
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        if BeginEstimateCaching("HubbardPlaquette.HoppingLayer", cacheVariant) {
+            within {
+                if IsResourceEstimating() {
+                    // Every routing swap is the same Clifford pair on a different pair of
+                    // modes, so the estimator only needs how many there are. Emitting one
+                    // and repeating its cost keeps the O(sites^1.5) gates out of the trace,
+                    // and the inversion count keeps the O(sites^2) sort out with them.
+                    let swapCount = RoutingSwapCount(blocks, Length(systems));
+                    if swapCount > 0 {
+                        within {
+                            RepeatEstimates(swapCount);
+                        } apply {
+                            SWAP(systems[0], systems[1]);
+                            CZ(systems[0], systems[1]);
+                        }
+                    }
+                } else {
+                    for position in RoutingSwaps(blocks, Length(systems)) {
+                        SWAP(systems[position], systems[position + 1]);
+                        CZ(systems[position], systems[position + 1]);
+                    }
+                }
+                for index in 0..Length(blocks) - 1 {
+                    let base = 4 * index;
+                    TwoModeFFFT(base + 0, base + 2, systems);
+                    TwoModeFFFT(base + 1, base + 3, systems);
+                }
+            } apply {
+                let pairs = StridedGroups(Length(blocks), 2, 4, 1, systems);
+                HammingWeightPhaseTerms(cacheVariant == 0 ? 0 | 1, -kappa / 2.0, [[PauliX, PauliX], size = Length(pairs)], pairs);
+                HammingWeightPhaseTerms(cacheVariant == 0 ? 0 | 1, -kappa / 2.0, [[PauliY, PauliY], size = Length(pairs)], pairs);
             }
-        } apply {
-            // Every block's phase is the same angle on a disjoint adjacent pair, so the
-            // tiling is not a loop over blocks but two equal-angle families: XX and YY,
-            // which commute on a pair. Each family shares one Hamming-weight register,
-            // turning the tiling's 2m rotations into 2*ceil(log2(m+1)).
-            let pairs = BlockPhaseQubits(Length(blocks), systems);
-            HammingWeightPhaseTerms(-kappa / 2.0, [[PauliX, PauliX], size = Length(pairs)], pairs);
-            HammingWeightPhaseTerms(-kappa / 2.0, [[PauliY, PauliY], size = Length(pairs)], pairs);
+            EndEstimateCaching();
         }
     }
 
@@ -552,14 +455,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
         InteractionLayer(params.interactionAngle / 2.0, params.onsiteAngle / 2.0, sites, systems);
-        HoppingLayer(params.hoppingAngle, gold, systems);
+        HoppingLayer(1, params.hoppingAngle, gold, systems);
         InteractionLayer(params.interactionAngle / 2.0, params.onsiteAngle / 2.0, sites, systems);
         if params.identityAngle != 0.0 {
             // R(PauliI, theta) is the global phase exp(-i theta / 2), so theta =
             // 2 * identityAngle realizes the step's exp(-i * identityAngle) factor.
             R(PauliI, 2.0 * params.identityAngle, systems[0]);
         }
-        HoppingLayer(params.hoppingAngle, pink, systems);
+        HoppingLayer(2, params.hoppingAngle, pink, systems);
     }
 
     /// # Summary
@@ -573,6 +476,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     operation RepPlaquetteExp(params : HubbardPlaquetteParams, systems : Qubit[]) : Unit is Adj + Ctl {
         within {
             HoppingLayer(
+                0,
                 params.hoppingAngle / 2.0,
                 PlaquetteSection(params.width, params.height, true),
                 systems
@@ -608,19 +512,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         Controlled RepPlaquetteExp([control], (params, systems));
-    }
-
-    /// # Summary
-    /// Builds the circuit for a repeated plaquette evolution on a fresh register.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    /// ## systems
-    /// Indices of the system qubits.
-    operation MakeRepPlaquetteExpCircuit(params : HubbardPlaquetteParams, systems : Int[]) : Unit {
-        use qs = Qubit[MaxInt(systems) + 1];
-        RepPlaquetteExp(params, Subarray(systems, qs));
     }
 
     /// # Summary
@@ -666,22 +557,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     function MakeRepControlledPlaquetteExpOnRegisterOp(
         params : HubbardPlaquetteParams
     ) : (Qubit[] => Unit is Adj + Ctl) {
-        ControlledRepPlaquetteExpOnRegister(params, _)
-    }
-
-    /// # Summary
-    /// Applies the controlled evolution to a register whose first qubit is the control.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    /// ## register
-    /// The control qubit followed by the system qubits.
-    operation ControlledRepPlaquetteExpOnRegister(
-        params : HubbardPlaquetteParams,
-        register : Qubit[]
-    ) : Unit is Adj + Ctl {
-        ControlledRepPlaquetteExp(params, register[0], register[1...]);
+        register => ControlledRepPlaquetteExp(params, register[0], register[1...])
     }
 
     /// # Summary
