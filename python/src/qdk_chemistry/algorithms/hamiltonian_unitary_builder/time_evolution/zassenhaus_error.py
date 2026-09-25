@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.utils.pauli_commutation import commutator
 from qdk_chemistry.utils.zassenhaus_generation import zassenhaus_commutator_plan
 
@@ -93,7 +94,7 @@ def zassenhaus_steps_naive(
     # include 'order + 1' so the bound can use the first omitted exponent without
     # regenerating the plan.
     container_type = hamiltonian.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"Zassenhaus step estimation requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."
@@ -236,7 +237,7 @@ def zassenhaus_omitted_commutator_norm(
     symbolic Zassenhaus coefficients.
     """
     container_type = hamiltonian.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"The Zassenhaus omitted-commutator norm requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."

@@ -10,8 +10,9 @@ using namespace qdk::chemistry::utils::model_hamiltonians;
 
 int main() {
   // start-cell-create-huckel
-  // Create a 6-site chain for the Hückel model
-  auto lattice = LatticeGraph::chain(6);
+  // Select nearest-neighbor hopping on a 6-site chain.
+  auto geometry = LatticeGeometry::chain(6);
+  auto lattice = LatticeGraph::from_geometry(geometry, {1});
 
   // Uniform parameters: all sites have the same on-site energy and hopping
   auto hamiltonian =

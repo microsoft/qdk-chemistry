@@ -18,6 +18,7 @@ Each of the links below leads to a detailed description of the data class, inclu
    basis_set
    hamiltonian
    orbitals
+   lattice_geometry
    lattice_graph
    majorana_mapping
    pauli_operator
@@ -61,9 +62,12 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`Symmetries <symmetries>`
      - Physical symmetries
      - Factory methods, User input
-   * - :doc:`LatticeGraph <lattice_graph>`
-     - Lattice topology for model Hamiltonians
+   * - :doc:`LatticeGeometry <lattice_geometry>`
+     - Site coordinates, periodic vectors, and geometric neighbor queries
      - Factory methods, User input
+   * - :doc:`LatticeGraph <lattice_graph>`
+     - Explicit weighted connectivity with optional shell and flavor labels
+     - Geometry selection, Factory methods, User input
    * - :doc:`MajoranaMapping <majorana_mapping>`
      - Fermion-to-qubit encoding (Majorana-to-Pauli table)
      - Factory methods, User input

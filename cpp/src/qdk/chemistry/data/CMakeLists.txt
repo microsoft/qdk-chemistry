@@ -2,6 +2,7 @@ target_sources(chemistry PRIVATE
     ansatz.cpp
     basis_set.cpp
     configuration.cpp
+    lattice_geometry.cpp
     lattice_graph.cpp
     configuration_set.cpp
     element_data.cpp

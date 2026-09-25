@@ -16,9 +16,12 @@ from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import SumOfSquaresContainer
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Mapping
+
     import h5py
 
     import qdk_chemistry.data.enums.fermion_mode_order
@@ -41,10 +44,11 @@ class QubitOperator(DataClass):
     available attributes depend on the representation. The attributes below resolve only
     when the operator wraps a
     :class:`~qdk_chemistry.data.qubit_operator.containers.pauli_decomposition.PauliDecompositionContainer`,
+    including its sparse-storage subclass built by :meth:`from_sparse_terms`,
     and raise :exc:`AttributeError` otherwise.
 
     Attributes:
-        pauli_strings (list[str]): List of Pauli strings representing the ``QubitOperator``.
+        pauli_strings (Sequence[str]): Pauli strings representing the ``QubitOperator``; a lazy view for sparse storage.
         term_partition (~qdk_chemistry.data.term_partition.TermPartition | None): Optional index-based partition of
             :attr:`pauli_strings` into algorithm-relevant groups.
 
@@ -112,6 +116,45 @@ class QubitOperator(DataClass):
             )
         self._container = resolved_container
         super().__init__()
+
+    @classmethod
+    def from_sparse_terms(
+        cls,
+        num_qubits: int,
+        terms: Iterable[Mapping[int, str] | Iterable[tuple[int, str]]],
+        coefficients: np.ndarray,
+        *,
+        encoding: str | None = None,
+        fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
+        term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
+        tapering: TaperingSpecification | None = None,
+    ) -> QubitOperator:
+        """Build an operator that stores only the non-identity factors of each term.
+
+        Args:
+            num_qubits: Register width.
+            terms: One mapping or iterable of ``(qubit, X/Y/Z)`` pairs per term; an empty term encodes identity.
+            coefficients: One coefficient per term.
+            encoding: Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
+            fermion_mode_order: Mode ordering (``"blocked"``/``"interleaved"``). Default ``None``.
+            term_partition: Optional term partition carrying group/layer metadata.
+            tapering: Applied tapering metadata, or None if untapered.
+
+        Returns:
+            QubitOperator: An operator with sparse Pauli decomposition storage.
+
+        """
+        return cls(
+            container=SparsePauliDecompositionContainer.from_sparse_terms(
+                num_qubits,
+                terms,
+                coefficients,
+                encoding=encoding,
+                fermion_mode_order=fermion_mode_order,
+                term_partition=term_partition,
+                tapering=tapering,
+            )
+        )
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -243,6 +286,8 @@ class QubitOperator(DataClass):
         container_type = json_data.get("container_type", "pauli_decomposition")
         if container_type == "pauli_decomposition":
             container = PauliDecompositionContainer.from_json(json_data)
+        elif container_type == "sparse_pauli_decomposition":
+            container = SparsePauliDecompositionContainer.from_json(json_data)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_json(json_data)
         else:
@@ -261,6 +306,8 @@ class QubitOperator(DataClass):
             container_type = container_type.decode("utf-8")
         if container_type == "pauli_decomposition":
             container = PauliDecompositionContainer.from_hdf5(group)
+        elif container_type == "sparse_pauli_decomposition":
+            container = SparsePauliDecompositionContainer.from_hdf5(group)
         elif container_type == "sum_of_squares":
             container = SumOfSquaresContainer.from_hdf5(group)
         else:

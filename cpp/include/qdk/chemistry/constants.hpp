@@ -79,6 +79,7 @@ static constexpr double reduced_planck_constant =
     planck_constant / (2.0 * 3.14159265358979323846);         // ħ, J⋅s
 static constexpr double speed_of_light = 299792458.0;         // m/s
 static constexpr double elementary_charge = 1.602176634e-19;  // C
+static constexpr double bohr_magneton = 9.2740100657e-24;     // μB, J/T
 
 // Energy conversion factors
 static constexpr double hartree_to_ev =
@@ -121,6 +122,7 @@ static constexpr double reduced_planck_constant =
     planck_constant / (2.0 * 3.14159265358979323846);         // ħ, J⋅s
 static constexpr double speed_of_light = 299792458.0;         // m/s
 static constexpr double elementary_charge = 1.602176634e-19;  // C
+static constexpr double bohr_magneton = 9.2740100783e-24;     // μB, J/T
 
 // Energy conversion factors
 static constexpr double hartree_to_ev =
@@ -163,6 +165,7 @@ static constexpr double reduced_planck_constant =
     planck_constant / (2.0 * 3.14159265358979323846);          // ħ, J⋅s
 static constexpr double speed_of_light = 299792458.0;          // m/s
 static constexpr double elementary_charge = 1.6021766208e-19;  // C
+static constexpr double bohr_magneton = 9.274009994e-24;       // μB, J/T
 
 // Energy conversion factors
 static constexpr double hartree_to_ev =
@@ -408,6 +411,10 @@ inline std::unordered_map<std::string, ConstantInfo> get_constants_info() {
            {"elementary_charge",
             "Elementary charge, electric charge carried by a single proton",
             "C", current_version, "e", elementary_charge}},
+          {"bohr_magneton",
+           {"bohr_magneton",
+            "Bohr magneton, natural unit of the electron magnetic moment",
+            "J/T", current_version, "μB", bohr_magneton}},
           {"hartree_to_ev",
            {"hartree_to_ev", "Hartree to electron volt conversion factor",
             "eV/Eₕ", current_version, "", hartree_to_ev}},

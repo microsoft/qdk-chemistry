@@ -28,6 +28,7 @@ import numpy as np
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
 from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -236,7 +237,7 @@ class PartiallyRandomized(QDrift):
         rng = np.random.default_rng(seed if seed >= 0 else None)
 
         container_type = qubit_hamiltonian.get_container_type()
-        if container_type != "pauli_decomposition":
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(
                 f"Partially randomized time evolution requires a Pauli decomposition qubit operator; "
                 f"got the {container_type!r} representation."

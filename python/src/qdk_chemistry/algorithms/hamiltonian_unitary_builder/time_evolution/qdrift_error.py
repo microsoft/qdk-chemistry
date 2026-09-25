@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+
 if TYPE_CHECKING:
     from qdk_chemistry.data import QubitOperator
 
@@ -65,7 +67,7 @@ def qdrift_samples_campbell(
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
 
     container_type = hamiltonian.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"qDRIFT sample estimation requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."

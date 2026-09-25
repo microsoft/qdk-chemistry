@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from qdk_chemistry.data import PauliTermAccumulator
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -64,7 +65,7 @@ def _require_pauli_decomposition(operator: QubitOperator) -> None:
 
     """
     container_type = operator.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(operator.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"Pauli commutation requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."

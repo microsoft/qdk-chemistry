@@ -4,96 +4,148 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
+    import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
+    import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
+    import Std.Arrays.IndexOf;
     import Std.Arrays.Subarray;
-    import Std.ResourceEstimation.*;
+    import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.RepeatEstimates;
 
-    /// Performs Controlled Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `control`: The index of the control qubit.
-    /// - `system`: An array of integers representing the indices of the system qubits.
-    /// # Returns
-    /// - `Unit`: The operation prepares the controlled time evolution on the allocated qubits.
-    operation ControlledPauliExp(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
+    /// Applies the producer's disjoint layers without changing their boundaries.
+    operation ControlledPauliLayers(
+        params : SparseRepPauliExpParams,
+        layerOffsets : Int[],
         control : Qubit,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        for idx in 0..Length(pauliExponents) - 1 {
-            let paulis = pauliExponents[idx];
-            let coeff = pauliCoefficients[idx];
-            Controlled Exp([control], (paulis, -coeff, systems));
+        for layer in 0..Length(layerOffsets) - 2 {
+            let first = layerOffsets[layer];
+            let last = layerOffsets[layer + 1] - 1;
+            if first == last {
+                if Length(params.pauliIndices[first]) == 0 {
+                    R1(-params.pauliCoefficients[first], control);
+                } else {
+                    Controlled Exp([control], (
+                        params.pauliOps[first], -params.pauliCoefficients[first],
+                        Subarray(params.pauliIndices[first], systems)
+                    ));
+                }
+            } else {
+                within {
+                    for term in first..last {
+                        let indices = params.pauliIndices[term];
+                        let paulis = params.pauliOps[term];
+                        for position in 0..Length(indices) - 1 {
+                            let q = systems[indices[position]];
+                            if paulis[position] == PauliX {
+                                H(q);
+                            } elif paulis[position] == PauliY {
+                                Adjoint S(q);
+                                H(q);
+                            }
+                        }
+                        if Length(indices) > 0 {
+                            for position in 1..Length(indices) - 1 {
+                                CNOT(systems[indices[position]], systems[indices[0]]);
+                            }
+                        }
+                    }
+                } apply {
+                    // Rotations share two rounds, but the CNOTs still share one control.
+                    for term in first..last {
+                        let indices = params.pauliIndices[term];
+                        if Length(indices) == 0 {
+                            // Identity terms retain their relative phase, including under further controls.
+                            R1(-params.pauliCoefficients[term], control);
+                        } else {
+                            Rz(params.pauliCoefficients[term], systems[indices[0]]);
+                        }
+                    }
+                    for term in first..last {
+                        let indices = params.pauliIndices[term];
+                        if Length(indices) > 0 {
+                            CNOT(control, systems[indices[0]]);
+                        }
+                    }
+                    for term in first..last {
+                        let indices = params.pauliIndices[term];
+                        if Length(indices) > 0 {
+                            Rz(-params.pauliCoefficients[term], systems[indices[0]]);
+                        }
+                    }
+                    for term in first..last {
+                        let indices = params.pauliIndices[term];
+                        if Length(indices) > 0 {
+                            CNOT(control, systems[indices[0]]);
+                        }
+                    }
+                }
+            }
         }
     }
 
-
-    /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
+    /// Applies repeated sparse Pauli evolution controlled on a single qubit.
+    ///
+    /// This is a named operation rather than a closure so that callables produced by
+    /// `MakeRepControlledPauliExpOp` stay resolvable by the Q# defunctionalizer, which
+    /// runs when a caller such as `HadamardTest` is lowered to QIR.
     /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the controlled evolution.
-    /// - `control`: The index of the control qubit.
-    /// - `systems`: An array of integers representing the indices of the system qubits.
-    struct RepControlledPauliExpParams {
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
-        control : Int,
-        systems : Int[],
-    }
-
-    /// Performs repeated Controlled Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
-    /// - `control`: The control qubit for the operation.
-    /// - `systems`: An array of qubits representing the system on which the operation acts.
-    /// # Returns
-    /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
+    /// - `params`: The sparse repeated Pauli evolution parameters.
+    /// - `layerOffsets`: Declared disjoint-layer boundaries; empty means term-by-term evolution.
+    /// - `control`: The control qubit.
+    /// - `systems`: The system qubits the evolution acts on.
     operation RepControlledPauliExp(
-        params : RepControlledPauliExpParams,
+        params : SparseRepPauliExpParams,
+        layerOffsets : Int[],
         control : Qubit,
-        systems : Qubit[],
+        systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        for i in 1..params.repetitions {
-            if BeginEstimateCaching("ControlledPauliExp", 0) {
-                ControlledPauliExp(params.pauliExponents, params.pauliCoefficients, control, systems);
-                EndEstimateCaching();
+        if Length(layerOffsets) == 0 {
+            Controlled SparseRepPauliExp([control], (params, systems));
+        } else {
+            let first = IndexOf(offset -> offset == params.beginning, layerOffsets);
+            let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.end, layerOffsets);
+            let stepOffsets = layerOffsets[first..last];
+            ControlledPauliLayers(params, layerOffsets[0..first], control, systems);
+            if IsResourceEstimating() {
+                within {
+                    RepeatEstimates(params.repetitions);
+                } apply {
+                    ControlledPauliLayers(params, stepOffsets, control, systems);
+                }
+            } else {
+                for _ in 1..params.repetitions {
+                    ControlledPauliLayers(params, stepOffsets, control, systems);
+                }
             }
+            ControlledPauliLayers(params, layerOffsets[last...], control, systems);
         }
     }
 
     /// A helper operation to create a circuit for repeated Controlled Time Evolution for a set of Pauli exponentials.
     /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the controlled evolution.
+    /// - `params`: The sparse repeated Pauli evolution parameters.
+    /// - `layerOffsets`: Declared disjoint-layer boundaries; empty means term-by-term evolution.
     /// - `control`: The index of the control qubit.
     /// - `systems`: An array of integers representing the indices of the system qubits.
     /// # Returns
     /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
     operation MakeRepControlledPauliExpCircuit(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        repetitions : Int,
+        params : SparseRepPauliExpParams,
+        layerOffsets : Int[],
         control : Int,
         systems : Int[]
     ) : Unit {
-        use qs = Qubit[Length(systems) + 1];
-        RepControlledPauliExp(
-            new RepControlledPauliExpParams { pauliExponents = pauliExponents, pauliCoefficients = pauliCoefficients, repetitions = repetitions, control = control, systems = systems },
-            qs[control],
-            Subarray(systems, qs)
-        );
+        use qs = Qubit[MaxInt([control] + systems) + 1];
+        RepControlledPauliExp(params, layerOffsets, qs[control], Subarray(systems, qs));
     }
 
-    /// A helper function to create a callable for repeated Controlled Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepControlledPauliExpParams` struct containing the parameters for the operation.
-    /// # Returns
-    /// - `(Qubit, Qubit[]) => Unit is Adj + Ctl`: A callable that takes a control qubit and an array of system qubits, and prepares the repeated controlled time evolution on the allocated qubits.
-    function MakeRepControlledPauliExpOp(params : RepControlledPauliExpParams) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
-        RepControlledPauliExp(params, _, _)
+    /// Returns a single-control callable for repeated sparse Pauli evolution.
+    function MakeRepControlledPauliExpOp(
+        params : SparseRepPauliExpParams,
+        layerOffsets : Int[]
+    ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
+        RepControlledPauliExp(params, layerOffsets, _, _)
     }
 }
