@@ -70,6 +70,11 @@ from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, QdkStabilizedScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
+from qdk_chemistry.algorithms.symmetry_shift import (
+    FermionicLowRankShifter,
+    SymmetryShiftCoeffs,
+    SymmetryShifter,
+)
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
@@ -83,6 +88,7 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EffectiveHamiltonianConstructor",
     "ExpectationEstimator",
+    "FermionicLowRankShifter",
     "FiniteDifferenceNuclearDerivativeCalculator",
     "GeometryOptimizer",
     "GeometryOptimizerSettings",
@@ -126,6 +132,8 @@ __all__ = [
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
+    "SymmetryShiftCoeffs",
+    "SymmetryShifter",
     "TimeEvolutionBuilder",
     # Factory functions
     "available",
