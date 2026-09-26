@@ -26,17 +26,16 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace {
 
-/// Read leaf M^{rc} out of the flat [R,B,N] / [R,B,C] arrays.
-///   M^{rc}_{pq} = Sum_b W^{rc}_b U^r_{bp} U^r_{bq}
+/// Read leaf M^r out of the flat [R,B,N] / [R,B] arrays (num_copies == 1).
+///   M^r_{pq} = Sum_b W^r_b U^r_{bp} U^r_{bq}
 /// `Ur` is [B,N] with eigenvectors in ROWS; the returned matrix is [N,N].
 Eigen::MatrixXd leaf_matrix(
     const Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
                                          Eigen::RowMajor>>& Ur,
-    const Eigen::VectorXd& w, size_t r, size_t c, size_t B, size_t C,
-    size_t norb) {
+    const Eigen::VectorXd& w, size_t r, size_t B, size_t norb) {
   Eigen::MatrixXd scaled(B, norb);
   for (size_t b = 0; b < B; ++b) {
-    scaled.row(b) = w(r * B * C + b * C + c) * Ur.row(b);
+    scaled.row(b) = w(r * B + b) * Ur.row(b);
   }
   return Ur.transpose() * scaled;
 }
@@ -103,11 +102,9 @@ FragmentAccumulation accumulate_fragment_shifts(
   const size_t norb = container.get_num_orbitals();
   const size_t R = container.get_num_ranks();
   const size_t B = container.get_num_bases();
-  const size_t C = container.get_num_copies();
 
   FragmentAccumulation result(static_cast<Eigen::Index>(norb),
-                              static_cast<Eigen::Index>(R),
-                              static_cast<Eigen::Index>(C));
+                              static_cast<Eigen::Index>(R));
 
   const Eigen::VectorXd& u = container.get_u_matrices();
   const Eigen::VectorXd& w = container.get_w_matrices();
@@ -122,44 +119,40 @@ FragmentAccumulation accumulate_fragment_shifts(
                                    Eigen::RowMajor>>
         Ur(u.data() + r * B * norb, B, norb);
 
-    for (size_t c = 0; c < C; ++c) {
-      // One matrix product serves all three accumulations:
-      //   coulomb_ij  = Sum_k g[i,j,k,k] = Sum_rc tr(M^rc) M^rc
-      //   exchange_ij = Sum_k g[i,k,k,j] = Sum_rc (M^rc M^rc)_ij
-      const Eigen::MatrixXd M = leaf_matrix(Ur, w, r, c, B, C, norb);
-      result.coulomb += M.trace() * M;
-      result.exchange.noalias() += M * M;
+    // One matrix product serves all three accumulations:
+    //   coulomb_ij  = Sum_k g[i,j,k,k] = Sum_r tr(M^r) M^r
+    //   exchange_ij = Sum_k g[i,k,k,j] = Sum_r (M^r M^r)_ij
+    const Eigen::MatrixXd M = leaf_matrix(Ur, w, r, B, norb);
+    result.coulomb += M.trace() * M;
+    result.exchange.noalias() += M * M;
 
-      Eigen::VectorXd eps(B);
-      for (size_t b = 0; b < B; ++b) {
-        eps(b) = kInvSqrt2 * w(r * B * C + b * C + c);
-      }
-
-      const double eps_abs_sum = eps.array().abs().sum();
-      const double lambda_baseline = 0.5 * eps_abs_sum * eps_abs_sum;
-
-      // Eq. 27's LP is minimized by every point of median_interval(eps). Take
-      // the upper endpoint: it is an actual eps_i, which drops a unitary from
-      // the one-electron LCU (text after Eq. 27).
-      const double phi = median_interval(eps).second;
-      result.phi(static_cast<Eigen::Index>(r), static_cast<Eigen::Index>(c)) =
-          phi;
-
-      result.lambda_df_baseline += lambda_baseline;
-      const double eps_shifted_abs_sum = (eps.array() - phi).abs().sum();
-      result.lambda_df_shifted +=
-          0.5 * eps_shifted_abs_sum * eps_shifted_abs_sum;
-
-      // Eq. 24's per-fragment BLISS parameters, negated: Eq. C6 *adds* the
-      // per-fragment K^(a), while the global K is *subtracted* from H (Eq. 5).
-      // Fragments in M (x) M form always have coefficient +1, so there is no
-      // per-fragment sign to carry.
-      result.mu2 -= phi * phi;
-
-      // theta = -2*phi*eps rotated back is U^T diag(theta) U = -sqrt(2)*phi*M,
-      // so M is all this needs; negating for H - K gives the +=.
-      result.xi.noalias() += std::sqrt(2.0) * phi * M;
+    Eigen::VectorXd eps(B);
+    for (size_t b = 0; b < B; ++b) {
+      eps(b) = kInvSqrt2 * w(r * B + b);
     }
+
+    const double eps_abs_sum = eps.array().abs().sum();
+    const double lambda_baseline = 0.5 * eps_abs_sum * eps_abs_sum;
+
+    // Eq. 27's LP is minimized by every point of median_interval(eps). Take
+    // the upper endpoint: it is an actual eps_i, which drops a unitary from
+    // the one-electron LCU (text after Eq. 27).
+    const double phi = median_interval(eps).second;
+    result.phi(static_cast<Eigen::Index>(r)) = phi;
+
+    result.lambda_df_baseline += lambda_baseline;
+    const double eps_shifted_abs_sum = (eps.array() - phi).abs().sum();
+    result.lambda_df_shifted += 0.5 * eps_shifted_abs_sum * eps_shifted_abs_sum;
+
+    // Eq. 24's per-fragment BLISS parameters, negated: Eq. C6 *adds* the
+    // per-fragment K^(a), while the global K is *subtracted* from H (Eq. 5).
+    // Fragments in M (x) M form always have coefficient +1, so there is no
+    // per-fragment sign to carry.
+    result.mu2 -= phi * phi;
+
+    // theta = -2*phi*eps rotated back is U^T diag(theta) U = -sqrt(2)*phi*M,
+    // so M is all this needs; negating for H - K gives the +=.
+    result.xi.noalias() += std::sqrt(2.0) * phi * M;
   }
 
   return result;
@@ -259,6 +252,15 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
         "Hamiltonian with a nonzero identity weight wB.");
   }
 
+  // Everything below reads W with the single-copy stride r*B + b and emits one
+  // phi per rank, so a multi-copy factorization would be read wrong.
+  if (container.get_num_copies() != 1) {
+    throw std::invalid_argument(
+        "solve_fermionic_low_rank_shift requires a factorized Hamiltonian "
+        "with exactly one copy per rank (num_copies == 1), as produced by the "
+        "\"double_factorization\" algorithm.");
+  }
+
   // Without complete rotations the reported 1-norms would not describe the
   // shifted Hamiltonian, so the guard below could not catch the mistake.
   if (!fragments_span_full_rotation(container)) {
@@ -278,9 +280,8 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
   const size_t norb = static_cast<size_t>(h_alpha.rows());
   QDK_LOGGER().debug(
       "solve_fermionic_low_rank_shift: num_orbitals={}, num_electrons={}, "
-      "num_ranks={}, num_copies={}",
-      norb, num_electrons, container.get_num_ranks(),
-      container.get_num_copies());
+      "num_ranks={}",
+      norb, num_electrons, container.get_num_ranks());
 
   // One pass over the fragments produces both the mean-field contractions of
   // the ORIGINAL g and the global (mu2, xi).
@@ -296,7 +297,7 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
   const double lambda_total_before =
       accumulation.lambda_df_baseline + one_electron.lambda_1e_baseline;
 
-  QDK_LOGGER().debug(
+  QDK_LOGGER().info(
       "solve_fermionic_low_rank_shift: lambda_total before={} ({} + {}), "
       "after={} ({} + {}); lambda_DF baseline={}, shifted={}; lambda_1e "
       "baseline={}, "
@@ -318,14 +319,13 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
         "so the Hamiltonian is left unchanged.",
         lambda_total_before, lambda_total_after);
 
-    SymmetryShift identity_shift;
+    SymmetryShiftCoeffs identity_shift;
     identity_shift.xi = Eigen::MatrixXd::Zero(static_cast<Eigen::Index>(norb),
                                               static_cast<Eigen::Index>(norb));
-    return {identity_shift, Eigen::MatrixXd::Zero(accumulation.phi.rows(),
-                                                  accumulation.phi.cols())};
+    return {identity_shift, Eigen::VectorXd::Zero(accumulation.phi.size())};
   }
 
-  SymmetryShift shift;
+  SymmetryShiftCoeffs shift;
   shift.mu1 = one_electron.mu1;
   shift.mu2 = accumulation.mu2;
   shift.xi = accumulation.xi;
@@ -344,7 +344,7 @@ rebuild_shifted_factorized_hamiltonian(
     const FermionicLowRankSolution& solution, unsigned int num_electrons) {
   QDK_LOG_TRACE_ENTERING();
 
-  const SymmetryShift& shift = solution.shift;
+  const SymmetryShiftCoeffs& shift = solution.shift;
 
   auto [h_alpha, h_beta] = original.get_one_body_integrals();
   (void)h_beta;
@@ -358,13 +358,16 @@ rebuild_shifted_factorized_hamiltonian(
 
   const size_t R = container.get_num_ranks();
   const size_t B = container.get_num_bases();
-  const size_t C = container.get_num_copies();
 
-  if (solution.phi.rows() != static_cast<Eigen::Index>(R) ||
-      solution.phi.cols() != static_cast<Eigen::Index>(C)) {
+  if (container.get_num_copies() != 1) {
     throw std::invalid_argument(
-        "rebuild_shifted_factorized_hamiltonian: phi must be num_ranks x "
-        "num_copies.");
+        "rebuild_shifted_factorized_hamiltonian requires num_copies == 1.");
+  }
+
+  if (solution.phi.size() != static_cast<Eigen::Index>(R)) {
+    throw std::invalid_argument(
+        "rebuild_shifted_factorized_hamiltonian: phi must have one entry per "
+        "rank.");
   }
 
   const double ne = static_cast<double>(num_electrons);
@@ -373,17 +376,14 @@ rebuild_shifted_factorized_hamiltonian(
   Eigen::MatrixXd h_tilde = h_alpha + (ne - 1.0) * shift.xi;
   h_tilde.diagonal().array() -= (shift.mu1 + shift.mu2);
 
-  // Two-body part: subtracting phi_rc from each fragment's eigenvalues is the
+  // Two-body part: subtracting phi_r from each fragment's eigenvalues is the
   // whole shift; sqrt(2) converts back to the stored scale.
   Eigen::VectorXd w_new = container.get_w_matrices();
   for (size_t r = 0; r < R; ++r) {
-    for (size_t c = 0; c < C; ++c) {
-      const double delta =
-          std::sqrt(2.0) * solution.phi(static_cast<Eigen::Index>(r),
-                                        static_cast<Eigen::Index>(c));
-      for (size_t b = 0; b < B; ++b) {
-        w_new[static_cast<Eigen::Index>(r * B * C + b * C + c)] -= delta;
-      }
+    const double delta =
+        std::sqrt(2.0) * solution.phi(static_cast<Eigen::Index>(r));
+    for (size_t b = 0; b < B; ++b) {
+      w_new[static_cast<Eigen::Index>(r * B + b)] -= delta;
     }
   }
 

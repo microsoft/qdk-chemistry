@@ -45,25 +45,26 @@ class SymmetryShifterBase : public SymmetryShifter,
 };
 
 void bind_symmetry_shift(py::module &m) {
-  // SymmetryShift: the (mu1, mu2, xi) shift parameters, decoupled from how
-  // they were produced so they can be inspected or supplied from any source.
-  py::class_<SymmetryShift>(m, "SymmetryShift", R"(
+  // SymmetryShiftCoeffs: the (mu1, mu2, xi) shift parameters, decoupled from
+  // how they were produced so they can be inspected or supplied from any
+  // source.
+  py::class_<SymmetryShiftCoeffs>(m, "SymmetryShiftCoeffs", R"(
 Number-symmetry shift parameters.
 
 Bundles the three quantities (mu1, mu2, xi) that define the symmetry-shift
 operator subtracted from a Hamiltonian to reduce its fermionic 1-norm while
-leaving the target electron-number sector's energy invariant. A SymmetryShift
+leaving the target electron-number sector's energy invariant. A SymmetryShiftCoeffs
 carries only the *result* of a shift computation, so it can come from
 :meth:`SymmetryShifter.last_shift` or from an external source. Applying one
 is :meth:`SymmetryShifter.run`'s job.
 )")
       .def(py::init<>())
-      .def_readwrite("mu1", &SymmetryShift::mu1, "One-electron shift.")
-      .def_readwrite("mu2", &SymmetryShift::mu2, "Two-electron shift.")
-      .def_readwrite("xi", &SymmetryShift::xi,
+      .def_readwrite("mu1", &SymmetryShiftCoeffs::mu1, "One-electron shift.")
+      .def_readwrite("mu2", &SymmetryShiftCoeffs::mu2, "Two-electron shift.")
+      .def_readwrite("xi", &SymmetryShiftCoeffs::xi,
                      "Two-electron shift matrix (norb x norb).")
-      .def("__repr__", [](const SymmetryShift &s) {
-        return "<qdk_chemistry.algorithms.SymmetryShift mu1=" +
+      .def("__repr__", [](const SymmetryShiftCoeffs &s) {
+        return "<qdk_chemistry.algorithms.SymmetryShiftCoeffs mu1=" +
                std::to_string(s.mu1) + " mu2=" + std::to_string(s.mu2) +
                " xi=" + std::to_string(s.xi.rows()) + "x" +
                std::to_string(s.xi.cols()) + ">";
@@ -122,7 +123,7 @@ Raises:
 The symmetry shift (mu1, mu2, xi) applied by the most recent :meth:`run`.
 
 Returns:
-    qdk_chemistry.algorithms.SymmetryShift | None: The shift the last
+    qdk_chemistry.algorithms.SymmetryShiftCoeffs | None: The shift the last
     :meth:`run` on this instance applied, or None if it has not been run or
     the implementation does not report one.
 

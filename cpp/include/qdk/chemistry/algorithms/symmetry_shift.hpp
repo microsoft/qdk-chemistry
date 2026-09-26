@@ -29,7 +29,7 @@ namespace qdk::chemistry::algorithms {
  */
 
 /**
- * @struct SymmetryShift
+ * @struct SymmetryShiftCoeffs
  * @brief Parameters of a number-symmetry shift operator [1].
  *
  * Bundles the parameters of the symmetry-shift operator subtracted from a
@@ -40,8 +40,8 @@ namespace qdk::chemistry::algorithms {
  *
  * This parameterization is shared by every SymmetryShifter implementation
  * (BLISS [1] and its fermionic low-rank variant [2] included); only the way
- * (mu1, mu2, xi) are *computed* differs. A SymmetryShift therefore carries
- * only the *result* of a shift computation, reported by
+ * (mu1, mu2, xi) are *computed* differs. A SymmetryShiftCoeffs therefore
+ * carries only the *result* of a shift computation, reported by
  * SymmetryShifter::last_shift() after a run.
  *
  * APPLYING ONE BY HAND: Eqs. 6-7 of [2] are written for the paper's
@@ -57,7 +57,7 @@ namespace qdk::chemistry::algorithms {
  * correction, and the factor 2 on the mu2 term is g = 2V. Applying Eqs. 6-7
  * literally instead lands wrong by exactly those terms.
  */
-struct SymmetryShift {
+struct SymmetryShiftCoeffs {
   double mu1 = 0.0;    ///< One-electron shift.
   double mu2 = 0.0;    ///< Two-electron shift.
   Eigen::MatrixXd xi;  ///< Two-electron shift matrix (norb x norb).
@@ -93,7 +93,7 @@ struct SymmetryShift {
  * auto shift = shifter->last_shift();  // optional, for inspection
  * @endcode
  *
- * @see SymmetryShift
+ * @see SymmetryShiftCoeffs
  * @see SymmetryShifterFactory for creating instances of symmetry shifters
  * @see data::FactorizedHamiltonianContainer::get_lambda to inspect a
  *      factorized Hamiltonian's fermionic 1-norm without running a shifter.
@@ -135,7 +135,7 @@ class SymmetryShifter
    * Implementations record (mu1, mu2, xi) as they apply it, so this costs
    * nothing beyond the run itself and cannot disagree with the Hamiltonian
    * run() returned. Reporting a shift is optional: an implementation whose
-   * shift is not expressible as a SymmetryShift leaves this empty.
+   * shift is not expressible as a SymmetryShiftCoeffs leaves this empty.
    *
    * @return The recorded shift, or std::nullopt if run() has not been called
    *         or the implementation does not report one.
@@ -143,7 +143,7 @@ class SymmetryShifter
    * @note Not synchronized. Concurrent run() calls on ONE shifter instance
    *       race on this slot; give each thread its own instance.
    */
-  std::optional<SymmetryShift> last_shift() const { return _last_shift; }
+  std::optional<SymmetryShiftCoeffs> last_shift() const { return _last_shift; }
 
   /**
    * @brief Access the algorithm's name.
@@ -163,7 +163,7 @@ class SymmetryShifter
   /**
    * @brief Record the shift that _run_impl() is applying, for last_shift().
    */
-  void _record_shift(SymmetryShift shift) const {
+  void _record_shift(SymmetryShiftCoeffs shift) const {
     _last_shift = std::move(shift);
   }
 
@@ -179,7 +179,7 @@ class SymmetryShifter
 
  private:
   /// Written by _record_shift() from the const _run_impl(); see last_shift().
-  mutable std::optional<SymmetryShift> _last_shift;
+  mutable std::optional<SymmetryShiftCoeffs> _last_shift;
 };
 
 /**

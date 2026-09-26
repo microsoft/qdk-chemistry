@@ -34,7 +34,7 @@
 // for the physical coefficient V = 1/2 g. The shift formulas below therefore
 // differ from Eqs. 6-7 by an extra -xi - mu2*I on the one-body tensor (the
 // normal-ordering correction) and by a factor 2 on the mu2 term (g = 2V).
-// Both deviations are deliberate; see the SymmetryShift doc in
+// Both deviations are deliberate; see the SymmetryShiftCoeffs doc in
 // algorithms/symmetry_shift.hpp for the full transcription.
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -66,29 +66,28 @@ inline std::pair<double, double> median_interval(
 struct FragmentAccumulation {
   /// The sizes are required so the matrices are well-formed even with no
   /// fragments to accumulate.
-  FragmentAccumulation(Eigen::Index norb, Eigen::Index num_ranks,
-                       Eigen::Index num_copies)
+  FragmentAccumulation(Eigen::Index norb, Eigen::Index num_ranks)
       : coulomb(Eigen::MatrixXd::Zero(norb, norb)),
         exchange(Eigen::MatrixXd::Zero(norb, norb)),
         xi(Eigen::MatrixXd::Zero(norb, norb)),
-        phi(Eigen::MatrixXd::Zero(num_ranks, num_copies)) {}
+        phi(Eigen::VectorXd::Zero(num_ranks)) {}
 
   /// coulomb_ij = sum_k g[i,j,k,k], taken from the factorization as
-  /// sum_rc tr(M^rc) M^rc -- never from a dense norb^4 tensor.
+  /// sum_r tr(M^r) M^r -- never from a dense norb^4 tensor.
   Eigen::MatrixXd coulomb;
-  /// exchange_ij = sum_k g[i,k,k,j] = sum_rc (M^rc M^rc)_ij.
+  /// exchange_ij = sum_k g[i,k,k,j] = sum_r (M^r M^r)_ij.
   Eigen::MatrixXd exchange;
 
   double mu2 = 0.0;    ///< Aggregated mu_2 (for H - K).
   Eigen::MatrixXd xi;  ///< Aggregated xi_ij (for H - K), norb x norb.
-  /// Per-fragment median shift phi^(opt), [num_ranks, num_copies], on the
-  /// BLISS scale eps = W / sqrt(2): shifted eigenvalues are W - sqrt(2)*phi.
-  Eigen::MatrixXd phi;
+  /// Per-fragment median shift phi^(opt), one per rank, on the BLISS scale
+  /// eps = W / sqrt(2): shifted eigenvalues are W - sqrt(2)*phi.
+  Eigen::VectorXd phi;
   double lambda_df_baseline = 0.0;  ///< Sum of pre-shift fragment 1-norms.
   double lambda_df_shifted = 0.0;   ///< Sum of post-shift fragment 1-norms.
 };
 
-/// Walk every (rank, copy) fragment of `container` ONCE, accumulating the
+/// Walk every rank's fragment of `container` ONCE, accumulating the
 /// mean-field contractions of g together with the per-fragment median shift
 /// (Eq. 27) aggregated into a global (mu2, xi) BLISS shift (Eq. 24, rotated
 /// back into the original orbital basis).
@@ -102,10 +101,11 @@ struct FragmentAccumulation {
 /// (mu2, xi) on the scale the rebuild expects. `U` is stored flattened [R,B,N]
 /// in ROW-major order, so row b of U^r is eigenvector b -- not column b.
 ///
-/// PRECONDITION: the aggregated (mu2, xi) are only meaningful when every U^r
-/// is a complete orthogonal rotation, since the -phi*N_hat step needs
-/// Sum_b u_b u_b^T = I. solve_fermionic_low_rank_shift() enforces this; a
-/// direct caller must check it too.
+/// PRECONDITIONS, both enforced by solve_fermionic_low_rank_shift() and both
+/// silently wrong if violated, so a direct caller must check them too:
+/// num_copies == 1, since W is read with the single-copy stride r*B + b; and
+/// every U^r a complete orthogonal rotation, since the -phi*N_hat step needs
+/// Sum_b u_b u_b^T = I.
 FragmentAccumulation accumulate_fragment_shifts(
     const qdk::chemistry::data::FactorizedHamiltonianContainer& container);
 
@@ -160,8 +160,8 @@ OneElectronShiftResult solve_one_electron_shift(
 /// mutually consistent when produced together on one particular
 /// factorization, so they travel as a single object.
 struct FermionicLowRankSolution {
-  SymmetryShift shift;
-  Eigen::MatrixXd phi;  ///< [num_ranks, num_copies]; zero for a zero shift.
+  SymmetryShiftCoeffs shift;
+  Eigen::VectorXd phi;  ///< One per rank; zero for a zero shift.
 };
 
 /// Compute the full fermionic low-rank BLISS solution for `hamiltonian` in the
@@ -182,8 +182,9 @@ struct FermionicLowRankSolution {
 ///         not reduce the fermionic 1-norm.
 /// @throws std::invalid_argument if `hamiltonian` is unrestricted, is not
 ///         backed by a FactorizedHamiltonianContainer, carries a nonzero
-///         identity weight wB, or whose rotations are not complete orthogonal
-///         rotations (see rebuild_shifted_factorized_hamiltonian).
+///         identity weight wB, has more than one copy per rank, or whose
+///         rotations are not complete orthogonal rotations (see
+///         rebuild_shifted_factorized_hamiltonian).
 FermionicLowRankSolution solve_fermionic_low_rank_shift(
     const qdk::chemistry::data::Hamiltonian& hamiltonian,
     unsigned int n_alpha_electrons, unsigned int n_beta_electrons);
@@ -196,14 +197,14 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
 ///   O_r^2 = (O_r - phi_r N)^2 + 2 phi_r N O_r - phi_r^2 N^2,
 /// whose trailing terms are exactly K. So the shift is absorbed exactly into
 /// the fragment eigenvalues and nothing is refactorized:
-///   U unchanged,  W~ = W - sqrt(2)*phi_rc,  wB = 0,
+///   U unchanged,  W~ = W - sqrt(2)*phi_r,  wB = 0,
 ///   h~ = h + (Ne-1)*xi - (mu1+mu2)*I,  E' = E_core + mu1*Ne + mu2*Ne^2.
 /// See the CONVENTION note at the top of this header for why h~ and the
 /// implied dg differ from Eqs. 6-7.
 ///
 /// NOT public: it is only correct when `solution` was produced by
 /// solve_fermionic_low_rank_shift() on `container` itself, and phi is not
-/// recoverable from a SymmetryShift alone.
+/// recoverable from a SymmetryShiftCoeffs alone.
 ///
 /// @param original The Hamiltonian being shifted; supplies everything but the
 ///        two-body integrals. Its inactive Fock matrix is carried over
@@ -253,9 +254,10 @@ class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  * SymmetryShifter::last_shift().
  *
  * PRECONDITIONS. The input must be restricted (spin-restricted) and backed by
- * a data::FactorizedHamiltonianContainer whose identity weight wB is zero and
- * whose rotations are complete orthogonal ones; anything else throws
- * std::invalid_argument. The output is backed by the same container type: the
+ * a data::FactorizedHamiltonianContainer whose identity weight wB is zero,
+ * which has one copy per rank, and whose rotations are complete orthogonal
+ * ones; anything else throws std::invalid_argument. The output is backed by
+ * the same container type: the
  * shift is absorbed into the fragment eigenvalues, so the result can be
  * block-encoded without being refactorized. Call get_two_body_integrals() for
  * dense ones.

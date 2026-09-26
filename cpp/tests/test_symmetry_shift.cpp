@@ -236,21 +236,18 @@ TEST_F(SymmetryShiftTest, Water_STO3G_OneNormRegression) {
   // Independent check of the sqrt(2) convention: the container stores the
   // eigenvalues W of fragments of g, while BLISS works with eps = W/sqrt(2)
   // drawn from V = 1/2 g. The baseline sum_a 1/2 (sum|eps|)^2 must therefore
-  // reproduce the two-body half of Eq. 17, 1/4 sum_rc (sum_b |W_b|)^2. Getting
+  // reproduce the two-body half of Eq. 17, 1/4 sum_r (sum_b |W_b|)^2. Getting
   // the scale wrong changes this by a factor of two.
   const auto& w = container.get_w_matrices();
   const size_t R = container.get_num_ranks();
   const size_t B = container.get_num_bases();
-  const size_t C = container.get_num_copies();
   double two_body_lambda = 0.0;
   for (size_t r = 0; r < R; ++r) {
-    for (size_t c = 0; c < C; ++c) {
-      double sum_abs_w = 0.0;
-      for (size_t b = 0; b < B; ++b) {
-        sum_abs_w += std::abs(w(r * B * C + b * C + c));
-      }
-      two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
+    double sum_abs_w = 0.0;
+    for (size_t b = 0; b < B; ++b) {
+      sum_abs_w += std::abs(w(r * B + b));
     }
+    two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
   }
   // Relative: lambda is extensive, so a fixed absolute bound would turn into
   // a size limit once the accumulation error grows with the system.
@@ -292,7 +289,7 @@ TEST_F(SymmetryShiftTest, ShiftedFactorizationReproducesDenseShiftedIntegrals) {
   ASSERT_TRUE(shifted->has_container_type<FactorizedHamiltonianContainer>());
 
   ASSERT_TRUE(shifter->last_shift().has_value());
-  const SymmetryShift shift = *shifter->last_shift();
+  const SymmetryShiftCoeffs shift = *shifter->last_shift();
 
   auto [h0, h0_beta] = factorized->get_one_body_integrals();
   (void)h0_beta;
@@ -352,18 +349,15 @@ TEST_F(SymmetryShiftTest, ShiftPreservesFactorizationStructure) {
   EXPECT_FALSE(after.get_w_matrices().isApprox(before.get_w_matrices(), 1e-12));
 
   // Within a fragment every eigenvalue shifts by the SAME amount, because the
-  // shift is -phi_rc * N_hat and N_hat is the fragment's own occupation sum.
+  // shift is -phi_r * N_hat and N_hat is the fragment's own occupation sum.
   const Eigen::VectorXd delta =
       after.get_w_matrices() - before.get_w_matrices();
   const size_t R = before.get_num_ranks();
   const size_t B = before.get_num_bases();
-  const size_t C = before.get_num_copies();
   for (size_t r = 0; r < R; ++r) {
-    for (size_t c = 0; c < C; ++c) {
-      const double reference = delta(r * B * C + c);
-      for (size_t b = 0; b < B; ++b) {
-        EXPECT_NEAR(delta(r * B * C + b * C + c), reference, 1e-12);
-      }
+    const double reference = delta(r * B);
+    for (size_t b = 0; b < B; ++b) {
+      EXPECT_NEAR(delta(r * B + b), reference, 1e-12);
     }
   }
 }
@@ -393,16 +387,13 @@ TEST_F(SymmetryShiftTest, Water_STO3G_ShiftedLambdaClosure) {
   const Eigen::VectorXd& w = after.get_w_matrices();
   const size_t R = after.get_num_ranks();
   const size_t B = after.get_num_bases();
-  const size_t C = after.get_num_copies();
   double two_body_lambda = 0.0;
   for (size_t r = 0; r < R; ++r) {
-    for (size_t c = 0; c < C; ++c) {
-      double sum_abs_w = 0.0;
-      for (size_t b = 0; b < B; ++b) {
-        sum_abs_w += std::abs(w(r * B * C + b * C + c));
-      }
-      two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
+    double sum_abs_w = 0.0;
+    for (size_t b = 0; b < B; ++b) {
+      sum_abs_w += std::abs(w(r * B + b));
     }
+    two_body_lambda += 0.25 * sum_abs_w * sum_abs_w;
   }
   EXPECT_NEAR(two_body_lambda, accumulation.lambda_df_shifted,
               1e-12 * accumulation.lambda_df_shifted);
@@ -500,14 +491,14 @@ TEST_F(SymmetryShiftTest, FallsBackToZeroShiftWhenLambdaWouldIncrease) {
       Eigen::MatrixXd::Zero(norb, norb), u, w, Eigen::MatrixXd::Zero(1, 1),
       std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
       Eigen::MatrixXd::Zero(0, 0));
-  auto hamiltonian = std::make_shared<qdk::chemistry::data::Hamiltonian>(
-      std::move(container));
+  auto hamiltonian =
+      std::make_shared<qdk::chemistry::data::Hamiltonian>(std::move(container));
 
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
   auto shifted = shifter->run(hamiltonian, 4, 4);
 
   ASSERT_TRUE(shifter->last_shift().has_value());
-  const SymmetryShift shift = *shifter->last_shift();
+  const SymmetryShiftCoeffs shift = *shifter->last_shift();
   EXPECT_EQ(shift.mu1, 0.0);
   EXPECT_EQ(shift.mu2, 0.0);
   EXPECT_EQ(shift.xi.cwiseAbs().maxCoeff(), 0.0);
@@ -519,12 +510,38 @@ TEST_F(SymmetryShiftTest, FallsBackToZeroShiftWhenLambdaWouldIncrease) {
 }
 
 /**
- * @brief The W array is strided [R,B,C], so a container with more than one
- * copy per rank is the only thing that exercises the `c` stride. Reading it
- * with the wrong stride would silently mix fragments together, which the
- * single-copy containers that double_factorization produces cannot detect.
+ * @brief A nonzero identity weight wB contributes to the Hamiltonian but is
+ * accounted for neither by the contractions nor by the rebuild, so it must be
+ * rejected rather than silently dropped.
  */
-TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreReadWithTheCorrectStride) {
+TEST_F(SymmetryShiftTest, NonzeroIdentityWeightIsRejected) {
+  constexpr Eigen::Index norb = 2;
+  constexpr Eigen::Index R = 1;
+
+  // A complete orthogonal rotation with one copy per rank, so wB is the only
+  // precondition this container violates.
+  Eigen::VectorXd u(R * norb * norb);
+  u << 1.0, 0.0, 0.0, 1.0;
+
+  auto container = std::make_unique<FactorizedHamiltonianContainer>(
+      Eigen::MatrixXd::Identity(norb, norb), u, Eigen::VectorXd::Ones(R * norb),
+      Eigen::MatrixXd::Ones(R, 1),
+      std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
+      Eigen::MatrixXd::Zero(0, 0));
+  auto hamiltonian =
+      std::make_shared<qdk::chemistry::data::Hamiltonian>(std::move(container));
+
+  EXPECT_THROW(SymmetryShifterFactory::create("fermionic_low_rank")
+                   ->run(hamiltonian, 1, 1),
+               std::invalid_argument);
+}
+
+/**
+ * @brief The implementation reads W with the single-copy stride and emits one
+ * phi per rank, so a multi-copy container must be rejected rather than
+ * silently read as if the copies were extra bases.
+ */
+TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreRejected) {
   constexpr Eigen::Index norb = 2;
   constexpr Eigen::Index R = 1;
   constexpr Eigen::Index C = 2;
@@ -532,7 +549,6 @@ TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreReadWithTheCorrectStride) {
   Eigen::VectorXd u(R * norb * norb);
   u << 1.0, 0.0, 0.0, 1.0;
 
-  // W[r,b,c] flattened as r*B*C + b*C + c: copy 0 is {1, 3}, copy 1 is {2, 8}.
   Eigen::VectorXd w(R * norb * C);
   w << 1.0, 2.0, 3.0, 8.0;
 
@@ -540,18 +556,12 @@ TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreReadWithTheCorrectStride) {
       Eigen::MatrixXd::Identity(norb, norb), u, w, Eigen::MatrixXd::Zero(R, C),
       std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb), 0.0,
       Eigen::MatrixXd::Zero(0, 0));
+  auto hamiltonian =
+      std::make_shared<qdk::chemistry::data::Hamiltonian>(std::move(container));
 
-  const auto accumulation = microsoft::accumulate_fragment_shifts(*container);
-
-  // 1/4 * ((1+3)^2 + (2+8)^2) = 29. Transposing the stride would read the
-  // copies as {1, 2} and {3, 8}, giving 1/4 * (9 + 121) = 32.5.
-  EXPECT_NEAR(accumulation.lambda_df_baseline, 29.0, 1e-12);
-
-  // Upper endpoint of each copy's median interval, on the eps = W/sqrt(2)
-  // scale. Transposing the stride would read copy 0 as {1, 2} and report
-  // 2/sqrt(2) here.
-  EXPECT_NEAR(accumulation.phi(0, 0), 3.0 / std::sqrt(2.0), 1e-12);
-  EXPECT_NEAR(accumulation.phi(0, 1), 8.0 / std::sqrt(2.0), 1e-12);
+  EXPECT_THROW(SymmetryShifterFactory::create("fermionic_low_rank")
+                   ->run(hamiltonian, 1, 1),
+               std::invalid_argument);
 }
 
 /**
@@ -578,29 +588,25 @@ TEST_F(SymmetryShiftTest, EvenBasisCountUsesTheMedianIntervalEndpoint) {
   const auto& w = container.get_w_matrices();
   const size_t R = container.get_num_ranks();
   const size_t B = container.get_num_bases();
-  const size_t C = container.get_num_copies();
   const double inv_sqrt2 = 1.0 / std::sqrt(2.0);
 
   double lambda_df_midpoint = 0.0;
   bool saw_real_interval = false;
   for (size_t r = 0; r < R; ++r) {
-    for (size_t c = 0; c < C; ++c) {
-      Eigen::VectorXd eps(B);
-      for (size_t b = 0; b < B; ++b) {
-        eps(b) = inv_sqrt2 * w(r * B * C + b * C + c);
-      }
-
-      const auto [lo, hi] = microsoft::median_interval(eps);
-      saw_real_interval = saw_real_interval || hi > lo;
-
-      const double phi = accumulation.phi(static_cast<Eigen::Index>(r),
-                                                static_cast<Eigen::Index>(c));
-      EXPECT_NEAR(phi, hi, 1e-12);
-      EXPECT_NEAR((eps.array() - phi).abs().minCoeff(), 0.0, 1e-12);
-
-      const double shifted = (eps.array() - 0.5 * (lo + hi)).abs().sum();
-      lambda_df_midpoint += 0.5 * shifted * shifted;
+    Eigen::VectorXd eps(B);
+    for (size_t b = 0; b < B; ++b) {
+      eps(b) = inv_sqrt2 * w(r * B + b);
     }
+
+    const auto [lo, hi] = microsoft::median_interval(eps);
+    saw_real_interval = saw_real_interval || hi > lo;
+
+    const double phi = accumulation.phi(static_cast<Eigen::Index>(r));
+    EXPECT_NEAR(phi, hi, 1e-12);
+    EXPECT_NEAR((eps.array() - phi).abs().minCoeff(), 0.0, 1e-12);
+
+    const double shifted = (eps.array() - 0.5 * (lo + hi)).abs().sum();
+    lambda_df_midpoint += 0.5 * shifted * shifted;
   }
   EXPECT_TRUE(saw_real_interval);
 
