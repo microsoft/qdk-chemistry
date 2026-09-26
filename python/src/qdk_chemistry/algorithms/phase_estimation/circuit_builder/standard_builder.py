@@ -17,6 +17,7 @@ from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import QpeCircuitBuilderSettings, StandardQpeCircuitBuilder
+from .unary_phase_estimation_builder import cosine_window_state
 
 __all__: list[str] = [
     "QdkStandardQpeCircuitBuilder",
@@ -38,6 +39,20 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "measurement-free, adjointable circuit, such as the preparation amplitude "
             "amplification reflects about.",
         )
+        self._set_default(
+            "phase_state",
+            "string",
+            "uniform",
+            "Phase-register state. 'uniform' prepares a Hadamard superposition. "
+            "'sine' prepares the Heisenberg-limited sine window state.",
+        )
+        self._set_default(
+            "compute_capacity",
+            "int",
+            -1,
+            "For memory compute layout, maximum number of compute qubits. "
+            "Set to -1 to keep all logical qubits in compute.",
+        )
 
 
 class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
@@ -54,6 +69,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_bits: int = -1,
         unitary_builder: AlgorithmRef | None = None,
         controlled_circuit_mapper: AlgorithmRef | None = None,
+        compute_capacity: int = -1,
     ):
         """Initialize the StandardQpeCircuitBuilder.
 
@@ -62,12 +78,14 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                         user needs to set a valid value.
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            compute_capacity: Number of compute qubits in memory compute layout; -1 disables placement.
 
         """
         Logger.trace_entering()
         super().__init__(num_bits=num_bits)
         self._settings = QdkStandardQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
+        self._settings.set("compute_capacity", compute_capacity)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if controlled_circuit_mapper is not None:
@@ -91,13 +109,17 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             A single-element list containing the standard QPE circuit.
 
         Raises:
-            ValueError: If ``num_bits`` is not a positive integer.
+            ValueError: If ``num_bits`` is not a positive integer, or if ``compute_capacity`` is not -1 or positive.
             RuntimeError: If the inputs do not carry Q# operations.
 
         """
         num_bits = self.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
+
+        compute_capacity = int(self._settings.get("compute_capacity"))
+        if compute_capacity == 0 or compute_capacity < -1:
+            raise ValueError(f"compute_capacity must be -1 or a positive integer. Got {compute_capacity}.")
 
         num_system_qubits = qubit_hamiltonian.num_qubits
 
@@ -148,7 +170,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         self._validate_state_prep_width(state_preparation, num_system_qubits)
-        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
+        phase_qubit_prep_op = self._phase_state_op(num_bits)
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         qpe_op = QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPEOp(
@@ -169,6 +191,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillaQubits": num_ancilla_qubits,
             "measurePhase": bool(self._settings.get("measure_phase")),
+            "computeCapacity": int(self._settings.get("compute_capacity")),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
@@ -177,6 +200,39 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             ),
             qsharp_op=qpe_op,
         )
+
+    def _phase_state_op(self, num_bits: int):
+        r"""Return the phase-register preparation for the configured window.
+
+        The ``uniform`` window is a Hadamard on every phase qubit. The ``sine`` window is
+        the Heisenberg-limited control state :math:`\psi_n \propto \sin(\pi(n+1)/(N+2))`
+        over the :math:`N+1 = 2^{\text{num\_bits}}` register slots, where
+        :math:`N = 2^{\text{num\_bits}} - 1` is the total number of controlled-unitary
+        applications. It attains the minimum Holevo variance
+        :math:`\tan^2(\pi/(N+2))` :cite:`Babbush2018,Berry2009`.
+
+        Args:
+            num_bits: Number of phase-register qubits.
+
+        Returns:
+            A Q# operation preparing the phase register.
+
+        Raises:
+            ValueError: If ``phase_state`` is not a recognized window name.
+
+        """
+        window = str(self._settings.get("phase_state"))
+        if window == "uniform":
+            return QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
+        if window == "sine":
+            params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
+                rowMap=list(range(num_bits - 1, -1, -1)),
+                stateVector=cosine_window_state((1 << num_bits) - 1),
+                expansionOps=[],
+                numQubits=num_bits,
+            )
+            return QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(params)
+        raise ValueError(f"phase_state must be 'uniform' or 'sine', got {window!r}.")
 
     def name(self) -> str:
         """Return the name of the builder algorithm."""

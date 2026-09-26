@@ -12,9 +12,13 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import qdk
-from qdk import TargetProfile
+from qdk import TargetProfile, qsharp
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 
 __all__ = [
     "QSHARP_UTILS",
@@ -37,6 +41,7 @@ _BASE_PROFILE_FILES = (
     "ControlledPauliExp.qs",
     "ControlledSwapPauliExp.qs",
     "HadamardTest.qs",
+    "HubbardPlaquette.qs",
     "PauliExp.qs",
     "MeasurementBasis.qs",
     "Select.qs",

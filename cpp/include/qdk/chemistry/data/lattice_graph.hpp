@@ -157,6 +157,16 @@ class LatticeGraph : public DataClass {
   std::uint64_t num_sites() const;
 
   /**
+   * @brief Return the dimensions the lattice was created with.
+   *
+   * chain() records {n} and the two-dimensional factories record {nx, ny}.
+   * A graph built from an adjacency matrix or edge map has no generating
+   * shape and returns an empty vector, since the shape cannot be recovered
+   * from connectivity alone.
+   */
+  const std::vector<std::uint64_t>& dims() const;
+
+  /**
    * @brief Return a const reference to the internal sparse adjacency matrix.
    */
   const Eigen::SparseMatrix<double>& sparse_adjacency_matrix() const;
@@ -523,7 +533,8 @@ class LatticeGraph : public DataClass {
    * @param coloring  Optional edge coloring (moved in).
    */
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                        std::optional<EdgeColoring> coloring = std::nullopt);
+                        std::optional<EdgeColoring> coloring = std::nullopt,
+                        std::vector<std::uint64_t> dims = {});
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
@@ -539,6 +550,8 @@ class LatticeGraph : public DataClass {
   bool _is_symmetric;
   /// Edge coloring, populated at construction for recognised topologies.
   std::optional<EdgeColoring> _edge_coloring;
+  /// dimensions the lattice was created with; empty when unknown.
+  std::vector<std::uint64_t> _dims;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,

@@ -215,6 +215,18 @@ Returns:
 )",
                     py::return_value_policy::reference_internal);
 
+  lattice_graph.def_property_readonly("dims", &LatticeGraph::dims, R"(
+Dimensions the lattice was generated from.
+
+``chain(n)`` records ``[n]`` and the two-dimensional factories record
+``[nx, ny]``. A graph built directly from an adjacency matrix or edge map has
+no generating shape and reports an empty list, since the shape cannot be
+recovered from connectivity alone.
+
+Returns:
+    list[int]: The generating extents, or an empty list when unknown.
+)");
+
   lattice_graph.def("weight", &LatticeGraph::weight, R"(
 Get the weight of the edge between sites i and j.
 
