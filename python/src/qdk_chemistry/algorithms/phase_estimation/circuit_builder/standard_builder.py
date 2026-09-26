@@ -46,6 +46,13 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Phase-register state. 'uniform' prepares a Hadamard superposition. "
             "'sine' prepares the Heisenberg-limited sine window state.",
         )
+        self._set_default(
+            "compute_capacity",
+            "int",
+            -1,
+            "For memory compute layout, maximum number of compute qubits. "
+            "Set to -1 to keep all logical qubits in compute.",
+        )
 
 
 class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
@@ -62,6 +69,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_bits: int = -1,
         unitary_builder: AlgorithmRef | None = None,
         controlled_circuit_mapper: AlgorithmRef | None = None,
+        compute_capacity: int = -1,
     ):
         """Initialize the StandardQpeCircuitBuilder.
 
@@ -70,12 +78,14 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                         user needs to set a valid value.
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            compute_capacity: Number of compute qubits in memory compute layout; -1 disables placement.
 
         """
         Logger.trace_entering()
         super().__init__(num_bits=num_bits)
         self._settings = QdkStandardQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
+        self._settings.set("compute_capacity", compute_capacity)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if controlled_circuit_mapper is not None:
@@ -99,13 +109,17 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             A single-element list containing the standard QPE circuit.
 
         Raises:
-            ValueError: If ``num_bits`` is not a positive integer.
+            ValueError: If ``num_bits`` is not a positive integer, or if ``compute_capacity`` is not -1 or positive.
             RuntimeError: If the inputs do not carry Q# operations.
 
         """
         num_bits = self.settings().get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
+
+        compute_capacity = int(self._settings.get("compute_capacity"))
+        if compute_capacity == 0 or compute_capacity < -1:
+            raise ValueError(f"compute_capacity must be -1 or a positive integer. Got {compute_capacity}.")
 
         num_system_qubits = qubit_hamiltonian.num_qubits
 
@@ -177,6 +191,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillaQubits": num_ancilla_qubits,
             "measurePhase": bool(self._settings.get("measure_phase")),
+            "computeCapacity": int(self._settings.get("compute_capacity")),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
