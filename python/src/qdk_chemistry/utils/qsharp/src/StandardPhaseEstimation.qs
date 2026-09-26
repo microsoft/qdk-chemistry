@@ -6,6 +6,9 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
+    import Std.Diagnostics.Fact;
+    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
+    import Std.ResourceEstimation.LeastRecentlyUsed;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
@@ -98,6 +101,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter).
     /// - `measurePhase`: Measure the ancilla qubits. When `false` nothing is measured.
+    /// - `computeCapacity`: Positive logical-qubit capacity to enable least-recently-used memory
+    ///   placement, or -1 to keep all logical qubits in compute.
     /// # Returns
     /// The measurement results of the ancilla qubits, or an empty array when `measurePhase` is `false`.
     operation MakeStandardQPECircuit(
@@ -109,7 +114,14 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
         measurePhase : Bool,
+        computeCapacity : Int,
     ) : Result[] {
+        Fact(computeCapacity == -1 or computeCapacity > 0, "computeCapacity must be -1 or positive");
+
+        if computeCapacity > 0 {
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
+
         let totalQubits = numBits + Length(systems) + numAncillaQubits;
         use qs = Qubit[totalQubits];
         RunStandardQPE(
