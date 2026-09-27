@@ -20,6 +20,10 @@ Acronym definitions
    BFGS
       Broyden-Fletcher-Goldfarb-Shanno quasi-Newton optimization algorithm.
 
+   BLISS
+      Block-Invariant Symmetry Shift.
+      A preprocessing technique that subtracts a number-symmetry operator from a second-quantized Hamiltonian to reduce its LCU 1-norm while preserving the energies of the target electron-number sector.
+
    BSE
       Basis Set Exchange, a repository of standardized quantum chemistry basis sets and effective core potentials.
 
