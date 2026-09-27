@@ -111,9 +111,9 @@ class Libint2Engine : public OneBodyIntegralEngine {
   }
 
  private:
-  libint2_util::BasisView obs_;   ///< View of the shared Libint2 basis set
-  libint2_util::Engine engine_;   ///< Libint2 integral engine for computation
-  BasisMode basis_mode_;          ///< Spherical vs Cartesian basis mode
+  libint2_util::BasisView obs_;  ///< View of the shared Libint2 basis set
+  libint2_util::Engine engine_;  ///< Libint2 integral engine for computation
+  BasisMode basis_mode_;         ///< Spherical vs Cartesian basis mode
 };
 
 /**

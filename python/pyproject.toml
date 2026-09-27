@@ -85,7 +85,8 @@ docs = [
   "sphinx",
   "sphinx-rtd-theme",
   "myst-parser",
-  "breathe",
+  # 5.0.0 duplicates constexpr on constructors (breathe-doc/breathe#1082).
+  "breathe!=5.0.0",
   "sphinx-autodoc-typehints",
   "sphinx-inline-tabs",
   "sphinxcontrib-napoleon",

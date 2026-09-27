@@ -82,7 +82,7 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
       ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
-      QDK_CHEMISTRY_UNITY_BUILD: 'ON'
+      QDK_CHEMISTRY_UNITY_BUILD: ON
     steps:
     - name: Free up disk space (Linux)
       if: matrix.os-name == 'Linux'
