@@ -32,7 +32,23 @@ A shifter chooses :math:`(\mu_1, \mu_2, \xi)` to minimize :math:`\lambda` of :ma
 Fermionic low-rank BLISS
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The fermionic low-rank method :cite:`Patel2024` solves for the shift directly on a *double-factorized* Hamiltonian, where the two-electron operator is a sum of squares of one-body fragments, each defined by an orbital rotation :math:`U^{(r)}` and its eigenvalues.
+The fermionic low-rank method :cite:`Patel2024` takes an already *double-factorized* Hamiltonian as its input,
+
+.. math::
+
+   H = \sum_{ij} h_{ij} \hat E_{ij}
+       + \frac{1}{2} \sum_r \Big( \sum_{ij} M^{(r)}_{ij} \hat E_{ij} \Big)^2
+       + \dots,
+   \qquad
+   M^{(r)}_{ij} = \sum_b W^{(r)}_b\, U^{(r)}_{bi} U^{(r)}_{bj},
+
+where each fragment :math:`r` is fixed by an orbital rotation :math:`U^{(r)}` and its eigenvalues :math:`W^{(r)}`.
+Producing that form is the job of the separate ``double_factorization`` algorithm, not of BLISS.
+
+.. note::
+   The square carries a factor of :math:`\tfrac{1}{2}`, since QDK/Chemistry factorizes the raw tensor :math:`g` while :cite:`Patel2024` works with :math:`V = \tfrac{1}{2} g`.
+   The shift is therefore computed from the rescaled eigenvalues :math:`\varepsilon^{(r)}_b = W^{(r)}_b / \sqrt{2}` and reported on the raw-:math:`g` scale, which gives the :math:`\mu_2` term below an extra factor of two relative to Eqs. 6-7 of :cite:`Patel2024`; the remaining difference, :math:`-\xi - \mu_2 I` on the one-body tensor, is the normal-ordering correction.
+
 The fermionic 1-norm splits into a one-electron and a fragment contribution, :math:`\lambda = \lambda_{1e} + \lambda_{\mathrm{DF}}`, and both are minimized in closed form:
 
 #. **Per-fragment shift.** Shifting fragment :math:`r` by :math:`\phi_r` moves all its eigenvalues by a constant, so the minimizer of its contribution to :math:`\lambda_{\mathrm{DF}}` is the *median* of the fragment's eigenvalues.
@@ -50,12 +66,6 @@ Because the shift is built from per-fragment medians, it is absorbed exactly int
    E'_{\mathrm{core}} &= E_{\mathrm{core}} + \mu_1 N_e + \mu_2 N_e^2 .
 
 No dense :math:`n_{\mathrm{orb}}^4` tensor is ever formed, and the output is again a factorized Hamiltonian that can be block-encoded without re-factorization.
-
-.. note::
-   These expressions are written for QDK/Chemistry's normal-ordered Hamiltonian,
-   :math:`H = \sum_{ij} h_{ij} \hat E_{ij} + \tfrac{1}{2} \sum_{ijkl} g_{ijkl} (\hat E_{ij}\hat E_{kl} - \delta_{jk}\hat E_{il})`,
-   with the raw tensor :math:`g`.
-   They differ from Eqs. 6-7 of :cite:`Patel2024` by the normal-ordering correction :math:`-\xi - \mu_2 I` on the one-body tensor and by a factor of two on the :math:`\mu_2` term, since the paper uses :math:`V = \tfrac{1}{2} g`.
 
 .. note::
    The one- and two-electron norms are minimized sequentially, not jointly, so the total 1-norm is not guaranteed to decrease.
@@ -105,6 +115,8 @@ The fermionic low-rank shifter has no tunable settings: truncation and the choic
       :end-before: // end-cell-create
 
 .. rubric:: Preparing a factorized Hamiltonian
+
+Double factorization is not part of the shift; this step only produces an input of the form the shifter accepts.
 
 .. tab:: Python API
 
