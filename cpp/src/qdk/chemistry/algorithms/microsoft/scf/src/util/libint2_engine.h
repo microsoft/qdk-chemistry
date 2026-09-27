@@ -89,6 +89,11 @@ class Engine {
    * @throws std::logic_error if other is uninitialized or moved from
    */
   Engine(const Engine& other);
+  /**
+   * @brief Transfer engine storage and already-computed results without
+   * copying.
+   * @param other Source engine, left with empty results and assignable state
+   */
   Engine(Engine&& other) noexcept;
   /**
    * @brief Copy configuration, reusing the destination's native storage.
@@ -100,6 +105,12 @@ class Engine {
    * be assigned again. Assignment into a moved-from destination is supported.
    */
   Engine& operator=(const Engine& other);
+  /**
+   * @brief Replace engine storage and results with those of the source.
+   * @param other Source engine, left with empty results unless self-assigned
+   * @return Reference to this engine
+   * @note Self-move assignment leaves the engine and its results unchanged.
+   */
   Engine& operator=(Engine&& other) noexcept;
   ~Engine();
 

@@ -10,5 +10,6 @@ namespace libint2 {
 class BasisSet;
 class Engine;
 struct Shell;
+struct ShellPair;
 
 }  // namespace libint2

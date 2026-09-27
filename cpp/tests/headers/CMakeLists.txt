@@ -100,7 +100,7 @@ qdk_check_header(qdk/chemistry/scf/fwd.h
 )
 
 qdk_check_header(qdk/chemistry/scf/util/libint2_fwd.h
-    FORWARD_TYPES libint2::BasisSet libint2::Engine libint2::Shell
+    FORWARD_TYPES libint2::BasisSet libint2::Engine libint2::Shell libint2::ShellPair
     DEFINITIONS libint2/basis.h libint2/shell.h
 )
 

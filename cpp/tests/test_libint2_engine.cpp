@@ -43,6 +43,49 @@ TEST(Libint2EngineTest, CopiesOwnTheirBuffersAndMovesRetainResults) {
   EXPECT_NEAR(copy_results[0][0], std::exp(-0.5), 1e-14);
 }
 
+TEST(Libint2EngineTest, MoveConstructionTransfersResultsAndClearsSource) {
+  const libint2::Shell shell({1.0}, {{0, true, {1.0}}}, {{0.0, 0.0, 0.0}});
+  integrals::Engine source(integrals::Operator::overlap, 1, 0);
+  const auto& source_results = source.results();
+  source.compute1(shell, shell);
+  const auto* buffer = source_results[0];
+  {
+    integrals::Engine destination(std::move(source));
+    ASSERT_EQ(destination.results().size(), 1);
+    EXPECT_EQ(destination.results()[0], buffer);
+    EXPECT_NEAR(destination.results()[0][0], 1.0, 1e-14);
+    EXPECT_TRUE(source_results.empty());
+  }
+  EXPECT_TRUE(source_results.empty());
+}
+
+TEST(Libint2EngineTest, MoveAssignmentTransfersResultsAndClearsSource) {
+  const libint2::Shell shell({1.0}, {{0, true, {1.0}}}, {{0.0, 0.0, 0.0}});
+  integrals::Engine source(integrals::Operator::overlap, 1, 0);
+  integrals::Engine destination(integrals::Operator::kinetic, 1, 0);
+  const auto& source_results = source.results();
+  const auto& destination_results = destination.results();
+  source.compute1(shell, shell);
+  destination.compute1(shell, shell);
+  const auto* buffer = source_results[0];
+
+  destination = std::move(source);
+  ASSERT_EQ(destination_results.size(), 1);
+  EXPECT_EQ(destination_results[0], buffer);
+  EXPECT_NEAR(destination_results[0][0], 1.0, 1e-14);
+  EXPECT_TRUE(source_results.empty());
+
+  auto& self = destination;
+  destination = std::move(self);
+  ASSERT_EQ(destination_results.size(), 1);
+  EXPECT_EQ(destination_results[0], buffer);
+  EXPECT_NEAR(destination_results[0][0], 1.0, 1e-14);
+
+  destination = std::move(source);
+  EXPECT_TRUE(destination_results.empty());
+  EXPECT_TRUE(source_results.empty());
+}
+
 TEST(Libint2EngineTest, CoulombAndRangeSeparatedKernelsMatchAnalyticIntegrals) {
   const libint2::Shell shell({1.0}, {{0, true, {1.0}}}, {{0.0, 0.0, 0.0}});
   integrals::Engine coulomb(integrals::Operator::coulomb, 1, 0);

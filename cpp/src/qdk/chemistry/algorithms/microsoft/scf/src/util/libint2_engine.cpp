@@ -4,11 +4,13 @@
 
 #include "util/libint2_engine.h"
 
+#include <libint2/basis.h>
 #include <libint2/engine.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <utility>
 
 namespace qdk::chemistry::scf::libint2_util {
 
@@ -97,7 +99,9 @@ Engine::Engine(Operator op, size_t max_nprim, int max_l, int deriv_order,
 
 Engine::Engine(const Engine& other) { *this = other; }
 
-Engine::Engine(Engine&& other) noexcept = default;
+Engine::Engine(Engine&& other) noexcept
+    : engine_(std::move(other.engine_)),
+      results_(std::exchange(other.results_, {})) {}
 
 Engine& Engine::operator=(const Engine& other) {
   if (this != &other) {
@@ -115,7 +119,13 @@ Engine& Engine::operator=(const Engine& other) {
   return *this;
 }
 
-Engine& Engine::operator=(Engine&& other) noexcept = default;
+Engine& Engine::operator=(Engine&& other) noexcept {
+  if (this != &other) {
+    engine_ = std::move(other.engine_);
+    results_ = std::exchange(other.results_, {});
+  }
+  return *this;
+}
 
 Engine::~Engine() = default;
 

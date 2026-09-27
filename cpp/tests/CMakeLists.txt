@@ -94,7 +94,7 @@ function(add_gtest_executable test_source)
     # Set properties for better organization
     set_target_properties(${test_name} PROPERTIES
         FOLDER "Tests"
-        CXX_STANDARD 17
+        CXX_STANDARD 20
         CXX_STANDARD_REQUIRED ON
     )
 endfunction()
