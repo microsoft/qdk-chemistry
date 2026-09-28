@@ -124,6 +124,10 @@ pauli_couplings = {1: 1.0 / 4.0, 2: 0.5 / 4.0}
 qubit_hamiltonian = create_heisenberg_hamiltonian(
     lattice, jx=pauli_couplings, jy=pauli_couplings, jz=pauli_couplings
 )
+
+print(f"J1-J2 Heisenberg Hamiltonian ({lattice.num_sites} qubits):")
+print(f"  Number of Pauli terms: {len(qubit_hamiltonian.pauli_strings)}")
+print(f"  Is Hermitian: {qubit_hamiltonian.is_hermitian()}")
 # end-cell-create-heisenberg-shells
 ################################################################################
 
