@@ -565,6 +565,46 @@ TEST_F(SymmetryShiftTest, MultipleCopiesPerRankAreRejected) {
 }
 
 /**
+ * @brief The one-electron solve diagonalizes with LAPACK syev, which reads a
+ * single triangle. HamiltonianType is a declared label that no container
+ * verifies, so both a NonHermitian declaration and a nonsymmetric one-body
+ * matrix under a Hermitian declaration must be rejected.
+ */
+TEST_F(SymmetryShiftTest, NonHermitianOneBodyMatrixIsRejected) {
+  constexpr Eigen::Index norb = 2;
+  constexpr Eigen::Index R = 1;
+
+  Eigen::VectorXd u(R * norb * norb);
+  u << 1.0, 0.0, 0.0, 1.0;
+
+  const auto make_hamiltonian =
+      [&](const Eigen::MatrixXd& h,
+          qdk::chemistry::data::HamiltonianType type) {
+        return std::make_shared<qdk::chemistry::data::Hamiltonian>(
+            std::make_unique<FactorizedHamiltonianContainer>(
+                h, u, Eigen::VectorXd::Ones(R * norb),
+                Eigen::MatrixXd::Zero(R, 1),
+                std::make_shared<qdk::chemistry::data::ModelOrbitals>(norb),
+                0.0, Eigen::MatrixXd::Zero(0, 0), type));
+      };
+
+  auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
+
+  auto declared_non_hermitian =
+      make_hamiltonian(Eigen::MatrixXd::Identity(norb, norb),
+                       qdk::chemistry::data::HamiltonianType::NonHermitian);
+  EXPECT_THROW(shifter->run(declared_non_hermitian, 1, 1),
+               std::invalid_argument);
+
+  Eigen::MatrixXd nonsymmetric(norb, norb);
+  nonsymmetric << 1.0, 0.5, -0.5, 1.0;
+  auto mislabelled = make_hamiltonian(
+      nonsymmetric, qdk::chemistry::data::HamiltonianType::Hermitian);
+  ASSERT_TRUE(mislabelled->is_hermitian());
+  EXPECT_THROW(shifter->run(mislabelled, 1, 1), std::invalid_argument);
+}
+
+/**
  * @brief For an even number of bases the Eq. 27 objective is flat across the
  * whole median interval. phi takes the upper endpoint, which is an actual
  * eps_i -- that is what drops a unitary from the one-electron LCU -- and,

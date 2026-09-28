@@ -232,6 +232,14 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
         "(spin-restricted) Hamiltonians.");
   }
 
+  // The one-electron solve diagonalizes with LAPACK syev, which reads a single
+  // triangle, and the reported 1-norms are sums of absolute eigenvalues.
+  if (!hamiltonian.is_hermitian()) {
+    throw std::invalid_argument(
+        "solve_fermionic_low_rank_shift requires a Hermitian Hamiltonian "
+        "(HamiltonianType::Hermitian).");
+  }
+
   if (!hamiltonian.has_container_type<
           qdk::chemistry::data::FactorizedHamiltonianContainer>()) {
     throw std::invalid_argument(
@@ -276,6 +284,15 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
 
   auto [h_alpha, h_beta] = hamiltonian.get_one_body_integrals();
   (void)h_beta;
+
+  // HamiltonianType is a declared label, never a measured property, so check
+  // the matrix that actually reaches syev.
+  if (!h_alpha.isApprox(h_alpha.transpose())) {
+    throw std::invalid_argument(
+        "solve_fermionic_low_rank_shift requires a symmetric one-body matrix; "
+        "the Hamiltonian is labelled Hermitian but its one-body integrals are "
+        "not.");
+  }
 
   const size_t norb = static_cast<size_t>(h_alpha.rows());
   QDK_LOGGER().debug(

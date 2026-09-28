@@ -224,7 +224,8 @@ fragments of an already double-factorized Hamiltonian each receive the
 closed-form median shift, and the one-electron shift is optimized against the
 resulting effective one-electron operator.
 
-The input must be restricted (spin-restricted) and backed by a
+The input must be restricted (spin-restricted), Hermitian with a symmetric
+one-body matrix, and backed by a
 ``FactorizedHamiltonianContainer`` whose identity weight is zero and whose
 rotations are complete orthogonal ones; anything else raises ``ValueError``.
 The output is backed by the same container type: the shift is absorbed into

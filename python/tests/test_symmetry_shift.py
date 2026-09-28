@@ -79,7 +79,7 @@ class TestSymmetryShifterFactory:
 
     def test_rejects_non_factorized_hamiltonian(self, water_hamiltonian):
         shifter = algorithms.create("symmetry_shifter", "fermionic_low_rank")
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="already double-factorized"):
             shifter.run(water_hamiltonian, 5, 5)
 
 
@@ -147,7 +147,5 @@ class TestSymmetryShifterCorrectness:
         # in: h~ = h + (Ne-1)*xi - (mu1+mu2)*I.
         h_before = water_factorized.get_one_body_integrals()[0]
         h_after = shifted.get_one_body_integrals()[0]
-        h_expected = h_before + 9.0 * shift.xi - (shift.mu1 + shift.mu2) * np.eye(
-            h_before.shape[0]
-        )
+        h_expected = h_before + 9.0 * shift.xi - (shift.mu1 + shift.mu2) * np.eye(h_before.shape[0])
         assert np.allclose(h_after, h_expected, rtol=0, atol=1e-12)

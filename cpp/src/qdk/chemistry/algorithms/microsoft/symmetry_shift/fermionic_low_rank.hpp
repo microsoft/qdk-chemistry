@@ -174,13 +174,15 @@ struct FermionicLowRankSolution {
 /// guaranteed to decrease; if it would increase, a zero shift (and a zero phi)
 /// is returned with a warning, leaving the Hamiltonian unchanged.
 ///
-/// @param hamiltonian The Hamiltonian to analyze. Must be restricted and
-///        backed by a data::FactorizedHamiltonianContainer.
+/// @param hamiltonian The Hamiltonian to analyze. Must be restricted,
+///        Hermitian with a symmetric one-body matrix, and backed by a
+///        data::FactorizedHamiltonianContainer.
 /// @param n_alpha_electrons Target number of alpha electrons.
 /// @param n_beta_electrons Target number of beta electrons.
 /// @return The computed solution, or a zero shift if the computed one would
 ///         not reduce the fermionic 1-norm.
 /// @throws std::invalid_argument if `hamiltonian` is unrestricted, is not
+///         Hermitian or carries a nonsymmetric one-body matrix, is not
 ///         backed by a FactorizedHamiltonianContainer, carries a nonzero
 ///         identity weight wB, has more than one copy per rank, or whose
 ///         rotations are not complete orthogonal rotations (see
@@ -253,7 +255,8 @@ class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  * effective one-electron operator. The shift that was applied is reported by
  * SymmetryShifter::last_shift().
  *
- * PRECONDITIONS. The input must be restricted (spin-restricted) and backed by
+ * PRECONDITIONS. The input must be restricted (spin-restricted), Hermitian
+ * with a symmetric one-body matrix, and backed by
  * a data::FactorizedHamiltonianContainer whose identity weight wB is zero,
  * which has one copy per rank, and whose rotations are complete orthogonal
  * ones; anything else throws std::invalid_argument. The output is backed by
