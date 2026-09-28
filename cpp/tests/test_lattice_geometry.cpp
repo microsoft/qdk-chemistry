@@ -270,12 +270,45 @@ TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
                                                          {-2.0, 0.0}};
   EXPECT_THROW(LatticeGeometry::from_json(dependent), std::invalid_argument);
   for (const auto& layout : std::vector<nlohmann::json>{
-           nlohmann::json::array(), {{"positions", {{0.0, 0.0}}}}}) {
+           {{"version", json.at("version")}},
+           {{"version", json.at("version")}, {"positions", {{0.0, 0.0}}}}}) {
     EXPECT_THROW(LatticeGeometry::from_json(layout), std::invalid_argument);
   }
   auto text = json;
   text["integer_embedding"]["site_by_coordinate"][0] = "text";
   EXPECT_THROW(LatticeGeometry::from_json(text), nlohmann::json::type_error);
+}
+
+TEST_F(LatticeGeometryTest, SerializationRequiresCompatibleVersion) {
+  const auto geometry = LatticeGeometry::square(2, 2, true, false);
+  const auto json = geometry.to_json();
+  ASSERT_TRUE(json.at("version").is_string());
+  auto unversioned = json;
+  unversioned.erase("version");
+  auto incompatible = json;
+  incompatible["version"] = "99.0.0";
+  for (const auto& invalid : std::vector<nlohmann::json>{
+           nlohmann::json::array(), unversioned, incompatible}) {
+    EXPECT_THROW(LatticeGeometry::from_json(invalid), std::runtime_error);
+  }
+
+  const std::string filename = "test_version.lattice_geometry.h5";
+  for (const std::string version : {"", "99.0.0"}) {
+    SCOPED_TRACE(version);
+    geometry.to_hdf5_file(filename);
+    {
+      H5::H5File file(filename, H5F_ACC_RDWR);
+      auto root = file.openGroup("/");
+      root.removeAttr("version");
+      if (!version.empty()) {
+        const H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+        root.createAttribute("version", string_type, H5::DataSpace(H5S_SCALAR))
+            .write(string_type, version);
+      }
+    }
+    EXPECT_THROW(LatticeGeometry::from_hdf5_file(filename), std::runtime_error);
+    std::filesystem::remove(filename);
+  }
 }
 
 TEST_F(LatticeGeometryTest, Hdf5RejectsInvalidLayout) {

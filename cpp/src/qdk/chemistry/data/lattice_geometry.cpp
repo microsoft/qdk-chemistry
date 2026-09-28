@@ -420,6 +420,7 @@ void LatticeGeometry::to_file(const std::string& filename,
 nlohmann::json LatticeGeometry::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
+  j["version"] = SERIALIZATION_VERSION;
   j["integer_embedding"] = {
       {"nx", _embedding.nx},
       {"ny", _embedding.ny},
@@ -446,6 +447,9 @@ void LatticeGeometry::to_json_file(const std::string& filename) const {
 void LatticeGeometry::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    group.createAttribute("version", string_type, H5::DataSpace(H5S_SCALAR))
+        .write(string_type, std::string(SERIALIZATION_VERSION));
     auto layout = group.createGroup("integer_embedding");
     save_stl_to_group(
         layout, "shape",
@@ -483,7 +487,12 @@ LatticeGeometry LatticeGeometry::from_file(const std::string& filename,
 
 LatticeGeometry LatticeGeometry::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
-  if (!j.is_object() || !j.contains("integer_embedding") ||
+  if (!j.contains("version")) {
+    throw std::runtime_error("Invalid JSON: missing version field");
+  }
+  validate_serialization_version(SERIALIZATION_VERSION,
+                                 j.at("version").get<std::string>());
+  if (!j.contains("integer_embedding") ||
       !j.at("integer_embedding").is_object()) {
     throw std::invalid_argument("Invalid lattice integer embedding.");
   }
@@ -542,6 +551,14 @@ LatticeGeometry LatticeGeometry::from_hdf5(H5::Group& group) {
       }
       return load_std_vector_from_group<int>(source, name);
     };
+    if (!group.attrExists("version")) {
+      throw std::runtime_error(
+          "HDF5 group missing required 'version' attribute");
+    }
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    std::string version;
+    group.openAttribute("version").read(string_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
     if (!group.nameExists("integer_embedding")) {
       throw std::invalid_argument("Invalid lattice integer embedding.");
     }

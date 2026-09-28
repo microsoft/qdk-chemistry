@@ -132,6 +132,9 @@ class LatticeGeometry : public DataClass {
  private:
   friend class LatticeGraph;
 
+  /// Serialization version
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
   /** @brief One bond of a distance shell, with its canonical unoriented axis.
    */
   struct ShellBond {

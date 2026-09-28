@@ -21,10 +21,18 @@
 #include <type_traits>
 #include <vector>
 
+#include "json_serialization.hpp"
+
 namespace qdk::chemistry::data {
 
 namespace detail {
 using Triplet = Eigen::Triplet<double>;
+
+// Graph files written before serialization versioning have no version.
+constexpr const char* kUnversionedGraphMessage =
+    "LatticeGraph data has no serialization version. If this file was written "
+    "by an older qdk-chemistry release, migrate it with: python -m "
+    "qdk_chemistry.migrate <old_file> <new_file>.";
 
 static EdgeColoring color_edges(
     std::uint64_t num_sites,
@@ -961,6 +969,7 @@ nlohmann::json LatticeGraph::to_json() const {
   }
 
   nlohmann::json j;
+  j["version"] = SERIALIZATION_VERSION;
   j["num_sites"] = _num_sites;
   j["is_symmetric"] = _is_symmetric;
   j["adjacency_sparse"] = edges;
@@ -1004,6 +1013,10 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
 
   try {
     H5::DataSpace scalar_space(H5S_SCALAR);
+
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    group.createAttribute("version", string_type, scalar_space)
+        .write(string_type, std::string(SERIALIZATION_VERSION));
 
     // Store num_sites as attribute on the group
     H5::Attribute sites_attr = group.createAttribute(
@@ -1126,6 +1139,11 @@ LatticeGraph LatticeGraph::from_json_file(const std::string& filename) {
 LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
 
+  if (!j.contains("version")) {
+    throw std::runtime_error(detail::kUnversionedGraphMessage);
+  }
+  validate_serialization_version(SERIALIZATION_VERSION,
+                                 j.at("version").get<std::string>());
   if (!j.is_object() || !j.contains("num_sites")) {
     throw std::runtime_error("JSON missing required 'num_sites' field");
   }
@@ -1233,6 +1251,13 @@ LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
 LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
+    if (!group.attrExists("version")) {
+      throw std::runtime_error(detail::kUnversionedGraphMessage);
+    }
+    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+    std::string version;
+    group.openAttribute("version").read(string_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
     // Row-major datasets with the fixed column count written by to_hdf5.
     const auto read_rows = [&](const std::string& name, hsize_t columns) {
       const auto dataset = group.openDataSet(name);

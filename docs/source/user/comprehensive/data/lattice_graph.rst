@@ -389,6 +389,7 @@ The :class:`~qdk_chemistry.data.LatticeGraph` class supports serialization to an
 Files store the sparse adjacency and any stored edge colors; labelled graphs also store one ``[i, j, shell, flavor]`` row per edge.
 Adjacency-only files retain their topology without inferring edge labels.
 To use such a lattice in a shell- or flavor-dependent model, construct a labelled graph with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
+Files record their serialization ``version``; convert files written before lattice graphs were versioned with the :doc:`migration tool <../../migrating-data-files>`.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation.
 
 .. note::

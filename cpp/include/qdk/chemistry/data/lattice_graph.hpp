@@ -573,6 +573,9 @@ class LatticeGraph : public DataClass {
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
+  /// Serialization version
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
   /**
    * @brief Private constructor from a sparse adjacency matrix.
    *

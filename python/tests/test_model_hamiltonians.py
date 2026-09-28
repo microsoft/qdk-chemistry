@@ -974,9 +974,7 @@ class TestModelHamiltonians:
         _assert_commuting_disjoint_partition(actual)
 
     def test_legacy_adjacency_requires_explicit_kitaev_selection(self) -> None:
-        graph = LatticeGraph.from_json(
-            '{"num_sites": 2, "is_symmetric": true, "adjacency_sparse": [[0, 1, 1.0], [1, 0, 1.0]]}'
-        )
+        graph = LatticeGraph.from_dense_matrix(np.array([[0.0, 1.0], [1.0, 0.0]]))
         with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 4.0)
 

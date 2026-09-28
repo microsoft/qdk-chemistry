@@ -384,6 +384,38 @@ TEST_F(LatticeGraphTest, Hdf5RejectsMalformedEdgeLabels) {
   replace("edge_labels", H5::PredType::NATIVE_DOUBLE, {2, 4}, duplicate);
 }
 
+TEST_F(LatticeGraphTest, SerializationRequiresCompatibleVersion) {
+  const auto graph = LatticeGraph::chain(3);
+  const auto json = graph.to_json();
+  ASSERT_TRUE(json.at("version").is_string());
+  // Unversioned files predate graph versioning and must be migrated first.
+  auto unversioned = json;
+  unversioned.erase("version");
+  auto incompatible = json;
+  incompatible["version"] = "99.0.0";
+  for (const auto& invalid : {unversioned, incompatible}) {
+    EXPECT_THROW(LatticeGraph::from_json(invalid), std::runtime_error);
+  }
+
+  const std::string filename = "test_version.lattice_graph.h5";
+  for (const std::string version : {"", "99.0.0"}) {
+    SCOPED_TRACE(version);
+    graph.to_hdf5_file(filename);
+    {
+      H5::H5File file(filename, H5F_ACC_RDWR);
+      auto root = file.openGroup("/");
+      root.removeAttr("version");
+      if (!version.empty()) {
+        const H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
+        root.createAttribute("version", string_type, H5::DataSpace(H5S_SCALAR))
+            .write(string_type, version);
+      }
+    }
+    EXPECT_THROW(LatticeGraph::from_hdf5_file(filename), std::runtime_error);
+    std::filesystem::remove(filename);
+  }
+}
+
 TEST_F(LatticeGraphTest, FromGeometrySelectsShellsAndWeights) {
   const auto geometry = LatticeGeometry::chain(4);
   const auto graph = LatticeGraph::from_geometry(

@@ -31,6 +31,9 @@ if TYPE_CHECKING:
 
     import h5py
 
+    import qdk_chemistry.data.enums.fermion_mode_order
+    import qdk_chemistry.data.term_partition
+
 __all__ = ["SparsePauliDecompositionContainer", "SparsePauliTerms"]
 
 
@@ -110,7 +113,8 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
     """Pauli decomposition that stores each term as its non-identity factors.
 
     Storage, hashing, serialization and operations with this container on the left scale with
-    the number of non-identity factors rather than the register width. :attr:`pauli_strings`
+    the number of non-identity factors rather than the register width.
+    :attr:`~qdk_chemistry.data.qubit_operator.containers.pauli_decomposition.PauliDecompositionContainer.pauli_strings`
     is a lazy :class:`SparsePauliTerms` view: indexing or iterating it
     builds full-width labels, which :meth:`iter_sparse_terms` avoids. A dense left operand
     uses the dense implementation and returns dense storage. Coefficients are copied and
@@ -137,8 +141,8 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         pauli_strings: SparsePauliTerms,
         coefficients: np.ndarray,
         encoding: str | None = None,
-        fermion_mode_order: FermionModeOrder | str | None = None,
-        term_partition: TermPartition | None = None,
+        fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
+        term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> None:
         """Initialize from sparse terms and one coefficient per term.
@@ -183,8 +187,8 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         coefficients: np.ndarray,
         *,
         encoding: str | None = None,
-        fermion_mode_order: FermionModeOrder | str | None = None,
-        term_partition: TermPartition | None = None,
+        fermion_mode_order: qdk_chemistry.data.enums.fermion_mode_order.FermionModeOrder | str | None = None,
+        term_partition: qdk_chemistry.data.term_partition.TermPartition | None = None,
         tapering: TaperingSpecification | None = None,
     ) -> SparsePauliDecompositionContainer:
         """Construct from mappings or iterables of ``(qubit, X/Y/Z)`` pairs.
