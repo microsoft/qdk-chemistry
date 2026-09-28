@@ -22,7 +22,7 @@ from qdk_chemistry.data import (
 )
 
 #: Container type emitted by the ``sossa`` hamiltonian unitary builder.
-SOSSA_BLOCK_ENCODING_CONTAINER_TYPE = "sossa_block_encoding"
+SOSSA_WALK_CONTAINER_TYPE = "sossa_walk"
 
 #: The only QPE circuit builder that accepts a SOSSA walk. Iterative and standard QPE
 #: drive a walk through a ``controlled_circuit_mapper``, and no controlled SOSSA mapper
@@ -49,40 +49,34 @@ def heisenberg_queries(lambda_effective: float, target_precision: float) -> int:
     )
 
 
-def require_sossa_block_encoding(unitary_representation_or_container):
-    """Return the SOSSA block encoding, rejecting any other container.
+def require_sossa_walk(unitary_representation):
+    """Return the SOSSA walk container, rejecting any other block encoding.
 
     The ``qdk_unary`` builder performs the same check and raises on a mismatch.
     Calling this first turns a mis-wired pipeline into an error at the point the
     walk is built, rather than several cells later.
 
     Args:
-        unitary_representation_or_container: Result of running a
-            ``hamiltonian_unitary_builder``, or its underlying container.
+        unitary_representation: Result of running a ``hamiltonian_unitary_builder``.
 
     Returns:
-        The underlying SOSSA block-encoding container.
+        The underlying SOSSA walk container.
 
     Raises:
-        TypeError: If the value does not hold a SOSSA block encoding.
+        TypeError: If the representation does not hold a SOSSA walk.
 
     """
-    get_container = getattr(unitary_representation_or_container, "get_container", None)
-    container = (
-        get_container()
-        if get_container is not None
-        else unitary_representation_or_container
-    )
-    if container.type != SOSSA_BLOCK_ENCODING_CONTAINER_TYPE:
+    container = unitary_representation.get_container()
+    if container.type != SOSSA_WALK_CONTAINER_TYPE:
         raise TypeError(
-            f"Expected a '{SOSSA_BLOCK_ENCODING_CONTAINER_TYPE}' container from the 'sossa' "
+            f"Expected a '{SOSSA_WALK_CONTAINER_TYPE}' container from the 'sossa' "
             f"hamiltonian unitary builder, got '{container.type}'. Spectrum amplification "
             "only applies to a sum-of-squares block encoding."
         )
     return container
 
 
-def simulation_qubit_estimate(block_encoding, num_queries: int) -> int:
+def simulation_qubit_estimate(walk_container, num_queries: int) -> int:
     """Return a screening estimate of the qubits a SOSSA QPE circuit would use.
 
     The estimate is the walk's own register total plus the phase register that
@@ -94,18 +88,18 @@ def simulation_qubit_estimate(block_encoding, num_queries: int) -> int:
     can be rejected before any circuit is constructed.
 
     Args:
-        block_encoding: SOSSA block encoding from :func:`require_sossa_block_encoding`.
+        walk_container: SOSSA walk container from :func:`require_sossa_walk`.
         num_queries: Number of walk queries the schedule would apply.
 
     Returns:
         The estimated number of qubits.
 
     """
-    return block_encoding.num_qubits + int(num_queries).bit_length()
+    return walk_container.num_qubits + int(num_queries).bit_length()
 
 
 def effective_normalization(
-    unitary_representation_or_container, override: float | None = None
+    walk_container, override: float | None = None
 ) -> tuple[float, str]:
     """Return the normalization that sets the query count, and where it came from.
 
@@ -120,8 +114,7 @@ def effective_normalization(
     reporting a cost that cannot be achieved.
 
     Args:
-        unitary_representation_or_container: SOSSA unitary representation or its
-            block-encoding container.
+        walk_container: SOSSA walk container from :func:`require_sossa_walk`.
         override: Published ``lambda_eff`` to use instead of the container's, or
             ``None`` to derive it.
 
@@ -131,12 +124,11 @@ def effective_normalization(
     """
     if override is not None:
         return float(override), "published value for this system"
-    block_encoding = require_sossa_block_encoding(unitary_representation_or_container)
     try:
-        return block_encoding.lambda_eff, "derived from the classical reference energy"
+        return walk_container.lambda_eff, "derived from the classical reference energy"
     except ValueError:
         return (
-            block_encoding.normalization,
+            walk_container.normalization,
             "no reference energy available, falling back to the conservative Lambda",
         )
 
@@ -298,7 +290,7 @@ def build_sossa_qpe_circuit(
 
     The walk container is built once, inside the QPE builder, which rejects any
     non-SOSSA block encoding itself. Building it here as well to call
-    :func:`require_sossa_block_encoding` would double the most expensive step of the sweep
+    :func:`require_sossa_walk` would double the most expensive step of the sweep
     without adding a check.
 
     Args:

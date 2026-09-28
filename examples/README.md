@@ -24,7 +24,7 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | Example | Install command |
 |---------|----------------|
 | `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
-| `sossa_qre.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `sossa_qre.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
 | `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |

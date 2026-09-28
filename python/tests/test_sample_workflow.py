@@ -131,6 +131,10 @@ def test_qpe_stretched_n2():
     not _HAS_QRE,
     reason="qdk.qre not available",
 )
+@pytest.mark.skipif(
+    not PYSCF_AVAILABLE,
+    reason="PySCF not available",
+)
 def test_sossa_qre():
     """Test the sequential SOSSA notebook workflow executes without errors.
 
