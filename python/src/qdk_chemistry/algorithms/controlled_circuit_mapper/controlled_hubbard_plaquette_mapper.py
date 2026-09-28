@@ -54,8 +54,6 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             width=container.width,
             height=container.height,
             interactionAngle=container.interaction_angle,
-            onsiteAngle=container.onsite_angle,
-            identityAngle=container.identity_angle,
             hoppingAngle=container.hopping_angle,
             repetitions=container.step_reps,
         )
