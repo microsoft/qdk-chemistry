@@ -50,7 +50,7 @@ jobs:
           uarch: x86-64-v3
           python-version: '3.10'
           cpp-omp-threads: 4
-          cpp-test-workers: 8
+          cpp-test-workers: 12
           python-omp-threads: 4
           python-test-workers: 8
         - os-name: Linux
@@ -59,7 +59,7 @@ jobs:
           uarch: x86-64-v3
           python-version: '3.13'
           cpp-omp-threads: 4
-          cpp-test-workers: 8
+          cpp-test-workers: 12
           python-omp-threads: 4
           python-test-workers: 8
           enable-coverage: true
@@ -69,7 +69,7 @@ jobs:
           uarch: x86-64-v3
           python-version: '3.14'
           cpp-omp-threads: 4
-          cpp-test-workers: 8
+          cpp-test-workers: 12
           python-omp-threads: 4
           python-test-workers: 8
           build-documentation: true
@@ -553,7 +553,7 @@ jobs:
     env:
       VCPKG_TRIPLET: x64-windows-static-md
       QDK_UARCH: x86-64-v3
-      CTEST_WORKERS: '8'
+      CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
       # Bump to force a rebuild of the cached dependencies.
@@ -781,7 +781,7 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
-      CTEST_WORKERS: '8'
+      CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
       # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
