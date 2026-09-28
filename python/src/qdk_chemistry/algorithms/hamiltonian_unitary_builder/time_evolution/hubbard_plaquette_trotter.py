@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import math
+from functools import cache
 
 import numpy as np
 import scipy.sparse
@@ -25,22 +26,41 @@ __all__: list[str] = [
     "HubbardPlaquetteTrotterSettings",
 ]
 
+class HubbardPlaquetteTrotterSettings(TrotterSettings):
+    """Settings for the plaquette Trotter builder."""
+
+    def __init__(self):
+        """Initialize the settings, adding the model parameters to the Trotter defaults."""
+        super().__init__()
+        self._set_default("t", "float", 1.0, "Uniform hopping amplitude of the Fermi-Hubbard model.")
+        self._set_default("u", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
+        self._set_default(
+            "num_electrons",
+            "int",
+            -1,
+            "Electron count for the scalar shift to the conventional model; -1 leaves it unshifted.",
+        )
+
 
 class HubbardPlaquetteTrotter(Trotter):
-    """Build a second-order product formula from exact plaquette evolutions.
+    r"""Plaquette Trotterization for THE Fermi-Hubbard model in two dimensional square lattice (TDL).
 
     The builder takes a :class:`~qdk_chemistry.data.QubitOperator` wrapping a
     :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`, which
-    carries the lattice geometry. The model parameters ``t``, ``u``, and ``epsilon`` are settings.
+    carries the lattice geometry. The model parameters ``t`` and ``u`` are settings.
+
+    The interaction is taken in Campbell's particle-hole symmetric form
+    :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is
+    pure :math:`ZZ`: there is no single-mode :math:`Z` layer. The conventional
+    :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model differs by :math:`U\eta/2 - UM/4` on a
+    state of :math:`\eta` electrons, with :math:`M` the site count. Setting ``num_electrons``
+    records that offset so the phase-to-energy conversion reports the conventional energy;
+    the quantum circuit itself omits the global phase. Leaving it unset reports the symmetric
+    model's energy directly.
 
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
     rule follow the later compilation of the same algorithm in :cite:`Apel2026`.
-
-    Note:
-        This expects a periodic square lattice whose sides are even with uniform edge weights.
-        Incompatible geometry raises a :class:`ValueError`.
-
     """
 
     def __init__(
@@ -49,7 +69,7 @@ class HubbardPlaquetteTrotter(Trotter):
         *,
         t: float = 1.0,
         u: float = 0.0,
-        epsilon: float = 0.0,
+        num_electrons: int | None = None,
         time: float = 0.0,
         target_accuracy: float = 0.0,
         num_divisions: int = 0,
@@ -61,13 +81,14 @@ class HubbardPlaquetteTrotter(Trotter):
         """Initialize the builder.
 
         Args:
-            order: Trotter-Suzuki order. Only 2 is supported.
+            order: Trotter decomposition order. Only 2 is supported.
             t: Uniform hopping amplitude of the Fermi-Hubbard model.
             u: Uniform on-site interaction of the Fermi-Hubbard model.
-            epsilon: Uniform on-site energy. Use ``-u/2`` for the particle-hole-shifted model.
+            num_electrons: Electron count the scalar shift is applied for. ``None`` leaves the
+                simulated particle-hole symmetric energy unshifted.
             time: The evolution time. Defaults to 0.0.
-            target_accuracy: Target accuracy for auto step computation. Use 0.0 to disable.
-            num_divisions: Divisions per Trotter step. Max of this and the auto value is used.
+            target_accuracy: Target accuracy for auto Trotter step computation. Use 0.0 to disable.
+            num_divisions: Number of Trotter steps. Max of this and the auto value is used.
             error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
             weight_threshold: Threshold for filtering small coefficients.
             power: The power to raise the unitary to. Defaults to 1.
@@ -101,7 +122,8 @@ class HubbardPlaquetteTrotter(Trotter):
         settings.set("weight_threshold", weight_threshold)
         settings.set("t", t)
         settings.set("u", u)
-        settings.set("epsilon", epsilon)
+        if num_electrons is not None:
+            settings.set("num_electrons", int(num_electrons))
         self._settings = settings
 
     def name(self) -> str:
@@ -111,21 +133,13 @@ class HubbardPlaquetteTrotter(Trotter):
     def _lattice_geometry(self, qubit_hamiltonian: QubitOperator):
         """Return the lattice, its shape, its edge weight, and its plaquette tilings.
 
-        The bond graph is validated here, in the single pass that also reads the edge
-        weights: the bonds must match the plaquette tiling the circuit applies, and their
-        weights must be uniform, since Campbell's formula is derived for a single hopping
-        amplitude on every bond.
-
-        The returned weight is the value the lattice carries on each of those bonds, the
-        ``t`` a :meth:`~qdk_chemistry.data.LatticeGraph.square` lattice was built with
-        (1.0 by default). It is a per-bond multiplier on the model's ``t`` setting, not
-        an amplitude in itself; the caller forms ``t * weight`` to get the hopping.
+        The bond graph is validated here: the bonds must match the plaquette tiling,
+        and their weights must be uniform.
+        The tilings are resolved from Q# to run the check, so they are handed back rather
+        than evaluated a second time by the caller that needs them for the error bound.
 
         Args:
             qubit_hamiltonian: The operator to inspect.
-
-        The tilings are resolved from Q# to run the check, so they are handed back rather
-        than evaluated a second time by the caller that needs them for the error bound.
 
         Returns:
             A tuple of the lattice, its ``(width, height)``, its edge weight, and its pink and gold tilings.
@@ -147,14 +161,12 @@ class HubbardPlaquetteTrotter(Trotter):
             )
         dims = tuple(int(d) for d in container.lattice.dims)
         if len(dims) != 2:
-            raise ValueError(
-                f"HubbardPlaquetteTrotter tiles a two-dimensional lattice, but the lattice reports "
-                f"{list(dims) or 'no'}."
-            )
+            raise ValueError(f"HubbardPlaquetteTrotter tiles a 2D lattice, but the lattice reports {list(dims)}.")
         width, height = dims
 
         lattice = container.lattice
         atol = self._settings.get("weight_threshold")
+        # upper triangle of the lattice's adjacency matrix, used to enumerate each bond exactly once.
         upper = scipy.sparse.triu(lattice.sparse_adjacency_matrix(), k=1, format="coo")
         bonds: set[frozenset[int]] = set()
         weights: set[float] = set()
@@ -165,7 +177,7 @@ class HubbardPlaquetteTrotter(Trotter):
             weights.add(round(float(value), 12))
 
         if not bonds:
-            raise ValueError("The lattice carries no bonds; nothing to tile into plaquettes.")
+            raise ValueError("The lattice carries no bonds.")
         if len(weights) > 1:
             raise ValueError(
                 f"HubbardPlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
@@ -174,49 +186,93 @@ class HubbardPlaquetteTrotter(Trotter):
 
         sections = self._plaquette_sections(width, height)
         pink, gold = sections
-        tiled = {frozenset((cycle[i], cycle[(i + 1) % 4])) for cycle in pink + gold for i in range(4)}
+        # Walk each plaquette, pairing every corner with the next and wrapping the last to the first.
+        tiled: set[frozenset[int]] = set()
+        for cycle in pink + gold:
+            for index, corner in enumerate(cycle):
+                next_corner = cycle[(index + 1) % len(cycle)]
+                tiled.add(frozenset((corner, next_corner)))
         if bonds != tiled:
             raise ValueError(
                 f"The lattice's bond graph does not match a periodic {width}x{height} "
                 f"square lattice: {len(tiled - bonds)} lattice bond(s) absent from the graph and "
-                f"{len(bonds - tiled)} graph bond(s) outside the tiling. Check the lattice "
-                "dimensions, the boundary conditions, and that sites are numbered row-major."
+                f"{len(bonds - tiled)} graph bond(s) outside the tiling. "
             )
 
         weight = next(iter(weights))
         Logger.debug(f"HubbardPlaquetteTrotter: edge weight {weight} over {len(bonds)} bonds per spin.")
-        return lattice, width, height, weight, sections
+        return width, height, weight, sections
+
+    @staticmethod
+    @cache
+    def _plaquette_sections(width: int, height: int) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
+        """Return Campbell's pink and gold four-cycle tilings of a periodic square lattice.
+
+        Args:
+            width: Number of lattice columns.
+            height: Number of lattice rows.
+
+        Returns:
+            The pink and gold tilings, each a list of four indices in cycle order, for one spin sector.
+
+        Raises:
+            ValueError: If the lattice cannot be tiled into vertex-disjoint four-cycles.
+
+        """
+        if width % 2 or height % 2:
+            raise ValueError(f"Plaquette tiling requires even side lengths, got {width}x{height}.")
+
+        if (width < 4 or height < 4) and (width, height) != (2, 2):
+            raise ValueError(
+                f"Plaquette tiling requires both sides to be at least four, or exactly 2x2, got {width}x{height}. "
+            )
+
+        sites = width * height
+        sections = []
+        for pink in ("true", "false"):
+            cycles = get_qsharp_context().eval(
+                f"QDKChemistry.Utils.HubbardPlaquette.PlaquetteSection({width}, {height}, {pink})"
+            )
+            # Q# emits both spin sectors; keep the one whose cycles start inside the first sector.
+            sector = []
+            for cycle in cycles:
+                modes = tuple(int(mode) for mode in cycle)
+                if modes[0] < sites:
+                    sector.append(modes)
+            sections.append(sector)
+        return sections[0], sections[1]
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
-        r"""Build Campbell's segmented plaquette product formula.
+        r"""Build the plaquette Trotter unitary representation for Fermi-Hubbard.
 
-        For a periodic :math:`w \times h` square lattice of :math:`M = wh` sites. Writing :math:`\langle ij \rangle`
-        for its bonds, :math:`\sigma \in \{\uparrow, \downarrow\}` for spin, :math:`a_{i\sigma}` for the
-        fermionic annihilation operator on site :math:`i` with spin :math:`\sigma`, and
-        :math:`n_{i\sigma} = a^\dagger_{i\sigma} a_{i\sigma}` for its number operator, the Fermi-Hubbard
-        Hamiltonian is
+        For a periodic :math:`w \times h` square lattice of :math:`M = wh` sites, writing
+        :math:`\langle ij \rangle` for its bonds, :math:`\sigma \in \{\uparrow, \downarrow\}` for spin,
+        :math:`a_{i\sigma}` for the fermionic annihilation operator on site :math:`i` with spin
+        :math:`\sigma`, and :math:`n_{i\sigma} = a^\dagger_{i\sigma} a_{i\sigma}` for the number operator,
+        the Fermi-Hubbard Hamiltonian is
 
         .. math::
             H = -t \sum_{\langle ij \rangle, \sigma} \left( a^\dagger_{i\sigma} a_{j\sigma}
                 + a^\dagger_{j\sigma} a_{i\sigma} \right)
-              + U \sum_i n_{i\uparrow} n_{i\downarrow}
-              + \varepsilon \sum_{i\sigma} n_{i\sigma},
+              + U \sum_i \left( n_{i\uparrow} - \tfrac{1}{2} \right)
+                         \left( n_{i\downarrow} - \tfrac{1}{2} \right),
 
-        where :math:`t` is the hopping amplitude, :math:`U` the on-site interaction, and :math:`\varepsilon`
-        the on-site energy.
-        :math:`H_I` collects the diagonal on-site terms above and :math:`H_h^p`, :math:`H_h^g` are the pink
-        and gold tilings: two sets of vertex-disjoint four-cycles that together cover every bond exactly
-        once. 
+        where :math:`t` is the hopping amplitude and :math:`U` the on-site interaction. The interaction
+        is written in the particle-hole symmetric form of :cite:`Campbell2022`; the conventional
+        :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model differs by :math:`U N / 2 - U M / 4`, with
+        :math:`N` the total number operator, so its energy follows from the simulated
+        :math:`\tilde{E}` by the classical shift :math:`E = \tilde{E} + U\eta/2 - UM/4` on a state of
+        :math:`\eta` electrons. The Hamiltonian is split into :math:`H_I`, the diagonal interaction
+        above, and :math:`H_h^p`, :math:`H_h^g`, the pink and gold tilings: two sets of
+        vertex-disjoint four-cycles that together cover every bond exactly once.
 
-        The :math:`2M` spin orbitals are numbered :math:`m = i + \sigma M`  so the two spin sectors are
-        contiguous blocks and a site's two orbitals sit a fixed stride :math:`M` apart. Under
-        :math:`n_m = (1 - Z_m)/2` the on-site terms are diagonal,
+        Since :math:`n_m - 1/2 = -Z_m/2` under :math:`n_m = (1 - Z_m)/2`, the interaction is a pure
+        :math:`ZZ` layer between a site and its spin partner,
 
         .. math::
-            U \sum_i n_{i\uparrow} n_{i\downarrow} + \varepsilon \sum_{i\sigma} n_{i\sigma}
-            = \underbrace{\frac{U}{4} \sum_i Z_{i} Z_{i+M}}_{\text{pair}}
-            - \underbrace{\left( \frac{\varepsilon}{2} + \frac{U}{4} \right) \sum_m Z_m}_{\text{single mode}}
-            + \underbrace{\left( \varepsilon + \frac{U}{4} \right) M}_{\text{scalar}},
+            U \sum_i \left( n_{i\uparrow} - \tfrac{1}{2} \right)
+                     \left( n_{i\downarrow} - \tfrac{1}{2} \right)
+            = \frac{U}{4} \sum_i Z_{i} Z_{i+M},
 
         while a hopping bond becomes a two-local term dressed by a Jordan-Wigner string of :math:`Z`
         operators between its endpoints,
@@ -225,17 +281,22 @@ class HubbardPlaquetteTrotter(Trotter):
             -t \left( a^\dagger_m a_n + a^\dagger_n a_m \right)
             = -\frac{t}{2} \left( X_m Z_{m+1} \cdots Z_{n-1} X_n + Y_m Z_{m+1} \cdots Z_{n-1} Y_n \right).
 
-        To avoid the Z strings, the ``HoppingLayer`` first routes every four-cycle of the tiling onto four 
-        contiguous modes with a network of fermionic swaps, so the whole layer is one batch of equal-angle 
+        Each hopping layer first uses fermionic swaps to route the four modes of every
+        plaquette into a contiguous block. Two radix-two fermionic Fourier butterflies then
+        transform its four-cycle hopping matrix, whose spectrum is
+        :math:`\mathrm{diag}(2t, 0, -2t, 0)`, into a single adjacent two-mode hopping term;
+        the other two modes decouple. The resulting equal-angle :math:`XX` and :math:`YY`
+        rotations can be batched by Hamming-weight phasing, after which the Fourier
+        butterflies and routing are uncomputed.
+        Each hopping layer is therefore an fswap routing, a basis change, two nonzero eigenvalue phases,
+        and the inverse basis change and routing.
+
+        To avoid the Z strings, the ``HoppingLayer`` first routes every four-cycle of the tiling onto four
+        contiguous modes with a network of fermionic swaps, so the whole layer is one batch of equal-angle
         two-local rotations that can be applied in parallel.
 
-        The hopping term is also diagnolized: its single-particle matrix :math:`K = t A = V \Lambda V^\dagger`, with 
-        :math:`A` the adjacency matrix of a four-cycle, is diagonalized by the discrete Fourier transform :math:`V`,
-        whose eigenvalues are :math:`\Lambda = \mathrm{diag}(2t, 0, -2t, 0)`,
-        so the hopping term has a fswap routing, basis change, two nonzero eigenvalue phases, and the inverse.
-
-        Over a total evolution time
-        :math:`T` split into :math:`r` steps of duration :math:`\delta = T/r`, one second-order step is
+        Thus, over a total evolution time :math:`T` split into :math:`r` steps of duration
+        :math:`\delta = T/r`, the plaquette trotterization gives:
 
         .. math::
             e^{-i\delta H_h^p/2}
@@ -261,91 +322,124 @@ class HubbardPlaquetteTrotter(Trotter):
         if order != 2:
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
 
-        # 1. Geometry, and the model angles the settings imply. The lattice's edge weight
-        # scales the hopping the settings carry.
-        lattice, width, height, weight, sections = self._lattice_geometry(qubit_hamiltonian)
-        num_sites = lattice.num_sites
+        # 1. Geometry
+        width, height, weight, _sections = self._lattice_geometry(qubit_hamiltonian)
+
+        # 2. Model parameters
         hopping = float(self._settings.get("t")) * weight
-
         interaction = float(self._settings.get("u"))
-        epsilon = float(self._settings.get("epsilon"))
-        single_z = -(0.5 * epsilon + 0.25 * interaction)
-        pair_z = 0.25 * interaction
-        identity = (epsilon + 0.25 * interaction) * num_sites
+        pair_angle = 0.25 * interaction
+        num_electrons = int(self._settings.get("num_electrons"))
+        num_sites = width * height
+        shift = 0.0 if num_electrons < 0 else interaction * (0.5 * num_electrons - 0.25 * num_sites)
 
-        # 2. Step count, reusing the hopping amplitude and tilings resolved above.
+        # 3. Step count
         time, power_repetitions = self._resolve_power()
-        num_divisions = self._step_count(hopping, sections, width, height, time)
-        delta = time / num_divisions
+        num_divisions = self._step_count(hopping, width, height, time)
+        delta_time = time / num_divisions
 
         return UnitaryRepresentation(
             container=HubbardPlaquetteContainer(
                 width=width,
                 height=height,
-                interaction_angle=pair_z * delta,
-                onsite_angle=single_z * delta,
-                identity_angle=identity * delta,
-                hopping_angle=2.0 * hopping * delta,
+                interaction_angle=pair_angle * delta_time,
+                constant_shift=shift * delta_time,
+                hopping_angle=2.0 * hopping * delta_time,
                 step_reps=num_divisions * power_repetitions,
                 scale=time,
             )
         )
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
-        """Return the step count the builder would use for this operator and duration.
+    @staticmethod
+    @cache
+    def _hopping_trace_norm(width: int, height: int) -> float:
+        """Return ``||H_h|| = ||R_p + R_g||_1`` for a unit hopping amplitude.
 
-        Args:
-            qubit_hamiltonian: The lattice-backed operator being evolved.
-            time: Duration of the evolution.
+        The two tilings cover every bond exactly once, so their sum is the whole periodic
+        lattice's single-particle matrix. That matrix is free-fermionic and the discrete
+        Fourier transform diagonalizes it, giving eigenvalues ``2 cos(k_x) + 2 cos(k_y)``.
+        Summing their magnitudes is exact at every lattice size and costs ``O(M)`` rather
+        than the ``O(M^3)`` of a singular value decomposition.
 
-        Returns:
-            The number of Trotter steps, at least one.
-
+        A side of two is the exception: its opposite neighbours are the same site, so the
+        tiling carries one bond where a torus carries two and the closed form would
+        double-count. That case falls back on the tiling matrices themselves.
         """
-        _, width, height, weight, sections = self._lattice_geometry(qubit_hamiltonian)
-        hopping = float(self._settings.get("t")) * weight
-        return self._step_count(hopping, sections, width, height, time)
+        if width < 4 or height < 4:
+            sections = HubbardPlaquetteTrotter._plaquette_sections(width, height)
+            matrices = []
+            for cycles in sections:
+                matrix = np.zeros((width * height, width * height))
+                for cycle in cycles:
+                    for index in range(4):
+                        site_a, site_b = cycle[index], cycle[(index + 1) % 4]
+                        matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
+                matrices.append(matrix)
+            matrix_p, matrix_g = matrices
+            return float(np.abs(np.linalg.eigvalsh(matrix_p + matrix_g)).sum())
+
+        momenta_x = 2.0 * math.pi * np.arange(width) / width
+        momenta_y = 2.0 * math.pi * np.arange(height) / height
+        spectrum = 2.0 * np.cos(momenta_x)[:, None] + 2.0 * np.cos(momenta_y)[None, :]
+        return float(np.abs(spectrum).sum())
+
+    @staticmethod
+    @cache
+    def _commutator_trace_norm(width: int, height: int) -> float:
+        """Return ``||[[R_p, R_g], R_g]||_1`` for a unit hopping amplitude.
+
+        The nested commutator is invariant under translations of the two-by-two plaquette
+        supercell. A Fourier transform over those cells splits it into the four-by-four
+        Hermitian blocks assembled below. The trace norm is therefore the sum of the
+        magnitudes of their eigenvalues.
+        """
+        cells_x, cells_y = width // 2, height // 2
+        momenta_x = 2.0 * math.pi * np.arange(cells_x) / cells_x
+        momenta_y = 2.0 * math.pi * np.arange(cells_y) / cells_y
+        phase_x = np.exp(2j * momenta_x)[:, None]
+        phase_y = np.exp(2j * momenta_y)[None, :]
+
+        fourier = np.zeros((cells_x, cells_y, 4, 4), dtype=complex)
+        fourier[:, :, 0, 1] = -2.0 + 2.0 / phase_x
+        fourier[:, :, 1, 0] = -2.0 + 2.0 * phase_x
+        fourier[:, :, 0, 2] = -2.0 + 2.0 / phase_y
+        fourier[:, :, 2, 0] = -2.0 + 2.0 * phase_y
+        fourier[:, :, 1, 3] = -2.0 + 2.0 / phase_y
+        fourier[:, :, 3, 1] = -2.0 + 2.0 * phase_y
+        fourier[:, :, 2, 3] = -2.0 + 2.0 / phase_x
+        fourier[:, :, 3, 2] = -2.0 + 2.0 * phase_x
+        return float(np.abs(np.linalg.eigvalsh(fourier)).sum())
 
     def _step_count(
         self,
         hopping: float,
-        sections: tuple[list[tuple[int, ...]], list[tuple[int, ...]]],
         width: int,
         height: int,
         time: float,
     ) -> int:
-        """Determine the step count from Campbell's plaquette-specific error constant.
+        """Determine the number of Trotter steps from plaquette-specific error constant.
 
-        The error constant ``W_PLAQ`` is derived for this exact splitting in
-        :cite:`Campbell2022`: Eq. (20) states it in the main text as
-        ``W_PLAQ <= W_SO2 + (3/24) ||[[H_h^p, H_h^g], H_h^g]||``, and App. D carries the
-        derivation, restating the same result as Eq. (D6). The energy budget is converted
-        into a step count with the exact form retained by Algorithm 1 of :cite:`Apel2026`
-        rather than its small-angle limit; see the comments on the conversion below.
+        ``W_PLAQ <= W_SO2 + W_extra2``. Eq. (20) of :cite:`Campbell2022`.
 
-        The bound deliberately ignores the single-mode term ``single_z``, which is nonzero
-        whenever ``epsilon != -U/2``. That term is a *uniform* on-site energy, so under the
-        Jordan-Wigner image it is proportional to ``M - 2 N``, where ``N`` is the total
-        number operator. Hopping and interaction both conserve particle number, so this
-        layer commutes with every other factor and contributes no Trotter error at any
-        ordering; only its scalar part matters, and that is carried by ``identity_angle``.
+        This constant is derived for the "IPG" factor ordering (interaction outermost), while the circuit
+        this builder emits uses the "PIG" ordering based on Sec. 4.8.2 of :cite:`Apel2026`.
+        The pure-hopping block ``[[H_h^p, H_h^g], .]`` is replaced by a mixed interaction-hopping block,
+        which is reported to be slightly larger than the IPG constant. The difference is neglected here.
 
-        Warning:
-            ``W_PLAQ`` below is Campbell's closed form, which is derived for the "IPG"
-            factor ordering (interaction outermost, Eq. (D2) of :cite:`Campbell2022`).
-            The circuit this builder emits uses the "PIG" ordering instead, and Sec. 4.8.2
-            of :cite:`Apel2026` states that changing the ordering requires recomputing the
-            commutator bound: under PIG the pure-hopping block ``[[H_h^p, H_h^g], .]``
-            that Campbell evaluates as ``W_extra2`` is replaced by a mixed
-            interaction-hopping block, and the accumulated operator following the first
-            factor is no longer purely hopping, so the ``W_SO2 + W_extra2`` split does not
-            transfer. Apel report the PIG constant to be larger than Campbell's IPG value
-            at every lattice size they plot (their Fig. 18, even ``L`` from 4 to 20; by
-            about 10% for ``L >= 10`` and about 20% at ``L = 4``). Since ``r`` scales as
-            ``sqrt(W_PLAQ)``, reusing the IPG constant here under-counts the steps by
-            roughly 5% for ``L >= 10``, in the optimistic direction. Apel give no closed
-            form for the PIG constant -- they evaluate it numerically (their Eq. (29) and
-            App. C.1) and publish no table of values -- so it is not reproduced here.
+        Here,
+            W_extra2 = (3/24) ||[[R^p, R^g], R^g]||
+            W_SO2 ≤ (uτ^2 / 6) * L^2 * (√5+8) + (u^2τ / 24) ||H_h||
+
+        The number of trotter steps are determined by
+
+        r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
+
+        T for the total evolution time, single Trotter step of duration s, for eps_TS  energy error budget
+        resulting from the Suzuki-Trotter approximation
+
+        A single step of size s carries unitary error ||Delta U|| <= W_PLAQ s^3.
+        Summing r steps of size s = T/r by subadditivity gives ||Delta U|| <= W_PLAQ T^3 / r^2.
+        The induced error in the estimated energy then satisfies |Delta E| <= (2/T) arcsin(||Delta U|| / 2).
 
         Args:
             hopping: Uniform hopping amplitude.
@@ -369,135 +463,20 @@ class HubbardPlaquetteTrotter(Trotter):
         hopping = abs(hopping)
         interaction = abs(self._settings.get("u"))
 
-        # R_p and R_g are the one-spin, unit-hopping matrices for the pink and gold tilings.
-        # Evaluate their trace norms exactly through 1600 sites; beyond that fall back on
-        # per-site asymptotic values, 16/pi^2 for ||R_p + R_g||_1 and 3.229 for
-        # ||[[R_p, R_g], R_g]||_1. These two constants are NOT tabulated by Campbell: App. D
-        # of Campbell2022 states only the cruder bounds (3/2) L^2 and (10/3) L^2, and its
-        # Table III tabulates extensive norms for L <= 32 rather than per-site limits.
-        # 16/pi^2 = 1.62114 is the exact thermodynamic limit of ||R_p + R_g||_1 / L^2, since
-        # the mean of |cos k_x + cos k_y| over the Brillouin zone is 8/pi^2. 3.229 is an
-        # empirical per-site value for the nested commutator; it is accurate near L = 40 but
-        # slightly below the limiting value (~3.24), so it is mildly optimistic as L grows.
-        if num_sites <= 1600:
-            section_matrices: list[np.ndarray] = []
-            for cycles in sections:
-                matrix = np.zeros((num_sites, num_sites))
-                for cycle in cycles:
-                    for index in range(4):
-                        site_a, site_b = cycle[index], cycle[(index + 1) % 4]
-                        matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
-                section_matrices.append(matrix)
-            matrix_p, matrix_g = section_matrices
+        hopping_norm = self._hopping_trace_norm(width, height) * hopping
+        commutator_norm = self._commutator_trace_norm(width, height) * hopping**3
 
-            inner = matrix_p @ matrix_g - matrix_g @ matrix_p
-            outer = inner @ matrix_g - matrix_g @ inner
-            hopping_norm = float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum()) * hopping
-            commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * hopping**3
-        else:
-            hopping_norm = 16.0 / math.pi**2 * num_sites * hopping
-            commutator_norm = 3.229 * num_sites * hopping**3
-
-        # 1. W_SO2, the split-operator error constant, from Eq. (10) of :cite:`Campbell2022`.
-        # "SO2" indexes Campbell's second split-operator *ordering*, not the Trotter order:
-        # both SO1 and SO2 are second-order formulas. Eq. (10) is the main-text statement;
-        # its appendix restatement Eq. (C3) carries a spurious hopping factor in the
-        # u^2/24 term, so Eq. (10) is the form reproduced here.
         w_so2 = (
             interaction * hopping**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + interaction**2 / 24.0 * hopping_norm
         )
-        # 2. The extra plaquette-splitting contribution, Eq. (D10) of :cite:`Campbell2022`.
         w_extra2 = 3.0 / 24.0 * commutator_norm
-        # 3. The complete plaquette error constant, Eq. (D6) of :cite:`Campbell2022`.
         w_plaquette = w_so2 + w_extra2
 
-        # 4. Convert the energy budget into a step count.
-        #
-        # Write T for the total evolution time. (Campbell reserves tau for the hopping
-        # amplitude, which appears inside W_PLAQ itself; Apel use tau for this duration.)
-        #
-        # A single step of size s carries unitary error ||Delta U|| <= W_PLAQ s^3, which is
-        # Eq. (F1) of :cite:`Campbell2022`. Summing r steps of size s = T/r by subadditivity
-        # gives W_PLAQ T^3 / r^2; that accumulation step is not itself stated by Campbell,
-        # who works per-step. The induced error in the estimated *energy* then satisfies
-        # |Delta E| <= (2/T) arcsin(||Delta U|| / 2).
-        #
-        #     r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
-        #
-        # which is the form retained by Algorithm 1 of :cite:`Apel2026`.
-        #
-        # Campbell Eq. (F2) instead states the linearized bound Delta_TS <= W s^2, giving
-        # s <= sqrt(eps_TS / W). That is the small-angle limit of the above, since
-        # 2 sin(x/2) -> x as x -> 0. The two differ by a factor sqrt(x / (2 sin(x / 2)))
-        # in r, where x = eps_TS T is the angle for that round. Because sin x <= x the
-        # linearized rule is always the optimistic one, so the exact form is used here.
-        # For the QPE ladder in examples/benchmark/sample_hubbard_resources.py the largest
-        # round runs at x ~ 0.78, worth about 1.3% on that round, and the change in the
-        # summed step count is between 0 and 0.74% depending on lattice size -- largest for
-        # small lattices and absorbed entirely by the integer ceiling for L >= 40.
         duration = abs(time)
         if w_plaquette <= 0.0 or duration == 0.0:
             automatic = 1
         else:
-            # ||Delta U|| can never exceed 2, so the arcsine saturates at eps_TS T = pi.
-            # Clamping there keeps the step count monotonic in the accuracy target; a looser
-            # target than that is certified by any step count and simply yields the floor.
             phase = min(target_accuracy * duration, math.pi)
             automatic = max(1, math.ceil(math.sqrt(w_plaquette * duration**3 / (2.0 * math.sin(phase / 2.0)))))
         Logger.debug(f"HubbardPlaquetteTrotter: bound gives r={automatic}, manual is {manual}.")
         return max(manual, automatic)
-
-    @staticmethod
-    def _plaquette_sections(width: int, height: int) -> tuple[list[tuple[int, ...]], list[tuple[int, ...]]]:
-        """Return Campbell's pink and gold four-cycle tilings of a periodic square lattice.
-
-        The cycles are read from the Q# implementation that executes them, so the bond
-        validation and the error bound are derived from the same tiling the circuit
-        applies rather than a second copy of the construction.
-
-        Args:
-            width: Number of lattice columns.
-            height: Number of lattice rows.
-
-        Returns:
-            The pink and gold tilings, each a list of four-cycles in cycle order, for one
-            spin sector.
-
-        Raises:
-            ValueError: If the lattice cannot be tiled into vertex-disjoint four-cycles.
-
-        """
-        if width % 2 or height % 2:
-            raise ValueError(f"Plaquette tiling requires even side lengths, got {width}x{height}.")
-        if (width < 4 or height < 4) and (width, height) != (2, 2):
-            raise ValueError(
-                f"Plaquette tiling requires both sides to be at least four, or exactly 2x2, "
-                f"got {width}x{height}. Other periodic lattices with a side below four wrap "
-                "onto themselves and cannot be tiled."
-            )
-
-        sites = width * height
-        sections = []
-        for pink in ("true", "false"):
-            cycles = get_qsharp_context().eval(
-                f"QDKChemistry.Utils.HubbardPlaquette.PlaquetteSection({width}, {height}, {pink})"
-            )
-            # Q# emits both spin sectors; the caller works in one and offsets the other.
-            sections.append([tuple(int(mode) for mode in cycle) for cycle in cycles if int(cycle[0]) < sites])
-        return sections[0], sections[1]
-
-
-class HubbardPlaquetteTrotterSettings(TrotterSettings):
-    """Settings for the plaquette Trotter builder."""
-
-    def __init__(self):
-        """Initialize the settings, adding the model parameters to the Trotter defaults."""
-        super().__init__()
-        self._set_default("t", "float", 1.0, "Uniform hopping amplitude of the Fermi-Hubbard model.")
-        self._set_default("u", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
-        self._set_default(
-            "epsilon",
-            "float",
-            0.0,
-            "Uniform on-site energy; use -u/2 for the particle-hole-shifted model.",
-        )
