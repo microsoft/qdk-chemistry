@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.28)
 
 # Read version from VERSION file at repo root
 set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
@@ -159,9 +159,16 @@ block()
         GIT_TAG        52aadfe54ee48874f6926da5932482e0f5cef85c
         SYSTEM
     )
+    # clang-cl ignores [[no_unique_address]] like MSVC, which fails a SeQuant size check.
+    set(_sequant_patch "")
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+        set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}" -P
+            "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-clang-cl-no-unique-address.cmake")
+    endif()
     FetchContent_Declare(SeQuant
         GIT_REPOSITORY https://github.com/ValeevGroup/SeQuant.git
         GIT_TAG        5fcefaebcf405e05fec07541822e2c970398e876
+        ${_sequant_patch}
     )
     set(SEQUANT_BTAS ON)
     # libPerm would otherwise fetch googletest and build its tests as part of `all`.

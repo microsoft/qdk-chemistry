@@ -59,6 +59,8 @@ find_dependency(Threads REQUIRED)
 
 # BTAS's config looks for blaspp_headers beside BLAS++, which may live outside this prefix.
 include("${CMAKE_CURRENT_LIST_DIR}/../blaspp/blaspp_headers-targets.cmake" OPTIONAL)
+# Find BTAS here, or SeQuant's config requires it at the original install path.
+find_dependency(BTAS REQUIRED)
 find_dependency(SeQuant REQUIRED)
 
 if(QDK_CHEMISTRY_ENABLE_DFTD3)
