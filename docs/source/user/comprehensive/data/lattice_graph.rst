@@ -8,8 +8,8 @@ As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immuta
 Overview
 --------
 
-A :class:`~qdk_chemistry.data.LatticeGraph` can store resolved physical connections, including their shells, axes, periodic images, weights, and optional semantic flavors.
-Its adjacency matrix is a projection of these records onto finite-lattice site pairs.
+A :class:`~qdk_chemistry.data.LatticeGraph` stores weighted edges between finite-lattice site pairs.
+Graphs built from a geometry also label each edge with its neighbor shell and an optional semantic flavor.
 It also supports adjacency-only input without inventing geometric labels.
 For example, :doc:`model Hamiltonian <../model_hamiltonians>` builders consume this connectivity together with interaction parameters.
 
@@ -20,30 +20,24 @@ Number of sites
    Total number of vertices in the lattice.
 
 Number of edges
-   ``num_edges`` counts stored upper-triangular adjacency entries, once per distinct site pair, across all selected shells.
-   It is not a count of physical images or of nearest-neighbor bonds alone; diagonal self-images are excluded.
+   ``num_edges`` counts stored upper-triangular adjacency entries, once per distinct site pair.
+   It is not a count of physical images or of nearest-neighbor bonds alone.
 
 Adjacency matrix
-   Sparse or dense matrix of edge weights. For explicit connections, weights of distinct images joining the same pair are summed symmetrically; self-image weights contribute once to the diagonal.
+   Sparse or dense matrix of edge weights.
    ``num_nonzeros`` counts stored sparse entries, which can include explicit zeros.
 
 Symmetry
    Whether the adjacency matrix is symmetric (required for physical Hamiltonians).
 
-Geometry
-   ``geometry`` is an optional immutable :class:`~qdk_chemistry.data.LatticeGeometry`; it is ``None`` for adjacency-only input.
-
-Selected shells
-   ``selected_shells`` contains sorted, unique positive shell indices, including selected shells with no connections.
-
-Connections
-   ``connections`` contains :class:`~qdk_chemistry.data.NeighborConnection` records ordered by shell, orientation, endpoints, and image shift.
+Edge labels
+   ``edge_labels`` maps each canonical pair ``(i, j)`` with ``i < j`` to an :class:`~qdk_chemistry.data.EdgeLabel` holding its ``shell`` and optional ``flavor``; it is empty for unlabelled graphs.
 
 Usage
 -----
 
 Choose geometry and select the required connectivity before applying interaction parameters.
-A graph may contain the union of several interactions' supports; each consumer uses the records relevant to its operation.
+A graph may contain the union of several interactions' supports; each consumer uses the edges relevant to its operation.
 
 .. note::
    All built-in lattice factory methods produce symmetric (bidirectional) graphs by default.
@@ -70,26 +64,22 @@ Use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` to materialize the re
       :end-before: // end-cell-from-geometry
 
 The Python call is ``LatticeGraph.from_geometry(geometry, shells, bond_flavors=[], weight=1.0, tolerance=1e-9)``.
-``shells`` is sorted and deduplicated; an empty selection creates a graph with all sites but no connections.
-Unavailable finite shells remain in ``selected_shells`` with no corresponding records.
-``weight`` must be finite and is assigned to each physical connection, not to the sum over its periodic images.
+``shells`` is deduplicated; an empty selection or unavailable finite shells create no edges.
+Each physical connection becomes one edge whose weight is the finite ``weight``.
 ``tolerance`` must be finite and positive and controls distance and axis comparisons.
 Optional :class:`~qdk_chemistry.data.BondFlavorDefinition` objects assign semantic labels while constructing the graph.
+The graph does not retain the geometry.
+Each edge is a single bond, so small periodic cells where several periodic images join one pair, or a site neighbors its own image, are rejected.
 
-Once constructed, the graph's selection is explicit.
-Querying its geometry, assigning flavors, or passing shell mappings to a :doc:`model builder <../model_hamiltonians>` does not discover or add connections.
-To use additional shells, construct a new graph from the same geometry with the required union.
-
-For already-resolved data, :meth:`~qdk_chemistry.data.LatticeGraph.from_connections` accepts a site count, physical connection records, optional geometry, and optional selected shells.
-The records are authoritative: supplied geometry is not queried to relabel them.
-Endpoints and image directions are canonicalized, duplicate endpoint/image records are rejected, and shells present in the records are included in the selection.
-Explicit records can therefore describe labeled connectivity without retaining geometry.
+Once constructed, the graph's edges are explicit.
+Passing shell mappings to a :doc:`model builder <../model_hamiltonians>` does not discover or add edges.
+To use additional shells or flavors, construct a new graph from the same geometry.
 
 Nearest-neighbor graph factories
 --------------------------------
 
 The existing :class:`~qdk_chemistry.data.LatticeGraph` factories remain nearest-neighbor convenience constructors, preserving their adjacency weights, site ordering, boundary behavior, and stored topology colorings.
-They retain a :class:`~qdk_chemistry.data.LatticeGeometry` and select shell 1, not every shell available in that geometry.
+Their edges are unlabelled; build shell- or flavor-dependent models with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 The available constructors are:
 
 * :meth:`~qdk_chemistry.data.LatticeGraph.chain` — a chain or ring of ``n`` sites.
@@ -253,7 +243,7 @@ Creating from adjacency data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For arbitrary connectivity, construct a :class:`~qdk_chemistry.data.LatticeGraph` from a dense adjacency matrix, a sparse adjacency matrix, or an edge-weight dictionary.
-These constructors preserve directed or asymmetric input without assigning geometry, shells, or flavors.
+These constructors preserve directed or asymmetric input without assigning shells or flavors.
 If Cartesian coordinates are available and geometric selection is desired, construct a :class:`~qdk_chemistry.data.LatticeGeometry` instead and use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 
 .. tab:: Python API
@@ -270,18 +260,16 @@ If Cartesian coordinates are available and geometric selection is desired, const
       :start-after: // start-cell-from-matrix
       :end-before: // end-cell-from-matrix
 
-Physical connections and bond flavors
--------------------------------------
+Edge labels and bond flavors
+----------------------------
 
-Each stored :class:`~qdk_chemistry.data.NeighborConnection` retains its endpoints, :class:`~qdk_chemistry.data.BondClass`, displacement, and periodic image shift, as described under :ref:`geometric-bond-classes`.
-Its ``weight`` is the physical connection's weight, and its ``flavor`` is an optional non-negative integer ID, not an enum object or a color.
-Distinct images remain separate in ``connections`` even when adjacency combines them into one site pair.
+Each :class:`~qdk_chemistry.data.EdgeLabel` records the edge's neighbor shell and its ``flavor``, an optional non-negative integer ID, not an enum object or a color.
+The edge's weight is its adjacency entry.
 
-Use :class:`~qdk_chemistry.data.BondFlavorDefinition` to associate a shell and unoriented axis with a semantic ID.
-Pass definitions to :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`, or use :meth:`~qdk_chemistry.data.LatticeGraph.with_bond_flavors` to replace labels on existing records.
+Use :class:`~qdk_chemistry.data.BondFlavorDefinition` to associate a shell and unoriented axis with a semantic ID, and pass definitions to :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 Axes are normalized before comparison; opposite directions describe the same class.
-Unmatched connections become unlabeled (``flavor is None``).
-Definitions neither select shells nor create connections, and relabeling preserves the graph's weights and geometry.
+Unmatched edges become unlabeled (``flavor is None``).
+Definitions neither select shells nor create edges.
 
 .. tab:: Python API
 
@@ -347,10 +335,9 @@ The ``~~~`` edges show the wrap-around connections that turn the open lattice in
       :start-after: // start-cell-periodic
       :end-before: // end-cell-periodic
 
-For physical-image queries, use :meth:`~qdk_chemistry.data.LatticeGeometry.neighbor_connections` on the geometry, or inspect ``graph.connections`` for the selected weighted records.
+For physical-image queries, use :meth:`~qdk_chemistry.data.LatticeGeometry.neighbor_connections` on the geometry.
 Small periodic cells can have several physical connections for one site pair; distinct-neighbor counts need not equal bulk coordination numbers.
-The nearest-neighbor graph factories preserve their existing adjacency weights by distributing each pair's weight over its physical images.
-In contrast, :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` assigns ``weight`` to every image separately, so it need not reproduce a convenience factory's weights on a small periodic cell.
+The nearest-neighbor graph factories preserve their existing adjacency weights, while :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` rejects such cells.
 See :ref:`geometry-periodic-images` for the image convention.
 
 Accessing lattice data
@@ -376,11 +363,9 @@ Serialization
 -------------
 
 The :class:`~qdk_chemistry.data.LatticeGraph` class supports serialization to and from JSON and HDF5 formats.
-Explicit graphs persist resolved connection records, selected shells, optional geometry, stored edge colors, and a checked adjacency cache.
-Weights, flavors, and image multiplicity are retained. A graph with no connection records and no selected shells is stored in adjacency-only form.
-Explicit-connection files without stored colors recompute them on load using the :ref:`constructor coloring policy <lattice-edge-coloring>`.
-Adjacency-only files, including those written before connection records existed, retain their topology without inferring connection records.
-To use such a lattice in a shell- or flavor-dependent model, construct a selected graph with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
+Files store the sparse adjacency and any stored edge colors; labelled graphs also store one ``[i, j, shell, flavor]`` row per edge.
+Adjacency-only files retain their topology without inferring edge labels.
+To use such a lattice in a shell- or flavor-dependent model, construct a labelled graph with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <serialization>` documentation.
 
 .. note::
@@ -406,15 +391,14 @@ Edge coloring
 -------------
 
 The ``edge_coloring`` property contains an optional ``dict[tuple[int, int], int]`` describing the graph's stored coloring; reading it returns an independent copy.
-:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` and :meth:`~qdk_chemistry.data.LatticeGraph.from_connections` compute it once over all stored canonical pairs with ``i < j``.
-Zero physical connection weights and cancellation between periodic-image weights do not remove pairs from this coloring.
-Distinct images of one pair share a color, and self-images are excluded.
-An explicit graph with no distinct-site pairs has an empty coloring, not ``None``.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` computes it once over all labelled pairs with ``i < j``.
+Zero weights do not remove pairs from this coloring.
+A geometry graph with no edges has an empty coloring, not ``None``.
 Nearest-neighbor convenience factories retain their existing topology colorings; raw-adjacency constructors do not assign one.
 
-The explicit constructors use the native greedy search with ``seed=0`` and ``trials=32``; it is deterministic but is not guaranteed to be optimal.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` uses the native greedy search with ``seed=0`` and ``trials=32``; it is deterministic but is not guaranteed to be optimal.
 Edges sharing a color have disjoint vertices, enabling parallel Pauli exponentials in a :doc:`Trotter step <../algorithms/hamiltonian_unitary_builder>`.
-:meth:`~qdk_chemistry.data.LatticeGraph.with_bond_flavors` preserves stored colors, and :meth:`~qdk_chemistry.data.LatticeGraph.permute` relabels their endpoints without recoloring.
+:meth:`~qdk_chemistry.data.LatticeGraph.permute` relabels their endpoints without recoloring.
 Serialization retains the stored assignment.
 
 Consumers restrict this single graph coloring to their active pair supports rather than recoloring each interaction family.

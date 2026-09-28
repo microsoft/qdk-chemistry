@@ -36,20 +36,21 @@ int main() {
   // start-cell-from-geometry
   auto square_geometry = LatticeGeometry::square(3, 3);
   auto graph = LatticeGraph::from_geometry(square_geometry, {1, 2});
-  const auto& selected_shells = graph.selected_shells();
   auto interaction_edges = graph.num_edges();
   // end-cell-from-geometry
 
   // --------------------------------------------------------------------------------------------
   // start-cell-bond-flavors
-  auto flavored_graph = graph.with_bond_flavors({
-      {1, Eigen::RowVector2d(1.0, 0.0), 10},
-      {1, Eigen::RowVector2d(0.0, 1.0), 20},
-      {2, Eigen::RowVector2d(1.0, 1.0), 30},
-      {2, Eigen::RowVector2d(1.0, -1.0), 40},
-  });
-  const auto& connection = flavored_graph.connections().front();
-  auto flavor = connection.flavor;  // Optional integer ID, not an edge color.
+  auto flavored_graph =
+      LatticeGraph::from_geometry(square_geometry, {1, 2},
+                                  {
+                                      {1, Eigen::RowVector2d(1.0, 0.0), 10},
+                                      {1, Eigen::RowVector2d(0.0, 1.0), 20},
+                                      {2, Eigen::RowVector2d(1.0, 1.0), 30},
+                                      {2, Eigen::RowVector2d(1.0, -1.0), 40},
+                                  });
+  const auto& [edge, edge_label] = *flavored_graph.edge_labels().begin();
+  auto flavor = edge_label.flavor;  // Optional integer ID, not an edge color.
   // end-cell-bond-flavors
 
   // --------------------------------------------------------------------------------------------
@@ -58,11 +59,10 @@ int main() {
   // throughout.
   const auto& coloring = graph.edge_coloring().value();
   EdgeColoring xx_coloring, zz_coloring;
-  for (const auto& c : graph.connections()) {
-    const auto pair = std::make_pair(c.site_i, c.site_j);
-    if (c.bond_class.shell == 1) {
+  for (const auto& [pair, label] : graph.edge_labels()) {
+    if (label.shell == 1) {
       xx_coloring.emplace(pair, coloring.at(pair));
-    } else if (c.bond_class.shell == 2) {
+    } else if (label.shell == 2) {
       zz_coloring.emplace(pair, coloring.at(pair));
     }
   }
@@ -142,9 +142,6 @@ int main() {
   // start-cell-properties
   // Query lattice properties
   auto lattice = LatticeGraph::chain(4);
-
-  // Built-in graph factories retain their geometry.
-  const auto& lattice_positions = lattice.geometry()->positions();
 
   // Check connectivity
   bool connected_01 = lattice.are_connected(0, 1);  // true

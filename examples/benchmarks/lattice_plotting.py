@@ -20,11 +20,12 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
     from numpy.typing import NDArray
-    from qdk_chemistry.data import LatticeGraph
+    from qdk_chemistry.data import LatticeGeometry, LatticeGraph
 
 
 def plot_lattice_graph(
     graph: LatticeGraph,
+    geometry: LatticeGeometry,
     *,
     shells: Sequence[int] | None = None,
     flavor_labels: Mapping[int, str] | None = None,
@@ -42,8 +43,9 @@ def plot_lattice_graph(
     physical image coordinates, which may lie outside the fundamental cell.
 
     Args:
-        graph: Graph carrying a two-dimensional geometry and resolved connections; supply a small graph for a preview.
-        shells: Shells to display, in panel order; defaults to the graph's selected shells, or a sites-only panel.
+        graph: Graph with edge labels, such as one from LatticeGraph.from_geometry; supply a small graph for a preview.
+        geometry: Two-dimensional geometry the graph was built from.
+        shells: Shells to display, in panel order; defaults to the graph's labelled shells, or a sites-only panel.
         flavor_labels: Optional legend labels by flavor ID; IDs themselves are used otherwise.
         flavor_colors: Optional Matplotlib color strings by flavor ID; unspecified IDs use the default palette.
         rotation_degrees: Counterclockwise display rotation of positions, bonds, and annotation vectors only.
@@ -55,12 +57,11 @@ def plot_lattice_graph(
         Figure and a one-dimensional array of axes; the caller handles display or saving.
 
     Raises:
-        ValueError: If the graph has no geometry or the display rotation is not finite.
+        ValueError: If the geometry and graph site counts differ or the display rotation is not finite.
 
     """
-    geometry = graph.geometry
-    if geometry is None:
-        raise ValueError("Plotting requires a LatticeGraph with geometry.")
+    if geometry.num_sites != graph.num_sites:
+        raise ValueError("Plotting requires the geometry the graph was built from.")
     if not np.isfinite(rotation_degrees):
         raise ValueError("rotation_degrees must be finite.")
     angle = np.deg2rad(rotation_degrees)
@@ -69,17 +70,19 @@ def plot_lattice_graph(
     )
     original_positions = geometry.positions
     positions = original_positions @ rotation.T
-    connections = graph.connections
-    selected = list(dict.fromkeys(graph.selected_shells if shells is None else shells))
+    labels = graph.edge_labels
+    labelled_shells = sorted({label.shell for label in labels.values()})
+    selected = list(dict.fromkeys(labelled_shells if shells is None else shells))
     panels = selected or [None]
+    drawn_shells = sorted(set(labelled_shells) & {*selected, 1})
     segments: dict[tuple[int, int | None], list[np.ndarray]] = {}
-    for bond in connections:
-        shell = bond.bond_class.shell
-        if shell in selected or shell == 1:
+    # Geometric images keep periodic bonds at their physical endpoints.
+    for bond in geometry.neighbor_connections(drawn_shells) if drawn_shells else []:
+        label = labels.get((bond.site_i, bond.site_j))
+        if label is not None and label.shell == bond.bond_class.shell:
             start = original_positions[bond.site_i]
-            # Do not collapse distinct periodic images to the finite-cell endpoint.
             segment = np.array([start, start + bond.displacement]) @ rotation.T
-            segments.setdefault((shell, bond.flavor), []).append(segment)
+            segments.setdefault((label.shell, label.flavor), []).append(segment)
 
     flavors = sorted(
         {

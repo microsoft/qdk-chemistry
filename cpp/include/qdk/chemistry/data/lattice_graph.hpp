@@ -10,7 +10,6 @@
 #include <Eigen/Sparse>
 #include <cstdint>
 #include <map>
-#include <memory>
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
@@ -28,6 +27,16 @@ namespace qdk::chemistry::data {
  * Two edges sharing the same color have disjoint vertex sets.
  */
 using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
+
+/** @brief Geometric shell and optional semantic flavor of one edge. */
+struct EdgeLabel {
+  std::uint64_t shell;
+  std::optional<BondFlavorId> flavor;
+  bool operator==(const EdgeLabel&) const = default;
+};
+
+/** @brief Edge labels keyed by ordered (i, j) with i < j. */
+using EdgeLabels = std::map<std::pair<std::uint64_t, std::uint64_t>, EdgeLabel>;
 
 /** @brief Optional semantic label for one shell and geometric bond axis. */
 struct BondFlavorDefinition {
@@ -106,11 +115,11 @@ EdgeColoring trivial_edge_coloring(const Eigen::SparseMatrix<double>& adj);
 /**
  * @brief Weighted graph representing a lattice connectivity structure.
  *
- * Explicit connection graphs retain physical images, shell-axis classes,
- * weights, and optional semantic flavors. Their sparse adjacency is a cached
- * symmetric sum of connection weights; self-image weights contribute once to
- * the diagonal. Adjacency-only graphs retain directed, asymmetric input
- * without inventing geometric labels. Geometry is a separate immutable object.
+ * Stores the lattice topology as a sparse adjacency matrix and provides
+ * static factory methods for common lattice geometries. Used by model
+ * Hamiltonian builders to define site connectivity and hopping integrals.
+ * Graphs built from a LatticeGeometry also label each edge with its neighbor
+ * shell and optional bond flavor.
  */
 class LatticeGraph : public DataClass {
  public:
@@ -150,14 +159,19 @@ class LatticeGraph : public DataClass {
       const Eigen::SparseMatrix<double>& sparse);
 
   /**
-   * @brief Materialize the requested geometric shells exactly once.
-   * @param geometry Source geometry, copied into shared immutable storage.
-   * @param shells Positive shell indices, sorted and deduplicated on storage.
+   * @brief Materialize the requested geometric shells as labelled edges.
+   *
+   * Each physical connection becomes one edge of weight `weight`. Edges are
+   * colored with greedy coloring, seed 0 and 32 trials.
+   *
+   * @param geometry Source geometry; it is not retained.
+   * @param shells Positive shell indices; duplicates are ignored.
    * @param definitions Optional shell-axis flavor assignments.
-   * @param weight Finite weight assigned to every physical connection.
+   * @param weight Finite weight of every edge.
    * @param tolerance Positive finite distance and axis tolerance.
-   * @return Graph retaining selected shells and a coloring of all selected
-   * pairs.
+   * @return Graph whose edges carry their shell and flavor.
+   * @throws std::invalid_argument If a site neighbors its own periodic image
+   *         or several periodic images join one site pair.
    */
   static LatticeGraph from_geometry(
       const LatticeGeometry& geometry,
@@ -166,39 +180,10 @@ class LatticeGraph : public DataClass {
       double weight = 1.0, double tolerance = 1.0e-9);
 
   /**
-   * @brief Construct a graph from resolved physical connections.
-   *
-   * Records are authoritative; geometry is not queried to relabel them.
-   * Reversed endpoints and negative self-images are canonicalized together
-   * with displacement and image shift. A self-image must have a nonzero image.
-   * Duplicate canonical endpoint/image records are rejected across all shells.
-   * Orientation IDs are unsigned shell-local labels, not necessarily contiguous
-   * in a selected subset. Axes must be finite unit vectors and displacements
-   * finite and nonzero. Axes, displacements, and image shifts share one
-   * dimension across records, matching the geometry when present. Images may
-   * have different weights and flavors.
-   * Distinct non-self site pairs are colored once, including zero-weight and
-   * cancelling-image pairs, using greedy coloring with seed 0 and 32 trials.
-   *
-   * @param num_sites Number of vertices, including isolated sites.
-   * @param connections Physical connections with finite weights.
-   * @param geometry Optional geometry with the same number of sites.
-   * @param selected_shells Additional selected shells, including empty shells.
-   * @return Graph with sorted connections and selected/record shells combined.
-   * @throws std::invalid_argument If records, shells, or geometry are invalid.
-   * @throws std::overflow_error If indices, images, or weights overflow.
-   */
-  static LatticeGraph from_connections(
-      std::uint64_t num_sites, std::vector<NeighborConnection> connections,
-      std::shared_ptr<const LatticeGeometry> geometry = nullptr,
-      std::vector<std::uint64_t> selected_shells = {});
-
-  /**
    * @brief Return a new lattice graph with reverse edges added.
    *
    * For each directed edge (i,j) with weight w, ensures (j,i) also exists
-   * with the same weight. Computes A_out = A + A^T. Explicit connection
-   * weights are doubled, including self-images.
+   * with the same weight. Computes A_out = A + A^T.
    *
    * @param graph The (possibly directed) lattice graph.
    * @return A new LatticeGraph with bidirectional edges.
@@ -265,25 +250,8 @@ class LatticeGraph : public DataClass {
    */
   std::uint64_t num_edges() const;
 
-  /** @brief Shared immutable geometry, or nullptr for geometry-free graphs. */
-  const std::shared_ptr<const LatticeGeometry>& geometry() const;
-
-  /** @brief Sorted unique selected shells, including empty shells. */
-  const std::vector<std::uint64_t>& selected_shells() const;
-
-  /** @brief Connections ordered by shell, orientation, sites, image. */
-  const std::vector<NeighborConnection>& connections() const;
-
-  /**
-   * @brief Replace flavors on existing records without discovering connections.
-   * @param definitions Shell-axis labels; unmatched records become unlabeled.
-   * @param tolerance Positive finite tolerance for normalized axis comparisons.
-   * @return Copy with unchanged selection, geometry, weights, and topology.
-   * @throws std::invalid_argument If definitions are invalid or axes duplicate.
-   */
-  LatticeGraph with_bond_flavors(
-      const std::vector<BondFlavorDefinition>& definitions,
-      double tolerance = 1.0e-9) const;
+  /** @brief Shell and flavor of each edge; empty for unlabelled graphs. */
+  const EdgeLabels& edge_labels() const;
 
   /**
    * @brief Create a one-dimensional chain lattice.
@@ -554,14 +522,12 @@ class LatticeGraph : public DataClass {
                const std::string& type) const override;
 
   /**
-   * @brief Serialize the graph's connectivity and optional geometry to JSON.
+   * @brief Convert lattice graph to JSON representation.
    *
-   * Adjacency-only graphs use sparse triplets. Graphs with connection records
-   * or selected shells also store those records and shells, and the adjacency
-   * becomes a checked cache retaining exact factory weights and zero entries.
-   * Nested geometry is stored whenever present.
+   * Stores the sparse adjacency matrix (row-major) and the symmetry flag,
+   * plus the edge coloring and edge labels when present.
    *
-   * @return JSON representation of the graph.
+   * @return JSON object containing the serialised data.
    */
   nlohmann::json to_json() const override;
 
@@ -587,8 +553,9 @@ class LatticeGraph : public DataClass {
   static LatticeGraph from_json_file(const std::string& filename);
 
   /**
-   * @brief Read resolved records or migrate a legacy adjacency payload.
-   * @param j Record-based or legacy adjacency JSON, including num_sites.
+   * @brief Load a lattice graph from a JSON object.
+   * @param j JSON object with num_sites, adjacency_sparse, and optional edge
+   *          metadata.
    * @return New LatticeGraph instance.
    */
   static LatticeGraph from_json(const nlohmann::json& j);
@@ -635,26 +602,13 @@ class LatticeGraph : public DataClass {
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
                         std::optional<EdgeColoring> coloring = std::nullopt);
 
-  // Share record validation while preserving supplied factory/persisted colors.
-  static LatticeGraph _from_connections(
-      std::uint64_t num_sites, std::vector<NeighborConnection> connections,
-      std::shared_ptr<const LatticeGeometry> geometry,
-      std::vector<std::uint64_t> selected_shells,
-      std::optional<EdgeColoring> coloring);
-
-  // Preserve legacy factory topology while distributing each pair's weight
-  // over its shell-one physical images.
-  static LatticeGraph _with_geometry(
-      Eigen::SparseMatrix<double> adjacency,
-      std::optional<EdgeColoring> coloring,
-      std::shared_ptr<const LatticeGeometry> geometry);
-  void _restore_adjacency(Eigen::SparseMatrix<double> adjacency);
   void _validate_coloring() const;
+  void _validate_edge_labels() const;
 
-  static LatticeGraph _honeycomb(
-      std::uint64_t num_cells_x, std::uint64_t num_cells_y,
-      bool remove_open_corners, bool periodic_x, bool periodic_y, double t,
-      std::shared_ptr<const LatticeGeometry> geometry);
+  static LatticeGraph _honeycomb(std::uint64_t num_cells_x,
+                                 std::uint64_t num_cells_y,
+                                 bool remove_open_corners, bool periodic_x,
+                                 bool periodic_y, double t);
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
@@ -668,11 +622,9 @@ class LatticeGraph : public DataClass {
   /// Flag indicating whether the adjacency matrix is symmetric (undirected
   /// graph)
   bool _is_symmetric;
-  /// Edge coloring, populated for factories and explicit physical connections.
+  /// Edge coloring, populated at construction for recognised topologies.
   std::optional<EdgeColoring> _edge_coloring;
-  std::shared_ptr<const LatticeGeometry> _geometry;
-  std::vector<std::uint64_t> _selected_shells;
-  std::vector<NeighborConnection> _connections;
+  EdgeLabels _edge_labels;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,

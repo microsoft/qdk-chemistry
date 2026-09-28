@@ -42,37 +42,35 @@ for connection in periodic_geometry.neighbor_connections([1]):
 # start-cell-from-geometry
 square_geometry = LatticeGeometry.square(3, 3)
 graph = LatticeGraph.from_geometry(square_geometry, shells=[1, 2])
-print(f"Selected shells: {graph.selected_shells}")
+print(
+    f"Labelled shells: {sorted({label.shell for label in graph.edge_labels.values()})}"
+)
 print(f"Interaction edges: {graph.num_edges}")
 # end-cell-from-geometry
 ################################################################################
 
 ################################################################################
 # start-cell-bond-flavors
-flavored_graph = graph.with_bond_flavors(
-    [
+flavored_graph = LatticeGraph.from_geometry(
+    square_geometry,
+    shells=[1, 2],
+    bond_flavors=[
         BondFlavorDefinition(1, np.array([1.0, 0.0]), 10),
         BondFlavorDefinition(1, np.array([0.0, 1.0]), 20),
         BondFlavorDefinition(2, np.array([1.0, 1.0]), 30),
         BondFlavorDefinition(2, np.array([1.0, -1.0]), 40),
-    ]
+    ],
 )
-connection = flavored_graph.connections[0]
-print(
-    connection.site_i,
-    connection.site_j,
-    connection.bond_class.shell,
-    connection.flavor,
-    connection.weight,
-)
+(site_i, site_j), label = next(iter(flavored_graph.edge_labels.items()))
+print(site_i, site_j, label.shell, label.flavor, flavored_graph.weight(site_i, site_j))
 # end-cell-bond-flavors
 ################################################################################
 
 ################################################################################
 # start-cell-coloring
 # Here XX acts on shell 1 and ZZ on shell 2, with nonzero couplings throughout.
-xx_pairs = [(c.site_i, c.site_j) for c in graph.connections if c.bond_class.shell == 1]
-zz_pairs = [(c.site_i, c.site_j) for c in graph.connections if c.bond_class.shell == 2]
+xx_pairs = [pair for pair, label in graph.edge_labels.items() if label.shell == 1]
+zz_pairs = [pair for pair, label in graph.edge_labels.items() if label.shell == 2]
 # Restrict the constructor's coloring; neither family is recolored.
 coloring = graph.edge_coloring
 assert coloring is not None
@@ -168,10 +166,6 @@ print(f"Bidirectional: is_symmetric = {bidirectional.is_symmetric}")
 # start-cell-properties
 # Query lattice properties
 lattice = LatticeGraph.chain(4)
-
-# Geometry is optional for general graphs, but present on built-in factories.
-assert lattice.geometry is not None
-print(f"Positions:\n{lattice.geometry.positions}")
 
 # Check connectivity
 print(f"Sites 0-1 connected: {lattice.are_connected(0, 1)}")

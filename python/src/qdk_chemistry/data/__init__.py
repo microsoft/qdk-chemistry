@@ -19,6 +19,7 @@ Exposed classes are:
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`DataClass`: Base data class.
+- :class:`EdgeLabel`: Geometric shell and optional semantic flavor of a lattice graph edge.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
@@ -27,7 +28,7 @@ Exposed classes are:
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGeometry`: Immutable Cartesian lattice positions, periodic vectors, and geometric neighbor queries.
-- :class:`LatticeGraph`: Weighted interaction graph with resolved connections and optional shared lattice geometry.
+- :class:`LatticeGraph`: Weighted interaction graph with labelled edges and optional shared lattice geometry.
 - :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
@@ -85,6 +86,7 @@ from qdk_chemistry._core.data import (
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
+    EdgeLabel,
     ElectronicStructureSettings,
     Element,
     FactorizedHamiltonianContainer,
@@ -164,6 +166,7 @@ __all__ = [
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
+    "EdgeLabel",
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",

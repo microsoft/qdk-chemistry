@@ -193,8 +193,8 @@ Relabeling and serialization
 ``path`` must be a permutation of every site. Positions and retained integer coordinates are reordered together; periodic vectors are unchanged.
 Use :meth:`~qdk_chemistry.data.LatticeGraph.permute` when connectivity and geometry must be relabeled together.
 
-JSON and HDF5 :doc:`serialization <serialization>` preserve only positions and optional periods.
-Deserialized geometries use Cartesian neighbor queries; the factory's integer-coordinate cache is not serialized.
+JSON and HDF5 :doc:`serialization <serialization>` store a factory geometry as its integer unit-cell layout, from which positions and periods are rebuilt exactly, so reloaded factory geometries keep stencil-based neighbor queries.
+Other geometries store positions and optional periods.
 The data type identifier is ``lattice_geometry``; a typical filename is ``patch.lattice_geometry.json``.
 
 Related documentation

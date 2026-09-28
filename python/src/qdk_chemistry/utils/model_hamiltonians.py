@@ -25,9 +25,9 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
 )
 from qdk_chemistry.data import (
     BondFlavorDefinition,
+    EdgeLabel,
     LatticeGraph,
     LayeredPartition,
-    NeighborConnection,
     QubitOperator,
 )
 from qdk_chemistry.utils import Logger
@@ -78,25 +78,28 @@ def _pair_parameter(value: np.ndarray | float, graph: LatticeGraph, name: str) -
     return to_pair_param(value, graph, name)
 
 
-def _selected_connections(
+def _selected_edges(
     graph: LatticeGraph,
     shells: set[int],
     *,
     required_shells: set[int] | None = None,
-) -> list[NeighborConnection]:
+) -> list[tuple[tuple[int, int], EdgeLabel]]:
     """Validate active shell requests without discovering or adding graph edges."""
     if not shells:
         return []
-    selected_shells = set(graph.selected_shells)
-    if not selected_shells and (graph.geometry is None or graph.num_nonzeros != 0):
-        raise ValueError("Shell interactions require lattice geometry or explicit neighbor-shell metadata.")
-    missing_shells = (shells if required_shells is None else required_shells) - selected_shells
+    labels = graph.edge_labels
+    if not labels and graph.num_nonzeros != 0:
+        raise ValueError(
+            "Shell interactions require edge-label metadata; build the graph with LatticeGraph.from_geometry."
+        )
+    edges = [(pair, label) for pair, label in labels.items() if label.shell in shells]
+    missing_shells = (shells if required_shells is None else required_shells) - {label.shell for _, label in edges}
     if missing_shells:
         raise ValueError(
             f"Requested neighbor shells {sorted(missing_shells)} are not selected in the lattice graph. "
             "Select them explicitly with LatticeGraph.from_geometry before constructing the Hamiltonian."
         )
-    return [connection for connection in graph.connections if connection.bond_class.shell in shells]
+    return edges
 
 
 def _build_sparse_hamiltonian(
@@ -229,8 +232,8 @@ def create_heisenberg_hamiltonian(
     couplings instead defines :math:`K_a^{ij}` on already-selected graph edges
     independently of adjacency weights. Select nonzero requested shells with
     :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` before constructing
-    the Hamiltonian; mappings never discover or add edges. Periodic shell mappings
-    remain unsupported. Empty or all-zero mappings require no geometry.
+    the Hamiltonian; mappings never discover or add edges. Empty or all-zero
+    mappings require no edge labels.
 
     Each qubit corresponds to a lattice site.
 
@@ -248,8 +251,7 @@ def create_heisenberg_hamiltonian(
         QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
 
     Raises:
-        ValueError: If the graph is asymmetric, shell metadata is absent, or an active mapped shell is unselected.
-        RuntimeError: If active shell mappings are used with periodic geometry.
+        ValueError: If the graph is asymmetric, shell metadata is absent, or an active mapped shell has no edges.
 
     """
     if not graph.is_symmetric:
@@ -274,18 +276,10 @@ def create_heisenberg_hamiltonian(
         else:
             adjacency_couplings[name] = _pair_parameter(coupling, graph, name)
 
-    connections = _selected_connections(graph, requested_shells)
-    geometry = graph.geometry
-    if requested_shells and (
-        (geometry is not None and geometry.periods is not None)
-        or any(any(connection.image_shift) for connection in connections)
-    ):
-        raise RuntimeError("Heisenberg shell mappings support open lattices only.")
+    edges = _selected_edges(graph, requested_shells)
     shell_pairs: dict[int, set[tuple[int, int]]] = {}
-    for connection in connections:
-        if connection.site_i == connection.site_j:
-            raise ValueError("Heisenberg interactions cannot connect a site to its own periodic image.")
-        shell_pairs.setdefault(connection.bond_class.shell, set()).add((connection.site_i, connection.site_j))
+    for pair, label in edges:
+        shell_pairs.setdefault(label.shell, set()).add(pair)
 
     adjacency_edges = []
     if adjacency_couplings:
@@ -361,11 +355,10 @@ def create_kitaev_hamiltonian(
     Scalars and arrays use selected first-neighbor connections and their weights. A mapping ``{m: coupling}``
     applies ``kx``, ``ky``, ``kz``, or ``j`` to already-selected shell ``m`` edges independently of their weights.
     Select active mapped shells with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` first; the model never
-    discovers or adds edges. Entirely unflavored active connections use :func:`kitaev_honeycomb_bond_flavors`;
-    partial or invalid explicit flavor labels are rejected rather than replaced.
+    discovers or adds edges. Every active edge needs an X, Y, or Z flavor; pass :func:`kitaev_honeycomb_bond_flavors`
+    to ``from_geometry`` for the standard honeycomb assignment.
     ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts apply to first-neighbor bonds; omitted
-    flavor-specific values fall back to ``gamma`` or ``gamma_prime``. Distinct periodic-image connections are
-    accumulated when they collapse onto the same finite-lattice site pair.
+    flavor-specific values fall back to ``gamma`` or ``gamma_prime``.
 
     The magnetic field is specified in the crystallographic :math:`(a,b,c)` frame and contributes
 
@@ -383,7 +376,7 @@ def create_kitaev_hamiltonian(
     :math:`S_i^\mu=\sigma_i^\mu/2`.
 
     Args:
-        graph: Selected interaction graph with X/Y/Z flavors, or unflavored connections matching the honeycomb defaults.
+        graph: Interaction graph whose active edges carry X/Y/Z flavors.
         kx: Kitaev coupling on X-flavor bonds as a scalar, ``(n, n)`` array, or shell mapping.
         ky: Kitaev coupling on Y-flavor bonds in the same format as ``kx``.
         kz: Kitaev coupling on Z-flavor bonds in the same format as ``kx``.
@@ -487,50 +480,43 @@ def create_kitaev_hamiltonian(
         weighted_field_xyz = crystal_transform.T @ weighted_field_abc
         output_field = bohr_magneton * transform @ weighted_field_xyz / 2.0
 
-    connections = _selected_connections(graph, requested_shells, required_shells=mapped_shells)
-    if connections and all(connection.flavor is None for connection in connections):
-        model_graph = graph.with_bond_flavors(kitaev_honeycomb_bond_flavors())
-        connections = [
-            connection for connection in model_graph.connections if connection.bond_class.shell in requested_shells
-        ]
+    edges = _selected_edges(graph, requested_shells, required_shells=mapped_shells)
     try:
-        connection_flavors = [KitaevBondFlavor(connection.flavor) for connection in connections]
+        edge_flavors = [KitaevBondFlavor(label.flavor) for _, label in edges]
     except (TypeError, ValueError) as error:
         raise ValueError(
             "The Kitaev Hamiltonian requires X, Y, or Z flavor IDs for every requested geometric connection."
         ) from error
-    if any(connection.site_i == connection.site_j for connection in connections):
-        raise ValueError("Kitaev interactions cannot connect a site to its own periodic image.")
 
-    def parameter_value(name: str, connection: NeighborConnection) -> float:
-        shell = connection.bond_class.shell
+    def parameter_value(name: str, pair: tuple[int, int], shell: int) -> float:
         if shell not in prepared[name]:
             return 0.0
         value = prepared[name][shell]
-        result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
+        result = value if isinstance(value, float) else value[pair]
         if name not in mapped_parameters:
-            result *= connection.weight
+            result *= graph.weight(*pair)
         return float(result)
 
     def nearest_neighbor_value(
         values: dict[KitaevBondFlavor, np.ndarray | float],
-        connection: NeighborConnection,
+        pair: tuple[int, int],
+        shell: int,
         flavor: KitaevBondFlavor,
     ) -> float:
-        if connection.bond_class.shell != 1:
+        if shell != 1:
             return 0.0
         value = values[flavor]
-        result = value if isinstance(value, float) else value[connection.site_i, connection.site_j]
-        return float(result * connection.weight)
+        result = value if isinstance(value, float) else value[pair]
+        return float(result * graph.weight(*pair))
 
     exchange_by_pair: dict[tuple[int, int], np.ndarray] = {}
-    for connection, flavor in zip(connections, connection_flavors, strict=True):
+    for (pair, label), flavor in zip(edges, edge_flavors, strict=True):
         flavor_index = int(flavor)
         other_indices = tuple(index for index in range(3) if index != flavor_index)
-        exchange = np.eye(3) * parameter_value("j", connection)
-        exchange[flavor_index, flavor_index] += parameter_value("k" + flavor.name.lower(), connection)
-        gamma_value = nearest_neighbor_value(gamma_parameters, connection, flavor)
-        gamma_prime_value = nearest_neighbor_value(gamma_prime_parameters, connection, flavor)
+        exchange = np.eye(3) * parameter_value("j", pair, label.shell)
+        exchange[flavor_index, flavor_index] += parameter_value("k" + flavor.name.lower(), pair, label.shell)
+        gamma_value = nearest_neighbor_value(gamma_parameters, pair, label.shell, flavor)
+        gamma_prime_value = nearest_neighbor_value(gamma_prime_parameters, pair, label.shell, flavor)
         exchange[other_indices[0], other_indices[1]] = gamma_value
         exchange[other_indices[1], other_indices[0]] = gamma_value
         for other_index in other_indices:
@@ -540,9 +526,7 @@ def create_kitaev_hamiltonian(
         scale = np.max(np.abs(transformed))
         if scale != 0.0:
             transformed[np.abs(transformed) < 100 * np.finfo(float).eps * scale] = 0.0
-        pair = (connection.site_i, connection.site_j)
-        exchange_by_pair.setdefault(pair, np.zeros((3, 3)))
-        exchange_by_pair[pair] += transformed
+        exchange_by_pair[pair] = transformed
 
     pauli_components = ("X", "Y", "Z")
     couplings: list[tuple[str, dict[tuple[int, int], float]]] = []
@@ -585,7 +569,7 @@ def create_ising_hamiltonian(
     ``{m: coupling}`` instead filters already-selected graph edges by geometric
     shell, independently of adjacency weights. Select active mapped shells with
     :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` first; no edges are added
-    by the model. Periodic shell mappings remain unsupported.
+    by the model.
 
     Args:
         graph: Lattice graph defining the connectivity.

@@ -415,6 +415,32 @@ TEST_F(LatticeGeometryTest, SerializationRetainsCoordinatesHashAndConnections) {
   }
 }
 
+TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
+  const auto geometry =
+      LatticeGeometry::honeycomb_plaquettes(2, 2, true, false);
+  const auto json = geometry.to_json();
+  ASSERT_TRUE(json.contains("integer_embedding"));
+  EXPECT_FALSE(json.contains("positions"));
+  EXPECT_EQ(LatticeGeometry::from_json(json).to_json(), json);
+  const std::string filename = "test_layout.lattice_geometry.h5";
+  geometry.to_hdf5_file(filename);
+  const auto hdf5 = LatticeGeometry::from_hdf5_file(filename);
+  std::filesystem::remove(filename);
+  EXPECT_EQ(hdf5.to_json(), json);
+
+  const std::vector<std::pair<std::string, nlohmann::json>> invalid = {
+      {"/integer_embedding/nx", 0},
+      {"/integer_embedding/site_by_coordinate/0", 99},
+      {"/integer_embedding/site_by_coordinate/1", 0},
+      {"/integer_embedding/primitive_vectors", {{1.0, 0.0}}}};
+  for (const auto& [path, value] : invalid) {
+    SCOPED_TRACE(path);
+    auto malformed = json;
+    malformed[nlohmann::json::json_pointer(path)] = value;
+    EXPECT_THROW(LatticeGeometry::from_json(malformed), std::invalid_argument);
+  }
+}
+
 TEST_F(LatticeGeometryTest, EmptyAndCoincidentGeometryRoundTrips) {
   for (Eigen::Index count : {0, 2}) {
     const LatticeGeometry geometry(Eigen::MatrixXd::Zero(count, 2));
@@ -525,7 +551,9 @@ TEST_F(LatticeGeometryTest, PermutationRemapsPositionsAndShells) {
 }
 
 TEST_F(LatticeGeometryTest, JsonRejectsInvalidGeometry) {
-  const auto valid = LatticeGeometry::square(2, 2, true, false).to_json();
+  const auto square = LatticeGeometry::square(2, 2, true, false);
+  const auto valid =
+      LatticeGeometry(square.positions(), square.periods()).to_json();
   const std::vector<std::pair<std::string, nlohmann::json>> invalid = {
       {"/positions", 0.0},
       {"/positions", {0.0, 0.0}},
@@ -555,7 +583,8 @@ TEST_F(LatticeGeometryTest, JsonRejectsInvalidGeometry) {
 }
 
 TEST_F(LatticeGeometryTest, Hdf5RejectsInvalidGeometry) {
-  const auto geometry = LatticeGeometry::square(2, 2, true, false);
+  const auto square = LatticeGeometry::square(2, 2, true, false);
+  const LatticeGeometry geometry(square.positions(), square.periods());
   const std::string filename = "test_invalid.lattice_geometry.h5";
   const auto expect_invalid = [&](const auto& mutate) {
     geometry.to_hdf5_file(filename);

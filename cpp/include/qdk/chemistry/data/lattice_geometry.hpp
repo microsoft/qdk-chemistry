@@ -242,6 +242,10 @@ class LatticeGeometry : public DataClass {
                                   bool remove_open_corners = false);
   std::vector<NeighborConnection> _integer_neighbor_connections(
       const std::set<std::uint64_t>& shells, double tolerance) const;
+  static LatticeGeometry _from_integer_embedding(
+      int nx, int ny, const Eigen::MatrixXd& primitive_vectors,
+      Eigen::MatrixXd basis, std::vector<int> site_by_coordinate,
+      bool periodic_x, bool periodic_y);
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   Eigen::MatrixXd _positions;

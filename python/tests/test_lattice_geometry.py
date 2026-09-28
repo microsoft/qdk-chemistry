@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import BondClass, BondFlavorDefinition, LatticeGeometry, LatticeGraph, NeighborConnection
+from qdk_chemistry.data import BondFlavorDefinition, LatticeGeometry, LatticeGraph, NeighborConnection
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -108,7 +108,7 @@ class TestLatticeGeometry:
 
 
 class TestSelectedLatticeGraph:
-    """Check selected connections, adjacency projection, and graph persistence."""
+    """Check edge labels and graph persistence."""
 
     def test_from_geometry_materializes_selected_union(self) -> None:
         """Selected shells yield a deduplicated weighted, flavored union without mutating geometry."""
@@ -118,66 +118,31 @@ class TestSelectedLatticeGraph:
             geometry, [2, 1, 99, 2], bond_flavors=definitions, weight=2.5, tolerance=1e-9
         )
 
-        assert graph.selected_shells == [1, 2, 99]
-        assert len(graph.connections) == 3
-        assert all(connection.weight == 2.5 for connection in graph.connections)
-        assert all(connection.flavor == 1000 + connection.bond_class.shell for connection in graph.connections)
+        labels = graph.edge_labels
+        assert {pair: label.shell for pair, label in labels.items()} == {(0, 1): 1, (0, 2): 2, (1, 2): 1}
+        assert all(label.flavor == 1000 + label.shell for label in labels.values())
         np.testing.assert_array_equal(graph.adjacency_matrix(), 2.5 * (np.ones((3, 3)) - np.eye(3)))
-        assert graph.geometry is not None
-        np.testing.assert_array_equal(graph.geometry.positions, geometry.positions)
         for connection in geometry.neighbor_connections([1, 2]):
             assert connection.flavor is None
             assert connection.weight == 1.0
 
-    def test_custom_record_constructors_and_canonicalization(self) -> None:
-        """Canonicalizing reversed bonds preserves metadata and sums weights without mutating inputs."""
-        bond_class = BondClass(shell=3, orientation=7, axis=np.array([1.0, 0.0]))
-        default = NeighborConnection(0, 2, bond_class, np.array([2.0, 0.0]), (0, 0))
-        reverse = NeighborConnection(2, 0, bond_class, np.array([-2.0, 0.0]), (-1, 0), flavor=1000, weight=-2.5)
-        graph = LatticeGraph.from_connections(3, [reverse, default], geometry=None, selected_shells=[99, 1, 99])
-
-        assert default.flavor is None
-        assert default.weight == 1.0
-        assert graph.geometry is None
-        assert graph.selected_shells == [1, 3, 99]
-        assert len(graph.connections) == 2
-        first, second = graph.connections
-        assert (first.site_i, first.site_j, first.flavor, first.weight) == (0, 2, None, 1.0)
-        assert (second.site_i, second.site_j, second.flavor, second.weight) == (0, 2, 1000, -2.5)
-        assert tuple(second.image_shift) == (1, 0)
-        assert (second.bond_class.shell, second.bond_class.orientation) == (3, 7)
-        np.testing.assert_array_equal(second.bond_class.axis, [1.0, 0.0])
-        np.testing.assert_array_equal(second.displacement, [2.0, 0.0])
-        assert graph.weight(0, 2) == -1.5
-        assert graph.weight(2, 0) == -1.5
-        assert reverse.site_i == 2
-
-    def test_graph_permutation_preserves_resolved_records(self) -> None:
-        """Valid permutations preserve resolved bonds and geometry; repeated indices are rejected."""
-        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(2, periodic=True), [1], weight=2.5)
-        permuted = LatticeGraph.permute(graph, [1, 0])
+    def test_graph_permutation_preserves_edge_labels(self) -> None:
+        """Valid permutations preserve edge labels; repeated indices are rejected."""
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(3), [1, 2], weight=2.5)
+        permuted = LatticeGraph.permute(graph, [2, 0, 1])
         restored = LatticeGraph.from_json(permuted.to_json())
         assert restored.content_hash() == permuted.content_hash()
-        _assert_same_connections(LatticeGraph.permute(permuted, [1, 0]).connections, graph.connections)
-        np.testing.assert_array_equal(permuted.geometry.positions, graph.geometry.positions[[1, 0]])
+        assert {pair: label.shell for pair, label in permuted.edge_labels.items()} == {(0, 1): 2, (0, 2): 1, (1, 2): 1}
         with pytest.raises(ValueError, match="Permutation"):
             LatticeGraph.permute(graph, [0, 0])
 
     @pytest.mark.parametrize("empty", [False, True])
     @pytest.mark.parametrize("format_name", ["json", "hdf5", "pickle"])
-    def test_round_trip_preserves_selected_records(self, tmp_path: Path, empty: bool, format_name: str) -> None:
-        """Serialization retains selected shells, physical images, weights, flavors, and optional geometry."""
-        geometry = None if empty else LatticeGeometry.chain(2, periodic=True)
-        bond_class = BondClass(1, 0, np.array([1.0, 0.0]))
-        connections = (
-            []
-            if empty
-            else [
-                NeighborConnection(0, 1, bond_class, np.array([1.0, 0.0]), (0, 0), flavor=1000, weight=2.0),
-                NeighborConnection(0, 1, bond_class, np.array([-1.0, 0.0]), (-1, 0), flavor=1001, weight=-3.0),
-            ]
-        )
-        graph = LatticeGraph.from_connections(2, connections, geometry=geometry, selected_shells=[1, 99])
+    def test_round_trip_preserves_edge_labels(self, tmp_path: Path, empty: bool, format_name: str) -> None:
+        """Serialization retains edge labels and weights."""
+        geometry = LatticeGeometry.chain(1) if empty else LatticeGeometry.chain(3, periodic=True)
+        definitions = [BondFlavorDefinition(1, np.array([1.0, 0.0]), 1000)]
+        graph = LatticeGraph.from_geometry(geometry, [1], bond_flavors=definitions, weight=2.0)
         if format_name == "json":
             restored = LatticeGraph.from_json(graph.to_json())
         elif format_name == "hdf5":
@@ -188,13 +153,7 @@ class TestSelectedLatticeGraph:
             restored = pickle.loads(pickle.dumps(graph))
 
         assert restored.num_sites == graph.num_sites
-        assert restored.selected_shells == [1, 99]
-        _assert_same_connections(restored.connections, graph.connections)
+        assert restored.edge_labels == graph.edge_labels
+        assert len(graph.edge_labels) == (0 if empty else 3)
         np.testing.assert_array_equal(restored.adjacency_matrix(), graph.adjacency_matrix())
         assert restored.content_hash() == graph.content_hash()
-        if geometry is None:
-            assert restored.geometry is None
-        else:
-            assert restored.geometry is not None
-            np.testing.assert_array_equal(restored.geometry.positions, geometry.positions)
-            np.testing.assert_array_equal(restored.geometry.periods, geometry.periods)

@@ -7,17 +7,17 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data import (
-    BondClass,
     FlatPartition,
     LatticeGeometry,
     LatticeGraph,
     LayeredPartition,
-    NeighborConnection,
     QubitOperator,
     TaperingSpecification,
     TermPartition,
@@ -484,17 +484,14 @@ class TestLatticeEdgeColoring:
     """Check constructor-owned colors cover physical pairs independently of weights."""
 
     @pytest.mark.parametrize("weight", [-2.0, 0.0])
-    @pytest.mark.parametrize("from_connections", [False, True])
-    def test_constructor_coloring_is_deterministic_and_disjoint(self, weight: float, from_connections: bool) -> None:
-        """Both explicit constructors color all stored pairs, including zero-weight ones."""
+    def test_constructor_coloring_is_deterministic_and_disjoint(self, weight: float) -> None:
+        """Geometry graphs color all labelled pairs, including zero-weight ones."""
         geometry = LatticeGeometry.square(3, 3)
         graph = LatticeGraph.from_geometry(geometry, [1, 2], weight=weight)
-        if from_connections:
-            graph = LatticeGraph.from_connections(graph.num_sites, list(reversed(graph.connections)), geometry=geometry)
         coloring = graph.edge_coloring
 
         assert coloring is not None
-        assert set(coloring) == {(connection.site_i, connection.site_j) for connection in graph.connections}
+        assert set(coloring) == set(graph.edge_labels)
         assert coloring == LatticeGraph.from_geometry(geometry, [2, 1]).edge_coloring
         sites_by_color: dict[int, set[int]] = {}
         for edge, color in coloring.items():
@@ -511,13 +508,12 @@ class TestLatticeEdgeColoring:
         assert coloring is not None
         assert len(set(coloring.values())) == 2
 
-    def test_empty_and_self_image_only_graphs_have_empty_coloring(self) -> None:
-        """An explicit graph has a coloring even when it has no distinct-site pairs."""
-        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(1, periodic=True), [1])
-        assert graph.connections
-        assert graph.edge_coloring == {}
-        assert LatticeGraph.from_connections(3, []).edge_coloring == {}
+    def test_edgeless_graphs_have_empty_coloring(self) -> None:
+        """A geometry graph has a coloring even when it has no edges."""
+        assert LatticeGraph.from_geometry(LatticeGeometry.chain(3), []).edge_coloring == {}
         assert LatticeGraph.from_dense_matrix(np.zeros((3, 3))).edge_coloring is None
+        with pytest.raises(ValueError, match="own periodic image"):
+            LatticeGraph.from_geometry(LatticeGeometry.chain(1, periodic=True), [1])
 
 
 # ---------------------------------------------------------------------------
@@ -607,47 +603,17 @@ class TestModelHamiltonianTermPartition:
 
     def test_kitaev_filters_stored_colors_after_exchange_cancellation(self) -> None:
         """Canceled exchanges are omitted without recoloring the remaining family support."""
-        geometry = LatticeGeometry.chain(5)
         xx_pairs = [(0, 1), (3, 4)]
-        connections = [
-            NeighborConnection(
-                connection.site_i,
-                connection.site_j,
-                connection.bond_class,
-                connection.displacement,
-                connection.image_shift,
-                flavor=KitaevBondFlavor.Z if (connection.site_i, connection.site_j) in xx_pairs else KitaevBondFlavor.X,
-            )
-            for connection in geometry.neighbor_connections([1])
-        ]
-        graph = LatticeGraph.from_connections(5, connections, geometry=geometry)
+        data = json.loads(LatticeGraph.from_geometry(LatticeGeometry.chain(5), [1]).to_json())
+        for label in data["edge_labels"]:
+            label[3] = int(KitaevBondFlavor.Z if tuple(label[:2]) in xx_pairs else KitaevBondFlavor.X)
+        graph = LatticeGraph.from_json(json.dumps(data))
         all_pairs = [(0, 1), (1, 2), (2, 3), (3, 4)]
 
         hamiltonian = create_kitaev_hamiltonian(graph, {1: -4.0}, {}, {}, j={1: 4.0})
 
         np.testing.assert_array_equal(hamiltonian.coefficients, np.ones(10))
         _assert_family_colorings(hamiltonian, graph, {"XX": xx_pairs, "YY": all_pairs, "ZZ": all_pairs})
-
-    def test_kitaev_coalesces_periodic_images_before_filtering_stored_colors(self) -> None:
-        """Periodic-image exchanges combine before filtering, even when adjacency weights cancel."""
-        geometry = LatticeGeometry.chain(2, periodic=True)
-        bond_class = BondClass(1, 0, np.array([1.0, 0.0]))
-        connections = [
-            NeighborConnection(0, 1, bond_class, np.array([1.0, 0.0]), (0, 0), flavor=KitaevBondFlavor.X, weight=2.0),
-            NeighborConnection(
-                0, 1, bond_class, np.array([-1.0, 0.0]), (-1, 0), flavor=KitaevBondFlavor.Y, weight=-2.0
-            ),
-        ]
-        graph = LatticeGraph.from_connections(2, connections, geometry=geometry)
-
-        hamiltonian = create_kitaev_hamiltonian(graph, 8.0, 12.0, {}, j=4.0)
-
-        # The adjacency and isotropic ZZ coupling cancel, but the flavored exchanges do not.
-        np.testing.assert_array_equal(graph.adjacency_matrix(), np.zeros((2, 2)))
-        assert graph.edge_coloring is not None
-        assert set(graph.edge_coloring) == {(0, 1)}
-        assert dict(hamiltonian.get_real_coefficients()) == {"XX": 4.0, "YY": -6.0}
-        _assert_family_colorings(hamiltonian, graph, {"XX": [(0, 1)], "YY": [(0, 1)]})
 
 
 # ---------------------------------------------------------------------------

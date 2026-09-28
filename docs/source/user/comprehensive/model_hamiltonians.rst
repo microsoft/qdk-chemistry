@@ -245,8 +245,8 @@ Selecting interaction shells
 The spin builders accept shell mappings that **filter already-selected graph connections**.
 Choose the union of active shells after resolving parameter defaults and component-specific overrides, then construct one :class:`~qdk_chemistry.data.LatticeGraph` for that union.
 A scalar coupling is active when nonzero; an array coupling is active when any entry is nonzero.
-An active mapped shell absent from ``graph.selected_shells`` raises an error, even if the geometry contains that distance.
-A selected shell with no geometric connections contributes no terms, and empty or all-zero mappings require no additional shell selection.
+An active mapped shell with no labelled graph edges raises an error, even if the geometry contains that distance.
+Empty or all-zero mappings require no edge labels.
 
 For example, a physical-spin first- and second-neighbor Heisenberg model can be written as:
 
@@ -356,12 +356,9 @@ Gamma and Gamma-prime parameters always use weighted shell-1 connections.
 The shared ``gamma`` and ``gamma_prime`` arguments provide isotropic defaults; ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts override individual flavors.
 
 The builder interprets :class:`~qdk_chemistry.utils.model_hamiltonians.KitaevBondFlavor` values X, Y, and Z as flavor IDs 0, 1, and 2.
-When all active connections are unflavored, the builder applies :func:`~qdk_chemistry.utils.model_hamiltonians.kitaev_honeycomb_bond_flavors` to a temporary graph copy.
-That helper defines the standard honeycomb axes for shells 1, 2, and 3; it neither creates edges nor limits the graph's general shell-selection API.
+Pass :func:`~qdk_chemistry.utils.model_hamiltonians.kitaev_honeycomb_bond_flavors` to :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` for the standard honeycomb axes of shells 1, 2, and 3.
 Other geometries or shells require suitable explicit flavors.
-Each active :class:`~qdk_chemistry.data.NeighborConnection` must have one of the three integer IDs; partially labeled or invalid active records are rejected rather than silently replaced.
-When distinct periodic images collapse onto one finite-lattice pair, their exchange contributions are accumulated rather than discarded.
-Self-image interactions are rejected.
+Each active edge's :class:`~qdk_chemistry.data.EdgeLabel` must have one of the three integer IDs; partially labeled or invalid active edges are rejected rather than silently replaced.
 
 The magnetic field and diagonal g factors are supplied in a crystallographic :math:`(a,b,c)` frame.
 Because its orientation is lattice-dependent, the caller supplies ``crystallographic_transform`` as the proper rotation :math:`D` satisfying
@@ -456,7 +453,6 @@ Geometric-shell spin couplings
    Shell couplings are independent of adjacency edge weights.
    For example, select ``shells=[1, 2]`` before passing ``{1: J1, 2: J2}`` for each of ``jx``, ``jy``, and ``jz`` in an isotropic first- and second-neighbor Heisenberg model, using Pauli-normalized values for that builder.
    For the Kitaev builder, ``kx``, ``ky``, and ``kz`` select the corresponding semantic flavor within each requested shell.
-   Heisenberg and Ising shell mappings support open lattices only; Kitaev mappings retain periodic-image multiplicity.
    To restrict a scalar exchange to shell 1 on a union graph, pass ``{1: value}`` rather than an adjacency-based Heisenberg/Ising scalar.
 
 .. tab:: Python API

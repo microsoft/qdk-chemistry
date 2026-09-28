@@ -582,40 +582,70 @@ LatticeGeometry LatticeGeometry::_bravais(std::uint64_t nx, std::uint64_t ny,
     throw std::overflow_error(
         "Lattice dimensions exceed the supported integer site range.");
   }
-  const int Nx = static_cast<int>(nx);
-  const int Ny = static_cast<int>(ny);
-  const int B = static_cast<int>(basis_size);
-  const int full_num_sites = Nx * Ny * B;
-  const int n = full_num_sites - (remove_open_corners ? 2 : 0);
-  std::vector<int> site_by_coordinate(full_num_sites, -1);
-  Eigen::MatrixXd positions(n, 2);
+  const auto full_num_sites = static_cast<int>(nx * ny * basis_size);
+  std::vector<int> site_by_coordinate(full_num_sites);
   int site = 0;
-  for (int y = 0; y < Ny; ++y) {
-    for (int x = 0; x < Nx; ++x) {
-      for (int s = 0; s < B; ++s) {
-        const int coordinate = B * (y * Nx + x) + s;
-        if (remove_open_corners &&
-            (coordinate == 0 || coordinate == full_num_sites - 1)) {
-          continue;
+  for (int coordinate = 0; coordinate < full_num_sites; ++coordinate) {
+    const bool removed = remove_open_corners &&
+                         (coordinate == 0 || coordinate == full_num_sites - 1);
+    site_by_coordinate[coordinate] = removed ? -1 : site++;
+  }
+  Eigen::MatrixXd primitive_vectors(2, 2);
+  primitive_vectors << a1, a2;
+  return _from_integer_embedding(
+      static_cast<int>(nx), static_cast<int>(ny), primitive_vectors,
+      std::move(basis), std::move(site_by_coordinate), periodic_x, periodic_y);
+}
+
+LatticeGeometry LatticeGeometry::_from_integer_embedding(
+    int nx, int ny, const Eigen::MatrixXd& primitive_vectors,
+    Eigen::MatrixXd basis, std::vector<int> site_by_coordinate, bool periodic_x,
+    bool periodic_y) {
+  const auto num_basis = static_cast<std::uint64_t>(basis.rows());
+  const auto limit =
+      static_cast<std::uint64_t>(std::numeric_limits<int>::max());
+  if (nx < 1 || ny < 1 || num_basis == 0 || basis.cols() != 2 ||
+      primitive_vectors.rows() != 2 || primitive_vectors.cols() != 2 ||
+      static_cast<std::uint64_t>(nx) >
+          limit / static_cast<std::uint64_t>(ny) / num_basis ||
+      site_by_coordinate.size() != static_cast<std::uint64_t>(nx) *
+                                       static_cast<std::uint64_t>(ny) *
+                                       num_basis) {
+    throw std::invalid_argument("Invalid lattice integer embedding.");
+  }
+  const auto n = static_cast<std::size_t>(
+      std::count_if(site_by_coordinate.begin(), site_by_coordinate.end(),
+                    [](int site) { return site != -1; }));
+  const Eigen::RowVector2d a1 = primitive_vectors.row(0);
+  const Eigen::RowVector2d a2 = primitive_vectors.row(1);
+  Eigen::MatrixXd positions(static_cast<Eigen::Index>(n), 2);
+  std::vector<bool> seen(n, false);
+  std::size_t coordinate = 0;
+  for (int y = 0; y < ny; ++y) {
+    for (int x = 0; x < nx; ++x) {
+      for (Eigen::Index s = 0; s < basis.rows(); ++s, ++coordinate) {
+        const int site = site_by_coordinate[coordinate];
+        if (site == -1) continue;
+        // The stencil search indexes positions through this map.
+        if (site < 0 || static_cast<std::size_t>(site) >= n || seen[site]) {
+          throw std::invalid_argument(
+              "Integer embedding sites must form a permutation.");
         }
+        seen[site] = true;
         const Eigen::RowVector2d offset = basis.row(s);
         positions.row(site) = x * a1 + y * a2 + offset;
-        site_by_coordinate[coordinate] = site++;
       }
     }
   }
   std::optional<Eigen::MatrixXd> periods;
   if (periodic_x || periodic_y) {
     periods.emplace(static_cast<int>(periodic_x) + periodic_y, 2);
-    if (periodic_x) periods->row(0) = Nx * a1;
-    if (periodic_y) periods->row(periodic_x ? 1 : 0) = Ny * a2;
+    if (periodic_x) periods->row(0) = nx * a1;
+    if (periodic_y) periods->row(periodic_x ? 1 : 0) = ny * a2;
   }
-  Eigen::Matrix2d primitive_vectors;
-  primitive_vectors.row(0) = a1;
-  primitive_vectors.row(1) = a2;
   LatticeGeometry geometry(std::move(positions), std::move(periods));
-  geometry._integer_embedding = IntegerEmbedding{Nx,
-                                                 Ny,
+  geometry._integer_embedding = IntegerEmbedding{nx,
+                                                 ny,
                                                  primitive_vectors,
                                                  std::move(basis),
                                                  std::move(site_by_coordinate),
@@ -740,6 +770,18 @@ void LatticeGeometry::to_file(const std::string& filename,
 nlohmann::json LatticeGeometry::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
+  if (_integer_embedding.has_value()) {
+    const auto& embedding = *_integer_embedding;
+    j["integer_embedding"] = {
+        {"nx", embedding.nx},
+        {"ny", embedding.ny},
+        {"primitive_vectors", matrix_to_json(embedding.primitive_vectors)},
+        {"basis", matrix_to_json(embedding.basis)},
+        {"site_by_coordinate", embedding.site_by_coordinate},
+        {"periodic_x", embedding.periodic_x},
+        {"periodic_y", embedding.periodic_y}};
+    return j;
+  }
   // Empty position arrays do not otherwise record their width.
   j["dimension"] = dimension();
   j["positions"] = matrix_to_json(_positions);
@@ -762,8 +804,24 @@ void LatticeGeometry::to_json_file(const std::string& filename) const {
 void LatticeGeometry::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
-    save_matrix_to_group(group, "positions", _positions);
-    if (_periods.has_value()) save_matrix_to_group(group, "periods", *_periods);
+    if (_integer_embedding.has_value()) {
+      const auto& embedding = *_integer_embedding;
+      auto layout = group.createGroup("integer_embedding");
+      save_stl_to_group(
+          layout, "shape",
+          std::vector<int>{embedding.nx, embedding.ny, embedding.periodic_x,
+                           embedding.periodic_y});
+      save_matrix_to_group(layout, "primitive_vectors",
+                           embedding.primitive_vectors);
+      save_matrix_to_group(layout, "basis", embedding.basis);
+      save_stl_to_group(layout, "site_by_coordinate",
+                        embedding.site_by_coordinate);
+    } else {
+      save_matrix_to_group(group, "positions", _positions);
+      if (_periods.has_value()) {
+        save_matrix_to_group(group, "periods", *_periods);
+      }
+    }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGeometry::to_hdf5: " +
                              std::string(e.getCDetailMsg()));
@@ -791,6 +849,19 @@ LatticeGeometry LatticeGeometry::from_file(const std::string& filename,
 
 LatticeGeometry LatticeGeometry::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
+  if (j.is_object() && j.contains("integer_embedding")) {
+    const auto& embedding = j.at("integer_embedding");
+    if (!embedding.is_object()) {
+      throw std::invalid_argument("Invalid lattice integer embedding.");
+    }
+    return _from_integer_embedding(
+        embedding.at("nx").get<int>(), embedding.at("ny").get<int>(),
+        json_to_matrix(embedding.at("primitive_vectors")),
+        json_to_matrix(embedding.at("basis")),
+        embedding.at("site_by_coordinate").get<std::vector<int>>(),
+        embedding.at("periodic_x").get<bool>(),
+        embedding.at("periodic_y").get<bool>());
+  }
   if (!j.is_object() || !j.contains("positions")) {
     throw std::runtime_error("JSON missing required 'positions' field.");
   }
@@ -877,6 +948,25 @@ LatticeGeometry LatticeGeometry::from_hdf5(H5::Group& group) {
       }
       return load_matrix_from_group(source, name);
     };
+    const auto read_ints = [](H5::Group& source, const std::string& name) {
+      // The shared loader reads a single extent without checking the rank.
+      if (source.openDataSet(name).getSpace().getSimpleExtentNdims() != 1) {
+        throw std::invalid_argument(
+            "Integer embedding dataset must have rank one: " + name);
+      }
+      return load_std_vector_from_group<int>(source, name);
+    };
+    if (group.nameExists("integer_embedding")) {
+      auto layout = group.openGroup("integer_embedding");
+      const auto shape = read_ints(layout, "shape");
+      if (shape.size() != 4) {
+        throw std::invalid_argument("Invalid lattice integer embedding.");
+      }
+      return _from_integer_embedding(
+          shape[0], shape[1], read_matrix(layout, "primitive_vectors"),
+          read_matrix(layout, "basis"), read_ints(layout, "site_by_coordinate"),
+          shape[2] != 0, shape[3] != 0);
+    }
     std::optional<Eigen::MatrixXd> periods;
     if (group.nameExists("periods")) periods = read_matrix(group, "periods");
     return LatticeGeometry(read_matrix(group, "positions"), std::move(periods));

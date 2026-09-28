@@ -21,15 +21,6 @@ void bind_lattice_geometry(py::module& m) {
 
   py::class_<BondClass, py::smart_holder>(
       m, "BondClass", "Geometric shell and bond-axis class.")
-      .def(py::init<std::uint64_t, std::uint32_t, Eigen::RowVectorXd>(),
-           py::arg("shell"), py::arg("orientation"), py::arg("axis"), R"(
-Describe a radial shell and an unoriented bond axis.
-
-Args:
-    shell (int): One-based radial shell index.
-    orientation (int): Zero-based orientation index within the shell.
-    axis (numpy.ndarray): Canonical unit axis with one component per spatial dimension.
-)")
       .def_property_readonly("shell",
                              [](const BondClass& self) { return self.shell; })
       .def_property_readonly(
@@ -41,25 +32,7 @@ Args:
 Physical lattice connection, retaining its periodic image.
 
 The displacement runs from ``site_i`` to the specified image of ``site_j``.
-:class:`LatticeGeometry` queries return unit weight and no semantic flavor;
-interaction graphs can assign weights and labels to these same records.
-)")
-      .def(py::init<std::uint64_t, std::uint64_t, BondClass, Eigen::RowVectorXd,
-                    std::vector<std::int64_t>, std::optional<BondFlavorId>,
-                    double>(),
-           py::arg("site_i"), py::arg("site_j"), py::arg("bond_class"),
-           py::arg("displacement"), py::arg("image_shift"),
-           py::arg("flavor") = py::none(), py::arg("weight") = 1.0, R"(
-Describe a physical connection and optional interaction metadata.
-
-Args:
-    site_i (int): Source site index.
-    site_j (int): Target site index.
-    bond_class (BondClass): Radial shell and unoriented axis class.
-    displacement (numpy.ndarray): Cartesian displacement with one component per spatial dimension.
-    image_shift (list[int]): One image coefficient per spatial dimension, in periodic-vector order, padded with zeros.
-    flavor (int | None, optional): Semantic label, if assigned. Defaults to None.
-    weight (float, optional): Interaction weight. Defaults to 1.0.
+:class:`LatticeGeometry` queries return unit weight and no semantic flavor.
 )")
       .def_property_readonly(
           "site_i", [](const NeighborConnection& self) { return self.site_i; })
@@ -303,7 +276,8 @@ Raises:
       .def(
           "to_json",
           [](const LatticeGeometry& self) { return self.to_json().dump(); },
-          "Serialize positions and optional periods to a JSON string.")
+          "Serialize the factory layout, or positions and optional periods, to "
+          "a JSON string.")
       .def_static(
           "from_json",
           [](const std::string& json_str) {
@@ -313,7 +287,7 @@ Raises:
 Load geometry from a JSON string.
 
 Args:
-    json_str (str): Serialized positions and optional periods.
+    json_str (str): Serialized factory layout, or positions and optional periods.
 
 Returns:
     LatticeGeometry: Restored geometry.
@@ -378,7 +352,7 @@ Returns:
             self.to_hdf5_file(to_string_path(filename));
           },
           py::arg("filename"), R"(
-Save positions and optional periods as numeric HDF5 matrices.
+Save the factory layout, or positions and optional periods, to an HDF5 file.
 
 Args:
     filename (str | pathlib.Path): Output path.

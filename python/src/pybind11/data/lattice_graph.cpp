@@ -61,11 +61,11 @@ void bind_lattice_graph(pybind11::module &m) {
       m, "BondFlavorDefinition", "Semantic label for a shell-axis class.")
       .def(py::init<std::uint64_t, Eigen::RowVectorXd, BondFlavorId>(),
            py::arg("shell"), py::arg("axis"), py::arg("flavor"), R"(
-Define a semantic label to resolve onto connection records.
+Define a semantic label to resolve onto lattice graph edges.
 
 Args:
     shell (int): One-based radial shell index.
-    axis (numpy.ndarray): Finite nonzero axis matching the connection dimension, normalized when labels are resolved.
+    axis (numpy.ndarray): Finite nonzero axis matching the geometry dimension, normalized when labels are resolved.
     flavor (int): Opaque non-negative semantic label.
 )")
       .def_property_readonly(
@@ -74,6 +74,22 @@ Args:
           "axis", [](const BondFlavorDefinition &self) { return self.axis; })
       .def_property_readonly("flavor", [](const BondFlavorDefinition &self) {
         return self.flavor;
+      });
+
+  py::class_<EdgeLabel, py::smart_holder>(
+      m, "EdgeLabel",
+      "Geometric shell and optional semantic flavor of an edge.")
+      .def_property_readonly(
+          "shell", [](const EdgeLabel &self) { return self.shell; },
+          "int: One-based radial shell index.")
+      .def_property_readonly(
+          "flavor", [](const EdgeLabel &self) { return self.flavor; },
+          "int | None: Opaque non-negative semantic label, or None.")
+      .def("__eq__", [](const EdgeLabel &self,
+                        const EdgeLabel &other) { return self == other; })
+      .def("__repr__", [](const EdgeLabel &self) {
+        return "EdgeLabel(shell=" + std::to_string(self.shell) + ", flavor=" +
+               (self.flavor ? std::to_string(*self.flavor) : "None") + ")";
       });
 
   // Module-level free function: trivial_edge_coloring
@@ -103,12 +119,13 @@ Returns:
 
   py::class_<LatticeGraph, DataClass, py::smart_holder> lattice_graph(
       m, "LatticeGraph", R"(
-Weighted lattice interactions with optional shared :class:`LatticeGeometry`.
+Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 
-Resolved :class:`NeighborConnection` records retain physical images, weights,
-and optional semantic flavors. Their sparse adjacency sums image weights
-symmetrically, counting self-images once on the diagonal. Adjacency-only inputs
-retain directed connectivity without inventing geometric labels.
+A LatticeGraph stores a (possibly weighted) adjacency matrix for a lattice of
+sites. It provides factory methods for common lattice topologies and exposes
+connectivity queries used by the model Hamiltonian builders. Graphs built from
+a :class:`LatticeGeometry` also label each edge with its neighbor shell and
+optional bond flavor.
 
 Examples:
     >>> from qdk_chemistry.data import LatticeGraph
@@ -175,59 +192,36 @@ Returns:
   lattice_graph.def_static(
       "from_geometry", &LatticeGraph::from_geometry,
       R"(
-Materialize selected geometric shells into weighted interaction records.
+Materialize selected geometric shells as labelled edges.
 
-Geometry is copied into shared immutable storage; periodic images stay distinct.
-Selected shells are retained even when they contain no connections.
+Each physical connection becomes one edge of weight ``weight``; the geometry is not retained.
 
 Args:
     geometry (LatticeGeometry): Source Cartesian geometry.
-    shells (list[int], optional): Positive shell indices, sorted and deduplicated on storage. Defaults to [1].
-    bond_flavors (list[BondFlavorDefinition], optional): Shell-axis labels resolved onto records. Defaults to [].
-    weight (float, optional): Finite weight for every physical connection. Defaults to 1.0.
+    shells (list[int], optional): Positive shell indices; duplicates are ignored. Defaults to [1].
+    bond_flavors (list[BondFlavorDefinition], optional): Shell-axis labels resolved onto edges. Defaults to [].
+    weight (float, optional): Finite weight of every edge. Defaults to 1.0.
     tolerance (float, optional): Positive finite distance and axis tolerance. Defaults to 1e-9.
 
 Returns:
-    LatticeGraph: Graph with resolved connections and their symmetric adjacency projection.
+    LatticeGraph: Graph whose edges carry their shell and flavor.
+
+Raises:
+    ValueError: If a site neighbors its own periodic image or several periodic images join one site pair.
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},
       py::arg("weight") = 1.0, py::arg("tolerance") = 1.0e-9);
 
-  lattice_graph.def_static(
-      "from_connections", &LatticeGraph::from_connections,
-      R"(
-Construct a graph from resolved physical connection records.
-
-Records are authoritative: geometry is retained without rediscovering bonds.
-Duplicate endpoint/image records are rejected after canonicalization.
-
-Args:
-    num_sites (int): Number of vertices, including isolated sites.
-    connections (list[NeighborConnection]): Physical connections with finite weights.
-    geometry (LatticeGeometry | None, optional): Shared immutable geometry with the same site count. Defaults to None.
-    selected_shells (list[int], optional): Additional positive shells, including empty shells. Defaults to [].
-
-Returns:
-    LatticeGraph: Graph with sorted records and the union of selected and record shells.
-
-Raises:
-    ValueError: If records, shells, or geometry are invalid.
-    OverflowError: If indices, images, or weights exceed the supported range.
-)",
-      py::arg("num_sites"), py::arg("connections"),
-      py::arg("geometry") = py::none(),
-      py::arg("selected_shells") = std::vector<std::uint64_t>{});
-
   lattice_graph.def_static("permute", &LatticeGraph::permute, R"(
-Relabel sites, physical connections, geometry, and topology colors together.
+Relabel sites, edge labels, and topology colors together.
 
 Args:
         graph (LatticeGraph): Source interaction graph.
         path (list[int]): Original site indices in the desired new order.
 
 Returns:
-        LatticeGraph: Relabeled graph retaining weights, labels, and periodic images.
+        LatticeGraph: Relabeled graph retaining weights and edge labels.
 
 Raises:
         ValueError: If path is not a permutation of every site.
@@ -242,7 +236,7 @@ Return a new lattice graph with reverse edges added.
 For each directed edge (i,j) with weight w, ensures (j,i) also
 exists with the same weight. Computes A_out = A + A^T, so this
 should be called on graphs where edges are specified in one
-direction only. Resolved connection weights are doubled.
+direction only.
 
 Args:
     graph (LatticeGraph): The (possibly directed) lattice graph.
@@ -282,43 +276,20 @@ Returns:
     bool: True if the adjacency matrix is symmetric.
 )");
   lattice_graph.def_property_readonly(
-      "geometry", [](const LatticeGraph &self) { return self.geometry(); },
+      "edge_labels",
+      [](const LatticeGraph &self) {
+        py::dict out;
+        for (const auto &[edge, label] : self.edge_labels()) {
+          out[py::make_tuple(edge.first, edge.second)] = label;
+        }
+        return out;
+      },
       R"(
-Shared immutable geometry, independent of interaction selection.
+Shell and optional flavor of each edge.
 
 Returns:
-    LatticeGeometry | None: Shared geometry, or None for geometry-free graphs.
+    dict[tuple[int, int], EdgeLabel]: Labels keyed by canonical edges (``i < j``); empty for unlabelled graphs.
 )");
-  lattice_graph.def_property_readonly(
-      "selected_shells",
-      [](const LatticeGraph &self) { return self.selected_shells(); }, R"(
-Selected geometric shells, including empty shells.
-
-Returns:
-    list[int]: Independent copy of the sorted unique shell indices.
-)");
-  lattice_graph.def_property_readonly(
-      "connections",
-      [](const LatticeGraph &self) { return self.connections(); }, R"(
-Resolved physical connections with weights and optional semantic labels.
-
-Returns:
-    list[NeighborConnection]: Independent copies ordered by shell, orientation, endpoints, and image shift.
-)");
-  lattice_graph.def("with_bond_flavors", &LatticeGraph::with_bond_flavors,
-                    R"(
-Return a copy with semantic labels resolved on existing connection records.
-
-Unmatched records become unlabeled; no connections are discovered.
-
-Args:
-    definitions (list[BondFlavorDefinition]): Shell-axis labels matched using normalized axes.
-    tolerance (float, optional): Positive finite axis comparison tolerance. Defaults to 1e-9.
-
-Returns:
-    LatticeGraph: Graph sharing geometry with unchanged selection, weights, and topology.
-)",
-                    py::arg("definitions"), py::arg("tolerance") = 1.0e-9);
   lattice_graph.def("adjacency_matrix", &LatticeGraph::adjacency_matrix, R"(
 Return the dense adjacency matrix.
 
@@ -375,7 +346,7 @@ Returns:
       R"(
 Edge coloring stored at construction time, or ``None``.
 
-Factory methods and explicit physical-connection constructors pre-populate this field.
+Factory methods for recognised topologies pre-populate this field.
 Returns ``None`` for lattices constructed without a coloring.
 
 Returns:
@@ -658,7 +629,7 @@ Examples:
 Convert the lattice graph to a JSON string.
 
 Returns:
-    str: JSON preserving connectivity, resolved records, selected shells, and optional geometry.
+    str: JSON string with adjacency matrix and metadata.
 )");
   lattice_graph.def_static(
       "from_json",
