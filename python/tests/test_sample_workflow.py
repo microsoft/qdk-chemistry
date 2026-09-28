@@ -186,6 +186,10 @@ def test_estimation_spin_models(notebook_name: str) -> None:
     not _HAS_QRE,
     reason="qdk.qre not available",
 )
+@pytest.mark.skipif(
+    not PYSCF_AVAILABLE,
+    reason="PySCF not available",
+)
 def test_sossa_qre():
     """Test the sequential SOSSA notebook workflow executes without errors.
 
