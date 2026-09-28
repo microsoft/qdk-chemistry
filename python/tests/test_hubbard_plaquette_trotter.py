@@ -54,13 +54,18 @@ def _lattice_operator(width: int, height: int) -> QubitOperator:
     return QubitOperator(container=LatticeContainer(lattice))
 
 
-def _reference_hamiltonian(width: int, height: int, *, t: float, u: float, epsilon: float) -> np.ndarray:
-    """Return the dense Hamiltonian from an independent Jordan-Wigner mapping."""
+def _reference_hamiltonian(width: int, height: int, *, t: float, u: float) -> np.ndarray:
+    """Return the dense Hamiltonian from an independent Jordan-Wigner mapping.
+
+    The builder simulates the particle-hole symmetric interaction, which the model helper
+    reaches at ``epsilon = -u/2`` up to the scalar ``-(u/4) M`` that the symmetric form drops.
+    """
     lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
-    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=epsilon, t=t, U=u)
+    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-0.5 * u, t=t, U=u)
     mapped = create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * width * height))
     labels, coefficients = zip(*mapped.get_real_coefficients(tolerance=1e-14), strict=True)
-    return pauli_to_dense_matrix(list(labels), list(coefficients))
+    dense = pauli_to_dense_matrix(list(labels), list(coefficients))
+    return dense + 0.25 * u * width * height * np.eye(dense.shape[0])
 
 
 def _plaquette_parameters(container):
@@ -69,8 +74,6 @@ def _plaquette_parameters(container):
         width=container.width,
         height=container.height,
         interactionAngle=container.interaction_angle,
-        onsiteAngle=container.onsite_angle,
-        identityAngle=container.identity_angle,
         hoppingAngle=container.hopping_angle,
         repetitions=container.step_reps,
     )
@@ -84,7 +87,6 @@ def _evolution_circuit(
     time: float,
     t: float = 1.0,
     u: float = 0.0,
-    epsilon: float = 0.0,
     num_divisions: int = 1,
 ):
     """Return the uncontrolled plaquette evolution as a Q# callable.
@@ -93,7 +95,7 @@ def _evolution_circuit(
     evolution is the same operation without its control, so it is taken directly from Q#.
     """
     builder = HubbardPlaquetteTrotter(
-        order=2, time=time, t=t, u=u, epsilon=epsilon, num_divisions=num_divisions, target_accuracy=0.0
+        order=2, time=time, t=t, u=u, num_divisions=num_divisions, target_accuracy=0.0
     )
     with use_qsharp_context(context):
         container = builder.run(_lattice_operator(width, height)).get_container()
@@ -132,7 +134,7 @@ class TestHubbardPlaquetteContainer:
     def test_builder_emits_a_plaquette_container(self):
         """The builder's representation is the plaquette container."""
         unitary = HubbardPlaquetteTrotter(
-            order=2, time=0.1, t=1.0, u=4.0, epsilon=-2.0, num_divisions=3, target_accuracy=0.0
+            order=2, time=0.1, t=1.0, u=4.0, num_divisions=3, target_accuracy=0.0
         ).run(_lattice_operator(2, 2))
         container = unitary.get_container()
 
@@ -148,7 +150,7 @@ class TestHubbardPlaquetteContainer:
         spell out one Pauli string per term, and the term count grows with the lattice.
         """
         payloads = [
-            HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, epsilon=-2.0, num_divisions=1)
+            HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, num_divisions=1)
             .run(_lattice_operator(side, side))
             .get_container()
             .to_json()
@@ -160,7 +162,7 @@ class TestHubbardPlaquetteContainer:
     def test_container_round_trips_through_json(self):
         """Serialization preserves every field the Q# lowering reads."""
         container = (
-            HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, epsilon=-4.0, num_divisions=2)
+            HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, num_divisions=2)
             .run(_lattice_operator(4, 4))
             .get_container()
         )
@@ -169,7 +171,7 @@ class TestHubbardPlaquetteContainer:
 
     def test_representation_round_trips_through_the_generic_loader(self):
         """``UnitaryRepresentation.from_json`` must recognize the plaquette container."""
-        unitary = HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, epsilon=-4.0, num_divisions=2).run(
+        unitary = HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, num_divisions=2).run(
             _lattice_operator(4, 4)
         )
 
@@ -293,7 +295,7 @@ class TestPlaquetteEvolutionOnAState:
         """A hopping-only plaquette evolution carries no Trotter error, so it is exact."""
         time = 0.17
         circuit = _evolution_circuit(2, 2, time=time, context=qsharp_context)
-        hamiltonian = _reference_hamiltonian(2, 2, t=1.0, u=0.0, epsilon=0.0)
+        hamiltonian = _reference_hamiltonian(2, 2, t=1.0, u=0.0)
 
         state = np.zeros(2**8, dtype=complex)
         state[basis_state] = 1.0
@@ -305,7 +307,7 @@ class TestPlaquetteEvolutionOnAState:
         """Exactness holds on an entangled superposition, not just basis states."""
         time = 0.23
         circuit = _evolution_circuit(2, 2, time=time, context=qsharp_context)
-        hamiltonian = _reference_hamiltonian(2, 2, t=1.0, u=0.0, epsilon=0.0)
+        hamiltonian = _reference_hamiltonian(2, 2, t=1.0, u=0.0)
         state = _random_state(8, seed=7)
         expected = scipy.linalg.expm(-1j * time * hamiltonian) @ state
 
@@ -318,8 +320,8 @@ class TestPlaquetteEvolutionOnAState:
         many steps reproduces exp(-iHt). Convergence is what distinguishes Trotter error
         from a wrong circuit.
         """
-        time, t, u, epsilon = 0.17, 1.0, 4.0, -2.0
-        hamiltonian = _reference_hamiltonian(2, 2, t=t, u=u, epsilon=epsilon)
+        time, t, u = 0.17, 1.0, 4.0
+        hamiltonian = _reference_hamiltonian(2, 2, t=t, u=u)
         state = _random_state(8, seed=11)
         expected = scipy.linalg.expm(-1j * time * hamiltonian) @ state
 
@@ -327,7 +329,7 @@ class TestPlaquetteEvolutionOnAState:
             _infidelity(
                 _applied_state(
                     _evolution_circuit(
-                        2, 2, time=time, t=t, u=u, epsilon=epsilon, num_divisions=divisions, context=qsharp_context
+                        2, 2, time=time, t=t, u=u, num_divisions=divisions, context=qsharp_context
                     ),
                     state,
                     qsharp_context,
@@ -418,15 +420,15 @@ class TestPlaquettePhaseEstimation:
         return circuit, float(values[0])
 
     @pytest.mark.parametrize(
-        ("t", "u", "epsilon", "num_divisions", "expected_energy"),
+        ("t", "u", "num_divisions", "expected_energy"),
         [
-            pytest.param(1.0, 0.0, 0.0, 1, -8.0, id="hopping-only"),
-            pytest.param(0.5, 2.0, -1.0, 4, -6.8284271247, id="weak-coupling"),
-            pytest.param(1.0, 4.0, -2.0, 8, -13.6568542495, id="strong-coupling"),
+            pytest.param(1.0, 0.0, 1, -8.0, id="hopping-only"),
+            pytest.param(0.5, 2.0, 4, -4.8284271247, id="weak-coupling"),
+            pytest.param(1.0, 4.0, 8, -9.6568542495, id="strong-coupling"),
         ],
     )
     def test_iterative_qpe_recovers_the_ground_energy(
-        self, t, u, epsilon, num_divisions, expected_energy, qsharp_context
+        self, t, u, num_divisions, expected_energy, qsharp_context
     ):
         """IQPE over the plaquette evolution recovers the 2x2 ground energy.
 
@@ -439,7 +441,7 @@ class TestPlaquettePhaseEstimation:
         """
         num_bits = 4
         time = 2 * np.pi / (2**num_bits * abs(expected_energy))
-        hamiltonian = _reference_hamiltonian(2, 2, t=t, u=u, epsilon=epsilon)
+        hamiltonian = _reference_hamiltonian(2, 2, t=t, u=u)
         preparation, ground_energy = self._ground_state_preparation(hamiltonian, 8)
         assert ground_energy == pytest.approx(expected_energy, abs=1e-9), "the reference energy pins the test"
 
@@ -458,7 +460,6 @@ class TestPlaquettePhaseEstimation:
                     time=time,
                     t=t,
                     u=u,
-                    epsilon=epsilon,
                     num_divisions=num_divisions,
                     target_accuracy=0.0,
                 ),
@@ -479,7 +480,7 @@ class TestPlaquettePhaseEstimation:
         the control is off, or the ancilla would pick up a phase from the wrong branch.
         """
         builder = HubbardPlaquetteTrotter(
-            order=2, time=0.19, t=1.0, u=4.0, epsilon=-2.0, num_divisions=1, target_accuracy=0.0
+            order=2, time=0.19, t=1.0, u=4.0, num_divisions=1, target_accuracy=0.0
         )
         with use_qsharp_context(qsharp_context):
             unitary = builder.run(_lattice_operator(2, 2))
@@ -534,12 +535,10 @@ def _auto_step_count(width: int, height: int, *, t: float, u: float, time: float
         time=time,
         t=t,
         u=u,
-        epsilon=-u / 2.0,
         num_divisions=1,
         target_accuracy=target_accuracy,
     )
-    sections = HubbardPlaquetteTrotter._plaquette_sections(width, height)
-    return builder._step_count(t, sections, width, height, time)
+    return builder._step_count(t, width, height, time)
 
 
 class TestAutomaticStepCount:
@@ -615,29 +614,30 @@ class TestAutomaticStepCount:
             time=time,
             t=t,
             u=u,
-            epsilon=-u / 2.0,
             num_divisions=automatic + 25,
             target_accuracy=target_accuracy,
         )
-        sections = HubbardPlaquetteTrotter._plaquette_sections(4, 4)
-        assert builder._step_count(t, sections, 4, 4, time) == automatic + 25
+        assert builder._step_count(t, 4, 4, time) == automatic + 25
 
     def test_a_disabled_target_leaves_the_manual_count_alone(self):
         builder = HubbardPlaquetteTrotter(
-            order=2, time=3.0, t=1.0, u=8.0, epsilon=-4.0, num_divisions=7, target_accuracy=0.0
+            order=2, time=3.0, t=1.0, u=8.0, num_divisions=7, target_accuracy=0.0
         )
-        sections = HubbardPlaquetteTrotter._plaquette_sections(4, 4)
-        assert builder._step_count(1.0, sections, 4, 4, 3.0) == 7
+        assert builder._step_count(1.0, 4, 4, 3.0) == 7
 
     def test_a_zero_duration_needs_a_single_step(self):
         assert _auto_step_count(4, 4, t=1.0, u=8.0, time=0.0, target_accuracy=0.1) == 1
 
-    @pytest.mark.parametrize("epsilon", [0.0, -4.0, 1.5])
-    def test_the_uniform_onsite_layer_commutes_with_the_hamiltonian(self, epsilon):
-        """Justifies omitting ``single_z`` from the error bound for any ``epsilon``."""
+    def test_the_hamiltonian_conserves_particle_number(self):
+        """Justifies recovering the conventional energy by a classical shift.
+
+        The simulated and conventional interactions differ by ``U N / 2 - U M / 4``. That
+        correction is exact on a particle-number eigenstate only because the Hamiltonian
+        commutes with the total number operator.
+        """
         width = height = 2
         num_qubits = 2 * width * height
-        hamiltonian = _reference_hamiltonian(width, height, t=1.0, u=8.0, epsilon=epsilon)
+        hamiltonian = _reference_hamiltonian(width, height, t=1.0, u=8.0)
 
         total_z = np.zeros((2**num_qubits, 2**num_qubits))
         for mode in range(num_qubits):
@@ -650,3 +650,36 @@ class TestAutomaticStepCount:
 
         commutator = hamiltonian @ total_z - total_z @ hamiltonian
         assert np.max(np.abs(commutator)) < 1e-10
+
+    @pytest.mark.parametrize("num_electrons", [0, 2, 4, 8])
+    def test_the_electron_count_shifts_to_the_conventional_model(self, num_electrons):
+        """``num_electrons`` adds the ``U*eta/2 - U*M/4`` offset during phase conversion."""
+        width = height = 2
+        u, time, divisions = 4.0, 0.3, 2
+        operator = _lattice_operator(width, height)
+
+        unshifted = HubbardPlaquetteTrotter(
+            order=2, time=time, t=1.0, u=u, num_divisions=divisions, target_accuracy=0.0
+        ).run(operator).get_container()
+        shifted = HubbardPlaquetteTrotter(
+            order=2,
+            time=time,
+            t=1.0,
+            u=u,
+            num_electrons=num_electrons,
+            num_divisions=divisions,
+            target_accuracy=0.0,
+        ).run(operator).get_container()
+
+        assert unshifted.constant_shift == 0.0, "an unset count leaves the symmetric energy alone"
+        assert shifted.interaction_angle == unshifted.interaction_angle, "only the scalar moves"
+        assert shifted.hopping_angle == unshifted.hopping_angle, "only the scalar moves"
+
+        delta = time / divisions
+        expected = u * (0.5 * num_electrons - 0.25 * width * height) * delta
+        assert shifted.constant_shift == pytest.approx(expected)
+        phase_fraction = 0.125
+        expected_energy_shift = expected * divisions / time
+        assert shifted.eigenvalue_from_phase(phase_fraction) == pytest.approx(
+            unshifted.eigenvalue_from_phase(phase_fraction) + expected_energy_shift
+        )

@@ -25,10 +25,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         height : Int,
         /// On-site pair angle for a full interaction layer.
         interactionAngle : Double,
-        /// Single-mode Z angle; zero under the particle-hole shift.
-        onsiteAngle : Double,
-        /// Scalar phase applied once per step.
-        identityAngle : Double,
         /// Twice the hopping amplitude times the step duration.
         hoppingAngle : Double,
         /// Number of repetitions of the body.
@@ -254,21 +250,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// # Input
     /// ## angle
     /// Pair rotation angle.
-    /// ## onsite
-    /// Single-mode rotation angle.
     /// ## sites
     /// Number of lattice sites.
     /// ## systems
     /// The system register.
     operation InteractionLayer(
         angle : Double,
-        onsite : Double,
         sites : Int,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        if onsite != 0.0 {
-            HammingWeightPhaseTerms(onsite, [[PauliZ], size = Length(systems)], StridedGroups(Length(systems), 1, 1, 1, systems));
-        }
         if angle != 0.0 {
             HammingWeightPhaseTerms(angle, [[PauliZ, PauliZ], size = sites], StridedGroups(sites, 2, 1, sites, systems));
         }
@@ -418,14 +408,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        InteractionLayer(params.interactionAngle / 2.0, params.onsiteAngle / 2.0, sites, systems);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems);
         HoppingLayer(params.hoppingAngle, gold, systems);
-        InteractionLayer(params.interactionAngle / 2.0, params.onsiteAngle / 2.0, sites, systems);
-        if params.identityAngle != 0.0 {
-            // R(PauliI, theta) is the global phase exp(-i theta / 2), so theta =
-            // 2 * identityAngle realizes the step's exp(-i * identityAngle) factor.
-            R(PauliI, 2.0 * params.identityAngle, systems[0]);
-        }
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems);
         HoppingLayer(params.hoppingAngle, pink, systems);
     }
 
