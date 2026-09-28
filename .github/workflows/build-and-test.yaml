@@ -340,7 +340,7 @@ jobs:
     - name: Run Python tests & generate coverage report
       env:
         OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
-        PYTHON_TEST_WORKERS: ${{ github.event_name == 'workflow_dispatch' && inputs.python_test_workers != 'matrix' && inputs.python_test_workers || matrix.python-test-workers }}
+        PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
@@ -564,8 +564,9 @@ jobs:
     env:
       VCPKG_TRIPLET: x64-windows-static-md
       QDK_UARCH: x86-64-v3
-      PYTHON_OMP_THREADS: '4'
-      PYTHON_TEST_WORKERS: ${{ github.event_name == 'workflow_dispatch' && inputs.python_test_workers != 'matrix' && inputs.python_test_workers || '8' }}
+      CTEST_WORKERS: '8'
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
     steps:
@@ -710,13 +711,11 @@ jobs:
 
     - name: Run C++ tests
       shell: pwsh
-      env:
-        OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Skip the vendored libint2's own tests: they build the dependency at
         # test time rather than exercising qdk. MACIS_SERIAL_TEST is excluded as on Linux.
-        ctest -j 8 --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit|libint2/eritest"
         $code = $LASTEXITCODE
@@ -757,7 +756,6 @@ jobs:
     - name: Run Python tests
       shell: pwsh
       env:
-        OMP_NUM_THREADS: ${{ env.PYTHON_OMP_THREADS }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
         New-Item -ItemType Directory -Force -Path test-results | Out-Null
@@ -794,8 +792,9 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
-      PYTHON_OMP_THREADS: '4'
-      PYTHON_TEST_WORKERS: ${{ github.event_name == 'workflow_dispatch' && inputs.python_test_workers != 'matrix' && inputs.python_test_workers || '8' }}
+      CTEST_WORKERS: '8'
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
       # clang-cl auto-detects armv8-a.
       # Bump to force a rebuild of the cached dependencies.
@@ -979,12 +978,10 @@ jobs:
     - name: Run C++ tests
       shell: pwsh
       timeout-minutes: 75
-      env:
-        OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Same exclusions as the x86_64 Windows job.
-        ctest -j 8 --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit"
         $code = $LASTEXITCODE
@@ -1026,7 +1023,6 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: ${{ env.PYTHON_OMP_THREADS }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
         New-Item -ItemType Directory -Force -Path test-results | Out-Null
@@ -1061,6 +1057,8 @@ jobs:
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: 32
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       QDK_UARCH: x86-64-v3
       QDK_BRANCH: main
     steps:
@@ -1179,13 +1177,12 @@ jobs:
 
     - name: Run Python tests
       env:
-        OMP_NUM_THREADS: 4
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
         mkdir -p ../test-results
-        pytest \
+        pytest -n "$PYTHON_TEST_WORKERS" --dist=loadscope \
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short
