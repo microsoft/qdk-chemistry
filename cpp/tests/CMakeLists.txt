@@ -102,6 +102,9 @@ foreach(test_source ${TEST_SOURCES})
     add_gtest_executable(${test_source})
 endforeach()
 
+# chemistry links SeQuant privately, so its smoke test needs it directly.
+target_link_libraries(test_sequant PRIVATE SeQuant::SeQuant)
+
 # Print information about discovered tests for debugging
 message(STATUS "Found ${CMAKE_CURRENT_LIST_LENGTH} test files:")
 foreach(test_source ${TEST_SOURCES})
