@@ -1038,7 +1038,7 @@ jobs:
   test-with-qdk-branch:
     name: Full Test with QDK Branch
     needs: coverage
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch && needs.coverage.result == 'success' }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
       QSHARP_PYTHON_TELEMETRY: 'false'
