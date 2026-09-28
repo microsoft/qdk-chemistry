@@ -118,8 +118,8 @@ EdgeColoring trivial_edge_coloring(const Eigen::SparseMatrix<double>& adj);
  * Stores the lattice topology as a sparse adjacency matrix and provides
  * static factory methods for common lattice geometries. Used by model
  * Hamiltonian builders to define site connectivity and hopping integrals.
- * Graphs built from a LatticeGeometry also label each edge with its neighbor
- * shell and optional bond flavor.
+ * Graphs built from a LatticeGeometry, or constructed with edge labels, also
+ * label each edge with its neighbor shell and optional bond flavor.
  */
 class LatticeGraph : public DataClass {
  public:
@@ -133,36 +133,49 @@ class LatticeGraph : public DataClass {
    * @param edge_weights Map of (source, target) -> weight.
    * @param num_sites   Total number of sites. If 0, inferred from the
    *                    largest index in edge_weights.
+   * @param edge_labels Shell and optional flavor of every stored pair (i, j)
+   *                    with i < j, or empty for an unlabelled graph.
+   * @throws std::invalid_argument If nonempty edge_labels do not label exactly
+   *         the stored pairs with positive shells.
    */
   LatticeGraph(const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
                    edge_weights,
-               std::uint64_t num_sites = 0);
+               std::uint64_t num_sites = 0, EdgeLabels edge_labels = {});
 
   /**
    * @brief Create a lattice graph from a dense adjacency matrix.
    *
    * @param adjacency_matrix Square dense matrix of edge weights.
+   * @param edge_labels Shell and optional flavor of every nonzero pair (i, j)
+   *                    with i < j, or empty for an unlabelled graph.
    * @return LatticeGraph with the given adjacency.
-   * @throws std::invalid_argument If the matrix is not square.
+   * @throws std::invalid_argument If the matrix is not square or the labels
+   *         are invalid.
    */
-  static LatticeGraph from_dense_matrix(
-      const Eigen::MatrixXd& adjacency_matrix);
+  static LatticeGraph from_dense_matrix(const Eigen::MatrixXd& adjacency_matrix,
+                                        EdgeLabels edge_labels = {});
 
   /**
    * @brief Create a lattice graph from a sparse adjacency matrix.
    *
    * @param sparse Sparse square matrix of edge weights.
+   * @param edge_labels Shell and optional flavor of every stored pair (i, j)
+   *                    with i < j, or empty for an unlabelled graph.
    * @return LatticeGraph with the given adjacency.
-   * @throws std::invalid_argument If the matrix is not square.
+   * @throws std::invalid_argument If the matrix is not square or the labels
+   *         are invalid.
    */
   static LatticeGraph from_sparse_matrix(
-      const Eigen::SparseMatrix<double>& sparse);
+      const Eigen::SparseMatrix<double>& sparse, EdgeLabels edge_labels = {});
 
   /**
    * @brief Materialize the requested geometric shells as labelled edges.
    *
-   * Each physical connection becomes one edge of weight `weight`. Edges are
-   * colored with greedy coloring, seed 0 and 32 trials.
+   * Shells rank the distinct distances present on this geometry, including
+   * periodic images, so a thin patch can lack a bulk-lattice shell and number
+   * the longer distances differently. Each physical connection becomes one
+   * edge of weight `weight`. Edges are colored with greedy coloring, seed 0
+   * and 32 trials.
    *
    * @param geometry Source geometry; it is not retained.
    * @param shells Positive shell indices; duplicates are ignored.
@@ -400,36 +413,6 @@ class LatticeGraph : public DataClass {
                                 bool dfs_ordering = false);
 
   /**
-   * @brief Create a honeycomb patch sized by complete hexagonal plaquettes.
-   *
-   * Open directions include the boundary sites needed to complete every
-   * requested plaquette. A fully open 1 x 1 patch is one six-site hexagon.
-   *
-   * @code
-   *   1x1 open plaquette patch:
-   *
-   *       1---2
-   *      /     \
-   *     0       5
-   *      \     /
-   *       3---4
-   * @endcode
-   *
-   * @param nx Number of complete plaquettes along x.
-   * @param ny Number of complete plaquettes along y.
-   * @param periodic_x If true, apply periodic boundary conditions along x.
-   * @param periodic_y If true, apply periodic boundary conditions along y.
-   * @param t Uniform hopping weight.
-   * @param dfs_ordering Reserved for API compatibility; currently ignored.
-   * @throws std::invalid_argument If nx or ny is 0.
-   */
-  static LatticeGraph honeycomb_plaquettes(std::uint64_t nx, std::uint64_t ny,
-                                           bool periodic_x = false,
-                                           bool periodic_y = false,
-                                           double t = 1.0,
-                                           bool dfs_ordering = false);
-
-  /**
    * @brief Create a two-dimensional kagome lattice.
    *
    * The kagome lattice has three sites per unit cell, arranged as
@@ -598,17 +581,14 @@ class LatticeGraph : public DataClass {
    *
    * @param adjacency Sparse square adjacency matrix (moved in).
    * @param coloring  Optional edge coloring (moved in).
+   * @param edge_labels Optional edge labels (moved in).
    */
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                        std::optional<EdgeColoring> coloring = std::nullopt);
+                        std::optional<EdgeColoring> coloring = std::nullopt,
+                        EdgeLabels edge_labels = {});
 
   void _validate_coloring() const;
   void _validate_edge_labels() const;
-
-  static LatticeGraph _honeycomb(std::uint64_t num_cells_x,
-                                 std::uint64_t num_cells_y,
-                                 bool remove_open_corners, bool periodic_x,
-                                 bool periodic_y, double t);
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */

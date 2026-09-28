@@ -6,119 +6,35 @@
 
 #include <Eigen/Core>
 #include <cstdint>
-#include <map>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
-#include <set>
 #include <string>
-#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::data {
 
-/** @brief Opaque semantic label assigned to a geometric bond class. */
+class LatticeGraph;
+
+/** @brief Opaque semantic label assigned to a lattice edge. */
 using BondFlavorId = std::uint32_t;
 
 /**
- * @brief A radial shell and unoriented geometric bond-axis class.
+ * @brief Immutable two-dimensional geometry of a built-in lattice.
  *
- * The axis is a unit vector with one component per spatial dimension.
- */
-struct BondClass {
-  std::uint64_t shell;
-  std::uint32_t orientation;
-  Eigen::RowVectorXd axis;
-};
-
-/**
- * @brief One physical lattice connection, including its periodic image.
- *
- * The displacement and image shift have one entry per spatial dimension.
- * Image coefficients follow periodic-vector order, padded with zeros.
- */
-struct NeighborConnection {
-  std::uint64_t site_i;
-  std::uint64_t site_j;
-  BondClass bond_class;
-  Eigen::RowVectorXd displacement;
-  std::vector<std::int64_t> image_shift;
-  std::optional<BondFlavorId> flavor;
-  double weight = 1.0;
-};
-
-/**
- * @brief Immutable Cartesian lattice geometry, independent of connectivity.
- *
- * Stores site positions in any positive spatial dimension and optional
- * periodic supercell vectors. Geometric queries retain distinct periodic
- * images; they do not assign interaction weights, semantic flavors, or edge
- * colors. Neighbor searches currently support two-dimensional geometries only.
+ * Stores the Cartesian site positions and optional periodic supercell vectors
+ * of a factory lattice. LatticeGraph::from_geometry turns its distance shells
+ * into labelled edges; the geometry assigns no weights, flavors, or colors.
  */
 class LatticeGeometry : public DataClass {
  public:
-  /**
-   * @brief Construct geometry from Cartesian positions and supercell vectors.
-   * @param positions Finite (num_sites, d) matrix with d > 0, possibly empty.
-   * @param periods Finite, nonzero, independent (k, d) vectors with k <= d.
-   * @throws std::invalid_argument If the geometry is invalid.
-   */
-  explicit LatticeGeometry(
-      Eigen::MatrixXd positions,
-      std::optional<Eigen::MatrixXd> periods = std::nullopt);
-
-  /** @brief Cartesian positions in site-index order. */
+  /** @brief Cartesian positions (num_sites, 2) in site-index order. */
   const Eigen::MatrixXd& positions() const;
 
-  /** @brief Periodic supercell vectors in image-shift order, if present. */
+  /** @brief Periodic supercell vectors, if present. */
   const std::optional<Eigen::MatrixXd>& periods() const;
 
-  /** @brief Number of sites, including isolated or coincident sites. */
+  /** @brief Number of sites. */
   std::uint64_t num_sites() const;
-
-  /** @brief Number of Cartesian components per position. */
-  std::uint64_t dimension() const;
-
-  /**
-   * @brief Return physical connections by positive distance shell and axis.
-   *
-   * Connections are ordered by shell, orientation, endpoints, and image shift.
-   * Endpoints satisfy site_i <= site_j; self-image connections have a positive
-   * first nonzero image component. Distinct images are not merged. Flavor is
-   * absent and weight is one. Unavailable finite shells contribute no entries.
-   *
-   * @param shells One-based shell indices; duplicate requests are ignored.
-   * @param tolerance Positive finite relative distance and axis tolerance.
-   * @return Canonical physical connections in the requested shells.
-   * @throws std::invalid_argument If a shell or tolerance is invalid.
-   * @throws std::runtime_error If the geometry is not two-dimensional.
-   * @throws std::overflow_error If an image or displacement is out of range.
-   */
-  std::vector<NeighborConnection> neighbor_connections(
-      const std::vector<std::uint64_t>& shells,
-      double tolerance = 1.0e-9) const;
-
-  /**
-   * @brief Project open-lattice connections to sorted, unique site pairs.
-   * @param shells One-based shell indices; unavailable shells map to empties.
-   * @param tolerance Positive finite relative distance and axis tolerance.
-   * @return Requested shells mapped to canonical pairs with i < j.
-   * @throws std::runtime_error If periodic vectors are present or the geometry
-   * is not two-dimensional.
-   */
-  std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
-  nearest_neighbor_shells(const std::vector<std::uint64_t>& shells,
-                          double tolerance = 1.0e-9) const;
-
-  /**
-   * @brief Return the sorted, unique pairs in one open-lattice shell.
-   * @param m One-based shell index.
-   * @param tolerance Positive finite relative distance and axis tolerance.
-   * @return Canonical site pairs, or empty if the shell is unavailable.
-   * @throws std::runtime_error If periodic vectors are present or the geometry
-   * is not two-dimensional.
-   */
-  std::vector<std::pair<std::uint64_t, std::uint64_t>> mth_nearest_neighbors(
-      std::uint64_t m, double tolerance = 1.0e-9) const;
 
   /**
    * @brief Unit-spaced chain with positions (i, 0), for 0 <= i < n.
@@ -192,16 +108,6 @@ class LatticeGeometry : public DataClass {
                                 bool periodic_x = false,
                                 bool periodic_y = false);
 
-  /**
-   * @brief Relabel positions and retained integer coordinates together.
-   * @param geometry Source geometry.
-   * @param path Original site indices in the desired new order.
-   * @return New geometry with unchanged periodic vectors.
-   * @throws std::invalid_argument If path is not a permutation of all sites.
-   */
-  static LatticeGeometry permute(const LatticeGeometry& geometry,
-                                 const std::vector<std::uint64_t>& path);
-
   /** @brief Wire-format identifier: lattice_geometry. */
   static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(LatticeGeometry);
@@ -224,6 +130,17 @@ class LatticeGeometry : public DataClass {
   static LatticeGeometry from_hdf5_file(const std::string& filename);
 
  private:
+  friend class LatticeGraph;
+
+  /** @brief One bond of a distance shell, with its canonical unoriented axis.
+   */
+  struct ShellBond {
+    std::uint64_t site_i;
+    std::uint64_t site_j;
+    std::uint64_t shell;
+    Eigen::RowVector2d axis;
+  };
+
   struct IntegerEmbedding {
     int nx;
     int ny;
@@ -234,14 +151,28 @@ class LatticeGeometry : public DataClass {
     bool periodic_y;
   };
 
+  LatticeGeometry(Eigen::MatrixXd positions,
+                  std::optional<Eigen::MatrixXd> periods,
+                  IntegerEmbedding embedding);
+
   static LatticeGeometry _bravais(std::uint64_t nx, std::uint64_t ny,
                                   const Eigen::RowVector2d& a1,
                                   const Eigen::RowVector2d& a2,
                                   Eigen::MatrixXd basis, bool periodic_x,
                                   bool periodic_y,
                                   bool remove_open_corners = false);
-  std::vector<NeighborConnection> _integer_neighbor_connections(
-      const std::set<std::uint64_t>& shells, double tolerance) const;
+
+  /**
+   * @brief Return one record per physical bond in the requested shells.
+   *
+   * Shells rank the distinct distances present on this lattice, including
+   * periodic images. Each image is a separate record with site_i <= site_j.
+   *
+   * @throws std::invalid_argument If a shell or the tolerance is invalid.
+   * @throws std::overflow_error If the stencil exceeds the integer range.
+   */
+  std::vector<ShellBond> _shell_bonds(const std::vector<std::uint64_t>& shells,
+                                      double tolerance) const;
   static LatticeGeometry _from_integer_embedding(
       int nx, int ny, const Eigen::MatrixXd& primitive_vectors,
       Eigen::MatrixXd basis, std::vector<int> site_by_coordinate,
@@ -250,7 +181,7 @@ class LatticeGeometry : public DataClass {
 
   Eigen::MatrixXd _positions;
   std::optional<Eigen::MatrixXd> _periods;
-  std::optional<IntegerEmbedding> _integer_embedding;
+  IntegerEmbedding _embedding;
 };
 
 static_assert(DataClassCompliant<LatticeGeometry>);

@@ -19,67 +19,18 @@ void bind_lattice_geometry(py::module& m) {
   using qdk::chemistry::python::utils::bind_getter_as_property;
   using qdk::chemistry::python::utils::to_string_path;
 
-  py::class_<BondClass, py::smart_holder>(
-      m, "BondClass", "Geometric shell and bond-axis class.")
-      .def_property_readonly("shell",
-                             [](const BondClass& self) { return self.shell; })
-      .def_property_readonly(
-          "orientation", [](const BondClass& self) { return self.orientation; })
-      .def_property_readonly("axis",
-                             [](const BondClass& self) { return self.axis; });
-
-  py::class_<NeighborConnection, py::smart_holder>(m, "NeighborConnection", R"(
-Physical lattice connection, retaining its periodic image.
-
-The displacement runs from ``site_i`` to the specified image of ``site_j``.
-:class:`LatticeGeometry` queries return unit weight and no semantic flavor.
-)")
-      .def_property_readonly(
-          "site_i", [](const NeighborConnection& self) { return self.site_i; })
-      .def_property_readonly(
-          "site_j", [](const NeighborConnection& self) { return self.site_j; })
-      .def_property_readonly(
-          "bond_class",
-          [](const NeighborConnection& self) { return self.bond_class; })
-      .def_property_readonly(
-          "displacement",
-          [](const NeighborConnection& self) { return self.displacement; })
-      .def_property_readonly(
-          "image_shift",
-          [](const NeighborConnection& self) { return self.image_shift; })
-      .def_property_readonly(
-          "flavor", [](const NeighborConnection& self) { return self.flavor; })
-      .def_property_readonly(
-          "weight", [](const NeighborConnection& self) { return self.weight; });
-
   py::class_<LatticeGeometry, DataClass, py::smart_holder> geometry(
       m, "LatticeGeometry", R"(
-Immutable Cartesian lattice geometry, independent of interactions.
+Immutable two-dimensional geometry of a built-in lattice.
 
-Positions form a ``(num_sites, d)`` matrix for any positive dimension ``d``,
-including empty geometries. Optional periodic vectors specify physical images.
-Neighbor searches currently support two-dimensional geometries only. Built-in
-factories are two-dimensional and retain compact integer coordinates for
-stencil-based neighbor queries.
-No adjacency matrix, semantic flavor assignment, or edge coloring is stored.
+Stores the Cartesian site positions and optional periodic supercell vectors of
+a factory lattice. :meth:`LatticeGraph.from_geometry` turns its distance shells
+into labelled edges; the geometry stores no adjacency, flavors, or coloring.
 )");
 
   geometry
-      .def(py::init<Eigen::MatrixXd, std::optional<Eigen::MatrixXd>>(),
-           py::arg("positions"), py::arg("periods") = py::none(), R"(
-Construct geometry from Cartesian positions and optional supercell vectors.
-
-Args:
-    positions (numpy.ndarray): Finite ``(num_sites, d)`` matrix with ``d > 0``; ``num_sites`` may be zero.
-    periods (numpy.ndarray | None, optional): At most ``d`` independent, finite, nonzero row vectors of length ``d``. Defaults to None.
-
-Raises:
-    ValueError: If the position or periodic-vector matrix is invalid.
-)")
       .def_property_readonly("num_sites", &LatticeGeometry::num_sites,
                              "Number of lattice sites.")
-      .def_property_readonly("dimension", &LatticeGeometry::dimension,
-                             "Number of Cartesian components per position.")
       .def_property_readonly(
           "positions",
           [](const LatticeGeometry& self) { return self.positions(); },
@@ -87,68 +38,15 @@ Raises:
 Cartesian positions in site-index order.
 
 Returns:
-    numpy.ndarray: Independent copy of the ``(num_sites, dimension)`` position matrix.
+    numpy.ndarray: Independent copy of the ``(num_sites, 2)`` position matrix.
 )")
       .def_property_readonly(
           "periods", [](const LatticeGeometry& self) { return self.periods(); },
           R"(
-Periodic vectors in image-shift order.
+Periodic supercell vectors.
 
 Returns:
     numpy.ndarray | None: Independent copy of the periodic-vector matrix, or None for an open geometry.
-)")
-      .def("neighbor_connections", &LatticeGeometry::neighbor_connections,
-           py::arg("shells"), py::arg("tolerance") = 1.0e-9, R"(
-Return physical connections classified by radial shell and unoriented axis.
-
-Distinct periodic images remain separate, including self-image connections.
-Results are ordered by shell, orientation, endpoints, and image shift, with
-``flavor=None`` and ``weight=1.0``. Unavailable finite shells contribute no entries.
-
-Args:
-    shells (list[int]): One-based shell indices; duplicate requests are ignored.
-    tolerance (float, optional): Relative distance and absolute axis tolerance. Defaults to 1e-9.
-
-Returns:
-    list[NeighborConnection]: Canonical physical connections in the requested shells.
-
-Raises:
-    ValueError: If a shell is zero or tolerance is not finite and positive.
-    RuntimeError: If the geometry is not two-dimensional.
-    OverflowError: If an integer stencil, periodic image, or displacement exceeds the supported range.
-)")
-      .def("nearest_neighbor_shells", &LatticeGeometry::nearest_neighbor_shells,
-           py::arg("shells"), py::arg("tolerance") = 1.0e-9, R"(
-Project open-geometry connections onto sorted, unique site pairs.
-
-Shell numbering uses the positive distances actually present in the geometry,
-not the bulk lattice. All requested shells are classified together.
-
-Args:
-    shells (list[int]): One-based shell indices; duplicate requests are ignored.
-    tolerance (float, optional): Relative distance and absolute axis tolerance. Defaults to 1e-9.
-
-Returns:
-    dict[int, list[tuple[int, int]]]: Canonical pairs with ``i < j``; unavailable shells map to empty lists.
-
-Raises:
-    ValueError: If a shell is zero or tolerance is not finite and positive.
-    RuntimeError: If periodic vectors are present or the geometry is not two-dimensional.
-)")
-      .def("mth_nearest_neighbors", &LatticeGeometry::mth_nearest_neighbors,
-           py::arg("m"), py::arg("tolerance") = 1.0e-9, R"(
-Return the sorted, unique site pairs in one open-geometry neighbor shell.
-
-Args:
-    m (int): One-based shell index.
-    tolerance (float, optional): Relative distance and absolute axis tolerance. Defaults to 1e-9.
-
-Returns:
-    list[tuple[int, int]]: Canonical pairs, or an empty list if the shell is unavailable.
-
-Raises:
-    ValueError: If m is zero or tolerance is not finite and positive.
-    RuntimeError: If periodic vectors are present or the geometry is not two-dimensional.
 )")
       .def_static("chain", &LatticeGeometry::chain, py::arg("n"),
                   py::arg("periodic") = false, R"(
@@ -240,20 +138,6 @@ Args:
 Returns:
     LatticeGeometry: Kagome geometry with ``3 * nx * ny`` sites.
 )")
-      .def_static("permute", &LatticeGeometry::permute, py::arg("geometry"),
-                  py::arg("path"), R"(
-Relabel sites so new site i is original site ``path[i]``.
-
-Args:
-    geometry (LatticeGeometry): Source geometry.
-    path (list[int]): Permutation of every original site index.
-
-Returns:
-    LatticeGeometry: Relabeled positions and integer coordinates, with unchanged periods.
-
-Raises:
-    ValueError: If path is not a valid permutation of all sites.
-)")
       .def_static("data_type_name", &LatticeGeometry::data_type_name,
                   "Return the wire-format identifier ``lattice_geometry``.")
       .def("get_data_type_name", &LatticeGeometry::get_data_type_name,
@@ -276,8 +160,7 @@ Raises:
       .def(
           "to_json",
           [](const LatticeGeometry& self) { return self.to_json().dump(); },
-          "Serialize the factory layout, or positions and optional periods, to "
-          "a JSON string.")
+          "Serialize the factory layout to a JSON string.")
       .def_static(
           "from_json",
           [](const std::string& json_str) {
@@ -287,7 +170,7 @@ Raises:
 Load geometry from a JSON string.
 
 Args:
-    json_str (str): Serialized factory layout, or positions and optional periods.
+    json_str (str): Serialized factory layout.
 
 Returns:
     LatticeGeometry: Restored geometry.
@@ -352,7 +235,7 @@ Returns:
             self.to_hdf5_file(to_string_path(filename));
           },
           py::arg("filename"), R"(
-Save the factory layout, or positions and optional periods, to an HDF5 file.
+Save the factory layout to an HDF5 file.
 
 Args:
     filename (str | pathlib.Path): Output path.

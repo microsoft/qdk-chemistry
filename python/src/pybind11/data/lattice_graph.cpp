@@ -65,7 +65,7 @@ Define a semantic label to resolve onto lattice graph edges.
 
 Args:
     shell (int): One-based radial shell index.
-    axis (numpy.ndarray): Finite nonzero axis matching the geometry dimension, normalized when labels are resolved.
+    axis (numpy.ndarray): Finite nonzero two-component axis, normalized when labels are resolved.
     flavor (int): Opaque non-negative semantic label.
 )")
       .def_property_readonly(
@@ -79,6 +79,17 @@ Args:
   py::class_<EdgeLabel, py::smart_holder>(
       m, "EdgeLabel",
       "Geometric shell and optional semantic flavor of an edge.")
+      .def(
+          py::init([](std::uint64_t shell, std::optional<BondFlavorId> flavor) {
+            return EdgeLabel{shell, flavor};
+          }),
+          py::arg("shell"), py::arg("flavor") = py::none(), R"(
+Label one edge with its neighbor shell and optional semantic flavor.
+
+Args:
+    shell (int): One-based neighbor shell index.
+    flavor (int | None, optional): Opaque non-negative semantic label. Defaults to None.
+)")
       .def_property_readonly(
           "shell", [](const EdgeLabel &self) { return self.shell; },
           "int: One-based radial shell index.")
@@ -124,8 +135,8 @@ Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 A LatticeGraph stores a (possibly weighted) adjacency matrix for a lattice of
 sites. It provides factory methods for common lattice topologies and exposes
 connectivity queries used by the model Hamiltonian builders. Graphs built from
-a :class:`LatticeGeometry` also label each edge with its neighbor shell and
-optional bond flavor.
+a :class:`LatticeGeometry`, or constructed with ``edge_labels``, also label
+each edge with its neighbor shell and optional bond flavor.
 
 Examples:
     >>> from qdk_chemistry.data import LatticeGraph
@@ -149,7 +160,7 @@ Examples:
   lattice_graph.def(
       py::init<
           const std::map<std::pair<std::uint64_t, std::uint64_t>, double> &,
-          std::uint64_t>(),
+          std::uint64_t, EdgeLabels>(),
       R"(
 Construct a lattice graph from a dictionary of edge weights.
 
@@ -158,23 +169,32 @@ Args:
         to edge weights.
     num_sites (int, optional): Number of sites. If 0, inferred from edge indices.
         Defaults to 0.
+    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every stored pair ``(i, j)`` with ``i < j``, or empty for an unlabelled graph. Defaults to {}.
+
+Raises:
+    ValueError: If nonempty edge labels do not label exactly the stored pairs with positive shells.
 )",
-      py::arg("edge_weights"), py::arg("num_sites") = 0);
+      py::arg("edge_weights"), py::arg("num_sites") = 0,
+      py::arg("edge_labels") = EdgeLabels{});
 
   // Static factories for matrix input
-  lattice_graph.def_static("from_dense_matrix",
-                           &LatticeGraph::from_dense_matrix,
-                           R"(
+  lattice_graph.def_static(
+      "from_dense_matrix", &LatticeGraph::from_dense_matrix,
+      R"(
 Create a lattice graph from a dense adjacency matrix.
 
 Args:
     adjacency_matrix (numpy.ndarray): Dense adjacency matrix [n x n]. Non-zero
         entries indicate edges with that weight.
+    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every nonzero pair ``(i, j)`` with ``i < j``, or empty for an unlabelled graph. Defaults to {}.
 
 Returns:
     LatticeGraph: A new lattice graph.
+
+Raises:
+    ValueError: If the matrix is not square or the edge labels are invalid.
 )",
-                           py::arg("adjacency_matrix"));
+      py::arg("adjacency_matrix"), py::arg("edge_labels") = EdgeLabels{});
 
   lattice_graph.def_static("from_sparse_matrix",
                            &LatticeGraph::from_sparse_matrix,
@@ -183,18 +203,26 @@ Create a lattice graph from a sparse adjacency matrix.
 
 Args:
     sparse_adjacency_matrix (scipy.sparse matrix): Sparse adjacency matrix [n x n].
+    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every stored pair ``(i, j)`` with ``i < j``, or empty for an unlabelled graph. Defaults to {}.
 
 Returns:
     LatticeGraph: A new lattice graph.
+
+Raises:
+    ValueError: If the matrix is not square or the edge labels are invalid.
 )",
-                           py::arg("sparse_adjacency_matrix"));
+                           py::arg("sparse_adjacency_matrix"),
+                           py::arg("edge_labels") = EdgeLabels{});
 
   lattice_graph.def_static(
       "from_geometry", &LatticeGraph::from_geometry,
       R"(
 Materialize selected geometric shells as labelled edges.
 
-Each physical connection becomes one edge of weight ``weight``; the geometry is not retained.
+Shells rank the distinct distances present on this geometry, including periodic
+images, so a thin patch can lack a bulk-lattice shell and number the longer
+distances differently. Each physical connection becomes one edge of weight
+``weight``; the geometry is not retained.
 
 Args:
     geometry (LatticeGeometry): Source Cartesian geometry.
@@ -509,40 +537,6 @@ Raises:
                            py::arg("periodic_x") = false,
                            py::arg("periodic_y") = false, py::arg("t") = 1.0,
                            py::arg("dfs_ordering") = false);
-
-  lattice_graph.def_static(
-      "honeycomb_plaquettes", &LatticeGraph::honeycomb_plaquettes,
-      R"(
-Create a honeycomb lattice patch sized by complete hexagonal plaquettes.
-
-Open directions include the boundary sites needed to complete every requested
-plaquette. A fully open ``1 x 1`` patch is one six-site hexagon.
-
-Example: 1x1 open plaquette patch::
-
-      1---2
-     /     \
-    0       5
-     \     /
-      3---4
-
-Args:
-    nx (int): Number of complete plaquettes along x.
-    ny (int): Number of complete plaquettes along y.
-    periodic_x (bool, optional): If True, apply periodic boundary conditions along x. Requires nx > 1. Defaults to False.
-    periodic_y (bool, optional): If True, apply periodic boundary conditions along y. Requires ny > 1. Defaults to False.
-    t (float, optional): Hopping weight for all edges. Defaults to 1.0.
-    dfs_ordering (bool, optional): Reserved for API compatibility. Defaults to False.
-
-Returns:
-    LatticeGraph: Honeycomb patch with the requested complete plaquettes.
-
-Raises:
-    ValueError: If nx or ny is 0.
-)",
-      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
-      py::arg("periodic_y") = false, py::arg("t") = 1.0,
-      py::arg("dfs_ordering") = false);
 
   lattice_graph.def_static(
       "kagome", &LatticeGraph::kagome, R"(

@@ -2,19 +2,19 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <Eigen/LU>
 #include <algorithm>
 #include <array>
 #include <blas.hh>
 #include <cmath>
 #include <fstream>
-#include <lapack.hh>
 #include <limits>
 #include <qdk/chemistry/data/lattice_geometry.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
+#include <utility>
 
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
@@ -37,14 +37,6 @@ Eigen::RowVector2d canonical_axis(const Eigen::RowVector2d& displacement,
   return axis;
 }
 
-bool connection_less(const NeighborConnection& lhs,
-                     const NeighborConnection& rhs) {
-  return std::tie(lhs.bond_class.shell, lhs.bond_class.orientation, lhs.site_i,
-                  lhs.site_j, lhs.image_shift) <
-         std::tie(rhs.bond_class.shell, rhs.bond_class.orientation, rhs.site_i,
-                  rhs.site_j, rhs.image_shift);
-}
-
 void validate_dimensions(const std::string& name, std::uint64_t nx,
                          std::uint64_t ny, bool periodic_x, bool periodic_y) {
   if (nx == 0 || ny == 0) {
@@ -61,49 +53,11 @@ void validate_dimensions(const std::string& name, std::uint64_t nx,
 }  // namespace
 
 LatticeGeometry::LatticeGeometry(Eigen::MatrixXd positions,
-                                 std::optional<Eigen::MatrixXd> periods)
-    : _positions(std::move(positions)), _periods(std::move(periods)) {
-  if (_positions.cols() == 0 || !_positions.allFinite()) {
-    throw std::invalid_argument(
-        "Lattice positions must be a finite (num_sites, d) matrix with d > 0.");
-  }
-  if (!_periods.has_value()) return;
-  if (_periods->rows() == 0 || _periods->rows() > _positions.cols() ||
-      _periods->cols() != _positions.cols() || !_periods->allFinite()) {
-    throw std::invalid_argument(
-        "Periodic vectors must be a finite (k, d) matrix with 0 < k <= d, "
-        "where d is the position dimension.");
-  }
-  const double position_scale =
-      _positions.size() == 0 ? 0.0 : _positions.cwiseAbs().maxCoeff();
-  const double geometry_scale =
-      std::max(position_scale, _periods->cwiseAbs().maxCoeff());
-  for (Eigen::Index i = 0; i < _periods->rows(); ++i) {
-    if (_periods->row(i).cwiseAbs().maxCoeff() == 0.0) {
-      throw std::invalid_argument("Periodic vectors must be nonzero.");
-    }
-    if (!std::isfinite(blas::nrm2(_periods->cols(), _periods->row(i).data(),
-                                  _periods->outerStride()))) {
-      throw std::invalid_argument("Periodic vector lengths must be finite.");
-    }
-    if ((_periods->row(i) / geometry_scale).cwiseAbs().maxCoeff() == 0.0) {
-      throw std::invalid_argument(
-          "Periodic vectors must be representable at the geometry scale.");
-    }
-  }
-  if (_periods->rows() > 1) {
-    Eigen::MatrixXd directions = *_periods;
-    for (Eigen::Index i = 0; i < directions.rows(); ++i) {
-      directions.row(i) /= directions.row(i).cwiseAbs().maxCoeff();
-    }
-    Eigen::FullPivLU<Eigen::MatrixXd> decomposition(directions);
-    decomposition.setThreshold(0.0);
-    if (decomposition.rank() != directions.rows()) {
-      throw std::invalid_argument(
-          "Periodic vectors must be linearly independent.");
-    }
-  }
-}
+                                 std::optional<Eigen::MatrixXd> periods,
+                                 IntegerEmbedding embedding)
+    : _positions(std::move(positions)),
+      _periods(std::move(periods)),
+      _embedding(std::move(embedding)) {}
 
 const Eigen::MatrixXd& LatticeGeometry::positions() const { return _positions; }
 
@@ -115,49 +69,21 @@ std::uint64_t LatticeGeometry::num_sites() const {
   return static_cast<std::uint64_t>(_positions.rows());
 }
 
-std::uint64_t LatticeGeometry::dimension() const {
-  return static_cast<std::uint64_t>(_positions.cols());
-}
-
-std::vector<std::pair<std::uint64_t, std::uint64_t>>
-LatticeGeometry::mth_nearest_neighbors(std::uint64_t m,
-                                       double tolerance) const {
-  return nearest_neighbor_shells({m}, tolerance).at(m);
-}
-
-std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
-LatticeGeometry::nearest_neighbor_shells(
+std::vector<LatticeGeometry::ShellBond> LatticeGeometry::_shell_bonds(
     const std::vector<std::uint64_t>& shells, double tolerance) const {
-  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
-    throw std::invalid_argument("Neighbor shell tolerance must be positive.");
-  }
-  std::map<std::uint64_t, std::vector<std::pair<std::uint64_t, std::uint64_t>>>
-      results;
+  std::set<std::uint64_t> requested_shells;
   for (std::uint64_t shell : shells) {
     if (shell == 0) {
-      throw std::invalid_argument("Neighbor shell index m must be > 0.");
+      throw std::invalid_argument("Neighbor shell index must be > 0.");
     }
-    results.try_emplace(shell);
+    requested_shells.insert(shell);
   }
-  if (_periods.has_value()) {
-    throw std::runtime_error(
-        "Geometric neighbor shells support open lattices only.");
+  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+    throw std::invalid_argument(
+        "Neighbor connection tolerance must be positive.");
   }
-  for (const auto& connection : neighbor_connections(shells, tolerance)) {
-    results.at(connection.bond_class.shell)
-        .emplace_back(connection.site_i, connection.site_j);
-  }
-  for (auto& [shell, pairs] : results) {
-    (void)shell;
-    std::sort(pairs.begin(), pairs.end());
-    pairs.erase(std::unique(pairs.begin(), pairs.end()), pairs.end());
-  }
-  return results;
-}
-
-std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
-    const std::set<std::uint64_t>& requested_shells, double tolerance) const {
-  const auto& embedding = *_integer_embedding;
+  if (requested_shells.empty()) return {};
+  const auto& embedding = _embedding;
   const int basis_size = static_cast<int>(embedding.basis.rows());
   const Eigen::RowVector2d a1 = embedding.primitive_vectors.row(0);
   const Eigen::RowVector2d a2 = embedding.primitive_vectors.row(1);
@@ -184,7 +110,6 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
     double distance;
     std::uint64_t shell = 0;
     Eigen::RowVector2d axis;
-    std::uint32_t orientation = 0;
   };
   std::vector<Stencil> stencils;
   int max_shell = 0;
@@ -248,9 +173,9 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
                 "Neighbor connection distance exceeds the supported range.");
           }
           if (distance == 0.0) continue;
-          stencils.push_back({source_basis, target_basis, dx, dy, distance, 0,
-                              canonical_axis(displacement, distance, tolerance),
-                              0});
+          stencils.push_back(
+              {source_basis, target_basis, dx, dy, distance, 0,
+               canonical_axis(displacement, distance, tolerance)});
         }
       }
     }
@@ -265,7 +190,6 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
       });
   std::uint64_t shell = 0;
   double shell_distance = 0.0;
-  std::map<std::uint64_t, std::vector<Eigen::RowVector2d>> axes_by_shell;
   for (auto& stencil : stencils) {
     if (shell == 0 ||
         !same_distance(stencil.distance, shell_distance, tolerance)) {
@@ -273,31 +197,9 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
       shell_distance = stencil.distance;
     }
     stencil.shell = shell;
-    if (!requested_shells.contains(shell)) continue;
-    auto& axes = axes_by_shell[shell];
-    if (std::none_of(axes.begin(), axes.end(), [&](const auto& axis) {
-          return (axis - stencil.axis).norm() <= tolerance;
-        })) {
-      axes.push_back(stencil.axis);
-    }
-  }
-  for (auto& [current_shell, axes] : axes_by_shell) {
-    (void)current_shell;
-    std::sort(axes.begin(), axes.end(), [](const auto& lhs, const auto& rhs) {
-      return std::atan2(lhs.y(), lhs.x()) < std::atan2(rhs.y(), rhs.x());
-    });
-  }
-  for (auto& stencil : stencils) {
-    if (!requested_shells.contains(stencil.shell)) continue;
-    const auto& axes = axes_by_shell.at(stencil.shell);
-    stencil.orientation = static_cast<std::uint32_t>(std::distance(
-        axes.begin(),
-        std::find_if(axes.begin(), axes.end(), [&](const auto& axis) {
-          return (axis - stencil.axis).norm() <= tolerance;
-        })));
   }
 
-  std::vector<NeighborConnection> result;
+  std::vector<ShellBond> result;
   std::set<std::tuple<std::uint64_t, std::uint64_t, std::int64_t, std::int64_t>>
       seen;
   for (const auto& stencil : stencils) {
@@ -308,10 +210,6 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
     const int x_begin = embedding.periodic_x ? 0 : std::max(0, -stencil.dx);
     const int x_end =
         embedding.nx - (embedding.periodic_x ? 0 : std::max(0, stencil.dx));
-    const Eigen::RowVector2d source_offset =
-        embedding.basis.row(stencil.source_basis);
-    const Eigen::RowVector2d target_offset =
-        embedding.basis.row(stencil.target_basis);
     for (int y = y_begin; y < y_end; ++y) {
       for (int x = x_begin; x < x_end; ++x) {
         const auto [target_x, image_x] =
@@ -323,9 +221,6 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
         int site_i = site_at(x, y, stencil.source_basis);
         int site_j = site_at(target_x, target_y, stencil.target_basis);
         if (site_i < 0 || site_j < 0) continue;
-        Eigen::RowVector2d displacement = static_cast<double>(stencil.dx) * a1 +
-                                          static_cast<double>(stencil.dy) * a2 +
-                                          target_offset - source_offset;
         std::array<std::int64_t, 2> image_shift{};
         if (embedding.periodic_x) image_shift[0] = image_x;
         if (embedding.periodic_y) {
@@ -335,7 +230,6 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
                                 (image_shift[0] < 0 || (image_shift[0] == 0 &&
                                                         image_shift[1] < 0)))) {
           std::swap(site_i, site_j);
-          displacement = -displacement;
           image_shift[0] = -image_shift[0];
           image_shift[1] = -image_shift[1];
         }
@@ -344,228 +238,11 @@ std::vector<NeighborConnection> LatticeGeometry::_integer_neighbor_connections(
           continue;
         }
         result.push_back({static_cast<std::uint64_t>(site_i),
-                          static_cast<std::uint64_t>(site_j),
-                          {stencil.shell, stencil.orientation, stencil.axis},
-                          displacement,
-                          {image_shift.begin(), image_shift.end()},
-                          std::nullopt,
-                          1.0});
+                          static_cast<std::uint64_t>(site_j), stencil.shell,
+                          stencil.axis});
       }
     }
   }
-  std::sort(result.begin(), result.end(), connection_less);
-  return result;
-}
-
-std::vector<NeighborConnection> LatticeGeometry::neighbor_connections(
-    const std::vector<std::uint64_t>& shells, double tolerance) const {
-  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
-    throw std::invalid_argument(
-        "Neighbor connection tolerance must be positive.");
-  }
-  std::set<std::uint64_t> requested_shells;
-  for (std::uint64_t shell : shells) {
-    if (shell == 0) {
-      throw std::invalid_argument("Neighbor shell index must be > 0.");
-    }
-    requested_shells.insert(shell);
-  }
-  if (dimension() != 2) {
-    throw std::runtime_error(
-        "Neighbor searches support two-dimensional geometries only.");
-  }
-  const std::uint64_t n = num_sites();
-  if (requested_shells.empty() || n == 0) return {};
-  if (_integer_embedding.has_value()) {
-    return _integer_neighbor_connections(requested_shells, tolerance);
-  }
-
-  struct Candidate {
-    double distance;
-    std::uint64_t site_i;
-    std::uint64_t site_j;
-    std::array<std::int64_t, 2> image_shift;
-    Eigen::RowVector2d displacement;
-    std::uint64_t shell = 0;
-  };
-  const Eigen::Index num_periods = _periods.has_value() ? _periods->rows() : 0;
-  Eigen::MatrixXd positions = _positions;
-  Eigen::MatrixXd periods = _periods.value_or(Eigen::MatrixXd(0, 2));
-  double geometry_scale = positions.cwiseAbs().maxCoeff();
-  if (num_periods != 0) {
-    geometry_scale = std::max(geometry_scale, periods.cwiseAbs().maxCoeff());
-  }
-  if (geometry_scale == 0.0) geometry_scale = 1.0;
-  // Binary scaling avoids overflow without rounding nearby coordinates apart.
-  // Subtracting a common origin can erase pairs far from that origin.
-  geometry_scale = std::scalbn(1.0, std::ilogb(geometry_scale));
-  positions /= geometry_scale;
-  periods /= geometry_scale;
-
-  double minimum_period_scale = std::numeric_limits<double>::infinity();
-  if (num_periods == 1) {
-    minimum_period_scale =
-        blas::nrm2(2, periods.row(0).data(), periods.outerStride());
-  } else if (num_periods == 2) {
-    Eigen::Matrix2d basis;
-    basis.col(0) = periods.row(0).transpose();
-    basis.col(1) = periods.row(1).transpose();
-    std::array<double, 2> singular_values;
-    double unused = 0.0;
-    const auto info = lapack::gesvd(lapack::Job::NoVec, lapack::Job::NoVec, 2,
-                                    2, basis.data(), 2, singular_values.data(),
-                                    &unused, 1, &unused, 1);
-    if (info != 0) {
-      throw std::runtime_error(
-          "Failed to compute the periodic-vector singular values.");
-    }
-    minimum_period_scale =
-        *std::min_element(singular_values.begin(), singular_values.end());
-  }
-  if (num_periods != 0 &&
-      (!std::isfinite(minimum_period_scale) || minimum_period_scale <= 0.0)) {
-    throw std::overflow_error(
-        "Periodic vectors are not numerically independent at the geometry "
-        "scale.");
-  }
-  const Eigen::RowVector2d position_extents{
-      positions.col(0).maxCoeff() - positions.col(0).minCoeff(),
-      positions.col(1).maxCoeff() - positions.col(1).minCoeff()};
-  const double position_span = blas::nrm2(2, position_extents.data(), 1);
-  const std::uint64_t max_requested_shell = *requested_shells.rbegin();
-
-  std::vector<Candidate> candidates;
-  for (std::int64_t radius = 0;; ++radius) {
-    candidates.clear();
-    std::set<
-        std::tuple<std::uint64_t, std::uint64_t, std::int64_t, std::int64_t>>
-        seen;
-    const std::int64_t lower_0 = num_periods >= 1 ? -radius : 0;
-    const std::int64_t upper_0 = num_periods >= 1 ? radius : 0;
-    const std::int64_t lower_1 = num_periods == 2 ? -radius : 0;
-    const std::int64_t upper_1 = num_periods == 2 ? radius : 0;
-    for (std::uint64_t source = 0; source < n; ++source) {
-      for (std::uint64_t target = 0; target < n; ++target) {
-        for (std::int64_t image_0 = lower_0; image_0 <= upper_0; ++image_0) {
-          for (std::int64_t image_1 = lower_1; image_1 <= upper_1; ++image_1) {
-            if (source == target && image_0 == 0 && image_1 == 0) continue;
-            std::uint64_t site_i = source;
-            std::uint64_t site_j = target;
-            std::array<std::int64_t, 2> image_shift = {image_0, image_1};
-            if (site_i > site_j ||
-                (site_i == site_j &&
-                 (image_shift[0] < 0 ||
-                  (image_shift[0] == 0 && image_shift[1] < 0)))) {
-              std::swap(site_i, site_j);
-              image_shift[0] = -image_shift[0];
-              image_shift[1] = -image_shift[1];
-            }
-            if (!seen.emplace(site_i, site_j, image_shift[0], image_shift[1])
-                     .second) {
-              continue;
-            }
-            Eigen::RowVector2d displacement =
-                positions.row(static_cast<Eigen::Index>(site_j)) -
-                positions.row(static_cast<Eigen::Index>(site_i));
-            if (num_periods >= 1) {
-              displacement +=
-                  static_cast<double>(image_shift[0]) * periods.row(0);
-            }
-            if (num_periods == 2) {
-              displacement +=
-                  static_cast<double>(image_shift[1]) * periods.row(1);
-            }
-            const double distance = blas::nrm2(2, displacement.data(), 1);
-            if (distance != 0.0) {
-              candidates.push_back(
-                  {distance, site_i, site_j, image_shift, displacement});
-            }
-          }
-        }
-      }
-    }
-    std::sort(candidates.begin(), candidates.end(),
-              [](const Candidate& lhs, const Candidate& rhs) {
-                if (lhs.distance != rhs.distance) {
-                  return lhs.distance < rhs.distance;
-                }
-                return std::tie(lhs.site_i, lhs.site_j, lhs.image_shift) <
-                       std::tie(rhs.site_i, rhs.site_j, rhs.image_shift);
-              });
-    std::uint64_t shell = 0;
-    double shell_distance = 0.0;
-    double requested_shell_distance = 0.0;
-    for (auto& candidate : candidates) {
-      if (shell == 0 ||
-          !same_distance(candidate.distance, shell_distance, tolerance)) {
-        ++shell;
-        shell_distance = candidate.distance;
-      }
-      candidate.shell = shell;
-      if (shell == max_requested_shell) {
-        requested_shell_distance = shell_distance;
-      }
-    }
-    if (num_periods == 0 ||
-        (shell >= max_requested_shell &&
-         minimum_period_scale * static_cast<double>(radius + 1) -
-                 position_span >
-             requested_shell_distance * (1.0 + tolerance))) {
-      break;
-    }
-    if (radius == std::numeric_limits<std::int64_t>::max() - 1) {
-      throw std::overflow_error(
-          "Neighbor connection image radius exceeds the supported range.");
-    }
-  }
-
-  std::map<std::uint64_t, std::vector<Eigen::RowVector2d>> shell_axes;
-  for (const auto& candidate : candidates) {
-    if (!requested_shells.contains(candidate.shell)) continue;
-    const Eigen::RowVector2d axis =
-        canonical_axis(candidate.displacement, candidate.distance, tolerance);
-    auto& axes = shell_axes[candidate.shell];
-    if (std::none_of(axes.begin(), axes.end(), [&](const auto& existing) {
-          const Eigen::RowVector2d difference = existing - axis;
-          return blas::nrm2(2, difference.data(), 1) <= tolerance;
-        })) {
-      axes.push_back(axis);
-    }
-  }
-  for (auto& [shell, axes] : shell_axes) {
-    (void)shell;
-    std::sort(axes.begin(), axes.end(), [](const auto& lhs, const auto& rhs) {
-      return std::atan2(lhs.y(), lhs.x()) < std::atan2(rhs.y(), rhs.x());
-    });
-  }
-  std::vector<NeighborConnection> result;
-  for (const auto& candidate : candidates) {
-    if (!requested_shells.contains(candidate.shell)) continue;
-    const Eigen::RowVector2d axis =
-        canonical_axis(candidate.displacement, candidate.distance, tolerance);
-    const auto& axes = shell_axes.at(candidate.shell);
-    const auto orientation = static_cast<std::uint32_t>(std::distance(
-        axes.begin(),
-        std::find_if(axes.begin(), axes.end(), [&](const auto& existing) {
-          const Eigen::RowVector2d difference = existing - axis;
-          return blas::nrm2(2, difference.data(), 1) <= tolerance;
-        })));
-    const Eigen::RowVector2d displacement =
-        candidate.displacement * geometry_scale;
-    if (!displacement.allFinite()) {
-      throw std::overflow_error(
-          "Neighbor connection displacement exceeds the supported range.");
-    }
-    result.push_back(
-        {candidate.site_i,
-         candidate.site_j,
-         {candidate.shell, orientation, axes[orientation]},
-         displacement,
-         {candidate.image_shift.begin(), candidate.image_shift.end()},
-         std::nullopt,
-         1.0});
-  }
-  std::sort(result.begin(), result.end(), connection_less);
   return result;
 }
 
@@ -643,15 +320,16 @@ LatticeGeometry LatticeGeometry::_from_integer_embedding(
     if (periodic_x) periods->row(0) = nx * a1;
     if (periodic_y) periods->row(periodic_x ? 1 : 0) = ny * a2;
   }
-  LatticeGeometry geometry(std::move(positions), std::move(periods));
-  geometry._integer_embedding = IntegerEmbedding{nx,
-                                                 ny,
-                                                 primitive_vectors,
-                                                 std::move(basis),
-                                                 std::move(site_by_coordinate),
-                                                 periodic_x,
-                                                 periodic_y};
-  return geometry;
+  // Serialized layouts are external input; reject degenerate supercells.
+  if (!positions.allFinite() || (periods && !periods->allFinite()) ||
+      (periodic_x && a1.isZero(0.0)) || (periodic_y && a2.isZero(0.0)) ||
+      (periodic_x && periodic_y && a1.x() * a2.y() == a1.y() * a2.x())) {
+    throw std::invalid_argument("Invalid lattice integer embedding.");
+  }
+  return LatticeGeometry(
+      std::move(positions), std::move(periods),
+      IntegerEmbedding{nx, ny, primitive_vectors, std::move(basis),
+                       std::move(site_by_coordinate), periodic_x, periodic_y});
 }
 
 LatticeGeometry LatticeGeometry::chain(std::uint64_t n, bool periodic) {
@@ -720,34 +398,6 @@ LatticeGeometry LatticeGeometry::kagome(std::uint64_t nx, std::uint64_t ny,
                   periodic_x, periodic_y);
 }
 
-LatticeGeometry LatticeGeometry::permute(
-    const LatticeGeometry& geometry, const std::vector<std::uint64_t>& path) {
-  const std::uint64_t n = geometry.num_sites();
-  if (path.size() != n) {
-    throw std::invalid_argument("Permutation must contain every lattice site.");
-  }
-  std::vector<std::uint64_t> inverse(n, n);
-  Eigen::MatrixXd positions(static_cast<Eigen::Index>(n),
-                            geometry._positions.cols());
-  for (std::uint64_t i = 0; i < n; ++i) {
-    if (path[i] >= n || inverse[path[i]] != n) {
-      throw std::invalid_argument(
-          "Permutation must contain each lattice site exactly once.");
-    }
-    inverse[path[i]] = i;
-    positions.row(static_cast<Eigen::Index>(i)) =
-        geometry._positions.row(static_cast<Eigen::Index>(path[i]));
-  }
-  LatticeGeometry result(std::move(positions), geometry._periods);
-  result._integer_embedding = geometry._integer_embedding;
-  if (result._integer_embedding.has_value()) {
-    for (int& site : result._integer_embedding->site_by_coordinate) {
-      if (site >= 0) site = static_cast<int>(inverse[site]);
-    }
-  }
-  return result;
-}
-
 std::string LatticeGeometry::get_summary() const {
   std::ostringstream summary;
   summary << "LatticeGeometry\n  Sites: " << num_sites()
@@ -770,22 +420,14 @@ void LatticeGeometry::to_file(const std::string& filename,
 nlohmann::json LatticeGeometry::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
-  if (_integer_embedding.has_value()) {
-    const auto& embedding = *_integer_embedding;
-    j["integer_embedding"] = {
-        {"nx", embedding.nx},
-        {"ny", embedding.ny},
-        {"primitive_vectors", matrix_to_json(embedding.primitive_vectors)},
-        {"basis", matrix_to_json(embedding.basis)},
-        {"site_by_coordinate", embedding.site_by_coordinate},
-        {"periodic_x", embedding.periodic_x},
-        {"periodic_y", embedding.periodic_y}};
-    return j;
-  }
-  // Empty position arrays do not otherwise record their width.
-  j["dimension"] = dimension();
-  j["positions"] = matrix_to_json(_positions);
-  if (_periods.has_value()) j["periods"] = matrix_to_json(*_periods);
+  j["integer_embedding"] = {
+      {"nx", _embedding.nx},
+      {"ny", _embedding.ny},
+      {"primitive_vectors", matrix_to_json(_embedding.primitive_vectors)},
+      {"basis", matrix_to_json(_embedding.basis)},
+      {"site_by_coordinate", _embedding.site_by_coordinate},
+      {"periodic_x", _embedding.periodic_x},
+      {"periodic_y", _embedding.periodic_y}};
   return j;
 }
 
@@ -804,24 +446,16 @@ void LatticeGeometry::to_json_file(const std::string& filename) const {
 void LatticeGeometry::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
-    if (_integer_embedding.has_value()) {
-      const auto& embedding = *_integer_embedding;
-      auto layout = group.createGroup("integer_embedding");
-      save_stl_to_group(
-          layout, "shape",
-          std::vector<int>{embedding.nx, embedding.ny, embedding.periodic_x,
-                           embedding.periodic_y});
-      save_matrix_to_group(layout, "primitive_vectors",
-                           embedding.primitive_vectors);
-      save_matrix_to_group(layout, "basis", embedding.basis);
-      save_stl_to_group(layout, "site_by_coordinate",
-                        embedding.site_by_coordinate);
-    } else {
-      save_matrix_to_group(group, "positions", _positions);
-      if (_periods.has_value()) {
-        save_matrix_to_group(group, "periods", *_periods);
-      }
-    }
+    auto layout = group.createGroup("integer_embedding");
+    save_stl_to_group(
+        layout, "shape",
+        std::vector<int>{_embedding.nx, _embedding.ny, _embedding.periodic_x,
+                         _embedding.periodic_y});
+    save_matrix_to_group(layout, "primitive_vectors",
+                         _embedding.primitive_vectors);
+    save_matrix_to_group(layout, "basis", _embedding.basis);
+    save_stl_to_group(layout, "site_by_coordinate",
+                      _embedding.site_by_coordinate);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGeometry::to_hdf5: " +
                              std::string(e.getCDetailMsg()));
@@ -849,66 +483,18 @@ LatticeGeometry LatticeGeometry::from_file(const std::string& filename,
 
 LatticeGeometry LatticeGeometry::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
-  if (j.is_object() && j.contains("integer_embedding")) {
-    const auto& embedding = j.at("integer_embedding");
-    if (!embedding.is_object()) {
-      throw std::invalid_argument("Invalid lattice integer embedding.");
-    }
-    return _from_integer_embedding(
-        embedding.at("nx").get<int>(), embedding.at("ny").get<int>(),
-        json_to_matrix(embedding.at("primitive_vectors")),
-        json_to_matrix(embedding.at("basis")),
-        embedding.at("site_by_coordinate").get<std::vector<int>>(),
-        embedding.at("periodic_x").get<bool>(),
-        embedding.at("periodic_y").get<bool>());
+  if (!j.is_object() || !j.contains("integer_embedding") ||
+      !j.at("integer_embedding").is_object()) {
+    throw std::invalid_argument("Invalid lattice integer embedding.");
   }
-  if (!j.is_object() || !j.contains("positions")) {
-    throw std::runtime_error("JSON missing required 'positions' field.");
-  }
-  std::size_t width = 0;
-  if (j.contains("dimension")) {
-    const auto& value = j.at("dimension");
-    if (!value.is_number_integer() || value.get<std::int64_t>() <= 0 ||
-        value.get<std::int64_t>() > std::numeric_limits<int>::max()) {
-      throw std::invalid_argument(
-          "Geometry dimension must be a positive integer.");
-    }
-    width = value.get<std::size_t>();
-  } else {
-    // Hand-written payloads may omit the dimension when a row determines it.
-    for (const char* name : {"positions", "periods"}) {
-      if (j.contains(name) && j.at(name).is_array() && !j.at(name).empty() &&
-          j.at(name).front().is_array()) {
-        width = j.at(name).front().size();
-        break;
-      }
-    }
-    if (width == 0) {
-      throw std::invalid_argument(
-          "Geometry JSON requires a positive 'dimension' when no row "
-          "determines it.");
-    }
-  }
-  const auto read_matrix =
-      [width](const nlohmann::json& value) -> Eigen::MatrixXd {
-    if (!value.is_array() || value.size() > std::numeric_limits<int>::max()) {
-      throw std::invalid_argument("Geometry matrices require arrays of rows.");
-    }
-    // The shared converter rejects empty arrays; the dimension fixes the width.
-    if (value.empty()) {
-      return Eigen::MatrixXd(0, static_cast<Eigen::Index>(width));
-    }
-    for (const auto& row : value) {
-      if (!row.is_array() || row.size() != width) {
-        throw std::invalid_argument(
-            "Geometry matrix rows must match the geometry dimension.");
-      }
-    }
-    return json_to_matrix(value);
-  };
-  std::optional<Eigen::MatrixXd> periods;
-  if (j.contains("periods")) periods = read_matrix(j.at("periods"));
-  return LatticeGeometry(read_matrix(j.at("positions")), std::move(periods));
+  const auto& embedding = j.at("integer_embedding");
+  return _from_integer_embedding(
+      embedding.at("nx").get<int>(), embedding.at("ny").get<int>(),
+      json_to_matrix(embedding.at("primitive_vectors")),
+      json_to_matrix(embedding.at("basis")),
+      embedding.at("site_by_coordinate").get<std::vector<int>>(),
+      embedding.at("periodic_x").get<bool>(),
+      embedding.at("periodic_y").get<bool>());
 }
 
 LatticeGeometry LatticeGeometry::from_json_file(const std::string& filename) {
@@ -956,20 +542,18 @@ LatticeGeometry LatticeGeometry::from_hdf5(H5::Group& group) {
       }
       return load_std_vector_from_group<int>(source, name);
     };
-    if (group.nameExists("integer_embedding")) {
-      auto layout = group.openGroup("integer_embedding");
-      const auto shape = read_ints(layout, "shape");
-      if (shape.size() != 4) {
-        throw std::invalid_argument("Invalid lattice integer embedding.");
-      }
-      return _from_integer_embedding(
-          shape[0], shape[1], read_matrix(layout, "primitive_vectors"),
-          read_matrix(layout, "basis"), read_ints(layout, "site_by_coordinate"),
-          shape[2] != 0, shape[3] != 0);
+    if (!group.nameExists("integer_embedding")) {
+      throw std::invalid_argument("Invalid lattice integer embedding.");
     }
-    std::optional<Eigen::MatrixXd> periods;
-    if (group.nameExists("periods")) periods = read_matrix(group, "periods");
-    return LatticeGeometry(read_matrix(group, "positions"), std::move(periods));
+    auto layout = group.openGroup("integer_embedding");
+    const auto shape = read_ints(layout, "shape");
+    if (shape.size() != 4) {
+      throw std::invalid_argument("Invalid lattice integer embedding.");
+    }
+    return _from_integer_embedding(
+        shape[0], shape[1], read_matrix(layout, "primitive_vectors"),
+        read_matrix(layout, "basis"), read_ints(layout, "site_by_coordinate"),
+        shape[2] != 0, shape[3] != 0);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGeometry::from_hdf5: " +
                              std::string(e.getCDetailMsg()));

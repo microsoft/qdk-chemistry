@@ -13,58 +13,27 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import BondFlavorDefinition, LatticeGeometry, LatticeGraph, NeighborConnection
+from qdk_chemistry.data import BondFlavorDefinition, EdgeLabel, LatticeGeometry, LatticeGraph
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _assert_same_connections(actual: list[NeighborConnection], expected: list[NeighborConnection]) -> None:
-    """Compare physical records without relying on Python wrapper identity."""
-    assert len(actual) == len(expected)
-    for left, right in zip(actual, expected, strict=True):
-        assert (left.site_i, left.site_j, left.flavor, left.weight) == (
-            right.site_i,
-            right.site_j,
-            right.flavor,
-            right.weight,
-        )
-        assert (left.bond_class.shell, left.bond_class.orientation) == (
-            right.bond_class.shell,
-            right.bond_class.orientation,
-        )
-        assert tuple(left.image_shift) == tuple(right.image_shift)
-        np.testing.assert_allclose(left.bond_class.axis, right.bond_class.axis, atol=1e-12, rtol=0.0)
-        np.testing.assert_allclose(left.displacement, right.displacement, atol=1e-12, rtol=0.0)
-
-
 class TestLatticeGeometry:
-    """Check neighbor discovery, geometry validation, and persistence."""
+    """Check factory geometry properties, shell selection, and persistence."""
 
-    def test_neighbor_queries_validate_shell_indices(self) -> None:
-        """Neighbor queries reject zero, negative, and nonintegral shell indices."""
+    def test_shell_selection_validates_indices(self) -> None:
+        """Shell selection rejects zero, negative, and nonintegral shell indices."""
         geometry = LatticeGeometry.chain(3)
-        with pytest.raises(ValueError, match="m must be > 0"):
-            geometry.mth_nearest_neighbors(0)
-        with pytest.raises(ValueError, match="m must be > 0"):
-            geometry.nearest_neighbor_shells([0])
         with pytest.raises(ValueError, match="shell index must be > 0"):
-            geometry.neighbor_connections([0])
+            LatticeGraph.from_geometry(geometry, [0])
         for shell in (-1, 1.5):
             with pytest.raises(TypeError):
-                geometry.mth_nearest_neighbors(shell)
-            with pytest.raises(TypeError):
-                geometry.nearest_neighbor_shells([shell])
-            with pytest.raises(TypeError):
-                geometry.neighbor_connections([shell])
+                LatticeGraph.from_geometry(geometry, [shell])
 
-    def test_cartesian_geometry_copies_inputs_and_properties(self) -> None:
-        """Mutating input or returned arrays leaves stored positions and periods unchanged."""
-        positions = np.array([[0.0, 0.0], [1.0, 0.0]])
-        periods = np.array([[2.0, 0.0], [0.0, 2.0]])
-        geometry = LatticeGeometry(positions, periods=periods)
-        positions[:] = 7.0
-        periods[:] = 7.0
+    def test_properties_return_copies(self) -> None:
+        """Mutating returned arrays leaves stored positions and periods unchanged."""
+        geometry = LatticeGeometry.square(2, 1, periodic_x=True)
         copied_positions = geometry.positions
         copied_periods = geometry.periods
         assert copied_periods is not None
@@ -72,19 +41,13 @@ class TestLatticeGeometry:
         copied_periods[:] = -7.0
 
         np.testing.assert_array_equal(geometry.positions, [[0.0, 0.0], [1.0, 0.0]])
-        np.testing.assert_array_equal(geometry.periods, [[2.0, 0.0], [0.0, 2.0]])
+        np.testing.assert_array_equal(geometry.periods, [[2.0, 0.0]])
 
-    @pytest.mark.parametrize("kind", ["open", "periodic", "empty"])
+    @pytest.mark.parametrize("periodic", [False, True])
     @pytest.mark.parametrize("format_name", ["json", "hdf5", "pickle"])
-    def test_round_trip_preserves_geometry(self, tmp_path: Path, kind: str, format_name: str) -> None:
-        """Serialization preserves coordinates, periods, hashes, and neighbor connections."""
-        geometry = (
-            LatticeGeometry(np.empty((0, 2)))
-            if kind == "empty"
-            else LatticeGeometry.honeycomb_plaquettes(
-                2, 2, periodic_x=kind == "periodic", periodic_y=kind == "periodic"
-            )
-        )
+    def test_round_trip_preserves_geometry(self, tmp_path: Path, periodic: bool, format_name: str) -> None:
+        """Serialization preserves the layout, coordinates, periods, hashes, and derived graphs."""
+        geometry = LatticeGeometry.honeycomb_plaquettes(2, 2, periodic_x=periodic, periodic_y=periodic)
         if format_name == "json":
             restored = LatticeGeometry.from_json(geometry.to_json())
             path = tmp_path / "geometry.lattice_geometry.json"
@@ -97,6 +60,7 @@ class TestLatticeGeometry:
         else:
             restored = pickle.loads(pickle.dumps(geometry))
 
+        assert restored.to_json() == geometry.to_json()
         assert restored.num_sites == geometry.num_sites
         np.testing.assert_array_equal(restored.positions, geometry.positions)
         if geometry.periods is None:
@@ -104,7 +68,9 @@ class TestLatticeGeometry:
         else:
             np.testing.assert_array_equal(restored.periods, geometry.periods)
         assert restored.content_hash() == geometry.content_hash()
-        _assert_same_connections(restored.neighbor_connections([1, 2, 3]), geometry.neighbor_connections([1, 2, 3]))
+        assert (
+            LatticeGraph.from_geometry(restored).content_hash() == LatticeGraph.from_geometry(geometry).content_hash()
+        )
 
 
 class TestSelectedLatticeGraph:
@@ -122,9 +88,23 @@ class TestSelectedLatticeGraph:
         assert {pair: label.shell for pair, label in labels.items()} == {(0, 1): 1, (0, 2): 2, (1, 2): 1}
         assert all(label.flavor == 1000 + label.shell for label in labels.values())
         np.testing.assert_array_equal(graph.adjacency_matrix(), 2.5 * (np.ones((3, 3)) - np.eye(3)))
-        for connection in geometry.neighbor_connections([1, 2]):
-            assert connection.flavor is None
-            assert connection.weight == 1.0
+
+    def test_custom_graphs_accept_edge_labels(self) -> None:
+        """Adjacency-built graphs retain user shells and flavors through data operations."""
+        labels = {(0, 1): EdgeLabel(1, flavor=10), (1, 2): EdgeLabel(1), (0, 2): EdgeLabel(2, flavor=20)}
+        adjacency = np.array([[0.0, 1.0, 0.5], [1.0, 0.0, 1.0], [0.5, 1.0, 0.0]])
+        dense = LatticeGraph.from_dense_matrix(adjacency, edge_labels=labels)
+        upper = LatticeGraph({pair: float(adjacency[pair]) for pair in labels}, edge_labels=labels)
+
+        assert dense.edge_labels == labels
+        assert labels[1, 2].flavor is None
+        sparse = LatticeGraph.from_sparse_matrix(dense.sparse_adjacency_matrix(), edge_labels=labels)
+        assert sparse.content_hash() == dense.content_hash()
+        assert LatticeGraph.make_bidirectional(upper).edge_labels == labels
+        assert LatticeGraph.from_json(dense.to_json()).content_hash() == dense.content_hash()
+        for invalid in ({(0, 1): EdgeLabel(1)}, {**labels, (0, 1): EdgeLabel(0)}):
+            with pytest.raises(ValueError, match="edge label"):
+                LatticeGraph.from_dense_matrix(adjacency, edge_labels=invalid)
 
     def test_graph_permutation_preserves_edge_labels(self) -> None:
         """Valid permutations preserve edge labels; repeated indices are rejected."""

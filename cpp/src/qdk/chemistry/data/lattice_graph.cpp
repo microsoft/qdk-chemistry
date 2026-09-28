@@ -37,14 +37,6 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(j, i, t);
 }
 
-static void normalize_shells(std::vector<std::uint64_t>& shells) {
-  if (std::find(shells.begin(), shells.end(), 0) != shells.end()) {
-    throw std::invalid_argument("Neighbor shell index must be > 0.");
-  }
-  std::sort(shells.begin(), shells.end());
-  shells.erase(std::unique(shells.begin(), shells.end()), shells.end());
-}
-
 // An axis and its negation describe one unoriented bond class. The first
 // component exceeding the tolerance selects the representative sign.
 static void orient_axis(Eigen::RowVectorXd& axis, double tolerance) {
@@ -56,16 +48,8 @@ static void orient_axis(Eigen::RowVectorXd& axis, double tolerance) {
   }
 }
 
-static void label_connections(std::vector<NeighborConnection>& connections,
-                              std::vector<BondFlavorDefinition> definitions,
-                              double tolerance) {
-  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
-    throw std::invalid_argument("Bond-flavor tolerance must be positive.");
-  }
-  const Eigen::Index dimension =
-      !connections.empty()   ? connections.front().bond_class.axis.size()
-      : !definitions.empty() ? definitions.front().axis.size()
-                             : 0;
+static std::vector<BondFlavorDefinition> prepare_flavors(
+    std::vector<BondFlavorDefinition> definitions, double tolerance) {
   for (auto& definition : definitions) {
     if (definition.shell == 0 || definition.axis.size() == 0 ||
         !definition.axis.allFinite() ||
@@ -73,9 +57,8 @@ static void label_connections(std::vector<NeighborConnection>& connections,
       throw std::invalid_argument(
           "Bond flavors require a positive shell and a finite nonzero axis.");
     }
-    if (definition.axis.size() != dimension) {
-      throw std::invalid_argument(
-          "Bond-flavor axes must match the connection dimension.");
+    if (definition.axis.size() != 2) {
+      throw std::invalid_argument("Bond-flavor axes must be two-dimensional.");
     }
     definition.axis /=
         blas::nrm2(definition.axis.size(), definition.axis.data(), 1);
@@ -104,19 +87,21 @@ static void label_connections(std::vector<NeighborConnection>& connections,
       }
     }
   }
-  for (auto& connection : connections) {
-    connection.flavor.reset();
-    Eigen::RowVectorXd axis = connection.bond_class.axis;
-    orient_axis(axis, tolerance);
-    for (const auto& definition : definitions) {
-      if (definition.shell != connection.bond_class.shell) continue;
-      const Eigen::RowVectorXd difference = definition.axis - axis;
-      if (blas::nrm2(difference.size(), difference.data(), 1) <= tolerance) {
-        connection.flavor = definition.flavor;
-        break;
-      }
+  return definitions;
+}
+
+// Geometry bond axes already have the orient_axis representative sign.
+static std::optional<BondFlavorId> flavor_of(
+    const std::vector<BondFlavorDefinition>& definitions, std::uint64_t shell,
+    const Eigen::RowVector2d& axis, double tolerance) {
+  for (const auto& definition : definitions) {
+    if (definition.shell != shell) continue;
+    const Eigen::RowVector2d difference = definition.axis - axis;
+    if (blas::nrm2(2, difference.data(), 1) <= tolerance) {
+      return definition.flavor;
     }
   }
+  return std::nullopt;
 }
 
 template <typename Integer>
@@ -207,7 +192,7 @@ std::vector<std::uint64_t> find_hamiltonian_path(
 LatticeGraph::LatticeGraph(
     const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
         edge_weights,
-    std::uint64_t num_sites) {
+    std::uint64_t num_sites, EdgeLabels edge_labels) {
   // get num_sites if not provided
   if (num_sites == 0) {
     for (const auto& [edge, weight] : edge_weights) {
@@ -238,15 +223,20 @@ LatticeGraph::LatticeGraph(
   adjacency_.setFromTriplets(triplets.begin(), triplets.end());
   adjacency_.makeCompressed();
   _is_symmetric = _check_symmetry(adjacency_);
+  _edge_labels = std::move(edge_labels);
+  _validate_edge_labels();
 }
 
 LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                           std::optional<EdgeColoring> coloring)
+                           std::optional<EdgeColoring> coloring,
+                           EdgeLabels edge_labels)
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
       _is_symmetric(_check_symmetry(adjacency_)),
-      _edge_coloring(std::move(coloring)) {
+      _edge_coloring(std::move(coloring)),
+      _edge_labels(std::move(edge_labels)) {
   _validate_coloring();
+  _validate_edge_labels();
 }
 
 void LatticeGraph::_validate_coloring() const {
@@ -303,23 +293,23 @@ void LatticeGraph::_validate_edge_labels() const {
 }
 
 LatticeGraph LatticeGraph::from_dense_matrix(
-    const Eigen::MatrixXd& adjacency_matrix) {
+    const Eigen::MatrixXd& adjacency_matrix, EdgeLabels edge_labels) {
   if (adjacency_matrix.rows() != adjacency_matrix.cols()) {
     throw std::invalid_argument("Adjacency matrix must be square.");
   }
   Eigen::SparseMatrix<double> sparse = adjacency_matrix.sparseView();
   sparse.makeCompressed();
-  return LatticeGraph(std::move(sparse));
+  return LatticeGraph(std::move(sparse), std::nullopt, std::move(edge_labels));
 }
 
 LatticeGraph LatticeGraph::from_sparse_matrix(
-    const Eigen::SparseMatrix<double>& sparse) {
+    const Eigen::SparseMatrix<double>& sparse, EdgeLabels edge_labels) {
   if (sparse.rows() != sparse.cols()) {
     throw std::invalid_argument("Adjacency matrix must be square.");
   }
   Eigen::SparseMatrix<double> copy = sparse;
   copy.makeCompressed();
-  return LatticeGraph(std::move(copy));
+  return LatticeGraph(std::move(copy), std::nullopt, std::move(edge_labels));
 }
 
 LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
@@ -327,10 +317,7 @@ LatticeGraph LatticeGraph::make_bidirectional(const LatticeGraph& graph) {
       (graph.adjacency_ +
        Eigen::SparseMatrix<double>(graph.adjacency_.transpose()));
   sym.makeCompressed();
-  LatticeGraph result(std::move(sym));
-  result._edge_labels = graph._edge_labels;
-  result._validate_edge_labels();
-  return result;
+  return LatticeGraph(std::move(sym), std::nullopt, graph._edge_labels);
 }
 
 std::uint64_t LatticeGraph::num_sites() const { return _num_sites; }
@@ -379,24 +366,23 @@ LatticeGraph LatticeGraph::from_geometry(
   if (!std::isfinite(weight)) {
     throw std::invalid_argument("Connection weight must be finite.");
   }
-  auto selected = shells;
-  detail::normalize_shells(selected);
-  auto connections = geometry.neighbor_connections(selected, tolerance);
-  detail::label_connections(connections, definitions, tolerance);
+  const auto bonds = geometry._shell_bonds(shells, tolerance);
+  const auto flavors = detail::prepare_flavors(definitions, tolerance);
   EdgeLabels labels;
   std::vector<detail::Triplet> triplets;
-  triplets.reserve(2 * connections.size());
-  for (const auto& connection : connections) {
-    const auto i = connection.site_i;
-    const auto j = connection.site_j;
+  triplets.reserve(2 * bonds.size());
+  for (const auto& bond : bonds) {
+    const auto i = bond.site_i;
+    const auto j = bond.site_j;
     if (i == j) {
       throw std::invalid_argument(
           "A lattice edge cannot join a site to its own periodic image.");
     }
     // Geometry records order endpoints with site_i < site_j.
     if (!labels
-             .try_emplace({i, j}, connection.bond_class.shell,
-                          connection.flavor)
+             .try_emplace(
+                 {i, j}, bond.shell,
+                 detail::flavor_of(flavors, bond.shell, bond.axis, tolerance))
              .second) {
       throw std::invalid_argument(
           "Several periodic images join sites " + std::to_string(i) + " and " +
@@ -417,10 +403,9 @@ LatticeGraph LatticeGraph::from_geometry(
   std::sort(pairs.begin(), pairs.end(), [](const auto& lhs, const auto& rhs) {
     return std::tie(lhs.second, lhs.first) < std::tie(rhs.second, rhs.first);
   });
-  LatticeGraph result(std::move(adjacency),
-                      detail::color_edges(geometry.num_sites(), pairs, 0, 32));
-  result._edge_labels = std::move(labels);
-  return result;
+  auto coloring = detail::color_edges(geometry.num_sites(), pairs, 0, 32);
+  return LatticeGraph(std::move(adjacency), std::move(coloring),
+                      std::move(labels));
 }
 
 LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
@@ -604,100 +589,45 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   if (periodic_y && ny < 2) {
     throw std::invalid_argument("honeycomb: periodic_y requires ny > 1.");
   }
-  return _honeycomb(nx, ny, false, periodic_x, periodic_y, t);
-}
 
-LatticeGraph LatticeGraph::honeycomb_plaquettes(std::uint64_t nx,
-                                                std::uint64_t ny,
-                                                bool periodic_x,
-                                                bool periodic_y, double t,
-                                                bool dfs_ordering) {
-  (void)dfs_ordering;
-  if (nx == 0 || ny == 0) {
-    throw std::invalid_argument("honeycomb_plaquettes: nx and ny must be > 0.");
-  }
-  if (periodic_x && nx < 2) {
-    throw std::invalid_argument(
-        "honeycomb_plaquettes: periodic_x requires nx > 1.");
-  }
-  if (periodic_y && ny < 2) {
-    throw std::invalid_argument(
-        "honeycomb_plaquettes: periodic_y requires ny > 1.");
-  }
-  const auto num_cells_x = nx + static_cast<std::uint64_t>(!periodic_x);
-  const auto num_cells_y = ny + static_cast<std::uint64_t>(!periodic_y);
-  return _honeycomb(num_cells_x, num_cells_y, !periodic_x && !periodic_y,
-                    periodic_x, periodic_y, t);
-}
-
-LatticeGraph LatticeGraph::_honeycomb(std::uint64_t num_cells_x,
-                                      std::uint64_t num_cells_y,
-                                      bool remove_open_corners, bool periodic_x,
-                                      bool periodic_y, double t) {
-  const auto Nx = static_cast<int>(num_cells_x);
-  const auto Ny = static_cast<int>(num_cells_y);
-  const int full_num_sites = 2 * Nx * Ny;
+  auto Nx = static_cast<int>(nx);
+  auto Ny = static_cast<int>(ny);
+  int N = 2 * Nx * Ny;  // 2 sites per unit cell
 
   // Site indices within unit cell (x, y):
   //   A = 2 * (y * Nx + x),  B = 2 * (y * Nx + x) + 1
   auto idxA = [Nx](int x, int y) { return 2 * (y * Nx + x); };
   auto idxB = [Nx](int x, int y) { return 2 * (y * Nx + x) + 1; };
 
-  std::vector<int> old_to_new(full_num_sites, -1);
-  int num_sites = 0;
-  for (int old_site = 0; old_site < full_num_sites; ++old_site) {
-    const bool dangling_open_corner =
-        remove_open_corners &&
-        (old_site == idxA(0, 0) || old_site == idxB(Nx - 1, Ny - 1));
-    if (!dangling_open_corner) old_to_new[old_site] = num_sites++;
-  }
-
   std::vector<detail::Triplet> triplets;
-  triplets.reserve(3 * num_sites);
-  auto add_edge = [&triplets, &old_to_new, t](int old_i, int old_j) {
-    const int i = old_to_new[old_i];
-    const int j = old_to_new[old_j];
-    if (i >= 0 && j >= 0) detail::add_edge(triplets, i, j, t);
-  };
+  triplets.reserve(3 * N);
 
   for (int y = 0; y < Ny; ++y) {
     for (int x = 0; x < Nx; ++x) {
       // Intra-cell bond: A -- B
-      add_edge(idxA(x, y), idxB(x, y));
+      detail::add_edge(triplets, idxA(x, y), idxB(x, y), t);
 
       // Inter-cell bond 1: B(x,y) -- A(x+1, y)  (horizontal)
       if (x + 1 < Nx) {
-        add_edge(idxB(x, y), idxA(x + 1, y));
+        detail::add_edge(triplets, idxB(x, y), idxA(x + 1, y), t);
       } else if (periodic_x) {
-        add_edge(idxB(x, y), idxA(0, y));
+        detail::add_edge(triplets, idxB(x, y), idxA(0, y), t);
       }
 
       // Inter-cell bond 2: B(x,y) -- A(x, y+1)  (vertical)
       if (y + 1 < Ny) {
-        add_edge(idxB(x, y), idxA(x, y + 1));
+        detail::add_edge(triplets, idxB(x, y), idxA(x, y + 1), t);
       } else if (periodic_y) {
-        add_edge(idxB(x, y), idxA(x, 0));
+        detail::add_edge(triplets, idxB(x, y), idxA(x, 0), t);
       }
     }
   }
 
-  Eigen::SparseMatrix<double> adj(num_sites, num_sites);
+  Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-
-  EdgeColoring coloring;
-  for (const auto& [edge, color] :
-       honeycomb_coloring(Nx, Ny, periodic_x, periodic_y)) {
-    const int i = old_to_new[edge.first];
-    const int j = old_to_new[edge.second];
-    if (i < 0 || j < 0) continue;
-    const auto mapped_i = static_cast<std::uint64_t>(i);
-    const auto mapped_j = static_cast<std::uint64_t>(j);
-    coloring[{std::min(mapped_i, mapped_j), std::max(mapped_i, mapped_j)}] =
-        color;
-  }
-
-  return LatticeGraph(std::move(adj), std::move(coloring));
+  return LatticeGraph(std::move(adj),
+                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,

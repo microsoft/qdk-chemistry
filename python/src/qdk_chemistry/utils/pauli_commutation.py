@@ -25,6 +25,7 @@ References:
 
 from __future__ import annotations
 
+import bisect
 import itertools
 import math
 from typing import TYPE_CHECKING
@@ -33,9 +34,10 @@ import numpy as np
 
 from qdk_chemistry.data import PauliTermAccumulator
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import _sparse_terms
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
 
     from qdk_chemistry.data import QubitOperator
 
@@ -329,6 +331,49 @@ def does_nested_commutator_vanish(*labels: str) -> bool:
     return do_pauli_labels_commute(labels[0], inner_product)
 
 
+def _real_term_supports(
+    hamiltonian: QubitOperator, weight_threshold: float
+) -> tuple[list[dict[int, str]], list[float], dict[int, list[int]]]:
+    """Return retained terms as qubit-to-Pauli maps, their real coefficients, and each qubit's term indices.
+
+    Terms, order, and filtering match ``get_real_coefficients`` without building register-width labels.
+
+    """
+    _require_pauli_decomposition(hamiltonian)
+    supports: list[dict[int, str]] = []
+    coefficients: list[float] = []
+    terms_by_qubit: dict[int, list[int]] = {}
+    for factors, coefficient in _sparse_terms(hamiltonian.get_container()):
+        if abs(coefficient.real) > weight_threshold:
+            for qubit, _ in factors:
+                terms_by_qubit.setdefault(qubit, []).append(len(supports))
+            supports.append(dict(factors))
+            coefficients.append(coefficient.real)
+    return supports, coefficients, terms_by_qubit
+
+
+def _later_terms_on(qubits: Iterable[int], after: int, terms_by_qubit: dict[int, list[int]]) -> list[int]:
+    """Return the sorted indices greater than ``after`` of terms acting on any of ``qubits``."""
+    later: set[int] = set()
+    for qubit in qubits:
+        indices = terms_by_qubit[qubit]
+        later.update(indices[bisect.bisect_right(indices, after) :])
+    return sorted(later)
+
+
+def _product_support(a: dict[int, str], b: dict[int, str]) -> dict[int, str]:
+    """Return the Pauli map of the product of two terms, up to phase."""
+    product = dict(a)
+    for qubit, pauli in b.items():
+        # Positions in "IXYZ" multiply by XOR, up to phase.
+        combined = "IXYZ"["IXYZ".index(product.get(qubit, "I")) ^ "IXYZ".index(pauli)]
+        if combined == "I":
+            del product[qubit]
+        else:
+            product[qubit] = combined
+    return product
+
+
 def commutator_bound_first_order(
     hamiltonian: QubitOperator,
     weight_threshold: float = 1e-12,
@@ -362,16 +407,13 @@ def commutator_bound_first_order(
         The sum of commutator norms over all unique pairs.
 
     """
-    _require_pauli_decomposition(hamiltonian)
-    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
-    pauli_labels = [label for label, _ in real_terms]
-    coefficients = [coeff for _, coeff in real_terms]
+    supports, coefficients, terms_by_qubit = _real_term_supports(hamiltonian, weight_threshold)
 
     total = 0.0
-    n = len(pauli_labels)
-    for j in range(n):
-        for k in range(j + 1, n):
-            if not do_pauli_labels_commute(pauli_labels[j], pauli_labels[k]):
+    # Terms on disjoint qubits commute; the rest are visited in index order, keeping the summation order.
+    for j, support in enumerate(supports):
+        for k in _later_terms_on(support, j, terms_by_qubit):
+            if not do_pauli_maps_commute(support, supports[k]):
                 total += 2.0 * abs(coefficients[j]) * abs(coefficients[k])
     return total
 
@@ -390,24 +432,21 @@ def commutator_bound_second_order(
         The commutator bound term multiplying :math:`t^{3} / 12`.
 
     """
-    _require_pauli_decomposition(hamiltonian)
-    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
-    pauli_labels = [label for label, _ in real_terms]
-    coefficients = [coeff for _, coeff in real_terms]
+    supports, coefficients, terms_by_qubit = _real_term_supports(hamiltonian, weight_threshold)
 
     total_term1 = 0.0
-    n = len(pauli_labels)
-    for i in range(n):
-        for j in range(i + 1, n):
-            for k in range(i + 1, n):
-                if not does_nested_commutator_vanish(pauli_labels[k], pauli_labels[j], pauli_labels[i]):
-                    total_term1 += 2.0**2 * abs(coefficients[i]) * abs(coefficients[j]) * abs(coefficients[k])
-
     total_term2 = 0.0
-    for i in range(n):
-        for j in range(i + 1, n):
-            if not does_nested_commutator_vanish(pauli_labels[i], pauli_labels[i], pauli_labels[j]):
-                total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
+    for i, support_i in enumerate(supports):
+        # [P_k, [P_j, P_i]] vanishes unless P_j anticommutes with P_i and P_k with the product P_j P_i.
+        for j in _later_terms_on(support_i, i, terms_by_qubit):
+            if do_pauli_maps_commute(supports[j], support_i):
+                continue
+            product = _product_support(supports[j], support_i)
+            for k in _later_terms_on(product, i, terms_by_qubit):
+                if not do_pauli_maps_commute(supports[k], product):
+                    total_term1 += 2.0**2 * abs(coefficients[i]) * abs(coefficients[j]) * abs(coefficients[k])
+            # [P_i, [P_i, P_j]] is nonzero exactly when P_i and P_j anticommute.
+            total_term2 += 2.0**2 * abs(coefficients[i]) ** 2 * abs(coefficients[j])
 
     return total_term1 + 0.5 * total_term2
 

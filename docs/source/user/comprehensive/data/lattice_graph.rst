@@ -2,7 +2,7 @@ LatticeGraph
 ============
 
 The :class:`~qdk_chemistry.data.LatticeGraph` class represents weighted connectivity between indexed lattice sites.
-Coordinates and geometric neighbor queries belong to the separate :doc:`LatticeGeometry <lattice_geometry>` class.
+Site coordinates of built-in lattices belong to the separate :doc:`LatticeGeometry <lattice_geometry>` class.
 As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
 
 Overview
@@ -10,7 +10,7 @@ Overview
 
 A :class:`~qdk_chemistry.data.LatticeGraph` stores weighted edges between finite-lattice site pairs.
 Graphs built from a geometry also label each edge with its neighbor shell and an optional semantic flavor.
-It also supports adjacency-only input without inventing geometric labels.
+Graphs built from adjacency data are unlabelled unless the caller supplies the same :ref:`edge labels <lattice-custom-edge-labels>`.
 For example, :doc:`model Hamiltonian <../model_hamiltonians>` builders consume this connectivity together with interaction parameters.
 
 Properties
@@ -79,16 +79,16 @@ Nearest-neighbor graph factories
 --------------------------------
 
 The existing :class:`~qdk_chemistry.data.LatticeGraph` factories remain nearest-neighbor convenience constructors, preserving their adjacency weights, site ordering, boundary behavior, and stored topology colorings.
-Their edges are unlabelled; build shell- or flavor-dependent models with :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
+Their edges are unlabelled, and model builders treat them as shell-1 edges; build models that use other shells or flavors from :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` or :ref:`custom edge labels <lattice-custom-edge-labels>`.
 The available constructors are:
 
 * :meth:`~qdk_chemistry.data.LatticeGraph.chain` — a chain or ring of ``n`` sites.
 * :meth:`~qdk_chemistry.data.LatticeGraph.square` — ``nx * ny`` sites on a square grid.
 * :meth:`~qdk_chemistry.data.LatticeGraph.triangular` — ``nx * ny`` sites on a triangular lattice.
 * :meth:`~qdk_chemistry.data.LatticeGraph.honeycomb` — two sites per unit cell.
-* :meth:`~qdk_chemistry.data.LatticeGraph.honeycomb_plaquettes` — a patch sized by complete hexagons.
 * :meth:`~qdk_chemistry.data.LatticeGraph.kagome` — three sites per unit cell.
 
+For a honeycomb patch sized by complete hexagons, pass :meth:`~qdk_chemistry.data.LatticeGeometry.honeycomb_plaquettes` to :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
 See :doc:`LatticeGeometry <lattice_geometry>` for the coordinate and indexing conventions.
 
 One-dimensional lattices
@@ -243,8 +243,8 @@ Creating from adjacency data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For arbitrary connectivity, construct a :class:`~qdk_chemistry.data.LatticeGraph` from a dense adjacency matrix, a sparse adjacency matrix, or an edge-weight dictionary.
-These constructors preserve directed or asymmetric input without assigning shells or flavors.
-If Cartesian coordinates are available and geometric selection is desired, construct a :class:`~qdk_chemistry.data.LatticeGeometry` instead and use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
+These constructors preserve directed or asymmetric input and assign shells or flavors only when :ref:`edge labels <lattice-custom-edge-labels>` are supplied.
+For the built-in lattices, :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` derives the labels from a :class:`~qdk_chemistry.data.LatticeGeometry` instead.
 
 .. tab:: Python API
 
@@ -287,7 +287,31 @@ Definitions neither select shells nor create edges.
 
 Flavor meanings belong to the consumer, not the geometry.
 For example, the :ref:`Kitaev model builder <model-kitaev>` interprets IDs 0, 1, and 2 as X, Y, and Z spin interactions.
-These semantic labels are independent of shell-local orientation indices and scheduling colors.
+These semantic labels are independent of scheduling colors.
+
+.. _lattice-custom-edge-labels:
+
+Custom edge labels
+~~~~~~~~~~~~~~~~~~
+
+Graphs built from adjacency data can carry the same labels, which defines neighbor shells and flavors for connectivity that no built-in geometry describes.
+Pass ``edge_labels``, a mapping from every stored pair ``(i, j)`` with ``i < j`` to an :class:`~qdk_chemistry.data.EdgeLabel`, to the edge-weight constructor, :meth:`~qdk_chemistry.data.LatticeGraph.from_dense_matrix`, or :meth:`~qdk_chemistry.data.LatticeGraph.from_sparse_matrix`.
+The labels must cover exactly the stored pairs, each with a positive shell; an empty mapping leaves the graph unlabelled.
+Model builders then select shells and flavors exactly as for graphs built from a geometry.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
+      :language: python
+      :start-after: # start-cell-custom-labels
+      :end-before: # end-cell-custom-labels
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
+      :language: cpp
+      :start-after: // start-cell-custom-labels
+      :end-before: // end-cell-custom-labels
 
 .. _lattice-periodic-boundary-conditions:
 
@@ -335,7 +359,6 @@ The ``~~~`` edges show the wrap-around connections that turn the open lattice in
       :start-after: // start-cell-periodic
       :end-before: // end-cell-periodic
 
-For physical-image queries, use :meth:`~qdk_chemistry.data.LatticeGeometry.neighbor_connections` on the geometry.
 Small periodic cells can have several physical connections for one site pair; distinct-neighbor counts need not equal bulk coordination numbers.
 The nearest-neighbor graph factories preserve their existing adjacency weights, while :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` rejects such cells.
 See :ref:`geometry-periodic-images` for the image convention.
@@ -424,7 +447,7 @@ The :ref:`spin model builders <model-term-partition>` perform this filtering aut
 Related classes
 ---------------
 
-- :doc:`LatticeGeometry <lattice_geometry>`: Coordinates, periodic vectors, and geometric neighbor queries
+- :doc:`LatticeGeometry <lattice_geometry>`: Site coordinates and periodic vectors of built-in lattices
 - :doc:`Model Hamiltonians <../model_hamiltonians>`: Using lattice graphs to build model Hamiltonians
 - :doc:`Hamiltonian <hamiltonian>`: The Hamiltonian class produced by fermionic model Hamiltonian builders
 

@@ -19,13 +19,13 @@ if TYPE_CHECKING:
 
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
-    from numpy.typing import NDArray
-    from qdk_chemistry.data import LatticeGeometry, LatticeGraph
+    from numpy.typing import ArrayLike, NDArray
+    from qdk_chemistry.data import LatticeGraph
 
 
 def plot_lattice_graph(
     graph: LatticeGraph,
-    geometry: LatticeGeometry,
+    positions: ArrayLike,
     *,
     shells: Sequence[int] | None = None,
     flavor_labels: Mapping[int, str] | None = None,
@@ -39,12 +39,12 @@ def plot_lattice_graph(
 
     All indexed sites are shown. Unflavored bonds use a neutral color; arbitrary
     flavor IDs get consistent colors across panels. Existing shell-1 bonds form
-    a faint scaffold in higher-shell panels. Periodic connections end at their
-    physical image coordinates, which may lie outside the fundamental cell.
+    a faint scaffold in higher-shell panels. Each labelled edge is drawn straight
+    between its site positions, so periodic wrap-around edges cross the drawing.
 
     Args:
         graph: Graph with edge labels, such as one from LatticeGraph.from_geometry; supply a small graph for a preview.
-        geometry: Two-dimensional geometry the graph was built from.
+        positions: Two-dimensional site positions with one row per graph site, such as LatticeGeometry.positions.
         shells: Shells to display, in panel order; defaults to the graph's labelled shells, or a sites-only panel.
         flavor_labels: Optional legend labels by flavor ID; IDs themselves are used otherwise.
         flavor_colors: Optional Matplotlib color strings by flavor ID; unspecified IDs use the default palette.
@@ -57,32 +57,29 @@ def plot_lattice_graph(
         Figure and a one-dimensional array of axes; the caller handles display or saving.
 
     Raises:
-        ValueError: If the geometry and graph site counts differ or the display rotation is not finite.
+        ValueError: If positions are not one two-dimensional row per site or the display rotation is not finite.
 
     """
-    if geometry.num_sites != graph.num_sites:
-        raise ValueError("Plotting requires the geometry the graph was built from.")
+    site_positions = np.asarray(positions, dtype=float)
+    if site_positions.shape != (graph.num_sites, 2):
+        raise ValueError("positions must have one two-dimensional row per graph site.")
     if not np.isfinite(rotation_degrees):
         raise ValueError("rotation_degrees must be finite.")
     angle = np.deg2rad(rotation_degrees)
     rotation = np.array(
         [[np.cos(angle), -np.sin(angle)], [np.sin(angle), np.cos(angle)]]
     )
-    original_positions = geometry.positions
-    positions = original_positions @ rotation.T
+    display_positions = site_positions @ rotation.T
     labels = graph.edge_labels
     labelled_shells = sorted({label.shell for label in labels.values()})
     selected = list(dict.fromkeys(labelled_shells if shells is None else shells))
     panels = selected or [None]
-    drawn_shells = sorted(set(labelled_shells) & {*selected, 1})
     segments: dict[tuple[int, int | None], list[np.ndarray]] = {}
-    # Geometric images keep periodic bonds at their physical endpoints.
-    for bond in geometry.neighbor_connections(drawn_shells) if drawn_shells else []:
-        label = labels.get((bond.site_i, bond.site_j))
-        if label is not None and label.shell == bond.bond_class.shell:
-            start = original_positions[bond.site_i]
-            segment = np.array([start, start + bond.displacement]) @ rotation.T
-            segments.setdefault((label.shell, label.flavor), []).append(segment)
+    for (site_i, site_j), label in labels.items():
+        if label.shell in selected or label.shell == 1:
+            segments.setdefault((label.shell, label.flavor), []).append(
+                display_positions[[site_i, site_j]]
+            )
 
     flavors = sorted(
         {
@@ -132,7 +129,7 @@ def plot_lattice_graph(
                     )
                 )
                 bond_count += len(bonds)
-        ax.scatter(*positions.T, s=14, color="#334155", zorder=3)
+        ax.scatter(*display_positions.T, s=14, color="#334155", zorder=3)
         origin = np.asarray(vector_origin) @ rotation.T
         for label, vector in (vectors or {}).items():
             endpoint = origin + np.asarray(vector) @ rotation.T

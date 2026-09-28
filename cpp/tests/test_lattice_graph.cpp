@@ -208,7 +208,7 @@ TEST_F(LatticeGraphTest, FactoriesHaveUnlabelledEdges) {
   for (const auto& graph :
        {LatticeGraph::chain(5), LatticeGraph::square(3, 3),
         LatticeGraph::triangular(3, 3), LatticeGraph::honeycomb(3, 3),
-        LatticeGraph::honeycomb_plaquettes(2, 2), LatticeGraph::kagome(3, 3)}) {
+        LatticeGraph::kagome(3, 3)}) {
     EXPECT_GT(graph.num_edges(), 0);
     EXPECT_TRUE(graph.edge_labels().empty());
     EXPECT_FALSE(graph.to_json().contains("edge_labels"));
@@ -220,7 +220,8 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
   EXPECT_EQ(unit_cell.num_sites(), 2);
   EXPECT_EQ(unit_cell.num_edges(), 1);
 
-  auto hexagon = LatticeGraph::honeycomb_plaquettes(1, 1, false, false, 2.5);
+  const auto geometry = LatticeGeometry::honeycomb_plaquettes(1, 1);
+  const auto hexagon = LatticeGraph::from_geometry(geometry, {1}, {}, 2.5);
   EXPECT_EQ(hexagon.num_sites(), 6);
   EXPECT_EQ(hexagon.num_edges(), 6);
   EXPECT_TRUE(hexagon.is_symmetric());
@@ -230,10 +231,6 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
               2);
   }
 
-  const auto geometry = LatticeGeometry::honeycomb_plaquettes(1, 1);
-  EXPECT_TRUE(LatticeGraph::from_geometry(geometry, {1}, {}, 2.5)
-                  .adjacency_matrix()
-                  .isApprox(hexagon.adjacency_matrix()));
   const auto flavored_hexagon = LatticeGraph::from_geometry(
       geometry, {1, 2, 3}, honeycomb_flavor_ids(), 2.5, 1.0e-9);
   std::map<std::uint64_t, std::map<BondFlavorId, std::size_t>> counts;
@@ -247,7 +244,8 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
     EXPECT_EQ(counts.at(2).at(flavor), 2);
     EXPECT_EQ(counts.at(3).at(flavor), 1);
   }
-  auto patch = LatticeGraph::honeycomb_plaquettes(4, 4);
+  const auto patch =
+      LatticeGraph::from_geometry(LatticeGeometry::honeycomb_plaquettes(4, 4));
   EXPECT_EQ(patch.num_sites(), 48);
   EXPECT_EQ(patch.num_edges(), 63);
   EXPECT_EQ(patch.num_edges() - patch.num_sites() + 1, 16);
@@ -256,18 +254,21 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
     EXPECT_GE(patch.sparse_adjacency_matrix().innerVector(site).nonZeros(), 2);
   }
 
-  EXPECT_EQ(
-      LatticeGraph::honeycomb(2, 2, true, true).content_hash(),
-      LatticeGraph::honeycomb_plaquettes(2, 2, true, true).content_hash());
+  // Periodic directions add no boundary cell, matching the unit-cell factory.
+  EXPECT_TRUE(
+      LatticeGraph::from_geometry(
+          LatticeGeometry::honeycomb_plaquettes(2, 2, true, true))
+          .adjacency_matrix()
+          .isApprox(
+              LatticeGraph::honeycomb(2, 2, true, true).adjacency_matrix()));
 }
 
 TEST_F(LatticeGraphTest, FromGeometryRejectsRepeatedPeriodicImages) {
   // Both images of a two-site ring join the same pair.
   EXPECT_THROW(LatticeGraph::from_geometry(LatticeGeometry::chain(2, true)),
                std::invalid_argument);
-  const LatticeGeometry self_image(Eigen::MatrixXd::Zero(1, 2),
-                                   Eigen::MatrixXd(Vec2(1.0, 0.0)));
-  EXPECT_THROW(LatticeGraph::from_geometry(self_image), std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::from_geometry(LatticeGeometry::chain(1, true)),
+               std::invalid_argument);
   const auto ring = LatticeGraph::from_geometry(LatticeGeometry::chain(3, true),
                                                 {1}, {}, 1.5);
   EXPECT_EQ(ring.num_edges(), 3);
@@ -398,11 +399,47 @@ TEST_F(LatticeGraphTest, FromGeometrySelectsShellsAndWeights) {
   }
   EXPECT_DOUBLE_EQ(graph.weight(0, 3), -2.5);
   EXPECT_FALSE(graph.are_connected(0, 2));
-  const auto raw = geometry.neighbor_connections({2});
-  ASSERT_EQ(raw.size(), 2);
-  for (const auto& connection : raw) {
-    EXPECT_FALSE(connection.flavor.has_value());
-    EXPECT_DOUBLE_EQ(connection.weight, 1.0);
+}
+
+TEST_F(LatticeGraphTest, CustomGraphsAcceptEdgeLabels) {
+  // A square plaquette with one second-shell diagonal and one unflavored edge.
+  const EdgeLabels labels = {{{0, 1}, {1, flavor_x}},
+                             {{1, 2}, {1, flavor_y}},
+                             {{2, 3}, {1, flavor_x}},
+                             {{0, 3}, {1, std::nullopt}},
+                             {{0, 2}, {2, flavor_z}}};
+  std::map<Edge, double> upper;
+  for (const auto& [edge, label] : labels) upper[edge] = -1.5;
+  const auto graph =
+      LatticeGraph::make_bidirectional(LatticeGraph(upper, 0, labels));
+  EXPECT_EQ(graph.edge_labels(), labels);
+  EXPECT_FALSE(graph.edge_coloring().has_value());
+  EXPECT_EQ(LatticeGraph::from_dense_matrix(graph.adjacency_matrix(), labels)
+                .edge_labels(),
+            labels);
+  EXPECT_EQ(
+      LatticeGraph::from_sparse_matrix(graph.sparse_adjacency_matrix(), labels)
+          .content_hash(),
+      graph.content_hash());
+  const auto restored = LatticeGraph::from_json(graph.to_json());
+  EXPECT_EQ(restored.edge_labels(), labels);
+  EXPECT_EQ(restored.content_hash(), graph.content_hash());
+
+  // Labels must cover exactly the stored pairs, each with a positive shell.
+  auto missing = labels;
+  missing.erase({0, 2});
+  auto extra = labels;
+  extra[{1, 3}] = {2, std::nullopt};
+  auto zero_shell = labels;
+  zero_shell.at({0, 1}).shell = 0;
+  for (const auto& invalid : {missing, extra, zero_shell}) {
+    EXPECT_THROW((LatticeGraph(upper, 0, invalid)), std::invalid_argument);
+    EXPECT_THROW(
+        LatticeGraph::from_dense_matrix(graph.adjacency_matrix(), invalid),
+        std::invalid_argument);
+    EXPECT_THROW(LatticeGraph::from_sparse_matrix(
+                     graph.sparse_adjacency_matrix(), invalid),
+                 std::invalid_argument);
   }
 }
 

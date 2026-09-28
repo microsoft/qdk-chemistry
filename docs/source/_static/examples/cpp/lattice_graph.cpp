@@ -11,25 +11,20 @@ int main() {
   // start-cell-create-geometry
   auto geometry = LatticeGeometry::honeycomb_plaquettes(1, 1);
   const auto& positions = geometry.positions();
-
-  Eigen::MatrixXd custom_positions(3, 2);
-  custom_positions << 0.0, 0.0, 1.0, 0.0, 0.0, 2.0;
-  LatticeGeometry custom_geometry(custom_positions);
   // end-cell-create-geometry
 
   // --------------------------------------------------------------------------------------------
-  // start-cell-query-geometry
-  auto shell_pairs = geometry.nearest_neighbor_shells({1, 2, 3});
-  // Shells 1, 2, and 3 contain 6, 6, and 3 pairs, respectively.
-  auto geometric_connections = geometry.neighbor_connections({1, 2, 3});
-  // Geometry queries return no flavor and unit weight; no graph is created.
-  // end-cell-query-geometry
+  // start-cell-geometry-shells
+  auto hexagon = LatticeGraph::from_geometry(geometry, {1, 2, 3});
+  // Shells 1, 2, and 3 contain 6, 6, and 3 labelled edges, respectively.
+  // end-cell-geometry-shells
 
   // --------------------------------------------------------------------------------------------
   // start-cell-periodic-geometry
-  auto periodic_geometry = LatticeGeometry::chain(2, /*periodic=*/true);
-  auto images = periodic_geometry.neighbor_connections({1});
-  // Two physical images connect the same finite-lattice pair.
+  auto ring_geometry = LatticeGeometry::chain(6, /*periodic=*/true);
+  auto ring_graph = LatticeGraph::from_geometry(ring_geometry, {1, 2});
+  // Six first- and six second-neighbor bonds. A periodic two-site chain joins
+  // its sites through two images, so from_geometry rejects it.
   // end-cell-periodic-geometry
 
   // --------------------------------------------------------------------------------------------
@@ -91,9 +86,6 @@ int main() {
   // Create a 3x2 honeycomb lattice (2 sites per unit cell)
   auto honeycomb = LatticeGraph::honeycomb(3, 2);
 
-  // Create one isolated six-site honeycomb plaquette
-  auto hexagon = LatticeGraph::honeycomb_plaquettes(1, 1);
-
   // Create a 3x2 kagome lattice (3 sites per unit cell)
   auto kagome = LatticeGraph::kagome(3, 2);
 
@@ -137,6 +129,20 @@ int main() {
   LatticeGraph directed(directed_edges, 4);
   auto bidirectional = LatticeGraph::make_bidirectional(directed);
   // end-cell-from-matrix
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-custom-labels
+  // A four-site ring with two bond flavors and one second-shell diagonal
+  EdgeLabels custom_labels = {{{0, 1}, {1, 0}},
+                              {{1, 2}, {1, 1}},
+                              {{2, 3}, {1, 0}},
+                              {{0, 3}, {1, 1}},
+                              {{0, 2}, {2, std::nullopt}}};
+  std::map<std::pair<std::uint64_t, std::uint64_t>, double> custom_weights;
+  for (const auto& [pair, label] : custom_labels) custom_weights[pair] = 1.0;
+  auto labelled = LatticeGraph::make_bidirectional(
+      LatticeGraph(custom_weights, /*num_sites=*/0, custom_labels));
+  // end-cell-custom-labels
 
   // --------------------------------------------------------------------------------------------
   // start-cell-properties

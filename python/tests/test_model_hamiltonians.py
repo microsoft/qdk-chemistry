@@ -17,6 +17,7 @@ import pytest
 from qdk_chemistry.constants import BOHR_MAGNETON, ELEMENTARY_CHARGE
 from qdk_chemistry.data import (
     BondFlavorDefinition,
+    EdgeLabel,
     Hamiltonian,
     LatticeGeometry,
     LatticeGraph,
@@ -331,9 +332,12 @@ class TestModelHamiltonians:
         j2 = -0.4
         geometry = LatticeGeometry.square(n, n)
         graph = LatticeGraph.from_geometry(geometry, [1, 2], weight=7.0)
-        shells = geometry.nearest_neighbor_shells([1, 2])
-        first_neighbors = set(shells[1])
-        second_neighbors = set(shells[2])
+        distances = {
+            (i, j): np.linalg.norm(geometry.positions[j] - geometry.positions[i])
+            for i, j in combinations(range(n * n), 2)
+        }
+        first_neighbors = {pair for pair, distance in distances.items() if np.isclose(distance, 1.0)}
+        second_neighbors = {pair for pair, distance in distances.items() if np.isclose(distance, np.sqrt(2.0))}
 
         couplings = {1: j1, 2: j2}
         hamiltonian = create_heisenberg_hamiltonian(
@@ -359,7 +363,7 @@ class TestModelHamiltonians:
                     pauli[n * n - 1 - i] = pauli_char
                     pauli[n * n - 1 - j] = pauli_char
                     assert terms["".join(pauli)] == pytest.approx(
-                        expected_coupling, abs=float_comparison_absolute_tolerance
+                        7.0 * expected_coupling, abs=float_comparison_absolute_tolerance
                     )
 
         for pauli_char in ["X", "Y", "Z"]:
@@ -470,6 +474,7 @@ class TestModelHamiltonians:
             ky=zero_couplings,
             kz=zero_couplings,
             j={shell: 4.0},
+            sparse_terms=True,
         )
 
         partition = _assert_commuting_disjoint_partition(hamiltonian)
@@ -702,7 +707,7 @@ class TestModelHamiltonians:
         )
         with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
             create_kitaev_hamiltonian(unsupported, kx=1.0, ky=1.0, kz=1.0)
-        with pytest.raises(ValueError, match="metadata"):
+        with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
             create_kitaev_hamiltonian(LatticeGraph.honeycomb(3, 3), kx=1.0, ky=1.0, kz=1.0)
 
         graph = LatticeGraph.honeycomb(3, 3)
@@ -793,8 +798,9 @@ class TestModelHamiltonians:
         assert field.num_qubits == 2
         assert field.is_hermitian()
 
-        with pytest.raises(ValueError, match=r"geometry|metadata"):
-            create_kitaev_hamiltonian(graph, {1: 1.0}, 0.0, 0.0)
+        assert create_kitaev_hamiltonian(graph, {1: 1.0}, 0.0, 0.0).content_hash() == zero.content_hash()
+        with pytest.raises(ValueError, match="not selected"):
+            create_kitaev_hamiltonian(graph, {2: 1.0}, 0.0, 0.0)
 
     def test_kitaev_open_hexagon_matches_explicit_matrix(self) -> None:
         graph = _kitaev_graph(LatticeGeometry.honeycomb_plaquettes(1, 1), [1, 2, 3])
@@ -917,9 +923,8 @@ class TestModelHamiltonians:
             graph, jx, {1: jy}, {2: jz}, include_term_groups=include_term_groups
         )
 
-        expected = {"IYY": 3.0, "YYI": 3.0, "ZIZ": 4.0}
-        if weight != 0.0:
-            expected.update(dict.fromkeys(("IXX", "XXI", "XIX"), 2.0 * weight))
+        expected = {"IXX": 2.0, "XXI": 2.0, "IYY": 3.0, "YYI": 3.0, "ZIZ": 4.0}
+        expected = {label: value * weight for label, value in expected.items()} if weight != 0.0 else {}
         assert _get_terms_dict(hamiltonian) == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
         if include_term_groups:
             _assert_commuting_disjoint_partition(hamiltonian)
@@ -928,16 +933,16 @@ class TestModelHamiltonians:
 
     @pytest.mark.parametrize("as_array", [False, True])
     @pytest.mark.parametrize("weight", [-2.0, 0.0])
-    def test_kitaev_scalar_array_weights_and_mapped_independence(self, weight: float, as_array: bool) -> None:
+    def test_kitaev_scalar_and_shell_one_mapping_scale_with_weights(self, weight: float, as_array: bool) -> None:
         graph = LatticeGraph.from_geometry(
             LatticeGeometry.honeycomb(1, 1), [1], bond_flavors=kitaev_honeycomb_bond_flavors(), weight=weight
         )
         j, kz, gamma, gamma_prime = [np.full((2, 2), value) if as_array else value for value in (4.0, 8.0, 12.0, 16.0)]
 
-        weighted = create_kitaev_hamiltonian(graph, 0.0, 0.0, kz, j=j, gamma=gamma, gamma_prime=gamma_prime)
+        scalar = create_kitaev_hamiltonian(graph, 0.0, 0.0, kz, j=j, gamma=gamma, gamma_prime=gamma_prime)
         mapped = create_kitaev_hamiltonian(graph, 0.0, 0.0, {1: kz}, j={1: j}, gamma=gamma, gamma_prime=gamma_prime)
-        assert not _is_sparse(weighted)
-        assert _is_sparse(mapped)
+        assert mapped.content_hash() == scalar.content_hash()
+        assert not _is_sparse(scalar)
 
         exchange = {"XX": 1.0, "YY": 1.0, "ZZ": 3.0}
         off_diagonal = {
@@ -949,15 +954,12 @@ class TestModelHamiltonians:
             "ZY": 4.0,
         }
         if weight == 0.0:
-            np.testing.assert_array_equal(weighted.to_matrix(), np.zeros((4, 4)))
+            np.testing.assert_array_equal(scalar.to_matrix(), np.zeros((4, 4)))
         else:
             expected = {label: value * weight for label, value in (exchange | off_diagonal).items()}
-            assert _get_terms_dict(weighted) == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
-        expected_mapped = exchange | {label: value * weight for label, value in off_diagonal.items() if weight != 0.0}
-        assert _get_terms_dict(mapped) == pytest.approx(expected_mapped, abs=float_comparison_absolute_tolerance)
+            assert _get_terms_dict(scalar) == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
         assert [label.flavor for label in graph.edge_labels.values()] == [KitaevBondFlavor.Z]
-        _assert_commuting_disjoint_partition(weighted)
-        _assert_commuting_disjoint_partition(mapped)
+        _assert_commuting_disjoint_partition(scalar)
 
     def test_kitaev_scalar_couplings_ignore_selected_higher_shells(self) -> None:
         geometry = LatticeGeometry.honeycomb_plaquettes(1, 1)
@@ -975,7 +977,7 @@ class TestModelHamiltonians:
         graph = LatticeGraph.from_json(
             '{"num_sites": 2, "is_symmetric": true, "adjacency_sparse": [[0, 1, 1.0], [1, 0, 1.0]]}'
         )
-        with pytest.raises(ValueError, match="metadata"):
+        with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
             create_kitaev_hamiltonian(graph, 0.0, 0.0, 4.0)
 
     def test_kitaev_does_not_fill_partial_explicit_flavors(self) -> None:
@@ -1003,13 +1005,17 @@ class TestModelHamiltonians:
             expected["".join(pauli)] = 1.0
         assert _get_terms_dict(hamiltonian) == pytest.approx(expected)
         _assert_commuting_disjoint_partition(hamiltonian)
+        sparse = create_ising_hamiltonian(graph, {2: 1.0}, sparse_terms=True)
+        assert _is_sparse(sparse)
+        assert not _is_sparse(hamiltonian)
+        assert _get_terms_dict(sparse) == _get_terms_dict(hamiltonian)
 
     def test_ising_shell_mapping_uses_only_selected_edges(self) -> None:
         geometry = LatticeGeometry.square(2, 2)
         graph = LatticeGraph.from_geometry(geometry, [2], weight=7.0)
         hamiltonian = create_ising_hamiltonian(graph, {2: -0.4})
 
-        assert _get_terms_dict(hamiltonian) == pytest.approx({"ZIIZ": -0.4, "IZZI": -0.4})
+        assert _get_terms_dict(hamiltonian) == pytest.approx({"ZIIZ": 7.0 * -0.4, "IZZI": 7.0 * -0.4})
         _assert_commuting_disjoint_partition(hamiltonian)
         with pytest.raises(ValueError, match="not selected"):
             create_ising_hamiltonian(graph, {1: 1.25})
@@ -1017,22 +1023,34 @@ class TestModelHamiltonians:
 
 @pytest.mark.parametrize("factory", [create_heisenberg_hamiltonian, create_kitaev_hamiltonian])
 class TestSelectedModelShells:
+    @pytest.mark.parametrize("sparse_terms", [False, True])
     @pytest.mark.parametrize("include_term_groups", [False, True])
     def test_shell_mapping_order_is_deterministic(
-        self, factory: Callable[..., QubitOperator], include_term_groups: bool
+        self, factory: Callable[..., QubitOperator], include_term_groups: bool, sparse_terms: bool
     ) -> None:
         graph = _kitaev_graph(LatticeGeometry.honeycomb(3, 3), [1, 2, 3])
         forward = {1: 1.0, 2: -0.5, 3: 0.25}
         reversed_order = {3: 0.25, 2: -0.5, 1: 1.0}
-        forward_hamiltonian = factory(graph, forward, forward, forward, include_term_groups=include_term_groups)
-        reversed_hamiltonian = factory(
-            graph, reversed_order, reversed_order, reversed_order, include_term_groups=include_term_groups
-        )
+        options = {"include_term_groups": include_term_groups, "sparse_terms": sparse_terms}
+        forward_hamiltonian = factory(graph, forward, forward, forward, **options)
+        reversed_hamiltonian = factory(graph, reversed_order, reversed_order, reversed_order, **options)
         assert reversed_hamiltonian.pauli_strings == forward_hamiltonian.pauli_strings
         np.testing.assert_array_equal(reversed_hamiltonian.coefficients, forward_hamiltonian.coefficients)
         assert reversed_hamiltonian.term_partition == forward_hamiltonian.term_partition
         assert reversed_hamiltonian.content_hash() == forward_hamiltonian.content_hash()
-        assert _is_sparse(forward_hamiltonian) is include_term_groups
+        assert _is_sparse(forward_hamiltonian) is sparse_terms
+
+    @pytest.mark.parametrize("include_term_groups", [False, True])
+    def test_scalar_matches_shell_one_mapping(
+        self, factory: Callable[..., QubitOperator], include_term_groups: bool
+    ) -> None:
+        geometry = LatticeGeometry.honeycomb(3, 3)
+        union = _kitaev_graph(geometry, [1, 2, 3])
+        scalar = factory(union, 1.0, -0.5, 0.25, include_term_groups=include_term_groups)
+        mapped = factory(union, {1: 1.0}, {1: -0.5}, {1: 0.25}, include_term_groups=include_term_groups)
+        first_shell = factory(_kitaev_graph(geometry), 1.0, -0.5, 0.25, include_term_groups=include_term_groups)
+        assert mapped.content_hash() == scalar.content_hash()
+        assert _get_terms_dict(scalar) == _get_terms_dict(first_shell)
 
     @pytest.mark.parametrize("selected_shells", [[], [1]])
     def test_active_shell_requires_selection(
@@ -1055,8 +1073,17 @@ class TestSelectedModelShells:
             assert not _is_sparse(hamiltonian)
             np.testing.assert_array_equal(hamiltonian.to_matrix(), np.zeros((4, 4)))
 
-        with pytest.raises(ValueError, match=r"geometry|metadata"):
-            factory(graph, {1: 4.0}, {1: 4.0}, {1: 4.0})
+    def test_unlabelled_edges_are_shell_one(self, factory: Callable[..., QubitOperator]) -> None:
+        graph = LatticeGraph.from_dense_matrix(np.array([[0.0, 7.0], [7.0, 0.0]]))
+        if factory is create_heisenberg_hamiltonian:
+            mapped = factory(graph, {1: 4.0}, {1: 4.0}, {1: 4.0})
+            assert mapped.content_hash() == factory(graph, 4.0, 4.0, 4.0).content_hash()
+            assert _get_terms_dict(mapped) == {"XX": 28.0, "YY": 28.0, "ZZ": 28.0}
+        else:
+            with pytest.raises(ValueError, match="requires X, Y, or Z flavor IDs"):
+                factory(graph, {1: 4.0}, {1: 4.0}, {1: 4.0})
+        with pytest.raises(ValueError, match="metadata"):
+            factory(graph, {2: 4.0}, {2: 4.0}, {2: 4.0})
 
     def test_stored_edge_labels_are_authoritative(self, factory: Callable[..., QubitOperator]) -> None:
         """Stored shell labels and support must not be rediscovered from positions."""
@@ -1070,10 +1097,25 @@ class TestSelectedModelShells:
         couplings = {7: 4.0}
         hamiltonian = factory(graph, couplings, couplings, couplings)
 
-        expected = {"XIX": 4.0, "YIY": 4.0, "ZIZ": 4.0} if factory is create_heisenberg_hamiltonian else {"XIX": 1.0}
+        expected = (
+            {"XIX": -32.0, "YIY": -32.0, "ZIZ": -32.0} if factory is create_heisenberg_hamiltonian else {"XIX": -8.0}
+        )
         assert _get_terms_dict(hamiltonian) == expected
         assert len(graph.edge_labels) == 1
         _assert_commuting_disjoint_partition(hamiltonian)
+
+    def test_custom_edge_labels_select_shells_and_flavors(self, factory: Callable[..., QubitOperator]) -> None:
+        """User-labelled adjacency graphs select shells and flavors without a geometry."""
+        labels = {
+            (0, 1): EdgeLabel(1, int(KitaevBondFlavor.X)),
+            (1, 2): EdgeLabel(1, int(KitaevBondFlavor.Y)),
+            (0, 2): EdgeLabel(2, int(KitaevBondFlavor.Z)),
+        }
+        graph = LatticeGraph.from_dense_matrix(2.0 * (np.ones((3, 3)) - np.eye(3)), edge_labels=labels)
+        hamiltonian = factory(graph, {2: 4.0}, {2: 4.0}, {2: 4.0})
+
+        expected = {"XIX": 8.0, "YIY": 8.0, "ZIZ": 8.0} if factory is create_heisenberg_hamiltonian else {"ZIZ": 2.0}
+        assert _get_terms_dict(hamiltonian) == expected
 
     @pytest.mark.parametrize("shell", [0, -1, 1.5, True])
     def test_invalid_mapped_shell_indices(self, factory: Callable[..., QubitOperator], shell: float) -> None:

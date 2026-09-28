@@ -1,31 +1,27 @@
 LatticeGeometry
 ===============
 
-The :class:`~qdk_chemistry.data.LatticeGeometry` class describes indexed site positions and optional periodic supercell vectors independently of connectivity.
-It supports geometric neighbor queries for built-in and custom Cartesian embeddings.
+The :class:`~qdk_chemistry.data.LatticeGeometry` class describes the site positions and optional periodic supercell vectors of a built-in two-dimensional lattice, independently of connectivity.
 Like other :doc:`data classes <../design/index>`, it is immutable and supports :doc:`serialization <serialization>`.
 
 Geometry does not store an adjacency matrix, interaction weights, semantic flavors, or edge colors.
 Use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` to turn selected geometric shells into an explicit :doc:`LatticeGraph <lattice_graph>`.
 That constructor computes and stores one :ref:`edge coloring <lattice-edge-coloring>` for the selected distinct-site pairs, including zero-weight pairs; model builders filter it rather than recoloring individual interaction families.
 The same geometry can be reused for different connectivity selections and consumers, such as :doc:`model Hamiltonians <../model_hamiltonians>` or visualization.
+For connectivity that no factory describes, build a graph from adjacency data with :ref:`custom edge labels <lattice-custom-edge-labels>`.
 
 Properties
 ----------
 
 ``num_sites``
-   Number of indexed sites, including isolated or coincident positions.
-
-``dimension``
-   Number of Cartesian components per position.
+   Number of indexed sites.
 
 ``positions``
-   Finite Cartesian ``(num_sites, dimension)`` matrix in site-index order, for any positive dimension.
-   Built-in factories are two-dimensional, including for a chain.
+   Cartesian ``(num_sites, 2)`` matrix in site-index order; a chain lies along the x axis.
    In Python, reading this property returns an independent copy.
 
 ``periods``
-   Optional matrix with at most ``dimension`` finite, nonzero, independent row vectors of length ``dimension``, in image-shift order.
+   Optional matrix of periodic supercell vectors, one row per periodic direction.
    ``None`` denotes an open geometry. Python returns a copy when periods are present.
 
 Creating geometry
@@ -56,9 +52,6 @@ A fully open ``honeycomb_plaquettes(1, 1)`` is a six-site hexagon; a ``4 x 4`` p
 Each open direction gains a boundary cell. Fully open patches omit the first A and last B corner sites and retain the remaining unit-cell order.
 With both axes periodic, plaquette and unit-cell sizing coincide.
 
-For custom embeddings, construct :class:`~qdk_chemistry.data.LatticeGeometry` directly from positions and optional periods.
-An empty position matrix with shape ``(0, dimension)`` is valid.
-
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
@@ -73,57 +66,31 @@ An empty position matrix with shape ``(0, dimension)`` is valid.
       :start-after: // start-cell-create-geometry
       :end-before: // end-cell-create-geometry
 
-Geometric neighbor shells
--------------------------
+Neighbor shells
+---------------
 
-Shells are the distinct positive distances actually present in the geometry, ordered from shortest to longest; shell 1 is the shortest.
+Shells are the distinct positive distances present on the given lattice, including distances to periodic images, ordered from shortest to longest; shell 1 is the shortest.
 For a finite open patch, this is not a fixed bulk-lattice shell table.
 For example, the first three shells on sufficiently large open square lattices have distances :math:`1`, :math:`\sqrt{2}`, and :math:`2`; honeycomb lattices have :math:`1`, :math:`\sqrt{3}`, and :math:`2`.
+A thin patch has its own shells: ``square(1, 5)`` has the same shells as ``chain(5)``, and ``square(2, 8)`` has no :math:`2\sqrt{2}` distance, so its fifth shell is distance :math:`3`.
 
-The following queries accept a finite, positive ``tolerance`` (default ``1e-9``) for relative distance and absolute axis comparisons:
-
-* :meth:`~qdk_chemistry.data.LatticeGeometry.mth_nearest_neighbors` returns sorted, unique pairs ``(i, j)`` with ``i < j`` for one open-geometry shell.
-* :meth:`~qdk_chemistry.data.LatticeGeometry.nearest_neighbor_shells` classifies all requested shells together and returns a mapping from shell indices to pairs.
-* :meth:`~qdk_chemistry.data.LatticeGeometry.neighbor_connections` returns physical connections classified by shell and axis, retaining periodic images.
-
-Shell indices are positive integers; duplicate requests are ignored.
-Neighbor queries currently require a two-dimensional geometry and raise ``RuntimeError`` otherwise.
-Unavailable finite shells have no connections and map to empty lists in the pair-query result.
-The pair-only methods reject periodic geometries because projecting to a pair would discard physical image multiplicity.
-Queries do not modify any graph's selected connectivity, and geometric records have unit weight and no flavor.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` materializes the requested shells as labelled edges.
+Its ``tolerance`` (default ``1e-9``) applies to relative distance and absolute axis comparisons, and unavailable finite shells contribute no edges.
+Factories retain their integer unit-cell layout, so shell searches do not compare all site pairs.
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/lattice_graph.py
       :language: python
-      :start-after: # start-cell-query-geometry
-      :end-before: # end-cell-query-geometry
+      :start-after: # start-cell-geometry-shells
+      :end-before: # end-cell-geometry-shells
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/lattice_graph.cpp
       :language: cpp
-      :start-after: // start-cell-query-geometry
-      :end-before: // end-cell-query-geometry
-
-Built-in factories retain compact integer unit-cell coordinates for stencil-based shell queries.
-Cartesian-only geometries use the general fallback; no lattice-specific neighbor cap is imposed by the query interface.
-
-.. _geometric-bond-classes:
-
-Geometric bond classes
-----------------------
-
-A :class:`~qdk_chemistry.data.BondClass` contains a one-based ``shell``, a shell-local ``orientation`` index, and a canonical unit ``axis``.
-The axis is unoriented: displacements :math:`\boldsymbol{d}` and :math:`-\boldsymbol{d}` belong to the same class.
-Orientation indices classify geometry; they do not encode a spin component, semantic flavor, or scheduling color.
-
-Each :class:`~qdk_chemistry.data.NeighborConnection` contains ``site_i``, ``site_j``, ``bond_class``, ``displacement``, and ``image_shift``, together with ``flavor`` and ``weight`` fields.
-Geometry queries return ``flavor=None`` and ``weight=1.0``.
-Their records are ordered by shell, orientation, endpoints, and image shift, with ``site_i <= site_j``.
-For open geometries the endpoints are distinct and ``image_shift`` is zero.
-For periodic self-images, the first nonzero image component is positive.
-Interaction-specific weights and labels are assigned by a :doc:`LatticeGraph <lattice_graph>`, not by the geometry.
+      :start-after: // start-cell-geometry-shells
+      :end-before: // end-cell-geometry-shells
 
 .. _geometry-periodic-images:
 
@@ -132,18 +99,16 @@ Periodic images
 
 ``chain`` accepts ``periodic=True``; the two-dimensional factories accept independent ``periodic_x`` and ``periodic_y`` flags along their primitive directions.
 Two-dimensional periodic directions require a size greater than one.
-Periodic one- and two-site chain geometries are supported, including their distinct physical images.
 
-If the rows of ``periods`` are :math:`\boldsymbol{P}_p`, a connection's displacement is
+If the rows of ``periods`` are :math:`\boldsymbol{P}_p`, the displacements from site :math:`i` to the images of site :math:`j` are
 
 .. math::
 
    \boldsymbol{d}_{ij}=\boldsymbol{r}_j-\boldsymbol{r}_i+
-   \sum_p n_p\boldsymbol{P}_p,
+   \sum_p n_p\boldsymbol{P}_p
 
-where ``image_shift`` stores the integer coefficients :math:`n_p` in row order, with one entry per spatial dimension, padded with zeros when fewer periods are present.
-Distinct images are not merged even when their finite-lattice endpoints coincide.
-A record may also connect a site to its own nonzero periodic image; individual consumers may reject such interactions.
+for integers :math:`n_p`, and shell ranking counts each image separately.
+A graph edge is a single bond, so :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` rejects a selection in which several images join one pair or a site neighbors its own image; for example, a periodic two-site chain joins its sites through two images.
 
 .. tab:: Python API
 
@@ -186,15 +151,10 @@ These vectors are part of the geometry and determine physical images across peri
 
 .. footbibliography::
 
-Relabeling and serialization
-----------------------------
+Serialization
+-------------
 
-:meth:`~qdk_chemistry.data.LatticeGeometry.permute` returns a new geometry with new site ``i`` taken from original site ``path[i]``.
-``path`` must be a permutation of every site. Positions and retained integer coordinates are reordered together; periodic vectors are unchanged.
-Use :meth:`~qdk_chemistry.data.LatticeGraph.permute` when connectivity and geometry must be relabeled together.
-
-JSON and HDF5 :doc:`serialization <serialization>` store a factory geometry as its integer unit-cell layout, from which positions and periods are rebuilt exactly, so reloaded factory geometries keep stencil-based neighbor queries.
-Other geometries store positions and optional periods.
+JSON and HDF5 :doc:`serialization <serialization>` store the integer unit-cell layout, from which positions and periods are rebuilt exactly.
 The data type identifier is ``lattice_geometry``; a typical filename is ``patch.lattice_geometry.json``.
 
 Related documentation

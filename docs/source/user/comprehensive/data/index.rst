@@ -63,7 +63,7 @@ The following table summarizes the available data classes in QDK/Chemistry and t
      - Physical symmetries
      - Factory methods, User input
    * - :doc:`LatticeGeometry <lattice_geometry>`
-     - Site coordinates, periodic vectors, and geometric neighbor queries
+     - Site coordinates and periodic vectors of built-in lattices
      - Factory methods, User input
    * - :doc:`LatticeGraph <lattice_graph>`
      - Explicit weighted connectivity with optional shell and flavor labels
