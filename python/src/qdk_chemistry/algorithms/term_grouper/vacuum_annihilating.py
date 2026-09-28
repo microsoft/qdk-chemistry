@@ -20,11 +20,15 @@ with :math:`F` the flipped-qubit set, :math:`n_Y` the number of :math:`Y` factor
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperSettings
-from qdk_chemistry.data import FlatPartition, QubitOperator
+from qdk_chemistry.data import FlatPartition
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import QubitOperator
 
 __all__ = ["VacuumAnnihilatingTermGrouper", "VacuumAnnihilatingTermGrouperSettings"]
 
@@ -151,11 +155,4 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
 
         ordered = ([diagonal] if diagonal else []) + sorted(groups, key=lambda group: group[0])
         partition = FlatPartition(strategy="vacuum_annihilating", groups=tuple(ordered))
-        return QubitOperator(
-            pauli_strings=list(qubit_hamiltonian.pauli_strings),
-            coefficients=qubit_hamiltonian.coefficients.copy(),
-            encoding=qubit_hamiltonian.encoding,
-            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-            tapering=qubit_hamiltonian.tapering,
-            term_partition=partition,
-        )
+        return self._with_partition(qubit_hamiltonian, partition, qubit_hamiltonian.tapering)

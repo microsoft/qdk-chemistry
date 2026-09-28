@@ -10,40 +10,49 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
-from qdk_chemistry.data import FlatPartition, QubitOperator
-from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
+from qdk_chemistry.data import FlatPartition
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
+from qdk_chemistry.utils.pauli_commutation import (
+    do_pauli_labels_commute,
+    do_pauli_labels_qw_commute,
+    do_pauli_maps_commute,
+    do_pauli_maps_qw_commute,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
+    from typing import Any
+
+    from qdk_chemistry.data import QubitOperator
 
 __all__ = ["FullCommutingTermGrouper", "QubitWiseCommutingTermGrouper"]
 
 
 def _color_non_commutation_graph(
-    pauli_strings: list[str],
-    commutes: Callable[[str, str], bool],
+    terms: Sequence[Any],
+    commutes: Callable[[Any, Any], bool],
 ) -> tuple[tuple[int, ...], ...]:
-    """Partition Pauli labels into commuting groups via greedy graph coloring.
+    """Partition Pauli terms into commuting groups via greedy graph coloring.
 
-    Builds the non-commutation graph and greedily assigns each label the
+    Builds the non-commutation graph and greedily assigns each term the
     lowest-index group in which it commutes with all existing members.
 
     Args:
-        pauli_strings: Pauli labels to partition.
-        commutes: Predicate returning ``True`` when two labels commute.
+        terms: Pauli labels or sparse Pauli maps to partition.
+        commutes: Predicate returning ``True`` when two terms commute.
 
     Returns:
-        Tuple of groups; each group is a tuple of indices into ``pauli_strings``.
+        Tuple of groups; each group is a tuple of indices into ``terms``.
 
     """
-    n = len(pauli_strings)
+    n = len(terms)
     if n == 0:
         return ()
 
     non_commuting: list[set[int]] = [set() for _ in range(n)]
     for i in range(1, n):
         for j in range(i):
-            if not commutes(pauli_strings[i], pauli_strings[j]):
+            if not commutes(terms[i], terms[j]):
                 non_commuting[i].add(j)
                 non_commuting[j].add(i)
 
@@ -64,6 +73,18 @@ def _color_non_commutation_graph(
             group_members.append({i})
 
     return tuple(tuple(g) for g in groups)
+
+
+def _partition_by_commutation(
+    qubit_hamiltonian: QubitOperator,
+    label_commutes: Callable[[str, str], bool],
+    map_commutes: Callable[[dict[int, str], dict[int, str]], bool],
+) -> tuple[tuple[int, ...], ...]:
+    """Color the non-commutation graph, comparing sparse words without building labels."""
+    if isinstance(qubit_hamiltonian.get_container(), SparsePauliDecompositionContainer):
+        maps = [dict(word) for word in qubit_hamiltonian.pauli_strings.words]
+        return _color_non_commutation_graph(maps, map_commutes)
+    return _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, label_commutes)
 
 
 class FullCommutingTermGrouper(TermGrouper):
@@ -91,15 +112,9 @@ class FullCommutingTermGrouper(TermGrouper):
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"commuting"``).
 
         """
-        groups = _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
+        groups = _partition_by_commutation(qubit_hamiltonian, do_pauli_labels_commute, do_pauli_maps_commute)
         partition = FlatPartition(strategy="commuting", groups=groups)
-        return QubitOperator(
-            pauli_strings=list(qubit_hamiltonian.pauli_strings),
-            coefficients=qubit_hamiltonian.coefficients.copy(),
-            encoding=qubit_hamiltonian.encoding,
-            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-            term_partition=partition,
-        )
+        return self._with_partition(qubit_hamiltonian, partition)
 
 
 class QubitWiseCommutingTermGrouper(TermGrouper):
@@ -127,12 +142,6 @@ class QubitWiseCommutingTermGrouper(TermGrouper):
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"qubit_wise_commuting"``).
 
         """
-        groups = _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
+        groups = _partition_by_commutation(qubit_hamiltonian, do_pauli_labels_qw_commute, do_pauli_maps_qw_commute)
         partition = FlatPartition(strategy="qubit_wise_commuting", groups=groups)
-        return QubitOperator(
-            pauli_strings=list(qubit_hamiltonian.pauli_strings),
-            coefficients=qubit_hamiltonian.coefficients.copy(),
-            encoding=qubit_hamiltonian.encoding,
-            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-            term_partition=partition,
-        )
+        return self._with_partition(qubit_hamiltonian, partition)
