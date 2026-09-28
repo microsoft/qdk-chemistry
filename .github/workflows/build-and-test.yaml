@@ -1038,7 +1038,7 @@ jobs:
   test-with-qdk-branch:
     name: Full Test with QDK Branch
     needs: coverage
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch && needs.coverage.result == 'success' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
       QSHARP_PYTHON_TELEMETRY: 'false'
@@ -1110,8 +1110,9 @@ jobs:
       run: |
         git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
         echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
-        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
+        python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
+        python -c "import os, pathlib, qdk; path = pathlib.Path(qdk.__file__).resolve(); prefix = pathlib.Path(os.environ['CMAKE_INSTALL_PREFIX']).resolve(); print('Imported qdk from:', path); assert path.is_relative_to(prefix), f'qdk did not load from {prefix}'"
         python -m pip show qdk
 
     - name: Run Python tests
