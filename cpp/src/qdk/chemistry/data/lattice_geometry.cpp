@@ -133,10 +133,11 @@ std::vector<LatticeGeometry::ShellBond> LatticeGeometry::_shell_bonds(
           embedding.basis.row(target_basis);
       for (int dy = min_dy; dy <= max_dy; ++dy) {
         for (int dx = min_dx; dx <= max_dx; ++dx) {
-          const auto key = std::tie(dx, dy, source_basis, target_basis);
-          const auto reverse =
-              std::make_tuple(-dx, -dy, target_basis, source_basis);
-          if (key >= reverse) continue;
+          if (dx > 0 ||
+              (dx == 0 &&
+               (dy > 0 || (dy == 0 && source_basis >= target_basis)))) {
+            continue;
+          }
 
           // Finite shells count only displacements realized by actual sites,
           // including the missing corners of an open plaquette patch.
