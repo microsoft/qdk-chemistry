@@ -41,16 +41,9 @@ function(qdk_select_blas_thread_backend src_dir out_src)
       "Expected AUTO, NONE or one of: ${QDK_CHEMISTRY_BLAS_VENDORS}.")
   endif()
 
-  # try_compile caches its result variable, so probes run once -- but they must
-  # not outlive the BLAS they were run against.
-  string(SHA256 key "${link}|${BLAS_INCLUDE_DIRS}")
-  if(NOT key STREQUAL "${QDK_CHEMISTRY_BLAS_PROBE_KEY}")
-    foreach(vendor IN LISTS QDK_CHEMISTRY_BLAS_VENDORS)
-      unset(QDK_CHEMISTRY_BLAS_PROBE_${vendor} CACHE)
-    endforeach()
-    set(QDK_CHEMISTRY_BLAS_PROBE_KEY "${key}" CACHE INTERNAL "")
-  endif()
-
+  # try_compile re-runs on every configure (it has no built-in skip), so the
+  # probes always reflect the BLAS resolved right now. Do not guard them with
+  # if(NOT DEFINED ...) -- that would cache results across a BLAS change.
   set(backend "")
   foreach(vendor IN LISTS candidates)
     if(link AND NOT backend)
