@@ -326,7 +326,7 @@ jobs:
 
         XDIST_ARGS=()
         if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
-          XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=loadscope)
+          XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=load)
         fi
 
         COV_ARGS=()
@@ -751,7 +751,7 @@ jobs:
         Push-Location python
         $xdistArgs = @()
         if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
-          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
+          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=load")
         }
         pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
@@ -1018,7 +1018,7 @@ jobs:
         Push-Location python
         $xdistArgs = @()
         if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
-          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
+          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=load")
         }
         pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
@@ -1122,7 +1122,7 @@ jobs:
       run: |
         set -e
         mkdir -p ../test-results
-        pytest -n "$PYTHON_TEST_WORKERS" --dist=loadscope \
+        pytest -n "$PYTHON_TEST_WORKERS" --dist=load \
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short
