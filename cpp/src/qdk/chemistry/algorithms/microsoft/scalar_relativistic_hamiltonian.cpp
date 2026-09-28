@@ -29,8 +29,8 @@ namespace detail {
 
 namespace {
 
-// Canonical-orthogonalization cutoff for the modified Dirac metric.
-constexpr double metric_linear_dependence_threshold = 1e-9;
+// Relative overlap cutoff for the common large/small AO space.
+constexpr double overlap_relative_linear_dependence_threshold = 1e-9;
 // Eigenvalue cutoff for the projected-overlap inverse square root.
 constexpr double overlap_linear_dependence_threshold = 1e-14;
 
@@ -59,7 +59,7 @@ std::vector<size_t> shell_offsets(const std::vector<qcs::Shell>& shells,
   return offsets;
 }
 
-/** @brief Solve the modified Dirac problem with a screened-metric fallback. */
+/** @brief Solve the modified Dirac problem in a common RKB-preserving space. */
 DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
                                       const Eigen::MatrixXd& kinetic,
                                       const Eigen::MatrixXd& potential,
@@ -70,6 +70,26 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
       qdk::chemistry::constants::fine_structure_constant;
   const double inverse_speed_of_light_squared =
       inverse_speed_of_light * inverse_speed_of_light;
+
+  // A successful generalized solve does not establish numerical overlap rank.
+  Eigen::MatrixXd overlap_vectors = overlap;
+  Eigen::VectorXd overlap_eigenvalues(dimension);
+  const int64_t overlap_info = lapack::syev(
+      lapack::Job::Vec, lapack::Uplo::Lower, dimension, overlap_vectors.data(),
+      dimension, overlap_eigenvalues.data());
+  if (overlap_info != 0) {
+    throw std::runtime_error("X2C overlap eigendecomposition failed (info=" +
+                             std::to_string(overlap_info) + ")");
+  }
+  const double cutoff = overlap_relative_linear_dependence_threshold *
+                        overlap_eigenvalues(dimension - 1);
+  Eigen::Index rank = 0;
+  for (Eigen::Index index = 0; index < dimension; ++index) {
+    if (overlap_eigenvalues(index) > cutoff) ++rank;
+  }
+  if (rank == 0) {
+    throw std::runtime_error("X2C overlap has no linearly independent modes");
+  }
 
   Eigen::MatrixXd dirac =
       Eigen::MatrixXd::Zero(dirac_dimension, dirac_dimension);
@@ -85,99 +105,56 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
   metric.bottomRightCorner(dimension, dimension) =
       kinetic * (inverse_speed_of_light_squared / 2.0);
 
-  Eigen::MatrixXd generalized_dirac = dirac;
-  Eigen::MatrixXd generalized_metric = metric;
-  Eigen::VectorXd eigenvalues(dirac_dimension);
-  const int64_t generalized_info = lapack::sygvd(
-      1, lapack::Job::Vec, lapack::Uplo::Lower, dirac_dimension,
-      generalized_dirac.data(), dirac_dimension, generalized_metric.data(),
-      dirac_dimension, eigenvalues.data());
-  if (generalized_info == 0) {
-    return {std::move(eigenvalues), std::move(generalized_dirac), dimension};
-  }
-  if (generalized_info <= dirac_dimension) {
-    throw std::runtime_error(
-        "X2C generalized eigendecomposition failed (info=" +
-        std::to_string(generalized_info) + ")");
-  }
-
-  Eigen::VectorXd metric_eigenvalues(dirac_dimension);
-  const int64_t metric_info =
-      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, dirac_dimension,
-                   metric.data(), dirac_dimension, metric_eigenvalues.data());
-  if (metric_info != 0) {
-    throw std::runtime_error(
-        "Symmetric eigendecomposition failed for X2C Dirac metric (info=" +
-        std::to_string(metric_info) + ")");
-  }
-  std::vector<Eigen::Index> retained_metric_indices;
-  for (Eigen::Index index = 0; index < metric_eigenvalues.size(); ++index) {
-    if (metric_eigenvalues(index) > metric_linear_dependence_threshold) {
-      retained_metric_indices.push_back(index);
+  Eigen::MatrixXd reduction;
+  if (rank < dimension) {
+    reduction = Eigen::MatrixXd::Zero(dirac_dimension, 2 * rank);
+    for (Eigen::Index column = 0; column < rank; ++column) {
+      const Eigen::Index index = dimension - rank + column;
+      double* large_column = reduction.data() + column * dirac_dimension;
+      blas::copy(dimension, overlap_vectors.data() + index * dimension, 1,
+                 large_column, 1);
+      blas::scal(dimension, 1.0 / std::sqrt(overlap_eigenvalues(index)),
+                 large_column, 1);
+      // The same AO combinations generate the large basis and its RKB partners.
+      blas::copy(
+          dimension, large_column, 1,
+          reduction.data() + (rank + column) * dirac_dimension + dimension, 1);
+    }
+    for (Eigen::MatrixXd* matrix : {&dirac, &metric}) {
+      Eigen::MatrixXd product(dirac_dimension, 2 * rank);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+                 dirac_dimension, 2 * rank, dirac_dimension, 1.0,
+                 matrix->data(), dirac_dimension, reduction.data(),
+                 dirac_dimension, 0.0, product.data(), dirac_dimension);
+      Eigen::MatrixXd reduced(2 * rank, 2 * rank);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
+                 2 * rank, 2 * rank, dirac_dimension, 1.0, reduction.data(),
+                 dirac_dimension, product.data(), dirac_dimension, 0.0,
+                 reduced.data(), 2 * rank);
+      *matrix = 0.5 * (reduced + reduced.transpose()).eval();
     }
   }
-  if (retained_metric_indices.empty()) {
-    throw std::runtime_error(
-        "X2C Dirac metric has no linearly independent "
-        "modes");
-  }
 
-  // The retained metric projector is block diagonal, so the trace of its
-  // large-component block is the retained overlap rank.
-  double large_component_metric_rank_trace = 0.0;
-  for (const Eigen::Index index : retained_metric_indices) {
-    large_component_metric_rank_trace +=
-        metric.col(index).head(dimension).squaredNorm();
-  }
-  const Eigen::Index large_component_metric_rank = static_cast<Eigen::Index>(
-      std::llround(large_component_metric_rank_trace));
-
-  const Eigen::Index retained_metric_dimension =
-      static_cast<Eigen::Index>(retained_metric_indices.size());
-  Eigen::MatrixXd orthogonalizer(dirac_dimension, retained_metric_dimension);
-  for (size_t column = 0; column < retained_metric_indices.size(); ++column) {
-    const Eigen::Index index = retained_metric_indices[column];
-    orthogonalizer.col(column) =
-        metric.col(index) / std::sqrt(metric_eigenvalues(index));
-  }
-
-  Eigen::MatrixXd dirac_times_orthogonalizer(dirac_dimension,
-                                             retained_metric_dimension);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             dirac_dimension, retained_metric_dimension, dirac_dimension, 1.0,
-             dirac.data(), dirac_dimension, orthogonalizer.data(),
-             dirac_dimension, 0.0, dirac_times_orthogonalizer.data(),
-             dirac_dimension);
-  Eigen::MatrixXd orthogonal_dirac(retained_metric_dimension,
-                                   retained_metric_dimension);
-  blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,
-             retained_metric_dimension, retained_metric_dimension,
-             dirac_dimension, 1.0, orthogonalizer.data(), dirac_dimension,
-             dirac_times_orthogonalizer.data(), dirac_dimension, 0.0,
-             orthogonal_dirac.data(), retained_metric_dimension);
-  orthogonal_dirac =
-      0.5 * (orthogonal_dirac + orthogonal_dirac.transpose()).eval();
-
-  eigenvalues.resize(retained_metric_dimension);
-  const int64_t info = lapack::syev(
-      lapack::Job::Vec, lapack::Uplo::Lower, retained_metric_dimension,
-      orthogonal_dirac.data(), retained_metric_dimension, eigenvalues.data());
+  const Eigen::Index solve_dimension = 2 * rank;
+  Eigen::VectorXd eigenvalues(solve_dimension);
+  const int64_t info = lapack::sygvd(
+      1, lapack::Job::Vec, lapack::Uplo::Lower, solve_dimension, dirac.data(),
+      solve_dimension, metric.data(), solve_dimension, eigenvalues.data());
   if (info != 0) {
     throw std::runtime_error(
-        "Symmetric eigendecomposition failed for orthogonalized X2C Dirac "
-        "Hamiltonian "
-        "(info=" +
+        "X2C generalized eigendecomposition failed (info=" +
         std::to_string(info) + ")");
   }
+  if (rank == dimension) {
+    return {std::move(eigenvalues), std::move(dirac), rank};
+  }
 
-  Eigen::MatrixXd eigenvectors(dirac_dimension, retained_metric_dimension);
-  blas::gemm(
-      blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-      dirac_dimension, retained_metric_dimension, retained_metric_dimension,
-      1.0, orthogonalizer.data(), dirac_dimension, orthogonal_dirac.data(),
-      retained_metric_dimension, 0.0, eigenvectors.data(), dirac_dimension);
-  return {std::move(eigenvalues), std::move(eigenvectors),
-          large_component_metric_rank};
+  Eigen::MatrixXd eigenvectors(dirac_dimension, solve_dimension);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             dirac_dimension, solve_dimension, solve_dimension, 1.0,
+             reduction.data(), dirac_dimension, dirac.data(), solve_dimension,
+             0.0, eigenvectors.data(), dirac_dimension);
+  return {std::move(eigenvalues), std::move(eigenvectors), rank};
 }
 
 /** @brief Construct the spin-free X2C-1e Hamiltonian from AO integrals. */
@@ -264,14 +241,19 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
         ", actual=" + std::to_string(retained_overlap_dimension) + ")");
   }
 
-  Eigen::MatrixXd projected_overlap_inverse_sqrt =
-      Eigen::MatrixXd::Zero(electronic_dimension, electronic_dimension);
+  Eigen::MatrixXd scaled_overlap_vectors = projected_overlap;
   for (Eigen::Index index = 0; index < electronic_dimension; ++index) {
-    projected_overlap_inverse_sqrt.noalias() +=
-        projected_overlap.col(index) *
-        projected_overlap.col(index).transpose() /
-        std::sqrt(projected_overlap_eigenvalues(index));
+    blas::scal(electronic_dimension,
+               1.0 / std::sqrt(projected_overlap_eigenvalues(index)),
+               scaled_overlap_vectors.data() + index * electronic_dimension, 1);
   }
+  Eigen::MatrixXd projected_overlap_inverse_sqrt(electronic_dimension,
+                                                 electronic_dimension);
+  blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+             electronic_dimension, electronic_dimension, electronic_dimension,
+             1.0, scaled_overlap_vectors.data(), electronic_dimension,
+             projected_overlap.data(), electronic_dimension, 0.0,
+             projected_overlap_inverse_sqrt.data(), electronic_dimension);
 
   Eigen::MatrixXd overlap_projection(electronic_dimension, dimension);
   blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans,

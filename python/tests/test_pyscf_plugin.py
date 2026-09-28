@@ -2384,6 +2384,22 @@ class TestPyscfPlugin:
         assert scf_ecp.mol.multiplicity == 2
         assert scf_ecp.mol.nelectron == 19
 
+    @pytest.mark.parametrize("constructor", ["qdk", "qdk_cholesky"])
+    @pytest.mark.parametrize("integral_dressing", ["x2c_1e", "x2c_1e_contracted"])
+    def test_hamiltonian_to_scf_preserves_x2c_hamiltonian(self, constructor: str, integral_dressing: str) -> None:
+        """Preserve the X2C one-body operator and scalar core when converting to PySCF."""
+        solver = algorithms.create("scf_solver", "qdk", enable_gdm=False)
+        _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
+        hamiltonian = algorithms.create(
+            "hamiltonian_constructor", constructor, integral_dressing=integral_dressing
+        ).run(wavefunction.get_orbitals())
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        mf = hamiltonian_to_scf(hamiltonian, occ_a, occ_b)
+        coeff = spin_channel_matrix(wavefunction.get_orbitals().coefficients(), axes.alpha())
+        h1, _ = hamiltonian.get_one_body_integrals()
+        np.testing.assert_allclose(coeff.T @ mf.get_hcore() @ coeff, h1, rtol=0.0, atol=scf_energy_tolerance)
+        assert mf.energy_nuc() == hamiltonian.get_core_energy()
+
     def test_hamiltonian_to_scf_rerouting_and_error_handling(self):
         """Test hamiltonian_to_scf rerouting and error handling.
 

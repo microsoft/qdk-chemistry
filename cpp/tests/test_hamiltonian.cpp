@@ -6,8 +6,12 @@
 #include <qdk/chemistry/scf/util/int1e.h>
 
 #include <Eigen/Dense>
+#include <array>
+#include <blas.hh>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <lapack.hh>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <numeric>
@@ -2872,6 +2876,136 @@ TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
         << "duplicate=\n"
         << duplicate_one_body << "\nexpected=\n"
         << expected_duplicate;
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, X2CNearDependentBasisPermutation) {
+  namespace qcs = qdk::chemistry::scf;
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  Structure structure(
+      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 3.0}},
+      std::vector<std::string>{"Li", "H"});
+  auto molecule =
+      qdk::chemistry::utils::microsoft::convert_to_molecule(structure, 0, 1);
+  const std::array<double, 6> exponents{89.71717804697998,
+                                        89.71717693019926,
+                                        3.681750530107935,
+                                        0.2748828886142721,
+                                        1.0,
+                                        0.3};
+  const std::array<std::array<size_t, 6>, 4> orders{{
+      {0, 1, 2, 3, 4, 5},
+      {1, 0, 2, 3, 4, 5},
+      {5, 4, 3, 2, 1, 0},
+      {2, 3, 0, 1, 4, 5},
+  }};
+  auto build = [&](const std::array<size_t, 6>& order, bool decontract) {
+    std::vector<qcs::Shell> shells;
+    for (const size_t index : order) {
+      qcs::Shell shell{};
+      shell.atom_index = index < 4 ? 0 : 1;
+      shell.O = molecule->coords[shell.atom_index];
+      shell.angular_momentum = 0;
+      shell.contraction = 1;
+      shell.exponents[0] = exponents[index];
+      shell.coefficients[0] = 1.0;
+      shells.push_back(shell);
+    }
+    auto basis = std::make_shared<qcs::BasisSet>(
+        molecule, shells, qcs::BasisMode::PSI4, true, false);
+    return microsoft::detail::build_x2c_one_body_ao(basis, decontract);
+  };
+
+  for (const bool decontract : {false, true}) {
+    SCOPED_TRACE(decontract);
+    const Eigen::MatrixXd reference = build(orders.front(), decontract);
+    for (size_t permutation = 1; permutation < orders.size(); ++permutation) {
+      SCOPED_TRACE(permutation);
+      const auto& order = orders[permutation];
+      const Eigen::MatrixXd actual = build(order, decontract);
+      for (size_t row = 0; row < order.size(); ++row) {
+        for (size_t column = 0; column < order.size(); ++column) {
+          EXPECT_NEAR(actual(row, column), reference(order[row], order[column]),
+                      1e-9);
+        }
+      }
+    }
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, X2CCommonSpaceMatchesContractedBasis) {
+  namespace qcs = qdk::chemistry::scf;
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  Structure structure(std::vector<Eigen::Vector3d>{Eigen::Vector3d::Zero()},
+                      std::vector<std::string>{"H"});
+  BasisSet basis_set("common-space",
+                     {Shell(0, OrbitalType::S, std::vector<double>{1.0},
+                            std::vector<double>{1.0}),
+                      Shell(0, OrbitalType::S, std::vector<double>{1.0001},
+                            std::vector<double>{1.0})},
+                     structure);
+  auto basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
+  qcs::OneBodyIntegral integrals(basis.get(), basis->mol.get(),
+                                 qcs::mpi_default_input());
+  Eigen::MatrixXd overlap_vectors(2, 2), kinetic(2, 2);
+  Eigen::VectorXd overlap_eigenvalues(2), kinetic_eigenvalues(2);
+  integrals.overlap_integral(overlap_vectors.data());
+  integrals.kinetic_integral(kinetic.data());
+  ASSERT_EQ(lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, 2,
+                         overlap_vectors.data(), 2, overlap_eigenvalues.data()),
+            0);
+  ASSERT_EQ(lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower, 2,
+                         kinetic.data(), 2, kinetic_eigenvalues.data()),
+            0);
+  // S discards a direction that an independent relative T screen would retain.
+  ASSERT_LT(overlap_eigenvalues(0), 1e-9 * overlap_eigenvalues(1));
+  ASSERT_GT(kinetic_eigenvalues(0), 1e-9 * kinetic_eigenvalues(1));
+  Eigen::VectorXd retained = overlap_vectors.col(1);
+  blas::scal(2, 1.0 / std::sqrt(overlap_eigenvalues(1)), retained.data(), 1);
+
+  // Physically contract the primitives with the retained large-component
+  // combination. Its kinetic-balance partners use that same contraction.
+  qcs::Shell contracted{};
+  contracted.atom_index = 0;
+  contracted.O = basis->shells[0].O;
+  contracted.angular_momentum = 0;
+  contracted.contraction = 2;
+  for (size_t primitive = 0; primitive < 2; ++primitive) {
+    contracted.exponents[primitive] = basis->shells[primitive].exponents[0];
+    contracted.coefficients[primitive] =
+        retained(primitive) * basis->shells[primitive].coefficients[0];
+  }
+  auto reduced_basis = std::make_shared<qcs::BasisSet>(
+      basis->mol, std::vector<qcs::Shell>{contracted}, qcs::BasisMode::RAW,
+      true, false);
+  const Eigen::MatrixXd reference =
+      microsoft::detail::build_x2c_one_body_ao(reduced_basis, false);
+  const Eigen::MatrixXd actual =
+      microsoft::detail::build_x2c_one_body_ao(basis, false);
+  Eigen::VectorXd product(2);
+  blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, 2, 2, 1.0,
+             actual.data(), 2, retained.data(), 1, 0.0, product.data(), 1);
+  EXPECT_NEAR(blas::dot(2, retained.data(), 1, product.data(), 1),
+              reference(0, 0), 1e-10);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CDiffusePrimitiveRetainsKineticEnergy) {
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  Structure structure(std::vector<Eigen::Vector3d>{Eigen::Vector3d::Zero()},
+                      std::vector<std::string>{"H"});
+  BasisSet basis_set("diffuse",
+                     {Shell(0, OrbitalType::S, std::vector<double>{1e-5},
+                            std::vector<double>{1.0})},
+                     structure);
+  auto basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
+  // PySCF one-electron X2C reference using QDK's speed of light.
+  constexpr double reference = -0.0050312650433745115;
+  for (const bool decontract : {false, true}) {
+    const Eigen::MatrixXd actual =
+        microsoft::detail::build_x2c_one_body_ao(basis, decontract);
+    EXPECT_NEAR(actual(0, 0), reference, 1e-11);
   }
 }
 
