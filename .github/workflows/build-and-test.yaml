@@ -73,6 +73,15 @@ jobs:
           python-omp-threads: 4
           python-test-workers: 8
           build-documentation: true
+        - os-name: Linux-arm64
+          runner: [self-hosted, 1ES.Pool=1es-gh-Dpds_v5-arm-pool, 1ES.ImageOverride=ubuntu-24.04-arm, 'JobId=qdk_chemistry-linux-arm64-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          build-parallel: 32
+          uarch: armv8-a
+          python-version: '3.13'
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
@@ -111,7 +120,7 @@ jobs:
         cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
-      if: matrix.os-name == 'Linux'
+      if: runner.os == 'Linux'
       run: |
         # Wait for any existing apt/dpkg processes to finish (e.g., unattended-upgrades)
         MAX_WAIT_SECONDS=300
@@ -243,7 +252,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
+          -DQDK_ENABLE_OPENMP=${{ runner.os == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
