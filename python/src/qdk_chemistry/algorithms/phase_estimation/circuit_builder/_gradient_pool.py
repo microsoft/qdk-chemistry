@@ -76,7 +76,8 @@ def plan_gradient_pool(requests: Sequence[tuple[PhaseGradient, ...]]) -> Gradien
 
     layouts, own_angles = [], []
     for slots in circuit_slots:
-        layout, own = [], []
+        layout: list[int] = []
+        own: list[float] = []
         for slot in slots:
             if slot in pool_index:
                 layout.append(pool_index[slot])

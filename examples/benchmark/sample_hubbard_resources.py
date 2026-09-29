@@ -52,6 +52,7 @@ QPE_BUDGET_FRACTION = 2.0 / 3.0
 # Plaquette Trotter order.
 TROTTER_ORDER = 2
 
+
 def run_sampling(context, size: int) -> pd.DataFrame:
     """Sample the logical resources of one lattice size.
 
@@ -73,7 +74,7 @@ def run_sampling(context, size: int) -> pd.DataFrame:
     resolution_bits = QPE_PRECISION_BITS
     qpe_budget = QPE_BUDGET_FRACTION * energy_budget
     trotter_budget = energy_budget - qpe_budget
-    # A sine-windowed QPE phase state of N = 2^bits - 1 queries has spread tan(pi / (N + 2)), 
+    # A sine-windowed QPE phase state of N = 2^bits - 1 queries has spread tan(pi / (N + 2)),
     # which equals the required eps_QPE * tau.
     base_time = math.tan(math.pi / (2**resolution_bits - 1 + 2)) / qpe_budget
     trotter_settings: dict[str, float | int | str] = {"target_accuracy": trotter_budget}
