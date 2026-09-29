@@ -13,8 +13,7 @@ ExaChem runs as an external MPI process; qdk-chemistry supplies pre-computed SCF
 orbitals via ExaChem's serial-IO restart format and parses the results.
 
 Prerequisites:
-    - ExaChem binary, configured via the calculator's ``exachem_binary`` setting
-      or discoverable as ``ExaChem`` on ``PATH``
+    - ExaChem binary discoverable as ``ExaChem`` on ``PATH``
     - MPI runtime (``mpirun`` or ``srun``) for parallel execution
 """
 

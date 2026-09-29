@@ -45,11 +45,6 @@ class ExachemRunError(RuntimeError):
 def find_exachem_binary() -> Path:
     """Locate the ExaChem binary on ``PATH``.
 
-    This is only the zero-configuration fallback used when an algorithm leaves its
-    ``exachem_binary`` setting empty. Prefer configuring the path explicitly::
-
-        calculator.settings().set("exachem_binary", "/opt/exachem/bin/ExaChem")
-
     Returns:
         Path to the ExaChem binary.
 
@@ -61,10 +56,7 @@ def find_exachem_binary() -> Path:
     if which:
         return Path(which)
 
-    raise ExachemNotFoundError(
-        "ExaChem binary not found on PATH. Install ExaChem and either add it to PATH "
-        "or set the 'exachem_binary' setting to the full binary path."
-    )
+    raise ExachemNotFoundError("ExaChem binary not found on PATH. Install ExaChem and add it to PATH.")
 
 
 def find_mpi_launcher() -> list[str]:
@@ -146,6 +138,9 @@ class CcsdInputConfig:
     extra_scf_options: dict = field(default_factory=dict)
     """Additional SCF block options merged into the input."""
 
+    atom_ecp: dict = field(default_factory=dict)
+    """Element symbol to ECP name in ExaChem's library, for atoms that use an ECP."""
+
     def to_json(self) -> dict:
         """Convert to ExaChem JSON input format."""
         cc_block: dict = {
@@ -169,6 +164,7 @@ class CcsdInputConfig:
             },
             "basis": {
                 "basisset": self.basis,
+                **({"atom_ecp": dict(self.atom_ecp)} if self.atom_ecp else {}),
             },
             "common": {
                 "maxiter": 100,
@@ -334,14 +330,8 @@ def run_exachem(
             logger.error(
                 "ExaChem failed (rc=%d):\nstdout: %s\nstderr: %s", result.returncode, result.stdout, result.stderr
             )
-            location = (
-                "The temporary work directory was removed."
-                if owns_work_dir
-                else f"Check work_dir={work_dir} for details."
-            )
-            raise ExachemRunError(
-                f"ExaChem exited with code {result.returncode}. {location}\nstderr: {result.stderr[:500]}"
-            )
+            output_tail = "\n".join(f"{result.stdout}\n{result.stderr}".strip().splitlines()[-5:])
+            raise ExachemRunError(f"ExaChem exited with code {result.returncode}. Output ends with:\n{output_tail}")
 
         return exachem_result
     except BaseException:

@@ -48,7 +48,13 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["export_scf_files", "write_exachem_matrix", "write_qdk_basis_g94"]
+__all__ = [
+    "basis_name_to_exachem",
+    "ecp_name_to_exachem",
+    "export_scf_files",
+    "write_exachem_matrix",
+    "write_qdk_basis_g94",
+]
 
 try:
     import h5py
@@ -64,6 +70,53 @@ def _require_h5py() -> None:
 
 
 _L_SYMBOL = {0: "S", 1: "P", 2: "D", 3: "F", 4: "G", 5: "H", 6: "I"}
+
+
+def basis_name_to_exachem(name: str) -> str:
+    """Translate a qdk-chemistry basis set name into ExaChem's spelling.
+
+    ExaChem lowercases basis set names, replaces spaces with underscores, and prefixes names starting with
+    ``aug`` with ``ec-``. The returned name is unchanged by that rewrite, so it names both ExaChem's library
+    entry and the file written by :func:`write_qdk_basis_g94`.
+
+    Args:
+        name: Basis set name, as returned by :meth:`~qdk_chemistry.data.BasisSet.get_name`.
+
+    Returns:
+        The basis set name as ExaChem spells it.
+
+    Examples:
+        >>> basis_name_to_exachem("aug-cc-pVDZ")
+        'ec-aug-cc-pvdz'
+
+    """
+    exachem_name = name.lower().replace(" ", "_")
+    return f"ec-{exachem_name}" if exachem_name.startswith("aug") else exachem_name
+
+
+def ecp_name_to_exachem(name: str) -> str:
+    """Translate a qdk-chemistry ECP name into the name of ExaChem's ECP library file.
+
+    ExaChem stores an ECP shared by several basis sets once: every def2 basis set uses ``def2-ecp``, and
+    LANL2DZ and LANL2DZdp use ``lanl2dz_ecp``. Other names are spelled as in :func:`basis_name_to_exachem`.
+
+    Args:
+        name: ECP name, as returned by :meth:`~qdk_chemistry.data.BasisSet.get_ecp_name`.
+
+    Returns:
+        The name of ExaChem's ``.ecp`` file holding the ECP.
+
+    Examples:
+        >>> ecp_name_to_exachem("def2-svp")
+        'def2-ecp'
+
+    """
+    exachem_name = basis_name_to_exachem(name)
+    if exachem_name.startswith("def2-"):
+        return "def2-ecp"
+    if exachem_name in ("lanl2dz", "lanl2dzdp"):
+        return "lanl2dz_ecp"
+    return exachem_name
 
 
 def _within_shell_m_reorder(basis_set) -> np.ndarray:
@@ -129,6 +182,9 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
     Returns:
         The ``basis_data_dir`` path, to be used as ``LIBINT_DATA_PATH``.
 
+    Raises:
+        ValueError: If the basis name is not a safe file name or atoms of one element carry different shells.
+
     """
     # basis_name becomes a file name, so reject anything that could escape the basis dir.
     if not basis_name or "/" in basis_name or "\\" in basis_name or ".." in basis_name:
@@ -139,14 +195,20 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
     for s in range(basis_set.get_num_shells()):
         atom_shells.setdefault(int(basis_set.get_shell(s).atom_index), []).append(s)
 
-    # One block per unique element (all atoms of an element share the basis).
+    # One block per element, so every atom of an element must carry the same shells.
     blocks: list[str] = []
-    seen: set[str] = set()
+    seen: dict[str, list] = {}
     for atom_idx in sorted(atom_shells):
         elem = str(elements[atom_idx]).strip().title()
+        shells = [
+            (sh.get_angular_momentum(), list(sh.exponents), list(sh.coefficients))
+            for sh in map(basis_set.get_shell, atom_shells[atom_idx])
+        ]
         if elem in seen:
+            if shells != seen[elem]:
+                raise ValueError(f"ExaChem needs one basis per element, but the {elem} atoms carry different shells.")
             continue
-        seen.add(elem)
+        seen[elem] = shells
         lines = [f"{elem}     0"]
         for s in atom_shells[atom_idx]:
             sh = basis_set.get_shell(s)

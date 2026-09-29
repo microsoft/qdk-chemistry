@@ -36,7 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
-from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, Settings, Wavefunction
+from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, BasisSet, Settings, Wavefunction
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.exachem.cli import CcsdInputConfig, ExachemResult, run_exachem
@@ -45,7 +45,7 @@ from qdk_chemistry.plugins.exachem.conversion import (
     parse_ccsd_amplitudes_unrestricted,
     parse_ccsdt_energy,
 )
-from qdk_chemistry.plugins.exachem.scf_export import export_scf_files
+from qdk_chemistry.plugins.exachem.scf_export import basis_name_to_exachem, ecp_name_to_exachem, export_scf_files
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +56,8 @@ class ExachemCcsdSettings(Settings):
     """Settings for the ExaChem CCSD calculator.
 
     Attributes:
-        exachem_binary (str): Path to the ExaChem binary, or empty to find ``ExaChem`` on ``PATH``.
         mpi_ranks (int): Number of MPI processes (default: 1).
         mpi_bind_to (str): Binding policy per rank; empty defers to the launcher (default: ``"core"``).
-        work_dir (str): Working directory, or empty for a temp dir (default: ``""``).
         timeout (int): Subprocess timeout in seconds (default: 3600).
         ccsd_threshold (float): CCSD convergence threshold (default: 1e-6).
         cd_diagtol (float): Cholesky decomposition diagonal tolerance (default: 1e-5).
@@ -72,17 +70,10 @@ class ExachemCcsdSettings(Settings):
     def __init__(self):
         """Initialize the settings with default values."""
         super().__init__()
-        self._set_default(
-            "exachem_binary",
-            "string",
-            "",
-            "Full path to the ExaChem binary; empty finds 'ExaChem' on PATH",
-        )
         self._set_default("mpi_ranks", "int", 1, "Number of MPI processes to launch ExaChem with")
         self._set_default(
             "mpi_bind_to", "string", "core", "Binding policy for each MPI rank; empty defers to the launcher default"
         )
-        self._set_default("work_dir", "string", "", "Working directory for ExaChem input/output; empty uses a temp dir")
         self._set_default("timeout", "int", 3600, "Maximum seconds to wait for ExaChem to finish")
         self._set_default("ccsd_threshold", "double", 1e-6, "CCSD convergence threshold")
         self._set_default("cd_diagtol", "double", 1e-5, "Cholesky decomposition diagonal tolerance")
@@ -107,7 +98,10 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
     calculator, returning ``(total_energy, wavefunction, None)`` where
     ``wavefunction`` carries the CCSD amplitudes.
 
-    The Ansatz must be backed by a molecular :class:`~qdk_chemistry.data.BasisSet`.
+    The Ansatz must be backed by a named molecular :class:`~qdk_chemistry.data.BasisSet` (ExaChem looks the
+    name up in its own library), and ``ExaChem`` must be on ``PATH``. Effective core potentials are taken from
+    ExaChem's own library by name; a run whose ExaChem SCF energy differs from the Ansatz reference energy
+    raises instead of returning.
     """
 
     def __init__(self):
@@ -135,10 +129,10 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             CCSD T1/T2 amplitudes (when ``store_amplitudes`` is enabled).
 
         Raises:
-            ValueError: If the Ansatz is not backed by a molecular basis set.
+            ValueError: If the Ansatz is not backed by a named molecular basis set.
             ExachemNotFoundError: If ExaChem or the MPI launcher is not found.
             ExachemRunError: If ExaChem fails.
-            RuntimeError: If the CCSD energy or amplitude files cannot be found.
+            RuntimeError: If ExaChem's SCF energy differs from the Ansatz reference or its CCSD outputs are missing.
 
         """
         s = self._settings
@@ -153,6 +147,8 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         basis_set = orbitals.get_basis_set()
         structure = basis_set.get_structure()
         basis_name = basis_set.get_name()
+        if basis_name == BasisSet.custom_name:
+            raise ValueError("ExaChem CCSD needs a named basis set, not a custom per-element or per-atom one.")
 
         # Build ExaChem geometry lines in Bohr (qdk stores coordinates in Bohr).
         symbols = structure.get_atomic_symbols()
@@ -161,8 +157,11 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
         n_alpha, n_beta = wavefunction.get_total_num_electrons()
         multiplicity = (n_alpha - n_beta) + 1
+        ecp_electrons = list(basis_set.get_ecp_electrons())
         total_nuclear_charge = round(structure.get_total_nuclear_charge())
-        charge = total_nuclear_charge - (n_alpha + n_beta)
+        charge = total_nuclear_charge - sum(ecp_electrons) - (n_alpha + n_beta)
+        exachem_ecp = ecp_name_to_exachem(basis_set.get_ecp_name())
+        atom_ecp = {sym: exachem_ecp for sym, n_core in zip(symbols, ecp_electrons, strict=True) if n_core}
 
         # ExaChem requires an unrestricted reference for any open-shell system.
         is_unrestricted = orbitals.is_unrestricted() or multiplicity > 1
@@ -172,14 +171,13 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         mo_coeff_alpha = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.alpha()))
 
         # Prepare the working directory and SCF restart prefix.
-        work = s.get("work_dir") or None
-        cleanup_work_dir = work is None
-        work_path = Path(work) if work else Path(tempfile.mkdtemp(prefix="exachem_ccsd_"))
-        work_path.mkdir(parents=True, exist_ok=True)
+        work_path = Path(tempfile.mkdtemp(prefix="exachem_ccsd_"))
 
         try:
             input_prefix = "ccsd_input"
-            scf_prefix_name = f"{input_prefix}.{basis_name}"
+            # LIBINT_DATA_PATH makes ExaChem read our shells under its library name.
+            exachem_basis = basis_name_to_exachem(basis_name)
+            scf_prefix_name = f"{input_prefix}.{exachem_basis}"
             scf_type_dir = work_path / f"{scf_prefix_name}_files" / scf_type
             scf_dir = scf_type_dir / "scf"
             scf_dir.mkdir(parents=True, exist_ok=True)
@@ -199,7 +197,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                     mo_coeff_alpha=mo_coeff_alpha,
                     density_alpha=np.asarray(density_alpha),
                     basis_set=basis_set,
-                    basis_name=basis_name,
+                    basis_name=exachem_basis,
                     elements=list(symbols),
                     basis_data_dir=basis_data_dir,
                     ao_tilesize=30,
@@ -215,7 +213,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                     mo_coeff_alpha=mo_coeff_alpha,
                     density_alpha=density_total,
                     basis_set=basis_set,
-                    basis_name=basis_name,
+                    basis_name=exachem_basis,
                     elements=list(symbols),
                     basis_data_dir=basis_data_dir,
                     ao_tilesize=30,
@@ -229,7 +227,8 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
             config = CcsdInputConfig(
                 atoms=atoms,
-                basis=basis_name,
+                basis=exachem_basis,
+                atom_ecp=atom_ecp,
                 charge=charge,
                 multiplicity=multiplicity,
                 units="bohr",
@@ -243,12 +242,10 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                 input_prefix=input_prefix,
             )
 
-            binary = s.get("exachem_binary") or None
             result: ExachemResult = run_exachem(
                 config,
                 nprocs=s.get("mpi_ranks"),
                 work_dir=work_path,
-                exachem_binary=Path(binary) if binary else None,
                 mpi_bind_to=s.get("mpi_bind_to"),
                 timeout=s.get("timeout"),
                 scf_files_prefix=scf_files_prefix,
@@ -256,10 +253,19 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             )
 
             energies = parse_ccsdt_energy(result.stdout)
+            # ExaChem ends many fatal errors with exit status 0, so errors quote its last output lines.
+            stdout_tail = "\n".join(result.stdout.strip().splitlines()[-5:])
+            reference_energy = ansatz.calculate_energy()
+            # Catches any basis, ECP, or charge mismatch; matching runs agree to about 1e-12 Eh.
+            if energies.scf_total is None or abs(energies.scf_total - reference_energy) > 1e-6:
+                raise RuntimeError(
+                    f"ExaChem's SCF energy ({energies.scf_total}) does not match the Ansatz reference energy "
+                    f"({reference_energy:.10f}). ExaChem output ends with:\n{stdout_tail}"
+                )
             if energies.ccsd_total is None:
                 raise RuntimeError(
-                    "ExaChem completed but the CCSD total energy could not be parsed from stdout. "
-                    f"Check {result.work_dir} for output."
+                    "ExaChem completed but the CCSD total energy could not be parsed. "
+                    f"ExaChem output ends with:\n{stdout_tail}"
                 )
             total_energy = energies.ccsd_total
 
@@ -280,11 +286,8 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
             return total_energy, updated_wavefunction, None
         finally:
-            # Remove every input/output/basis file written during the run, unless
-            # the caller supplied an explicit work_dir (then they own the files).
-            if cleanup_work_dir:
-                shutil.rmtree(work_path, ignore_errors=True)
-                logger.debug("Cleaned up work directory %s", work_path)
+            shutil.rmtree(work_path, ignore_errors=True)
+            logger.debug("Cleaned up work directory %s", work_path)
 
     @staticmethod
     def _find_amplitude_files(work_dir: Path) -> tuple[Path, Path]:

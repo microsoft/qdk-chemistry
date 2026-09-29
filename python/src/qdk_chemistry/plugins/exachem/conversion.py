@@ -7,7 +7,7 @@
 
 ExaChem writes its converged coupled-cluster results in two places:
 
-1. **stdout** -- the CCSD/CCSD(T) energy summary, parsed by
+1. **stdout** -- the SCF and CCSD/CCSD(T) energy summaries, parsed by
    :func:`parse_ccsdt_energy` into :class:`CcsdtEnergies`.
 2. **T-amplitude text files** -- written when ``CC.PRINT.tamplitudes`` is
    enabled, parsed by :func:`parse_ccsd_amplitudes_restricted` and
@@ -43,6 +43,9 @@ class CcsdtEnergies:
     ``ccsd_bracket_t_*`` fields hold the related "CCSD[T]" bracket variant.
     """
 
+    scf_total: float | None = None
+    """SCF total energy of the reference that ExaChem correlated."""
+
     ccsd_correlation: float | None = None
     """CCSD correlation energy."""
 
@@ -63,9 +66,9 @@ class CcsdtEnergies:
 
 
 def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
-    """Parse CCSD and CCSD(T) energies from ExaChem stdout.
+    """Parse the SCF, CCSD and CCSD(T) energies from ExaChem stdout.
 
-    ExaChem prints the CCSD and CCSD(T)/CCSD[T] energies as labeled lines (at
+    ExaChem prints the SCF, CCSD and CCSD(T)/CCSD[T] energies as labeled lines (at
     15-digit precision). This extracts them into a :class:`CcsdtEnergies`.
 
     Args:
@@ -77,6 +80,7 @@ def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
     """
     num = r"(-?\d+\.\d+)"
     patterns = {
+        "scf_total": rf"\bTotal SCF energy\s*=\s*{num}",
         "ccsd_correlation": rf"\bCCSD correlation energy / hartree\s*=\s*{num}",
         "ccsd_total": rf"\bCCSD total energy / hartree\s*=\s*{num}",
         "ccsd_bracket_t_correction": rf"\bCCSD\[T\] correction energy / hartree\s*=\s*{num}",

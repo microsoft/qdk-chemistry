@@ -14,11 +14,10 @@ orbitals through its serial-IO restart files and rebuilds the integrals with its
 own Libint2, so agreement is limited by that integral re-computation, by ExaChem's
 Cholesky decomposition tolerance, and by the two codes' coupled-cluster
 convergence thresholds. Both restricted (RHF) and unrestricted (UHF) references
-are exercised.
+are exercised, and an effective-core-potential case is checked against native PySCF.
 
-Each test runs ExaChem via MPI, so they are marked ``slow``. The binary is passed to
-the calculator through its ``exachem_binary`` setting; the tests locate one by looking
-for ``ExaChem`` on ``PATH`` and are skipped when it or an MPI runtime is missing.
+Each test runs ExaChem via MPI, so they are marked ``slow``. The calculator finds
+``ExaChem`` on ``PATH``; the tests are skipped when it or an MPI runtime is missing.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -35,7 +34,8 @@ import pytest
 
 import qdk_chemistry.plugins.exachem as exachem_plugin
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Ansatz, Structure
+from qdk_chemistry.data import Ansatz, BasisSet, Structure
+from qdk_chemistry.plugins.exachem.scf_export import basis_name_to_exachem, ecp_name_to_exachem, write_qdk_basis_g94
 
 from .reference_tolerances import mp2_energy_tolerance, rdm_tolerance
 
@@ -45,13 +45,10 @@ exachem_plugin.load()
 # Skip conditions
 # ---------------------------------------------------------------------------
 
-# The ExaChem binary is configuration, not environment: it is supplied through the
-# calculator's ``exachem_binary`` setting. These tests discover one on PATH purely to
-# decide whether to run, then pass the resolved path through that setting.
 _EXACHEM_BINARY = shutil.which("ExaChem") or ""
 
 try:
-    import pyscf  # noqa: F401
+    from pyscf import cc, gto, scf
 
     import qdk_chemistry.plugins.pyscf as pyscf_plugin
 
@@ -87,6 +84,7 @@ H2 = "2\nH2\nH 0 0 0\nH 0 0 0.74\n"
 LIH = "2\nLiH\nLi 0 0 0\nH 0 0 1.6\n"
 H2O = "3\nH2O\nO 0 0 0.117790\nH 0 0.756950 -0.471161\nH 0 -0.756950 -0.471161\n"
 OH = "2\nOH\nO 0 0 0\nH 0 0 0.97\n"
+HI = "2\nHI\nH 0 0 0\nI 0 0 1.609\n"
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +129,6 @@ def run_coupled_cluster(variant: str, ansatz: Ansatz):
     calculator.settings().set("store_amplitudes", True)
     if variant == "exachem_ccsd":
         calculator.settings().set("mpi_ranks", 2)
-        calculator.settings().set("exachem_binary", _EXACHEM_BINARY)
     return calculator.run(ansatz)
 
 
@@ -207,6 +204,8 @@ class TestCcsdRestricted:
             pytest.param(LIH, "sto-3g", id="lih_sto3g"),
             pytest.param(H2O, "sto-3g", id="h2o_sto3g"),
             pytest.param(H2O, "cc-pvdz", id="h2o_ccpvdz"),
+            # ExaChem renames aug-* basis sets internally.
+            pytest.param(H2O, "aug-cc-pvdz", id="h2o_augccpvdz"),
         ],
     )
     def test_energy_and_amplitudes_match_pyscf(self, xyz: str, basis: str):
@@ -228,3 +227,60 @@ class TestCcsdUnrestricted:
     )
     def test_energy_and_amplitudes_match_pyscf(self, xyz: str, basis: str):
         assert_exachem_matches_pyscf(xyz, basis, multiplicity=2, scf_type="unrestricted")
+
+
+class TestCcsdEffectiveCorePotential:
+    """Compare ExaChem with native PySCF for basis sets that carry ECPs.
+
+    The PySCF plugin is not the reference here: it does not reproduce qdk's reference energy for these systems.
+    """
+
+    @pytest.mark.parametrize("basis", ["def2-svp", "lanl2dz"])
+    def test_energy_matches_native_pyscf(self, basis: str):
+        energy, wavefunction, _ = run_coupled_cluster("exachem_ccsd", build_ansatz(HI, basis, 0, 1, "restricted"))
+
+        molecule = gto.M(atom="H 0 0 0; I 0 0 1.609", basis=basis, ecp=basis, verbose=0)
+        reference = cc.CCSD(scf.RHF(molecule).run(conv_tol=1e-10)).run(conv_tol=1e-8)
+
+        np.testing.assert_allclose(energy, reference.e_tot, atol=_energy_tolerance)
+        assert wavefunction.get_container().has_t2_amplitudes()
+
+
+class TestBasisExport:
+    """Check how qdk-chemistry's basis set is handed to ExaChem."""
+
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [("cc-pVDZ", "cc-pvdz"), ("aug-cc-pvdz", "ec-aug-cc-pvdz"), ("ahlrichs pvdz", "ahlrichs_pvdz")],
+    )
+    def test_basis_name_to_exachem(self, name: str, expected: str):
+        assert basis_name_to_exachem(name) == expected
+
+    @pytest.mark.parametrize(
+        ("name", "expected"),
+        [
+            ("def2-tzvp", "def2-ecp"),
+            ("lanl2dz", "lanl2dz_ecp"),
+            ("lanl2dzdp", "lanl2dz_ecp"),
+            ("cc-pvdz-pp", "cc-pvdz-pp"),
+            ("aug-cc-pvdz-pp", "ec-aug-cc-pvdz-pp"),
+        ],
+    )
+    def test_ecp_name_to_exachem(self, name: str, expected: str):
+        assert ecp_name_to_exachem(name) == expected
+
+    def test_rejects_custom_basis_sets(self):
+        structure = Structure.from_xyz(H2O)
+        basis_set = BasisSet.from_element_map({"O": "cc-pvdz", "H": "sto-3g"}, structure)
+        _, wavefunction = create("scf_solver").run(structure, 0, 1, basis_set)
+        ansatz = Ansatz(create("hamiltonian_constructor").run(wavefunction.get_orbitals()), wavefunction)
+
+        with pytest.raises(ValueError, match="named basis set"):
+            create("dynamical_correlation_calculator", "exachem_ccsd").run(ansatz)
+
+    def test_rejects_different_shells_on_atoms_of_one_element(self, tmp_path):
+        structure = Structure.from_xyz(H2O)
+        basis_set = BasisSet.from_index_map({0: "cc-pvdz", 1: "sto-3g", 2: "cc-pvdz"}, structure)
+
+        with pytest.raises(ValueError, match="one basis per element"):
+            write_qdk_basis_g94(basis_set, structure.get_atomic_symbols(), tmp_path, "sto-3g")

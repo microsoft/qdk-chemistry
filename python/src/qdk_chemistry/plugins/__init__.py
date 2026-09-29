@@ -40,8 +40,9 @@ QDK/Chemistry also includes integrations for:
 * :mod:`qdk_chemistry.plugins.pyscf` for electronic-structure algorithms;
 * :mod:`qdk_chemistry.plugins.qiskit` for circuit construction, mapping, and execution;
 * :mod:`qdk_chemistry.plugins.openfermion` for operator conversion and qubit mapping;
-* :mod:`qdk_chemistry.plugins.networkx` for graph-coloring term grouping; and
-* :mod:`qdk_chemistry.plugins.geometric` for molecular geometry optimization.
+* :mod:`qdk_chemistry.plugins.networkx` for graph-coloring term grouping;
+* :mod:`qdk_chemistry.plugins.geometric` for molecular geometry optimization; and
+* :mod:`qdk_chemistry.plugins.exachem` for coupled-cluster amplitudes from an external ExaChem executable.
 
 Bundled integrations are loaded automatically when their optional dependencies
 are available. Their implementations can then be created through the standard
