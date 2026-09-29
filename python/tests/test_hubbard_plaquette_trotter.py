@@ -18,6 +18,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard
     HubbardPlaquetteTrotter,
 )
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -757,3 +758,181 @@ class TestAutomaticStepCount:
         assert shifted.eigenvalue_from_phase(phase_fraction) == pytest.approx(
             unshifted.eigenvalue_from_phase(phase_fraction) + expected_energy_shift
         )
+
+
+#: Settings of the ``examples/estimation_hubbard_2d.ipynb`` benchmark, repeated here so that the
+#: pinned counts below depend on the library rather than on the notebook. The notebook explains
+#: where each one comes from; the short version is that ``U = 8t`` is the strong-coupling regime,
+#: the error budget is allocated per site, and minimizing the total Trotter step count
+#: ``sum_k r_k ~ 1 / (f * sqrt(1 - f))`` over the phase-estimation share ``f`` gives ``f = 2/3``,
+#: the same optimum used in Campbell (arXiv:2012.09238v4, App. F).
+_BENCHMARK_HOPPING_T = 1.0
+_BENCHMARK_U_OVER_T = 8.0
+_BENCHMARK_FILLING = 0.875
+_BENCHMARK_PRECISION_PER_SITE = 0.0051
+_BENCHMARK_QPE_BITS = 10
+_BENCHMARK_QPE_BUDGET_FRACTION = 2.0 / 3.0
+_BENCHMARK_TROTTER_ORDER = 2
+
+
+#: Rotation synthesis rounds transcendental angles, so these two counts drift by a few
+#: units out of millions across platforms (Linux matches exactly, macOS is +1, Windows
+#: ARM64 is +5). They are pinned to a relative tolerance; every other column stays exact.
+_PLATFORM_SENSITIVE_COLUMNS = frozenset({"rotations", "rotation_depth"})
+_PLATFORM_RELATIVE_TOLERANCE = 1e-4
+
+
+#: L=2 has four sites, which is below the Hamming-weight-phasing break-even of eight terms, so
+#: every tower rotates term by term: no adder tree, and therefore no Toffolis at all.
+_HUBBARD_L2_FULL_CIRCUIT = {
+    "L": 2,
+    "sites": 4,
+    "system_qubits": 8,
+    "electrons": 4,
+    "target_precision": 0.0204,
+    "qpe_budget": 0.013600000000000001,
+    "trotter_budget": 0.0068000000000000005,
+    "qpe_bits": 10,
+    "base_time": 0.2253660323553513,
+    "logical_qubits": 18,
+    "rotations": 1047435,
+    "rotation_depth": 698414,
+    "t_gates": 698155,
+    "ccz_count": 0,
+    "ccix_count": 0,
+    "toffolis": 0,
+    "measurements": 10,
+}
+
+
+#: L=4 has sixteen sites, so every tower is above the break-even and takes the
+#: Hamming-weight-phasing path: an adder tree compresses sixteen same-angle rotations into a
+#: five-bit weight, and each place value takes one synthesized ``Rz``. This is the case that
+#: exercises the construction, which is why it is pinned.
+_HUBBARD_L4_FULL_CIRCUIT = {
+    "L": 4,
+    "sites": 16,
+    "system_qubits": 32,
+    "electrons": 14,
+    "target_precision": 0.0816,
+    "qpe_budget": 0.054400000000000004,
+    "trotter_budget": 0.027200000000000002,
+    "qpe_bits": 10,
+    "base_time": 0.056341508088837824,
+    "logical_qubits": 57,
+    "rotations": 261223,
+    "rotation_depth": 190086,
+    "t_gates": 759067,
+    "ccz_count": 355500,
+    "ccix_count": 0,
+    "toffolis": 355500,
+    "measurements": 355510,
+}
+
+
+def _benchmark_schedule(size: int) -> tuple[float, float, float, float]:
+    """Return the energy budgets and base evolution time the benchmark uses for one lattice."""
+    energy_budget = _BENCHMARK_PRECISION_PER_SITE * size * size
+    qpe_budget = _BENCHMARK_QPE_BUDGET_FRACTION * energy_budget
+    trotter_budget = energy_budget - qpe_budget
+    # A sine-windowed QPE phase state of N = 2^bits - 1 queries has spread
+    # tan(pi / (N + 2)), which equals the required eps_QPE * tau.
+    base_time = math.tan(math.pi / (2**_BENCHMARK_QPE_BITS - 1 + 2)) / qpe_budget
+    return energy_budget, qpe_budget, trotter_budget, base_time
+
+
+def _benchmark_logical_counts(size: int) -> dict:
+    """Build the benchmark's phase-estimation circuit for one lattice and trace its gate counts."""
+    operator = _lattice_operator(size, size)
+    energy_budget, qpe_budget, trotter_budget, base_time = _benchmark_schedule(size)
+
+    unitary_builder = AlgorithmRef(
+        "hamiltonian_unitary_builder",
+        "hubbard_plaquette",
+        order=_BENCHMARK_TROTTER_ORDER,
+        time=base_time,
+        t=_BENCHMARK_HOPPING_T,
+        u=_BENCHMARK_U_OVER_T * _BENCHMARK_HOPPING_T,
+        # Bit k evolves for base_time * 2^k rather than repeating the block 2^k times.
+        power_strategy="rescale",
+        target_accuracy=trotter_budget,
+    )
+    circuit_builder = create(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=_BENCHMARK_QPE_BITS,
+        unitary_builder=unitary_builder,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
+    )
+    circuit_builder.settings().set("phase_state", "sine")
+
+    built = circuit_builder.run(identity_state_prep(num_qubits=operator.num_qubits), operator)[0]
+    factory = built._qsharp_factory
+    assert factory is not None, "the QPE circuit does not have Q# factory data"
+    counts = dict(get_qsharp_context().logical_counts(factory.program, *factory.parameter.values()))
+
+    ccz_count = int(counts.get("cczCount", 0))
+    ccix_count = int(counts.get("ccixCount", 0))
+    return {
+        "L": size,
+        "sites": size * size,
+        "system_qubits": operator.num_qubits,
+        "electrons": round(_BENCHMARK_FILLING * size * size),
+        "target_precision": energy_budget,
+        "qpe_budget": qpe_budget,
+        "trotter_budget": trotter_budget,
+        "qpe_bits": _BENCHMARK_QPE_BITS,
+        "base_time": base_time,
+        "logical_qubits": int(counts["numQubits"]),
+        "rotations": int(counts.get("rotationCount", 0)),
+        "rotation_depth": int(counts.get("rotationDepth", 0)),
+        "t_gates": int(counts.get("tCount", 0)),
+        "ccz_count": ccz_count,
+        "ccix_count": ccix_count,
+        "toffolis": ccz_count + ccix_count,
+        "measurements": int(counts.get("measurementCount", 0)),
+    }
+
+
+def _compare_counts(actual: dict, expected: dict) -> list[str]:
+    """Return one message per pinned column the traced circuit does not match."""
+    mismatches = []
+    for column, want in expected.items():
+        got = actual[column]
+        if column in _PLATFORM_SENSITIVE_COLUMNS:
+            matches = got == pytest.approx(want, rel=_PLATFORM_RELATIVE_TOLERANCE)
+            tolerance = f" (rel={_PLATFORM_RELATIVE_TOLERANCE})"
+        else:
+            matches = got == pytest.approx(want) if isinstance(want, float) else got == want
+            tolerance = ""
+        if not matches:
+            mismatches.append(f"  L={expected['L']} {column}: expected {want}{tolerance}, got {got}")
+    return mismatches
+
+
+class TestBenchmarkLogicalResources:
+    """Pin the logical cost of the benchmark circuit that ``estimation_hubbard_2d.ipynb`` reports.
+
+    These run unconditionally. The notebook's own end-to-end test is slow-gated and needs a
+    Jupyter kernel, so it does not run on an ordinary push; this pin is the guard that does.
+    """
+
+    def test_lattice_below_the_break_even(self):
+        """L=2 rotates term by term, so it must carry no adder tree and no Toffolis."""
+        actual = _benchmark_logical_counts(2)
+        mismatches = _compare_counts(actual, _HUBBARD_L2_FULL_CIRCUIT)
+        assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
+
+        # Below the break-even zero Toffolis is the correct answer, not a collapsed circuit.
+        assert actual["toffolis"] == 0, "the 2x2 lattice is below the break-even and phases term by term"
+
+    def test_lattice_above_the_break_even(self):
+        """L=4 is the case that exercises the adder tree and the Hamming-weight rotation ladder."""
+        actual = _benchmark_logical_counts(4)
+        mismatches = _compare_counts(actual, _HUBBARD_L4_FULL_CIRCUIT)
+        assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
+
+        # A collapse back to the term-by-term fallback would silently erase the adder tree, which
+        # is the only source of Toffolis in this circuit. Pin the sign of the count, not just its
+        # value: this exact regression was golden-ed in once before it was caught.
+        assert actual["toffolis"] > 0, "the 4x4 lattice must take the Hamming-weight-phasing path"
