@@ -76,6 +76,7 @@ void bind_basis_set(py::module& m) {
 
   // Bind OrbitalType enum
   py::enum_<OrbitalType>(m, "OrbitalType", "Enumeration of orbital types")
+      .value("UL", OrbitalType::UL, "local ECP potential (l=-1)")
       .value("S", OrbitalType::S, "s orbital (l=0)")
       .value("P", OrbitalType::P, "p orbital (l=1)")
       .value("D", OrbitalType::D, "d orbital (l=2)")
