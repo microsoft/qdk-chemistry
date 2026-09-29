@@ -125,3 +125,39 @@ def test_qpe_stretched_n2():
             },
         },
     )
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _RUN_SLOW_TESTS,
+    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+)
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+def test_estimation_hubbard_2d():
+    """Test the 2D Fermi-Hubbard resource-estimation notebook executes without errors.
+
+    The logical counts this notebook reports are pinned unconditionally by
+    ``test_hubbard_plaquette_trotter.py``; this test only covers the notebook itself.
+    """
+    notebook_path = EXAMPLES_DIR / "estimation_hubbard_2d.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        cell_patches={
+            14: {
+                "LATTICE_SIZES = (2, 4, 6, 8, 10, 20)": "LATTICE_SIZES = (2, 4)",
+            },
+            17: {
+                "num_ts_per_rotation=list(range(20, 45, 2))": "num_ts_per_rotation=[20, 30, 40]",
+                "slow_down_factor=[1.0 * j for j in range(1, 20)]": "slow_down_factor=[1.0, 5.0]",
+            },
+        },
+    )
