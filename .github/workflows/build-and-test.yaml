@@ -753,6 +753,18 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Install Visual Studio 2026 Build Tools
+      if: matrix.compiler == 'msvc'
+      shell: pwsh
+      run: |
+        $vsInstaller = "$env:RUNNER_TEMP\vs_buildtools.exe"
+        Invoke-WebRequest https://aka.ms/vs/18/stable/vs_buildtools.exe -OutFile $vsInstaller
+        & $vsInstaller --quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools `
+            --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.VC.CMake.Project `
+            --add Microsoft.VisualStudio.Component.Windows11SDK.26100 | Out-Null
+        if ($LASTEXITCODE -notin 0, 3010) { throw "vs_buildtools.exe failed ($LASTEXITCODE)" }
+        $global:LASTEXITCODE = 0  # 3010 only requests a reboot
+
     - name: Set up ${{ matrix.compiler }} environment (ARM64)
       id: env
       shell: pwsh
