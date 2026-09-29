@@ -49,6 +49,14 @@ Settings
    ``control_indices`` (list of int): Which qubits serve as controls (default: ``[0]``).
    ``target_indices`` (list of int): Which qubits the unitary acts on (default: auto-filled).
 
+.. _compact-formula-mappers:
+
+.. rubric:: Compact product-formula support
+
+:ref:`Compact product-formula containers <compact-product-formulas>` are supported by :class:`~qdk_chemistry.algorithms.circuit_mapper.PauliSequenceMapper` and :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`.
+They execute ``beginning`` and ``end`` once, preserving the body's symbolic ``step_reps``; declared layers do not cross these segment boundaries.
+The :ref:`CSWAP mapper <cswap-pauli-sequence-mapper>` also supports nonempty endpoints, subject to independent section-wise vacuum validation.
+
 .. rubric:: Creating a mapper
 
 .. tab:: Python API
@@ -95,6 +103,20 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 
 .. note::
    The current implementation supports a single control qubit.
+
+When the :class:`~qdk_chemistry.data.PauliProductFormulaContainer` supplies ``layer_offsets``,
+the mapper interleaves controlled-rotation decompositions into two rotation rounds
+per declared disjoint layer. These boundaries originate in the unitary builder;
+the mapper does not infer layers from supports or merge neighboring layers.
+Term order, signed angles, and symbolic repetitions are preserved, and identity
+terms retain their phase on the control. Without layer metadata, each controlled
+exponential is completed separately.
+
+This can reduce logical rotation depth without extra ancillas or a different
+mapper selection. Shared-control CNOTs remain serial in a two-qubit-gate model,
+so the rotation-depth improvement is not a guarantee of constant total gate depth.
+
+.. _cswap-pauli-sequence-mapper:
 
 Controlled SWAP Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -146,6 +168,11 @@ commute and can be exponentiated term by term.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
+
+.. important::
+
+   Compact formulas support nonempty ``beginning`` and ``end``; each executes once around the repeated body inside the same CSWAP sandwich.
+   The prefix, body, and suffix are independently validated for vacuum preservation, sharing one leakage tolerance across repetition counts ``1``, ``step_reps``, and ``1``.
 
 .. rubric:: Worked example
 

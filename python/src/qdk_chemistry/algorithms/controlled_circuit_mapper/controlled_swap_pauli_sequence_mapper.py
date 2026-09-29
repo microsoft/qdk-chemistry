@@ -7,8 +7,7 @@
 
 import math
 
-from qdk import qsharp
-
+from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import _pauli_evolution_parameters
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -96,7 +95,7 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings)
 
     Attributes:
         vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,
-            aggregated over every flipped-qubit set and over all ``step_reps`` repetitions.
+            aggregated over every flipped-qubit set, all body repetitions, and both endpoints.
 
     """
 
@@ -107,7 +106,7 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings)
             "vacuum_preservation_tolerance",
             "double",
             1e-9,
-            "Absolute tolerance on the total amplitude the repeated evolution may leak out of the vacuum.",
+            "Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum.",
         )
 
 
@@ -118,7 +117,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper builds a
     controlled :math:`U(t)` without controlling every gate.  An internally allocated
     ``vacuum`` register (:math:`|0\ldots0\rangle`) is conditionally swapped with the system,
-    the *uncontrolled* evolution runs on the vacuum (``step_reps`` times), and the swap is
+    the full *uncontrolled* evolution runs on the vacuum, and the swap is
     uncomputed.  The eigenphase accumulates on the :math:`|1\rangle` control branch, as with
     a directly controlled evolution, using an additional system-sized register and two layers
     of system-wide controlled-:math:`\mathrm{SWAP}` gates.
@@ -203,19 +202,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
 
         vacuum_phase = self._vacuum_phase(unitary_container)
 
-        pauli_terms: list[list[qsharp.Pauli]] = []
-        angles: list[float] = []
-        for term in unitary_container.step_terms:
-            base_terms = [qsharp.Pauli.I] * unitary_container.num_qubits
-            for index, pauli in term.pauli_term.items():
-                base_terms[index] = getattr(qsharp.Pauli, pauli)
-            pauli_terms.append(base_terms.copy())
-            angles.append(term.angle)
-
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
-            pauliExponents=pauli_terms,
-            pauliCoefficients=angles,
-            repetitions=unitary_container.step_reps,
+            evolution=QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
             vacuumPhase=vacuum_phase,
             control=control_indices[0],
             systems=target_indices,
@@ -233,32 +221,35 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
 
     def _vacuum_phase(self, container: PauliProductFormulaContainer) -> float:
-        r"""Return the phase the repeated evolution imprints on the vacuum register.
+        r"""Return the vacuum phase of the beginning, repeated body, and end.
 
-        The vacuum must remain an eigenstate: leaked amplitude entangles the vacuum register
-        with the control and destroys the control coherence.
+        Each section must preserve the vacuum independently. Cross-section cancellations
+        are not certified; the leakage tolerance is shared over all section executions.
 
         Args:
             container: The Pauli product formula to validate.
 
         Returns:
-            The phase accumulated over all ``step_reps`` repetitions.
+            The total phase, counting endpoints once and the body ``step_reps`` times.
 
         Raises:
-            ValueError: If the vacuum is not an eigenstate of the product formula.
+            ValueError: If a section is not vacuum preserving.
 
         """
-        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        # A residual left by one step leaks again on every repetition, so the per-step budget shrinks.
-        atol = self._settings.get("vacuum_preservation_tolerance") / container.step_reps
-        phase = _vacuum_eigenphase(terms, atol)
-        if phase is None:
-            raise ValueError(
-                "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: the "
-                "Pauli terms could not be split into contiguous, mutually commuting blocks that leave "
-                "|0...0> invariant, so the CSWAP sandwich would leak the vacuum and decohere the control. "
-                "The mapper applies to particle-conserving Hamiltonians; group such a Hamiltonian with "
-                "the 'vacuum_annihilating' term grouper before building the unitary, e.g. "
-                "registry.create('term_grouper', 'vacuum_annihilating').run(qubit_hamiltonian)."
-            )
-        return container.step_reps * phase
+        sections = ((container.beginning, 1), (container.step_terms, container.step_reps), (container.end, 1))
+        atol = self._settings.get("vacuum_preservation_tolerance") / max(
+            1, sum(repetitions for terms, repetitions in sections if terms)
+        )
+        phases = []
+        for terms, repetitions in sections:
+            if not terms:
+                continue
+            phase = _vacuum_eigenphase([(term.pauli_term, term.angle) for term in terms], atol)
+            if phase is None:
+                raise ValueError(
+                    "ControlledSwapPauliSequenceMapper requires a vacuum-preserving product formula: each section "
+                    "must split into contiguous, mutually commuting blocks that leave |0...0> invariant. "
+                    "Use the 'vacuum_annihilating' term grouper before building the unitary."
+                )
+            phases.append(repetitions * phase)
+        return math.fsum(phases)

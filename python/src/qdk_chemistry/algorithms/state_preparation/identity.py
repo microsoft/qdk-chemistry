@@ -33,4 +33,5 @@ def identity_state_prep(num_qubits: int) -> Circuit:
             program=QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
             parameter={"evo_params": params, "target_indices": targets},
         ),
+        num_qubits=num_qubits,
     )
