@@ -190,7 +190,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     frames: list[pd.DataFrame] = []
     for size in args.size:
-        Logger.info(f"Sampling L={size}; writing {args.output}", flush=True)
+        # The library logger is silenced above, so sweep progress goes straight to stdout.
+        print(f"Sampling L={size}; writing {args.output}", flush=True)
         try:
             frame = run_sampling(context, size)
         except Exception as error:  # noqa: BLE001 - keep the sweep alive; the log explains the gap
@@ -201,11 +202,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     f"{stamp} L={size} produced no result: "
                     f"{type(error).__name__}: {error}\n"
                 )
-            Logger.warning(f"L={size} produced no result; see {log_path}", flush=True)
+            print(f"L={size} produced no result; see {log_path}", flush=True)
             continue
         frames.append(frame)
         pd.concat(frames, ignore_index=True).to_csv(args.output, index=False)
-        Logger.info(f"Finished L={size}", flush=True)
+        print(f"Finished L={size}", flush=True)
 
     return 0
 
