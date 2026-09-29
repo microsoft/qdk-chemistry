@@ -229,7 +229,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     ///
     /// It is therefore a qubit-for-rotations knob, and the useful setting depends on the device:
     /// hardware demonstrations of Fermi-Hubbard dynamics run on a fixed and comparatively small
-    /// register (:cite:`Granet2025` simulate the model on a trapped-ion processor), where the
+    /// register, where the
     /// adder tree of a full lattice-sized tower may simply not fit, while a fault-tolerant
     /// estimate is usually better off spending the qubits to save the rotations. The default is
     /// no cap, which reproduces the uncapped construction exactly.
