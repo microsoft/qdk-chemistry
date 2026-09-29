@@ -8,7 +8,7 @@
 from typing import Any
 
 from qdk_chemistry.data import AlgorithmRef, SettingNotFound, Settings
-from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, PhaseGradient, QsharpFactoryData
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -331,10 +331,9 @@ class SOSSAMapper(CircuitMapper):
             register_layout,
         )
 
-        num_gradient = regs["num_phase_gradient_qubits"]
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
             num_qubits=regs["num_system_qubits"] + regs["num_ancilla_qubits"],
-            metadata=CircuitMetadata(phase_gradients=(PhaseGradient.binary(num_gradient),) if num_gradient else ()),
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=regs["num_phase_gradient_qubits"]),
         )

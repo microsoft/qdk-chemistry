@@ -1,23 +1,17 @@
-"""Tests for phase gradient states and generalized phase-gradient addition."""
+"""Tests for phase gradient states and Hamming-weight phasing through them."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import cmath
 import math
 
 import numpy as np
 import pytest
 from qdk.test_utils import dump_operation_on_state
 
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder._gradient_pool import (
-    GradientPoolPlan,
-    plan_gradient_pool,
-)
-from qdk_chemistry.data.circuit import PhaseGradient
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 _PG = "QDKChemistry.Utils.PhaseGradient"
 
@@ -47,183 +41,100 @@ def _gradient_state(phase: float, num_qubits: int) -> np.ndarray:
     return state / np.sqrt(2**num_qubits)
 
 
-class TestPhaseGradientData:
-    """The phase gradient description carried by circuit metadata."""
-
-    def test_binary_gradient_has_the_binary_fraction_phase(self):
-        """The binary gradient is the special case phase = 2 pi / 2^n."""
-        gradient = PhaseGradient.binary(5)
-        assert gradient == PhaseGradient(2 * math.pi / 32, 5)
-        assert gradient.is_binary
-        assert not PhaseGradient(0.37, 5).is_binary
-
-    @pytest.mark.parametrize(("phase", "num_qubits", "match"), [(0.1, 0, "positive"), (math.inf, 3, "finite")])
-    def test_rejects_an_unusable_gradient(self, phase, num_qubits, match):
-        """An empty register or a non-finite phase cannot be prepared."""
-        with pytest.raises(ValueError, match=match):
-            PhaseGradient(phase, num_qubits)
+def _expected_words(phi: float, n: int, bits: int) -> list[int]:
+    """Return the ``bits``-bit word of each place value, computed independently of Q#."""
+    modulus = 1 << bits
+    return [round(phi * 2**j * modulus / (4.0 * math.pi)) % modulus for j in range(n)]
 
 
-class TestPreparePhaseGradients:
-    """Preparation of consecutive gradient registers."""
+class TestPreparePhaseGradientState:
+    """The binary gradient register every rotation is added into."""
 
     @pytest.mark.parametrize("num_qubits", [1, 3, 4])
-    def test_binary_and_generalized_preparations_agree(self, num_qubits):
-        """The binary gradient is a generalized gradient, whichever way it is prepared."""
-        phase = PhaseGradient.binary(num_qubits).phase
-        binary = _state(f"qs => {_PG}.PreparePhaseGradients([({phase}, {num_qubits}, true)], qs)", num_qubits)
-        general = _state(f"qs => {_PG}.PreparePhaseGradients([({phase}, {num_qubits}, false)], qs)", num_qubits)
-        assert np.allclose(binary, _gradient_state(phase, num_qubits), atol=1e-10)
-        assert np.allclose(general, binary, atol=1e-10)
-
-    def test_consecutive_registers_hold_their_own_gradients(self):
-        """Each entry fills the next slice of the register."""
-        gradients = [(0.37, 2, False), (-1.1, 3, False)]
-        literal = "[" + ", ".join(f"({p}, {n}, {'true' if b else 'false'})" for p, n, b in gradients) + "]"
-        actual = _state(f"qs => {_PG}.PreparePhaseGradients({literal}, qs)", 5)
-        assert np.allclose(actual, np.kron(_gradient_state(0.37, 2), _gradient_state(-1.1, 3)), atol=1e-10)
+    def test_prepares_the_binary_gradient(self, num_qubits):
+        """The state is sum_k e^{-2 pi i k / 2^n}|k> on little-endian qubits."""
+        actual = _state(f"qs => {_PG}.PreparePhaseGradientState(qs)", num_qubits)
+        assert np.allclose(actual, _gradient_state(2 * math.pi / 2**num_qubits, num_qubits), atol=1e-10)
 
 
-class TestPhaseByGeneralizedGradient:
-    """Generalized phase-gradient addition applies e^{i phi w} exactly and returns its catalyst."""
+class TestBinaryGradientWords:
+    """The classical words Hamming-weight phasing loads, one per place value of the weight."""
 
-    @staticmethod
-    def _operation(phi: float, n: int, controlled: bool) -> str:
-        weight, catalyst = (f"qs[1..{n}]", f"qs[{n + 1}...]") if controlled else (f"qs[0..{n - 1}]", f"qs[{n}...]")
-        call = f"{_PG}.PhaseByGeneralizedGradient({phi}, {weight}, {catalyst})"
-        if controlled:
-            call = f"Controlled {_PG}.PhaseByGeneralizedGradient([qs[0]], ({phi}, {weight}, {catalyst}))"
-        prepare = f"{_PG}.PrepareGeneralizedPhaseGradient({_PG}.GeneralizedPhaseGradientAngles({phi}, {n}), {catalyst})"
-        return f"qs => {{ within {{ {prepare}; }} apply {{ {call}; }} }}"
+    @pytest.mark.parametrize("phi", [0.37, -2.9, 0.75 * math.pi, 9.5])
+    @pytest.mark.parametrize(("n", "bits"), [(1, 4), (3, 5), (4, 8)])
+    def test_words_are_the_nearest_representable_rotation(self, phi, n, bits):
+        """Word j rounds Rz(phi 2^j) onto the 4 pi / 2^bits lattice the gradient resolves."""
+        actual = [int(word) for word in QSHARP_UTILS.PhaseGradient.BinaryGradientWords(phi, n, bits)]
+        assert actual == _expected_words(phi, n, bits)
+        assert all(0 <= word < 2**bits for word in actual), "a word must fit the gradient register"
 
-    @pytest.mark.parametrize(("n", "phi"), [(1, 0.7), (3, 0.37), (3, -2.9), (4, 1.234)])
-    def test_phases_every_weight_and_restores_the_catalyst(self, n, phi):
-        """Every weight picks up e^{i phi w}; the catalyst ends in |0> after unpreparation."""
-        amplitudes = np.zeros(2 ** (2 * n))
+    def test_a_lattice_angle_is_represented_exactly(self):
+        """Angles that are multiples of 4 pi / 2^bits round to themselves, so the phasing is exact."""
+        bits, k = 5, 3
+        phi = 4.0 * math.pi * k / 2**bits
+        actual = [int(word) for word in QSHARP_UTILS.PhaseGradient.BinaryGradientWords(phi, 4, bits)]
+        assert actual == [(k * 2**j) % 2**bits for j in range(4)]
+
+    def test_the_offset_cancels_the_rz_layer_constant(self):
+        """Rz(a) = e^{-ia/2} R1(a), so the offset must be minus the sum of the realized angles."""
+        bits = 5
+        words = [3, 6, 12]
+        offset = QSHARP_UTILS.PhaseGradient.BinaryGradientPhaseOffset(words, bits)
+        assert offset == pytest.approx(-sum(4.0 * math.pi * word / 2**bits for word in words))
+
+
+class TestPhaseByBinaryGradient:
+    """Hamming-weight phasing applies e^{i phi w} and returns the gradient register prepared."""
+
+    #: A phase on the 4 pi / 2^bits lattice, so every word is exact and the assertions can be tight.
+    BITS = 4
+    PHI = 4.0 * math.pi * 3 / 2**4
+
+    @classmethod
+    def _operation(cls, n: int, controlled: bool) -> str:
+        """Return Q# applying the phasing, with the constant offset, on a gradient prepared around it."""
+        words = _expected_words(cls.PHI, n, cls.BITS)
+        offset = -sum(4.0 * math.pi * word / 2**cls.BITS for word in words)
+        lead = 1 if controlled else 0
+        weight = f"qs[{lead}..{lead + n - 1}]"
+        gradient = f"qs[{lead + n}...]"
+        body = (
+            f"{_PG}.PhaseByBinaryGradient({words}, {weight}, {gradient}); R(PauliI, {offset}, {weight}[0]);"
+            if not controlled
+            else (
+                f"Controlled {_PG}.PhaseByBinaryGradient([qs[0]], ({words}, {weight}, {gradient})); "
+                f"Controlled R([qs[0]], (PauliI, {offset}, {weight}[0]));"
+            )
+        )
+        return f"qs => {{ within {{ {_PG}.PreparePhaseGradientState({gradient}); }} apply {{ {body} }} }}"
+
+    @pytest.mark.parametrize("n", [1, 3])
+    def test_phases_every_weight_and_restores_the_gradient(self, n):
+        """Every weight picks up e^{i phi w}; the gradient ends in |0> after unpreparation."""
+        widths = [n, self.BITS]
+        amplitudes = np.zeros(2 ** sum(widths))
         for weight in range(2**n):
-            amplitudes[_index([weight, 0], [n, n])] = 2 ** (-n / 2)
-        actual = _state(self._operation(phi, n, controlled=False), 2 * n, amplitudes.tolist())
+            amplitudes[_index([weight, 0], widths)] = 2 ** (-n / 2)
+        actual = _state(self._operation(n, controlled=False), sum(widths), amplitudes.tolist())
 
         expected = np.zeros_like(actual)
         for weight in range(2**n):
-            expected[_index([weight, 0], [n, n])] = 2 ** (-n / 2) * np.exp(1j * phi * weight)
+            expected[_index([weight, 0], widths)] = 2 ** (-n / 2) * np.exp(1j * self.PHI * weight)
         assert np.allclose(actual, expected, atol=1e-10)
 
-    @pytest.mark.parametrize(("n", "phi"), [(2, 0.9), (3, -0.41)])
-    def test_controlled_addition_acts_only_when_the_control_is_set(self, n, phi):
-        """Masking the weight by the control keeps the catalyst an eigenstate on both branches."""
-        widths = [1, n, n]
-        amplitudes = np.zeros(2 ** (2 * n + 1))
-        for control in (0, 1):
-            for weight in range(2**n):
-                amplitudes[_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2)
-        actual = _state(self._operation(phi, n, controlled=True), 2 * n + 1, amplitudes.tolist())
-
-        expected = np.zeros_like(actual)
-        for control in (0, 1):
-            for weight in range(2**n):
-                phase = np.exp(1j * phi * weight) if control else 1.0
-                expected[_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2) * phase
-        assert np.allclose(actual, expected, atol=1e-10)
-
-
-def _assert_plan_serves(requests: list[tuple[PhaseGradient, ...]], plan: GradientPoolPlan) -> None:
-    """Every circuit gets distinct qubits, each in the state its gradient needs."""
-    for circuit, gradients in enumerate(requests):
-        required = [-gradient.phase * 2.0**bit for gradient in gradients for bit in range(gradient.num_qubits)]
-        layout, own = plan.layouts[circuit], plan.own_angles[circuit]
-        assert len(layout) == len(required)
-        assert len(set(layout)) == len(layout), "a circuit must never receive the same qubit twice"
-        assert sorted(index for index in layout if index < 0) == [-1 - i for i in reversed(range(len(own)))]
-        for index, angle in zip(layout, required, strict=True):
-            served = plan.pool_angles[index] if index >= 0 else own[-1 - index]
-            assert cmath.isclose(cmath.exp(1j * served), cmath.exp(1j * angle), abs_tol=1e-9)
-
-
-class TestGradientPoolPlan:
-    """Controlled unitaries share every gradient qubit two or more of them need."""
-
-    def test_a_doubled_phase_shares_all_but_one_qubit(self):
-        """The gradient for 2 phi is the one for phi without its lowest qubit."""
-        requests = [(PhaseGradient(0.74, 3),), (PhaseGradient(0.37, 3),)]
-        plan = plan_gradient_pool(requests)
-        _assert_plan_serves(requests, plan)
-        assert len(plan.pool_angles) == 2
-        assert [len(own) for own in plan.own_angles] == [1, 1]
-
-    def test_rescaled_plaquette_catalysts_mostly_share(self):
-        """Doubling both the interaction and the hopping angle leaves one own qubit per catalyst."""
-        requests = [
-            (PhaseGradient(0.3, 9), PhaseGradient(-0.1, 10)),
-            (PhaseGradient(0.6, 9), PhaseGradient(-0.2, 10)),
-        ]
-        plan = plan_gradient_pool(requests)
-        _assert_plan_serves(requests, plan)
-        assert len(plan.pool_angles) == 17
-        assert [len(own) for own in plan.own_angles] == [2, 2]
-
-    def test_angles_equal_modulo_two_pi_are_shared(self):
-        """A qubit's state only depends on its angle modulo 2 pi."""
-        requests = [(PhaseGradient(0.37, 1),), (PhaseGradient(0.37 + 2 * math.pi, 1),)]
-        plan = plan_gradient_pool(requests)
-        _assert_plan_serves(requests, plan)
-        assert len(plan.pool_angles) == 1
-
-    def test_unrelated_gradients_keep_their_own_qubits(self):
-        """Nothing is held for the whole run when no two circuits need the same state."""
-        requests = [(PhaseGradient(0.37, 3),), (PhaseGradient(0.5, 3),)]
-        plan = plan_gradient_pool(requests)
-        _assert_plan_serves(requests, plan)
-        assert plan.pool_angles == ()
-
-    def test_an_angle_needed_twice_by_one_circuit_uses_two_qubits(self):
-        """A circuit may use both copies at once, so they must not alias."""
-        requests = [(PhaseGradient(0.37, 1), PhaseGradient(0.37, 1)), (PhaseGradient(0.37, 1),)]
-        plan = plan_gradient_pool(requests)
-        _assert_plan_serves(requests, plan)
-        assert len(plan.pool_angles) == 1
-        assert [len(own) for own in plan.own_angles] == [1, 0]
-
-    def test_a_circuit_without_gradients_draws_nothing(self):
-        """Its targets are passed through with the pool stripped."""
-        requests = [(PhaseGradient(0.37, 3),), ()]
-        plan = plan_gradient_pool(requests)
-        _assert_plan_serves(requests, plan)
-        assert plan.layouts[1] == ()
-
-
-class TestPooledGradientControlledOp:
-    """The wrapper hands each operation its pooled and own gradient qubits, in the order it expects them."""
-
-    @pytest.mark.parametrize("circuit", [0, 1])
-    def test_each_circuit_phases_exactly_on_the_shared_pool(self, circuit):
-        """Both GPGA calls read their catalysts from one pool plus a qubit they prepare themselves."""
-        n, phi = 3, 0.37
-        phases = [2 * phi, phi]
-        plan = plan_gradient_pool([(PhaseGradient(phase, n),) for phase in phases])
-        pool_size = len(plan.pool_angles)
-
-        op = f"{_PG}.TestControlledGradientPhase({phases[circuit]}, {n}, _, _)"
-        wrapped = (
-            f"{_PG}.MakePooledGradientControlledOp({pool_size}, {list(plan.layouts[circuit])}, "
-            f"{list(plan.own_angles[circuit])}, {op})"
-        )
-        operation = (
-            f"qs => {{ let pool = qs[{n + 1}...]; "
-            f"within {{ {_PG}.PrepareGeneralizedPhaseGradient({list(plan.pool_angles)}, pool); }} "
-            f"apply {{ ({wrapped})(qs[0], qs[1..{n}] + pool); }} }}"
-        )
-
-        widths = [1, n, pool_size]
+    @pytest.mark.parametrize("n", [2, 3])
+    def test_controlled_phasing_acts_only_when_the_control_is_set(self, n):
+        """Loading the word under control leaves the addition, and the gradient, uncontrolled."""
+        widths = [1, n, self.BITS]
         amplitudes = np.zeros(2 ** sum(widths))
         for control in (0, 1):
             for weight in range(2**n):
                 amplitudes[_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2)
-        actual = _state(operation, sum(widths), amplitudes.tolist())
+        actual = _state(self._operation(n, controlled=True), sum(widths), amplitudes.tolist())
 
         expected = np.zeros_like(actual)
         for control in (0, 1):
             for weight in range(2**n):
-                phase = np.exp(1j * phases[circuit] * weight) if control else 1.0
+                phase = np.exp(1j * self.PHI * weight) if control else 1.0
                 expected[_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2) * phase
         assert np.allclose(actual, expected, atol=1e-10)

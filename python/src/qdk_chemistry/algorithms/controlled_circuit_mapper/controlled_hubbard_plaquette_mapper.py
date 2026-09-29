@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.data import Circuit, UnitaryRepresentation
-from qdk_chemistry.data.circuit import CircuitMetadata, PhaseGradient, QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -109,5 +109,5 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             ),
             qsharp_op=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOp(params),
             num_qubits=len(targets) + num_gradient,
-            metadata=CircuitMetadata(phase_gradients=(PhaseGradient.binary(num_gradient),)),
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient),
         )
