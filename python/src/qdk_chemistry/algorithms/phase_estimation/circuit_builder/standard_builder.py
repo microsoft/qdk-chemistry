@@ -176,15 +176,13 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             gradient_pool, routes = PhaseGradientPool.from_requests(gradient_requests)
             shared_gradient_sizes = [gradient.num_qubits for gradient in gradient_pool.gradients]
             state_prep_gradient_indices = routes[0]
-            ctrl_unitary_ops = [
-                QSHARP_UTILS.PhaseGradient.MakeRoutedGradientOp(shared_gradient_sizes, list(route), op)
-                for route, op in zip(routes[1:], ctrl_unitary_ops, strict=True)
-            ]
+            ctrl_unitary_gradient_indices = [list(route) for route in routes[1:]]
             prepare_shared_op = phase_gradients_preparation(gradient_pool.gradients)
             num_shared_ancillas = gradient_pool.num_qubits
         else:
             shared_gradient_sizes = []
             state_prep_gradient_indices = ()
+            ctrl_unitary_gradient_indices = [[] for _ in ctrl_unitary_ops]
             prepare_shared_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
             num_shared_ancillas = 0
         self._validate_state_prep_width(
@@ -206,6 +204,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             num_shared_ancillas,
             shared_gradient_sizes,
             list(state_prep_gradient_indices),
+            ctrl_unitary_gradient_indices,
         )
         standard_parameters = {
             "statePrep": state_prep_op,
@@ -219,6 +218,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "numSharedAncillas": num_shared_ancillas,
             "sharedGradientSizes": shared_gradient_sizes,
             "statePrepSharedIndices": list(state_prep_gradient_indices),
+            "controlledUnitarySharedIndices": ctrl_unitary_gradient_indices,
             "measurePhase": bool(self._settings.get("measure_phase")),
             "computeCapacity": int(self._settings.get("compute_capacity")),
         }

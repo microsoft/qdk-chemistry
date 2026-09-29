@@ -66,14 +66,14 @@ _HUBBARD_L2_FULL_CIRCUIT = {
     "trotter_budget": 0.0068,
     "qpe_bits": 10,
     "base_time": 0.2253660323553513,
-    "logical_qubits": 18,
-    "rotations": 1047435,
-    "rotation_depth": 698414,
+    "logical_qubits": 86,
+    "rotations": 262453,
+    "rotation_depth": 262264,
     "t_gates": 698155,
-    "ccz_count": 0,
+    "ccz_count": 1439389,
     "ccix_count": 0,
-    "toffolis": 0,
-    "measurements": 10,
+    "toffolis": 1439389,
+    "measurements": 1439399,
 }
 
 
@@ -110,6 +110,7 @@ def test_sample_hubbard_L2(  # noqa: N802 - L is the lattice side
     assert not missing, f"pinned columns absent from the table: {sorted(missing)}"
 
     row = frame.iloc[0]
+    assert row["toffolis"] > 0, "the benchmark must exercise the phase-gradient Hamming-weight towers"
     mismatches = []
     for column, want in _HUBBARD_L2_FULL_CIRCUIT.items():
         got = row[column]

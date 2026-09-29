@@ -7,6 +7,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     import Std.Arrays.Subarray;
     import Std.Diagnostics.Fact;
     import QDKChemistry.Utils.PhaseGradient.PhaseGradientSizeOffsets;
+    import QDKChemistry.Utils.PhaseGradient.RoutedGradientControlledBody;
     import QDKChemistry.Utils.PhaseGradient.RoutedGradientQubitIndices;
 
     /// A struct to hold parameters for iterative Quantum Phase Estimation (IQPE).
@@ -20,6 +21,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
     /// - `sharedGradientSizes`: Width of each register in the shared pool.
     /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
+    /// - `controlledUnitarySharedIndices`: Pool registers appended to the controlled unitary.
     struct IterativePhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         repControlledUnitary : (Qubit, Qubit[]) => Unit,
@@ -31,6 +33,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numSharedAncillas : Int,
         sharedGradientSizes : Int[],
         statePrepSharedIndices : Int[],
+        controlledUnitarySharedIndices : Int[],
     }
 
     /// Runs the iterative Quantum Phase Estimation (IQPE) circuit based on the provided parameters.
@@ -52,6 +55,10 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             "shared gradient sizes must sum to numSharedAncillas"
         );
         let statePrepSharedPicks = RoutedGradientQubitIndices(params.sharedGradientSizes, params.statePrepSharedIndices);
+        let controlledUnitarySharedPicks = RoutedGradientQubitIndices(
+            params.sharedGradientSizes,
+            params.controlledUnitarySharedIndices
+        );
 
         within {
             params.prepareSharedOp(shared);
@@ -61,7 +68,13 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
                 H(phaseQubit);
             } apply {
                 Rz(params.accumulatePhase, phaseQubit);
-                params.repControlledUnitary(phaseQubit, allTargets);
+                RoutedGradientControlledBody(
+                    params.numSharedAncillas,
+                    controlledUnitarySharedPicks,
+                    params.repControlledUnitary,
+                    phaseQubit,
+                    allTargets
+                );
             }
         }
         let result = MResetZ(phaseQubit);
@@ -81,6 +94,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
     /// - `sharedGradientSizes`: Width of each register in the shared pool.
     /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
+    /// - `controlledUnitarySharedIndices`: Pool registers appended to the controlled unitary.
     /// # Returns
     /// The result of measuring the phase qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(
@@ -94,6 +108,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numSharedAncillas : Int,
         sharedGradientSizes : Int[],
         statePrepSharedIndices : Int[],
+        controlledUnitarySharedIndices : Int[],
     ) : Result[] {
         return RunIQPE(new IterativePhaseEstimationParams {
             statePrep = statePrep,
@@ -105,7 +120,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             prepareSharedOp = prepareSharedOp,
             numSharedAncillas = numSharedAncillas,
             sharedGradientSizes = sharedGradientSizes,
-            statePrepSharedIndices = statePrepSharedIndices
+            statePrepSharedIndices = statePrepSharedIndices,
+            controlledUnitarySharedIndices = controlledUnitarySharedIndices
         });
     }
 }

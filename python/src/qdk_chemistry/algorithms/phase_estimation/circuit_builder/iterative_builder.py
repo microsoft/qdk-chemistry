@@ -193,16 +193,12 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
                 PhaseGradientPool.from_requests(gradient_requests)
             )
             shared_gradient_sizes = [gradient.num_qubits for gradient in gradient_pool.gradients]
-            ctrl_unitary_op = QSHARP_UTILS.PhaseGradient.MakeRoutedGradientOp(
-                shared_gradient_sizes,
-                list(ctrl_unitary_gradient_indices),
-                ctrl_unitary_op,
-            )
             prepare_shared_op = phase_gradients_preparation(gradient_pool.gradients)
             num_shared_ancillas = gradient_pool.num_qubits
         else:
             shared_gradient_sizes = []
             state_prep_gradient_indices = ()
+            ctrl_unitary_gradient_indices = ()
             prepare_shared_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
             num_shared_ancillas = 0
         self._validate_state_prep_width(
@@ -220,6 +216,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "numSharedAncillas": num_shared_ancillas,
             "sharedGradientSizes": shared_gradient_sizes,
             "statePrepSharedIndices": list(state_prep_gradient_indices),
+            "controlledUnitarySharedIndices": list(ctrl_unitary_gradient_indices),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

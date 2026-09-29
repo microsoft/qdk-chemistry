@@ -10,6 +10,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.LeastRecentlyUsed;
     import QDKChemistry.Utils.PhaseGradient.PhaseGradientSizeOffsets;
+    import QDKChemistry.Utils.PhaseGradient.RoutedGradientControlledAdj;
     import QDKChemistry.Utils.PhaseGradient.RoutedGradientQubitIndices;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
@@ -26,6 +27,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     ///   so each controlled unitary finds it at the end of its targets and leaves it prepared.
     /// - `sharedGradientSizes`: Width of each register in the shared pool.
     /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
+    /// - `controlledUnitarySharedIndices`: Pool registers appended to each controlled unitary.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit is Adj,
         controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
@@ -38,6 +40,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numSharedAncillas : Int,
         sharedGradientSizes : Int[],
         statePrepSharedIndices : Int[],
+        controlledUnitarySharedIndices : Int[][],
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
@@ -75,7 +78,16 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
             // Each controlledUnitary[k] already implements the correct power.
             // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
             for ancillaIdx in 0..params.numBits - 1 {
-                params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
+                RoutedGradientControlledAdj(
+                    params.numSharedAncillas,
+                    RoutedGradientQubitIndices(
+                        params.sharedGradientSizes,
+                        params.controlledUnitarySharedIndices[ancillaIdx]
+                    ),
+                    params.controlledUnitary[ancillaIdx],
+                    ancillas[ancillaIdx],
+                    allTargets
+                );
             }
         }
 
@@ -99,6 +111,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numSharedAncillas : Int,
         sharedGradientSizes : Int[],
         statePrepSharedIndices : Int[],
+        controlledUnitarySharedIndices : Int[][],
     ) : Qubit[] => Unit is Adj {
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -113,6 +126,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 numSharedAncillas = numSharedAncillas,
                 sharedGradientSizes = sharedGradientSizes,
                 statePrepSharedIndices = statePrepSharedIndices,
+                controlledUnitarySharedIndices = controlledUnitarySharedIndices,
             },
             _
         )
@@ -132,6 +146,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
     /// - `sharedGradientSizes`: Width of each register in the shared pool.
     /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
+    /// - `controlledUnitarySharedIndices`: Pool registers appended to each controlled unitary.
     /// - `measurePhase`: Measure the ancilla qubits. When `false` nothing is measured.
     /// - `computeCapacity`: Positive logical-qubit capacity to enable least-recently-used memory
     ///   placement, or -1 to keep all logical qubits in compute.
@@ -149,6 +164,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numSharedAncillas : Int,
         sharedGradientSizes : Int[],
         statePrepSharedIndices : Int[],
+        controlledUnitarySharedIndices : Int[][],
         measurePhase : Bool,
         computeCapacity : Int,
     ) : Result[] {
@@ -174,6 +190,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 numSharedAncillas = numSharedAncillas,
                 sharedGradientSizes = sharedGradientSizes,
                 statePrepSharedIndices = statePrepSharedIndices,
+                controlledUnitarySharedIndices = controlledUnitarySharedIndices,
             },
             qs
         );

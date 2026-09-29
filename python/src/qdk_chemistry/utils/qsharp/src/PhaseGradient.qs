@@ -170,22 +170,42 @@ namespace QDKChemistry.Utils.PhaseGradient {
         op : (Qubit, Qubit[]) => Unit is Adj + Ctl
     ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
         let offsets = PhaseGradientSizeOffsets(poolSizes);
-        RoutedGradientControlled(
-            offsets[Length(offsets) - 1],
-            RoutedGradientQubitIndices(poolSizes, indices),
-            op,
-            _,
-            _
-        )
+        let poolSize = offsets[Length(offsets) - 1];
+        let picks = RoutedGradientQubitIndices(poolSizes, indices);
+        return (control, targets) => RoutedGradientControlled(poolSize, picks, op, control, targets);
     }
 
-    internal operation RoutedGradientControlled(
+    operation RoutedGradientControlled(
         poolSize : Int,
         picks : Int[],
         op : (Qubit, Qubit[]) => Unit is Adj + Ctl,
         control : Qubit,
         targets : Qubit[]
     ) : Unit is Adj + Ctl {
+        Fact(poolSize <= Length(targets), "The shared gradient pool is larger than the operation target register.");
+        let split = Length(targets) - poolSize;
+        op(control, targets[0..split - 1] + Subarray(picks, targets[split...]));
+    }
+
+    operation RoutedGradientControlledAdj(
+        poolSize : Int,
+        picks : Int[],
+        op : (Qubit, Qubit[]) => Unit is Adj,
+        control : Qubit,
+        targets : Qubit[]
+    ) : Unit is Adj {
+        Fact(poolSize <= Length(targets), "The shared gradient pool is larger than the operation target register.");
+        let split = Length(targets) - poolSize;
+        op(control, targets[0..split - 1] + Subarray(picks, targets[split...]));
+    }
+
+    operation RoutedGradientControlledBody(
+        poolSize : Int,
+        picks : Int[],
+        op : (Qubit, Qubit[]) => Unit,
+        control : Qubit,
+        targets : Qubit[]
+    ) : Unit {
         Fact(poolSize <= Length(targets), "The shared gradient pool is larger than the operation target register.");
         let split = Length(targets) - poolSize;
         op(control, targets[0..split - 1] + Subarray(picks, targets[split...]));

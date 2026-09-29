@@ -351,10 +351,7 @@ def _hopping_phases(angle: float, num_pairs: int, control: str | None = None) ->
 
 def _tower_catalyst_prep(phase: float, count: int) -> str:
     """Return a Q# statement preparing the Hamming-weight phase-gradient catalyst."""
-    bits = 0 if count < 8 else count.bit_length()
-    if bits == 0:
-        return "QDKChemistry.Utils.PrepSelPrep.NoOpPrepare(catalyst)"
-    return f"{_PG}.PreparePhaseGradients([({phase}, {bits}, false)], catalyst)"
+    return f"{_PG}.PreparePhaseGradients([({phase}, {count.bit_length()}, false)], catalyst)"
 
 
 class TestHoppingPhases:
@@ -362,7 +359,7 @@ class TestHoppingPhases:
 
     @pytest.mark.parametrize("num_pairs", [2, 4, 5])
     def test_tower_matches_the_separate_rotations(self, num_pairs):
-        """Below the break-even the terms are applied directly; from 8 rotations on, through HWP."""
+        """The fused Hamming-weight tower matches the separate rotations."""
         angle = 0.41
         operation = _hopping_phases(angle, num_pairs)
 
@@ -603,9 +600,11 @@ class TestSharedPlaquetteCatalysts:
         assert circuit.metadata.phase_gradients == (PhaseGradient(0.3, 4), PhaseGradient(-0.1, 5))
         assert circuit.num_qubits == 2 * _CATALYST_SITES + 9
 
-    def test_a_lattice_below_the_break_even_declares_none(self):
-        """The 2x2 towers rotate term by term, so there is nothing to share."""
-        assert _plaquette_controlled(0.3, 0.2, 1, width=2, height=2).metadata.phase_gradients == ()
+    def test_a_2x2_lattice_declares_catalyst_gradients(self):
+        """The benchmark-sized lattice still routes its catalysts through phase estimation."""
+        circuit = _plaquette_controlled(0.3, 0.2, 1, width=2, height=2)
+        assert circuit.metadata.phase_gradients == (PhaseGradient(0.3, 3), PhaseGradient(-0.1, 4))
+        assert circuit.num_qubits == 15
 
     @pytest.mark.slow
     @pytest.mark.parametrize(("feedback", "expected"), [(0.0, 0), (np.pi, 1)])
@@ -654,7 +653,10 @@ class TestSharedPlaquetteCatalysts:
     def test_a_circuit_without_catalysts_takes_none_from_the_pool(self):
         """Circuits may declare different gradients, including none; empty requests route no registers."""
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
-        circuits = [_plaquette_controlled(0.3, 0.2, 1), _plaquette_controlled(0.3, 0.2, 1, width=2, height=2)]
+        no_op = QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(
+            QSHARP_UTILS.CircuitComposition.MakeControlledOp(QSHARP_UTILS.PrepSelPrep.NoOpPrepare)
+        )
+        circuits = [_plaquette_controlled(0.3, 0.2, 1), Circuit(qasm="OPENQASM 3.0;", qsharp_op=no_op)]
         pool, routes = PhaseGradientPool.from_requests([circuit.metadata.phase_gradients for circuit in circuits])
         assert routes[1] == ()
         ops, prepare, num_shared = builder._shared_register(circuits)

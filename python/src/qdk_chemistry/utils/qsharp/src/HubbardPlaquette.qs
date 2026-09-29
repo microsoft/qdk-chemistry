@@ -169,7 +169,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     }
 
     /// Applies exp(-i theta P_t) for every term P_t, phasing the batch through a Hamming-weight
-    /// register once it reaches the measured break-even size.
+    /// register.
     ///
     /// Each term is first rotated onto a single Z on its last qubit, so the batch becomes
     /// `count` equal-angle rotations exp(-i theta Z). Their product is
@@ -177,8 +177,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// adder tree computes w into log2(count) + 1 bits, the generalized phase-gradient
     /// addition applies e^{2 i theta w} with a single payload rotation, and the constant
     /// becomes a phase on the control when the whole is controlled. This is the catalyzed
-    /// variant of Sec. 4.4 of :cite:`Apel2026`. Below the break-even size each term is
-    /// applied as its own rotation instead.
+    /// variant of Sec. 4.4 of :cite:`Apel2026`. Non-resource simulation keeps tiny towers
+    /// as direct rotations to avoid compiling the adder tree when it has no semantic effect.
     ///
     /// # Input
     /// ## theta
@@ -188,8 +188,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// ## targets
     /// The qubits of each term, disjoint across terms.
     /// ## catalyst
-    /// `TowerCatalystSize(Length(targets))` qubits prepared for the phase `2.0 * theta`;
-    /// empty below the break-even size.
+    /// `TowerCatalystSize(Length(targets))` qubits prepared for the phase `2.0 * theta`.
     internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
@@ -199,7 +198,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let count = Length(targets);
         Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
         Fact(Length(catalyst) == TowerCatalystSize(count), "HammingWeightPhase got a catalyst of the wrong size.");
-        if Length(catalyst) == 0 {
+        if Length(catalyst) == 0 or (not IsResourceEstimating() and count < 8) {
             for t in 0..count - 1 {
                 Exp(pauliOps[t], -theta, targets[t]);
             }
@@ -227,9 +226,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// Catalyst qubits a tower of `count` equal-angle rotations consumes: none below the measured break-even of 8.
+    /// Catalyst qubits a tower of `count` equal-angle rotations consumes.
     internal function TowerCatalystSize(count : Int) : Int {
-        return count < 8 ? 0 | BitSizeI(count);
+        return BitSizeI(count);
     }
 
     /// # Summary
@@ -370,35 +369,37 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             // middle pair of every plaquette: exp(i angle XX) exp(i angle YY) on each pair.
             let angle = kappa / 2.0;
             let pairs = StridedGroups(Length(blocks), 2, 4, 1, systems[1...]);
-            Fact(
-                Length(catalyst) == TowerCatalystSize(2 * Length(pairs)),
-                "HoppingLayer got a catalyst of the wrong size."
-            );
-            if Length(catalyst) == 0 {
-                for pair in pairs {
-                    Exp([PauliX, PauliX], angle, pair);
-                    Exp([PauliY, PauliY], angle, pair);
-                }
-            } else {
-                // XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY
-                // to -Z on the second, and X removes that sign. The tiling then becomes one
-                // tower of twice as many equal-angle Z rotations, which with catalyzed
-                // Hamming-weight phasing saves a payload rotation and a catalyst over separate
-                // XX and YY towers (Sec. 4.4 of :cite:`Apel2026`).
-                within {
+            if Length(pairs) > 0 {
+                Fact(
+                    Length(catalyst) == TowerCatalystSize(2 * Length(pairs)),
+                    "HoppingLayer got a catalyst of the wrong size."
+                );
+                if Length(catalyst) == 0 {
                     for pair in pairs {
-                        CNOT(pair[0], pair[1]);
-                        H(pair[0]);
-                        CNOT(pair[0], pair[1]);
-                        X(pair[1]);
+                        Exp([PauliX, PauliX], angle, pair);
+                        Exp([PauliY, PauliY], angle, pair);
                     }
-                } apply {
-                    HammingWeightPhase(
-                        -angle,
-                        [[PauliZ], size = 2 * Length(pairs)],
-                        Mapped(q -> [q], Flattened(pairs)),
-                        catalyst
-                    );
+                } else {
+                    // XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY
+                    // to -Z on the second, and X removes that sign. The tiling then becomes one
+                    // tower of twice as many equal-angle Z rotations, which with catalyzed
+                    // Hamming-weight phasing saves a payload rotation and a catalyst over separate
+                    // XX and YY towers (Sec. 4.4 of :cite:`Apel2026`).
+                    within {
+                        for pair in pairs {
+                            CNOT(pair[0], pair[1]);
+                            H(pair[0]);
+                            CNOT(pair[0], pair[1]);
+                            X(pair[1]);
+                        }
+                    } apply {
+                        HammingWeightPhase(
+                            -angle,
+                            [[PauliZ], size = 2 * Length(pairs)],
+                            Mapped(q -> [q], Flattened(pairs)),
+                            catalyst
+                        );
+                    }
                 }
             }
         }
