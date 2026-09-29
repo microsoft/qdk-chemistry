@@ -616,8 +616,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     Args:
         hamiltonian: QDK/Chemistry Hamiltonian containing integrals, core energy, and orbital data.
-        alpha_occ: Occupation numbers for alpha (spin-up) electrons.
-        beta_occ: Occupation numbers for beta (spin-down) electrons.
+        alpha_occ: Per-orbital occupations (0 or 1) for alpha (spin-up) electrons.
+        beta_occ: Per-orbital occupations (0 or 1) for beta (spin-down) electrons.
 
     Returns:
         A PySCF mean-field reference initialized for post-HF calculations.
@@ -662,10 +662,10 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     alpha_occ = np.asarray(alpha_occ)
     beta_occ = np.asarray(beta_occ)
     if any(
-        occ.shape != (norb,) or not np.all(np.isfinite(occ)) or np.any((occ < 0) | (occ > 1))
+        occ.shape != (norb,) or not np.all(np.isfinite(occ)) or np.any((occ != 0) & (occ != 1))
         for occ in (alpha_occ, beta_occ)
     ):
-        raise ValueError("Occupations must contain one finite value between 0 and 1 per molecular orbital and spin.")
+        raise ValueError("Occupations must contain one value of 0 or 1 per molecular orbital and spin.")
 
     active = [spin_channel_indices(orbitals.active_indices(), spin) for spin in (axes.alpha(), axes.beta())]
     if any(indices != list(range(norb)) for indices in active) or any(

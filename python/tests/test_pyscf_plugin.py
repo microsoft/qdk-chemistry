@@ -2503,6 +2503,15 @@ class TestPyscfPlugin:
         # Verify electron count
         assert scf_from_model.mol.nelectron == 4, "Total electron count should be 4"
 
+        for reference in (hamiltonian, h_model):
+            empty = np.zeros(reference.get_orbitals().get_num_molecular_orbitals())
+            for count in (1, 2):  # Fractional and integral sums must both be rejected.
+                fractional = empty.copy()
+                fractional[:count] = 0.5
+                for alpha, beta in ((fractional, empty), (empty, fractional)):
+                    with pytest.raises(ValueError, match="0 or 1"):
+                        hamiltonian_to_scf(reference, alpha, beta)
+
 
 class TestQDKChemistryPySCFBasisConversion:
     """Test suite for QDK/Chemistry-PySCF basis set conversion."""
