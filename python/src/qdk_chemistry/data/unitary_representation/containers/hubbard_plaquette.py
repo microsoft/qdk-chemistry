@@ -32,13 +32,13 @@ class HubbardPlaquetteContainer(UnitaryContainer):
 
     Every angle below is a :math:`\theta` entering as :math:`e^{-i\theta P}` for its Pauli
     word :math:`P`. For the Fermi-Hubbard parameters hopping :math:`t` and on-site interaction
-    :math:`U` and the per-step duration :math:`\delta = T / r` for a total evolution time 
+    :math:`U` and the per-step duration :math:`\delta = T / r` for a total evolution time
     :math:`T` over :math:`r` steps:
 
     * ``interaction_angle`` is :math:`(U/4)\delta`, the :math:`Z_i Z_{i+M}` angle of one
       :math:`e^{-i\delta I}` layer, applied once per site.
 
-    * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. A plaquette's 
+    * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. A plaquette's
       hopping matrix is diagonalized with :math:`\pm 2t` nonzero eigenvalues.
 
     * ``constant_shift`` :math:`U\eta/2 - UM/4` offset that shift the interaction terms.
