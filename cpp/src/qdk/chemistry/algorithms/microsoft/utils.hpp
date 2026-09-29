@@ -5,12 +5,16 @@
 #pragma once
 
 #include <qdk/chemistry/scf/core/basis_set.h>
+#include <qdk/chemistry/scf/core/enums.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 
+#include <Eigen/Core>
 #include <cstdint>
 #include <libint2.hpp>  // for Shell class
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <string>
+#include <vector>
 
 namespace qdk::chemistry::utils::microsoft {
 
@@ -178,5 +182,17 @@ size_t factorial(size_t n);
  * @return The binomial coefficient C(n, k), or 0 if k > n.
  */
 size_t binomial_coefficient(size_t n, size_t k);
+
+/**
+ * @brief Accepted one-electron dressing labels for settings constraints.
+ * @return Labels from the same vocabulary used by parse_integral_dressing.
+ */
+const std::vector<std::string>& integral_dressing_labels();
+
+/**
+ * @brief Parse a dressing label; empty means nonrelativistic.
+ * @throws std::invalid_argument if the label is not recognized.
+ */
+qcs::IntegralDressing parse_integral_dressing(const std::string& label);
 
 }  // namespace qdk::chemistry::utils::microsoft
