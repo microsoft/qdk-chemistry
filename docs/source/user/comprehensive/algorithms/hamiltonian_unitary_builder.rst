@@ -321,7 +321,7 @@ The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations
 With another formula, ``combine(other_container, atol=1e-12)`` appends its evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
 It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including endpoints, and returns ``step_reps=1``.
 
-:doc:`JSON and HDF5 serialization <../data/serialization>` always write fixed schema ``0.4.0`` without expansion and read legacy ``0.2.0`` lists and packed ``0.3.0`` payloads.
+:doc:`JSON and HDF5 serialization <../data/serialization>` write schema ``0.3.0`` without expanding repetitions; convert ``0.2.0`` files from earlier releases with the :doc:`migration tool <../../migrating-data-files>`.
 Plain formulas without endpoints or group/layer metadata retain their legacy content hashes.
 Compact storage and :ref:`mapping <compact-formula-mappers>` do not guarantee compact circuit export, simulation, or resource estimation.
 

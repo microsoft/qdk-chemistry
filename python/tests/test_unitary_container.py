@@ -148,32 +148,6 @@ class TestPauliProductFormulaContainer:
         assert len(restored.step_terms) == len(container.step_terms)
 
     @pytest.mark.parametrize("file_format", ["json", "hdf5"])
-    def test_version_0_2_layout_loads_in_order(self, tmp_path, file_format):
-        """Main's 0.2.0 layout loads in order, including double-digit HDF5 term indices."""
-        expected = PauliProductFormulaContainer(
-            [ExponentiatedPauliTerm({i % 3: "XYZ"[i % 3]}, 0.1 * (i + 1)) for i in range(12)], 3, 3, scale=1.7
-        )
-        step_terms = [
-            {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
-            for term in expected.step_terms
-        ]
-        header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": 3, "num_qubits": 3}
-        if file_format == "json":
-            payload = {**header, "step_terms": step_terms, "scale": 1.7}
-            restored = PauliProductFormulaContainer.from_json(json.loads(json.dumps(payload)))
-        else:
-            with h5py.File(tmp_path / "version_0_2.h5", "w") as group:
-                group.attrs.update({**header, "scale": 1.7})
-                terms_group = group.create_group("step_terms")
-                for i, term in enumerate(expected.step_terms):
-                    term_group = terms_group.create_group(f"term_{i}")
-                    term_group.attrs["angle"] = term.angle
-                    term_group.create_group("pauli_term").attrs.update({str(k): v for k, v in term.pauli_term.items()})
-                restored = PauliProductFormulaContainer.from_hdf5(group)
-        assert restored.to_json() == expected.to_json()
-        assert restored.content_hash() == expected.content_hash()
-
-    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
     @pytest.mark.parametrize("with_endpoints", [False, True])
     def test_serialization_preserves_term_order_and_hash(self, container, file_format, tmp_path, with_endpoints):
         """Restore numeric Pauli keys and order, including double-digit HDF5 term indices."""

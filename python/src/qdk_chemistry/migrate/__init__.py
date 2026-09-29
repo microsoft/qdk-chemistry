@@ -15,7 +15,8 @@ Python::
     migrate.convert_file("old.hamiltonian.json", "new.hamiltonian.h5")
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result`` / ``lattice_graph``) and the
+(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result`` / ``lattice_graph`` /
+``unitary_representation`` / ``pauli_product_formula_container``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 Input and output formats may differ.
 
@@ -24,7 +25,8 @@ on a library release: every migratable type exposes a ``STEPS`` table mapping a
 source version to a ``(next_version, transform)`` pair, and the chain is followed
 until it reaches the version the installed library accepts. To support a future
 serialization-version bump for a data class, register the next step in that type's
-``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``/``_lattice_graph``);
+``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``/``_lattice_graph``/
+``_unitary_representation``);
 the migrated document is validated against the live deserializer, so a missing step
 fails loudly.
 
@@ -44,9 +46,18 @@ from pathlib import Path
 
 import h5py
 
-from qdk_chemistry.data import Ansatz, Hamiltonian, LatticeGraph, Orbitals, QpeResult, Wavefunction
+from qdk_chemistry.data import (
+    Ansatz,
+    Hamiltonian,
+    LatticeGraph,
+    Orbitals,
+    PauliProductFormulaContainer,
+    QpeResult,
+    UnitaryRepresentation,
+    Wavefunction,
+)
 
-from . import _ansatz, _hamiltonian, _io, _lattice_graph, _orbitals, _qpe_result, _wavefunction
+from . import _ansatz, _hamiltonian, _io, _lattice_graph, _orbitals, _qpe_result, _unitary_representation, _wavefunction
 
 __all__ = ["MigrationError", "convert_file"]
 
@@ -77,6 +88,8 @@ _MODULES = {
     "ansatz": _ansatz,
     "qpe_result": _qpe_result,
     "lattice_graph": _lattice_graph,
+    "unitary_representation": _unitary_representation,
+    "pauli_product_formula_container": _unitary_representation,
 }
 
 _CLASSES = {
@@ -86,7 +99,12 @@ _CLASSES = {
     "ansatz": Ansatz,
     "qpe_result": QpeResult,
     "lattice_graph": LatticeGraph,
+    "unitary_representation": UnitaryRepresentation,
+    "pauli_product_formula_container": PauliProductFormulaContainer,
 }
+
+# Python data classes deserialize a dict; the C++-bound classes take a JSON string.
+_DICT_INPUT_TYPES = frozenset({"qpe_result", "unitary_representation", "pauli_product_formula_container"})
 
 
 def convert_file(src: _PathLike, dst: _PathLike) -> Path:
@@ -134,7 +152,7 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
         raise MigrationError(f"Failed to migrate '{src_path}': {error}") from error
 
     try:
-        json_input = new_json if data_type == "qpe_result" else json.dumps(new_json)
+        json_input = new_json if data_type in _DICT_INPUT_TYPES else json.dumps(new_json)
         obj = _CLASSES[data_type].from_json(json_input)
     except (KeyError, TypeError, ValueError, RuntimeError) as error:
         raise MigrationError(
