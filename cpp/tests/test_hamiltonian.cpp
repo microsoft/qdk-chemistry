@@ -3099,8 +3099,8 @@ TEST_F(HamiltonianConstructorTest, X2CRestrictedOpenShellOrbitals) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
-  // Reference uses exact QDK basis shells, QDK's speed of light,
-  // and QDK SCF orbital coefficients.
+  // PySCF 2.12.0 AO references using exact QDK basis shells and
+  // c = 1 / 7.2973525643e-3 (QDK's speed of light).
   auto symmetric_matrix = [](const std::vector<double>& upper_triangle) {
     constexpr Eigen::Index dimension = 7;
     EXPECT_EQ(upper_triangle.size(),
@@ -3119,41 +3119,41 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
   const std::map<std::string, Eigen::MatrixXd> references = {
       {"x2c_1e_contracted",
        symmetric_matrix({
-           -32.578789438529064,     0.57475877515990514,
-           1.741252692451031e-14,   0.21214833081572079,
-           1.0707454094009528e-14,  0.25948012062218612,
-           1.4153690683979093e-14,  -7.5664728031635518,
-           2.1525459798948942e-14,  -0.5230431108841932,
-           1.0205396554301009e-12,  -1.2206893405988162,
-           1.0675319334232235e-12,  -6.0181608259892263,
-           -2.7620067359211549e-12, 4.638436321001968e-12,
-           4.3074331355157158e-12,  -1.7668404206455299,
-           -6.6105711519795918,     -2.4208231591644891e-12,
-           1.3054587177535795,      -2.4596898235476929e-12,
-           -7.347734524712167,      6.1278782981257408e-13,
-           3.090605210090857e-12,   -5.2920635209012863,
-           1.2822670519703641e-12,  -5.5139248098732256,
+           -32.59573593678715,      -7.5764994100077967,
+           5.42284887913705e-17,    -0.014500537922483982,
+           -1.8225770768982156e-18, -1.2400109852873031,
+           -1.2400109852873025,     -9.2010124961381763,
+           -5.7472880500372602e-13, -0.17688158521689221,
+           9.332090575872369e-13,   -2.9070648281751748,
+           -2.907064828174954,      -7.4594218940232633,
+           -1.0936044694886338e-12, 1.8548580351614272e-12,
+           -1.6754227457659239,     1.6754227457649222,
+           -7.4158877337023714,     -1.8739290823020759e-12,
+           -1.3568637849744429,     -1.3568637849730438,
+           -7.3477345247129833,     2.7061681987046333e-12,
+           4.6479488472421802e-13,  -4.5404154142637934,
+           -1.0712123442635384,     -4.5404154142635171,
        })},
       {"x2c_1e", symmetric_matrix({
-                     -32.577465748805508,     0.57443326282304286,
-                     1.4996893278855433e-13,  0.21195248033067005,
-                     -1.4870515069039216e-13, 0.25925084541357557,
-                     2.1067784051087736e-13,  -7.5663640982116798,
-                     -1.1542909236468568e-13, -0.52298575799108227,
-                     -2.0194426824969573e-12, -1.2206180050254942,
-                     7.2519744211165663e-13,  -6.0181075598311926,
-                     -5.5280294679280144e-12, 7.32905942149941e-12,
-                     7.085402784594798e-12,   -1.7667679601125272,
-                     -6.6104535879945931,     -9.3999751947578105e-12,
-                     1.305419716793242,       -1.9350423059321846e-12,
-                     -7.3475818978072001,     1.8828301212178241e-12,
-                     -8.2166702812457013e-12, -5.2919455673432667,
-                     4.5812263626087009e-12,  -5.5138130903856251,
+                     -32.594395077618017,     -7.5765291579454868,
+                     1.5563620847649365e-13,  -0.014474177022443718,
+                     -2.6676019849563857e-15, -1.2399538882165906,
+                     -1.2399538882165986,     -9.2009788032057251,
+                     3.4427545686989208e-12,  -0.17689223480387992,
+                     1.8288133793693761e-12,  -2.9070603663805055,
+                     -2.9070603663819221,     -7.4592876280477034,
+                     -2.4440476918419774e-12, -6.9266022720166381e-13,
+                     -1.6754206707895318,     1.6754206707943002,
+                     -7.4157454421111906,     -2.6679563262403625e-13,
+                     -1.3568649664676735,     -1.3568649664610088,
+                     -7.3475818978126286,     3.1032773761121595e-12,
+                     2.8716170091097693e-12,  -4.5404102159429636,
+                     -1.0712107261777311,     -4.540410215945248,
                  })},
   };
 
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
-    for (const auto& [integral_dressing, expected] : references) {
+    for (const auto& [integral_dressing, expected_ao] : references) {
       auto [h_nr, h_x2c, orbitals] = run_water_nr_and_x2c(integral_dressing);
       if (factory_name == "qdk_cholesky") {
         auto constructor =
@@ -3161,13 +3161,13 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
         h_x2c = constructor->run(orbitals);
       }
       auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
-      EXPECT_LT((one_body_alpha.cwiseAbs() - expected.cwiseAbs())
-                    .cwiseAbs()
-                    .maxCoeff(),
+      // Use the same orbital phases for the signed reference and actual matrix.
+      const auto& coeff =
+          orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+      const Eigen::MatrixXd expected = coeff.transpose() * expected_ao * coeff;
+      EXPECT_LT((one_body_alpha - expected).cwiseAbs().maxCoeff(),
                 1000 * testing::integral_tolerance);
-      EXPECT_LT((one_body_beta.cwiseAbs() - expected.cwiseAbs())
-                    .cwiseAbs()
-                    .maxCoeff(),
+      EXPECT_LT((one_body_beta - expected).cwiseAbs().maxCoeff(),
                 1000 * testing::integral_tolerance);
       EXPECT_EQ(h_x2c->get_container_type(),
                 factory_name == "qdk" ? "canonical_four_center" : "cholesky");
