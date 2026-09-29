@@ -5,8 +5,10 @@
 namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
-    import QDKChemistry.Utils.PhaseGradient.PhaseByGeneralizedGradient;
-    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradients;
+    import QDKChemistry.Utils.PhaseGradient.BinaryGradientPhaseOffset;
+    import QDKChemistry.Utils.PhaseGradient.BinaryGradientWords;
+    import QDKChemistry.Utils.PhaseGradient.PhaseByBinaryGradient;
+    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import Std.Arrays.All;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
@@ -34,6 +36,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         hoppingAngle : Double,
         /// Number of repetitions of the body.
         repetitions : Int,
+        /// Width of the phase gradient register the Hamming-weight rotations are applied through.
+        rotationBitPrecision : Int,
     }
 
     /// # Summary
@@ -174,10 +178,13 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Each term is first rotated onto a single Z on its last qubit, so the batch becomes
     /// `count` equal-angle rotations exp(-i theta Z). Their product is
     /// e^{-i theta count} e^{2 i theta w}, where w is the Hamming weight of those qubits. An
-    /// adder tree computes w into log2(count) + 1 bits, the generalized phase-gradient
-    /// addition applies e^{2 i theta w} with a single payload rotation, and the constant
-    /// becomes a phase on the control when the whole is controlled. This is the catalyzed
-    /// variant of Sec. 4.4 of :cite:`Apel2026`. Below the break-even size each term is
+    /// adder tree computes w into log2(count) + 1 bits, which Hamming-weight phasing
+    /// (:cite:`Gidney2018`, :cite:`Nam2019`) then phases with one rotation per place value
+    /// instead of one per term; the constant becomes a phase on the control when the whole is
+    /// controlled. This is the construction of :cite:`Kan2025`, whose Methods diagonalize every
+    /// plaquette and every on-site pair into a layer of same-angle R_z gates and synthesize that
+    /// layer collectively with HWP. Each place-value rotation is applied through the shared
+    /// binary phase gradient rather than synthesized. Below the break-even size each term is
     /// applied as its own rotation instead.
     ///
     /// # Input
@@ -187,19 +194,22 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// The Pauli string of each term.
     /// ## targets
     /// The qubits of each term, disjoint across terms.
-    /// ## catalyst
-    /// `TowerCatalystSize(Length(targets))` qubits prepared for the phase `2.0 * theta`;
-    /// empty below the break-even size.
+    /// ## gradient
+    /// The shared binary phase gradient, prepared by `PreparePhaseGradientState`; unused, and
+    /// permitted to be empty, below the break-even size.
     internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][],
-        catalyst : Qubit[]
+        gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = Length(targets);
         Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
-        Fact(Length(catalyst) == TowerCatalystSize(count), "HammingWeightPhase got a catalyst of the wrong size.");
-        if Length(catalyst) == 0 {
+        Fact(
+            not UsesHammingWeightPhasing(count) or Length(gradient) > 0,
+            "HammingWeightPhase needs the shared phase gradient at or above the break-even size."
+        );
+        if not UsesHammingWeightPhasing(count) {
             for t in 0..count - 1 {
                 Exp(pauliOps[t], -theta, targets[t]);
             }
@@ -207,6 +217,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let inputs = Mapped(term -> Tail(term), targets);
             let (schedule, finalBits, _) = HammingWeightSchedule(count);
             Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
+            let words = BinaryGradientWords(2.0 * theta, Length(finalBits), Length(gradient));
             use scratch = Qubit[Length(schedule)];
             let work = inputs + scratch;
             within {
@@ -221,15 +232,26 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     }
                 }
             } apply {
-                PhaseByGeneralizedGradient(2.0 * theta, Mapped(bit -> work[bit], finalBits), catalyst);
-                R(PauliI, 2.0 * theta * IntAsDouble(count), inputs[0]);
+                PhaseByBinaryGradient(words, Mapped(bit -> work[bit], finalBits), gradient);
+                R(
+                    PauliI,
+                    2.0 * theta * IntAsDouble(count) + BinaryGradientPhaseOffset(words, Length(gradient)),
+                    inputs[0]
+                );
             }
         }
     }
 
-    /// Catalyst qubits a tower of `count` equal-angle rotations consumes: none below the measured break-even of 8.
-    internal function TowerCatalystSize(count : Int) : Int {
-        return count < 8 ? 0 | BitSizeI(count);
+    /// Whether a tower of `count` equal-angle rotations is phased through a Hamming-weight
+    /// register: not below the measured break-even of 8, where the adder tree costs more than the
+    /// rotations it saves.
+    internal function UsesHammingWeightPhasing(count : Int) : Bool {
+        return count >= 8;
+    }
+
+    /// Phase gradient qubits a tower of `count` equal-angle rotations consumes: none below the break-even.
+    internal function TowerGradientSize(count : Int, rotationBitPrecision : Int) : Int {
+        return UsesHammingWeightPhasing(count) ? rotationBitPrecision | 0;
     }
 
     /// # Summary
@@ -257,7 +279,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         angle : Double,
         sites : Int,
         systems : Qubit[],
-        catalyst : Qubit[]
+        gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         // A negligible angle skips the adder tree, which a hopping-only model would pay for nothing.
         if AbsD(angle) > 1e-12 {
@@ -265,7 +287,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 angle,
                 [[PauliZ, PauliZ], size = sites],
                 StridedGroups(sites, 2, 1, sites, systems),
-                catalyst
+                gradient
             );
         }
     }
@@ -338,7 +360,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         kappa : Double,
         blocks : Int[][],
         systems : Qubit[],
-        catalyst : Qubit[]
+        gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         within {
             let (swapCount, swaps) = RoutingSwaps(blocks, Length(systems), not IsResourceEstimating());
@@ -368,56 +390,56 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         } apply {
             // The third butterfly is fused into the phases, so the equal-angle family is the
             // middle pair of every plaquette: exp(i angle XX) exp(i angle YY) on each pair.
-            let angle = kappa / 2.0;
-            let pairs = StridedGroups(Length(blocks), 2, 4, 1, systems[1...]);
-            Fact(
-                Length(catalyst) == TowerCatalystSize(2 * Length(pairs)),
-                "HoppingLayer got a catalyst of the wrong size."
-            );
-            if Length(catalyst) == 0 {
+            HoppingPhases(kappa / 2.0, StridedGroups(Length(blocks), 2, 4, 1, systems[1...]), gradient);
+        }
+    }
+
+    /// # Summary
+    /// The momentum-basis phases of one hopping tiling: exp(i angle XX) exp(i angle YY) on every pair.
+    ///
+    /// # Description
+    /// XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY to -Z on the
+    /// second, and X removes that sign. The tiling then becomes one tower of twice as many
+    /// equal-angle Z rotations, which with Hamming-weight phasing saves a place-value rotation
+    /// over separate XX and YY towers. Below the break-even each pair takes its own two rotations.
+    internal operation HoppingPhases(angle : Double, pairs : Qubit[][], gradient : Qubit[]) : Unit is Adj + Ctl {
+        if not UsesHammingWeightPhasing(2 * Length(pairs)) {
+            for pair in pairs {
+                Exp([PauliX, PauliX], angle, pair);
+                Exp([PauliY, PauliY], angle, pair);
+            }
+        } else {
+            within {
                 for pair in pairs {
-                    Exp([PauliX, PauliX], angle, pair);
-                    Exp([PauliY, PauliY], angle, pair);
+                    CNOT(pair[0], pair[1]);
+                    H(pair[0]);
+                    CNOT(pair[0], pair[1]);
+                    X(pair[1]);
                 }
-            } else {
-                // XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY
-                // to -Z on the second, and X removes that sign. The tiling then becomes one
-                // tower of twice as many equal-angle Z rotations, which with catalyzed
-                // Hamming-weight phasing saves a payload rotation and a catalyst over separate
-                // XX and YY towers (Sec. 4.4 of :cite:`Apel2026`).
-                within {
-                    for pair in pairs {
-                        CNOT(pair[0], pair[1]);
-                        H(pair[0]);
-                        CNOT(pair[0], pair[1]);
-                        X(pair[1]);
-                    }
-                } apply {
-                    HammingWeightPhase(
-                        -angle,
-                        [[PauliZ], size = 2 * Length(pairs)],
-                        Mapped(q -> [q], Flattened(pairs)),
-                        catalyst
-                    );
-                }
+            } apply {
+                HammingWeightPhase(
+                    -angle,
+                    [[PauliZ], size = 2 * Length(pairs)],
+                    Mapped(q -> [q], Flattened(pairs)),
+                    gradient
+                );
             }
         }
     }
 
-    /// One second-order Trotter step, I^(1/2) G I^(1/2) P, on caller-prepared catalysts.
+    /// One second-order Trotter step, I^(1/2) G I^(1/2) P, on the caller-prepared gradient.
     internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
         systems : Qubit[],
-        interaction : Qubit[],
-        hopping : Qubit[]
+        gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, interaction);
-        HoppingLayer(params.hoppingAngle, gold, systems, hopping);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, interaction);
-        HoppingLayer(params.hoppingAngle, pink, systems, hopping);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, gradient);
+        HoppingLayer(params.hoppingAngle, gold, systems, gradient);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, gradient);
+        HoppingLayer(params.hoppingAngle, pink, systems, gradient);
     }
 
     /// # Summary
@@ -432,111 +454,109 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost instead.
     ///
     /// The catalysts are prepared by the caller and left prepared, so phase estimation can
-    /// prepare them once for every query.
+    /// prepare them once for every query. Every layer phases through the same binary gradient,
+    /// whose state does not depend on any angle, so one register serves the whole evolution.
     ///
     /// # Input
     /// ## params
     /// The lattice shape and the layer angles.
     /// ## systems
     /// The system register.
-    /// ## catalysts
-    /// `PlaquetteCatalystSize(params)` qubits holding `PlaquetteCatalystGradients(params)`.
+    /// ## gradient
+    /// `PlaquetteGradientSize(params)` qubits holding the binary phase gradient.
     operation RepPlaquetteExp(
         params : HubbardPlaquetteParams,
         systems : Qubit[],
-        catalysts : Qubit[]
+        gradient : Qubit[]
     ) : Unit is Adj + Ctl {
-        Fact(Length(catalysts) == PlaquetteCatalystSize(params), "The plaquette catalyst register has the wrong size.");
-        // The register is the interaction gradient, then one hopping gradient for the half-angle
-        // boundary. A gradient for twice an angle is the same register without its lowest qubit,
-        // so the full-angle body shares it with a single extra qubit.
-        let bits = TowerCatalystSize(params.width * params.height);
-        let interaction = catalysts[0..bits - 1];
-        let boundary = catalysts[bits..2 * bits - 1];
-        let hopping = catalysts[bits + 1..2 * bits];
+        Fact(
+            Length(gradient) == PlaquetteGradientSize(params),
+            "The plaquette phase gradient register has the wrong size."
+        );
         within {
             HoppingLayer(
                 params.hoppingAngle / 2.0,
                 PlaquetteSection(params.width, params.height, true),
                 systems,
-                boundary
+                gradient
             );
         } apply {
             if IsResourceEstimating() {
                 within {
                     RepeatEstimates(params.repetitions);
                 } apply {
-                    PlaquetteStep(params, systems, interaction, hopping);
+                    PlaquetteStep(params, systems, gradient);
                 }
             } else {
                 for _ in 1..params.repetitions {
-                    PlaquetteStep(params, systems, interaction, hopping);
+                    PlaquetteStep(params, systems, gradient);
                 }
             }
         }
     }
 
-    /// Number of catalyst qubits the plaquette evolution consumes.
-    function PlaquetteCatalystSize(params : HubbardPlaquetteParams) : Int {
-        let bits = TowerCatalystSize(params.width * params.height);
-        return bits == 0 ? 0 | 2 * bits + 1;
+    /// Number of phase gradient qubits the plaquette evolution consumes.
+    ///
+    /// # Description
+    /// Both the on-site tower and each hopping tower hold one rotation per site, so a lattice
+    /// either phases every layer through the gradient or none of them.
+    function PlaquetteGradientSize(params : HubbardPlaquetteParams) : Int {
+        return TowerGradientSize(params.width * params.height, params.rotationBitPrecision);
     }
 
-    /// The catalyst phase gradients, in order, as `(phase, qubits, binary)` entries for `PreparePhaseGradients`.
-    function PlaquetteCatalystGradients(params : HubbardPlaquetteParams) : (Double, Int, Bool)[] {
-        let bits = TowerCatalystSize(params.width * params.height);
-        if bits == 0 {
-            return [];
+    /// Prepares the binary phase gradient, or nothing when the lattice is below the break-even.
+    internal operation PreparePlaquetteGradient(gradient : Qubit[]) : Unit is Adj + Ctl {
+        if Length(gradient) > 0 {
+            PreparePhaseGradientState(gradient);
         }
-        return [(params.interactionAngle, bits, false), (-params.hoppingAngle / 2.0, bits + 1, false)];
     }
 
-    /// Returns a callable applying the evolution on catalysts it prepares around itself.
+    /// Returns a callable applying the evolution on a gradient it prepares around itself.
     function MakeRepPlaquetteExpOp(params : HubbardPlaquetteParams) : (Qubit[] => Unit is Adj + Ctl) {
         systems => {
-            use catalysts = Qubit[PlaquetteCatalystSize(params)];
+            use gradient = Qubit[PlaquetteGradientSize(params)];
             within {
-                PreparePhaseGradients(PlaquetteCatalystGradients(params), catalysts);
+                PreparePlaquetteGradient(gradient);
             } apply {
-                RepPlaquetteExp(params, systems, catalysts);
+                RepPlaquetteExp(params, systems, gradient);
             }
         }
     }
 
-    /// Builds the controlled evolution on the given qubit indices, preparing its catalysts.
+    /// Builds the controlled evolution on the given qubit indices, preparing its phase gradient.
     operation MakeRepControlledPlaquetteExpCircuit(
         params : HubbardPlaquetteParams,
         control : Int,
         systems : Int[]
     ) : Unit {
         use qs = Qubit[MaxInt([control] + systems) + 1];
-        use catalysts = Qubit[PlaquetteCatalystSize(params)];
+        use gradient = Qubit[PlaquetteGradientSize(params)];
         within {
-            PreparePhaseGradients(PlaquetteCatalystGradients(params), catalysts);
+            PreparePlaquetteGradient(gradient);
         } apply {
-            ControlledRepPlaquetteExp(params, qs[control], Subarray(systems, qs) + catalysts);
+            ControlledRepPlaquetteExp(params, qs[control], Subarray(systems, qs) + gradient);
         }
     }
 
-    /// Applies the evolution controlled on `control`; `targets` holds the systems, then the prepared catalysts.
+    /// Applies the evolution controlled on `control`; `targets` holds the systems, then the prepared gradient.
     operation ControlledRepPlaquetteExp(
         params : HubbardPlaquetteParams,
         control : Qubit,
         targets : Qubit[]
     ) : Unit is Adj + Ctl {
         let numSystems = 2 * params.width * params.height;
-        let numCatalysts = PlaquetteCatalystSize(params);
+        let numGradient = PlaquetteGradientSize(params);
         Fact(
-            Length(targets) >= numSystems + numCatalysts,
-            "The targets must hold the system and the catalyst register."
+            Length(targets) >= numSystems + numGradient,
+            "The targets must hold the system and the phase gradient register."
         );
         Controlled RepPlaquetteExp(
             [control],
-            (params, targets[0..numSystems - 1], targets[Length(targets) - numCatalysts...])
+            (params, targets[0..numSystems - 1], targets[Length(targets) - numGradient...])
         );
     }
 
-    /// Returns `ControlledRepPlaquetteExp` as a callable whose catalysts phase estimation prepares once per query.
+    /// Returns `ControlledRepPlaquetteExp` as a callable whose gradient phase estimation prepares once per query.
     function MakeRepControlledPlaquetteExpOp(
         params : HubbardPlaquetteParams
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
