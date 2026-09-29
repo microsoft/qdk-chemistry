@@ -19,9 +19,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `ancillas`: An array of indices representing the ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter, >0 for block encoding).
-    /// - `prepareSharedOp`: Prepares the shared register once around every controlled unitary.
-    /// - `numSharedAncillas`: Size of the shared register, appended after the unitary's ancillas
-    ///   so each controlled unitary finds it at the end of its targets and leaves it prepared.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit is Adj,
         controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
@@ -30,8 +27,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         ancillas : Int[],
         systems : Int[],
         numAncillaQubits : Int,
-        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
-        numSharedAncillas : Int,
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
@@ -44,11 +39,12 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     operation RunStandardQPE(params : StandardPhaseEstimationParams, qs : Qubit[]) : Unit is Adj {
         let ancillas = Subarray(params.ancillas, qs);
         let systems = Subarray(params.systems, qs);
-        let ancillaStart = params.numBits + Length(params.systems);
-        let unitaryAncillas = qs[ancillaStart..ancillaStart + params.numAncillaQubits - 1];
-        let sharedStart = ancillaStart + params.numAncillaQubits;
-        let shared = qs[sharedStart..sharedStart + params.numSharedAncillas - 1];
-        let allTargets = systems + unitaryAncillas + shared;
+        let unitaryAncillas = if params.numAncillaQubits == 0 {
+            []
+        } else {
+            qs[params.numBits + Length(params.systems)..Length(qs) - 1]
+        };
+        let allTargets = systems + unitaryAncillas;
 
         // Step 1: Prepare the initial state on system qubits
         params.statePrep(systems);
@@ -59,12 +55,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
         // Each controlledUnitary[k] already implements the correct power.
         // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
-        within {
-            params.prepareSharedOp(shared);
-        } apply {
-            for ancillaIdx in 0..params.numBits - 1 {
-                params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
-            }
+        for ancillaIdx in 0..params.numBits - 1 {
+            params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
         }
 
         // Step 4: Apply inverse QFT on ancilla qubits
@@ -83,8 +75,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
-        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
-        numSharedAncillas : Int,
     ) : Qubit[] => Unit is Adj {
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -95,8 +85,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 ancillas = ancillas,
                 systems = systems,
                 numAncillaQubits = numAncillaQubits,
-                prepareSharedOp = prepareSharedOp,
-                numSharedAncillas = numSharedAncillas,
             },
             _
         )
@@ -112,8 +100,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `systems`: An array of indices for the system qubits.
     /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter).
-    /// - `prepareSharedOp`: Prepares the shared register once around every controlled unitary.
-    /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
     /// - `measurePhase`: Measure the ancilla qubits. When `false` nothing is measured.
     /// - `computeCapacity`: Positive logical-qubit capacity to enable least-recently-used memory
     ///   placement, or -1 to keep all logical qubits in compute.
@@ -127,8 +113,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
-        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
-        numSharedAncillas : Int,
         measurePhase : Bool,
         computeCapacity : Int,
     ) : Result[] {
@@ -138,8 +122,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
             EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
         }
 
-        Fact(numSharedAncillas >= 0, "numSharedAncillas must be non-negative");
-        let totalQubits = numBits + Length(systems) + numAncillaQubits + numSharedAncillas;
+        let totalQubits = numBits + Length(systems) + numAncillaQubits;
         use qs = Qubit[totalQubits];
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -150,8 +133,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 ancillas = ancillas,
                 systems = systems,
                 numAncillaQubits = numAncillaQubits,
-                prepareSharedOp = prepareSharedOp,
-                numSharedAncillas = numSharedAncillas,
             },
             qs
         );
