@@ -15,11 +15,8 @@ namespace QDKChemistry.Utils.PhaseGradient {
     import Std.Arithmetic.RippleCarryCGIncByLE;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
-    import Std.Math.PI;
-    import Std.Math.Round;
 
     /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.
     ///
@@ -93,108 +90,6 @@ namespace QDKChemistry.Utils.PhaseGradient {
         } apply {
             RzViaPhaseGradient(targetQubit, angleQubits, phaseGradient);
         }
-    }
-
-    /// # Summary
-    /// Applies e^{i·phi·w} to the little-endian integer w held in `weight`, through a shared
-    /// binary phase gradient.
-    ///
-    /// # Description
-    /// Hamming-weight phasing (:cite:`Gidney2018`, :cite:`Nam2019`): w = Σ_j 2^j w_j, so the phase
-    /// is a layer of one rotation per place value, the bit of place value 2^j taking the angle
-    /// phi·2^j. Every one of those angles is classical, so `RzViaPhaseGradient` applies it by
-    /// adding its rounded word into the gradient register, which costs one addition instead of a
-    /// synthesized rotation and leaves the register prepared for the next use.
-    ///
-    /// `Rz(a)` is `diag(e^{-ia/2}, e^{ia/2})`, so the layer also carries the constant phase that
-    /// `BinaryGradientPhaseOffset` returns. The caller must apply it: under control it is not a
-    /// global phase.
-    ///
-    /// Cost: `Length(words)` additions of `Length(gradient)` bits, so
-    /// `Length(words) · (Length(gradient) - 1)` AND operations, plus Cliffords. Under control the
-    /// word load is controlled and the additions are not, which adds one CNOT per set bit.
-    ///
-    /// # Input
-    /// ## words
-    /// The rotation words `BinaryGradientWords` returns, one per place value of w.
-    /// ## weight
-    /// The integer w, little-endian, one qubit per place value.
-    /// ## gradient
-    /// A register prepared by `PreparePhaseGradientState`, returned in that state.
-    operation PhaseByBinaryGradient(words : Int[], weight : Qubit[], gradient : Qubit[]) : Unit is Adj + Ctl {
-        body (...) {
-            RzWordLayer(words, weight, gradient, []);
-        }
-        controlled (controls, ...) {
-            if Length(controls) <= 1 {
-                RzWordLayer(words, weight, gradient, controls);
-            } else {
-                use joint = Qubit();
-                within {
-                    Controlled X(controls, joint);
-                } apply {
-                    RzWordLayer(words, weight, gradient, [joint]);
-                }
-            }
-        }
-    }
-
-    /// One `RzViaPhaseGradient` per word, on the matching target, from one reusable angle register.
-    ///
-    /// # Description
-    /// A word is loaded with X gates, so controlling the load costs one CNOT per set bit and
-    /// leaves both the addition and the gradient register uncontrolled: with the control clear the
-    /// word is zero, and adding zero is the identity.
-    internal operation RzWordLayer(
-        words : Int[],
-        targets : Qubit[],
-        gradient : Qubit[],
-        controls : Qubit[]
-    ) : Unit is Adj {
-        Fact(Length(words) == Length(targets), "RzWordLayer needs one rotation word per target.");
-        Fact(Length(gradient) > 0, "RzWordLayer needs a non-empty phase gradient register.");
-        use angle = Qubit[Length(gradient)];
-        for index in 0..Length(targets) - 1 {
-            within {
-                Controlled ApplyXorInPlace(controls, (words[index], angle));
-            } apply {
-                RzViaPhaseGradient(targets[index], angle, gradient);
-            }
-        }
-    }
-
-    /// # Summary
-    /// The rotation words `PhaseByBinaryGradient` applies for the phase `phi` on `n` place values.
-    ///
-    /// # Description
-    /// Word j is the `bits`-bit integer x whose `Rz(4π·x/2^bits)` is closest to `Rz(phi·2^j)`, so
-    /// each angle is exact up to the 2π/2^bits resolution of a `bits`-qubit gradient. `Rz` has
-    /// period 4π and the word covers that period exactly, so no place value overflows however
-    /// large phi·2^j grows.
-    function BinaryGradientWords(phi : Double, n : Int, bits : Int) : Int[] {
-        Fact(bits > 0, "BinaryGradientWords needs a non-empty gradient register.");
-        let modulus = 1 <<< bits;
-        let scale = IntAsDouble(modulus) / (4.0 * PI());
-        mutable words = [];
-        for j in 0..n - 1 {
-            let raw = Round(phi * IntAsDouble(1 <<< j) * scale);
-            set words += [((raw % modulus) + modulus) % modulus];
-        }
-        return words;
-    }
-
-    /// # Summary
-    /// The `R(PauliI, _)` angle cancelling the constant phase of a `PhaseByBinaryGradient` layer.
-    ///
-    /// # Description
-    /// `Rz(a) = e^{-ia/2} R1(a)`, so a layer of words applies Π_j e^{-i·a_j/2} on top of the
-    /// intended e^{i·phi·w}. `R(PauliI, g)` is e^{-ig/2}, so g = -Σ_j a_j undoes exactly that.
-    function BinaryGradientPhaseOffset(words : Int[], bits : Int) : Double {
-        mutable total = 0.0;
-        for word in words {
-            set total += IntAsDouble(word);
-        }
-        return -4.0 * PI() * total / IntAsDouble(1 <<< bits);
     }
 
     /// Test wrapper: Ry via phase gradient on `[target | angle | gradient]`.
