@@ -761,7 +761,7 @@ jobs:
         Invoke-WebRequest https://aka.ms/vs/18/stable/vs_buildtools.exe -OutFile $vsInstaller
         & $vsInstaller --quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools `
             --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.VC.CMake.Project `
-            --add Microsoft.VisualStudio.Component.Windows11SDK.26100 | Out-Null
+            --add Microsoft.VisualStudio.Component.VC.Llvm.Clang --add Microsoft.VisualStudio.Component.Windows11SDK.26100 | Out-Null
         if ($LASTEXITCODE -notin 0, 3010) { throw "vs_buildtools.exe failed ($LASTEXITCODE)" }
         $global:LASTEXITCODE = 0  # 3010 only requests a reboot
 
