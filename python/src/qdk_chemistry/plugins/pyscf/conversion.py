@@ -47,6 +47,7 @@ from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 __all__ = [
     "basis_to_pyscf_mol",
     "hamiltonian_to_scf",
+    "hamiltonian_to_scf_from_n_electrons_and_multiplicity",
     "pyscf_mol_to_qdk_basis",
     "structure_to_pyscf_atom_labels",
 ]
