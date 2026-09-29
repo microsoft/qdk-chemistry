@@ -82,8 +82,8 @@ _HUBBARD_L2_FULL_CIRCUIT = {
 
 #: L=4 has sixteen sites, so every tower is above the break-even and takes the
 #: Hamming-weight-phasing path: an adder tree compresses sixteen same-angle rotations into a
-#: five-bit weight, and each place value is rotated through the shared ten-qubit binary phase
-#: gradient. This is the case that exercises the construction, which is why it is pinned.
+#: five-bit weight, and each place value takes one synthesized ``Rz``. This is the case that
+#: exercises the construction, which is why it is pinned.
 _HUBBARD_L4_FULL_CIRCUIT = {
     "L": 4,
     "sites": 16,
@@ -94,14 +94,14 @@ _HUBBARD_L4_FULL_CIRCUIT = {
     "trotter_budget": 0.027200000000000002,
     "qpe_bits": 10,
     "base_time": 0.056341508088837824,
-    "logical_qubits": 87,
-    "rotations": 24539,
-    "rotation_depth": 24247,
-    "t_gates": 759121,
-    "ccz_count": 1422000,
+    "logical_qubits": 57,
+    "rotations": 261223,
+    "rotation_depth": 190086,
+    "t_gates": 759067,
+    "ccz_count": 355500,
     "ccix_count": 0,
-    "toffolis": 1422000,
-    "measurements": 1422010,
+    "toffolis": 355500,
+    "measurements": 355510,
 }
 
 
