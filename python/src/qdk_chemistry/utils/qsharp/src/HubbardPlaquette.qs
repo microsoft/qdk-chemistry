@@ -178,7 +178,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// binary phase gradient.
     ///
     /// # Description
-    /// Hamming-weight phasing (:cite:`Gidney2018`, :cite:`Nam2019`): w = Σ_j 2^j w_j, so the phase
+    /// Hamming-weight phasing (:cite:`Kan2025`): w = Σ_j 2^j w_j, so the phase
     /// is a layer of one rotation per place value, the bit of place value 2^j taking the angle
     /// phi·2^j. Every one of those angles is classical, so `RzViaPhaseGradient` applies it by
     /// adding its rounded word into the gradient register, which costs one addition instead of a
@@ -266,10 +266,10 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Each term is first rotated onto a single Z on its last qubit, so the batch becomes
     /// `count` equal-angle rotations exp(-i theta Z). Their product is
     /// e^{-i theta count} e^{2 i theta w}, where w is the Hamming weight of those qubits. An
-    /// adder tree computes w into log2(count) + 1 bits, which Hamming-weight phasing
-    /// (:cite:`Gidney2018`, :cite:`Nam2019`) then phases with one rotation per place value
-    /// instead of one per term; the constant becomes a phase on the control when the whole is
-    /// controlled. This is the construction of :cite:`Kan2025`, whose Methods diagonalize every
+    /// adder tree computes w into log2(count) + 1 bits, which Hamming-weight phasing then phases
+    /// with one rotation per place value instead of one per term; the constant becomes a phase on
+    /// the control when the whole is controlled. This is the construction of :cite:`Kan2025`,
+    /// whose Methods diagonalize every
     /// plaquette and every on-site pair into a layer of same-angle R_z gates and synthesize that
     /// layer collectively with HWP. Each place-value rotation is applied through the shared
     /// binary phase gradient rather than synthesized. Below the break-even size each term is
