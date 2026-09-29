@@ -183,7 +183,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        (ctrl_unitary_op,), prepare_shared_op, num_shared_ancillas = self._shared_register([controlled_unitary_circuit])
         self._validate_state_prep_width(state_preparation, num_system_qubits)
         iterative_parameters = {
             "statePrep": state_prep_op,
@@ -192,6 +192,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "phaseQubit": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
+            "prepareSharedOp": prepare_shared_op,
+            "numSharedAncillas": num_shared_ancillas,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

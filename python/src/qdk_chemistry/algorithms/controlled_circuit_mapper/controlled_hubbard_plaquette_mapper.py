@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.data import Circuit, UnitaryRepresentation
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, PhaseGradient, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -30,7 +30,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
         """Build the controlled circuit for a plaquette evolution.
 
         Args:
-            evolution: The plaquette evolution to lower.
+            evolution: The plaquette unitary representation to be mapped.
 
         Returns:
             Circuit: The Q# circuit applying the controlled evolution.
@@ -48,6 +48,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
         control_indices = self._get_control_indices()
         if len(control_indices) != 1:
             raise ValueError("The plaquette mapper currently only supports a single control qubit.")
+
         # Only the lattice shape and the layer angles cross the boundary; the tilings and
         # spin pairings are derived in Q# from the shape.
         params = QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
@@ -58,10 +59,29 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             repetitions=container.step_reps,
         )
         targets = self._get_target_indices(evolution)
+        num_catalysts = QSHARP_UTILS.HubbardPlaquette.PlaquetteCatalystSize(params)
+        if num_catalysts == 0:
+            return Circuit(
+                qsharp_factory=QsharpFactoryData(
+                    program=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit,
+                    parameter={"params": params, "control": control_indices[0], "systems": targets},
+                ),
+                qsharp_op=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOp(params),
+            )
+
+        # The Hamming-weight towers phase through phase gradient catalysts. The Q# operation expects them at the end
+        # of its targets, so phase estimation can prepare them once for every query; the standalone factory
+        # program prepares its own.
+        gradients = tuple(
+            PhaseGradient(phase, size)
+            for phase, size in QSHARP_UTILS.HubbardPlaquette.PlaquetteCatalystGradients(params)
+        )
         return Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit,
                 parameter={"params": params, "control": control_indices[0], "systems": targets},
             ),
             qsharp_op=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOp(params),
+            num_qubits=len(targets) + num_catalysts,
+            metadata=CircuitMetadata(phase_gradients=gradients),
         )

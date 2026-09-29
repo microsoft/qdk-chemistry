@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import math
 import re
 import tempfile
 from pathlib import Path
@@ -27,7 +28,7 @@ except ImportError:
 from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data import circuit as circuit_module
-from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, PhaseGradient, QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -104,18 +105,61 @@ class TestCircuitConstruction:
 
     def test_phase_gradient_ancillas_are_recorded(self):
         """A trailing phase gradient register is declared on the circuit."""
-        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=CircuitMetadata(num_phase_gradient_ancillas=2))
+        metadata = CircuitMetadata(phase_gradients=(PhaseGradient.binary(2),))
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=metadata)
         assert circuit.metadata.num_phase_gradient_ancillas == 2
 
     def test_phase_gradient_ancillas_survive_a_json_round_trip(self):
         """The declaration is plain data, so it serializes with the rest of the circuit."""
-        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=CircuitMetadata(num_phase_gradient_ancillas=2))
+        metadata = CircuitMetadata(phase_gradients=(PhaseGradient.binary(2),))
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=metadata)
         assert Circuit.from_json(circuit.to_json()).metadata.num_phase_gradient_ancillas == 2
+
+    def test_the_ancilla_count_totals_every_gradient(self):
+        """Several gradients share one trailing register, in order."""
+        metadata = CircuitMetadata(phase_gradients=[PhaseGradient(0.3, 4), PhaseGradient(-0.1, 5)])
+        assert metadata.phase_gradients == (PhaseGradient(0.3, 4), PhaseGradient(-0.1, 5))
+        assert metadata.num_phase_gradient_ancillas == 9
+
+    def test_generalized_gradients_survive_json_and_hdf5_round_trips(self, tmp_path):
+        """Each gradient keeps its phase and size, so a caller can prepare exactly what was declared."""
+        metadata = CircuitMetadata(phase_gradients=(PhaseGradient(0.37, 3), PhaseGradient(-0.215, 4)))
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=9, metadata=metadata)
+        assert Circuit.from_json(circuit.to_json()).metadata == metadata
+
+        path = tmp_path / "circuit.h5"
+        with h5py.File(path, "w") as handle:
+            circuit.to_hdf5(handle)
+        with h5py.File(path, "r") as handle:
+            assert Circuit.from_hdf5(handle).metadata == metadata
+
+    def test_legacy_ancilla_count_loads_as_a_binary_gradient(self, tmp_path):
+        """Files written before gradients were described by phase still load."""
+        data = Circuit(qasm="OPENQASM 3.0;", num_qubits=5).to_json()
+        data["metadata"] = {"num_phase_gradient_ancillas": 3}
+        assert Circuit.from_json(data).metadata == CircuitMetadata(phase_gradients=(PhaseGradient.binary(3),))
+
+        path = tmp_path / "legacy.h5"
+        with h5py.File(path, "w") as handle:
+            Circuit(qasm="OPENQASM 3.0;", num_qubits=5).to_hdf5(handle)
+            handle.create_group("metadata").attrs["num_phase_gradient_ancillas"] = 3
+        with h5py.File(path, "r") as handle:
+            assert Circuit.from_hdf5(handle).metadata.phase_gradients == (PhaseGradient.binary(3),)
+
+    def test_only_a_non_binary_gradient_changes_the_digest(self):
+        """Binary gradients hash as before; other phases must not collide with them."""
+
+        def digest(*gradients):
+            metadata = CircuitMetadata(phase_gradients=gradients)
+            return Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=metadata).content_hash()
+
+        assert digest(PhaseGradient.binary(3)) == digest(PhaseGradient(2 * math.pi / 8, 3))
+        assert digest(PhaseGradient.binary(3)) != digest(PhaseGradient(0.37, 3))
+        assert digest(PhaseGradient(0.37, 3)) != digest(PhaseGradient(0.38, 3))
 
     @pytest.mark.parametrize(
         ("num_qubits", "num_gradient", "match"),
         [
-            (5, -1, "must be non-negative"),
             (2, 3, "cannot exceed num_qubits"),
             (None, 1, "num_qubits must be declared"),
         ],
@@ -126,7 +170,7 @@ class TestCircuitConstruction:
             Circuit(
                 qasm="OPENQASM 3.0;",
                 num_qubits=num_qubits,
-                metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient),
+                metadata=CircuitMetadata(phase_gradients=(PhaseGradient.binary(num_gradient),)),
             )
 
 

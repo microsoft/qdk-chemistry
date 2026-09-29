@@ -8,7 +8,7 @@
 import numpy as np
 
 from qdk_chemistry.data import Settings, Wavefunction
-from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, PhaseGradient, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .state_preparation import StatePreparation
@@ -111,7 +111,9 @@ class QROMStatePreparation(StatePreparation):
             qsharp_factory=qsharp_factory,
             encoding="jordan-wigner",
             num_qubits=num_qubits,
-            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_ancillas),
+            metadata=CircuitMetadata(
+                phase_gradients=(PhaseGradient.binary(num_gradient_ancillas),) if num_gradient_ancillas else ()
+            ),
         )
 
     def _build_params(self, wavefunction: Wavefunction):
