@@ -26,6 +26,7 @@ __all__: list[str] = [
     "HubbardPlaquetteTrotterSettings",
 ]
 
+
 class HubbardPlaquetteTrotterSettings(TrotterSettings):
     """Settings for the plaquette Trotter builder."""
 
@@ -279,11 +280,11 @@ class HubbardPlaquetteTrotter(Trotter):
             = -\frac{t}{2} \left( X_m Z_{m+1} \cdots Z_{n-1} X_n + Y_m Z_{m+1} \cdots Z_{n-1} Y_n \right).
 
         To avoid the Jordan-Wigner :math:`Z` strings, each hopping layer first uses a network of
-        fermionic swaps to route the four modes of every plaquette into a contiguous block. 
+        fermionic swaps to route the four modes of every plaquette into a contiguous block.
         Interacting fermionic sites become adjacent in the Jordan-Wigner ordering thus localizing the hopping
         Two radix-two fermionic Fourier butterflies then
         transform its four-cycle hopping matrix, whose spectrum is
-        :math:`\mathrm{diag}(2t, 0, -2t, 0)`, into a single adjacent two-mode hopping term. 
+        :math:`\mathrm{diag}(2t, 0, -2t, 0)`, into a single adjacent two-mode hopping term.
         The resulting equal-angle :math:`XX` and :math:`YY`
         rotations can be batched by Hamming-weight phasing, after which the Fourier
         butterflies and routing are uncomputed.
