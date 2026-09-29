@@ -149,12 +149,4 @@ def test_estimation_hubbard_2d():
     """
     notebook_path = EXAMPLES_DIR / "benchmark" / "estimation_hubbard_2d.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(
-        notebook_path,
-        cell_patches={
-            10: {
-                "num_ts_per_rotation=list(range(20, 45, 2))": "num_ts_per_rotation=[20, 30, 40]",
-                "slow_down_factor=[1.0 * j for j in range(1, 20)]": "slow_down_factor=[1.0, 5.0]",
-            },
-        },
-    )
+    _execute_notebook_skip_visualizations(notebook_path)
