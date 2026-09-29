@@ -66,12 +66,7 @@ pytestmark = [
     ),
 ]
 
-# The two solvers are not converged to a common threshold: ExaChem's ccsd_threshold
-# defaults to 1e-6 and its Cholesky cd_diagtol to 1e-5, while pyscf's conv_tol is
-# 1e-7. These tolerances are therefore set by the looser code plus the integral
-# re-computation noted in the module docstring, not by either solver alone.
-# NOTE: they are estimates -- they have not been calibrated against a real ExaChem
-# build, so revisit them the first time this suite runs in CI.
+# With run_coupled_cluster's thresholds the codes agree to ~1e-9 Eh and ~1e-8 in amplitudes (ExaChem 45c192e8).
 _energy_tolerance = 100 * mp2_energy_tolerance
 # Amplitudes are wavefunction parameters and converge less tightly than the energy.
 _amplitude_tolerance = 10 * rdm_tolerance
@@ -127,8 +122,13 @@ def run_coupled_cluster(variant: str, ansatz: Ansatz):
     """
     calculator = create("dynamical_correlation_calculator", variant)
     calculator.settings().set("store_amplitudes", True)
+    # Default thresholds leave up to ~1e-6 Eh between the codes, the size of the tolerance.
     if variant == "exachem_ccsd":
-        calculator.settings().set("mpi_ranks", 2)
+        calculator.settings().set("ccsd_threshold", 1e-9)
+        calculator.settings().set("cd_diagtol", 1e-9)
+    else:
+        calculator.settings().set("conv_tol", 1e-10)
+        calculator.settings().set("conv_tol_normt", 1e-8)
     return calculator.run(ansatz)
 
 
@@ -244,6 +244,27 @@ class TestCcsdEffectiveCorePotential:
 
         np.testing.assert_allclose(energy, reference.e_tot, atol=_energy_tolerance)
         assert wavefunction.get_container().has_t2_amplitudes()
+
+
+class TestActiveSpace:
+    """Check that ExaChem correlates only the Ansatz's active orbitals."""
+
+    def test_valence_active_space_matches_native_pyscf(self):
+        _, wavefunction = create("scf_solver").run(Structure.from_xyz(H2O), 0, 1, "cc-pvdz")
+        selector = create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 8)
+        selector.settings().set("num_active_orbitals", 20)
+        active_wavefunction = selector.run(wavefunction)
+        hamiltonian = create("hamiltonian_constructor").run(active_wavefunction.get_orbitals())
+
+        energy, amplitudes, _ = run_coupled_cluster("exachem_ccsd", Ansatz(hamiltonian, active_wavefunction))
+
+        molecule = gto.M(atom="\n".join(H2O.splitlines()[2:]), basis="cc-pvdz", verbose=0)
+        # O 1s and the three highest virtuals lie outside the active space.
+        reference = cc.CCSD(scf.RHF(molecule).run(conv_tol=1e-10), frozen=[0, 21, 22, 23]).run(conv_tol=1e-10)
+
+        np.testing.assert_allclose(energy, reference.e_tot, atol=_energy_tolerance)
+        assert amplitudes.get_container().has_t2_amplitudes()
 
 
 class TestBasisExport:

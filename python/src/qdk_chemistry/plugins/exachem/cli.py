@@ -240,7 +240,6 @@ def run_exachem(
     *,
     nprocs: int = 1,
     work_dir: Path | None = None,
-    exachem_binary: Path | None = None,
     mpi_bind_to: str = "",
     mpi_extra_args: list[str] | None = None,
     timeout: int | None = None,
@@ -253,7 +252,6 @@ def run_exachem(
         config: ExaChem input configuration (:class:`CcsdInputConfig`).
         nprocs: Number of MPI processes.
         work_dir: Working directory. If None, creates a temporary directory.
-        exachem_binary: Path to ExaChem binary. If None, auto-detects.
         mpi_bind_to: Binding policy per rank (e.g. ``"core"``); empty defers to the launcher default.
         mpi_extra_args: Extra arguments for the MPI launcher (e.g. ``["--bind-to", "core"]``).
         timeout: Timeout in seconds for the subprocess.
@@ -265,11 +263,10 @@ def run_exachem(
 
     Raises:
         ExachemNotFoundError: If ExaChem or MPI launcher cannot be found.
-        ExachemRunError: If ExaChem exits with non-zero status.
+        ExachemRunError: If ExaChem exits with non-zero status or does not finish within ``timeout`` seconds.
 
     """
-    if exachem_binary is None:
-        exachem_binary = find_exachem_binary()
+    exachem_binary = find_exachem_binary()
 
     # A caller-supplied work_dir belongs to the caller; a directory we create here is
     # ours to remove if the run fails, and is handed to the caller on success.
@@ -292,7 +289,8 @@ def run_exachem(
 
         # Build command
         launcher = find_mpi_launcher()
-        cmd = [*launcher, "-np", str(nprocs)]
+        # mpirun, mpiexec and srun all take -n; srun has no -np.
+        cmd = [*launcher, "-n", str(nprocs)]
         cmd.extend(_binding_args(launcher[0], mpi_bind_to))
         if mpi_extra_args:
             cmd.extend(mpi_extra_args)
@@ -308,15 +306,19 @@ def run_exachem(
             run_env["LIBINT_DATA_PATH"] = str(libint_data_path)
             logger.info("Using LIBINT_DATA_PATH=%s for ExaChem basis", libint_data_path)
 
-        result = subprocess.run(
-            cmd,
-            cwd=str(work_dir),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-            env=run_env,
+        process = subprocess.Popen(
+            cmd, cwd=str(work_dir), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=run_env
         )
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except BaseException as error:
+            # SIGTERM lets the launcher stop its ranks; subprocess.run's SIGKILL would orphan them.
+            process.terminate()
+            process.communicate()
+            if isinstance(error, subprocess.TimeoutExpired):
+                raise ExachemRunError(f"ExaChem did not finish within {timeout} s.") from None
+            raise
+        result = subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
 
         exachem_result = ExachemResult(
             input_json=input_path,

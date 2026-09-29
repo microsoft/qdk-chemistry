@@ -37,7 +37,7 @@ import numpy as np
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, BasisSet, Settings, Wavefunction
-from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.plugins.exachem.cli import CcsdInputConfig, ExachemResult, run_exachem
 from qdk_chemistry.plugins.exachem.conversion import (
@@ -52,17 +52,28 @@ logger = logging.getLogger(__name__)
 __all__ = ["ExachemCcsdCalculator", "ExachemCcsdSettings"]
 
 
+def _exachem_orbital_order(orbitals) -> tuple[list[int], int, int]:
+    """Return the MO order inactive, active, remaining virtual, with the inactive and remaining virtual counts."""
+    nmo = orbitals.get_num_molecular_orbitals()
+    if not orbitals.has_active_space():
+        return list(range(nmo)), 0, 0
+    active = spin_channel_indices(orbitals.active_indices(), axes.alpha())
+    if active != spin_channel_indices(orbitals.active_indices(), axes.beta()):
+        raise ValueError("ExaChem CCSD needs the same active orbitals for both spins.")
+    inactive = spin_channel_indices(orbitals.inactive_indices(), axes.alpha())
+    remaining_virtual = sorted(set(range(nmo)) - set(active) - set(inactive))
+    return [*inactive, *active, *remaining_virtual], len(inactive), len(remaining_virtual)
+
+
 class ExachemCcsdSettings(Settings):
     """Settings for the ExaChem CCSD calculator.
 
     Attributes:
-        mpi_ranks (int): Number of MPI processes (default: 1).
+        mpi_ranks (int): Number of MPI processes; ExaChem's default GA runtime needs at least 2 (default: 2).
         mpi_bind_to (str): Binding policy per rank; empty defers to the launcher (default: ``"core"``).
         timeout (int): Subprocess timeout in seconds (default: 3600).
         ccsd_threshold (float): CCSD convergence threshold (default: 1e-6).
         cd_diagtol (float): Cholesky decomposition diagonal tolerance (default: 1e-5).
-        freeze_core (int): Number of frozen core orbitals (default: 0).
-        freeze_virtual (int): Number of frozen virtual orbitals (default: 0).
         store_amplitudes (bool): Read the T1/T2 amplitudes back into the returned wavefunction.
 
     """
@@ -70,15 +81,15 @@ class ExachemCcsdSettings(Settings):
     def __init__(self):
         """Initialize the settings with default values."""
         super().__init__()
-        self._set_default("mpi_ranks", "int", 1, "Number of MPI processes to launch ExaChem with")
+        self._set_default(
+            "mpi_ranks", "int", 2, "Number of MPI processes; ExaChem's default GA runtime needs at least 2"
+        )
         self._set_default(
             "mpi_bind_to", "string", "core", "Binding policy for each MPI rank; empty defers to the launcher default"
         )
         self._set_default("timeout", "int", 3600, "Maximum seconds to wait for ExaChem to finish")
         self._set_default("ccsd_threshold", "double", 1e-6, "CCSD convergence threshold")
         self._set_default("cd_diagtol", "double", 1e-5, "Cholesky decomposition diagonal tolerance")
-        self._set_default("freeze_core", "int", 0, "Number of frozen core orbitals")
-        self._set_default("freeze_virtual", "int", 0, "Number of frozen virtual orbitals")
         self._set_default(
             "store_amplitudes",
             "bool",
@@ -101,7 +112,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
     The Ansatz must be backed by a named molecular :class:`~qdk_chemistry.data.BasisSet` (ExaChem looks the
     name up in its own library), and ``ExaChem`` must be on ``PATH``. Effective core potentials are taken from
     ExaChem's own library by name; a run whose ExaChem SCF energy differs from the Ansatz reference energy
-    raises instead of returning.
+    raises instead of returning. If the orbitals define an active space, only the active orbitals are correlated.
     """
 
     def __init__(self):
@@ -129,7 +140,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             CCSD T1/T2 amplitudes (when ``store_amplitudes`` is enabled).
 
         Raises:
-            ValueError: If the Ansatz is not backed by a named molecular basis set.
+            ValueError: If the Ansatz lacks a named molecular basis set or has different active orbitals per spin.
             ExachemNotFoundError: If ExaChem or the MPI launcher is not found.
             ExachemRunError: If ExaChem fails.
             RuntimeError: If ExaChem's SCF energy differs from the Ansatz reference or its CCSD outputs are missing.
@@ -168,7 +179,9 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         scf_type = "unrestricted" if is_unrestricted else "restricted"
 
         alpha_occ, beta_occ = wavefunction.get_total_orbital_occupations()
-        mo_coeff_alpha = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.alpha()))
+        # ExaChem freezes the first and last orbitals it is given.
+        order, freeze_core, freeze_virtual = _exachem_orbital_order(orbitals)
+        mo_coeff_alpha = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.alpha()))[:, order]
 
         # Prepare the working directory and SCF restart prefix.
         work_path = Path(tempfile.mkdtemp(prefix="exachem_ccsd_"))
@@ -191,7 +204,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
             if is_unrestricted:
                 density_alpha, density_beta = orbitals.calculate_ao_density_matrix(alpha_occ, beta_occ)
-                mo_coeff_beta = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.beta()))
+                mo_coeff_beta = np.asarray(spin_channel_matrix(orbitals.coefficients(), axes.beta()))[:, order]
                 export_scf_files(
                     files_prefix=scf_files_prefix,
                     mo_coeff_alpha=mo_coeff_alpha,
@@ -222,8 +235,6 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             logger.info("Exported SCF data for noscf CCSD (%s) to %s", scf_type, scf_dir)
 
             store_amplitudes = bool(s.get("store_amplitudes"))
-            freeze_core = int(s.get("freeze_core"))
-            freeze_virtual = int(s.get("freeze_virtual"))
 
             config = CcsdInputConfig(
                 atoms=atoms,
