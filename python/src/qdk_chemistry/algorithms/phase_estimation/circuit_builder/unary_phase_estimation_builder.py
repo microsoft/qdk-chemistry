@@ -19,7 +19,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABloc
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import QpeCircuitBuilder, QpeCircuitBuilderSettings
+from .base import QpeCircuitBuilder, QpeCircuitBuilderSettings, phase_gradients_preparation
 
 __all__: list[str] = [
     "QdkUnaryQpeCircuitBuilder",
@@ -218,19 +218,18 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
         num_system_qubits = qubit_hamiltonian.num_qubits
 
+        block_encoding_gradients = block_encoding.metadata.phase_gradients
+        state_prep_gradients = state_preparation.metadata.phase_gradients
+        if block_encoding_gradients and state_prep_gradients and block_encoding_gradients != state_prep_gradients:
+            raise ValueError(
+                f"State preparation expects the phase gradients {list(state_prep_gradients)} but the "
+                f"block encoding expects {list(block_encoding_gradients)}."
+            )
+        shared_gradients = block_encoding_gradients or state_prep_gradients
         block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
         state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas
-        if block_encoding_shared and state_prep_shared and block_encoding_shared != state_prep_shared:
-            raise ValueError(
-                f"State preparation expects {state_prep_shared} phase gradient ancilla but the "
-                f"block encoding expects {block_encoding_shared}."
-            )
-        num_phase_gradient_ancillas = max(block_encoding_shared, state_prep_shared)
-        prepare_shared_op = (
-            QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState
-            if num_phase_gradient_ancillas
-            else QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-        )
+        num_phase_gradient_ancillas = sum(gradient.num_qubits for gradient in shared_gradients)
+        prepare_shared_op = phase_gradients_preparation(shared_gradients)
         num_ancilla_qubits = num_qubits - num_system_qubits - block_encoding_shared
         if num_ancilla_qubits <= 0:
             raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")

@@ -43,7 +43,7 @@ class HubbardPlaquetteTrotterSettings(TrotterSettings):
 
 
 class HubbardPlaquetteTrotter(Trotter):
-    r"""Plaquette Trotterization for THE Fermi-Hubbard model in two dimensional square lattice (TDL).
+    r"""Plaquette Trotterization of the Fermi-Hubbard model on a periodic two-dimensional square lattice.
 
     The builder takes a :class:`~qdk_chemistry.data.QubitOperator` wrapping a
     :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`, which
@@ -84,8 +84,7 @@ class HubbardPlaquetteTrotter(Trotter):
             order: Trotter decomposition order. Only 2 is supported.
             t: Uniform hopping amplitude of the Fermi-Hubbard model.
             u: Uniform on-site interaction of the Fermi-Hubbard model.
-            num_electrons: Electron count the scalar shift is applied for. ``None`` leaves the
-                simulated particle-hole symmetric energy unshifted.
+            num_electrons: Electron count for the classical shift to the conventional model; ``None`` skips it.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto Trotter step computation. Use 0.0 to disable.
             num_divisions: Number of Trotter steps. Max of this and the auto value is used.
@@ -131,22 +130,20 @@ class HubbardPlaquetteTrotter(Trotter):
         return "hubbard_plaquette"
 
     def _lattice_geometry(self, qubit_hamiltonian: QubitOperator):
-        """Return the lattice, its shape, its edge weight, and its plaquette tilings.
+        """Return the lattice shape, its edge weight, and its plaquette tilings.
 
         The bond graph is validated here: the bonds must match the plaquette tiling,
         and their weights must be uniform.
-        The tilings are resolved from Q# to run the check, so they are handed back rather
-        than evaluated a second time by the caller that needs them for the error bound.
+        The tilings are resolved from Q# to run the check, so they are returned alongside the shape.
 
         Args:
             qubit_hamiltonian: The operator to inspect.
 
         Returns:
-            A tuple of the lattice, its ``(width, height)``, its edge weight, and its pink and gold tilings.
+            A tuple of the lattice width, height, edge weight, and its pink and gold tilings.
 
         Raises:
-            TypeError: If the operator does not wrap a
-                :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`.
+            TypeError: If the operator does not wrap a ``LatticeContainer``.
             ValueError: If the lattice is not a periodic square grid tiled by plaquettes with uniform edge weights.
 
         """
@@ -213,7 +210,7 @@ class HubbardPlaquetteTrotter(Trotter):
             height: Number of lattice rows.
 
         Returns:
-            The pink and gold tilings, each a list of four indices in cycle order, for one spin sector.
+            The pink and gold tilings for one spin sector, each a list of four-site cycles in cycle order.
 
         Raises:
             ValueError: If the lattice cannot be tiled into vertex-disjoint four-cycles.
@@ -281,22 +278,20 @@ class HubbardPlaquetteTrotter(Trotter):
             -t \left( a^\dagger_m a_n + a^\dagger_n a_m \right)
             = -\frac{t}{2} \left( X_m Z_{m+1} \cdots Z_{n-1} X_n + Y_m Z_{m+1} \cdots Z_{n-1} Y_n \right).
 
-        Each hopping layer first uses fermionic swaps to route the four modes of every
-        plaquette into a contiguous block. Two radix-two fermionic Fourier butterflies then
+        To avoid the Jordan-Wigner :math:`Z` strings, each hopping layer first uses a network of
+        fermionic swaps to route the four modes of every plaquette into a contiguous block. 
+        Interacting fermionic sites become adjacent in the Jordan-Wigner ordering thus localizing the hopping
+        Two radix-two fermionic Fourier butterflies then
         transform its four-cycle hopping matrix, whose spectrum is
-        :math:`\mathrm{diag}(2t, 0, -2t, 0)`, into a single adjacent two-mode hopping term;
-        the other two modes decouple. The resulting equal-angle :math:`XX` and :math:`YY`
+        :math:`\mathrm{diag}(2t, 0, -2t, 0)`, into a single adjacent two-mode hopping term. 
+        The resulting equal-angle :math:`XX` and :math:`YY`
         rotations can be batched by Hamming-weight phasing, after which the Fourier
         butterflies and routing are uncomputed.
         Each hopping layer is therefore an fswap routing, a basis change, two nonzero eigenvalue phases,
-        and the inverse basis change and routing.
-
-        To avoid the Z strings, the ``HoppingLayer`` first routes every four-cycle of the tiling onto four
-        contiguous modes with a network of fermionic swaps, so the whole layer is one batch of equal-angle
-        two-local rotations that can be applied in parallel.
+        and the inverse basis change and routing, with every plaquette of the tiling handled in parallel.
 
         Thus, over a total evolution time :math:`T` split into :math:`r` steps of duration
-        :math:`\delta = T/r`, the plaquette trotterization gives:
+        :math:`\delta = T/r`, the plaquette Trotterization gives:
 
         .. math::
             e^{-i\delta H_h^p/2}
@@ -314,8 +309,7 @@ class HubbardPlaquetteTrotter(Trotter):
             UnitaryRepresentation: The segmented plaquette product formula.
 
         Raises:
-            NotImplementedError: If the configured Trotter order is not 2.
-            ValueError: If the lattice's bonds do not match a periodic square tiling with uniform hopping.
+            ValueError: If the order is not 2, or the bonds do not match a periodic square tiling with uniform hopping.
 
         """
         order = self._settings.get("order")
@@ -417,33 +411,33 @@ class HubbardPlaquetteTrotter(Trotter):
         height: int,
         time: float,
     ) -> int:
-        """Determine the number of Trotter steps from plaquette-specific error constant.
+        """Determine the number of Trotter steps from the plaquette-specific error constant.
 
-        ``W_PLAQ <= W_SO2 + W_extra2``. Eq. (20) of :cite:`Campbell2022`.
+        ``W_PLAQ <= W_SO2 + W_extra2``, Eq. (20) of :cite:`Campbell2022`.
 
         This constant is derived for the "IPG" factor ordering (interaction outermost), while the circuit
         this builder emits uses the "PIG" ordering based on Sec. 4.8.2 of :cite:`Apel2026`.
         The pure-hopping block ``[[H_h^p, H_h^g], .]`` is replaced by a mixed interaction-hopping block,
-        which is reported to be slightly larger than the IPG constant. The difference is neglected here.
+        which is reported to make the constant slightly larger than the IPG one. The difference is neglected here.
 
-        Here,
+        Here::
+
             W_extra2 = (3/24) ||[[R^p, R^g], R^g]||
-            W_SO2 ≤ (uτ^2 / 6) * L^2 * (√5+8) + (u^2τ / 24) ||H_h||
+            W_SO2 <= (uτ^2 / 6) * L^2 * (√5+8) + (u^2τ / 24) ||H_h||
 
-        The number of trotter steps are determined by
+        The number of Trotter steps is determined by::
 
-        r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
+            r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
 
-        T for the total evolution time, single Trotter step of duration s, for eps_TS  energy error budget
-        resulting from the Suzuki-Trotter approximation
+        where T is the total evolution time, s = T/r the duration of a single Trotter step, and eps_TS the
+        energy error budget for the Suzuki-Trotter approximation.
 
-        A single step of size s carries unitary error ||Delta U|| <= W_PLAQ s^3.
-        Summing r steps of size s = T/r by subadditivity gives ||Delta U|| <= W_PLAQ T^3 / r^2.
-        The induced error in the estimated energy then satisfies |Delta E| <= (2/T) arcsin(||Delta U|| / 2).
+        A single step of size s carries unitary error ``||Delta U|| <= W_PLAQ s^3``.
+        Summing r steps of size s = T/r by subadditivity gives ``||Delta U|| <= W_PLAQ T^3 / r^2``.
+        The induced error in the estimated energy then satisfies ``|Delta E| <= (2/T) arcsin(||Delta U|| / 2)``.
 
         Args:
             hopping: Uniform hopping amplitude.
-            sections: The pink and gold tilings, reused from the caller.
             width: Number of lattice columns.
             height: Number of lattice rows.
             time: Duration of the evolution.

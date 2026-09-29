@@ -22,7 +22,7 @@ __all__ = ["HubbardPlaquetteContainer"]
 
 
 class HubbardPlaquetteContainer(UnitaryContainer):
-    r"""One second-order plaquette Trotter step, as layers of batched rotations.
+    r"""Container for second-order plaquette Trotter step for the 2D Fermi-Hubbard model.
 
     The step is :math:`P^{1/2}\,(I^{1/2} G I^{1/2} P)^r\,P^{-1/2}`, where :math:`I` is the
     on-site interaction and :math:`P`, :math:`G` are the pink and gold hopping tilings.
@@ -31,29 +31,17 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     register.
 
     Every angle below is a :math:`\theta` entering as :math:`e^{-i\theta P}` for its Pauli
-    word :math:`P`, quoted at its full-layer value; Q# halves the interaction angles where
-    the formula calls for a half layer. They are written in terms of the Fermi-Hubbard
-    parameters the builder was configured with -- hopping :math:`t` and on-site interaction
-    :math:`U` -- together with the per-step
-    duration :math:`\delta = T / r` for a total evolution time :math:`T` over :math:`r`
-    steps, and the site count :math:`M = \text{width} \times \text{height}`:
+    word :math:`P`. For the Fermi-Hubbard parameters hopping :math:`t` and on-site interaction
+    :math:`U` and the per-step duration :math:`\delta = T / r` for a total evolution time 
+    :math:`T` over :math:`r` steps:
 
     * ``interaction_angle`` is :math:`(U/4)\delta`, the :math:`Z_i Z_{i+M}` angle of one
-      full :math:`e^{-i\delta I}` layer, applied once per site. The particle-hole symmetric
-      interaction has no single-mode companion, so this is the whole operator layer.
-    * ``constant_shift`` is the scalar phase of one step. The symmetric form itself carries
-      no constant; a nonzero value is the :math:`U\eta/2 - UM/4` offset that converts the
-      simulated energy to the conventional :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`
-      model on a state of :math:`\eta` electrons. The quantum circuit omits this global
-      phase, and :meth:`eigenvalue_from_phase` applies the corresponding energy correction
-      classically.
-    * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. It is an
-      eigenphase, not a term coefficient: a plaquette's hopping matrix is diagonalized
-      exactly, and :math:`\pm 2t` are its nonzero eigenvalues, so the factor of two is the
-      four-cycle's spectrum rather than a convention.
-    * ``step_reps`` is :math:`r` times the repetition count of a ``"repeat"`` power
-      strategy, and ``scale`` records the total time :math:`T` the step count was
-      certified for.
+      :math:`e^{-i\delta I}` layer, applied once per site.
+
+    * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. A plaquette's 
+      hopping matrix is diagonalized with :math:`\pm 2t` nonzero eigenvalues.
+
+    * ``constant_shift`` :math:`U\eta/2 - UM/4` offset that shift the interaction terms.
 
     Args:
         width: Number of lattice columns.
@@ -111,7 +99,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     @property
     def num_qubits(self) -> int:
         """Return the width of the system register, two spin orbitals per site."""
-        return 2 * self.num_sites
+        return 2 * self.width * self.height
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from a time-evolution phase.
@@ -200,4 +188,6 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         return (
             f"Hubbard plaquette evolution ({self.width}x{self.height} lattice, "
             f"{self.num_qubits} qubits, {self.step_reps} repetitions)"
+            f"interaction angle: {self.interaction_angle}, constant shift: {self.constant_shift}, "
+            f"hopping angle: {self.hopping_angle}"
         )
