@@ -56,24 +56,52 @@ _PLATFORM_RELATIVE_TOLERANCE = 1e-4
 #: Algorithm 1 of Apel et al. (arXiv:2609.05316) rather than its small-angle linearization;
 #: see ``HubbardPlaquetteTrotter._step_count``. ``logical_qubits`` is independent of the
 #: step count and so does not move when that rule changes.
+#:
+#: L=2 has four sites, which is below the Hamming-weight-phasing break-even of eight terms, so
+#: every tower rotates term by term: no adder tree, and therefore no Toffolis at all.
 _HUBBARD_L2_FULL_CIRCUIT = {
     "L": 2,
     "sites": 4,
     "system_qubits": 8,
     "electrons": 4,
     "target_precision": 0.0204,
-    "qpe_budget": 0.0136,
-    "trotter_budget": 0.0068,
+    "qpe_budget": 0.013600000000000001,
+    "trotter_budget": 0.0068000000000000005,
     "qpe_bits": 10,
     "base_time": 0.2253660323553513,
-    "logical_qubits": 25,
-    "rotations": 2224986,
-    "rotation_depth": 1483448,
+    "logical_qubits": 18,
+    "rotations": 1047435,
+    "rotation_depth": 698414,
     "t_gates": 698155,
-    "ccz_count": 610582,
+    "ccz_count": 0,
     "ccix_count": 0,
-    "toffolis": 610582,
-    "measurements": 610592,
+    "toffolis": 0,
+    "measurements": 10,
+}
+
+
+#: L=4 has sixteen sites, so every tower is above the break-even and takes the
+#: Hamming-weight-phasing path: an adder tree compresses sixteen same-angle rotations into a
+#: five-bit weight, and each place value is rotated through the shared ten-qubit binary phase
+#: gradient. This is the case that exercises the construction, which is why it is pinned.
+_HUBBARD_L4_FULL_CIRCUIT = {
+    "L": 4,
+    "sites": 16,
+    "system_qubits": 32,
+    "electrons": 14,
+    "target_precision": 0.0816,
+    "qpe_budget": 0.054400000000000004,
+    "trotter_budget": 0.027200000000000002,
+    "qpe_bits": 10,
+    "base_time": 0.056341508088837824,
+    "logical_qubits": 87,
+    "rotations": 24539,
+    "rotation_depth": 24247,
+    "t_gates": 759121,
+    "ccz_count": 1422000,
+    "ccix_count": 0,
+    "toffolis": 1422000,
+    "measurements": 1422010,
 }
 
 
@@ -96,22 +124,10 @@ def script() -> Any:
         sys.modules.pop(spec.name, None)
 
 
-def test_sample_hubbard_L2(  # noqa: N802 - L is the lattice side
-    script: Any,
-    tmp_path: Path,
-) -> None:
-    """Pin the sampling script's 2x2 lattice result."""
-    output_path = tmp_path / "hubbard_logical_resources.csv"
-    assert script.main(["--size", "2", "-o", str(output_path)]) == 0
-    frame = pandas.read_csv(output_path)
-
-    assert len(frame) == 1, "one row per lattice size is expected"
-    missing = set(_PINNED_COLUMNS) - set(frame.columns)
-    assert not missing, f"pinned columns absent from the table: {sorted(missing)}"
-
-    row = frame.iloc[0]
+def _compare(row: Any, expected: dict[str, Any]) -> list[str]:
+    """Return one message per pinned column the row does not match."""
     mismatches = []
-    for column, want in _HUBBARD_L2_FULL_CIRCUIT.items():
+    for column, want in expected.items():
         got = row[column]
         got = got.item() if hasattr(got, "item") else got
         if column in _PLATFORM_SENSITIVE_COLUMNS:
@@ -121,5 +137,33 @@ def test_sample_hubbard_L2(  # noqa: N802 - L is the lattice side
             matches = got == pytest.approx(want) if isinstance(want, float) else got == want
             tolerance = ""
         if not matches:
-            mismatches.append(f"  {column}: expected {want}{tolerance}, got {got}")
+            mismatches.append(f"  L={expected['L']} {column}: expected {want}{tolerance}, got {got}")
+    return mismatches
+
+
+def test_sample_hubbard_L2_and_L4(  # noqa: N802 - L is the lattice side
+    script: Any,
+    tmp_path: Path,
+) -> None:
+    """Pin the sampling script's 2x2 and 4x4 lattice results.
+
+    The 4x4 row is the primary pin: its sixteen-term towers are above the Hamming-weight-phasing
+    break-even, so it is the case that actually exercises the adder tree and the phase gradient.
+    The 2x2 row pins the fallback below the break-even.
+    """
+    output_path = tmp_path / "hubbard_logical_resources.csv"
+    assert script.main(["--size", "2", "4", "-o", str(output_path)]) == 0
+    frame = pandas.read_csv(output_path)
+
+    assert len(frame) == 2, "one row per lattice size is expected"
+    missing = set(_PINNED_COLUMNS) - set(frame.columns)
+    assert not missing, f"pinned columns absent from the table: {sorted(missing)}"
+
+    rows = {int(frame.iloc[index]["L"]): frame.iloc[index] for index in range(len(frame))}
+    mismatches = _compare(rows[2], _HUBBARD_L2_FULL_CIRCUIT) + _compare(rows[4], _HUBBARD_L4_FULL_CIRCUIT)
     assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
+
+    # A collapse back to the term-by-term fallback would silently erase the adder tree, which is
+    # the only source of Toffolis in this circuit. Pin the sign of the count, not just its value.
+    assert rows[4]["toffolis"] > 0, "the 4x4 lattice must take the Hamming-weight-phasing path"
+    assert rows[2]["toffolis"] == 0, "the 2x2 lattice is below the break-even and phases term by term"
