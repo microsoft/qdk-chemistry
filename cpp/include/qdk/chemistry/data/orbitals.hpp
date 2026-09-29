@@ -14,7 +14,6 @@
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -501,12 +500,18 @@ class Orbitals : public DataClass,
       const Eigen::MatrixXd& rdm) const;
 
   /**
-   * @brief Get the data type name for this class
+   * @brief Get the static data type name for this class.
    * @return "orbitals"
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(Orbitals);
   }
+
+  /**
+   * @brief Get the data type name for this instance.
+   * @return "orbitals"
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Get summary string of orbital information

@@ -236,6 +236,13 @@ class QDrift(TimeEvolutionBuilder):
         rng = np.random.default_rng(seed if seed >= 0 else None)
         weight_threshold: float = self._settings.get("weight_threshold")
 
+        container_type = qubit_hamiltonian.get_container_type()
+        if container_type != "pauli_decomposition":
+            raise ValueError(
+                f"qDRIFT time evolution requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+
         if not qubit_hamiltonian.is_hermitian(tolerance=weight_threshold):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 

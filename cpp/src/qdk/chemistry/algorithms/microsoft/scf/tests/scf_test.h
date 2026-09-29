@@ -17,6 +17,7 @@
 #include <qdk/chemistry/scf/core/exc.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
+#include <qdk/chemistry/scf/util/blas_threads.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 
 #include <filesystem>
@@ -154,7 +155,7 @@ class SCFTest
     cfg.k_eri.method = k_eri == "HGP"   ? ERIMethod::HGP
                        : k_eri == "RYS" ? ERIMethod::Rys
                        : k_eri == "SNK" ? ERIMethod::SnK
-                       : eri == "CPU"   ? ERIMethod::Libint2Direct
+                       : k_eri == "CPU" ? ERIMethod::Libint2Direct
                                         : ERIMethod::Incore;
     cfg.grad_eri.method = (cfg.eri.method == ERIMethod::Incore && !cfg.do_dfj)
                               ? ERIMethod::HGP
@@ -162,8 +163,11 @@ class SCFTest
 #else
     cfg.eri.method =
         eri == "CPU" ? ERIMethod::Libint2Direct : ERIMethod::Incore;
-    cfg.k_eri.method =
-        eri == "CPU" ? ERIMethod::Libint2Direct : ERIMethod::Incore;
+    // SnK is not gated by the HGP/RYS/LibintX options, so it is available here
+    // too; without this the "SNK" rows silently fall back to TradJK.
+    cfg.k_eri.method = k_eri == "SNK"   ? ERIMethod::SnK
+                       : k_eri == "CPU" ? ERIMethod::Libint2Direct
+                                        : ERIMethod::Incore;
     cfg.grad_eri.method = (cfg.eri.method == ERIMethod::Incore && !cfg.do_dfj)
                               ? ERIMethod::Libint2Direct
                               : cfg.eri.method;
@@ -222,7 +226,14 @@ class SCFTest
     auto scf = scf_type == "rhf" or scf_type == "uhf"
                    ? SCF::make_hf_solver(mol, cfg)
                    : SCF::make_ks_solver(mol, cfg);
+    // GauXC parallelizes over grid batches with OpenMP and calls BLAS from
+    // each thread, so its entry points pin BLAS to one thread and must restore
+    // the previous count on exit. 0 means this build bound no thread-control
+    // API, where the guard is intentionally a no-op and nothing is restored.
+    const int blas_threads_before = util::get_blas_num_threads();
     const auto& ctx = scf->run();
+    if (blas_threads_before > 0)
+      EXPECT_EQ(util::get_blas_num_threads(), blas_threads_before);
     auto res = ctx.result;
 
     // Print JSON line for reference data

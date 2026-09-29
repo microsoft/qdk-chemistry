@@ -14,6 +14,8 @@
 #include <type_traits>
 #include <variant>
 
+#include "microsoft/localization/active_space_qio.hpp"
+#include "microsoft/localization/gauge_fixing.hpp"
 #include "microsoft/localization/mp2_natural_orbitals.hpp"
 #include "microsoft/localization/natural_orbitals.hpp"
 #include "microsoft/localization/pipek_mezey.hpp"
@@ -127,7 +129,10 @@ void warn_if_not_aufbau_determinant_wavefunction(
 std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
     std::shared_ptr<data::Wavefunction> wavefunction,
     std::shared_ptr<data::Orbitals> new_orbitals,
-    std::optional<data::ContainerTypes::MatrixVariant> one_rdm_spin_traced) {
+    const std::optional<data::ContainerTypes::MatrixVariant>&
+        one_rdm_spin_traced,
+    std::shared_ptr<const data::SymmetryBlockedTensorVariant<2>>
+        active_one_rdm) {
   QDK_LOG_TRACE_ENTERING();
   if (!wavefunction) {
     throw std::invalid_argument("Wavefunction pointer cannot be nullptr");
@@ -139,13 +144,21 @@ std::shared_ptr<data::Wavefunction> new_aufbau_determinant_wavefunction(
   auto aufbau_det = _active_configuration_for_orbitals(
       _aufbau_determinant_configuration(wavefunction, new_orbitals),
       new_orbitals);
-  if (one_rdm_spin_traced) {
+  if (one_rdm_spin_traced || active_one_rdm) {
     Eigen::VectorXd coeffs = Eigen::VectorXd::Ones(1);
     data::ContainerTypes::DeterminantVector determinants{aufbau_det};
+    auto one_rdm_spin_traced_ptr =
+        one_rdm_spin_traced
+            ? std::make_shared<data::ContainerTypes::MatrixVariant>(
+                  *one_rdm_spin_traced)
+            : nullptr;
     auto new_container = std::make_unique<data::StateVectorContainer>(
         data::ContainerTypes::VectorVariant(coeffs), determinants, new_orbitals,
-        one_rdm_spin_traced, std::nullopt, "electrons",
-        data::OrbitalEntropies{}, wavefunction->get_type());
+        std::move(one_rdm_spin_traced_ptr),
+        nullptr,  // two_rdm_spin_traced
+        std::move(active_one_rdm),
+        nullptr,  // active_two_rdm
+        "electrons", data::OrbitalEntropies{}, wavefunction->get_type());
     return std::make_shared<data::Wavefunction>(std::move(new_container));
   }
 
@@ -180,6 +193,18 @@ std::unique_ptr<Localizer> make_natural_orbital_localizer() {
   return std::make_unique<microsoft::NaturalOrbitalLocalizer>();
 }
 
+std::unique_ptr<Localizer> make_gauge_fixing_localizer() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<microsoft::GaugeFixingLocalizer>();
+}
+
+std::unique_ptr<Localizer> make_active_space_qio_localizer() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<microsoft::ActiveSpaceQIOLocalizer>();
+}
+
 std::unique_ptr<Localizer> make_vvhv_localizer() {
   QDK_LOG_TRACE_ENTERING();
 
@@ -192,6 +217,8 @@ void LocalizerFactory::register_default_instances() {
   LocalizerFactory::register_instance(&make_pipek_mezey_localizer);
   LocalizerFactory::register_instance(&make_mp2_natural_orbital_localizer);
   LocalizerFactory::register_instance(&make_natural_orbital_localizer);
+  LocalizerFactory::register_instance(&make_gauge_fixing_localizer);
+  LocalizerFactory::register_instance(&make_active_space_qio_localizer);
   LocalizerFactory::register_instance(&make_vvhv_localizer);
 }
 

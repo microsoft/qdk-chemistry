@@ -27,8 +27,15 @@ __all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Sel
 class BlockEncodingContainer(UnitaryContainer):
     """Abstract base class for block encoding containers."""
 
-    # Class attribute for filename validation
-    _data_type_name = "block_encoding_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for block-encoding containers.
+
+        Returns:
+            ``"block_encoding_container"``.
+
+        """
+        return "block_encoding_container"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
@@ -153,8 +160,15 @@ class LCUContainer(BlockEncodingContainer):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "lcu_container"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for LCU containers.
+
+        Returns:
+            ``"lcu_container"``.
+
+        """
+        return "lcu_container"
 
     # Serialization version for this class
     _serialization_version = "0.2.0"

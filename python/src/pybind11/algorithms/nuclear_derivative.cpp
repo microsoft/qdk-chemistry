@@ -80,6 +80,11 @@ Args:
 Returns:
     tuple: ``(energy, gradients, hessian, wavefunction)``.
 )");
+  calculator.def(
+      "hash", &NuclearDerivativeCalculator::hash, py::arg("structure"),
+      py::arg("charge"), py::arg("spin_multiplicity"), py::arg("seed_or_basis"),
+      py::arg("n_inactive_orbitals") = 0,
+      R"(Compute a deterministic content hash for a nuclear derivative run.)");
   calculator.def("settings", &NuclearDerivativeCalculator::settings,
                  py::return_value_policy::reference_internal,
                  R"(Return the calculator settings.)");
@@ -96,6 +101,8 @@ Returns:
       R"(Internal settings replacement hook for Python subclasses.)");
   calculator.def("name", &NuclearDerivativeCalculator::name,
                  R"(Return the implementation name.)");
+  calculator.def("aliases", &NuclearDerivativeCalculator::aliases,
+                 R"(Return all registered names for the implementation.)");
   calculator.def("type_name", &NuclearDerivativeCalculator::type_name,
                  R"(Return the algorithm type name.)");
   calculator.def("__repr__", [](const NuclearDerivativeCalculator& self) {

@@ -14,6 +14,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
+from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError
 from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:
@@ -307,6 +308,7 @@ class AlgorithmFactory(ABC):
     def __init__(self) -> None:
         """Initialize the algorithm factory with an empty registry."""
         self._registry: dict[str, Callable[[], Algorithm]] = {}
+        self._aliases: dict[str, str] = {}
 
     @abstractmethod
     def algorithm_type_name(self) -> str:
@@ -332,7 +334,7 @@ class AlgorithmFactory(ABC):
 
         """
 
-    def create(self, name: str | None = None) -> Algorithm:
+    def create(self, name: str | None = None, *, suppress_warnings: bool = False) -> Algorithm:
         """Create an algorithm instance by name.
 
         Creates and returns a new instance of the requested algorithm. If no name
@@ -342,6 +344,8 @@ class AlgorithmFactory(ABC):
             name (Optional[str]): The name of the algorithm to create.
 
                 If None or empty, creates the default algorithm.
+
+            suppress_warnings (bool): Whether to suppress creation-time warnings.
 
         Returns:
             Algorithm: A new instance of the requested algorithm.
@@ -357,14 +361,17 @@ class AlgorithmFactory(ABC):
             >>> pyscf_solver = factory.create("pyscf")
 
         """
+        del suppress_warnings
         if name is None or name == "":
             name = self.default_algorithm_name()
-        if name not in self._registry:
-            raise RuntimeError(
-                f"Algorithm '{name}' of type '{self.algorithm_type_name()}' is not registered. "
-                f"Available algorithms: {list(self._registry.keys())}"
-            )
-        return self._registry[name]()
+        generator = self._registry.get(self._aliases.get(name, name))
+        if generator is not None:
+            return generator()
+
+        raise RuntimeError(
+            f"Algorithm '{name}' of type '{self.algorithm_type_name()}' is not registered. "
+            f"Available algorithms: {list(self._registry.keys())}"
+        )
 
     def register_instance(self, generator: Callable[[], Algorithm]) -> None:
         """Register a new algorithm implementation in this factory.
@@ -375,15 +382,44 @@ class AlgorithmFactory(ABC):
         Args:
             generator (Callable[[], Algorithm]): A callable that returns a new instance of the algorithm.
 
-                Must return an Algorithm whose name()
-                will be used as the registration key.
+                Must return an Algorithm with unique names and aliases.
+
+        Raises:
+            DuplicateRegistrationError: If an algorithm name or alias is already registered in this factory.
 
         Examples:
             >>> factory = ScfSolverFactory()
             >>> factory.register_instance(lambda: MyCustomScf())
 
         """
-        self._registry[generator().name()] = generator
+        instance = generator()
+        name = instance.name()
+        aliases = instance.aliases()
+        if not isinstance(aliases, list):
+            raise TypeError(f"Algorithm '{name}' aliases must be returned as a list")
+        if not name:
+            raise ValueError("Algorithm name must not be empty")
+        if name not in aliases:
+            raise ValueError(f"Algorithm '{name}' must include its canonical name in aliases")
+        if any(not isinstance(alias, str) or not alias for alias in aliases):
+            raise ValueError(f"Algorithm '{name}' aliases must be non-empty strings")
+        if len(aliases) != len(set(aliases)):
+            raise ValueError(f"Algorithm '{name}' aliases must be unique")
+        if name in self._registry or name in self._aliases:
+            raise _DuplicateRegistrationError(
+                f"Algorithm factory for {self.algorithm_type_name()}: "
+                f"algorithm with name/alias '{name}' already exists in registry"
+            )
+        for alias in aliases:
+            if alias == name:
+                continue
+            if alias in self._registry or alias in self._aliases:
+                raise _DuplicateRegistrationError(
+                    f"Algorithm factory for {self.algorithm_type_name()}: "
+                    f"algorithm with name/alias '{alias}' already exists in registry"
+                )
+        self._registry[name] = generator
+        self._aliases.update(dict.fromkeys((alias for alias in aliases if alias != name), name))
 
     def unregister_instance(self, name: str) -> bool:
         """Remove an algorithm implementation from this factory.
@@ -399,7 +435,10 @@ class AlgorithmFactory(ABC):
             >>> success = factory.unregister_instance("my_custom_scf")
 
         """
-        return self._registry.pop(name, None) is not None
+        if self._registry.pop(name, None) is None:
+            return False
+        self._aliases = {alias: owner for alias, owner in self._aliases.items() if owner != name}
+        return True
 
     def available(self) -> list[str]:
         """Get a list of all available algorithm names in this factory.
@@ -431,7 +470,7 @@ class AlgorithmFactory(ABC):
             ...     scf = factory.create("pyscf")
 
         """
-        return key in self._registry
+        return key in self._registry or key in self._aliases
 
     def clear(self) -> None:
         """Remove all registered algorithms from this factory.
@@ -445,3 +484,4 @@ class AlgorithmFactory(ABC):
 
         """
         self._registry.clear()
+        self._aliases.clear()

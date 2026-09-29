@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 
@@ -93,6 +92,13 @@ Args:
            R"(Return the x, y, z gradient components for one atom.)")
       .def("as_matrix", &NuclearGradients::as_matrix,
            R"(Return gradients as an ``(num_atoms, 3)`` matrix.)")
+      .def_static("data_type_name", &NuclearGradients::data_type_name, R"(
+Return the wire-format identifier for nuclear gradients.
+
+Returns:
+    str: ``"nuclear_gradients"``
+
+)")
       .def("get_data_type_name", &NuclearGradients::get_data_type_name,
            R"(Return the serialized data type name.)")
       .def("get_summary", &NuclearGradients::get_summary,

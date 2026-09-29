@@ -11,11 +11,11 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -521,6 +521,9 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "sparse") {
     return SparseHamiltonianContainer::from_json(j);
   }
+  if (container_type == "factorized") {
+    return FactorizedHamiltonianContainer::from_json(j);
+  }
   throw std::runtime_error("Unknown container type: " + container_type);
 }
 
@@ -548,6 +551,9 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     }
     if (container_type == "sparse") {
       return SparseHamiltonianContainer::from_hdf5(group);
+    }
+    if (container_type == "factorized") {
+      return FactorizedHamiltonianContainer::from_hdf5(group);
     }
     throw std::runtime_error("Unknown container type: " + container_type);
 
@@ -589,7 +595,7 @@ void Hamiltonian::to_hdf5_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Hamiltonian));
+      filename, Hamiltonian::data_type_name());
 
   _to_hdf5_file(validated_filename);
 }
@@ -601,8 +607,8 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_hdf5_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Hamiltonian::data_type_name());
 
   return _from_hdf5_file(validated_filename);
 }
@@ -614,7 +620,7 @@ void Hamiltonian::to_json_file(const std::string& filename) const {
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Hamiltonian));
+      filename, Hamiltonian::data_type_name());
 
   _to_json_file(validated_filename);
 }
@@ -626,8 +632,8 @@ std::shared_ptr<Hamiltonian> Hamiltonian::from_json_file(
     throw std::invalid_argument("Filename cannot be empty");
   }
   // Validate filename has correct data type suffix
-  std::string validated_filename =
-      DataTypeFilename::validate_read_suffix(filename, "hamiltonian");
+  std::string validated_filename = DataTypeFilename::validate_read_suffix(
+      filename, Hamiltonian::data_type_name());
 
   return _from_json_file(validated_filename);
 }
@@ -640,7 +646,7 @@ void Hamiltonian::to_fcidump_file(const std::string& filename, size_t nalpha,
   }
   // Validate filename has correct data type suffix
   std::string validated_filename = DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(Hamiltonian));
+      filename, Hamiltonian::data_type_name());
 
   _container->to_fcidump_file(validated_filename, nalpha, nbeta);
 }

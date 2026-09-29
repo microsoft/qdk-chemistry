@@ -30,6 +30,14 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
     def __init__(self):
         """Initialize the settings for the Standard Phase Estimation Circuit Builder."""
         super().__init__()
+        self._set_default(
+            "measure_phase",
+            "bool",
+            True,
+            "Measure the phase register in the computational basis. Set to false for a "
+            "measurement-free, adjointable circuit, such as the preparation amplitude "
+            "amplification reflects about.",
+        )
 
 
 class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
@@ -84,6 +92,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Raises:
             ValueError: If ``num_bits`` is not a positive integer.
+            RuntimeError: If the inputs do not carry Q# operations.
 
         """
         num_bits = self.settings().get("num_bits")
@@ -138,9 +147,19 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
+        qpe_op = QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPEOp(
+            state_prep_op,
+            ctrl_unitary_ops,
+            num_bits,
+            ancillas,
+            systems,
+            phase_qubit_prep_op,
+            num_ancilla_qubits,
+        )
         standard_parameters = {
             "statePrep": state_prep_op,
             "controlledUnitary": ctrl_unitary_ops,
@@ -149,12 +168,14 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillaQubits": num_ancilla_qubits,
+            "measurePhase": bool(self._settings.get("measure_phase")),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.StandardPhaseEstimation.MakeStandardQPECircuit,
                 parameter=standard_parameters,
-            )
+            ),
+            qsharp_op=qpe_op,
         )
 
     def name(self) -> str:

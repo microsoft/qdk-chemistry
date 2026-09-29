@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -27,7 +26,6 @@ void stability_result_to_file_wrapper(StabilityResult &self,
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 // Wrapper for from_file() that converts Python path objects to strings
 std::shared_ptr<StabilityResult> stability_result_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
@@ -667,7 +665,12 @@ Examples:
         return *result;
       }));
 
-  // Data type name class attribute
-  stability_result.attr("_data_type_name") =
-      DATACLASS_TO_SNAKE_CASE(StabilityResult);
+  stability_result.def_static("data_type_name",
+                              &StabilityResult::data_type_name, R"(
+Return the wire-format identifier for stability results.
+
+Returns:
+        str: ``"stability_result"``
+
+)");
 }

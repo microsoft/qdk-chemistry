@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data import Element, Structure
+from qdk_chemistry.data._type_name import class_data_type_name
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -853,6 +854,5 @@ class TestStructurePicklingAndRepr:
 
 
 def test_structure_data_type_name():
-    """Test that Structure has the correct _data_type_name class attribute."""
-    assert hasattr(Structure, "_data_type_name")
-    assert Structure._data_type_name == "structure"
+    """Test that Structure exposes its static wire-format identifier."""
+    assert class_data_type_name(Structure) == "structure"

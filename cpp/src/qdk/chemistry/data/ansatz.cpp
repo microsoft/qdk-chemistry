@@ -8,7 +8,6 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -573,8 +572,7 @@ void Ansatz::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(filename,
-                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_write_suffix(filename, Ansatz::data_type_name());
   _to_hdf5_file(filename);
 }
 
@@ -583,8 +581,7 @@ std::shared_ptr<Ansatz> Ansatz::from_hdf5_file(const std::string& filename) {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename,
-                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_read_suffix(filename, Ansatz::data_type_name());
   return _from_hdf5_file(filename);
 }
 
@@ -593,8 +590,7 @@ void Ansatz::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(filename,
-                                          DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_write_suffix(filename, Ansatz::data_type_name());
   _to_json_file(filename);
 }
 
@@ -603,8 +599,7 @@ std::shared_ptr<Ansatz> Ansatz::from_json_file(const std::string& filename) {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename,
-                                         DATACLASS_TO_SNAKE_CASE(Ansatz));
+  DataTypeFilename::validate_read_suffix(filename, Ansatz::data_type_name());
   return _from_json_file(filename);
 }
 

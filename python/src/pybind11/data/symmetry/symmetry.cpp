@@ -67,6 +67,13 @@ void bind_symmetry(py::module& symmetry) {
       .def(py::self == py::self)
       .def(py::self != py::self)
       .def("__hash__", &SymmetryAxis::hash)
+      .def_static("data_type_name", &SymmetryAxis::data_type_name, R"(
+    Return the wire-format identifier for symmetry axes.
+
+    Returns:
+        str: ``"symmetry_axis"``
+
+    )")
       .def("get_data_type_name", &SymmetryAxis::get_data_type_name)
       .def("get_summary", &SymmetryAxis::get_summary)
       .def("__repr__", &SymmetryAxis::get_summary)
@@ -123,6 +130,13 @@ void bind_symmetry(py::module& symmetry) {
       .def(py::self == py::self)
       .def(py::self != py::self)
       .def("__hash__", &SymmetryProduct::hash)
+      .def_static("data_type_name", &SymmetryProduct::data_type_name, R"(
+    Return the wire-format identifier for symmetry products.
+
+    Returns:
+        str: ``"symmetry_product"``
+
+    )")
       .def("get_data_type_name", &SymmetryProduct::get_data_type_name)
       .def("get_summary", &SymmetryProduct::get_summary)
       .def("__repr__", &SymmetryProduct::get_summary)

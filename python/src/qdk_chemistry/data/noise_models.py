@@ -124,8 +124,15 @@ class QuantumErrorProfile(DataClass):
 
     """
 
-    # Class attribute for filename validation
-    _data_type_name = "quantum_error_profile"
+    @staticmethod
+    def data_type_name() -> str:
+        """Return the wire-format identifier for quantum error profiles.
+
+        Returns:
+            ``"quantum_error_profile"``.
+
+        """
+        return "quantum_error_profile"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"

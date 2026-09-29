@@ -2,7 +2,7 @@ Orbital localization
 ====================
 
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemistry performs various orbital transformations to create localized or otherwise transformed molecular orbitals.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with localized orbitals as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with transformed orbitals as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 
 Overview
@@ -46,13 +46,15 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` requires the following inputs:
 
 Wavefunction
-   A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be localized.
+   A :class:`~qdk_chemistry.data.Wavefunction` instance containing the molecular orbitals to be transformed.
 
 Alpha orbital indices (``loc_indices_a``)
-   A list/vector of indices specifying which alpha orbitals to include in the localization. Indices must be sorted in ascending order.
+   A list/vector of indices specifying which alpha orbitals to include in the transformation. Indices must be sorted in ascending order; an empty list selects no alpha orbitals.
 
 Beta orbital indices (``loc_indices_b``)
-   A list/vector of indices specifying which beta orbitals to include in the localization. Indices must be sorted in ascending order.
+   A list/vector of indices specifying which beta orbitals to include in the transformation. Indices must be sorted in ascending order; an empty list selects no beta orbitals.
+
+If both index lists are empty, the orbital transformation is a no-op.
 
 
 .. rubric:: Creating a localizer
@@ -90,7 +92,7 @@ See `Available implementations`_ below for implementation-specific options.
       :start-after: // start-cell-configure
       :end-before: // end-cell-configure
 
-.. rubric:: Running localization
+.. rubric:: Running the transformation
 
 .. note::
    For restricted calculations, ``loc_indices_a`` and ``loc_indices_b`` must be identical.
@@ -112,7 +114,7 @@ See `Available implementations`_ below for implementation-specific options.
 Available implementations
 -------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface to orbital localization methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` provides a unified interface to orbital localization and transformation methods.
 You can discover available implementations programmatically:
 
 .. tab:: Python API
@@ -171,6 +173,7 @@ QDK Natural Orbitals
 
 Transforms active orbitals to natural orbitals :cite:`Lowdin1956` by diagonalizing the active-space one-particle reduced density matrix (1-RDM).
 The eigenvalues are the natural-orbital occupation numbers.
+Natural orbitals are not necessarily spatially localized.
 
 The input wavefunction must define an active space and contain active-space 1-RDM data.
 The selected alpha and beta indices must be identical and must match the active-space indices.
@@ -179,6 +182,126 @@ For unrestricted inputs, spin-dependent active-space 1-RDM blocks are combined i
 .. rubric:: Settings
 
 This implementation has no configurable settings.
+
+.. _localizer-qdk-gauge-fixing:
+
+QDK Gauge Fixing
+~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_gauge_fixing"``
+
+Natural orbitals with equal occupation numbers span a well-defined subspace but do not have unique orbital vectors.
+Any orthogonal rotation within the active space leaves the exact :term:`CASCI` energy unchanged, yet it produces a
+different qubit Hamiltonian after mapping.
+Restricting the rotations to occupation-degenerate blocks additionally keeps the active-space 1-RDM diagonal up to
+``degeneracy_tolerance`` while preserving its occupation spectrum.
+This localizer resolves that freedom deterministically: it first anchors every degenerate block to the atomic-orbital
+basis, then runs coordinate-descent sweeps over Givens plane rotations inside each block, accepting only rotations
+that reduce the mapped coefficient norm :math:`\lambda = \sum_\ell |h_\ell|` of the active-space Hamiltonian.
+:math:`\lambda` is measured before any post-mapping qubit tapering, and is the same for every linear
+fermion-to-qubit encoding, so the choice of mapping does not affect which gauge is selected.
+
+Because :math:`\lambda` sets the evolution time in :doc:`phase estimation <phase_estimation>` and the normalization of
+a linear-combination-of-unitaries block encoding, reducing it lowers quantum resource estimates without affecting the
+energy.
+The returned wavefunction carries the occupation numbers and the spin-resolved active-space 1-RDM in the chosen
+gauge.
+
+Choosing a gauge is a separate objective from finding the natural orbitals, so the two are composed rather than
+combined: run :ref:`QDK Natural Orbitals <localizer-qdk-natural-orbitals>` first and pass its result here.
+The input orbitals must be restricted and must diagonalize the active-space 1-RDM.
+The selected indices must be a subset of the active-space indices, and they may not split a degenerate block, because
+selecting only part of a degenerate block would make the chosen gauge depend on the arbitrary input orientation.
+Selecting a proper subset restricts which blocks are anchored and swept; :math:`\lambda` is always measured over the
+full active space, and the returned wavefunction carries the input active space unchanged.
+
+AO anchoring canonicalizes the gauge before optimization and may not decrease :math:`\lambda` relative to the input
+orientation.
+
+.. note::
+   Each objective evaluation performs an integral transformation and a qubit mapping, so the cost grows with the
+   number of degenerate planes, ``angle_samples``, and ``max_sweeps``.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``hamiltonian_constructor``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - ``AlgorithmRef("hamiltonian_constructor", "qdk")``
+     - Hamiltonian constructor used to define the mapped coefficient-norm objective
+   * - ``degeneracy_tolerance``
+     - float
+     - ``1e-6``
+     - Maximum occupation-number spread within one degenerate block
+   * - ``angle_samples``
+     - int
+     - ``32``
+     - Uniform samples over :math:`[0, \pi)` used to bracket each plane rotation
+   * - ``max_sweeps``
+     - int
+     - ``3``
+     - Maximum coordinate-descent passes; ``0`` applies AO anchoring only
+   * - ``improvement_tolerance``
+     - float
+     - ``1e-10``
+     - Minimum coefficient-norm reduction, in Hartree, required to accept a rotation
+.. _localizer-qdk-active-space-qio:
+
+QDK Active-Space Quantum-Information Orbitals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_active_space_qio"``
+
+Transforms active orbitals by minimizing the sum of their single-orbital entropies with gradient-free Jacobi sweeps :cite:`Liao2024`.
+The objective uses the same entropy convention as :meth:`~qdk_chemistry.data.Wavefunction.get_single_orbital_entropies`.
+This transformation can provide an orbital basis with more compactly distributed correlation.
+
+The input :class:`~qdk_chemistry.data.Wavefunction` must contain a restricted active orbital space and spin-dependent active-space one- and two-particle reduced density matrices.
+Open-shell restricted references are supported, but unrestricted orbitals are not.
+The selected alpha and beta indices must be identical and match the active-space indices.
+
+The localizer optimizes against the fixed input density matrices and returns a single orbital rotation.
+It does not recompute the correlated wavefunction after rotating the orbitals.
+It minimizes the quantum-information-orbital objective restricted to rotations within a fixed active space.
+It does not implement full-space QIO or QICAS, both of which mix orbitals across the active-space boundary and require a self-consistent correlated workflow.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``max_cycles``
+     - int
+     - ``200``
+     - Maximum number of Jacobi sweeps
+   * - ``convergence_tolerance``
+     - float
+     - ``1e-10``
+     - Sweep-to-sweep entropy change used for convergence
+   * - ``coarse_angle_step``
+     - float
+     - ``0.02``
+     - Coarse pair-rotation angle spacing in radians; valid range ``[1e-4, pi/2]``
+   * - ``fine_samples``
+     - int
+     - ``201``
+     - Number of samples used to refine the best coarse angle
+   * - ``improvement_tolerance``
+     - float
+     - ``1e-12``
+     - Minimum entropy decrease required to accept a pair rotation
 
 QDK MP2 Natural Orbitals
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -13,6 +13,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -229,6 +230,23 @@ TEST_F(AnsatzEnergyCalculationTest, O2TripletCAS_8e6o) {
   double energy_hf = ansatz_hf.calculate_energy();
 
   EXPECT_NEAR(energy_hf, E_scf, testing::scf_energy_tolerance);
+}
+
+TEST_F(AnsatzEnergyCalculationTest, AgHWithEcpMatchesScfEnergy) {
+  auto structure = testing::create_agh_structure();
+  auto scf = ScfSolverFactory::create();
+  const auto& [scf_energy, wavefunction] =
+      scf->run(structure, 0, 1, "def2-svp");
+
+  auto orbitals = wavefunction->get_orbitals();
+  ASSERT_TRUE(orbitals->get_basis_set()->has_ecp_electrons());
+
+  auto hamiltonian_constructor = HamiltonianConstructorFactory::create();
+  auto hamiltonian = hamiltonian_constructor->run(orbitals);
+  Ansatz mean_field_ansatz(hamiltonian, wavefunction);
+
+  EXPECT_NEAR(mean_field_ansatz.calculate_energy(), scf_energy,
+              testing::scf_energy_tolerance);
 }
 
 // Test for creating Ansatz from separately loaded Hamiltonian and Wavefunction

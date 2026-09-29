@@ -78,3 +78,57 @@ index 0881fae..46d98b2 100644
      typedef blas::scalar_type<TA, TX, TY> scalar_t;
  
      #define A(i_, j_) A[ (i_) + (j_)*lda ]
+# 4. config/return_complex.cc: make the zdotc return-convention probe compile
+#    under MSVC. The probe hardcodes C99 `double _Complex`, which MSVC does not
+#    support in C++, so it always fails to compile there and blaspp falls back to
+#    the hidden-argument probe. On x64 that fallback is right by accident (MSVC
+#    returns 16-byte structs via a hidden pointer, ABI-identical to an explicit
+#    leading pointer), but on ARM64 a struct of two doubles is an HFA returned in
+#    d0/d1, so the fallback measures the wrong ABI, both probes fail and configure
+#    aborts with 'Cannot detect zdotc return value'.
+#
+#    blas/config.h already typedefs blas_complex_double to 'struct {double real,
+#    imag;}' for MSVC -- exactly what OpenBLAS returns -- and src/dot.cc's
+#    non-ARGUMENT branch consumes that struct correctly, so only the probe is
+#    wrong. Mirror that typedef here so the probe measures the ABI the library
+#    actually uses. Detection stays self-correcting: if the by-value probe ever
+#    reports a wrong result it prints 'failed' and blaspp falls back to the
+#    hidden-argument probe exactly as before.
+diff --git a/config/return_complex.cc b/config/return_complex.cc
+index b89fac6..d9f5be0 100644
+--- a/config/return_complex.cc
++++ b/config/return_complex.cc
+@@ -7,7 +7,14 @@
+ #include <complex>
+ 
+ // Use C99 _Complex as return type to be compatible with extern C linkage.
+-#include <complex.h>
++// MSVC has no C99 _Complex; mirror the struct typedef that blas/config.h uses
++// there so this probe measures the same ABI the library will actually use.
++#ifdef _MSC_VER
++    typedef struct { double real, imag; } blas_probe_complex_double;
++#else
++    #include <complex.h>
++    typedef double _Complex blas_probe_complex_double;
++#endif
+ 
+ #include "config.h"
+ 
+@@ -18,7 +25,7 @@
+ #ifdef __cplusplus
+ extern "C"
+ #endif
+-double _Complex BLAS_zdotc(
++blas_probe_complex_double BLAS_zdotc(
+     const blas_int* n,
+     const std::complex<double>* x, const blas_int* incx,
+     const std::complex<double>* y, const blas_int* incy );
+@@ -35,7 +42,7 @@ int main()
+                 i, real( y[ i ] ), imag( y[ i ] ) );
+     }
+ 
+-    double _Complex r = BLAS_zdotc( &n, x, &ione, y, &ione );
++    blas_probe_complex_double r = BLAS_zdotc( &n, x, &ione, y, &ione );
+     std::complex<double> result = *reinterpret_cast< std::complex<double>* >( &r );
+     printf( "result = %.1f + %.1fi; should be 35.0 + 0.0i\n",
+             real( result ), imag( result ) );

@@ -8,7 +8,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -175,8 +174,8 @@ void StabilityResult::to_file(const std::string& filename,
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(StabilityResult));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          StabilityResult::data_type_name());
 
   if (type == "json") {
     to_json_file(filename);
@@ -217,8 +216,8 @@ void StabilityResult::to_json_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(StabilityResult));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          StabilityResult::data_type_name());
   _to_json_file(filename);
 }
 void StabilityResult::to_hdf5(H5::Group& group) const {
@@ -270,8 +269,8 @@ void StabilityResult::to_hdf5_file(const std::string& filename) const {
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_write_suffix(
-      filename, DATACLASS_TO_SNAKE_CASE(StabilityResult));
+  DataTypeFilename::validate_write_suffix(filename,
+                                          StabilityResult::data_type_name());
   _to_hdf5_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_file(
@@ -280,7 +279,8 @@ std::shared_ptr<StabilityResult> StabilityResult::from_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "stability_result");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         StabilityResult::data_type_name());
 
   if (type == "json") {
     return from_json_file(filename);
@@ -298,7 +298,8 @@ std::shared_ptr<StabilityResult> StabilityResult::from_json_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "stability_result");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         StabilityResult::data_type_name());
   return _from_json_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_json(
@@ -355,7 +356,8 @@ std::shared_ptr<StabilityResult> StabilityResult::from_hdf5_file(
   if (filename.empty()) {
     throw std::invalid_argument("Filename cannot be empty");
   }
-  DataTypeFilename::validate_read_suffix(filename, "stability_result");
+  DataTypeFilename::validate_read_suffix(filename,
+                                         StabilityResult::data_type_name());
   return _from_hdf5_file(filename);
 }
 std::shared_ptr<StabilityResult> StabilityResult::from_hdf5(H5::Group& group) {

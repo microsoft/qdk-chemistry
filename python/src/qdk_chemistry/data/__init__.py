@@ -20,6 +20,7 @@ Exposed classes are:
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
+- :class:`FactorizedHamiltonianContainer`: Container for factorized hamiltonians.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
@@ -80,6 +81,7 @@ from qdk_chemistry._core.data import (
     ConfigurationSet,
     ElectronicStructureSettings,
     Element,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
@@ -119,6 +121,7 @@ from qdk_chemistry.data.qpe_result import QpeResult
 
 # ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
 from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
+from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
@@ -154,6 +157,7 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
+    "FactorizedHamiltonianContainer",
     "FermionModeOrder",
     "FlatPartition",
     "Hamiltonian",
@@ -199,7 +203,10 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
+    "available_dataclasses",
     "get_current_ciaaw_version",
+    "get_dataclass_type",
+    "register_dataclass",
 ]
 
 

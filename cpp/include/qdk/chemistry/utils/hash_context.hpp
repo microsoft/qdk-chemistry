@@ -334,6 +334,46 @@ void hash_value(HashContext& ctx, const std::complex<T>& value) {
   hash_value(ctx, value.imag());
 }
 
+/**
+ * @brief Hash a dense Eigen vector or matrix.
+ *
+ * Vector shapes use the established size-prefixed encoding. Matrix shapes use
+ * the established row- and column-prefixed encoding and column-major logical
+ * element order, independent of their storage option.
+ *
+ * @tparam Scalar Matrix scalar type
+ * @tparam Rows Compile-time row count
+ * @tparam Cols Compile-time column count
+ * @tparam Options Eigen storage options
+ * @tparam MaxRows Compile-time maximum row count
+ * @tparam MaxCols Compile-time maximum column count
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+template <typename Scalar, int Rows, int Cols, int Options, int MaxRows,
+          int MaxCols>
+  requires requires(HashContext& scalar_ctx, const Scalar& scalar) {
+    hash_value(scalar_ctx, scalar);
+  }
+void hash_value(
+    HashContext& ctx,
+    const Eigen::Matrix<Scalar, Rows, Cols, Options, MaxRows, MaxCols>& value) {
+  if constexpr (Rows == 1 || Cols == 1) {
+    hash_value(ctx, static_cast<int64_t>(value.size()));
+    for (Eigen::Index i = 0; i < value.size(); ++i) {
+      hash_value(ctx, value.coeff(i));
+    }
+  } else {
+    hash_value(ctx, static_cast<int64_t>(value.rows()));
+    hash_value(ctx, static_cast<int64_t>(value.cols()));
+    for (Eigen::Index col = 0; col < value.cols(); ++col) {
+      for (Eigen::Index row = 0; row < value.rows(); ++row) {
+        hash_value(ctx, value.coeff(row, col));
+      }
+    }
+  }
+}
+
 template <typename T>
 void hash_value(HashContext& ctx, const std::shared_ptr<T>& value) {
   hash_value(ctx, HashValueTag::SharedPtr);

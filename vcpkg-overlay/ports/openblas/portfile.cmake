@@ -43,6 +43,42 @@ if(VCPKG_TARGET_IS_EMSCRIPTEN)
     )
 endif()
 
+# QDK overlay change: build with clang-cl on Windows ARM64.
+#
+# MSVC cannot assemble OpenBLAS's ARM64 kernels, which are GNU-syntax .S files.
+# The only MSVC-compatible fallback is TARGET=GENERIC, but that yields blocking
+# parameters which make the blocked LU factorisation loop forever: getrf_single.c
+# advances its loops by GEMM_P / GEMM_Q / GEMM_R, and a zero step never
+# terminates. It is a silent hang, not a build or link error -- dgemm returns
+# correct results and dgetrf never returns above the getf2 crossover (verified
+# on CI: n = 1, 2, 4 return via getf2, n = 24 hangs).
+#
+# clang-cl understands the GNU assembly dialect, so getarch can select the real
+# ARMV8 kernels. This is also the configuration OpenBLAS itself supports: its
+# Windows ARM64 CI job builds with clang-cl and never with MSVC.
+if(VCPKG_TARGET_ARCHITECTURE MATCHES "^arm64" AND VCPKG_TARGET_IS_WINDOWS AND NOT VCPKG_TARGET_IS_MINGW)
+    find_program(QDK_OPENBLAS_CLANG_CL
+        NAMES clang-cl clang-cl.exe
+        PATHS
+            "$ENV{ProgramFiles}/LLVM/bin"
+            "$ENV{ProgramW6432}/LLVM/bin"
+            "$ENV{VCINSTALLDIR}/Tools/Llvm/ARM64/bin"
+            "$ENV{VCINSTALLDIR}/Tools/Llvm/bin"
+    )
+    # Fail loudly rather than silently falling back to the MSVC/GENERIC build,
+    # which produces a library that hangs at runtime instead of failing to build.
+    if(NOT QDK_OPENBLAS_CLANG_CL)
+        message(FATAL_ERROR
+            "clang-cl is required to build OpenBLAS for Windows ARM64: MSVC cannot "
+            "assemble the ARM64 kernels, and the GENERIC fallback hangs in getrf.")
+    endif()
+    message(STATUS "OpenBLAS Windows ARM64: building with ${QDK_OPENBLAS_CLANG_CL}")
+    list(APPEND OPTIONS
+        "-DCMAKE_C_COMPILER=${QDK_OPENBLAS_CLANG_CL}"
+        "-DCMAKE_ASM_COMPILER=${QDK_OPENBLAS_CLANG_CL}"
+    )
+endif()
+
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS

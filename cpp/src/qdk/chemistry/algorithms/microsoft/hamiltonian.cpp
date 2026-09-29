@@ -143,8 +143,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
         ", Beta: " + std::to_string(nactive_beta));
   }
 
-  // Create internal Molecule
-  auto structure = basis_set->get_structure();
+  const double effective_nuclear_repulsion =
+      basis_set->calculate_effective_nuclear_repulsion_energy();
 
   // Create internal BasisSet (includes ECP-adjusted nuclear charges)
   auto internal_basis_set =
@@ -312,8 +312,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active, moeri_aaaa, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock));
+              H_active, moeri_aaaa, orbitals, effective_nuclear_repulsion,
+              dummy_fock));
     } else {
       // Use unrestricted constructor
       Eigen::MatrixXd H_active_alpha(nactive, nactive);
@@ -325,8 +325,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals, structure->calculate_nuclear_repulsion_energy(),
-              dummy_fock_alpha, dummy_fock_beta));
+              orbitals, effective_nuclear_repulsion, dummy_fock_alpha,
+              dummy_fock_beta));
     }
   }
 
@@ -387,8 +387,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             H_active, moeri_aaaa, orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive));
+            E_inactive + effective_nuclear_repulsion, F_inactive));
 
   } else {
     // Unrestricted case
@@ -495,8 +494,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-            orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            orbitals, E_inactive + effective_nuclear_repulsion,
             F_inactive_alpha, F_inactive_beta));
   }
 }

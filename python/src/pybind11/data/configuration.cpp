@@ -9,7 +9,6 @@
 #include <pybind11/stl.h>
 
 #include <qdk/chemistry.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "property_binding_helpers.hpp"
 
@@ -107,8 +106,6 @@ Returns:
 Examples:
     >>> qdk_chemistry.Configuration.from_bitstring("101").bits_per_mode
     1
-    >>> qdk_chemistry.Configuration.from_spin_half_string("2u0").bits_per_mode
-    2
 
 )");
 
@@ -380,7 +377,12 @@ Examples:
 
 )",
       py::arg("n_bits"));
-  // Data type name class attribute
-  configuration.attr("_data_type_name") =
-      DATACLASS_TO_SNAKE_CASE(Configuration);
+  configuration.def_static("data_type_name", &Configuration::data_type_name,
+                           R"(
+Return the wire-format identifier for configurations.
+
+Returns:
+    str: ``"configuration"``
+
+)");
 }

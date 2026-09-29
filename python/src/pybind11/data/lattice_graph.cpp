@@ -8,7 +8,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -23,7 +22,6 @@ void lattice_graph_to_file_wrapper(
   self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
                format_type);
 }
-
 qdk::chemistry::data::LatticeGraph lattice_graph_from_file_wrapper(
     const py::object &filename, const std::string &format_type) {
   return qdk::chemistry::data::LatticeGraph::from_file(
@@ -624,5 +622,12 @@ Examples:
       }));
 
   // Data type name class attribute
-  lattice_graph.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(LatticeGraph);
+  lattice_graph.def_static("data_type_name", &LatticeGraph::data_type_name,
+                           R"(
+Return the wire-format identifier for lattice graphs.
+
+Returns:
+        str: ``"lattice_graph"``
+
+)");
 }

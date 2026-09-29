@@ -9,7 +9,6 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -25,7 +24,6 @@ void structure_to_xyz_file_wrapper(Structure &self, const py::object &filename,
   self.to_xyz_file(qdk::chemistry::python::utils::to_string_path(filename),
                    comment);
 }
-
 std::shared_ptr<Structure> structure_from_xyz_file_wrapper(
     const py::object &filename) {
   return Structure::from_xyz_file(
@@ -1053,6 +1051,11 @@ Examples:
         return *Structure::from_json(nlohmann::json::parse(json_str));
       }));
 
-  // Data type name class attribute
-  structure.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Structure);
+  structure.def_static("data_type_name", &Structure::data_type_name, R"(
+Return the wire-format identifier for structures.
+
+Returns:
+        str: ``"structure"``
+
+)");
 }

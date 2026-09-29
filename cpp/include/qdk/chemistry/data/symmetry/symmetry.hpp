@@ -11,7 +11,6 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
-#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -239,12 +238,18 @@ class SymmetryAxis : public DataClass {
   std::size_t hash() const;
 
   /**
-   * @brief @ref DataClass type identifier.
+   * @brief Static @ref DataClass type identifier.
    * @return The string @c "symmetry_axis".
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(SymmetryAxis);
   }
+
+  /**
+   * @brief @ref DataClass type identifier for this instance.
+   * @return The string @c "symmetry_axis".
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Single-line human-readable summary.
@@ -428,12 +433,18 @@ class SymmetryProduct : public DataClass {
   std::size_t hash() const;
 
   /**
-   * @brief @ref DataClass type identifier.
-   * @return The string @c "symmetries".
+   * @brief Static @ref DataClass type identifier.
+   * @return The string @c "symmetry_product".
    */
-  std::string get_data_type_name() const override {
+  static std::string data_type_name() {
     return DATACLASS_TO_SNAKE_CASE(SymmetryProduct);
   }
+
+  /**
+   * @brief @ref DataClass type identifier for this instance.
+   * @return The string @c "symmetry_product".
+   */
+  std::string get_data_type_name() const override { return data_type_name(); }
 
   /**
    * @brief Single-line human-readable summary.

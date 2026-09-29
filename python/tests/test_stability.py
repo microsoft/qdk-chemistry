@@ -16,6 +16,7 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import StabilityResult, Structure
+from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.utils import rotate_orbitals
 
 from .reference_tolerances import (
@@ -1031,6 +1032,5 @@ class TestStabilityWorkflow:
 
 
 def test_stability_result_data_type_name():
-    """Test that StabilityResult has the correct _data_type_name class attribute."""
-    assert hasattr(StabilityResult, "_data_type_name")
-    assert StabilityResult._data_type_name == "stability_result"
+    """Test that StabilityResult exposes its static wire-format identifier."""
+    assert class_data_type_name(StabilityResult) == "stability_result"

@@ -28,6 +28,7 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
+GEOMETRIC_AVAILABLE = importlib.util.find_spec("geometric") is not None
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # Release-note example scripts are snapshots that only work with the matching
@@ -38,15 +39,20 @@ _INSTALLED_MAJOR_MINOR = tuple(int(x) for x in _INSTALLED_VERSION.split(".")[:2]
 _RELEASE_NOTES_RE = re.compile(r"^release_notes_v(\d+)_(\d+)\.py$")
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
-    """Check if an example file requires qiskit, pyscf, openfermion or contains slow tests.
+def _generic_python_examples() -> list[Path]:
+    """Return examples owned by the shared source-build test lane."""
+    return sorted(path for path in PYTHON_EXAMPLES_DIR.glob("*.py") if not path.name.startswith("tutorial_"))
+
+
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool, bool]:
+    """Check optional dependencies and execution requirements for an example.
 
     Args:
         example_file: Path to the example file to check
 
     Returns:
         Tuple of (requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature,
-                  requires_openfermion, is_slow)
+              requires_openfermion, requires_geometric, requires_external_service, is_slow)
 
     """
     content = example_file.read_text(encoding="utf-8")
@@ -56,6 +62,8 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     requires_qiskit_aer = False
     requires_qiskit_nature = False
     requires_openfermion = False
+    requires_geometric = False
+    requires_external_service = False
     is_slow = False
 
     # Check for explicit imports
@@ -67,6 +75,9 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
 
     if "import openfermion" in content or "from openfermion" in content:
         requires_openfermion = True
+
+    if "import geometric" in content or "from geometric" in content:
+        requires_geometric = True
 
     # Check for plugin usage patterns in create() calls
     # Look for create(..., "pyscf") or create(..., 'pyscf') patterns
@@ -103,6 +114,12 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
         requires_pyscf = True
     if "import qdk_chemistry.plugins.qiskit" in content:
         requires_qiskit = True
+    if "import qdk_chemistry.plugins.geometric" in content:
+        requires_geometric = True
+
+    # The only registered geometry optimizer is the geomeTRIC plugin
+    if 'create("geometry_optimizer"' in content or "create('geometry_optimizer'" in content:
+        requires_geometric = True
 
     if any(
         pattern in content
@@ -130,7 +147,23 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
         is_slow = True
 
-    return requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature, requires_openfermion, is_slow
+    # Individual examples can declare intentionally long execution explicitly.
+    if "# docs-example: slow" in content:
+        is_slow = True
+
+    if "# docs-example: requires-external-service" in content:
+        requires_external_service = True
+
+    return (
+        requires_pyscf,
+        requires_qiskit,
+        requires_qiskit_aer,
+        requires_qiskit_nature,
+        requires_openfermion,
+        requires_geometric,
+        requires_external_service,
+        is_slow,
+    )
 
 
 class TestExampleScripts(unittest.TestCase):
@@ -144,7 +177,7 @@ class TestExampleScripts(unittest.TestCase):
         if not PYTHON_EXAMPLES_DIR.exists():
             raise FileNotFoundError(f"Python examples directory not found: {PYTHON_EXAMPLES_DIR}")
 
-        cls.py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        cls.py_example_files = _generic_python_examples()
 
         if not cls.py_example_files:
             raise FileNotFoundError(f"No Python example files found in {PYTHON_EXAMPLES_DIR}")
@@ -152,15 +185,18 @@ class TestExampleScripts(unittest.TestCase):
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
         with TemporaryDirectory(dir=example_file.parent.parent) as tmpdir:
+            example_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+            example_timeout = 1200 if "# docs-example: slow" in example_file.read_text(encoding="utf-8") else 360
+
             result = subprocess.run(
                 [sys.executable, str(example_file)],
                 check=False,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
-                timeout=360,
+                timeout=example_timeout,
                 cwd=tmpdir,
-                env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                env=example_env,
             )
 
             assert result.returncode == 0, (
@@ -173,7 +209,8 @@ def _create_test_methods():
     """Create individual test methods for each example file."""
     if PYTHON_EXAMPLES_DIR.exists():
         # Python examples
-        py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        # Version-pinned tutorial scripts run in tutorial-compatibility.yaml.
+        py_example_files = _generic_python_examples()
 
         for example_file in py_example_files:
             # Create a test method name from the file name
@@ -187,12 +224,22 @@ def _create_test_methods():
                 requires_qiskit_aer,
                 requires_qiskit_nature,
                 requires_openfermion,
+                requires_geometric,
+                requires_external_service,
                 is_slow,
             ) = check_example_requirements(example_file)
 
             # Create the test method
             def make_test(
-                filepath, needs_pyscf, needs_qiskit, needs_qiskit_aer, needs_qiskit_nature, needs_openfermion, slow
+                filepath,
+                needs_pyscf,
+                needs_qiskit,
+                needs_qiskit_aer,
+                needs_qiskit_nature,
+                needs_openfermion,
+                needs_geometric,
+                needs_external_service,
+                slow,
             ):
                 """Create a test method for the given example file."""
 
@@ -218,6 +265,10 @@ def _create_test_methods():
                         self.skipTest("Qiskit Nature not available")
                     if needs_openfermion and not OPENFERMION_AVAILABLE:
                         self.skipTest("OpenFermion not available")
+                    if needs_geometric and not GEOMETRIC_AVAILABLE:
+                        self.skipTest("geomeTRIC not available")
+                    if needs_external_service:
+                        self.skipTest("Example requires an external service")
                     if slow and not _RUN_SLOW_TESTS:
                         self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
@@ -236,6 +287,8 @@ def _create_test_methods():
                     requires_qiskit_aer,
                     requires_qiskit_nature,
                     requires_openfermion,
+                    requires_geometric,
+                    requires_external_service,
                     is_slow,
                 ),
             )

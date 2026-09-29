@@ -40,9 +40,9 @@
         "type": "other",
         "other": {
           "name": "Libint",
-          "version": "2.9.0",
-          "downloadUrl": "https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz",
-          "hash": "cb63f296d4b05d0542ff0307b29302f9d2a591a3"
+          "version": "2.13.1",
+          "downloadUrl": "https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz",
+          "hash": "d22f42c475bd487c07cb41f0e76c109568d0d4ca"
         }
       },
       "developmentDependency": false
@@ -192,7 +192,37 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/wavefunction91/gauxc.git",
-          "commitHash": "f05cd68e1fd549cc45a318e6d039f49d044d3e1d"
+          "commitHash": "162e4562552323a871af17ae4acd73b71071bd24"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pypi",
+        "pypi": {
+          "name": "azure-ai-discovery",
+          "version": "1.0.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pypi",
+        "pypi": {
+          "name": "azure-identity",
+          "version": "1.19.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "pypi",
+        "pypi": {
+          "name": "azure-storage-blob",
+          "version": "12.25.0"
         }
       },
       "developmentDependency": false
