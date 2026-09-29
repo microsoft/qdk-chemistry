@@ -26,7 +26,7 @@ from qdk_chemistry.data import (
     QubitOperator,
     UnitaryRepresentation,
 )
-from qdk_chemistry.data.circuit import PhaseGradient, QsharpFactoryData
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
@@ -605,12 +605,12 @@ class TestSharedPlaquetteCatalysts:
     def test_mapper_declares_its_phase_gradient(self):
         """Every tower phases through one binary gradient, whose state carries no angle."""
         circuit = _plaquette_controlled(0.3, 0.2, 1)
-        assert circuit.metadata.phase_gradients == (PhaseGradient.binary(_GRADIENT_BITS),)
+        assert circuit.metadata.num_phase_gradient_ancillas == _GRADIENT_BITS
         assert circuit.num_qubits == 2 * _CATALYST_SITES + _GRADIENT_BITS
 
     def test_a_lattice_below_the_break_even_declares_none(self):
         """The 2x2 towers rotate term by term, so there is nothing to share."""
-        assert _plaquette_controlled(0.3, 0.2, 1, width=2, height=2).metadata.phase_gradients == ()
+        assert _plaquette_controlled(0.3, 0.2, 1, width=2, height=2).metadata.num_phase_gradient_ancillas == 0
 
     @pytest.mark.slow
     @pytest.mark.parametrize(("feedback", "expected"), [(0.0, 0), (np.pi, 1)])
@@ -657,10 +657,17 @@ class TestSharedPlaquetteCatalysts:
 
         assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
 
-    def test_a_circuit_without_a_gradient_takes_none_from_the_shared_register(self):
-        """Circuits may declare different gradients, including none; then nothing is shared."""
+    def test_mismatched_gradient_requests_are_rejected(self):
+        """One register cannot serve two widths, and silently dropping one would emit a broken circuit."""
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         circuits = [_plaquette_controlled(0.3, 0.2, 1), _plaquette_controlled(0.3, 0.2, 1, width=2, height=2)]
+        with pytest.raises(ValueError, match="same phase gradient register"):
+            builder._shared_register(circuits)
+
+    def test_a_lattice_below_the_break_even_shares_nothing(self):
+        """Nothing is prepared when no controlled unitary asks for a gradient."""
+        builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
+        circuits = [_plaquette_controlled(0.3, 0.2, 1, width=2, height=2)] * 2
         ops, prepare, num_shared = builder._shared_register(circuits)
         assert len(ops) == 2
         assert num_shared == 0

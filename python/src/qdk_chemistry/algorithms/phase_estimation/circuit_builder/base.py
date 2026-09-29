@@ -15,11 +15,7 @@ from qdk_chemistry.data import (
     QubitOperator,
     Settings,
 )
-from qdk_chemistry.data.circuit import PhaseGradient
-from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
-
-from ._gradient_pool import plan_gradient_pool
 
 __all__: list[str] = [
     "IterativeQpeCircuitBuilder",
@@ -133,11 +129,9 @@ class QpeCircuitBuilder(Algorithm):
     def _shared_register(controlled_unitary_circuits: list[Circuit]) -> tuple[list[Any], Any, int]:
         """Resolve the phase gradient register the controlled unitaries request through their metadata.
 
-        A controlled unitary that declares ``phase_gradients`` expects those qubits at the end of its targets, prepared
-        by its caller and left prepared. When every circuit declares the same gradients, phase estimation prepares them
-        once around all the controlled unitaries. Otherwise the qubits two or more circuits need are pooled and prepared
-        once, and each circuit prepares the qubits only it needs around its own call; see
-        :func:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder._gradient_pool.plan_gradient_pool`.
+        A controlled unitary that declares phase gradient ancillas expects those qubits at the end of its targets,
+        prepared by its caller and left prepared. Every declaration is the binary phase gradient, whose state does not
+        depend on any angle, so phase estimation prepares one register around all the controlled unitaries.
 
         Args:
             controlled_unitary_circuits: The controlled unitaries, each carrying a Q# operation.
@@ -145,28 +139,20 @@ class QpeCircuitBuilder(Algorithm):
         Returns:
             The operations to apply, the shared register preparation, and the shared register size.
 
+        Raises:
+            ValueError: If the circuits ask for registers of different widths, which one register cannot serve.
+
         """
         ops = [circuit._qsharp_op for circuit in controlled_unitary_circuits]  # noqa: SLF001
-        requests = [circuit.metadata.phase_gradients for circuit in controlled_unitary_circuits]
-        if not any(requests):
+        requests = {circuit.metadata.num_phase_gradient_ancillas for circuit in controlled_unitary_circuits}
+        if requests == {0} or not requests:
             return ops, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
-        if all(request == requests[0] for request in requests):
-            num_shared = controlled_unitary_circuits[0].metadata.num_phase_gradient_ancillas
-            return ops, phase_gradients_preparation(requests[0]), num_shared
-
-        plan = plan_gradient_pool(requests)
-        pool_size = len(plan.pool_angles)
-        wrapped = [
-            QSHARP_UTILS.PhaseGradient.MakePooledGradientControlledOp(pool_size, list(layout), list(own), op)
-            for layout, own, op in zip(plan.layouts, plan.own_angles, ops, strict=True)
-        ]
-        Logger.info(
-            f"Sharing {pool_size} phase gradient qubits across {len(ops)} controlled unitaries; "
-            f"{sum(len(own) for own in plan.own_angles)} more are prepared per call."
-        )
-        if not pool_size:
-            return wrapped, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
-        return wrapped, QSHARP_UTILS.PhaseGradient.MakePhaseStatesPrep(list(plan.pool_angles)), pool_size
+        if len(requests) > 1:
+            raise ValueError(
+                "The controlled unitaries of one phase estimation must all request the same phase gradient "
+                f"register. Got widths {sorted(requests)}."
+            )
+        return ops, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, requests.pop()
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
@@ -220,23 +206,3 @@ class StandardQpeCircuitBuilder(QpeCircuitBuilder):
     (non-iterative) quantum phase estimation algorithm using QFT.
 
     """
-
-
-def _phase_gradient_spec(gradients: tuple[PhaseGradient, ...]) -> list[tuple[float, int, bool]]:
-    """Return the ``(phase, numQubits, binary)`` entries Q# ``PreparePhaseGradients`` takes."""
-    return [(gradient.phase, gradient.num_qubits, gradient.is_binary) for gradient in gradients]
-
-
-def phase_gradients_preparation(gradients: tuple[PhaseGradient, ...]) -> Any:
-    """Return the Q# operation preparing consecutive phase gradient registers.
-
-    Args:
-        gradients: The gradients, in register order.
-
-    Returns:
-        A Q# ``Qubit[] => Unit is Adj + Ctl`` operation, or a no-op when there are no gradients.
-
-    """
-    if not gradients:
-        return QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-    return QSHARP_UTILS.PhaseGradient.MakePhaseGradientsPrep(_phase_gradient_spec(gradients))
