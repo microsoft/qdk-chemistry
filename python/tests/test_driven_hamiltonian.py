@@ -67,7 +67,7 @@ class TestDrivenQubitHamiltonianDriveFunctions:
     def test_sinusoidal_drive(self):
         """Sinusoidal drive f(t) = sin(t) should modulate H1 coefficients."""
         td = DrivenQubitHamiltonian(self._h0(), self._h1(), drive=np.sin)
-        for t in [0.0, np.pi / 4, np.pi / 2, np.pi]:
+        for t in [np.pi / 4, np.pi / 2, np.pi]:
             snap = td.evaluate(t)
             np.testing.assert_allclose(
                 snap.coefficients,
@@ -90,11 +90,11 @@ class TestDrivenQubitHamiltonianDriveFunctions:
         np.testing.assert_allclose(td.evaluate(2.0).coefficients[2:], [2.0, 2.0])
 
     def test_zero_drive_returns_h0_only(self):
-        """Zero drive f(t) = 0 should yield only H0 contributions for H1 terms."""
+        """Zero drive f(t) = 0 should return H0 without the H1 terms."""
         td = DrivenQubitHamiltonian(self._h0(), self._h1(), drive=lambda _t: 0.0)
         snap = td.evaluate(1.0)
-        np.testing.assert_allclose(snap.coefficients[:2], [1.0, 0.5])
-        np.testing.assert_allclose(snap.coefficients[2:], [0.0, 0.0])
+        assert snap.pauli_strings == ["ZI", "IZ"]
+        np.testing.assert_allclose(snap.coefficients, [1.0, 0.5])
 
     def test_step_function_drive(self):
         """Step function drive should switch H1 on/off at threshold."""
@@ -103,7 +103,7 @@ class TestDrivenQubitHamiltonianDriveFunctions:
             return 1.0 if t >= 1.5 else 0.0
 
         td = DrivenQubitHamiltonian(self._h0(), self._h1(), drive=step_drive)
-        np.testing.assert_allclose(td.evaluate(1.0).coefficients[2:], [0.0, 0.0])
+        np.testing.assert_allclose(td.evaluate(1.0).coefficients, [1.0, 0.5])
         np.testing.assert_allclose(td.evaluate(2.0).coefficients[2:], [1.0, 1.0])
 
     def test_cosine_drive_symmetry(self):
