@@ -623,8 +623,11 @@ class TestSharedPlaquetteCatalysts:
         assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
 
     @pytest.mark.slow
-    def test_differing_gradients_prepare_their_own_catalysts(self):
-        """Rescaled powers change the angles, so each query prepares its own register instead."""
+    def test_rescaled_powers_share_the_overlapping_catalyst_qubits(self):
+        """Doubling the angles doubles each gradient's phase, which only drops its lowest qubit.
+
+        So the two queries share 7 of their 9 catalyst qubits and each prepares the other 2 itself.
+        """
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         powers = [
             _plaquette_controlled(2 * _INTERACTION, 2 * _HOPPING, 1),
@@ -632,17 +635,19 @@ class TestSharedPlaquetteCatalysts:
         ]
         circuit = builder._create_circuit_from_qsharp_op(_one_electron_preparation(), powers, 2, 2 * _CATALYST_SITES)
         parameters = circuit._qsharp_factory.parameter
-        assert parameters["numSharedAncillas"] == 9
-        assert parameters["prepareSharedOp"] is QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        assert parameters["numSharedAncillas"] == 7
+        assert parameters["prepareSharedOp"] is not QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
         assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
 
-    def test_only_some_circuits_requesting_catalysts_is_rejected(self):
-        """A circuit that ignores the shared register must not be handed one."""
+    def test_a_circuit_without_catalysts_takes_none_from_the_pool(self):
+        """Circuits may declare different gradients, including none; nothing is pooled that only one needs."""
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         circuits = [_plaquette_controlled(0.3, 0.2, 1), _plaquette_controlled(0.3, 0.2, 1, width=2, height=2)]
-        with pytest.raises(ValueError, match="Only some"):
-            builder._shared_register(circuits)
+        ops, prepare, num_shared = builder._shared_register(circuits)
+        assert len(ops) == 2
+        assert num_shared == 0
+        assert prepare is QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
 
 def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> float:

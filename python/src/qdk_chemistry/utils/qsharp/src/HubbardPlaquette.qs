@@ -259,18 +259,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return groups;
     }
 
-    /// # Summary
     /// The on-site layer, phased through a Hamming-weight register.
-    ///
-    /// # Input
-    /// ## angle
-    /// Pair rotation angle.
-    /// ## sites
-    /// Number of lattice sites.
-    /// ## systems
-    /// The system register.
-    /// ## catalyst
-    /// `TowerCatalystSize(sites)` qubits holding the phase gradient for `2.0 * angle`.
     internal operation InteractionLayer(
         angle : Double,
         sites : Int,
@@ -288,20 +277,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// # Summary
-    /// The routing permutation: where the mode at each position must end up.
-    ///
-    /// # Description
-    /// Concatenating the tiling's four-cycles and appending the modes it leaves alone
-    /// gives the frame the routing network has to reach, so sorting this permutation
-    /// with adjacent transpositions is exactly the routing problem.
-    ///
-    /// Each four-cycle is placed with its diagonals interleaved. The three butterflies of
-    /// a four-mode FFFT pair the two diagonals and then the two surviving modes, which is
-    /// a path on the four corners; interleaving the diagonals embeds that path in the
-    /// line, so every butterfly acts on adjacent positions and no basis change carries a
-    /// Jordan-Wigner string. Cycle order instead leaves both diagonal butterflies two apart.
-    internal function RoutingOrder(blocks : Int[][], count : Int) : Int[] {
+    /// Routes every four-cycle of a tiling onto adjacent modes: the swap count and, if `listSwaps`, the adjacent swaps.
+    internal function RoutingSwaps(blocks : Int[][], count : Int, listSwaps : Bool) : (Int, Int[]) {
+        // Interleaving the diagonals embeds the FFFT's butterfly path (both diagonals, then the
+        // surviving pair) in the line, so every butterfly acts on adjacent modes and no basis
+        // change carries a Jordan-Wigner string. Unused modes follow in order.
         mutable target = [];
         for block in blocks {
             set target += [block[0], block[2], block[1], block[3]];
@@ -321,41 +301,13 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         for position in 0..count - 1 {
             set order w/= target[position] <- position;
         }
-        return order;
-    }
 
-    /// # Summary
-    /// Adjacent swaps routing each plaquette of a tiling onto contiguous modes.
-    internal function RoutingSwaps(blocks : Int[][], count : Int) : Int[] {
-        mutable order = RoutingSwaps(blocks, count);
-        mutable swaps = [];
-        for round in 0..count - 1 {
-            for position in round % 2..2..count - 2 {
-                if order[position] > order[position + 1] {
-                    let held = order[position];
-                    set order w/= position <- order[position + 1];
-                    set order w/= position + 1 <- held;
-                    set swaps += [position];
-                }
-            }
-        }
-        return swaps;
-    }
-
-    /// # Summary
-    /// How many adjacent swaps the routing network performs.
-    ///
-    /// # Description
-    /// Each adjacent transposition removes exactly one inversion, so the length of
-    /// RoutingSwaps is the inversion count of the routing permutation. A Fenwick tree
-    /// counts those in O(count log count) instead of running the O(count^2) sort that
-    /// would otherwise produce them, which is what keeps large lattices tractable.
-    internal function RoutingSwapCount(blocks : Int[][], count : Int) : Int {
-        let order = RoutingOrder(blocks, count);
+        // Every adjacent swap removes one inversion, so the swap count is the inversion count.
+        // A Fenwick tree finds it in O(count log count), keeping the O(count^2) sort out of
+        // resource estimation. Walking right to left, each element meets the already-inserted
+        // elements to its right; those smaller than it are the inversions it takes part in.
         mutable tree = [0, size = count + 1];
         mutable inversions = 0;
-        // Walking right to left, each element meets the already-inserted elements to its
-        // right; those smaller than it are precisely the inversions it takes part in.
         for index in count - 1..-1..0 {
             mutable lower = order[index];
             while lower > 0 {
@@ -368,26 +320,27 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 set node += (node &&& -node);
             }
         }
-        return inversions;
+
+        // Odd-even transposition sort: disjoint adjacent swaps in each round.
+        mutable swaps = [];
+        if listSwaps {
+            for round in 0..count - 1 {
+                for position in round % 2..2..count - 2 {
+                    if order[position] > order[position + 1] {
+                        let held = order[position];
+                        set order w/= position <- order[position + 1];
+                        set order w/= position + 1 <- held;
+                        set swaps += [position];
+                    }
+                }
+            }
+            Fact(Length(swaps) == inversions, "The routing swap count must match the swaps.");
+        }
+        return (inversions, swaps);
     }
 
     /// # Summary
-    /// One hopping tiling: every plaquette's FFFT, then its momentum-basis phase.
-    ///
-    /// # Description
-    /// The basis changes are hoisted across the whole tiling so the phases sit together
-    /// in the middle, which is what lets every XX and YY term of the tiling share one
-    /// Hamming-weight tower once the modes of a plaquette are routed adjacent.
-    ///
-    /// # Input
-    /// ## kappa
-    /// Twice the hopping amplitude times the step duration.
-    /// ## blocks
-    /// Four-cycles of the tiling, in cycle order.
-    /// ## systems
-    /// The system register.
-    /// ## catalyst
-    /// `TowerCatalystSize(2 * Length(blocks))` qubits holding the phase gradient for `-kappa`.
+    /// One hopping tiling: every plaquette's fswap, ffft, then its momentum-basis phase.
     internal operation HoppingLayer(
         kappa : Double,
         blocks : Int[][],
@@ -395,12 +348,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         within {
+            let (swapCount, swaps) = RoutingSwaps(blocks, Length(systems), not IsResourceEstimating());
             if IsResourceEstimating() {
                 // Every routing swap is the same Clifford pair on a different pair of
                 // modes, so the estimator only needs how many there are. Emitting one
-                // and repeating its cost keeps the O(sites^1.5) gates out of the trace,
-                // and the inversion count keeps the O(sites^2) sort out with them.
-                let swapCount = RoutingSwapCount(blocks, Length(systems));
+                // and repeating its cost keeps the O(sites^1.5) gates out of the trace.
                 if swapCount > 0 {
                     within {
                         RepeatEstimates(swapCount);
@@ -410,7 +362,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     }
                 }
             } else {
-                for position in RoutingSwaps(blocks, Length(systems)) {
+                for position in swaps {
                     SWAP(systems[position], systems[position + 1]);
                     CZ(systems[position], systems[position + 1]);
                 }
@@ -421,81 +373,45 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 TwoModeFFFT(base + 2, base + 3, systems);
             }
         } apply {
-            // The third butterfly is fused into the phases, so the equal-angle family
-            // is the middle pair of every plaquette.
-            HoppingPhases(kappa / 2.0, StridedGroups(Length(blocks), 2, 4, 1, systems[1...]), catalyst);
-        }
-    }
-
-    /// # Summary
-    /// exp(i angle XX) exp(i angle YY) on every pair, as one equal-angle tower.
-    ///
-    /// # Description
-    /// Sec. 4.4 of :cite:`Apel2026` phases a hopping tiling as a single tower of L^2
-    /// rotations. With the catalyzed Hamming-weight phasing every tower costs one payload
-    /// rotation and one catalyst, so one tower instead of separate XX and YY towers saves
-    /// both, for w(L^2 / 2) more AND operations.
-    ///
-    /// XX and YY commute, so one Clifford diagonalizes both: CNOT, H, CNOT sends XX to Z
-    /// on the first qubit of a pair and YY to -Z on the second, and the trailing X removes
-    /// that sign. Both qubits then carry a parity bit of the same angle, which is what
-    /// turns the tiling into a single tower of twice as many equal-angle Z rotations.
-    ///
-    /// # Input
-    /// ## angle
-    /// The rotation angle shared by every XX and YY term.
-    /// ## pairs
-    /// Disjoint qubit pairs, one per hopping term.
-    /// ## catalyst
-    /// `TowerCatalystSize(2 * Length(pairs))` qubits prepared for the phase `-2.0 * angle`.
-    internal operation HoppingPhases(angle : Double, pairs : Qubit[][], catalyst : Qubit[]) : Unit is Adj + Ctl {
-        Fact(
-            Length(catalyst) == TowerCatalystSize(2 * Length(pairs)),
-            "HoppingPhases got a catalyst of the wrong size."
-        );
-        if 2 * Length(pairs) < HammingWeightBreakEven() {
-            for pair in pairs {
-                Exp([PauliX, PauliX], angle, pair);
-                Exp([PauliY, PauliY], angle, pair);
-            }
-        } else {
-            within {
+            // The third butterfly is fused into the phases, so the equal-angle family is the
+            // middle pair of every plaquette: exp(i angle XX) exp(i angle YY) on each pair.
+            let angle = kappa / 2.0;
+            let pairs = StridedGroups(Length(blocks), 2, 4, 1, systems[1...]);
+            Fact(
+                Length(catalyst) == TowerCatalystSize(2 * Length(pairs)),
+                "HoppingLayer got a catalyst of the wrong size."
+            );
+            if 2 * Length(pairs) < HammingWeightBreakEven() {
                 for pair in pairs {
-                    CNOT(pair[0], pair[1]);
-                    H(pair[0]);
-                    CNOT(pair[0], pair[1]);
-                    X(pair[1]);
+                    Exp([PauliX, PauliX], angle, pair);
+                    Exp([PauliY, PauliY], angle, pair);
                 }
-            } apply {
-                HammingWeightPhase(
-                    -angle,
-                    [[PauliZ], size = 2 * Length(pairs)],
-                    Mapped(q -> [q], Flattened(pairs)),
-                    catalyst
-                );
+            } else {
+                // XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY
+                // to -Z on the second, and X removes that sign. The tiling then becomes one
+                // tower of twice as many equal-angle Z rotations, which with catalyzed
+                // Hamming-weight phasing saves a payload rotation and a catalyst over separate
+                // XX and YY towers (Sec. 4.4 of :cite:`Apel2026`).
+                within {
+                    for pair in pairs {
+                        CNOT(pair[0], pair[1]);
+                        H(pair[0]);
+                        CNOT(pair[0], pair[1]);
+                        X(pair[1]);
+                    }
+                } apply {
+                    HammingWeightPhase(
+                        -angle,
+                        [[PauliZ], size = 2 * Length(pairs)],
+                        Mapped(q -> [q], Flattened(pairs)),
+                        catalyst
+                    );
+                }
             }
         }
     }
 
-    /// # Summary
-    /// One second-order plaquette Trotter step.
-    ///
-    /// # Description
-    /// The body is I^(1/2) G I^(1/2) P; the caller supplies the one-time P^(1/2)
-    /// boundary that merging across repetitions leaves outside. Merging the hopping
-    /// layer rather than the interaction is what saves: the body then carries two
-    /// hopping layers instead of three, and hopping dominates the layer cost.
-    ///
-    /// The catalysts are prepared by the caller, once for every repetition and, under phase
-    /// estimation, once for every query.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    /// ## systems
-    /// The system register.
-    /// ## catalysts
-    /// `PlaquetteCatalystSize(params)` qubits holding `PlaquetteCatalystGradients(params)`.
+    /// One second-order Trotter step, I^(1/2) G I^(1/2) P, on caller-prepared catalysts.
     internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
         systems : Qubit[],
@@ -509,65 +425,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         HoppingLayer(params.hoppingAngle, gold, systems, bulk);
         InteractionLayer(params.interactionAngle / 2.0, sites, systems, interaction);
         HoppingLayer(params.hoppingAngle, pink, systems, bulk);
-    }
-
-    /// # Summary
-    /// Number of catalyst qubits the plaquette evolution consumes.
-    ///
-    /// # Description
-    /// Every tower has one rotation per lattice site, so each catalyst has
-    /// `TowerCatalystSize(sites)` qubits. The interaction towers phase by
-    /// `interactionAngle` and need their own. The hopping towers phase by `-hoppingAngle`
-    /// in the body and by half that on the boundary, and a catalyst for twice an angle is
-    /// the one for the angle without its lowest qubit, so both share one register with a
-    /// single extra qubit. This is the 2 floor(log2 L^2) + 3 of Sec. 4.4 of :cite:`Apel2026`.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    function PlaquetteCatalystSize(params : HubbardPlaquetteParams) : Int {
-        let bits = TowerCatalystSize(params.width * params.height);
-        return bits == 0 ? 0 | 2 * bits + 1;
-    }
-
-    /// # Summary
-    /// The phase gradients the plaquette catalyst register holds, in order, as (phase, qubits).
-    ///
-    /// # Description
-    /// Each is the state Σ_k e^{-i·phase·k}|k⟩ that `PrepareGeneralizedPhaseGradient` prepares
-    /// from `GeneralizedPhaseGradientAngles(phase, qubits)`. See `PlaquetteCatalystSize`.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    function PlaquetteCatalystGradients(params : HubbardPlaquetteParams) : (Double, Int)[] {
-        let bits = TowerCatalystSize(params.width * params.height);
-        if bits == 0 {
-            return [];
-        }
-        return [(params.interactionAngle, bits), (-params.hoppingAngle / 2.0, bits + 1)];
-    }
-
-    /// The interaction, boundary hopping and body hopping catalysts inside the register.
-    internal function PlaquetteCatalystSlices(
-        params : HubbardPlaquetteParams,
-        catalysts : Qubit[]
-    ) : (Qubit[], Qubit[], Qubit[]) {
-        Fact(Length(catalysts) == PlaquetteCatalystSize(params), "The plaquette catalyst register has the wrong size.");
-        let bits = TowerCatalystSize(params.width * params.height);
-        if bits == 0 {
-            return ([], [], []);
-        }
-        return (catalysts[0..bits - 1], catalysts[bits..2 * bits - 1], catalysts[bits + 1..2 * bits]);
-    }
-
-    /// Prepares the catalyst register `PlaquetteCatalystGradients(params)` describes.
-    internal operation PreparePlaquetteCatalysts(
-        params : HubbardPlaquetteParams,
-        catalysts : Qubit[]
-    ) : Unit is Adj + Ctl {
-        let gradients = Mapped((phase, size) -> (phase, size, false), PlaquetteCatalystGradients(params));
-        PreparePhaseGradients(gradients, catalysts);
     }
 
     /// # Summary
@@ -619,12 +476,54 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
+    
+    /// Number of catalyst qubits the plaquette evolution consumes.
+    function PlaquetteCatalystSize(params : HubbardPlaquetteParams) : Int {
+        let bits = TowerCatalystSize(params.width * params.height);
+        return bits == 0 ? 0 | 2 * bits + 1;
+    }
+
     /// # Summary
-    /// Returns a callable applying a repeated plaquette evolution on catalysts it prepares around itself.
+    /// The phase gradients the plaquette catalyst register holds, in order, as (phase, qubits).
+    ///
+    /// # Description
+    /// Each is the state Σ_k e^{-i·phase·k}|k⟩ that `PrepareGeneralizedPhaseGradient` prepares
+    /// from `GeneralizedPhaseGradientAngles(phase, qubits)`. See `PlaquetteCatalystSize`.
     ///
     /// # Input
     /// ## params
     /// The lattice shape and the layer angles.
+    function PlaquetteCatalystGradients(params : HubbardPlaquetteParams) : (Double, Int)[] {
+        let bits = TowerCatalystSize(params.width * params.height);
+        if bits == 0 {
+            return [];
+        }
+        return [(params.interactionAngle, bits), (-params.hoppingAngle / 2.0, bits + 1)];
+    }
+
+    /// The interaction, boundary hopping and body hopping catalysts inside the register.
+    internal function PlaquetteCatalystSlices(
+        params : HubbardPlaquetteParams,
+        catalysts : Qubit[]
+    ) : (Qubit[], Qubit[], Qubit[]) {
+        Fact(Length(catalysts) == PlaquetteCatalystSize(params), "The plaquette catalyst register has the wrong size.");
+        let bits = TowerCatalystSize(params.width * params.height);
+        if bits == 0 {
+            return ([], [], []);
+        }
+        return (catalysts[0..bits - 1], catalysts[bits..2 * bits - 1], catalysts[bits + 1..2 * bits]);
+    }
+
+    /// Prepares the catalyst register `PlaquetteCatalystGradients(params)` describes.
+    internal operation PreparePlaquetteCatalysts(
+        params : HubbardPlaquetteParams,
+        catalysts : Qubit[]
+    ) : Unit is Adj + Ctl {
+        let gradients = Mapped((phase, size) -> (phase, size, false), PlaquetteCatalystGradients(params));
+        PreparePhaseGradients(gradients, catalysts);
+    }
+
+    /// Returns a callable applying the evolution on catalysts it prepares around itself.
     function MakeRepPlaquetteExpOp(params : HubbardPlaquetteParams) : (Qubit[] => Unit is Adj + Ctl) {
         systems => {
             use catalysts = Qubit[PlaquetteCatalystSize(params)];
@@ -636,16 +535,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// # Summary
-    /// Builds the controlled circuit for a repeated plaquette evolution, preparing its catalysts.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    /// ## control
-    /// Index of the control qubit.
-    /// ## systems
-    /// Indices of the system qubits.
+    /// Builds the controlled evolution on the given qubit indices, preparing its catalysts.
     operation MakeRepControlledPlaquetteExpCircuit(
         params : HubbardPlaquetteParams,
         control : Int,
@@ -660,18 +550,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// # Summary
-    /// Applies a controlled plaquette evolution whose targets end in its catalyst register.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    /// ## control
-    /// The control qubit.
-    /// ## targets
-    /// The system register first and the last `PlaquetteCatalystSize(params)` qubits
-    /// holding `PlaquetteCatalystGradients(params)`, which are left prepared.
-    /// Any qubits in between are unused.
+    /// Applies the evolution controlled on `control`; `targets` holds the systems, then the prepared catalysts.
     operation ControlledRepPlaquetteExp(
         params : HubbardPlaquetteParams,
         control : Qubit,
@@ -689,26 +568,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         );
     }
 
-    /// # Summary
-    /// Returns a single-control callable that expects its catalysts prepared by the caller.
-    ///
-    /// # Description
-    /// Phase estimation prepares the register once around every query, which is what the
-    /// `phase_gradients` circuit metadata requests. See `ControlledRepPlaquetteExp` for
-    /// the target layout.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
+    /// Returns `ControlledRepPlaquetteExp` as a callable whose catalysts phase estimation prepares once per query.
     function MakeRepControlledPlaquetteExpOp(
         params : HubbardPlaquetteParams
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         ControlledRepPlaquetteExp(params, _, _)
     }
 
-    /// Test helper: prepares the catalyst one tower of rotations by `phi / 2` consumes, so a
-    /// single layer can be checked in isolation. The evolution prepares all of its catalysts
-    /// at once with `PreparePlaquetteCatalysts`.
+    /// Test helper: prepares the catalyst one tower of rotations by `phi / 2` consumes.
     internal operation PrepareTowerCatalyst(phi : Double, catalyst : Qubit[]) : Unit is Adj + Ctl {
         PrepareGeneralizedPhaseGradient(GeneralizedPhaseGradientAngles(phi, Length(catalyst)), catalyst);
     }
