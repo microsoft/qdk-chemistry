@@ -56,7 +56,7 @@ def _reference_hamiltonian(width: int, height: int, *, t: float, u: float) -> np
     return dense + 0.25 * u * width * height * np.eye(dense.shape[0])
 
 
-def _plaquette_parameters(container):
+def _plaquette_parameters(container, max_batch_size: int = -1):
     """Return the Q# parameter struct for a plaquette container."""
     return QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
         width=container.width,
@@ -64,6 +64,7 @@ def _plaquette_parameters(container):
         interactionAngle=container.interaction_angle,
         hoppingAngle=container.hopping_angle,
         repetitions=container.step_reps,
+        maxBatchSize=max_batch_size,
     )
 
 
@@ -346,7 +347,7 @@ def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
 def _hopping_phases(angle: float, control: str | None = None) -> str:
     """Return Q# applying ``HoppingPhases``, optionally controlled."""
     register = "qs" if control is None else "qs[1...]"
-    arguments = f"({angle}, Std.Arrays.Chunks(2, {register}))"
+    arguments = f"({angle}, Std.Arrays.Chunks(2, {register}), -1)"
     tower = (
         f"{_PLAQUETTE}.HoppingPhases{arguments}"
         if control is None
@@ -398,8 +399,88 @@ class TestInteractionLayer:
             spins = [1 - 2 * ((index >> (num_qubits - 1 - qubit)) & 1) for qubit in range(num_qubits)]
             expected[index] *= np.exp(-1j * angle * sum(spins[s] * spins[s + sites] for s in range(sites)))
 
-        operation = f"qs => {{ {_PLAQUETTE}.InteractionLayer({angle}, {sites}, qs); }}"
+        operation = f"qs => {{ {_PLAQUETTE}.InteractionLayer({angle}, {sites}, qs, -1); }}"
         assert np.allclose(_applied_state(operation, amplitudes), expected, atol=1e-10)
+
+
+def _single_z_tower(angle: float, count: int, cap: int, controlled: bool = False) -> str:
+    """Return Q# phasing ``count`` single-qubit Z terms as one capped Hamming-weight tower."""
+    lead = 1 if controlled else 0
+    arguments = f"({angle}, [[PauliZ], size = {count}], Std.Arrays.Chunks(1, qs[{lead}..{lead + count - 1}]), {cap})"
+    call = (
+        f"Controlled {_PLAQUETTE}.HammingWeightPhase([qs[0]], {arguments})"
+        if controlled
+        else f"{_PLAQUETTE}.HammingWeightPhase{arguments}"
+    )
+    return f"qs => {{ {call}; }}"
+
+
+def _single_z_phases(angle: float, count: int, num_qubits: int, lead: int, basis_states) -> np.ndarray:
+    """Return exp(-i angle sum_j Z_j) over ``count`` qubits starting at ``lead``, per basis state."""
+    phases = np.ones(2**num_qubits, dtype=complex)
+    for index in basis_states:
+        spins = [1 - 2 * ((index >> (num_qubits - 1 - qubit)) & 1) for qubit in range(num_qubits)]
+        phases[index] = np.exp(-1j * angle * sum(spins[lead : lead + count]))
+    return phases
+
+
+def _sparse_state(num_qubits: int, seed: int, support: int = 24):
+    """Return a normalized real state on a few basis states, and which states those are."""
+    rng = np.random.default_rng(seed)
+    basis_states = rng.choice(2**num_qubits, size=support, replace=False)
+    amplitudes = np.zeros(2**num_qubits)
+    amplitudes[basis_states] = rng.normal(size=len(basis_states))
+    return amplitudes / np.linalg.norm(amplitudes), basis_states
+
+
+class TestHammingWeightBatchCap:
+    """Capping the batch splits a tower into several Hamming-weight registers without changing it.
+
+    The phases are additive over the split, so every configuration below must reproduce the same
+    exp(-i angle sum_j Z_j). Each batch carries its own ``R(PauliI, _)`` constant, so a batch-count
+    error in that constant shows up as a wrong phase here rather than as a wrong gate count.
+    """
+
+    @pytest.mark.parametrize(
+        ("count", "cap", "batches"),
+        [
+            (12, -1, "one batch, uncapped"),
+            (16, 8, "two batches, both above the break-even"),
+            (12, 8, "one batch above the break-even and one below"),
+            (10, 5, "two batches, both below the break-even"),
+        ],
+    )
+    def test_the_split_preserves_the_tower(self, count, cap, batches):
+        """Whatever the split, the tower is still exp(-i angle sum_j Z_j)."""
+        angle = 3 * _ANGLE_QUANTUM
+        amplitudes, basis_states = _sparse_state(count, seed=count + cap)
+        expected = amplitudes.astype(complex) * _single_z_phases(angle, count, count, 0, basis_states)
+
+        actual = _applied_state(_single_z_tower(angle, count, cap), amplitudes)
+        assert np.allclose(actual, expected, atol=1e-10), f"capped tower differs for {batches}"
+
+    def test_a_capped_tower_is_controlled_as_a_whole(self):
+        """Each batch's identity phase is not global under control, so a stray one is visible here."""
+        angle, count, cap = 3 * _ANGLE_QUANTUM, 12, 8
+        num_qubits = count + 1
+        amplitudes, basis_states = _sparse_state(num_qubits, seed=77)
+
+        # The control is qubit 0, so it is the most significant bit of the big-endian index.
+        half = 2 ** (num_qubits - 1)
+        phases = _single_z_phases(angle, count, num_qubits, 1, basis_states)
+        expected = amplitudes.astype(complex)
+        expected[half:] *= phases[half:]
+
+        actual = _applied_state(_single_z_tower(angle, count, cap, controlled=True), amplitudes)
+        assert np.allclose(actual, expected, atol=1e-10)
+
+    @pytest.mark.parametrize(
+        ("count", "cap", "expected"),
+        [(16, -1, 16), (16, 8, 8), (16, 16, 16), (16, 32, 16), (5, 8, 5), (1, 1, 1)],
+    )
+    def test_the_batch_size_is_the_cap_until_the_tower_is_shorter(self, count, cap, expected):
+        """A cap at or above the tower length leaves it whole; -1 never splits."""
+        assert QSHARP_UTILS.HubbardPlaquette.HammingWeightBatchSize(count, cap) == expected
 
 
 class TestPlaquetteEvolutionOnAState:
@@ -434,7 +515,7 @@ class TestPlaquetteEvolutionOnAState:
         cycles = [[5, 6, 2, 1], [7, 4, 0, 3]]
         kappa = 2.0 * duration
         literal = "[" + ", ".join("[" + ", ".join(map(str, cycle)) + "]" for cycle in cycles) + "]"
-        operation = get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.HoppingLayer({kappa}, {literal}, qs); }}")
+        operation = get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.HoppingLayer({kappa}, {literal}, qs, -1); }}")
 
         annihilate = np.array([[0, 1], [0, 0]], dtype=complex)
         identity = np.eye(2)
@@ -632,6 +713,23 @@ class TestPlaquetteUnderPhaseEstimation:
         """Nothing in the plaquette path asks phase estimation for ancillas any more."""
         circuit = _plaquette_controlled(0.3, 0.2, 1)
         assert circuit.metadata.num_phase_gradient_ancillas == 0
+
+    def test_the_mapper_defaults_to_an_uncapped_batch(self):
+        """The cap is opt-in, so the default must leave the tower whole."""
+        mapper = create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0])
+        assert int(mapper.settings().get("max_hwp_batch_size")) == -1
+
+    def test_the_mapper_rejects_a_zero_cap(self):
+        """Zero terms per batch would phase nothing, and zero is inside the setting's range."""
+        container = HubbardPlaquetteContainer(width=4, height=2, interaction_angle=0.3, hopping_angle=0.2, step_reps=1)
+        mapper = create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0], max_hwp_batch_size=0)
+        with pytest.raises(ValueError, match="max_hwp_batch_size must be -1 or a positive integer"):
+            mapper.run(UnitaryRepresentation(container=container))
+
+    def test_the_mapper_rejects_a_cap_below_the_no_cap_sentinel(self):
+        """Only -1 means 'no cap', so the declared range refuses anything more negative."""
+        with pytest.raises(ValueError, match="allowed range"):
+            create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0], max_hwp_batch_size=-2)
 
 
 def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> float:
@@ -846,7 +944,7 @@ def _benchmark_schedule(size: int) -> tuple[float, float, float, float]:
     return energy_budget, qpe_budget, trotter_budget, base_time
 
 
-def _benchmark_logical_counts(size: int) -> dict:
+def _benchmark_logical_counts(size: int, max_batch_size: int = -1) -> dict:
     """Build the benchmark's phase-estimation circuit for one lattice and trace its gate counts."""
     operator = _lattice_operator(size, size)
     energy_budget, qpe_budget, trotter_budget, base_time = _benchmark_schedule(size)
@@ -867,7 +965,9 @@ def _benchmark_logical_counts(size: int) -> dict:
         "qdk_standard",
         num_bits=_BENCHMARK_QPE_BITS,
         unitary_builder=unitary_builder,
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "hubbard_plaquette", max_hwp_batch_size=max_batch_size
+        ),
     )
     circuit_builder.settings().set("phase_state", "sine")
 
@@ -942,3 +1042,23 @@ class TestBenchmarkLogicalResources:
         # is the only source of Toffolis in this circuit. Pin the sign of the count, not just its
         # value: this exact regression was golden-ed in once before it was caught.
         assert actual["toffolis"] > 0, "the 4x4 lattice must take the Hamming-weight-phasing path"
+
+    def test_a_cap_at_least_the_tower_length_changes_nothing(self):
+        """The 4x4 towers are sixteen terms long, so a cap of sixteen cannot split any of them."""
+        assert _benchmark_logical_counts(4, max_batch_size=16) == _benchmark_logical_counts(4)
+
+    def test_capping_trades_qubits_for_rotations(self):
+        """Halving the batch releases the adder-tree scratch sooner and pays for it in rotations."""
+        uncapped = _benchmark_logical_counts(4)
+        capped = _benchmark_logical_counts(4, max_batch_size=8)
+
+        assert capped["logical_qubits"] < uncapped["logical_qubits"], "a shorter batch must hold fewer ancillas"
+        assert capped["rotations"] > uncapped["rotations"], "each batch pays its own place-value rotations"
+        assert capped["toffolis"] > 0, "batches of eight are still at the break-even, so the tree survives"
+
+    def test_a_cap_below_the_break_even_falls_back(self):
+        """No batch can reach eight terms, so the adder tree disappears entirely."""
+        capped = _benchmark_logical_counts(4, max_batch_size=4)
+
+        assert capped["toffolis"] == 0, "every batch is below the break-even, so nothing is phased through a tree"
+        assert capped["logical_qubits"] < _benchmark_logical_counts(4)["logical_qubits"]
