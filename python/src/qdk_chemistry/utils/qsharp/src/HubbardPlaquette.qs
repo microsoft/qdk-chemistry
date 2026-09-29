@@ -217,16 +217,24 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     }
                 }
             } apply {
+                // TEMPORARY (legacy parity): the legacy ladder also phased every place value with an
+                // R(PauliI) and applied the whole batch constant at the end.
+                let legacy = UsesLegacyCosts();
                 // w = Σ_j 2^j w_j, so e^{2 i theta w} is one rotation per place value, the bit of
                 // place value 2^j taking the angle 2 theta 2^j.
                 for j in 0..places - 1 {
-                    Rz(2.0 * theta * IntAsDouble(1 <<< j), work[finalBits[j]]);
+                    let angle = 2.0 * theta * IntAsDouble(1 <<< j);
+                    Rz(angle, work[finalBits[j]]);
+                    if legacy {
+                        R(PauliI, -angle, work[finalBits[j]]);
+                    }
                 }
                 // `Rz(a) = e^{-ia/2} R1(a)`, so the ladder carries an extra
                 // Π_j e^{-i theta 2^j} = e^{-i theta (2^places - 1)} beyond the intended phase.
                 // `R(PauliI, g)` is e^{-ig/2}, so this g both supplies the batch constant
                 // e^{-i theta count} and undoes the ladder's. Under control it is not global.
-                R(PauliI, 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1)), inputs[0]);
+                let constant = legacy ? count | count - ((1 <<< places) - 1);
+                R(PauliI, 2.0 * theta * IntAsDouble(constant), inputs[0]);
             }
         }
     }
@@ -266,6 +274,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     ) : Unit is Adj + Ctl {
         // A negligible angle skips the adder tree, which a hopping-only model would pay for nothing.
         if AbsD(angle) > 1e-12 {
+            // TEMPORARY (legacy parity): the legacy layer also phased a single-mode Z tower over
+            // every mode, the conventional model's n_up + n_down terms.
+            if UsesLegacyCosts() {
+                HammingWeightPhase(-angle, [[PauliZ], size = Length(systems)], Mapped(q -> [q], systems));
+            }
             HammingWeightPhase(
                 angle,
                 [[PauliZ, PauliZ], size = sites],
@@ -384,7 +397,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// equal-angle Z rotations, which with Hamming-weight phasing saves a place-value rotation
     /// over separate XX and YY towers. Below the break-even each pair takes its own two rotations.
     internal operation HoppingPhases(angle : Double, pairs : Qubit[][]) : Unit is Adj + Ctl {
-        if not UsesHammingWeightPhasing(2 * Length(pairs)) {
+        // TEMPORARY (legacy parity): the legacy layer phased XX and YY as two separate towers.
+        if UsesLegacyCosts() {
+            HammingWeightPhase(-angle, [[PauliX, PauliX], size = Length(pairs)], pairs);
+            HammingWeightPhase(-angle, [[PauliY, PauliY], size = Length(pairs)], pairs);
+        } elif not UsesHammingWeightPhasing(2 * Length(pairs)) {
             for pair in pairs {
                 Exp([PauliX, PauliX], angle, pair);
                 Exp([PauliY, PauliY], angle, pair);
@@ -418,7 +435,18 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         InteractionLayer(params.interactionAngle / 2.0, sites, systems);
         HoppingLayer(params.hoppingAngle, gold, systems);
         InteractionLayer(params.interactionAngle / 2.0, sites, systems);
+        // TEMPORARY (legacy parity): the legacy step also applied the conventional model's scalar,
+        // a real rotation under control.
+        if UsesLegacyCosts() and AbsD(params.interactionAngle) > 1e-12 {
+            R(PauliI, 2.0 * params.interactionAngle * IntAsDouble(sites), systems[0]);
+        }
         HoppingLayer(params.hoppingAngle, pink, systems);
+    }
+
+    /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's extra work, which
+    /// changes no simulated result. Remove this function and every branch on it to revert.
+    internal function UsesLegacyCosts() : Bool {
+        return IsResourceEstimating();
     }
 
     /// # Summary
