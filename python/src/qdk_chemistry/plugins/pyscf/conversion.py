@@ -230,8 +230,10 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
                     shells_by_l[l_value][r_power].append((exp, coeff))
 
             # Build PySCF format: [ncore, [[l, [term0, term1, ...]], ...]]
+            # qdk-chemistry stores the local ECP term as the highest angular momentum; PySCF labels it -1.
+            local_l = max(shells_by_l)
             l_components = []
-            for l_value in sorted(shells_by_l.keys()):
+            for l_value in sorted(shells_by_l, key=lambda value: -1 if value == local_l else value):
                 # Find max r-power for this l to know array size
                 max_r = max(shells_by_l[l_value].keys())
 
@@ -240,7 +242,7 @@ def basis_to_pyscf_mol(basis: BasisSet, charge: int = 0, multiplicity: int = 1) 
                 for r_power, primitives in shells_by_l[l_value].items():
                     terms[r_power] = primitives
 
-                l_components.append([l_value, terms])
+                l_components.append([-1 if l_value == local_l else l_value, terms])
 
             ecp_data_by_atom[iatm] = [ncore, l_components]
 
@@ -344,9 +346,11 @@ def pyscf_mol_to_qdk_basis(
                 ecp_data = pyscf_mol._ecp[ecp_key]  # noqa: SLF001
                 # Structure: [ncore, [[l, [[[exp, coeff]], ...]], ...]], where the inner structure has r-power terms
                 ecp_components = ecp_data[1]
+                # PySCF labels the local ECP term -1; qdk-chemistry stores it as the highest angular momentum.
+                local_l = max((component[0] for component in ecp_components), default=-1) + 1
 
                 for component in ecp_components:
-                    l_value = component[0]
+                    l_value = local_l if component[0] == -1 else component[0]
                     terms = component[1]
 
                     # Process each r-power term

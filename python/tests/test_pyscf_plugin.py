@@ -3116,3 +3116,20 @@ class TestQDKChemistryPySCFBasisConversion:
         assert mol1.nao == mol2.nao
         assert mol1.nelectron == mol2.nelectron
         assert np.isclose(energy1, energy2, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+
+        # Both conversions must map PySCF's local ECP term (l = -1) to QDK's highest angular momentum.
+        mol3 = basis_to_pyscf_mol(qdk_native_basis)
+        assert [component[0] for component in mol3._ecp["Ag"][1]] == [component[0] for component in mol1._ecp["Ag"][1]]
+        scf3 = pyscf.scf.RHF(mol3)
+        scf3.verbose = 0
+        assert np.isclose(
+            scf3.kernel(), energy1, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance
+        )
+
+        assert {shell.orbital_type for shell in qdk_basis.get_ecp_shells()} == {
+            shell.orbital_type for shell in qdk_native_basis.get_ecp_shells()
+        }
+        qdk_energy_converted, _ = qdk_scf.run(structure, 0, 1, qdk_basis)
+        assert np.isclose(
+            qdk_energy_converted, qdk_energy, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance
+        )
