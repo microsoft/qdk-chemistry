@@ -12,11 +12,11 @@ without executing them, enabling standalone resource estimation and circuit prev
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import PhaseGradientPool, QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import IterativeQpeCircuitBuilder, QpeCircuitBuilderSettings
+from .base import IterativeQpeCircuitBuilder, QpeCircuitBuilderSettings, phase_gradients_preparation
 
 __all__: list[str] = [
     "QdkIterativeQpeCircuitBuilder",
@@ -183,8 +183,32 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        (ctrl_unitary_op,), prepare_shared_op, num_shared_ancillas = self._shared_register([controlled_unitary_circuit])
-        self._validate_state_prep_width(state_preparation, num_system_qubits)
+        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        gradient_requests = [
+            state_preparation.metadata.phase_gradients,
+            controlled_unitary_circuit.metadata.phase_gradients,
+        ]
+        if any(gradient_requests):
+            gradient_pool, (state_prep_gradient_indices, ctrl_unitary_gradient_indices) = (
+                PhaseGradientPool.from_requests(gradient_requests)
+            )
+            shared_gradient_sizes = [gradient.num_qubits for gradient in gradient_pool.gradients]
+            ctrl_unitary_op = QSHARP_UTILS.PhaseGradient.MakeRoutedGradientOp(
+                shared_gradient_sizes,
+                list(ctrl_unitary_gradient_indices),
+                ctrl_unitary_op,
+            )
+            prepare_shared_op = phase_gradients_preparation(gradient_pool.gradients)
+            num_shared_ancillas = gradient_pool.num_qubits
+        else:
+            shared_gradient_sizes = []
+            state_prep_gradient_indices = ()
+            prepare_shared_op = QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+            num_shared_ancillas = 0
+        self._validate_state_prep_width(
+            state_preparation,
+            num_system_qubits + state_preparation.metadata.num_phase_gradient_ancillas,
+        )
         iterative_parameters = {
             "statePrep": state_prep_op,
             "repControlledUnitary": ctrl_unitary_op,
@@ -194,6 +218,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "numAncillaQubits": num_ancilla_qubits,
             "prepareSharedOp": prepare_shared_op,
             "numSharedAncillas": num_shared_ancillas,
+            "sharedGradientSizes": shared_gradient_sizes,
+            "statePrepSharedIndices": list(state_prep_gradient_indices),
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

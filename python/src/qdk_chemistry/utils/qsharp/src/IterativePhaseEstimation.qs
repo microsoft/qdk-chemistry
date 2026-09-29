@@ -5,6 +5,9 @@
 namespace QDKChemistry.Utils.IterativePhaseEstimation {
 
     import Std.Arrays.Subarray;
+    import Std.Diagnostics.Fact;
+    import QDKChemistry.Utils.PhaseGradient.PhaseGradientSizeOffsets;
+    import QDKChemistry.Utils.PhaseGradient.RoutedGradientQubitIndices;
 
     /// A struct to hold parameters for iterative Quantum Phase Estimation (IQPE).
     /// - `statePrep`: A function to prepare the initial quantum state.
@@ -15,6 +18,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
     /// - `prepareSharedOp`: Prepares the shared register around the controlled unitary.
     /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
+    /// - `sharedGradientSizes`: Width of each register in the shared pool.
+    /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
     struct IterativePhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         repControlledUnitary : (Qubit, Qubit[]) => Unit,
@@ -24,6 +29,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        sharedGradientSizes : Int[],
+        statePrepSharedIndices : Int[],
     }
 
     /// Runs the iterative Quantum Phase Estimation (IQPE) circuit based on the provided parameters.
@@ -39,16 +46,21 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         let ancillas = qs[ancillaStart..ancillaStart + params.numAncillaQubits - 1];
         let shared = qs[ancillaStart + params.numAncillaQubits...];
         let allTargets = systems + ancillas + shared;
-
-        params.statePrep(systems);
+        let sharedOffsets = PhaseGradientSizeOffsets(params.sharedGradientSizes);
+        Fact(
+            sharedOffsets[Length(sharedOffsets) - 1] == params.numSharedAncillas,
+            "shared gradient sizes must sum to numSharedAncillas"
+        );
+        let statePrepSharedPicks = RoutedGradientQubitIndices(params.sharedGradientSizes, params.statePrepSharedIndices);
 
         within {
-            H(phaseQubit);
+            params.prepareSharedOp(shared);
         } apply {
-            Rz(params.accumulatePhase, phaseQubit);
+            params.statePrep(systems + Subarray(statePrepSharedPicks, shared));
             within {
-                params.prepareSharedOp(shared);
+                H(phaseQubit);
             } apply {
+                Rz(params.accumulatePhase, phaseQubit);
                 params.repControlledUnitary(phaseQubit, allTargets);
             }
         }
@@ -67,6 +79,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
     /// - `prepareSharedOp`: Prepares the shared register around the controlled unitary.
     /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
+    /// - `sharedGradientSizes`: Width of each register in the shared pool.
+    /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
     /// # Returns
     /// The result of measuring the phase qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(
@@ -78,6 +92,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        sharedGradientSizes : Int[],
+        statePrepSharedIndices : Int[],
     ) : Result[] {
         return RunIQPE(new IterativePhaseEstimationParams {
             statePrep = statePrep,
@@ -87,7 +103,9 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             systems = systems,
             numAncillaQubits = numAncillaQubits,
             prepareSharedOp = prepareSharedOp,
-            numSharedAncillas = numSharedAncillas
+            numSharedAncillas = numSharedAncillas,
+            sharedGradientSizes = sharedGradientSizes,
+            statePrepSharedIndices = statePrepSharedIndices
         });
     }
 }

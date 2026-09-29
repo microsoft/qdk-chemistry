@@ -9,6 +9,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     import Std.Diagnostics.Fact;
     import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.LeastRecentlyUsed;
+    import QDKChemistry.Utils.PhaseGradient.PhaseGradientSizeOffsets;
+    import QDKChemistry.Utils.PhaseGradient.RoutedGradientQubitIndices;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
@@ -22,6 +24,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `prepareSharedOp`: Prepares the shared register once around every controlled unitary.
     /// - `numSharedAncillas`: Size of the shared register, appended after the unitary's ancillas
     ///   so each controlled unitary finds it at the end of its targets and leaves it prepared.
+    /// - `sharedGradientSizes`: Width of each register in the shared pool.
+    /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit is Adj,
         controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
@@ -32,6 +36,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        sharedGradientSizes : Int[],
+        statePrepSharedIndices : Int[],
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
@@ -49,19 +55,25 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         let sharedStart = ancillaStart + params.numAncillaQubits;
         let shared = qs[sharedStart..sharedStart + params.numSharedAncillas - 1];
         let allTargets = systems + unitaryAncillas + shared;
+        let sharedOffsets = PhaseGradientSizeOffsets(params.sharedGradientSizes);
+        Fact(
+            sharedOffsets[Length(sharedOffsets) - 1] == params.numSharedAncillas,
+            "shared gradient sizes must sum to numSharedAncillas"
+        );
+        let statePrepSharedPicks = RoutedGradientQubitIndices(params.sharedGradientSizes, params.statePrepSharedIndices);
 
-        // Step 1: Prepare the initial state on system qubits
-        params.statePrep(systems);
-
-        // Step 2: Prepare phase (ancilla) qubits
-        params.phaseQubitPrep(ancillas);
-
-        // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
-        // Each controlledUnitary[k] already implements the correct power.
-        // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
         within {
             params.prepareSharedOp(shared);
         } apply {
+            // Step 1: Prepare the initial state on system qubits
+            params.statePrep(systems + Subarray(statePrepSharedPicks, shared));
+
+            // Step 2: Prepare phase (ancilla) qubits
+            params.phaseQubitPrep(ancillas);
+
+            // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
+            // Each controlledUnitary[k] already implements the correct power.
+            // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
             for ancillaIdx in 0..params.numBits - 1 {
                 params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
             }
@@ -85,6 +97,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        sharedGradientSizes : Int[],
+        statePrepSharedIndices : Int[],
     ) : Qubit[] => Unit is Adj {
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -97,6 +111,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 numAncillaQubits = numAncillaQubits,
                 prepareSharedOp = prepareSharedOp,
                 numSharedAncillas = numSharedAncillas,
+                sharedGradientSizes = sharedGradientSizes,
+                statePrepSharedIndices = statePrepSharedIndices,
             },
             _
         )
@@ -114,6 +130,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter).
     /// - `prepareSharedOp`: Prepares the shared register once around every controlled unitary.
     /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
+    /// - `sharedGradientSizes`: Width of each register in the shared pool.
+    /// - `statePrepSharedIndices`: Pool registers appended to the state-preparation register.
     /// - `measurePhase`: Measure the ancilla qubits. When `false` nothing is measured.
     /// - `computeCapacity`: Positive logical-qubit capacity to enable least-recently-used memory
     ///   placement, or -1 to keep all logical qubits in compute.
@@ -129,6 +147,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        sharedGradientSizes : Int[],
+        statePrepSharedIndices : Int[],
         measurePhase : Bool,
         computeCapacity : Int,
     ) : Result[] {
@@ -152,6 +172,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 numAncillaQubits = numAncillaQubits,
                 prepareSharedOp = prepareSharedOp,
                 numSharedAncillas = numSharedAncillas,
+                sharedGradientSizes = sharedGradientSizes,
+                statePrepSharedIndices = statePrepSharedIndices,
             },
             qs
         );

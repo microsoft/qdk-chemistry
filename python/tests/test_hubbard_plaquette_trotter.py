@@ -26,7 +26,7 @@ from qdk_chemistry.data import (
     QubitOperator,
     UnitaryRepresentation,
 )
-from qdk_chemistry.data.circuit import PhaseGradient, QsharpFactoryData
+from qdk_chemistry.data.circuit import PhaseGradient, PhaseGradientPool, QsharpFactoryData
 from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
@@ -229,12 +229,10 @@ class TestPlaquetteTiling:
                 f"QDKChemistry.Utils.HubbardPlaquette.PlaquetteSection({side},{side},false)"
             )
         ]
-        swaps = [
-            int(position)
-            for position in get_qsharp_context().eval(
-                f"QDKChemistry.Utils.HubbardPlaquette.RoutingSwaps({gold}, {num_modes})"
-            )
-        ]
+        _, raw_swaps = get_qsharp_context().eval(
+            f"QDKChemistry.Utils.HubbardPlaquette.RoutingSwaps({gold}, {num_modes}, true)"
+        )
+        swaps = [int(position) for position in raw_swaps]
 
         # Replay the adjacent exchanges the network emits, which is what the circuit does.
         routed = list(range(num_modes))
@@ -316,6 +314,7 @@ class TestTwoModeFFFT:
 
 
 _PLAQUETTE = "QDKChemistry.Utils.HubbardPlaquette"
+_PG = "QDKChemistry.Utils.PhaseGradient"
 _PAULI_X = np.array([[0, 1], [1, 0]], dtype=complex)
 _PAULI_Y = np.array([[0, -1j], [1j, 0]], dtype=complex)
 
@@ -330,21 +329,32 @@ def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
 
 
 def _hopping_phases(angle: float, num_pairs: int, control: str | None = None) -> str:
-    """Return Q# applying ``HoppingPhases`` on a catalyst prepared around it, optionally controlled.
+    """Return Q# applying the fused hopping-phase tower, optionally controlled.
 
     Only the tower is controlled, as in the evolution: the catalyst is prepared either way.
     """
     register = "qs" if control is None else "qs[1...]"
-    arguments = f"({angle}, Std.Arrays.Chunks(2, {register}), catalyst)"
+    arguments = f"({-angle}, [[PauliZ], size = {2 * num_pairs}], Std.Arrays.Mapped(q -> [q], {register}), catalyst)"
     tower = (
-        f"{_PLAQUETTE}.HoppingPhases{arguments}"
+        f"{_PLAQUETTE}.HammingWeightPhase{arguments}"
         if control is None
-        else f"Controlled {_PLAQUETTE}.HoppingPhases([{control}], {arguments})"
+        else f"Controlled {_PLAQUETTE}.HammingWeightPhase([{control}], {arguments})"
     )
     return (
         f"qs => {{ use catalyst = Qubit[{_PLAQUETTE}.TowerCatalystSize({2 * num_pairs})]; "
-        f"within {{ {_PLAQUETTE}.PrepareTowerCatalyst({-2.0 * angle}, catalyst); }} apply {{ {tower}; }} }}"
+        f"within {{ {_tower_catalyst_prep(-2.0 * angle, 2 * num_pairs)}; "
+        f"for pair in Std.Arrays.Chunks(2, {register}) {{ "
+        "CNOT(pair[0], pair[1]); H(pair[0]); CNOT(pair[0], pair[1]); X(pair[1]); "
+        f"}} }} apply {{ {tower}; }} }}"
     )
+
+
+def _tower_catalyst_prep(phase: float, count: int) -> str:
+    """Return a Q# statement preparing the Hamming-weight phase-gradient catalyst."""
+    bits = 0 if count < 8 else count.bit_length()
+    if bits == 0:
+        return "QDKChemistry.Utils.PrepSelPrep.NoOpPrepare(catalyst)"
+    return f"{_PG}.PreparePhaseGradients([({phase}, {bits}, false)], catalyst)"
 
 
 class TestHoppingPhases:
@@ -391,7 +401,7 @@ class TestInteractionLayer:
 
         operation = (
             f"qs => {{ use catalyst = Qubit[{_PLAQUETTE}.TowerCatalystSize({sites})]; "
-            f"within {{ {_PLAQUETTE}.PrepareTowerCatalyst({2.0 * angle}, catalyst); }} "
+            f"within {{ {_tower_catalyst_prep(2.0 * angle, sites)}; }} "
             f"apply {{ {_PLAQUETTE}.InteractionLayer({angle}, {sites}, qs, catalyst); }} }}"
         )
         assert np.allclose(_applied_state(operation, amplitudes), expected, atol=1e-10)
@@ -431,7 +441,7 @@ class TestPlaquetteEvolutionOnAState:
         literal = "[" + ", ".join("[" + ", ".join(map(str, cycle)) + "]" for cycle in cycles) + "]"
         operation = get_qsharp_context().eval(
             f"qs => {{ use catalyst = Qubit[{_PLAQUETTE}.TowerCatalystSize({2 * len(cycles)})]; "
-            f"within {{ {_PLAQUETTE}.PrepareTowerCatalyst({-kappa}, catalyst); }} "
+            f"within {{ {_tower_catalyst_prep(-kappa, 2 * len(cycles))}; }} "
             f"apply {{ {_PLAQUETTE}.HoppingLayer({kappa}, {literal}, qs, catalyst); }} }}"
         )
 
@@ -628,11 +638,8 @@ class TestSharedPlaquetteCatalysts:
         assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
 
     @pytest.mark.slow
-    def test_rescaled_powers_share_the_overlapping_catalyst_qubits(self):
-        """Doubling the angles doubles each gradient's phase, which only drops its lowest qubit.
-
-        So the two queries share 7 of their 9 catalyst qubits and each prepares the other 2 itself.
-        """
+    def test_rescaled_powers_get_distinct_catalyst_registers(self):
+        """Register-level pooling shares only equal gradients, not overlapping qubits."""
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         powers = [
             _plaquette_controlled(2 * _INTERACTION, 2 * _HOPPING, 1),
@@ -640,19 +647,20 @@ class TestSharedPlaquetteCatalysts:
         ]
         circuit = builder._create_circuit_from_qsharp_op(_one_electron_preparation(), powers, 2, 2 * _CATALYST_SITES)
         parameters = circuit._qsharp_factory.parameter
-        assert parameters["numSharedAncillas"] == 7
+        assert parameters["numSharedAncillas"] == 18
+        assert parameters["sharedGradientSizes"] == [4, 5, 4, 5]
         assert parameters["prepareSharedOp"] is not QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
-        assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
-
     def test_a_circuit_without_catalysts_takes_none_from_the_pool(self):
-        """Circuits may declare different gradients, including none; nothing is pooled that only one needs."""
+        """Circuits may declare different gradients, including none; empty requests route no registers."""
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         circuits = [_plaquette_controlled(0.3, 0.2, 1), _plaquette_controlled(0.3, 0.2, 1, width=2, height=2)]
+        pool, routes = PhaseGradientPool.from_requests([circuit.metadata.phase_gradients for circuit in circuits])
+        assert routes[1] == ()
         ops, prepare, num_shared = builder._shared_register(circuits)
         assert len(ops) == 2
-        assert num_shared == 0
-        assert prepare is QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        assert num_shared == pool.num_qubits == 9
+        assert prepare is not QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
 
 def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> float:

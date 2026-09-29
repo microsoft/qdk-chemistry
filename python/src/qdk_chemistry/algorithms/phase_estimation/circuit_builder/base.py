@@ -15,11 +15,9 @@ from qdk_chemistry.data import (
     QubitOperator,
     Settings,
 )
-from qdk_chemistry.data.circuit import PhaseGradient
+from qdk_chemistry.data.circuit import PhaseGradient, PhaseGradientPool
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
-
-from ._gradient_pool import plan_gradient_pool
 
 __all__: list[str] = [
     "IterativeQpeCircuitBuilder",
@@ -134,10 +132,8 @@ class QpeCircuitBuilder(Algorithm):
         """Resolve the phase gradient register the controlled unitaries request through their metadata.
 
         A controlled unitary that declares ``phase_gradients`` expects those qubits at the end of its targets, prepared
-        by its caller and left prepared. When every circuit declares the same gradients, phase estimation prepares them
-        once around all the controlled unitaries. Otherwise the qubits two or more circuits need are pooled and prepared
-        once, and each circuit prepares the qubits only it needs around its own call; see
-        :func:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder._gradient_pool.plan_gradient_pool`.
+        by its caller and left prepared. Phase estimation prepares one register-level pool around all the controlled
+        unitaries and routes each unitary to the pool registers it requested.
 
         Args:
             controlled_unitary_circuits: The controlled unitaries, each carrying a Q# operation.
@@ -150,23 +146,18 @@ class QpeCircuitBuilder(Algorithm):
         requests = [circuit.metadata.phase_gradients for circuit in controlled_unitary_circuits]
         if not any(requests):
             return ops, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
-        if all(request == requests[0] for request in requests):
-            num_shared = controlled_unitary_circuits[0].metadata.num_phase_gradient_ancillas
-            return ops, phase_gradients_preparation(requests[0]), num_shared
 
-        plan = plan_gradient_pool(requests)
-        pool_size = len(plan.pool_angles)
+        pool, routes = PhaseGradientPool.from_requests(requests)
+        pool_sizes = [gradient.num_qubits for gradient in pool.gradients]
         wrapped = [
-            QSHARP_UTILS.PhaseGradient.MakePooledGradientControlledOp(pool_size, list(layout), list(own), op)
-            for layout, own, op in zip(plan.layouts, plan.own_angles, ops, strict=True)
+            QSHARP_UTILS.PhaseGradient.MakeRoutedGradientOp(pool_sizes, list(route), op)
+            for route, op in zip(routes, ops, strict=True)
         ]
         Logger.info(
-            f"Sharing {pool_size} phase gradient qubits across {len(ops)} controlled unitaries; "
-            f"{sum(len(own) for own in plan.own_angles)} more are prepared per call."
+            f"Prepared {len(pool.gradients)} phase gradient registers "
+            f"({pool.num_qubits} qubits) for {len(ops)} controlled unitaries."
         )
-        if not pool_size:
-            return wrapped, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
-        return wrapped, QSHARP_UTILS.PhaseGradient.MakePhaseStatesPrep(list(plan.pool_angles)), pool_size
+        return wrapped, phase_gradients_preparation(pool.gradients), pool.num_qubits
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:

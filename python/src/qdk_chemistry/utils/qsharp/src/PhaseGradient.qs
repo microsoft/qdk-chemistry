@@ -13,6 +13,7 @@
 namespace QDKChemistry.Utils.PhaseGradient {
 
     import Std.Arithmetic.RippleCarryCGIncByLE;
+    import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
@@ -147,64 +148,70 @@ namespace QDKChemistry.Utils.PhaseGradient {
         PreparePhaseGradients(gradients, _)
     }
 
-    /// Returns a preparation of qubit j as (|0⟩ + e^{i·angles[j]}|1⟩)/√2, for a pooled register.
-    function MakePhaseStatesPrep(angles : Double[]) : Qubit[] => Unit is Adj + Ctl {
-        PrepareGeneralizedPhaseGradient(angles, _)
-    }
-
     /// # Summary
-    /// Wraps a controlled operation that expects phase gradient qubits at the end of its
-    /// targets, so that it draws them from a pool shared with other operations.
+    /// Wraps a controlled operation that expects phase gradient registers at the end of
+    /// its targets, so that it draws whole registers from a shared pool.
     ///
     /// # Description
-    /// A phase gradient is a product state that its consumers return unchanged, so each of
-    /// its qubits can be shared with any other operation that needs the same single-qubit
-    /// state. The caller appends a prepared pool to the targets. For each gradient qubit the
-    /// operation expects, `layout` holds its index in the pool, or `-1 - i` for the i-th
-    /// qubit it alone needs, which the wrapper prepares around the call from `ownAngles`.
+    /// The caller appends the prepared pool to the targets. `poolSizes` gives each pool
+    /// register's width, and `indices` gives the registers this operation expects, in the
+    /// same order it expects them.
     ///
     /// # Input
-    /// ## poolSize
-    /// Number of pool qubits at the end of the targets the wrapper is given.
-    /// ## layout
-    /// Where each of the operation's gradient qubits comes from.
-    /// ## ownAngles
-    /// Angles of the qubits only this operation uses.
+    /// ## poolSizes
+    /// Width of each register in the shared pool.
+    /// ## indices
+    /// Pool registers the operation consumes.
     /// ## op
     /// The operation, expecting its gradient qubits at the end of its targets.
-    function MakePooledGradientControlledOp(
-        poolSize : Int,
-        layout : Int[],
-        ownAngles : Double[],
+    function MakeRoutedGradientOp(
+        poolSizes : Int[],
+        indices : Int[],
         op : (Qubit, Qubit[]) => Unit is Adj + Ctl
     ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
-        PooledGradientControlled(poolSize, layout, ownAngles, op, _, _)
+        let offsets = PhaseGradientSizeOffsets(poolSizes);
+        RoutedGradientControlled(
+            offsets[Length(offsets) - 1],
+            RoutedGradientQubitIndices(poolSizes, indices),
+            op,
+            _,
+            _
+        )
     }
 
-    internal operation PooledGradientControlled(
+    internal operation RoutedGradientControlled(
         poolSize : Int,
-        layout : Int[],
-        ownAngles : Double[],
+        picks : Int[],
         op : (Qubit, Qubit[]) => Unit is Adj + Ctl,
         control : Qubit,
         targets : Qubit[]
     ) : Unit is Adj + Ctl {
+        Fact(poolSize <= Length(targets), "The shared gradient pool is larger than the operation target register.");
         let split = Length(targets) - poolSize;
-        use own = Qubit[Length(ownAngles)];
-        within {
-            PrepareGeneralizedPhaseGradient(ownAngles, own);
-        } apply {
-            op(control, targets[0..split - 1] + GatherGradientQubits(layout, targets[split..Length(targets) - 1], own));
-        }
+        op(control, targets[0..split - 1] + Subarray(picks, targets[split...]));
     }
 
-    /// The qubits `layout` selects from the pool and from the operation's own qubits.
-    internal function GatherGradientQubits(layout : Int[], pool : Qubit[], own : Qubit[]) : Qubit[] {
-        mutable qubits = [];
-        for index in layout {
-            set qubits += [index >= 0 ? pool[index] | own[-1 - index]];
+    /// Where each register of sizes `sizes` starts, followed by their total size.
+    function PhaseGradientSizeOffsets(sizes : Int[]) : Int[] {
+        mutable offsets = [0];
+        for size in sizes {
+            Fact(size >= 0, "Phase gradient register sizes must be non-negative.");
+            set offsets += [offsets[Length(offsets) - 1] + size];
         }
-        return qubits;
+        return offsets;
+    }
+
+    /// The flat pool qubit indices selected by `indices`, preserving whole-register order.
+    function RoutedGradientQubitIndices(poolSizes : Int[], indices : Int[]) : Int[] {
+        let offsets = PhaseGradientSizeOffsets(poolSizes);
+        mutable picks = [];
+        for index in indices {
+            Fact(0 <= index and index < Length(poolSizes), "Phase gradient pool index out of range.");
+            for qubit in offsets[index]..offsets[index + 1] - 1 {
+                set picks += [qubit];
+            }
+        }
+        return picks;
     }
 
     /// Test wrapper: GPGA controlled on `control`, on `targets` = weight (n) + catalyst (n).

@@ -14,7 +14,7 @@ Supported formats and conversions:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -39,7 +39,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
-__all__: list[str] = ["CircuitMetadata", "PhaseGradient", "QsharpFactoryData"]
+__all__: list[str] = ["CircuitMetadata", "PhaseGradient", "PhaseGradientPool", "QsharpFactoryData"]
 
 
 @dataclass(frozen=True)
@@ -93,6 +93,58 @@ class PhaseGradient:
     def is_binary(self) -> bool:
         """Whether this is the binary phase gradient :meth:`binary` returns."""
         return self == PhaseGradient.binary(self.num_qubits)
+
+
+@dataclass(frozen=True)
+class PhaseGradientPool:
+    """Phase gradient registers prepared once and shared by index."""
+
+    gradients: tuple[PhaseGradient, ...] = ()
+    """Registers in the pool, laid out consecutively in this order."""
+
+    def __post_init__(self) -> None:
+        """Normalize the gradients to a tuple."""
+        object.__setattr__(self, "gradients", tuple(self.gradients))
+
+    @classmethod
+    def from_requests(
+        cls,
+        requests: Sequence[tuple[PhaseGradient, ...]],
+    ) -> tuple["PhaseGradientPool", tuple[tuple[int, ...], ...]]:
+        """Build a pool and return each consumer's register indices.
+
+        Equal requests share a register. If one consumer requests the same gradient more
+        than once, those occurrences use distinct pool registers.
+        """
+        pool: list[PhaseGradient] = []
+        index_by_occurrence: dict[tuple[PhaseGradient, int], int] = {}
+        routes: list[tuple[int, ...]] = []
+        for request in requests:
+            occurrences: dict[PhaseGradient, int] = {}
+            route: list[int] = []
+            for gradient in request:
+                occurrence = occurrences.get(gradient, 0)
+                occurrences[gradient] = occurrence + 1
+                key = (gradient, occurrence)
+                if key not in index_by_occurrence:
+                    index_by_occurrence[key] = len(pool)
+                    pool.append(gradient)
+                route.append(index_by_occurrence[key])
+            routes.append(tuple(route))
+        return cls(tuple(pool)), tuple(routes)
+
+    @property
+    def num_qubits(self) -> int:
+        """Total width of the pooled registers."""
+        return sum(gradient.num_qubits for gradient in self.gradients)
+
+    @property
+    def offsets(self) -> tuple[int, ...]:
+        """Register start offsets followed by the total size."""
+        offsets = [0]
+        for gradient in self.gradients:
+            offsets.append(offsets[-1] + gradient.num_qubits)
+        return tuple(offsets)
 
 
 @dataclass(frozen=True)

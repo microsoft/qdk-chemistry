@@ -5,6 +5,7 @@
 namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     import Std.Arrays.Reversed;
+    import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
@@ -14,6 +15,8 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.LeastRecentlyUsed;
     import Std.ResourceEstimation.RepeatEstimates;
+    import QDKChemistry.Utils.PhaseGradient.PhaseGradientSizeOffsets;
+    import QDKChemistry.Utils.PhaseGradient.RoutedGradientQubitIndices;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
@@ -99,8 +102,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     ///
     /// `numAncillas` counts the block ancilla the walk reflects about. The `numSharedAncillas`
     /// shared qubits sit past them: `prepareSharedOp` initializes them once around the query
-    /// schedule and whoever consumes them leaves them in that state. Set `statePrepUsesShared` or
-    /// `blockEncodingUsesShared` for the component that expects them appended to its register.
+    /// schedule and whoever consumes them leaves them in that state. `sharedGradientSizes`
+    /// gives the register boundaries, while `statePrepSharedIndices` and
+    /// `blockEncodingSharedIndices` select which pool registers are appended to each component.
     /// Set `computeCapacity` to a positive logical-qubit capacity to enable least-recently-used
     /// memory placement, or to -1 to keep all logical qubits in compute.
     operation MakeUnaryQPECircuit(
@@ -113,18 +117,22 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         numSystemQubits : Int,
         numAncillas : Int,
         numSharedAncillas : Int,
-        statePrepUsesShared : Bool,
-        blockEncodingUsesShared : Bool,
+        sharedGradientSizes : Int[],
+        statePrepSharedIndices : Int[],
+        blockEncodingSharedIndices : Int[],
         computeCapacity : Int,
     ) : Result[] {
         Fact(numSystemQubits > 0, "numSystemQubits must be positive");
         Fact(numAncillas >= 0, "numAncillas must be non-negative");
         Fact(numSharedAncillas >= 0, "numSharedAncillas must be non-negative");
-        Fact(
-            numSharedAncillas > 0 or not (statePrepUsesShared or blockEncodingUsesShared),
-            "consuming shared ancilla requires a non-empty shared register"
-        );
         Fact(computeCapacity == -1 or computeCapacity > 0, "computeCapacity must be -1 or positive");
+        let sharedOffsets = PhaseGradientSizeOffsets(sharedGradientSizes);
+        Fact(
+            sharedOffsets[Length(sharedOffsets) - 1] == numSharedAncillas,
+            "shared gradient sizes must sum to numSharedAncillas"
+        );
+        let statePrepSharedPicks = RoutedGradientQubitIndices(sharedGradientSizes, statePrepSharedIndices);
+        let blockEncodingSharedPicks = RoutedGradientQubitIndices(sharedGradientSizes, blockEncodingSharedIndices);
         let numPhaseQubits = PhaseRegisterSize(numQueries);
 
         if computeCapacity > 0 {
@@ -144,11 +152,10 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
                 prepareSharedOp(sharedQubits);
             }
         } apply {
-            statePrep(statePrepUsesShared ? systemQubits + sharedQubits | systemQubits);
-            let blockEncoding =
-                blockEncodingUsesShared
-                ? (register) => applyBlockEncoding(register + sharedQubits)
-                | applyBlockEncoding;
+            statePrep(systemQubits + Subarray(statePrepSharedPicks, sharedQubits));
+            let blockEncoding = (register) => applyBlockEncoding(
+                register + Subarray(blockEncodingSharedPicks, sharedQubits)
+            );
             ApplySignedPowerSchedule(
                 blockEncoding,
                 applyReflection,
@@ -243,8 +250,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             1,
             0,
             0,
-            false,
-            false,
+            [],
+            [],
+            [],
             -1
         );
     }

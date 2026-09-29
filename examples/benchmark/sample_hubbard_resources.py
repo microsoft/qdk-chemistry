@@ -190,7 +190,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     frames: list[pd.DataFrame] = []
     for size in args.size:
-        Logger.info(f"Sampling L={size}; writing {args.output}", flush=True)
+        Logger.info(f"Sampling L={size}; writing {args.output}")
         try:
             frame = run_sampling(context, size)
         except Exception as error:  # noqa: BLE001 - keep the sweep alive; the log explains the gap
@@ -205,7 +205,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             continue
         frames.append(frame)
         pd.concat(frames, ignore_index=True).to_csv(args.output, index=False)
-        Logger.info(f"Finished L={size}", flush=True)
+        Logger.info(f"Finished L={size}")
 
     return 0
 

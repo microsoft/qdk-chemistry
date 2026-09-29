@@ -66,14 +66,14 @@ _HUBBARD_L2_FULL_CIRCUIT = {
     "trotter_budget": 0.0068,
     "qpe_bits": 10,
     "base_time": 0.2253660323553513,
-    "logical_qubits": 25,
-    "rotations": 2224986,
-    "rotation_depth": 1483448,
+    "logical_qubits": 18,
+    "rotations": 1047435,
+    "rotation_depth": 698414,
     "t_gates": 698155,
-    "ccz_count": 610582,
+    "ccz_count": 0,
     "ccix_count": 0,
-    "toffolis": 610582,
-    "measurements": 610592,
+    "toffolis": 0,
+    "measurements": 10,
 }
 
 

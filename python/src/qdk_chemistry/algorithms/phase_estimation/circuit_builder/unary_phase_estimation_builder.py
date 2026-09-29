@@ -8,7 +8,7 @@
 import numpy as np
 
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import PhaseGradientPool, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
     BlockEncodingContainer,
@@ -220,16 +220,13 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         block_encoding_gradients = block_encoding.metadata.phase_gradients
         state_prep_gradients = state_preparation.metadata.phase_gradients
-        if block_encoding_gradients and state_prep_gradients and block_encoding_gradients != state_prep_gradients:
-            raise ValueError(
-                f"State preparation expects the phase gradients {list(state_prep_gradients)} but the "
-                f"block encoding expects {list(block_encoding_gradients)}."
-            )
-        shared_gradients = block_encoding_gradients or state_prep_gradients
+        gradient_pool, (state_prep_gradient_indices, block_encoding_gradient_indices) = PhaseGradientPool.from_requests(
+            [state_prep_gradients, block_encoding_gradients]
+        )
         block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
         state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas
-        num_phase_gradient_ancillas = sum(gradient.num_qubits for gradient in shared_gradients)
-        prepare_shared_op = phase_gradients_preparation(shared_gradients)
+        num_phase_gradient_ancillas = gradient_pool.num_qubits
+        prepare_shared_op = phase_gradients_preparation(gradient_pool.gradients)
         num_ancilla_qubits = num_qubits - num_system_qubits - block_encoding_shared
         if num_ancilla_qubits <= 0:
             raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")
@@ -256,8 +253,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "numSystemQubits": num_system_qubits,
             "numAncillas": num_ancilla_qubits,
             "numSharedAncillas": num_phase_gradient_ancillas,
-            "statePrepUsesShared": bool(state_prep_shared),
-            "blockEncodingUsesShared": bool(block_encoding_shared),
+            "sharedGradientSizes": [gradient.num_qubits for gradient in gradient_pool.gradients],
+            "statePrepSharedIndices": list(state_prep_gradient_indices),
+            "blockEncodingSharedIndices": list(block_encoding_gradient_indices),
             "computeCapacity": compute_capacity,
         }
         circuit = Circuit(
