@@ -5,7 +5,7 @@
  -->
 <!-- Title: TutorialQpeIqpeIteration Pages: 1 -->
 <svg width="587pt" height="891pt"
- viewBox="0.00 0.00 587.00 891.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-iqpe-iteration-title tutorial-qpe-iqpe-iteration-desc" data-source-sha256="b4c8825e0f1a25b5fbb43c0d3503e69ccd81e999f7584d7621a43bea113b27ef">
+ viewBox="0.00 0.00 587.00 891.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" role="img" aria-labelledby="tutorial-qpe-iqpe-iteration-title tutorial-qpe-iqpe-iteration-desc" data-source-sha256="74b79beae2a119dbce31b700d7a86a51c709652e83a13f4be17f37218676a9fa">
 <title id="tutorial-qpe-iqpe-iteration-title">Iterative phase-estimation iteration</title>
 <desc id="tutorial-qpe-iqpe-iteration-desc">Flow through one IQPE iteration. In parallel, freshly prepare the molecular trial state on the compute register and a Hadamard superposition on a new readout ancilla. Rotate the ancilla using feedback from earlier measured bits, then use it to control this iteration's time-evolution power on the compute register. Apply a final Hadamard gate and measure the ancilla for one shot. Repeat with fresh registers for an odd number of shots; their majority selects phase bit b sub k. Use that bit to update the classical feedback angle and continue to iteration k plus 1.</desc>
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 876.6)">
@@ -23,7 +23,10 @@
 <title>Evolution</title>
 <path fill="#e0f2f1" stroke="#00796b" stroke-width="2.5" d="M424.6,-635.4C424.6,-635.4 88.6,-635.4 88.6,-635.4 82.6,-635.4 76.6,-629.4 76.6,-623.4 76.6,-623.4 76.6,-579 76.6,-579 76.6,-573 82.6,-567 88.6,-567 88.6,-567 424.6,-567 424.6,-567 430.6,-567 436.6,-573 436.6,-579 436.6,-579 436.6,-623.4 436.6,-623.4 436.6,-629.4 430.6,-635.4 424.6,-635.4"/>
 <text xml:space="preserve" text-anchor="start" x="155.35" y="-608.4" font-family="Arial" font-weight="bold" font-size="14.00" fill="#004d40">Apply controlled time evolution</text>
-<text xml:space="preserve" text-anchor="start" x="124.23" y="-583.25" font-family="Arial" font-size="11.00" fill="#004d40">Ancilla controls U^(2^(m−k−1)) on the compute register</text>
+<text xml:space="preserve" text-anchor="start" x="140.35" y="-583.25" font-family="Arial" font-size="11.00" fill="#004d40">Ancilla controls U</text>
+<text xml:space="preserve" text-anchor="start" x="223.6" y="-583.25" font-family="Arial" baseline-shift="super" font-size="11.00" fill="#004d40">2</text>
+<text xml:space="preserve" text-anchor="start" x="228.85" y="-583.25" font-family="Arial" baseline-shift="super" font-size="11.00" fill="#004d40">m−k−1</text>
+<text xml:space="preserve" text-anchor="start" x="256.6" y="-583.25" font-family="Arial" font-size="11.00" fill="#004d40"> on the compute register</text>
 </g>
 <!-- Compute&#45;&gt;Evolution -->
 <g id="edge2" class="edge">

@@ -25,11 +25,11 @@ After completing this chapter, you will be able to:
    Calculate the number of qubits needed to encode the selected active-space fermionic state before verifying it with code.
    Record the core energy separately and identify every quantity excluded from this qubit count.
 
-Example download
-====================
+Example files
+=============
 
-Download :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` and save it in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py`` from :doc:`Choosing the active space <03_choosing_the_active_space>`.
-Open all three files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
+Add :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` to your tutorial working folder.
+Open the new file in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
 The script imports the tested :doc:`Choosing the active space <03_choosing_the_active_space>` workflow so that both lessons use the same selected active space.
 
 The active-space Hamiltonian

@@ -111,6 +111,8 @@ def test_graphviz_sources_generate_accessible_svg_figures():
         dot_path = DIAGRAMS_DIR / dot_name
         dot_source = dot_path.read_text(encoding="utf-8")
         assert 'bgcolor="#FFFFFF"' in dot_source
+        if dot_name == "tutorial_qpe_iqpe_iteration.dot":
+            assert "U<SUP>2<SUP>m\u2212k\u22121</SUP></SUP>" in dot_source
         if dot_name == "tutorial_qpe_wavefunction_hierarchy.dot":
             assert "χ[μ]" not in dot_source
             assert "Φ(HF)" not in dot_source
@@ -171,7 +173,10 @@ def test_matplotlib_sources_generate_accessible_svg_figures():
         svg_id = svg_path.stem.replace("_", "-")
         assert root.attrib["role"] == "img"
         assert root.attrib["aria-labelledby"] == f"{svg_id}-title {svg_id}-desc"
-        assert root.attrib["data-source-sha256"] == source_sha256(*paths)
+        expected_source_hash = source_sha256(*paths)
+        assert root.attrib["data-source-sha256"] == expected_source_hash, (
+            f"{svg_name} has stale source metadata; regenerate it with `python {paths[0].relative_to(REPOSITORY_ROOT)}`"
+        )
         title = root.find(f"{{{SVG_NAMESPACE}}}title")
         description = root.find(f"{{{SVG_NAMESPACE}}}desc")
         assert title is not None

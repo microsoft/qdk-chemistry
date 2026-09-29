@@ -225,7 +225,7 @@ echo "=== Installing libint2 ==="
 LIBINT_TARBALL=$(basename "$LIBINT_URL")
 wget -q "$LIBINT_URL"
 tar xzf "$LIBINT_TARBALL"
-# The tarball libint-2.9.0-mpqc4.tgz extracts to libint-2.9.0, not libint-2.9.0-mpqc4
+# The tarball extracts to a single top-level libint-* directory; detect it dynamically.
 # Find the actual extracted directory (excluding macOS metadata files starting with ._)
 LIBINT_DIR=$(ls -d libint-*/ 2>/dev/null | grep -v '^\._' | head -1 | tr -d '/')
 if [[ -z "$LIBINT_DIR" || ! -d "$LIBINT_DIR" ]]; then

@@ -25,12 +25,11 @@ After completing this chapter, you will be able to:
    Record the algorithm settings before starting the final simulation and record the measured values after it finishes.
    Use the completed lab notebook to explain whether the result meets the teaching target and which chemistry and algorithm limitations remain.
 
-Example download
-================
+Example files
+=============
 
-Download :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and save it in the tutorial working directory alongside :download:`tutorial_orbital_coordinates.py <../../_static/examples/python/tutorial_orbital_coordinates.py>`, :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>`, :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>`, and :download:`tutorial_prepare_trial_state.py <../../_static/examples/python/tutorial_prepare_trial_state.py>`.
-Also download :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` to the same directory.
-Open the files in Visual Studio Code and review the complete :term:`IQPE` script, including imports, data classes, and helper functions omitted from the excerpts below.
+Add :download:`tutorial_run_iqpe.py <../../_static/examples/python/tutorial_run_iqpe.py>` and :download:`tutorial_visualize_iqpe_circuit.ipynb <../../_static/examples/python/tutorial_visualize_iqpe_circuit.ipynb>` to your tutorial working folder.
+Open the new files in Visual Studio Code and review the complete :term:`IQPE` script, including imports, data classes, and helper functions omitted from the excerpts below.
 The script imports the mapping and trial-state workflows from previous chapters so every stage uses the same selected Hamiltonian and four-determinant trial state.
 The Jupyter notebook constructs and renders the shortest iteration circuit without executing the simulator.
 

@@ -152,6 +152,12 @@ The algorithm's name.
 Returns:
     str: The name of the algorithm
 )");
+  constructor.def("aliases", &EffectiveHamiltonianConstructor::aliases, R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+)");
   constructor.def("type_name", &EffectiveHamiltonianConstructor::type_name, R"(
 The algorithm's type name.
 

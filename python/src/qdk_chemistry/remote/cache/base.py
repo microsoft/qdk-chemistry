@@ -44,7 +44,7 @@ def is_cacheable(value: Any) -> bool:
         return True
     if isinstance(value, np.ndarray):
         return not value.dtype.hasobject
-    if isinstance(value, list):
+    if isinstance(value, list | tuple):
         return all(_is_cache_node(item) for item in value)
     return False
 

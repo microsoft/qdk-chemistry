@@ -92,6 +92,13 @@ def zassenhaus_steps_naive(
     # zassenhaus_commutator_plan as its first element. If provided, the mapping must
     # include 'order + 1' so the bound can use the first omitted exponent without
     # regenerating the plan.
+    container_type = hamiltonian.get_container_type()
+    if container_type != "pauli_decomposition":
+        raise ValueError(
+            f"Zassenhaus step estimation requires a Pauli decomposition qubit operator; "
+            f"got the {container_type!r} representation."
+        )
+
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     one_norm = sum(abs(coeff) for _, coeff in real_terms)
     num_real_terms = len(real_terms)
@@ -228,6 +235,13 @@ def zassenhaus_omitted_commutator_norm(
     Hamiltonian commutator DAG can be evaluated directly and scaled by the
     symbolic Zassenhaus coefficients.
     """
+    container_type = hamiltonian.get_container_type()
+    if container_type != "pauli_decomposition":
+        raise ValueError(
+            f"The Zassenhaus omitted-commutator norm requires a Pauli decomposition qubit operator; "
+            f"got the {container_type!r} representation."
+        )
+
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     if len(real_terms) < 2:
         return 0.0

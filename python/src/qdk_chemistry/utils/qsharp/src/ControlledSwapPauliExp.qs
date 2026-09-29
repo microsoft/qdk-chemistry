@@ -14,11 +14,12 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// An internally allocated `vacuum` register (initialized to |0...0>) is conditionally
     /// swapped with the system register, the *uncontrolled* Pauli evolution is applied to the
     /// vacuum register, and the swap is uncomputed. The eigenphase accumulates on the |1>
-    /// branch, matching the standard controlled-U convention, for the cost of a single layer
-    /// of controlled-`SWAP` instead of controlling every gate of `Exp`.
+    /// branch, matching the standard controlled-U convention. For an n-qubit system, this uses
+    /// an additional n-qubit vacuum register and two layers of n controlled-`SWAP` operations
+    /// instead of controlling every gate of `Exp`.
     ///
-    /// The `repetitions` loop lives *inside* the sandwich, so one layer of controlled-`SWAP`
-    /// covers the whole repeated evolution.
+    /// The `repetitions` loop lives *inside* the sandwich, so the same two controlled-`SWAP`
+    /// layers cover the whole repeated evolution.
     ///
     /// The evolution must leave the vacuum invariant, `U|0...0> = e^{i phi_0}|0...0>`, as a
     /// particle-conserving Hamiltonian does. That `phi_0` lands on the |0> branch and is passed

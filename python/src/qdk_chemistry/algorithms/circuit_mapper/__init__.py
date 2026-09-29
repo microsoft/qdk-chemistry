@@ -8,6 +8,7 @@
 from .base import CircuitMapperFactory
 from .pauli_sequence_mapper import PauliSequenceMapper, PauliSequenceMapperSettings
 from .psp_mapper import PSPMapper, PSPMapperSettings
+from .sossa_mapper import SOSSAMapper, SOSSAMapperSettings
 
 __all__ = [
     "CircuitMapperFactory",
@@ -15,4 +16,6 @@ __all__ = [
     "PSPMapperSettings",
     "PauliSequenceMapper",
     "PauliSequenceMapperSettings",
+    "SOSSAMapper",
+    "SOSSAMapperSettings",
 ]

@@ -36,7 +36,7 @@ from qdk_chemistry.remote.backends.local import LocalBackend
 from qdk_chemistry.remote.cache.folder import FolderCache
 from qdk_chemistry.remote.cache.tiered import TieredCache
 from qdk_chemistry.remote.job import Job
-from qdk_chemistry.remote.proxy import _build_payload_for, run, submit
+from qdk_chemistry.remote.proxy import _build_payload_for, _job_cache_key, run, submit
 from qdk_chemistry.remote.serialization import (
     FileSerializer,
     deserialize_inputs,
@@ -489,7 +489,11 @@ def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
         run_hash="testhash",
         force_rerun=True,
     )
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", True)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", True)),
+    )
     get_cached_result = MagicMock(return_value=-75.5)
     monkeypatch.setattr(remote_worker, "_get_cached_result", get_cached_result)
     algorithm = MagicMock()
@@ -501,6 +505,91 @@ def test_worker_force_rerun_bypasses_remote_cache(tmp_path, monkeypatch):
     algorithm.run.assert_called_once_with()
 
 
+def test_worker_cache_transport_skips_output_serialization(tmp_path, monkeypatch):
+    """Shared-cache transport does not create unused output artifacts."""
+    input_dir = tmp_path / "input"
+    output_dir = tmp_path / "output"
+    serialize_inputs(
+        input_dir,
+        args=(),
+        kwargs={},
+        algorithm_type="test_algorithm",
+        algorithm_name="plugin",
+        settings={},
+        run_hash="testhash",
+        remote_cache={"name": "shared"},
+        remote_cache_transport=True,
+    )
+    result = 6
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
+    monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=result))
+    serialize = MagicMock()
+    monkeypatch.setattr(serialization_module, "serialize_outputs", serialize)
+
+    assert execute_job(input_dir, output_dir) == result
+    serialize.assert_not_called()
+    assert not output_dir.exists()
+
+
+def test_shared_cache_transport_scopes_worker_and_client_jobs_by_owner(tmp_path, monkeypatch):
+    """Two owners retain distinct shared-cache results for one run hash."""
+    shared_cache = FolderCache(path=tmp_path / "shared", is_shared=True)
+    owners = [
+        {"workspace_root": "/workspace", "project_name": "project-a"},
+        {"workspace_root": "/workspace", "project_name": "project-b"},
+    ]
+    run_hash = "testhash"
+    results = [1, 2]
+    algorithms = []
+
+    for index, (owner, result) in enumerate(zip(owners, results, strict=True)):
+        input_dir = tmp_path / f"input-{index}"
+        job_cache_key = _job_cache_key(run_hash, owner)
+        serialize_inputs(
+            input_dir,
+            args=(),
+            kwargs={},
+            algorithm_type="test_algorithm",
+            algorithm_name="plugin",
+            settings={},
+            run_hash=run_hash,
+            job_cache_key=job_cache_key,
+            owner=owner,
+            remote_cache={"name": "folder", "path": str(tmp_path / "shared"), "is_shared": True},
+            remote_cache_transport=True,
+        )
+        algorithm = MagicMock()
+        algorithm.run.return_value = result
+        algorithms.append(algorithm)
+        monkeypatch.setattr(algorithms_module, "create", MagicMock(return_value=algorithm))
+
+        assert execute_job(input_dir, tmp_path / f"output-{index}") == result
+        assert shared_cache.get_job(job_cache_key) is not None
+
+    assert [algorithm.run.call_count for algorithm in algorithms] == [1, 1]
+
+    class CachedAlgorithm:
+        def type_name(self):
+            return "test_algorithm"
+
+        def name(self):
+            return "plugin"
+
+        def settings(self):
+            return Settings()
+
+        def hash(self, *_args, **_kwargs):
+            return run_hash
+
+    cached_algorithm = CachedAlgorithm()
+    for owner, result in zip(owners, results, strict=True):
+        assert run(cached_algorithm, cache=shared_cache, _owner=owner) == result
+
+
 def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -510,10 +599,11 @@ def test_worker_logs_remote_cache_load_failure(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(remote_cache_module, "get_cache", MagicMock(side_effect=RuntimeError("cache unavailable")))
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, job_cache_key, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash == "testhash"
+    assert job_cache_key == "testhash"
     assert force_rerun is False
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert record.levelno == logging.WARNING
@@ -531,10 +621,11 @@ def test_worker_validates_manifest_before_loading_remote_cache(tmp_path, monkeyp
     monkeypatch.setattr(remote_cache_module, "get_cache", get_cache)
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        cache, run_hash, force_rerun = remote_worker._load_remote_cache(input_dir)
+        cache, run_hash, job_cache_key, force_rerun = remote_worker._load_remote_cache(input_dir)
 
     assert cache is None
     assert run_hash is None
+    assert job_cache_key is None
     assert force_rerun is False
     get_cache.assert_not_called()
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
@@ -567,7 +658,11 @@ def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
         settings={},
         run_hash="testhash",
     )
-    monkeypatch.setattr(remote_worker, "_load_remote_cache", MagicMock(return_value=(MagicMock(), "testhash", False)))
+    monkeypatch.setattr(
+        remote_worker,
+        "_load_remote_cache",
+        MagicMock(return_value=(MagicMock(), "testhash", "testhash", False)),
+    )
     monkeypatch.setattr(remote_worker, "_get_cached_result", MagicMock(return_value=6))
     deserialize = MagicMock()
     monkeypatch.setattr(serialization_module, "deserialize_inputs", deserialize)
@@ -584,6 +679,7 @@ def test_worker_cache_hit_skips_input_deserialization(tmp_path, monkeypatch):
         pytest.param((42,), True, id="singleton-tuple"),
         pytest.param((), True, id="empty-tuple"),
         pytest.param((None,), True, id="singleton-none-tuple"),
+        pytest.param((1, (2, 3)), True, id="nested-tuple"),
     ],
 )
 def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):
@@ -594,7 +690,7 @@ def test_worker_cache_preserves_result_shape(tmp_path, result, output_is_tuple):
         "settings": {},
     }
 
-    remote_worker._store_cached_result(cache, "testhash", inputs, result)
+    remote_worker._store_cached_result(cache, "testhash", "testhash", inputs, result)
 
     assert remote_worker._get_cached_result(cache, "testhash") == result
     job = cache.get_job("testhash")
@@ -612,7 +708,7 @@ def test_worker_logs_cache_write_failure(caplog):
     }
 
     with caplog.at_level(logging.WARNING, logger=remote_worker.__name__):
-        remote_worker._store_cached_result(cache, "testhash", inputs, 42)
+        remote_worker._store_cached_result(cache, "testhash", "testhash", inputs, 42)
 
     record = next(record for record in caplog.records if record.name == remote_worker.__name__)
     assert record.levelno == logging.WARNING
@@ -664,6 +760,7 @@ class TestJob:
             status="submitted",
             run_hash="aaaa",
             input_hashes={"args.arg_0": "hash0"},
+            owner={"workspace_root": "/workspace", "project_name": "project-a"},
         )
         loaded = Job.load(job.save(tmp_path / "job_j1.json"))
         assert loaded.job_id == "j1"
@@ -672,6 +769,17 @@ class TestJob:
         assert loaded.backend_state == {"pid": 1234}
         assert loaded.run_hash == "aaaa"
         assert loaded.input_hashes == {"args.arg_0": "hash0"}
+        assert loaded.owner == {"workspace_root": "/workspace", "project_name": "project-a"}
+
+    def test_load_legacy_job_without_owner(self, tmp_path):
+        job = Job(job_id="j1", backend="local", backend_config={}, backend_state={})
+        data = job.to_dict()
+        data["version"] = 2
+        data.pop("owner", None)
+        path = tmp_path / "job_j1.json"
+        path.write_text(json.dumps(data))
+
+        assert Job.load(path).owner is None
 
     def test_load_requires_status(self, tmp_path):
         path = tmp_path / "job_j1.json"
@@ -1009,7 +1117,7 @@ class TestBackendRegistry:
         with pytest.raises(DuplicateRegistrationError, match="already registered"):
             register_backend("duplicate-backend")(SecondBackend)
 
-        with pytest.raises(DuplicateRegistrationError, match="already registered.*duplicate-backend"):
+        with pytest.raises(DuplicateRegistrationError, match=r"already registered.*duplicate-backend"):
             register_backend("backend-alias")(FirstBackend)
 
         assert remote_backend_registry._BACKENDS["duplicate-backend"] is FirstBackend
@@ -1045,6 +1153,43 @@ class TestBackendRegistry:
 
         assert "_test_stub" in available_backends()
         assert isinstance(get_backend("_test_stub"), StubBackend)
+
+    @pytest.mark.parametrize(
+        ("declaration", "match"),
+        [
+            (["endpoint"], "frozenset"),
+            (frozenset({""}), "non-empty strings"),
+            (frozenset({"missing"}), "not named constructor parameters"),
+        ],
+    )
+    def test_register_backend_validates_mcp_safe_config_options(self, monkeypatch, declaration, match):
+        class InvalidBackend(RemoteBackend):
+            mcp_safe_config_options = declaration
+
+            def __init__(self, *, endpoint=None):
+                super().__init__(endpoint=endpoint)
+
+        monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
+
+        with pytest.raises(TypeError, match=rf"{match}"):
+            register_backend("invalid-mcp-config")(InvalidBackend)
+
+        assert remote_backend_registry._BACKENDS == {}
+
+    def test_registered_backend_does_not_inherit_mcp_safe_config(self, monkeypatch):
+        class ParentBackend(RemoteBackend):
+            mcp_safe_config_options = frozenset({"endpoint"})
+
+            def __init__(self, *, endpoint=None):
+                super().__init__(endpoint=endpoint)
+
+        class ChildBackend(ParentBackend):
+            pass
+
+        monkeypatch.setattr(remote_backend_registry, "_BACKENDS", {})
+        register_backend("child-backend")(ChildBackend)
+
+        assert "mcp_safe_config_options" not in ChildBackend.__dict__
 
 
 @pytest.fixture(params=["local"])
@@ -1088,6 +1233,7 @@ class TestBackendContract:
                 "algorithm_type": "test_algorithm",
                 "algorithm_name": "plugin",
                 "settings": {"energy_calculator": energy_calculator},
+                "owner": {"workspace_root": "/workspace", "project_name": "project-a"},
             },
             job_dir=tmp_path,
         )
@@ -1096,6 +1242,7 @@ class TestBackendContract:
         assert loaded.backend_config == {"workdir": str(tmp_path)}
         assert loaded.backend_state == {"output_dir": str(tmp_path / "output")}
         assert loaded.algorithm_info["settings"]["energy_calculator"]["__type__"] == "algorithm_ref"
+        assert loaded.owner == {"workspace_root": "/workspace", "project_name": "project-a"}
         assert job.to_dict() == loaded.to_dict()
         backend._submit.assert_called_once()
 
@@ -1643,6 +1790,47 @@ class TestRunWithCache:
         backend.submit.assert_not_called()
         sleep.assert_not_called()
         cleanup.assert_not_called()
+
+    def test_foreign_inflight_cache_job_is_not_resumed(self, tmp_path):
+        cache = FolderCache(path=tmp_path / "cache")
+        algo = self._mock_algorithm()
+        foreign_job = Job(
+            job_id="foreign-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="running",
+            run_hash="testhash1234abcd",
+            owner={"workspace_root": "/workspace", "project_name": "project-a"},
+        )
+        foreign_job.output_hashes = [{"value": -71.0}]
+        foreign_job.output_is_tuple = False
+        foreign_job.wait = MagicMock()
+        cache.put_job(_job_cache_key("testhash1234abcd", foreign_job.owner), foreign_job)
+        submitted_job = Job(
+            job_id="current-job",
+            backend="test",
+            backend_config={},
+            backend_state={},
+            status="succeeded",
+        )
+        submitted_job.wait = MagicMock(return_value=JobStatus(job_id="current-job", status="succeeded"))
+        submitted_job.fetch = MagicMock(return_value=-75.5)
+        backend = MagicMock()
+        backend.submit.return_value = submitted_job
+        owner = {"workspace_root": "/workspace", "project_name": "project-b"}
+
+        assert run(algo, cache=cache, remote=backend, _owner=owner) == -75.5
+
+        foreign_job.wait.assert_not_called()
+        assert foreign_job.status == "running"
+        backend.submit.assert_called_once()
+        assert backend.submit.call_args.args[0]["owner"] == owner
+        assert submitted_job.owner == owner
+        persisted_foreign_job = cache.get_job(_job_cache_key("testhash1234abcd", foreign_job.owner))
+        assert persisted_foreign_job is not None
+        assert persisted_foreign_job.to_dict() == foreign_job.to_dict()
+        assert cache.get_job(_job_cache_key("testhash1234abcd", owner)).owner == owner
 
     def test_cached_success_without_outputs_retries_fetch(self, tmp_path, monkeypatch):
         """A persisted success is fetched again instead of being resubmitted."""

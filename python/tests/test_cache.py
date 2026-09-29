@@ -18,6 +18,7 @@ import qdk_chemistry.remote.cache as cache_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
+from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -236,6 +237,26 @@ class TestFolderCacheData:
         np.testing.assert_array_equal(loaded[0], value[0])
         assert loaded[1] == (3, 4.0)
 
+    def test_put_and_get_tuple(self, folder_cache):
+        """Round-trip a generic tuple through the cache."""
+        value = ("result", (1, 2))
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert loaded == value
+        assert isinstance(loaded, tuple)
+
+    def test_put_and_get_homogeneous_dataclass_tuple(self, folder_cache, sample_orbitals):
+        """Round-trip a homogeneous DataClass tuple without converting it to a list."""
+        value = (sample_orbitals, sample_orbitals)
+
+        folder_cache.put_data("tuple_hash", value)
+        loaded = folder_cache.get_data("tuple_hash")
+
+        assert isinstance(loaded, tuple)
+        assert all(isinstance(item, Orbitals) for item in loaded)
+
     def test_delete_list_removes_nested_numpy_arrays(self, folder_cache, cache_dir):
         """Delete array blobs referenced by a cached list manifest."""
         folder_cache.put_data("numpy_list_hash", [np.array([1.0, 2.0])])
@@ -243,6 +264,26 @@ class TestFolderCacheData:
 
         assert folder_cache.delete_data("numpy_list_hash")
         assert not array_path.exists()
+
+    def test_delete_tuple_preserves_shared_children(self, folder_cache, cache_dir):
+        """Delete only tuple children that no other manifest references."""
+        shared = np.array([1.0, 2.0])
+        unique = np.array([3.0, 4.0])
+        folder_cache.put_data("first_tuple", (shared, unique))
+        folder_cache.put_data("second_tuple", (shared,))
+
+        assert len(list(cache_dir.glob("*.ndarray.npy"))) == 2
+        assert folder_cache.delete_data("first_tuple")
+
+        assert not folder_cache.has_data("first_tuple")
+        assert folder_cache.has_data("second_tuple")
+        loaded = folder_cache.get_data("second_tuple")
+        assert isinstance(loaded, tuple)
+        np.testing.assert_array_equal(loaded[0], shared)
+        assert len(list(cache_dir.glob("*.ndarray.npy"))) == 1
+
+        assert folder_cache.delete_data("second_tuple")
+        assert not list(cache_dir.glob("*.ndarray.npy"))
 
     def test_put_data_rejects_unsupported_value_graph(self, folder_cache):
         """Reject a list containing values outside the cache backend contract."""
@@ -475,6 +516,28 @@ class TestCacheRegistry:
         """get_cache with an unknown name raises ValueError."""
         with pytest.raises(ValueError, match="No cache registered"):
             get_cache("does_not_exist")
+
+    def test_register_duplicate_cache_name_raises(self, monkeypatch):
+        """Two cache backends cannot silently claim the same name."""
+
+        class FirstCache(CacheBackend):
+            """First cache backend claiming the test name."""
+
+        class SecondCache(CacheBackend):
+            """Second cache backend claiming the test name."""
+
+        monkeypatch.setattr(cache_module, "_CACHES", {})
+        register_cache("duplicate-cache")(FirstCache)
+
+        with pytest.raises(DuplicateRegistrationError, match="already registered"):
+            register_cache("duplicate-cache")(SecondCache)
+
+        with pytest.raises(DuplicateRegistrationError, match="already registered.*duplicate-cache"):
+            register_cache("cache-alias")(FirstCache)
+
+        assert cache_module._CACHES["duplicate-cache"] is FirstCache
+        assert "cache-alias" not in cache_module._CACHES
+        assert FirstCache.name == "duplicate-cache"
 
     def test_tiered_shared_operations_ignore_local_only_tiers(self, tmp_path, sample_orbitals):
         """Transport checks and writes operate only on shared tiers."""

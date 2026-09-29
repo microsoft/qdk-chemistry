@@ -25,12 +25,11 @@ After completing this chapter, you will be able to:
    Record the evidence used to select the active space, not only the final orbital and electron counts.
    Explain what the energy comparison establishes within the chosen basis and identify the energy that will serve as the algorithmic reference.
 
-Example download
-====================
+Example files
+=============
 
-First download :download:`tutorial_orbital_coordinates.py <../../_static/examples/python/tutorial_orbital_coordinates.py>`, which contains the reusable numerical machinery for choosing coordinates inside degenerate orbital subspaces.
-Then download :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>`, and save all three files in your tutorial working directory.
-Open all three files in Visual Studio Code and review the complete scripts, including imports and setup code omitted from the excerpts below.
+Add :download:`tutorial_choose_active_space.py <../../_static/examples/python/tutorial_choose_active_space.py>` and :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>` to your tutorial working folder.
+Open both files in Visual Studio Code and review the complete script and notebook, including imports and setup code omitted from the excerpts below.
 The script resumes the stretched N\ :sub:`2` workflow from :doc:`Describing the molecule <02_describing_the_molecule>` before constructing and refining the correlated model.
 Unlike the earlier examples, this script organizes the calculation into importable functions so that the command-line example and interactive Jupyter notebook use the same tested chemistry workflow rather than duplicate it.
 
@@ -235,7 +234,10 @@ The selector then repartitions the orbitals according to the selected group:
 The asterisks in the script output identify the selected orbitals.
 The selected high-entropy group determines the refined active space.
 Equal natural-orbital occupations can leave the corresponding orbital vectors free to rotate within a degenerate subspace.
-The script chooses a reproducible representation within each selected degenerate block by coordinate-minimizing the mapped Hamiltonian coefficient norm :math:`\lambda=\sum_\ell\lvert h_\ell\rvert`, without changing the orbital subspace or its exact :term:`CASCI` energy.
+The script passes the complete autoCAS-selected blocks to the native :ref:`qdk_gauge_fixing localizer <localizer-qdk-gauge-fixing>`.
+This localizer first anchors each selected block to the atomic-orbital basis and then rotates those blocks to minimize the valence-space mapped Hamiltonian coefficient norm :math:`\lambda=\sum_\ell\lvert h_\ell\rvert`, without changing the orbital subspace or its exact :term:`CASCI` energy.
+Gauge fixing uses the correlated natural-orbital wavefunction because its one-particle :term:`RDM` defines the occupation-degenerate blocks.
+The script then applies the refined autoCAS partition to the gauge-fixed orbitals before constructing the final selected-space Hamiltonian.
 Among the unselected orbitals, those below the occupied--virtual boundary of the reference determinant become inactive, while those above the boundary become virtual.
 Freezing these low-entropy orbitals is still an approximation because low entropy does not mean that their correlation contribution is exactly zero, so the energy comparison below measures part of its cost.
 Their entropies are small rather than exactly zero, and allowing excitations involving them can still lower the correlated energy.
@@ -322,7 +324,7 @@ Use the final selected-space energy as the algorithmic reference, while retainin
 Candidate-orbital visualization
 ================================
 
-Download and open :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>` in Visual Studio Code.
+Open :download:`tutorial_choose_active_space.ipynb <../../_static/examples/python/tutorial_choose_active_space.ipynb>` in Visual Studio Code.
 Choose **Select Kernel**, select **Python Environments**, and choose the ``.venv`` environment created in :doc:`Before you begin <00_before_you_begin>`.
 If ``.venv`` does not appear, open the Command Palette, run **Developer: Reload Window**, and reopen the kernel selector.
 Then select **Run All** to execute the shared active-space calculation and generate an interactive molecular-orbital viewer.

@@ -73,7 +73,7 @@ class TrialStateWorkflowResult:
     """Reference data and trial-state comparisons used by the chapter.
 
     Attributes:
-        active_space_result: Coordinate-minimized selected molecular model.
+        active_space_result: Gauge-fixed selected molecular model.
         active_hamiltonian: Fermionic Hamiltonian in the selected orbital gauge.
         reference_determinants: Leading CASCI determinants for interpretation.
         trial_states: PMC/circuit results in requested determinant-count order.
@@ -325,7 +325,7 @@ def run_trial_state_workflow(
 
         ################################################################################
         # start-cell-preparation-circuit
-        state_preparation = create("state_prep", "sparse_isometry_gf2x")
+        state_preparation = create("state_prep", "sparse_isometry")
         circuit = state_preparation.run(trial_wavefunction)
         num_compute_qubits, num_logical_gates, logical_gate_counts = circuit_statistics(
             circuit
