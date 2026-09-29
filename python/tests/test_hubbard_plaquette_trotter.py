@@ -328,6 +328,98 @@ _PAULI_X = np.array([[0, 1], [1, 0]], dtype=complex)
 _PAULI_Y = np.array([[0, -1j], [1j, 0]], dtype=complex)
 
 
+def _register_index(values: list[int], widths: list[int]) -> int:
+    """Return the big-endian basis index of little-endian registers holding *values*."""
+    index, offset = 0, sum(widths)
+    for value, width in zip(values, widths, strict=True):
+        for bit in range(width):
+            offset -= 1
+            index |= ((value >> bit) & 1) << offset
+    return index
+
+
+def _binary_gradient_words(phi: float, n: int, bits: int) -> list[int]:
+    """Return the ``bits``-bit word of each place value, computed independently of Q#."""
+    modulus = 1 << bits
+    return [round(phi * 2**j * modulus / (4.0 * math.pi)) % modulus for j in range(n)]
+
+
+class TestBinaryGradientWords:
+    """The classical words Hamming-weight phasing loads, one per place value of the weight."""
+
+    @pytest.mark.parametrize("phi", [0.37, -2.9, 0.75 * math.pi, 9.5])
+    @pytest.mark.parametrize(("n", "bits"), [(1, 4), (3, 5), (4, 8)])
+    def test_words_are_the_nearest_representable_rotation(self, phi, n, bits):
+        """Word j rounds Rz(phi 2^j) onto the 4 pi / 2^bits lattice the gradient resolves."""
+        actual = [int(word) for word in QSHARP_UTILS.HubbardPlaquette.BinaryGradientWords(phi, n, bits)]
+        assert actual == _binary_gradient_words(phi, n, bits)
+        assert all(0 <= word < 2**bits for word in actual), "a word must fit the gradient register"
+
+    def test_a_lattice_angle_is_represented_exactly(self):
+        """Angles that are multiples of 4 pi / 2^bits round to themselves, so the phasing is exact."""
+        bits, k = 5, 3
+        phi = 4.0 * math.pi * k / 2**bits
+        actual = [int(word) for word in QSHARP_UTILS.HubbardPlaquette.BinaryGradientWords(phi, 4, bits)]
+        assert actual == [(k * 2**j) % 2**bits for j in range(4)]
+
+
+class TestPhaseByBinaryGradient:
+    """Hamming-weight phasing applies e^{i phi w} and returns the gradient register prepared."""
+
+    #: A phase on the 4 pi / 2^bits lattice, so every word is exact and the assertions can be tight.
+    BITS = 4
+    PHI = 4.0 * math.pi * 3 / 2**4
+
+    @classmethod
+    def _operation(cls, n: int, controlled: bool) -> str:
+        """Return Q# applying the phasing, with the constant offset, on a gradient prepared around it."""
+        words = _binary_gradient_words(cls.PHI, n, cls.BITS)
+        offset = -sum(4.0 * math.pi * word / 2**cls.BITS for word in words)
+        lead = 1 if controlled else 0
+        weight = f"qs[{lead}..{lead + n - 1}]"
+        gradient = f"qs[{lead + n}...]"
+        body = (
+            f"{_PLAQUETTE}.PhaseByBinaryGradient({words}, {weight}, {gradient}); R(PauliI, {offset}, {weight}[0]);"
+            if not controlled
+            else (
+                f"Controlled {_PLAQUETTE}.PhaseByBinaryGradient([qs[0]], ({words}, {weight}, {gradient})); "
+                f"Controlled R([qs[0]], (PauliI, {offset}, {weight}[0]));"
+            )
+        )
+        return f"qs => {{ within {{ {_PLAQUETTE}.PreparePlaquetteGradient({gradient}); }} apply {{ {body} }} }}"
+
+    @pytest.mark.parametrize("n", [1, 3])
+    def test_phases_every_weight_and_restores_the_gradient(self, n):
+        """Every weight picks up e^{i phi w}; the gradient ends in |0> after unpreparation."""
+        widths = [n, self.BITS]
+        amplitudes = np.zeros(2 ** sum(widths))
+        for weight in range(2**n):
+            amplitudes[_register_index([weight, 0], widths)] = 2 ** (-n / 2)
+        actual = _applied_state(self._operation(n, controlled=False), amplitudes)
+
+        expected = np.zeros_like(actual)
+        for weight in range(2**n):
+            expected[_register_index([weight, 0], widths)] = 2 ** (-n / 2) * np.exp(1j * self.PHI * weight)
+        assert np.allclose(actual, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("n", [2, 3])
+    def test_controlled_phasing_acts_only_when_the_control_is_set(self, n):
+        """Loading the word under control leaves the addition, and the gradient, uncontrolled."""
+        widths = [1, n, self.BITS]
+        amplitudes = np.zeros(2 ** sum(widths))
+        for control in (0, 1):
+            for weight in range(2**n):
+                amplitudes[_register_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2)
+        actual = _applied_state(self._operation(n, controlled=True), amplitudes)
+
+        expected = np.zeros_like(actual)
+        for control in (0, 1):
+            for weight in range(2**n):
+                phase = np.exp(1j * self.PHI * weight) if control else 1.0
+                expected[_register_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2) * phase
+        assert np.allclose(actual, expected, atol=1e-10)
+
+
 def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
     """Return exp(i angle XX) exp(i angle YY) on every pair (2k, 2k + 1), which all commute."""
     num_qubits = 2 * num_pairs
