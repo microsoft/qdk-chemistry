@@ -74,7 +74,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
         # program prepares its own.
         gradients = tuple(
             PhaseGradient(phase, size)
-            for phase, size in QSHARP_UTILS.HubbardPlaquette.PlaquetteCatalystGradients(params)
+            for phase, size, _ in QSHARP_UTILS.HubbardPlaquette.PlaquetteCatalystGradients(params)
         )
         return Circuit(
             qsharp_factory=QsharpFactoryData(
