@@ -94,6 +94,7 @@ class PhaseGradient:
         """Whether this is the binary phase gradient :meth:`binary` returns."""
         return self == PhaseGradient.binary(self.num_qubits)
 
+
 @dataclass(frozen=True)
 class CircuitMetadata:
     """Metadata specific to the subroutines a circuit is built from."""

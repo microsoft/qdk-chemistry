@@ -39,6 +39,7 @@ def _lattice_operator(width: int, height: int) -> QubitOperator:
     lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
     return QubitOperator(container=LatticeContainer(lattice))
 
+
 def _reference_hamiltonian(width: int, height: int, *, t: float, u: float) -> np.ndarray:
     """Return the dense Hamiltonian from an independent Jordan-Wigner mapping."""
     lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
@@ -47,6 +48,7 @@ def _reference_hamiltonian(width: int, height: int, *, t: float, u: float) -> np
     labels, coefficients = zip(*mapped.get_real_coefficients(tolerance=1e-14), strict=True)
     dense = pauli_to_dense_matrix(list(labels), list(coefficients))
     return dense + 0.25 * u * width * height * np.eye(dense.shape[0])
+
 
 def _plaquette_parameters(container):
     """Return the Q# parameter struct for a plaquette container."""
@@ -58,6 +60,7 @@ def _plaquette_parameters(container):
         repetitions=container.step_reps,
     )
 
+
 def _evolution_circuit(
     width: int,
     height: int,
@@ -68,11 +71,10 @@ def _evolution_circuit(
     num_divisions: int = 1,
 ):
     """Return the uncontrolled plaquette evolution as a Q# callable."""
-    builder = HubbardPlaquetteTrotter(
-        order=2, time=time, t=t, u=u, num_divisions=num_divisions, target_accuracy=0.0
-    )
+    builder = HubbardPlaquetteTrotter(order=2, time=time, t=t, u=u, num_divisions=num_divisions, target_accuracy=0.0)
     container = builder.run(_lattice_operator(width, height)).get_container()
     return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(_plaquette_parameters(container))
+
 
 def _applied_state(operation, state: np.ndarray) -> np.ndarray:
     """Return the state the operation produces from *state*."""
@@ -82,6 +84,7 @@ def _applied_state(operation, state: np.ndarray) -> np.ndarray:
         dump_operation_on_state(operation, num_qubits, amplitudes, context=get_qsharp_context()),
         dtype=complex,
     )
+
 
 def _random_state(num_qubits: int, seed: int) -> np.ndarray:
     """Return a normalized random state vector with real amplitudes.
@@ -94,18 +97,20 @@ def _random_state(num_qubits: int, seed: int) -> np.ndarray:
     state = rng.normal(size=2**num_qubits)
     return (state / np.linalg.norm(state)).astype(complex)
 
+
 def _infidelity(actual: np.ndarray, expected: np.ndarray) -> float:
     """Return one minus the overlap magnitude, which ignores global phase."""
     return 1.0 - abs(np.vdot(expected, actual))
+
 
 class TestHubbardPlaquetteContainer:
     """The emitted representation carries geometry and angles, and nothing that scales."""
 
     def test_builder_emits_a_plaquette_container(self):
         """The builder's representation is the plaquette container."""
-        unitary = HubbardPlaquetteTrotter(
-            order=2, time=0.1, t=1.0, u=4.0, num_divisions=3, target_accuracy=0.0
-        ).run(_lattice_operator(2, 2))
+        unitary = HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, num_divisions=3, target_accuracy=0.0).run(
+            _lattice_operator(2, 2)
+        )
         container = unitary.get_container()
 
         assert isinstance(container, HubbardPlaquetteContainer)
@@ -114,7 +119,7 @@ class TestHubbardPlaquetteContainer:
         assert container.step_reps == 3
 
     def test_representation_size_is_independent_of_the_lattice(self):
-        """The payload is a fixed set of scalars, so it does not grow with the lattice. """
+        """The payload is a fixed set of scalars, so it does not grow with the lattice."""
         payloads = [
             HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, num_divisions=1)
             .run(_lattice_operator(side, side))
@@ -715,9 +720,7 @@ class TestAutomaticStepCount:
         assert beyond_pi == at_pi
 
     def test_a_disabled_target_leaves_the_manual_count_alone(self):
-        builder = HubbardPlaquetteTrotter(
-            order=2, time=3.0, t=1.0, u=8.0, num_divisions=7, target_accuracy=0.0
-        )
+        builder = HubbardPlaquetteTrotter(order=2, time=3.0, t=1.0, u=8.0, num_divisions=7, target_accuracy=0.0)
         assert builder._step_count(1.0, 4, 4, 3.0) == 7
 
     def test_the_hamiltonian_conserves_particle_number(self):
@@ -745,18 +748,24 @@ class TestAutomaticStepCount:
         u, time, divisions = 4.0, 0.3, 2
         operator = _lattice_operator(width, height)
 
-        unshifted = HubbardPlaquetteTrotter(
-            order=2, time=time, t=1.0, u=u, num_divisions=divisions, target_accuracy=0.0
-        ).run(operator).get_container()
-        shifted = HubbardPlaquetteTrotter(
-            order=2,
-            time=time,
-            t=1.0,
-            u=u,
-            num_electrons=num_electrons,
-            num_divisions=divisions,
-            target_accuracy=0.0,
-        ).run(operator).get_container()
+        unshifted = (
+            HubbardPlaquetteTrotter(order=2, time=time, t=1.0, u=u, num_divisions=divisions, target_accuracy=0.0)
+            .run(operator)
+            .get_container()
+        )
+        shifted = (
+            HubbardPlaquetteTrotter(
+                order=2,
+                time=time,
+                t=1.0,
+                u=u,
+                num_electrons=num_electrons,
+                num_divisions=divisions,
+                target_accuracy=0.0,
+            )
+            .run(operator)
+            .get_container()
+        )
 
         assert unshifted.constant_shift == 0.0, "an unset count leaves the symmetric energy alone"
         assert shifted.interaction_angle == unshifted.interaction_angle, "only the scalar moves"
