@@ -168,7 +168,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
+        ctrl_unitary_ops, prepare_shared_op, num_shared_ancillas = self._shared_register(controlled_unitary_circuits)
         self._validate_state_prep_width(state_preparation, num_system_qubits)
         phase_qubit_prep_op = self._phase_state_op(num_bits)
         ancillas = list(range(num_bits))
@@ -181,6 +181,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             systems,
             phase_qubit_prep_op,
             num_ancilla_qubits,
+            prepare_shared_op,
+            num_shared_ancillas,
         )
         standard_parameters = {
             "statePrep": state_prep_op,
@@ -190,6 +192,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillaQubits": num_ancilla_qubits,
+            "prepareSharedOp": prepare_shared_op,
+            "numSharedAncillas": num_shared_ancillas,
             "measurePhase": bool(self._settings.get("measure_phase")),
             "computeCapacity": int(self._settings.get("compute_capacity")),
         }
@@ -203,13 +207,6 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
     def _phase_state_op(self, num_bits: int):
         r"""Return the phase-register preparation for the configured window.
-
-        The ``uniform`` window is a Hadamard on every phase qubit. The ``sine`` window is
-        the Heisenberg-limited control state :math:`\psi_n \propto \sin(\pi(n+1)/(N+2))`
-        over the :math:`N+1 = 2^{\text{num\_bits}}` register slots, where
-        :math:`N = 2^{\text{num\_bits}} - 1` is the total number of controlled-unitary
-        applications. It attains the minimum Holevo variance
-        :math:`\tan^2(\pi/(N+2))` :cite:`Babbush2018,Berry2009`.
 
         Args:
             num_bits: Number of phase-register qubits.
