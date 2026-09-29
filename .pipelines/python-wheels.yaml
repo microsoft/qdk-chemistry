@@ -111,8 +111,8 @@ extends:
         justificationForDisabling: JavaScript is not used in this repository.
         exitOnFatalError: true
       sourceAnalysisPool:
-        name: Azure-Pipelines-DevTools-EO
-        image: windows-2022
+        name: ado-1es-Da_v4
+        image: windows-2025-vanilla-1espt
         os: windows
     stages:
     - stage: Build
