@@ -147,32 +147,74 @@ namespace QDKChemistry.Utils.PhaseGradient {
         PreparePhaseGradients(gradients, _)
     }
 
-    /// # Summary
-    /// Wraps a controlled operation that expects caller-prepared phase gradients at the end
-    /// of its targets, so that it prepares them itself.
-    ///
-    /// # Description
-    /// For callers that cannot share one register across several such operations, for
-    /// example because their gradients differ. The registers are prepared around every call.
-    function MakeSelfPreparingControlledOp(
-        gradients : (Double, Int, Bool)[],
-        op : (Qubit, Qubit[]) => Unit is Adj + Ctl
-    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
-        SelfPreparingControlled(gradients, op, _, _)
+    /// Returns a preparation of qubit j as (|0⟩ + e^{i·angles[j]}|1⟩)/√2, for a pooled register.
+    function MakePhaseStatesPrep(angles : Double[]) : Qubit[] => Unit is Adj + Ctl {
+        PrepareGeneralizedPhaseGradient(angles, _)
     }
 
-    internal operation SelfPreparingControlled(
-        gradients : (Double, Int, Bool)[],
+    /// # Summary
+    /// Wraps a controlled operation that expects phase gradient qubits at the end of its
+    /// targets, so that it draws them from a pool shared with other operations.
+    ///
+    /// # Description
+    /// A phase gradient is a product state that its consumers return unchanged, so each of
+    /// its qubits can be shared with any other operation that needs the same single-qubit
+    /// state. The caller appends a prepared pool to the targets. For each gradient qubit the
+    /// operation expects, `layout` holds its index in the pool, or `-1 - i` for the i-th
+    /// qubit it alone needs, which the wrapper prepares around the call from `ownAngles`.
+    ///
+    /// # Input
+    /// ## poolSize
+    /// Number of pool qubits at the end of the targets the wrapper is given.
+    /// ## layout
+    /// Where each of the operation's gradient qubits comes from.
+    /// ## ownAngles
+    /// Angles of the qubits only this operation uses.
+    /// ## op
+    /// The operation, expecting its gradient qubits at the end of its targets.
+    function MakePooledGradientControlledOp(
+        poolSize : Int,
+        layout : Int[],
+        ownAngles : Double[],
+        op : (Qubit, Qubit[]) => Unit is Adj + Ctl
+    ) : (Qubit, Qubit[]) => Unit is Adj + Ctl {
+        PooledGradientControlled(poolSize, layout, ownAngles, op, _, _)
+    }
+
+    internal operation PooledGradientControlled(
+        poolSize : Int,
+        layout : Int[],
+        ownAngles : Double[],
         op : (Qubit, Qubit[]) => Unit is Adj + Ctl,
         control : Qubit,
         targets : Qubit[]
     ) : Unit is Adj + Ctl {
-        let size = PhaseGradientOffsets(gradients)[Length(gradients)];
+        let split = Length(targets) - poolSize;
+        use own = Qubit[Length(ownAngles)];
         within {
-            PreparePhaseGradients(gradients, targets[Length(targets) - size...]);
+            PrepareGeneralizedPhaseGradient(ownAngles, own);
         } apply {
-            op(control, targets);
+            op(control, targets[0..split - 1] + GatherGradientQubits(layout, targets[split..Length(targets) - 1], own));
         }
+    }
+
+    /// The qubits `layout` selects from the pool and from the operation's own qubits.
+    internal function GatherGradientQubits(layout : Int[], pool : Qubit[], own : Qubit[]) : Qubit[] {
+        mutable qubits = [];
+        for index in layout {
+            set qubits += [index >= 0 ? pool[index] | own[-1 - index]];
+        }
+        return qubits;
+    }
+
+    /// Test wrapper: GPGA controlled on `control`, on `targets` = weight (n) + catalyst (n).
+    internal operation TestControlledGradientPhase(
+        phi : Double,
+        n : Int,
+        control : Qubit,
+        targets : Qubit[]
+    ) : Unit is Adj + Ctl {
+        Controlled PhaseByGeneralizedGradient([control], (phi, targets[0..n - 1], targets[n..2 * n - 1]));
     }
 
     /// The per-qubit angles of the n-qubit catalyst for the phase `phi`: -phi·2^j.

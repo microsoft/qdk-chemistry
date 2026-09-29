@@ -19,6 +19,8 @@ from qdk_chemistry.data.circuit import PhaseGradient
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+from ._gradient_pool import plan_gradient_pool
+
 __all__: list[str] = [
     "IterativeQpeCircuitBuilder",
     "QpeCircuitBuilder",
@@ -129,12 +131,13 @@ class QpeCircuitBuilder(Algorithm):
 
     @staticmethod
     def _shared_register(controlled_unitary_circuits: list[Circuit]) -> tuple[list[Any], Any, int]:
-        """Resolve the shared phase gradient register the controlled unitaries request through their metadata.
+        """Resolve the phase gradient register the controlled unitaries request through their metadata.
 
-        A controlled unitary that declares ``phase_gradients`` expects those registers at the end of its targets,
-        prepared by its caller and left prepared. When every circuit declares the same gradients, phase estimation
-        prepares them once around all the controlled unitaries. Circuits that declare different gradients cannot share,
-        so each is wrapped to prepare its own around every call instead.
+        A controlled unitary that declares ``phase_gradients`` expects those qubits at the end of its targets, prepared
+        by its caller and left prepared. When every circuit declares the same gradients, phase estimation prepares them
+        once around all the controlled unitaries. Otherwise the qubits two or more circuits need are pooled and prepared
+        once, and each circuit prepares the qubits only it needs around its own call; see
+        :func:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder._gradient_pool.plan_gradient_pool`.
 
         Args:
             controlled_unitary_circuits: The controlled unitaries, each carrying a Q# operation.
@@ -142,28 +145,28 @@ class QpeCircuitBuilder(Algorithm):
         Returns:
             The operations to apply, the shared register preparation, and the shared register size.
 
-        Raises:
-            ValueError: If only some of the circuits declare phase gradients.
-
         """
         ops = [circuit._qsharp_op for circuit in controlled_unitary_circuits]  # noqa: SLF001
         requests = [circuit.metadata.phase_gradients for circuit in controlled_unitary_circuits]
         if not any(requests):
             return ops, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
-        if not all(requests):
-            raise ValueError("Only some of the controlled unitaries request a shared phase gradient register.")
-        num_shared = max(circuit.metadata.num_phase_gradient_ancillas for circuit in controlled_unitary_circuits)
-        if len(set(requests)) == 1:
+        if all(request == requests[0] for request in requests):
+            num_shared = controlled_unitary_circuits[0].metadata.num_phase_gradient_ancillas
             return ops, phase_gradients_preparation(requests[0]), num_shared
-        Logger.warn(
-            "The controlled unitaries request different phase gradients, so each prepares its own around every call "
-            "instead of sharing one across the queries."
-        )
+
+        plan = plan_gradient_pool(requests)
+        pool_size = len(plan.pool_angles)
         wrapped = [
-            QSHARP_UTILS.PhaseGradient.MakeSelfPreparingControlledOp(_phase_gradient_spec(gradients), op)
-            for gradients, op in zip(requests, ops, strict=True)
+            QSHARP_UTILS.PhaseGradient.MakePooledGradientControlledOp(pool_size, list(layout), list(own), op)
+            for layout, own, op in zip(plan.layouts, plan.own_angles, ops, strict=True)
         ]
-        return wrapped, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, num_shared
+        Logger.info(
+            f"Sharing {pool_size} phase gradient qubits across {len(ops)} controlled unitaries; "
+            f"{sum(len(own) for own in plan.own_angles)} more are prepared per call."
+        )
+        if not pool_size:
+            return wrapped, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
+        return wrapped, QSHARP_UTILS.PhaseGradient.MakePhaseStatesPrep(list(plan.pool_angles)), pool_size
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
