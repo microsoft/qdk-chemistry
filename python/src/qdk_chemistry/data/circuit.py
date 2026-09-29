@@ -13,13 +13,11 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import math
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 import h5py
-import numpy as np
 from qdk import TargetProfile, qsharp
 from qdk.estimator import EstimatorParams, EstimatorResult
 from qdk.openqasm import OutputSemantics
@@ -27,7 +25,7 @@ from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
 from qdk.openqasm import estimate as openqasm_estimate
 
-from qdk_chemistry.data._hashing import _hash_float, _hash_optional, _hash_str, _hash_uint
+from qdk_chemistry.data._hashing import _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import get_qsharp_context
@@ -39,7 +37,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
-__all__: list[str] = ["CircuitMetadata", "PhaseGradient", "QsharpFactoryData"]
+__all__: list[str] = ["CircuitMetadata", "QsharpFactoryData"]
 
 
 @dataclass(frozen=True)
@@ -54,66 +52,23 @@ class QsharpFactoryData:
 
 
 @dataclass(frozen=True)
-class PhaseGradient:
-    r"""A phase gradient state :math:`2^{-n/2}\sum_k e^{-i\varphi k}|k\rangle` on ``num_qubits`` little-endian."""
-
-    phase: float
-    """The phase :math:`\varphi` per unit added into the register."""
-
-    num_qubits: int
-    """Number of qubits in the register."""
-
-    def __post_init__(self) -> None:
-        """Reject an empty register or a non-finite phase.
-
-        Raises:
-            ValueError: If ``num_qubits`` is not positive or ``phase`` is not finite.
-
-        """
-        if self.num_qubits <= 0:
-            raise ValueError(f"A phase gradient needs a positive number of qubits. Got {self.num_qubits}.")
-        object.__setattr__(self, "phase", float(self.phase))
-        if not math.isfinite(self.phase):
-            raise ValueError(f"A phase gradient needs a finite phase. Got {self.phase}.")
-
-    @classmethod
-    def binary(cls, num_qubits: int) -> "PhaseGradient":
-        """Return the binary phase gradient, whose phase is ``2π / 2**num_qubits``.
-
-        Args:
-            num_qubits: Number of qubits in the register.
-
-        Returns:
-            PhaseGradient: The binary phase gradient on ``num_qubits`` qubits.
-
-        """
-        return cls(2.0 * math.pi / 2**num_qubits, num_qubits)
-
-    @property
-    def is_binary(self) -> bool:
-        """Whether this is the binary phase gradient :meth:`binary` returns."""
-        return self == PhaseGradient.binary(self.num_qubits)
-
-
-@dataclass(frozen=True)
 class CircuitMetadata:
     """Metadata specific to the subroutines a circuit is built from."""
 
-    phase_gradients: tuple[PhaseGradient, ...] = ()
-    """Phase gradient registers the circuit expects its caller to prepare once and share.
-
-    They occupy the last qubits of the circuit's register, in order, and the circuit leaves them prepared. A caller may
-    share one register between circuits only if they declare equal gradients.
-    """
+    num_phase_gradient_ancillas: int = 0
+    """The phase gradient ancillas that should be initialized once and reused in multiple subroutines."""
 
     def __post_init__(self) -> None:
-        """Normalize the gradients to a tuple."""
-        object.__setattr__(self, "phase_gradients", tuple(self.phase_gradients))
+        """Reject invalid metadata.
 
-    @property
-    def num_phase_gradient_ancillas(self) -> int:
-        """Total number of qubits in the phase gradient registers."""
-        return sum(gradient.num_qubits for gradient in self.phase_gradients)
+        Raises:
+            ValueError: If ``num_phase_gradient_ancillas`` is negative.
+
+        """
+        if self.num_phase_gradient_ancillas < 0:
+            raise ValueError(
+                f"num_phase_gradient_ancillas must be non-negative. Got {self.num_phase_gradient_ancillas}."
+            )
 
 
 class Circuit(DataClass):
@@ -457,12 +412,6 @@ class Circuit(DataClass):
         # Only fed when non-zero, so circuits without a phase gradient keep their digest.
         if self.metadata.num_phase_gradient_ancillas:
             _hash_uint(h, self.metadata.num_phase_gradient_ancillas)
-        # Only fed for non-binary gradients, so circuits declaring a binary gradient keep their digest.
-        if not all(gradient.is_binary for gradient in self.metadata.phase_gradients):
-            _hash_str(h, "phase_gradients")
-            for gradient in self.metadata.phase_gradients:
-                _hash_float(h, gradient.phase)
-                _hash_uint(h, gradient.num_qubits)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Circuit to a dictionary for JSON serialization.
@@ -480,13 +429,8 @@ class Circuit(DataClass):
             data["encoding"] = self.encoding
         if self.num_qubits is not None:
             data["num_qubits"] = self.num_qubits
-        if self.metadata.phase_gradients:
-            data["metadata"] = {
-                "phase_gradients": [
-                    {"phase": gradient.phase, "num_qubits": gradient.num_qubits}
-                    for gradient in self.metadata.phase_gradients
-                ]
-            }
+        if self.metadata.num_phase_gradient_ancillas:
+            data["metadata"] = {"num_phase_gradient_ancillas": self.metadata.num_phase_gradient_ancillas}
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -505,13 +449,9 @@ class Circuit(DataClass):
             group.attrs["encoding"] = self.encoding
         if self.num_qubits is not None:
             group.attrs["num_qubits"] = self.num_qubits
-        if self.metadata.phase_gradients:
+        if self.metadata.num_phase_gradient_ancillas:
             metadata_group = group.create_group("metadata")
-            gradients = self.metadata.phase_gradients
-            metadata_group.attrs["phase_gradient_phases"] = np.asarray([g.phase for g in gradients], dtype=np.float64)
-            metadata_group.attrs["phase_gradient_num_qubits"] = np.asarray(
-                [g.num_qubits for g in gradients], dtype=np.int64
-            )
+            metadata_group.attrs["num_phase_gradient_ancillas"] = self.metadata.num_phase_gradient_ancillas
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
@@ -533,7 +473,7 @@ class Circuit(DataClass):
             qir=json_data.get("qir"),
             encoding=json_data.get("encoding"),
             num_qubits=json_data.get("num_qubits"),
-            metadata=_metadata_from_dict(json_data.get("metadata", {})),
+            metadata=CircuitMetadata(**json_data.get("metadata", {})),
         )
 
     @classmethod
@@ -556,44 +496,11 @@ class Circuit(DataClass):
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
         num_qubits = group.attrs.get("num_qubits")
-        metadata_attrs = dict(group["metadata"].attrs) if "metadata" in group else {}
-        if "phase_gradient_phases" in metadata_attrs:
-            metadata = CircuitMetadata(
-                phase_gradients=tuple(
-                    PhaseGradient(float(phase), int(num_qubits))
-                    for phase, num_qubits in zip(
-                        np.asarray(metadata_attrs["phase_gradient_phases"]).reshape(-1),
-                        np.asarray(metadata_attrs["phase_gradient_num_qubits"]).reshape(-1),
-                        strict=True,
-                    )
-                )
-            )
-        else:
-            metadata = _metadata_from_dict(metadata_attrs)
+        num_gradient = group["metadata"].attrs.get("num_phase_gradient_ancillas", 0) if "metadata" in group else 0
         return cls(
             qasm=group.attrs.get("qasm"),
             qir=group.attrs.get("qir"),
             encoding=encoding,
             num_qubits=None if num_qubits is None else int(num_qubits),
-            metadata=metadata,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=int(num_gradient)),
         )
-
-
-def _metadata_from_dict(data: dict[str, Any]) -> CircuitMetadata:
-    """Rebuild circuit metadata from its serialized form.
-
-    Args:
-        data: The serialized metadata; the legacy ``num_phase_gradient_ancillas`` key denotes a binary gradient.
-
-    Returns:
-        CircuitMetadata: The metadata the dictionary describes.
-
-    """
-    if "phase_gradients" in data:
-        return CircuitMetadata(
-            phase_gradients=tuple(
-                PhaseGradient(float(entry["phase"]), int(entry["num_qubits"])) for entry in data["phase_gradients"]
-            )
-        )
-    legacy = int(data.get("num_phase_gradient_ancillas", 0))
-    return CircuitMetadata(phase_gradients=(PhaseGradient.binary(legacy),) if legacy else ())
