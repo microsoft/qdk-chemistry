@@ -44,6 +44,7 @@ class TestCoreBinding:
             "REDUCED_PLANCK_CONSTANT",
             "SPEED_OF_LIGHT",
             "ELEMENTARY_CHARGE",
+            "BOHR_MAGNETON",
             "HARTREE_TO_EV",
             "EV_TO_HARTREE",
             "HARTREE_TO_KCAL_PER_MOL",
@@ -183,6 +184,13 @@ class TestValueConsistency:
             h2ev * ev2h, 1.0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
 
+    def test_bohr_magneton_in_mev_per_tesla(self):
+        """Test the Bohr magneton against the CODATA 2022 value in meV/T."""
+        if "2022" not in core_constants.get_current_codata_version():
+            pytest.skip("Reference value is CODATA 2022.")
+        bohr_magneton_mev_per_tesla = constants.BOHR_MAGNETON / constants.ELEMENTARY_CHARGE * 1.0e3
+        assert bohr_magneton_mev_per_tesla == pytest.approx(5.7883817982e-2, rel=1.0e-10)
+
     def test_documentation_value_consistency(self):
         """Test that ConstantInfo values match actual constants."""
         test_constants = {
@@ -190,6 +198,7 @@ class TestValueConsistency:
             "fine_structure_constant": ("FINE_STRUCTURE_CONSTANT", constants.FINE_STRUCTURE_CONSTANT),
             "hartree_to_ev": ("HARTREE_TO_EV", constants.HARTREE_TO_EV),
             "speed_of_light": ("SPEED_OF_LIGHT", constants.SPEED_OF_LIGHT),
+            "bohr_magneton": ("BOHR_MAGNETON", constants.BOHR_MAGNETON),
         }
 
         for info_key, (cpp_attr_name, python_value) in test_constants.items():
