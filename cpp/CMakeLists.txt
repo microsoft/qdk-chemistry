@@ -52,6 +52,8 @@ endif()
 project(qdk VERSION ${QDK_VERSION} LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Nothing here uses C++20 modules; skip the per-source scan the 3.28 policies enable.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 if(APPLE AND NOT DEFINED CMAKE_MACOSX_RPATH)
     set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Use macOS RPATH" FORCE)
