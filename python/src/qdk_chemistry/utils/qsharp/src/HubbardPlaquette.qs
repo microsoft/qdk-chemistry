@@ -6,6 +6,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
     import Std.Arrays.All;
+    import Std.Arrays.Chunks;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
     import Std.Arrays.Subarray;
@@ -32,6 +33,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         hoppingAngle : Double,
         /// Number of repetitions of the body.
         repetitions : Int,
+        /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
+        /// See `HammingWeightBatchSize` for what the cap buys and what it costs.
+        maxBatchSize : Int,
     }
 
     /// # Summary
@@ -180,6 +184,10 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// layer collectively with HWP. Each place-value rotation is a synthesized `Rz`. Below the
     /// break-even size each term is applied as its own rotation instead.
     ///
+    /// A tower longer than `maxBatchSize` is split into consecutive batches of at most that many
+    /// terms, each phased through its own Hamming-weight register. The phases are additive over
+    /// the split, so the result is unchanged; only the cost moves. See `HammingWeightBatchSize`.
+    ///
     /// # Input
     /// ## theta
     /// The rotation angle shared by every term.
@@ -187,13 +195,66 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// The Pauli string of each term.
     /// ## targets
     /// The qubits of each term, disjoint across terms.
+    /// ## maxBatchSize
+    /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
     internal operation HammingWeightPhase(
+        theta : Double,
+        pauliOps : Pauli[][],
+        targets : Qubit[][],
+        maxBatchSize : Int
+    ) : Unit is Adj + Ctl {
+        let count = Length(targets);
+        Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
+        if count > 0 {
+            // Chunking in a function keeps the index arithmetic out of this adjointable body.
+            let batchSize = HammingWeightBatchSize(count, maxBatchSize);
+            let opBatches = Chunks(batchSize, pauliOps);
+            let targetBatches = Chunks(batchSize, targets);
+            for index in 0..Length(targetBatches) - 1 {
+                HammingWeightPhaseBatch(theta, opBatches[index], targetBatches[index]);
+            }
+        }
+    }
+
+    /// # Summary
+    /// The tower length phased through one Hamming-weight register, given the cap.
+    ///
+    /// # Description
+    /// A batch of `n` terms costs one adder tree: roughly `n` Toffolis and, more importantly,
+    /// `n - popcount(n)` scratch qubits held for as long as the weight is needed. Splitting a
+    /// tower into batches lets the scratch of one batch be released before the next allocates,
+    /// so the peak ancilla count follows the batch rather than the whole tower, while the
+    /// Toffoli count stays essentially the same. The price is the place-value rotations, which
+    /// are paid once per batch instead of once per tower.
+    ///
+    /// It is therefore a qubit-for-rotations knob, and the useful setting depends on the device:
+    /// hardware demonstrations of Fermi-Hubbard dynamics run on a fixed and comparatively small
+    /// register (:cite:`Granet2025` simulate the model on a trapped-ion processor), where the
+    /// adder tree of a full lattice-sized tower may simply not fit, while a fault-tolerant
+    /// estimate is usually better off spending the qubits to save the rotations. The default is
+    /// no cap, which reproduces the uncapped construction exactly.
+    ///
+    /// A cap below the break-even of `UsesHammingWeightPhasing` leaves every batch too short to
+    /// phase through a register, so the whole tower falls back to one rotation per term.
+    ///
+    /// # Input
+    /// ## count
+    /// Number of equal-angle terms in the tower.
+    /// ## maxBatchSize
+    /// Largest tower phased through a single register, or -1 for no cap.
+    internal function HammingWeightBatchSize(count : Int, maxBatchSize : Int) : Int {
+        Fact(maxBatchSize == -1 or maxBatchSize > 0, "maxBatchSize must be -1 or positive.");
+        return maxBatchSize == -1 or maxBatchSize > count ? count | maxBatchSize;
+    }
+
+    /// One batch of equal-angle terms, phased through a single Hamming-weight register.
+    /// See `HammingWeightPhase`, which splits a tower into batches of this shape.
+    internal operation HammingWeightPhaseBatch(
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][]
     ) : Unit is Adj + Ctl {
         let count = Length(targets);
-        Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
         if not UsesHammingWeightPhasing(count) {
             for t in 0..count - 1 {
                 Exp(pauliOps[t], -theta, targets[t]);
@@ -270,7 +331,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     internal operation InteractionLayer(
         angle : Double,
         sites : Int,
-        systems : Qubit[]
+        systems : Qubit[],
+        maxBatchSize : Int
     ) : Unit is Adj + Ctl {
         // A negligible angle skips the adder tree, which a hopping-only model would pay for nothing.
         if AbsD(angle) > 1e-12 {
@@ -282,7 +344,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             HammingWeightPhase(
                 angle,
                 [[PauliZ, PauliZ], size = sites],
-                StridedGroups(sites, 2, 1, sites, systems)
+                StridedGroups(sites, 2, 1, sites, systems),
+                maxBatchSize
             );
         }
     }
@@ -354,7 +417,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     internal operation HoppingLayer(
         kappa : Double,
         blocks : Int[][],
-        systems : Qubit[]
+        systems : Qubit[],
+        maxBatchSize : Int
     ) : Unit is Adj + Ctl {
         within {
             let (swapCount, swaps) = RoutingSwaps(blocks, Length(systems), not IsResourceEstimating());
@@ -384,7 +448,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         } apply {
             // The third butterfly is fused into the phases, so the equal-angle family is the
             // middle pair of every plaquette: exp(i angle XX) exp(i angle YY) on each pair.
-            HoppingPhases(kappa / 2.0, StridedGroups(Length(blocks), 2, 4, 1, systems[1...]));
+            HoppingPhases(kappa / 2.0, StridedGroups(Length(blocks), 2, 4, 1, systems[1...]), maxBatchSize);
         }
     }
 
@@ -395,13 +459,18 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY to -Z on the
     /// second, and X removes that sign. The tiling then becomes one tower of twice as many
     /// equal-angle Z rotations, which with Hamming-weight phasing saves a place-value rotation
-    /// over separate XX and YY towers. Below the break-even each pair takes its own two rotations.
-    internal operation HoppingPhases(angle : Double, pairs : Qubit[][]) : Unit is Adj + Ctl {
+    /// over separate XX and YY towers. Below the break-even each pair takes its own two
+    /// rotations, and a batch cap short enough to put every batch below the break-even has the
+    /// same effect, so the basis change is skipped rather than paid for nothing.
+    internal operation HoppingPhases(angle : Double, pairs : Qubit[][], maxBatchSize : Int) : Unit is Adj + Ctl {
+        let count = 2 * Length(pairs);
+        // Every batch is at most this long, so this decides the path for the whole tower.
+        let phasesBatch = count > 0 and UsesHammingWeightPhasing(HammingWeightBatchSize(count, maxBatchSize));
         // TEMPORARY (legacy parity): the legacy layer phased XX and YY as two separate towers.
         if UsesLegacyCosts() {
-            HammingWeightPhase(-angle, [[PauliX, PauliX], size = Length(pairs)], pairs);
-            HammingWeightPhase(-angle, [[PauliY, PauliY], size = Length(pairs)], pairs);
-        } elif not UsesHammingWeightPhasing(2 * Length(pairs)) {
+            HammingWeightPhase(-angle, [[PauliX, PauliX], size = Length(pairs)], pairs, maxBatchSize);
+            HammingWeightPhase(-angle, [[PauliY, PauliY], size = Length(pairs)], pairs, maxBatchSize);
+        } elif not phasesBatch {
             for pair in pairs {
                 Exp([PauliX, PauliX], angle, pair);
                 Exp([PauliY, PauliY], angle, pair);
@@ -417,8 +486,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             } apply {
                 HammingWeightPhase(
                     -angle,
-                    [[PauliZ], size = 2 * Length(pairs)],
-                    Mapped(q -> [q], Flattened(pairs))
+                    [[PauliZ], size = count],
+                    Mapped(q -> [q], Flattened(pairs)),
+                    maxBatchSize
                 );
             }
         }
@@ -432,15 +502,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems);
-        HoppingLayer(params.hoppingAngle, gold, systems);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, params.maxBatchSize);
+        HoppingLayer(params.hoppingAngle, gold, systems, params.maxBatchSize);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, params.maxBatchSize);
         // TEMPORARY (legacy parity): the legacy step also applied the conventional model's scalar,
         // a real rotation under control.
         if UsesLegacyCosts() and AbsD(params.interactionAngle) > 1e-12 {
             R(PauliI, 2.0 * params.interactionAngle * IntAsDouble(sites), systems[0]);
         }
-        HoppingLayer(params.hoppingAngle, pink, systems);
+        HoppingLayer(params.hoppingAngle, pink, systems, params.maxBatchSize);
     }
 
     /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's extra work, which
@@ -476,7 +546,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             HoppingLayer(
                 params.hoppingAngle / 2.0,
                 PlaquetteSection(params.width, params.height, true),
-                systems
+                systems,
+                params.maxBatchSize
             );
         } apply {
             if IsResourceEstimating() {
