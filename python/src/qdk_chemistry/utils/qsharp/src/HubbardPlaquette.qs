@@ -5,10 +5,8 @@
 namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
-    import QDKChemistry.Utils.PhaseGradient.GeneralizedPhaseGradientAngles;
     import QDKChemistry.Utils.PhaseGradient.PhaseByGeneralizedGradient;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradients;
-    import QDKChemistry.Utils.PhaseGradient.PrepareGeneralizedPhaseGradient;
     import Std.Arrays.All;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
@@ -201,7 +199,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let count = Length(targets);
         Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
         Fact(Length(catalyst) == TowerCatalystSize(count), "HammingWeightPhase got a catalyst of the wrong size.");
-        if count < HammingWeightBreakEven() {
+        if Length(catalyst) == 0 {
             for t in 0..count - 1 {
                 Exp(pauliOps[t], -theta, targets[t]);
             }
@@ -229,14 +227,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// The smallest equal-angle batch worth phasing through a Hamming-weight register.
-    internal function HammingWeightBreakEven() : Int {
-        return 8;
-    }
-
-    /// Catalyst qubits one equal-angle batch of `count` rotations consumes.
+    /// Catalyst qubits a tower of `count` equal-angle rotations consumes: none below the measured break-even of 8.
     internal function TowerCatalystSize(count : Int) : Int {
-        return count < HammingWeightBreakEven() ? 0 | BitSizeI(count);
+        return count < 8 ? 0 | BitSizeI(count);
     }
 
     /// # Summary
@@ -381,7 +374,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 Length(catalyst) == TowerCatalystSize(2 * Length(pairs)),
                 "HoppingLayer got a catalyst of the wrong size."
             );
-            if 2 * Length(pairs) < HammingWeightBreakEven() {
+            if Length(catalyst) == 0 {
                 for pair in pairs {
                     Exp([PauliX, PauliX], angle, pair);
                     Exp([PauliY, PauliY], angle, pair);
@@ -415,16 +408,16 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
         systems : Qubit[],
-        catalysts : Qubit[]
+        interaction : Qubit[],
+        hopping : Qubit[]
     ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        let (interaction, _, bulk) = PlaquetteCatalystSlices(params, catalysts);
         InteractionLayer(params.interactionAngle / 2.0, sites, systems, interaction);
-        HoppingLayer(params.hoppingAngle, gold, systems, bulk);
+        HoppingLayer(params.hoppingAngle, gold, systems, hopping);
         InteractionLayer(params.interactionAngle / 2.0, sites, systems, interaction);
-        HoppingLayer(params.hoppingAngle, pink, systems, bulk);
+        HoppingLayer(params.hoppingAngle, pink, systems, hopping);
     }
 
     /// # Summary
@@ -453,7 +446,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[],
         catalysts : Qubit[]
     ) : Unit is Adj + Ctl {
-        let (_, boundary, _) = PlaquetteCatalystSlices(params, catalysts);
+        Fact(Length(catalysts) == PlaquetteCatalystSize(params), "The plaquette catalyst register has the wrong size.");
+        // The register is the interaction gradient, then one hopping gradient for the half-angle
+        // boundary. A gradient for twice an angle is the same register without its lowest qubit,
+        // so the full-angle body shares it with a single extra qubit.
+        let bits = TowerCatalystSize(params.width * params.height);
+        let interaction = catalysts[0..bits - 1];
+        let boundary = catalysts[bits..2 * bits - 1];
+        let hopping = catalysts[bits + 1..2 * bits];
         within {
             HoppingLayer(
                 params.hoppingAngle / 2.0,
@@ -466,61 +466,29 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 within {
                     RepeatEstimates(params.repetitions);
                 } apply {
-                    PlaquetteStep(params, systems, catalysts);
+                    PlaquetteStep(params, systems, interaction, hopping);
                 }
             } else {
                 for _ in 1..params.repetitions {
-                    PlaquetteStep(params, systems, catalysts);
+                    PlaquetteStep(params, systems, interaction, hopping);
                 }
             }
         }
     }
 
-    
     /// Number of catalyst qubits the plaquette evolution consumes.
     function PlaquetteCatalystSize(params : HubbardPlaquetteParams) : Int {
         let bits = TowerCatalystSize(params.width * params.height);
         return bits == 0 ? 0 | 2 * bits + 1;
     }
 
-    /// # Summary
-    /// The phase gradients the plaquette catalyst register holds, in order, as (phase, qubits).
-    ///
-    /// # Description
-    /// Each is the state Σ_k e^{-i·phase·k}|k⟩ that `PrepareGeneralizedPhaseGradient` prepares
-    /// from `GeneralizedPhaseGradientAngles(phase, qubits)`. See `PlaquetteCatalystSize`.
-    ///
-    /// # Input
-    /// ## params
-    /// The lattice shape and the layer angles.
-    function PlaquetteCatalystGradients(params : HubbardPlaquetteParams) : (Double, Int)[] {
+    /// The catalyst phase gradients, in order, as `(phase, qubits, binary)` entries for `PreparePhaseGradients`.
+    function PlaquetteCatalystGradients(params : HubbardPlaquetteParams) : (Double, Int, Bool)[] {
         let bits = TowerCatalystSize(params.width * params.height);
         if bits == 0 {
             return [];
         }
-        return [(params.interactionAngle, bits), (-params.hoppingAngle / 2.0, bits + 1)];
-    }
-
-    /// The interaction, boundary hopping and body hopping catalysts inside the register.
-    internal function PlaquetteCatalystSlices(
-        params : HubbardPlaquetteParams,
-        catalysts : Qubit[]
-    ) : (Qubit[], Qubit[], Qubit[]) {
-        Fact(Length(catalysts) == PlaquetteCatalystSize(params), "The plaquette catalyst register has the wrong size.");
-        let bits = TowerCatalystSize(params.width * params.height);
-        if bits == 0 {
-            return ([], [], []);
-        }
-        return (catalysts[0..bits - 1], catalysts[bits..2 * bits - 1], catalysts[bits + 1..2 * bits]);
-    }
-
-    /// Prepares the catalyst register `PlaquetteCatalystGradients(params)` describes.
-    internal operation PreparePlaquetteCatalysts(
-        params : HubbardPlaquetteParams,
-        catalysts : Qubit[]
-    ) : Unit is Adj + Ctl {
-        let gradients = Mapped((phase, size) -> (phase, size, false), PlaquetteCatalystGradients(params));
-        PreparePhaseGradients(gradients, catalysts);
+        return [(params.interactionAngle, bits, false), (-params.hoppingAngle / 2.0, bits + 1, false)];
     }
 
     /// Returns a callable applying the evolution on catalysts it prepares around itself.
@@ -528,7 +496,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems => {
             use catalysts = Qubit[PlaquetteCatalystSize(params)];
             within {
-                PreparePlaquetteCatalysts(params, catalysts);
+                PreparePhaseGradients(PlaquetteCatalystGradients(params), catalysts);
             } apply {
                 RepPlaquetteExp(params, systems, catalysts);
             }
@@ -544,7 +512,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         use qs = Qubit[MaxInt([control] + systems) + 1];
         use catalysts = Qubit[PlaquetteCatalystSize(params)];
         within {
-            PreparePlaquetteCatalysts(params, catalysts);
+            PreparePhaseGradients(PlaquetteCatalystGradients(params), catalysts);
         } apply {
             ControlledRepPlaquetteExp(params, qs[control], Subarray(systems, qs) + catalysts);
         }
@@ -573,10 +541,5 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         params : HubbardPlaquetteParams
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         ControlledRepPlaquetteExp(params, _, _)
-    }
-
-    /// Test helper: prepares the catalyst one tower of rotations by `phi / 2` consumes.
-    internal operation PrepareTowerCatalyst(phi : Double, catalyst : Qubit[]) : Unit is Adj + Ctl {
-        PrepareGeneralizedPhaseGradient(GeneralizedPhaseGradientAngles(phi, Length(catalyst)), catalyst);
     }
 }
