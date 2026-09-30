@@ -147,6 +147,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]

@@ -3,9 +3,10 @@
     Install the built Windows wheel and run pytest.
 
 .DESCRIPTION
-    Bootstraps a Python test environment (conda, or a plain venv on platforms
-    conda does not package), installs the wheel with its [test] extras,
-    generates a Component Governance PipReport (non-fatal), and runs pytest.
+    Bootstraps a Python test environment using ms-ensureconda, or a plain venv
+    on platforms conda does not package. Audits the wheel's native DLL imports,
+    installs the base wheel using binary distributions only, verifies a clean
+    import, then installs [test] extras and runs pytest.
 #>
 param(
     [string]$SrcDir        = (Resolve-Path "$PSScriptRoot\..\.." -ErrorAction Stop),
@@ -21,8 +22,8 @@ $ErrorActionPreference = 'Stop'
 $pythonDir = "$SrcDir\python"
 
 # ─── 1. Bootstrap the Python test environment ────────────────────────────────
-# conda everywhere except Windows ARM64, where conda has no usable win-arm64
-# packages; there the wheel is tested in a venv on top of the agent interpreter.
+# ms-ensureconda everywhere except Windows ARM64, where conda has no usable
+# win-arm64 packages; there the wheel is tested in a venv.
 if ($PythonEnv -eq 'venv') {
     Write-Host "=== Set up venv test environment (Python $PythonVersion) ==="
     $runExe = & "$PSScriptRoot\bootstrap-venv.ps1" -EnvName testenv -PythonVersion $PythonVersion
@@ -37,16 +38,29 @@ if ($PythonEnv -eq 'venv') {
     $runNoCapArgs = @('run', '-n', 'testenv', '--no-capture-output', 'python')
 }
 
-# ─── 2. Install wheel with test dependencies ──────────────────────────────────
-Write-Host "=== Install wheel with test dependencies ==="
+# ─── 2. Audit wheel DLL imports ───────────────────────────────────────────────
 $wheels = Get-ChildItem "$pythonDir\repaired_wheelhouse\qdk_chemistry*.whl"
 if ($wheels.Count -ne 1) {
     throw "Expected exactly 1 wheel, found $($wheels.Count): $($wheels.Name -join ', ')"
 }
 $wheel = $wheels[0].FullName
-Write-Host "Installing: $wheel"
 & $runExe @runArgs -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed ($LASTEXITCODE)" }
+& $runExe @runArgs -m pip install pefile==2024.8.26
+if ($LASTEXITCODE -ne 0) { throw "pefile install failed ($LASTEXITCODE)" }
+& $runExe @runArgs "$PSScriptRoot\check-wheel-dll-imports.py" $wheel
+if ($LASTEXITCODE -ne 0) { throw "Windows wheel DLL import validation failed ($LASTEXITCODE)" }
+
+# ─── 3. Validate the normal end-user installation path ───────────────────────
+Write-Host "=== Install base wheel using binary distributions only ==="
+Write-Host "Installing: $wheel"
+& $runExe @runArgs -m pip install --only-binary=:all: $wheel
+if ($LASTEXITCODE -ne 0) { throw "minimal pip install failed ($LASTEXITCODE)" }
+& $runExe @runArgs -I -c "import qdk_chemistry; print(qdk_chemistry.__version__)"
+if ($LASTEXITCODE -ne 0) { throw "minimal qdk_chemistry import failed ($LASTEXITCODE)" }
+
+# ─── 4. Install wheel with test dependencies ──────────────────────────────────
+Write-Host "=== Install wheel with test dependencies ==="
 & $runExe @runArgs -m pip install "$wheel[test]"
 if ($LASTEXITCODE -ne 0) { throw "pip install wheel[test] failed ($LASTEXITCODE)" }
 if ($Triplet -ne 'arm64-windows-static-md') {
@@ -54,7 +68,7 @@ if ($Triplet -ne 'arm64-windows-static-md') {
     if ($LASTEXITCODE -ne 0) { throw "MCP installation smoke test failed ($LASTEXITCODE)" }
 }
 
-# ─── 3. Component Governance PipReport (non-fatal) ───────────────────────────
+# ─── 5. Component Governance PipReport (non-fatal) ───────────────────────────
 Write-Host "=== Generate Component Governance PipReport ==="
 try {
     $manifestDir = "$pythonDir\build\test-manifest"
@@ -71,7 +85,7 @@ try {
     Write-Warning "PipReport generation failed (non-fatal): $_"
 }
 
-# ─── 4. Run pytest ────────────────────────────────────────────────────────────
+# ─── 6. Run pytest ────────────────────────────────────────────────────────────
 Write-Host "=== Running pytest suite ==="
 $env:QSHARP_PYTHON_TELEMETRY      = 'false'
 $env:QDK_CHEMISTRY_RUN_SLOW_TESTS = $RunSlowTests

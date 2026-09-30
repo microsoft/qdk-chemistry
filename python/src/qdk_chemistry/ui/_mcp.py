@@ -31,22 +31,30 @@ class _InactiveMCPServer:
 
 
 if MCP_AVAILABLE:
+    from mcp.server.apps import Apps
     from mcp.server.mcpserver import Context as MCPContext
     from mcp.server.mcpserver import MCPServer
 
+    apps: Any = Apps()
+    from .visualization import register_visualization_tools
+
+    register_visualization_tools(apps)
     app: Any = MCPServer(
         "qdk-chemistry",
         version=__version__,
         dependencies=["qdk_chemistry"],
+        extensions=[apps],
         instructions=(
-            "Call bind_workspace before every other QDK Chemistry tool when it is available. "
-            "Plugin-launched servers require one immutable absolute workspace binding. "
+            "Call bind_workspace once before the first workspace-dependent QDK Chemistry tool when it is available. "
+            "The binding persists for the MCP server process and must not be repeated before each tool call. "
+            "Plugin-launched servers require one immutable absolute workspace binding per process. "
             "Tool descriptions are compact call contracts; before chaining tools or choosing methods and settings, "
             "load the qdk-chemistry-mcp skill when it is available."
         ),
     )
 else:
     MCPContext = Any
+    apps = None
     app = _InactiveMCPServer()
 
 

@@ -161,6 +161,13 @@ class Trotter(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
+        container_type = qubit_hamiltonian.get_container_type()
+        if container_type != "pauli_decomposition":
+            raise ValueError(
+                f"Trotter time evolution requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
         if order in {1, 2} or (order > 2 and order % 2 == 0):

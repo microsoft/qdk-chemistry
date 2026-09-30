@@ -235,6 +235,13 @@ class PartiallyRandomized(QDrift):
         seed: int = self._settings.get("seed")
         rng = np.random.default_rng(seed if seed >= 0 else None)
 
+        container_type = qubit_hamiltonian.get_container_type()
+        if container_type != "pauli_decomposition":
+            raise ValueError(
+                f"Partially randomized time evolution requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+
         if not qubit_hamiltonian.is_hermitian(tolerance=tolerance):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 

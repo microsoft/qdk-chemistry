@@ -64,6 +64,13 @@ def qdrift_samples_campbell(
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
 
+    container_type = hamiltonian.get_container_type()
+    if container_type != "pauli_decomposition":
+        raise ValueError(
+            f"qDRIFT sample estimation requires a Pauli decomposition qubit operator; "
+            f"got the {container_type!r} representation."
+        )
+
     real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
     lambda_norm = sum(abs(coeff) for _, coeff in real_terms)
 

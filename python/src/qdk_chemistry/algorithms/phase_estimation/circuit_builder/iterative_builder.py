@@ -184,6 +184,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
         iterative_parameters = {
             "statePrep": state_prep_op,
             "repControlledUnitary": ctrl_unitary_op,
