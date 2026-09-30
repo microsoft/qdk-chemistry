@@ -215,7 +215,7 @@ jobs:
         MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
-        # ExaChem's extra memory-heavy build is Linux-only; keep macOS dependency builds at their matrix parallelism.
+        # Cap only dependency/ExaChem builds here; the later qdk-chemistry build keeps matrix-level parallelism.
         if [ "${{ matrix.os-name }}" == "macOS" ]; then
           jobs="${{ matrix.build-parallel }}"
           echo "macOS dependency build -> JOBS=$jobs"

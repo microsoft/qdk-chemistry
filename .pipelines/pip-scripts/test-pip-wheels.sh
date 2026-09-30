@@ -15,11 +15,14 @@ fi
 
 EXACHEM_INSTALL_DIR="/workspace/exachem_install"
 EXACHEM_REQUIRED="${EXACHEM_REQUIRED:-false}"
-if [ "${EXACHEM_REQUIRED,,}" = "true" ] &&
-    { [ ! -x "${EXACHEM_INSTALL_DIR}/bin/ExaChem" ] || [ ! -d "${EXACHEM_INSTALL_DIR}/basis" ]; }; then
-    echo "ERROR: ExaChem is required, but ${EXACHEM_INSTALL_DIR} is missing or incomplete." >&2
-    exit 1
-fi
+case "$EXACHEM_REQUIRED" in
+    [Tt][Rr][Uu][Ee])
+        if [ ! -x "${EXACHEM_INSTALL_DIR}/bin/ExaChem" ] || [ ! -d "${EXACHEM_INSTALL_DIR}/basis" ]; then
+            echo "ERROR: ExaChem is required, but ${EXACHEM_INSTALL_DIR} is missing or incomplete." >&2
+            exit 1
+        fi
+        ;;
+esac
 
 export DEBIAN_FRONTEND=noninteractive
 
