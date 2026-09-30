@@ -187,9 +187,16 @@ def _parse_set_overrides(set_args: list[str] | None) -> dict:
 
         # Build nested dict from dotted path
         parts = key.split(".")
+        if any(not part for part in parts):
+            raise argparse.ArgumentTypeError(f"Invalid --set key path: '{key}'. Path components must be non-empty")
         target = overrides
         for part in parts[:-1]:
-            target = target.setdefault(part, {})
+            nested = target.setdefault(part, {})
+            if not isinstance(nested, dict):
+                raise argparse.ArgumentTypeError(
+                    f"Invalid --set key path: '{key}'. '{part}' already contains a non-object value"
+                )
+            target = nested
         target[parts[-1]] = parsed_value
     return overrides
 
