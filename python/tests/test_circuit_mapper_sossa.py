@@ -12,6 +12,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _ROTATION_LOOKUP_METHODS
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -398,29 +399,31 @@ class TestSOSSAMapper:
         assert load_separately is False
 
     @pytest.mark.parametrize(
-        ("sf_rows", "sf_address_qubits", "dq_rows", "dq_address_qubits"),
+        "table_shape",
         [
             (4, 2, 4, 2),
             (3, 2, 3, 2),
             (5, 3, 3, 2),
             (2, 1, 7, 3),
         ],
+        ids=["sf4dq4", "sf3dq3", "sf5dq3", "sf2dq7"],
     )
     @pytest.mark.parametrize("swap_bits", [(0, 0), (1, 0), (0, 1), (1, 1)])
+    @pytest.mark.parametrize("lookup_method", ["select_swap", "dirty_select_swap"])
     def test_branched_angle_word_erasure_restores_the_address_register(
         self,
-        sf_rows: int,
-        sf_address_qubits: int,
-        dq_rows: int,
-        dq_address_qubits: int,
+        table_shape: tuple[int, int, int, int],
+        lookup_method: str,
         swap_bits: tuple[int, int],
     ) -> None:
         """The measurement-based erasure must phase exactly what the forward load wrote.
 
-        Swept over the dirty-QROAM widths as well: a borrowed swap network has to leave the
+        Swept over both swap-network loaders and their widths: a select-swap has to leave the
         angle word in the state the plain lookup would, or the shared erasure stops matching.
-        The borrowed register is conjugated along with the addresses, so it also has to come
-        back unentangled.
+        The row counts that are not powers of two are the ones that bite -- ``Select`` aliases
+        the surplus addresses onto real rows, so a loader that zero-filled them instead would
+        load a different word than the fixup table phases. The borrowed register is conjugated
+        along with the addresses, so a dirty network also has to come back unentangled.
 
         One swap bit is the widest setting every shape here can take -- the narrowest table
         has two rows, so a single address bit -- and it keeps the borrowed block out of the
@@ -428,6 +431,7 @@ class TestSOSSAMapper:
         a deeper network on a shape that can afford one.
         """
         width = 3
+        sf_rows, sf_address_qubits, dq_rows, dq_address_qubits = table_shape
         sf_data = [[(i + j) % 3 == 0 for j in range(width)] for i in range(sf_rows)]
         dq_data = [[bool((i >> j) & 1) for j in range(width - 1)] for i in range(dq_rows)]
         sf_swap_bits, dq_swap_bits = swap_bits
@@ -438,6 +442,7 @@ class TestSOSSAMapper:
                 dq_data,
                 sf_address_qubits,
                 dq_address_qubits,
+                _ROTATION_LOOKUP_METHODS[lookup_method],
                 sf_swap_bits,
                 dq_swap_bits,
             )
@@ -454,7 +459,7 @@ class TestSOSSAMapper:
 
         for _ in range(_ROUND_TRIP_TRIALS):
             assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
-                sf_data, dq_data, 2, 3, 1, dq_swap_bits
+                sf_data, dq_data, 2, 3, _ROTATION_LOOKUP_METHODS["dirty_select_swap"], 1, dq_swap_bits
             )
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
@@ -575,7 +580,7 @@ class TestSelectFullFidelity:
         num_bases: int = 1,
         num_copies: int = 1,
         rotation_batch_size: int = 0,
-        use_dirty_qroam: bool = False,
+        lookup_method: str = "select",
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -595,7 +600,7 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
             "rotationBatchSize": rotation_batch_size,
-            "useDirtyQROAM": use_dirty_qroam,
+            "rotationLookupMethod": _ROTATION_LOOKUP_METHODS[lookup_method],
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -634,7 +639,7 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
             "rotationBatchSize": 0,
-            "useDirtyQROAM": False,
+            "rotationLookupMethod": _ROTATION_LOOKUP_METHODS["select"],
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
@@ -709,14 +714,18 @@ class TestSelectFullFidelity:
         ],
         ids=["N3R1B1", "N4R1B2"],
     )
-    @pytest.mark.parametrize("use_dirty_qroam", [False, True])
+    @pytest.mark.parametrize("lookup_method", ["select", "select_swap", "dirty_select_swap"])
     def test_streamed_rotation_angles_match_the_resident_register(
         self,
         dims: tuple[int, int, int, int],
         bit_precision: int,
-        use_dirty_qroam: bool,
+        lookup_method: str,
     ):
         """Streaming the Givens angles must not change what SELECT does, only what it costs.
+
+        Run for all three loaders, since each is a different forward path sharing one
+        measurement-based erasure: whichever one loads the angle word, the resulting state has
+        to be the resident register's.
 
         Covers both branches of the angle lookup -- ``xo = 0`` takes the one-body DQ table and
         ``xo = N`` takes the two-body SF table -- at both ``b`` values that matter, since
@@ -750,7 +759,7 @@ class TestSelectFullFidelity:
                         self._select_data(
                             num_orbitals,
                             rotation_batch_size=batch,
-                            use_dirty_qroam=use_dirty_qroam,
+                            lookup_method=lookup_method,
                             **kwargs,
                         ),
                         xo_value=xo_value,
@@ -762,7 +771,7 @@ class TestSelectFullFidelity:
                     # magnitude is the comparison that means anything here.
                     fidelity = abs(np.vdot(reference, streamed))
                     assert fidelity == pytest.approx(1.0, abs=1e-9), (
-                        f"lambda={batch} dirty={use_dirty_qroam} xo={xo_value} b={b_value} "
+                        f"lambda={batch} lookup={lookup_method} xo={xo_value} b={b_value} "
                         f"disagrees with the resident register: fidelity={fidelity}"
                     )
 

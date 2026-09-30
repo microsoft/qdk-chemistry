@@ -20,6 +20,13 @@ __all__: list[str] = [
     "SOSSAMapperSettings",
 ]
 
+#: Maps the ``rotation_lookup_method`` setting onto the Q# ``RotationLookup*`` constants.
+_ROTATION_LOOKUP_METHODS: dict[str, int] = {
+    "select": 0,
+    "select_swap": 1,
+    "dirty_select_swap": 2,
+}
+
 
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
@@ -67,12 +74,18 @@ class SOSSAMapperSettings(Settings):
             (0, 4096),
         )
         self._set_default(
-            "rotation_dirty_qroam",
-            "bool",
-            True,
-            "Whether streamed rotation batches borrow wavefunction qubits for a select-swap "
-            "network instead of a plain unary-iteration lookup. Has no effect unless "
-            "'rotation_batch_size' streams the angles.",
+            "rotation_lookup_method",
+            "string",
+            "dirty_select_swap",
+            "Loader for streamed rotation batches. 'select' is a plain unary-iteration lookup: "
+            "no extra qubits, Toffoli cost one per table row. 'select_swap' is a clean QROAM "
+            "that roughly halves those Toffolis but allocates b_rot*lambda*(2^k-1) scratch "
+            "qubits, which partly offsets the register the streaming saved. 'dirty_select_swap' "
+            "runs the same network on borrowed wavefunction qubits, so it costs no width at all, "
+            "but only undercuts 'select' on tables large relative to the angle word and "
+            "otherwise falls back to it. Has no effect unless 'rotation_batch_size' streams the "
+            "angles.",
+            ["select", "select_swap", "dirty_select_swap"],
         )
         self._set_default(
             "coefficient_bit_precision",
@@ -200,6 +213,10 @@ class SOSSAMapper(CircuitMapper):
         else:
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
+        lookup_method = self._settings.get("rotation_lookup_method")
+        if lookup_method not in _ROTATION_LOOKUP_METHODS:
+            raise ValueError(f"Unsupported SOSSA rotation lookup method '{lookup_method}'.")
+
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
             "numRanks": meta.num_ranks,
@@ -210,7 +227,7 @@ class SOSSAMapper(CircuitMapper):
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
             "rotationBatchSize": int(self._settings.get("rotation_batch_size")),
-            "useDirtyQROAM": bool(self._settings.get("rotation_dirty_qroam")),
+            "rotationLookupMethod": _ROTATION_LOOKUP_METHODS[lookup_method],
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
