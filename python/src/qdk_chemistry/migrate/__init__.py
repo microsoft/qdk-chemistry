@@ -29,8 +29,8 @@ the migrated document is validated against the live deserializer, so a missing s
 fails loudly.
 
 A ``BasisSet`` keeps its own serialization version wherever another file embeds it,
-so embedded basis sets are migrated through ``_basis_set.STEPS`` first; a file whose
-own version is already current is then complete.
+so embedded basis sets are migrated first; a file whose own version is already
+current is then complete.
 
 This module lives outside the data classes so that no legacy-schema knowledge
 leaks into the core serialization.
@@ -128,8 +128,7 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
         # The installed deserializers expect the name.type.ext pattern.
         staged = Path(tmp) / f"staged.{data_type}.{'json' if src_format == 'json' else 'h5'}"
         try:
-            # A standalone basis set goes through its own steps below.
-            upgraded = data_type != "basis_set" and _basis_set.upgrade_embedded(src_path, staged, src_format)
+            upgraded = _basis_set.upgrade_embedded(src_path, staged, src_format)
         except (KeyError, ValueError, RuntimeError, OSError) as error:
             raise MigrationError(f"Failed to migrate '{src_path}': {error}") from error
         obj = _load_current(data_type, staged, src_format) if upgraded else None

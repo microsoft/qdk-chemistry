@@ -16,7 +16,6 @@
 #include <libint2.hpp>
 #include <map>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <set>
 #include <stdexcept>
 #include <string>
 
@@ -363,39 +362,37 @@ nlohmann::ordered_json convert_to_json(
 
   // Handle ECP
   std::vector<nlohmann::ordered_json> json_ecp_shells;
-  if (basis_set.has_ecp_shells()) {
-    const auto& ecp_shells = basis_set.get_ecp_shells();
+  for (size_t atom = 0; atom < basis_set.get_num_atoms(); ++atom) {
+    const auto& ecp_shells = basis_set.get_ecp_shells_for_atom(atom);
+    if (ecp_shells.empty()) {
+      continue;
+    }
     // The backend takes each atom's highest ECP angular momentum as its local
     // term, so UL goes one above the atom's other channels.
-    std::map<size_t, int> local_am;
-    std::set<size_t> atoms_with_local;
+    int local_am = 0;
+    bool has_local = false;
     for (const auto& ecp_shell : ecp_shells) {
-      int& am = local_am[ecp_shell.atom_index];
       if (ecp_shell.orbital_type == qdk::chemistry::data::OrbitalType::UL) {
-        atoms_with_local.insert(ecp_shell.atom_index);
+        has_local = true;
       } else {
-        am = std::max(am, static_cast<int>(ecp_shell.orbital_type) + 1);
+        local_am =
+            std::max(local_am, static_cast<int>(ecp_shell.orbital_type) + 1);
       }
     }
-    for (size_t i = 0; i < ecp_shells.size(); ++i) {
-      const auto& ecp_shell = ecp_shells[i];
+    for (const auto& ecp_shell : ecp_shells) {
       auto record = convert_to_json(ecp_shell);
       if (ecp_shell.orbital_type == qdk::chemistry::data::OrbitalType::UL) {
-        record["am"] = local_am[ecp_shell.atom_index];
+        record["am"] = local_am;
       }
       json_ecp_shells.push_back(record);
-      const bool last_of_atom =
-          i + 1 == ecp_shells.size() ||
-          ecp_shells[i + 1].atom_index != ecp_shell.atom_index;
-      // A zero local term keeps the atom's highest channel non-local.
-      if (last_of_atom &&
-          atoms_with_local.insert(ecp_shell.atom_index).second) {
-        json_ecp_shells.push_back({{"atom", ecp_shell.atom_index},
-                                   {"am", local_am[ecp_shell.atom_index]},
-                                   {"exp", std::vector<double>{1.0}},
-                                   {"coeff", std::vector<double>{0.0}},
-                                   {"rpowers", std::vector<int>{2}}});
-      }
+    }
+    // A zero local term keeps the atom's highest channel non-local.
+    if (!has_local) {
+      json_ecp_shells.push_back({{"atom", atom},
+                                 {"am", local_am},
+                                 {"exp", std::vector<double>{1.0}},
+                                 {"coeff", std::vector<double>{0.0}},
+                                 {"rpowers", std::vector<int>{2}}});
     }
   }
 

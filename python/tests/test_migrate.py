@@ -881,6 +881,8 @@ def test_library_anchor_requires_step_to_current_schema(tmp_path, monkeypatch):
 # --------------------------------------------------------------------------- #
 _ANGULAR_MOMENTUM = "spdfghi"
 _ECP_BASIS = ("def2-svp", ["H", "I"], [[0.0, 0.0, 0.0], [0.0, 0.0, 3.04]])
+# The I and Ce ECPs have different highest angular momenta.
+_TWO_ECP_BASIS = ("def2-svp", ["I", "Ce"], [[0.0, 0.0, 0.0], [0.0, 0.0, 5.5]])
 _ALL_ELECTRON_BASIS = ("sto-3g", ["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 _TEST_DATA = pathlib.Path(__file__).parent / "test_data"
 
@@ -957,7 +959,9 @@ def _write_pre_ul(obj, path, fmt):
 
 
 @pytest.mark.parametrize("fmt", ["json", "hdf5"])
-@pytest.mark.parametrize("spec", [_ECP_BASIS, _ALL_ELECTRON_BASIS], ids=["ecp", "all_electron"])
+@pytest.mark.parametrize(
+    "spec", [_ECP_BASIS, _TWO_ECP_BASIS, _ALL_ELECTRON_BASIS], ids=["ecp", "two_ecp_atoms", "all_electron"]
+)
 def test_basis_set(tmp_path, fmt, spec):
     library = _library_basis(spec)
     ext = "json" if fmt == "json" else "h5"
@@ -971,6 +975,26 @@ def test_basis_set(tmp_path, fmt, spec):
     assert _basis_summary(BasisSet.from_file(str(src), fmt)) == _basis_summary(expected)
     with pytest.raises(migrate.MigrationError, match="current serialization version"):
         migrate.convert_file(dst, tmp_path / f"again.basis_set.{ext}")
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_basis_set_already_ul(tmp_path, fmt):
+    # Version 0.1.0 files from the PySCF import already label the local term UL.
+    library = _library_basis(_ECP_BASIS)
+    ext = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"old.basis_set.{ext}"
+    library.to_file(str(src), fmt)
+    if fmt == "json":
+        src.write_text(json.dumps({**json.loads(src.read_text()), "version": "0.1.0"}))
+    else:
+        with h5py.File(src, "r+") as handle:
+            handle["basis_set"].attrs.modify("version", "0.1.0")
+
+    dst = tmp_path / f"new.basis_set.{ext}"
+    migrate.convert_file(src, dst)
+    expected = _basis_summary(_reloaded(library, tmp_path / f"current.basis_set.{ext}", fmt))
+    assert _basis_summary(BasisSet.from_file(str(dst), fmt)) == expected
+    assert _basis_summary(BasisSet.from_file(str(src), fmt)) == expected
 
 
 @pytest.mark.parametrize("fmt", ["json", "hdf5"])

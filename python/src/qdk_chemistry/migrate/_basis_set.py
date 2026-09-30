@@ -2,7 +2,8 @@
 
 ``BasisSet`` 0.1.0 stored each atom's local ECP term at the atom's highest ECP
 angular momentum; 0.2.0 labels it ``OrbitalType.UL``. The layout is otherwise
-unchanged. A ``BasisSet`` keeps its own serialization version wherever another
+unchanged, so HDF5 groups are relabeled in place, while JSON objects go through
+``STEPS``. A ``BasisSet`` keeps its own serialization version wherever another
 file embeds it, so :func:`upgrade_embedded` migrates those before the enclosing
 type's own steps run.
 """
@@ -16,18 +17,15 @@ from __future__ import annotations
 
 import json
 import shutil
-import tempfile
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import h5py
-
-from qdk_chemistry.data import BasisSet, Structure
+import numpy as np
 
 from . import _io
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from pathlib import Path
 
 NEW_VERSION = "0.2.0"
 OLD_VERSION = "0.1.0"
@@ -46,29 +44,9 @@ def from_json_doc(doc: dict) -> dict:
 
 
 def from_hdf5_file(path) -> dict:
-    """Normalize a legacy basis-set HDF5 file into the internal old-doc."""
+    """Read only the version of a basis-set HDF5 file; :func:`upgrade_embedded` migrates old ones in place."""
     with h5py.File(path, "r") as handle:
-        return from_hdf5_group(handle[_KEY])
-
-
-def from_hdf5_group(group: h5py.Group) -> dict:
-    """Normalize a legacy basis-set HDF5 group into the internal old-doc."""
-    metadata = group["metadata"]
-    old: dict = {"_source_version": _io.read_attr(group, "version"), "name": _io.read_attr(metadata, "name")}
-    if "atomic_orbital_type" in metadata.attrs:
-        old["atomic_orbital_type"] = _io.read_attr(metadata, "atomic_orbital_type")
-    atoms: dict[int, dict] = {}
-    for key in ("shells", "ecp_shells"):
-        if key in group:
-            for atom_index, shell in _read_shells(group[key]):
-                atoms.setdefault(atom_index, {"atom_index": atom_index}).setdefault(key, []).append(shell)
-    old["atoms"] = [atoms[index] for index in sorted(atoms)]
-    if "ecp_name" in group.attrs:
-        old["ecp_name"] = _io.read_attr(group, "ecp_name")
-        old["ecp_electrons"] = _io.read_index_vector(group, "ecp_electrons") or []
-    if "structure" in group:
-        old["structure"] = _io.subgroup_to_json(group["structure"], Structure, "structure")
-    return old
+        return {"_source_version": _io.read_attr(handle[_KEY], "version")}
 
 
 def to_new_json(old: dict) -> dict:
@@ -81,6 +59,8 @@ def to_new_json(old: dict) -> dict:
 
 def upgrade_embedded(src: Path, dst: Path, fmt: str) -> bool:
     """Copy ``src`` to ``dst`` with every embedded old ``BasisSet`` migrated.
+
+    HDF5 stores a standalone basis set in a ``basis_set`` group as well, so that is migrated here too.
 
     Args:
         src: File to read.
@@ -116,21 +96,15 @@ def _upgrade_embedded_json(src: Path, dst: Path) -> bool:
 
 
 def _upgrade_embedded_hdf5(src: Path, dst: Path) -> bool:
-    """Replace the old basis-set groups of an HDF5 file with migrated ones."""
+    """Copy an HDF5 file to ``dst`` and migrate its old basis-set groups there in place."""
     with h5py.File(src, "r") as handle:
         names = _old_group_names(handle)
     if not names:
         return False
     shutil.copyfile(src, dst)
-    with h5py.File(dst, "r+") as handle, tempfile.TemporaryDirectory() as tmp:
-        for index, name in enumerate(names):
-            new_json = _io.migrate_doc(STEPS, from_hdf5_group(handle[name]), "embedded BasisSet")
-            migrated_path = Path(tmp) / f"{index}.basis_set.h5"
-            BasisSet.from_json(json.dumps(new_json)).to_hdf5_file(str(migrated_path))
-            parent, _, leaf = name.rpartition("/")
-            del handle[name]
-            with h5py.File(migrated_path, "r") as migrated:
-                migrated.copy(migrated[_KEY], handle[parent or "/"], name=leaf)
+    with h5py.File(dst, "r+") as handle:
+        for name in names:
+            _upgrade_group(handle[name])
     return True
 
 
@@ -147,28 +121,17 @@ def _old_group_names(handle: h5py.File) -> list[str]:
     return names
 
 
-def _read_shells(group: h5py.Group) -> Iterator[tuple[int, dict]]:
-    """Yield ``(atom_index, shell)`` JSON pairs from a legacy flat shell group."""
-    exponents = _io.read_vector(group, "exponents")
-    coefficients = _io.read_vector(group, "coefficients")
-    rpowers = _io.read_index_vector(group, "rpowers")
-    offset = 0
-    for atom_index, orbital_type, count in zip(
-        group["atom_indices"][()].tolist(),
-        group["orbital_types"][()].tolist(),
-        group["num_primitives"][()].tolist(),
-        strict=True,
-    ):
-        primitives = slice(offset, offset + count)
-        shell = {
-            "orbital_type": _ORBITAL_TYPES[orbital_type + 1],
-            "exponents": [] if exponents is None else exponents[primitives].tolist(),
-            "coefficients": [] if coefficients is None else coefficients[primitives].tolist(),
-        }
-        if rpowers is not None:
-            shell["rpowers"] = rpowers[primitives]
-        offset += count
-        yield atom_index, shell
+def _upgrade_group(group: h5py.Group) -> None:
+    """In place, label each atom's highest ECP channel UL (-1) unless one already is, and bump the version."""
+    if "ecp_shells" in group:
+        atoms = group["ecp_shells/atom_indices"][()]
+        types = group["ecp_shells/orbital_types"][()]
+        for atom in np.unique(atoms):
+            on_atom = atoms == atom
+            if not (types[on_atom] == -1).any():
+                types[on_atom & (types == types[on_atom].max())] = -1
+        group["ecp_shells/orbital_types"][...] = types
+    group.attrs.modify("version", NEW_VERSION)
 
 
 def _label_local_term(atom: dict) -> dict:

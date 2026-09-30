@@ -168,7 +168,7 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
 }
 
 // Labels each atom's highest ECP channel UL unless the atom already has one.
-bool label_local_ecp_terms(std::vector<Shell>& ecp_shells) {
+void relabel_legacy_ecp_shells(std::vector<Shell>& ecp_shells) {
   std::map<size_t, OrbitalType> highest;
   std::set<size_t> has_local;
   for (const auto& sh : ecp_shells) {
@@ -186,11 +186,7 @@ bool label_local_ecp_terms(std::vector<Shell>& ecp_shells) {
       relabeled = true;
     }
   }
-  return relabeled;
-}
-
-void relabel_legacy_ecp_shells(std::vector<Shell>& ecp_shells) {
-  if (label_local_ecp_terms(ecp_shells)) {
+  if (relabeled) {
     QDK_LOGGER().warn(
         "BasisSet serialization version {} stored each atom's local ECP term "
         "at its highest angular momentum; it was relabeled UL on load. To "
@@ -292,7 +288,14 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
       ecp_shells.push_back(sh);
     }
     // The basis library stores the local term at the highest angular momentum.
-    label_local_ecp_terms(ecp_shells);
+    const auto local_term =
+        std::max_element(ecp_shells.begin(), ecp_shells.end(),
+                         [](const Shell& lhs, const Shell& rhs) {
+                           return lhs.orbital_type < rhs.orbital_type;
+                         });
+    if (local_term != ecp_shells.end()) {
+      local_term->orbital_type = OrbitalType::UL;
+    }
   }
   return {shells, ecp_shells, num_ecp_elecs};
 }
