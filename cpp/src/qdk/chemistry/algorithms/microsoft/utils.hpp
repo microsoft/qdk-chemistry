@@ -184,15 +184,15 @@ size_t factorial(size_t n);
 size_t binomial_coefficient(size_t n, size_t k);
 
 /**
- * @brief Accepted one-electron dressing labels for settings constraints.
- * @return Labels from the same vocabulary used by parse_integral_dressing.
+ * @brief Accepted relativity labels for settings constraints.
+ * @return Labels from the same vocabulary used by parse_relativity.
  */
-const std::vector<std::string>& integral_dressing_labels();
+const std::vector<std::string>& relativity_labels();
 
 /**
- * @brief Parse a dressing label; empty means nonrelativistic.
+ * @brief Parse a relativity label; empty means nonrelativistic.
  * @throws std::invalid_argument if the label is not recognized.
  */
-qcs::IntegralDressing parse_integral_dressing(const std::string& label);
+qcs::Relativity parse_relativity(const std::string& label);
 
 }  // namespace qdk::chemistry::utils::microsoft

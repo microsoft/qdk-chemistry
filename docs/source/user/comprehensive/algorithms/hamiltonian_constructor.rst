@@ -122,26 +122,28 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
-   * - ``integral_dressing``
+   * - ``relativity``
      - string
-     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
+     - Relativistic treatment (``""``, ``"sf-x2c"``, or ``"sf-x2c-contracted"``). Default: ``""`` (nonrelativistic)
 
-Spin-Free X2C-1e Option
-~~~~~~~~~~~~~~~~~~~~~~~
+Relativistic treatment
+~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Setting: ``integral_dressing="x2c_1e"`` or ``integral_dressing="x2c_1e_contracted"``
+.. rubric:: Setting: ``relativity="sf-x2c"`` or ``relativity="sf-x2c-contracted"``
 
 .. note::
 
-   To include X2C-1e during the SCF procedure, set the same ``integral_dressing`` value on :doc:`ScfSolver <scf_solver>`.
+   To include spin-free X2C during the :term:`SCF` procedure, set the same ``relativity`` value on :doc:`ScfSolver <scf_solver>`.
+   :doc:`Orbitals <../data/orbitals>` do not retain the relativistic treatment; set ``relativity`` explicitly on the downstream :class:`~qdk_chemistry.algorithms.HamiltonianConstructor`.
 
-The ``integral_dressing`` setting applies spin-free exact-two-component scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
-The X2C-1e path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
+The ``relativity`` setting selects the relativistic treatment of the Hamiltonian; its default ``""`` retains the nonrelativistic Hamiltonian.
+The spin-free exact-two-component (X2C) options apply scalar-relativistic corrections to the one-electron Hamiltonian using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
+The spin-free X2C path constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
 
-This implementation uses the X2C-1e approximation: the two-electron integrals are not transformed, and spin-orbit terms are not included.
-ECPs and Cartesian atomic orbitals are not supported.
-With ``integral_dressing="x2c_1e"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
-Use ``integral_dressing="x2c_1e_contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
+Both options use the one-electron X2C approximation (X2C-1e): the two-electron integrals are unchanged, and spin-orbit coupling is not included.
+Spin-free X2C requires spherical all-electron basis sets; ECPs and Cartesian atomic orbitals are not supported.
+With ``relativity="sf-x2c"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
+Use ``relativity="sf-x2c-contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
 
 .. tab:: Python API
 
@@ -187,9 +189,9 @@ Four-center integrals are lazily computed from the three-center integrals on dem
    * - ``store_ao_cholesky_vectors``
      - bool
      - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
-   * - ``integral_dressing``
+   * - ``relativity``
      - string
-     - One-electron integral dressing ("", "x2c_1e", or "x2c_1e_contracted"). Default: ""
+     - Relativistic treatment (``""``, ``"sf-x2c"``, or ``"sf-x2c-contracted"``). Default: ``""`` (nonrelativistic)
 
 Related classes
 ---------------

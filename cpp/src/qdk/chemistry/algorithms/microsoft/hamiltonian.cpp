@@ -23,23 +23,25 @@ namespace qdk::chemistry::algorithms::microsoft {
 namespace qcs = qdk::chemistry::scf;
 
 HamiltonianSettings::HamiltonianSettings() {
-  set_default("integral_dressing", std::string(""),
-              "One-electron integral dressing: '' for nonrelativistic, "
-              "'x2c_1e' for decontracted X2C-1e, or "
-              "'x2c_1e_contracted' for X2C-1e in the contracted basis",
+  set_default("relativity", std::string(""),
+              "Relativistic treatment: '' for nonrelativistic, "
+              "'sf-x2c' for spin-free X2C with basis decontraction and "
+              "recontraction, or 'sf-x2c-contracted' for spin-free X2C in "
+              "the supplied contracted basis. Both X2C options use "
+              "the one-electron approximation",
               data::ListConstraint<std::string>{
-                  {utils::microsoft::integral_dressing_labels()}});
+                  {utils::microsoft::relativity_labels()}});
 }
 
 std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
 detail::build_one_body_ao(const data::BasisSet& basis_set,
-                          qcs::IntegralDressing integral_dressing) {
-  const bool use_x2c =
-      integral_dressing == qcs::IntegralDressing::X2C1e ||
-      integral_dressing == qcs::IntegralDressing::X2C1eContracted;
+                          qcs::Relativity relativity) {
+  const bool use_x2c = relativity == qcs::Relativity::SFX2C ||
+                       relativity == qcs::Relativity::SFX2CContracted;
   if (use_x2c &&
       basis_set.get_atomic_orbital_type() == data::AOType::Cartesian) {
-    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
+    throw std::invalid_argument(
+        "Spin-free X2C currently supports spherical AOs only");
   }
 
   auto internal_basis_set =
@@ -48,9 +50,8 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
 
   if (use_x2c) {
     return {internal_basis_set,
-            qcs::build_x2c_one_body_ao(
-                internal_basis_set, mpi,
-                integral_dressing == qcs::IntegralDressing::X2C1e)};
+            qcs::build_x2c_one_body_ao(internal_basis_set, mpi,
+                                       relativity == qcs::Relativity::SFX2C)};
   }
 
   const size_t dimension = basis_set.get_num_atomic_orbitals();
@@ -454,8 +455,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   auto basis_set = orbitals->get_basis_set();
   auto [internal_basis_set, one_body_ao] = detail::build_one_body_ao(
-      *basis_set, utils::microsoft::parse_integral_dressing(
-                      _settings->get<std::string>("integral_dressing")));
+      *basis_set, utils::microsoft::parse_relativity(
+                      _settings->get<std::string>("relativity")));
 
   return detail::construct_canonical_hamiltonian(
       std::move(orbitals), internal_basis_set, one_body_ao,

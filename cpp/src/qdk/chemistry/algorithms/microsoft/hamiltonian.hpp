@@ -16,7 +16,7 @@
 
 namespace qdk::chemistry::scf {
 class BasisSet;
-enum class IntegralDressing;
+enum class Relativity;
 }  // namespace qdk::chemistry::scf
 
 namespace qdk::chemistry::data {
@@ -41,7 +41,7 @@ inline bool indices_are_contiguous(const std::vector<std::size_t>& indices) {
 
 std::pair<std::shared_ptr<qdk::chemistry::scf::BasisSet>, Eigen::MatrixXd>
 build_one_body_ao(const data::BasisSet& basis_set,
-                  qdk::chemistry::scf::IntegralDressing integral_dressing);
+                  qdk::chemistry::scf::Relativity relativity);
 
 std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
     std::shared_ptr<data::Orbitals> orbitals,

@@ -323,24 +323,23 @@ TEST_F(ScfTest, OH_ROHF_GDM) {
 
 TEST_F(ScfTest, X2CSettings) {
   auto solver = ScfSolverFactory::create("qdk");
-  EXPECT_EQ(solver->settings().get<std::string>("integral_dressing"), "");
-  EXPECT_NO_THROW(solver->settings().set("integral_dressing", "x2c_1e"));
-  EXPECT_NO_THROW(
-      solver->settings().set("integral_dressing", "x2c_1e_contracted"));
-  EXPECT_THROW(solver->settings().set("integral_dressing", "unsupported"),
+  EXPECT_EQ(solver->settings().get<std::string>("relativity"), "");
+  EXPECT_NO_THROW(solver->settings().set("relativity", "sf-x2c"));
+  EXPECT_NO_THROW(solver->settings().set("relativity", "sf-x2c-contracted"));
+  EXPECT_THROW(solver->settings().set("relativity", "unsupported"),
                std::invalid_argument);
 }
 
 TEST_F(ScfTest, X2CWaterRHFReferences) {
   auto water = testing::create_water_structure();
   const std::vector<std::pair<std::string, double>> references = {
-      {"x2c_1e", -74.98146893703478},
-      {"x2c_1e_contracted", -74.98498098619933}};
+      {"sf-x2c", -74.98146893703478},
+      {"sf-x2c-contracted", -74.98498098619933}};
 
-  for (const auto& [integral_dressing, reference_energy] : references) {
-    SCOPED_TRACE(integral_dressing);
+  for (const auto& [relativity, reference_energy] : references) {
+    SCOPED_TRACE(relativity);
     auto solver = ScfSolverFactory::create("qdk");
-    solver->settings().set("integral_dressing", integral_dressing);
+    solver->settings().set("relativity", relativity);
     solver->settings().set("enable_gdm", false);
     solver->settings().set("scf_type", "restricted");
     solver->settings().set("convergence_threshold", 1e-10);
@@ -350,7 +349,7 @@ TEST_F(ScfTest, X2CWaterRHFReferences) {
     EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
 
     auto constructor = HamiltonianConstructorFactory::create("qdk");
-    constructor->settings().set("integral_dressing", integral_dressing);
+    constructor->settings().set("relativity", relativity);
     auto hamiltonian = constructor->run(wavefunction->get_orbitals());
     Ansatz mean_field_ansatz(hamiltonian, wavefunction);
     EXPECT_NEAR(mean_field_ansatz.calculate_energy(), energy,
@@ -360,7 +359,7 @@ TEST_F(ScfTest, X2CWaterRHFReferences) {
 
 TEST_F(ScfTest, X2COxygenUHFReference) {
   auto solver = ScfSolverFactory::create("qdk");
-  solver->settings().set("integral_dressing", "x2c_1e");
+  solver->settings().set("relativity", "sf-x2c");
   solver->settings().set("enable_gdm", false);
   solver->settings().set("scf_type", "unrestricted");
   solver->settings().set("convergence_threshold", 1e-10);
@@ -373,7 +372,7 @@ TEST_F(ScfTest, X2COxygenUHFReference) {
 
 TEST_F(ScfTest, X2COHROHFReference) {
   auto solver = ScfSolverFactory::create("qdk");
-  solver->settings().set("integral_dressing", "x2c_1e");
+  solver->settings().set("relativity", "sf-x2c");
   solver->settings().set("enable_gdm", false);
   solver->settings().set("scf_type", "restricted");
   solver->settings().set("convergence_threshold", 1e-10);
@@ -386,14 +385,14 @@ TEST_F(ScfTest, X2COHROHFReference) {
 
 TEST_F(ScfTest, X2CRejectsEcp) {
   auto solver = ScfSolverFactory::create("qdk");
-  solver->settings().set("integral_dressing", "x2c_1e");
+  solver->settings().set("relativity", "sf-x2c");
   EXPECT_THROW(solver->run(testing::create_agh_structure(), 0, 1, "def2-svp"),
                std::invalid_argument);
 }
 
 TEST_F(ScfTest, X2CRejectsAnalyticNuclearGradient) {
   qdk::chemistry::algorithms::microsoft::ScfSolver gradient_solver;
-  gradient_solver.settings().set("integral_dressing", "x2c_1e");
+  gradient_solver.settings().set("relativity", "sf-x2c");
   EXPECT_THROW(
       gradient_solver.run_with_analytic_gradient(
           testing::create_water_structure(), 0, 1, std::string("sto-3g")),

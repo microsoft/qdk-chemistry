@@ -60,12 +60,11 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   auto& mol = *mol_ptr;
   ctx_.mol = mol_ptr.get();
   ctx_.cfg = &cfg;
-  if (cfg.integral_dressing != IntegralDressing::None && cfg.require_gradient) {
+  if (cfg.relativity != Relativity::None && cfg.require_gradient) {
     throw std::invalid_argument(
         "Analytic nuclear gradients are not available with X2C-1e");
   }
-  if (cfg.integral_dressing != IntegralDressing::None &&
-      cfg.require_polarizability) {
+  if (cfg.relativity != Relativity::None && cfg.require_polarizability) {
     throw std::invalid_argument(
         "Polarizabilities are not available with X2C-1e");
   }
@@ -940,8 +939,8 @@ void SCFImpl::build_one_electron_integrals_() {
         RowMajorMatrix::Zero(num_orbital_spin_blocks_, num_molecular_orbitals_);
   }
   RowMajorMatrix one_body_ao;
-  switch (ctx_.cfg->integral_dressing) {
-    case IntegralDressing::None: {
+  switch (ctx_.cfg->relativity) {
+    case Relativity::None: {
       RowMajorMatrix kinetic =
           RowMajorMatrix::Zero(num_atomic_orbitals_, num_atomic_orbitals_);
       RowMajorMatrix potential =
@@ -960,10 +959,9 @@ void SCFImpl::build_one_electron_integrals_() {
       }
       break;
     }
-    case IntegralDressing::X2C1e:
-    case IntegralDressing::X2C1eContracted:
-      const bool decontract =
-          ctx_.cfg->integral_dressing == IntegralDressing::X2C1e;
+    case Relativity::SFX2C:
+    case Relativity::SFX2CContracted:
+      const bool decontract = ctx_.cfg->relativity == Relativity::SFX2C;
       TIMEIT(one_body_ao = build_x2c_one_body_ao(ctx_.basis_set, ctx_.cfg->mpi,
                                                  decontract),
              "SCFImpl::build_one_electron_integrals->x2c");

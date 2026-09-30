@@ -2386,9 +2386,9 @@ class TestPyscfPlugin:
 
     def test_hamiltonian_to_scf_preserves_x2c_hamiltonian(self):
         """Preserve the X2C one-body operator and scalar core when converting to PySCF."""
-        solver = algorithms.create("scf_solver", "qdk", integral_dressing="x2c_1e", enable_gdm=False)
+        solver = algorithms.create("scf_solver", "qdk", relativity="sf-x2c", enable_gdm=False)
         _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
-        hamiltonian = algorithms.create("hamiltonian_constructor", "qdk", integral_dressing="x2c_1e").run(
+        hamiltonian = algorithms.create("hamiltonian_constructor", "qdk", relativity="sf-x2c").run(
             wavefunction.get_orbitals()
         )
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()

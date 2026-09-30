@@ -190,8 +190,7 @@ struct SCFConfig {
   uint64_t fock_reset_steps =
       1073741824;  ///< Number of steps between full Fock matrix rebuilds
                    ///< (default: 2^30 = effectively never)
-  IntegralDressing integral_dressing =
-      IntegralDressing::None;  ///< One-electron integral dressing
+  Relativity relativity = Relativity::None;  ///< Relativistic treatment
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   DispersionType disp = DispersionType::None;
