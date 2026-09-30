@@ -215,19 +215,22 @@ jobs:
         MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
-        # This step's own JOBS, scoped here only: the matrix's build-parallel is sized for the
-        # already-built qdk-chemistry/ExaChem binaries (test run, no compilation), not for building
-        # ExaChem/TAMM's memory-hungry translation units from scratch, so cap by available RAM instead.
-        cpu=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.logicalcpu)
-        if [ -r /proc/meminfo ]; then
-          ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+        # ExaChem's extra memory-heavy build is Linux-only; keep macOS dependency builds at their matrix parallelism.
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          jobs="${{ matrix.build-parallel }}"
+          echo "macOS dependency build -> JOBS=$jobs"
         else
-          ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+          cpu=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.logicalcpu)
+          if [ -r /proc/meminfo ]; then
+            ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+          else
+            ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+          fi
+          jobs=$(awk "BEGIN { print int($ram_gb / 8) }")
+          [ "$jobs" -lt 1 ] && jobs=1
+          [ "$jobs" -gt "$cpu" ] && jobs=$cpu
+          echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
         fi
-        jobs=$(awk "BEGIN { print int($ram_gb / 8) }")
-        [ "$jobs" -lt 1 ] && jobs=1
-        [ "$jobs" -gt "$cpu" ] && jobs=$cpu
-        echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
 
         # macOS has no BLAS package installed, so let BLAS++ auto-detect Apple's Accelerate framework; Linux
         # installs OpenBLAS via apt above.
