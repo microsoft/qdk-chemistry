@@ -19,12 +19,6 @@ if(NOT GTest_FOUND)
 
     FetchContent_MakeAvailable(googletest)
 
-    # Create aliases to match find_package targets
-    add_library(GTest::gtest ALIAS gtest)
-    add_library(GTest::gtest_main ALIAS gtest_main)
-    add_library(GTest::gmock ALIAS gmock)
-    add_library(GTest::gmock_main ALIAS gmock_main)
-
     message(STATUS "Google Test fetched successfully")
 else()
     message(STATUS "Using system Google Test")
@@ -101,6 +95,9 @@ endfunction()
 foreach(test_source ${TEST_SOURCES})
     add_gtest_executable(${test_source})
 endforeach()
+
+# chemistry links SeQuant privately, so its smoke test needs it directly.
+target_link_libraries(test_sequant PRIVATE SeQuant::SeQuant)
 
 # Print information about discovered tests for debugging
 message(STATUS "Found ${CMAKE_CURRENT_LIST_LENGTH} test files:")

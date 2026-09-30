@@ -286,7 +286,7 @@ select = [
 # Scikit-build-core configuration
 [tool.scikit-build]
 experimental = true
-cmake.version = ">=3.15"
+cmake.version = ">=3.28"
 cmake.build-type = "Release"
 # Build in current directory (python/)
 cmake.source-dir = "."
