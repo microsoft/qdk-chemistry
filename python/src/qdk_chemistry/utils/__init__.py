@@ -14,6 +14,12 @@ from qdk_chemistry._core.utils import (
     rotate_orbitals,
 )
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
+from qdk_chemistry.utils.file_io import (
+    ensure_parent_directory,
+    read_text_file,
+    write_file_atomically,
+    write_text_file_atomically,
+)
 
 from . import model_hamiltonians
 
@@ -23,7 +29,11 @@ __all__ = [
     "CubeGrid",
     "Logger",
     "compute_valence_space_parameters",
+    "ensure_parent_directory",
     "generate_orbital_cubes",
     "model_hamiltonians",
+    "read_text_file",
     "rotate_orbitals",
+    "write_file_atomically",
+    "write_text_file_atomically",
 ]
