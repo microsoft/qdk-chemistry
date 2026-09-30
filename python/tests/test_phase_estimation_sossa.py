@@ -836,16 +836,38 @@ class TestSOSSAResourceEstimation:
             f"same width: {tight_toffolis} vs {knee_toffolis}"
         )
 
-    def test_dirty_qroam_is_never_worse_than_the_plain_lookup(self):
-        """Borrowing must be opt-out-able by the cost model, not unconditional.
+    def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):
+        """Each loader has to be worth choosing somewhere, and none may be a silent regression.
 
         At the Fe2S2 table shape the SF lookup is only 224 rows against a 15-bit angle word,
-        well under the ``numData > 32 * numBits`` point where a borrowed swap network starts
-        to pay. ``ComputeOptimalDirtySwapBits`` is expected to decline it and leave the plain
-        lookup in place, so enabling the setting must cost nothing here.
+        well under the ``numData > 32 * numBits`` point where a *borrowed* swap network starts
+        to pay, so ``dirty_select_swap`` is expected to decline it and leave the plain lookup
+        in place -- selecting it must therefore cost nothing at all here.
         See ``TestDirtyQROAMCostModel`` for the regime where it does pay.
-        """
-        plain = self._fe2s2_logical_counts(rotation_batch_size=1, rotation_dirty_qroam=False)
-        dirty = self._fe2s2_logical_counts(rotation_batch_size=1, rotation_dirty_qroam=True)
 
-        assert dirty <= plain, f"enabling dirty QROAM made SELECT worse: {plain} -> {dirty}"
+        A *clean* swap network has no such threshold: it buys the same Toffoli reduction with
+        allocated scratch instead of borrowed qubits, so ``select_swap`` should cut Toffolis
+        here where ``dirty_select_swap`` cannot. That scratch is the price, and the point of
+        offering all three is that the right trade depends on which budget is binding.
+        """
+        plain_qubits, plain_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=1, rotation_lookup_method="select"
+        )
+        clean_qubits, clean_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=1, rotation_lookup_method="select_swap"
+        )
+        dirty_qubits, dirty_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=1, rotation_lookup_method="dirty_select_swap"
+        )
+
+        assert (dirty_qubits, dirty_toffolis) == (plain_qubits, plain_toffolis), (
+            "the dirty cost model should have declined at this shape and left the plain lookup "
+            f"in place, but it changed the cost: {(plain_qubits, plain_toffolis)} -> "
+            f"{(dirty_qubits, dirty_toffolis)}"
+        )
+        assert clean_toffolis < plain_toffolis, (
+            f"a clean swap network should undercut the plain lookup: {plain_toffolis} -> {clean_toffolis}"
+        )
+        assert clean_qubits >= plain_qubits, (
+            f"a clean swap network allocates scratch, so it cannot also be narrower: {plain_qubits} -> {clean_qubits}"
+        )

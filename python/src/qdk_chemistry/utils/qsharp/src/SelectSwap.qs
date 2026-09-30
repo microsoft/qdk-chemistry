@@ -49,6 +49,20 @@ namespace QDKChemistry.Utils.SelectSwap {
         Padded(-2^nRequired, [false, size = Length(data[0])], data)
     }
 
+    /// Expands a lookup table to the full `2^nRequired` address space the way `Select` reads it.
+    ///
+    /// `Select` never reads a surplus address as zero; `UnaryIteration` routes anything at or
+    /// above `Length(data)` back onto a real row. A loader that zero-pads instead disagrees with
+    /// `Select` -- and with any phase fixup written against `Select` -- on exactly those
+    /// addresses. Building the table this way makes the agreement unconditional rather than a
+    /// property of which addresses happen to carry amplitude.
+    internal function AliasToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
+        MappedOverRange(
+            i -> data[UnaryIterationActionIndex(Length(data), i)],
+            0..2^nRequired - 1
+        )
+    }
+
     /// Register slices and the flattened table shared by the swap path and its erasure.
     internal function SwappedLoadShape(
         data : Bool[][][],
@@ -244,6 +258,58 @@ namespace QDKChemistry.Utils.SelectSwap {
         } else {
             WithSelectSwap(swapBits, padded, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
         }
+    }
+
+    /// Clean select-swap whose surplus addresses alias the way a bare `Select` reads them.
+    ///
+    /// `SelectSwap` zero-pads, which is right when its own adjoint erases the load. Here the
+    /// erasure is a shared measurement-based unlookup with a phase fixup written against
+    /// `Select`'s routing, so the forward load has to agree with that routing instead.
+    operation SelectSwapAliased(
+        numSwapBits : Int,
+        data : Bool[][],
+        address : Qubit[],
+        output : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let nRequired = DimensionsForSelect(data, address);
+        SelectSwap(numSwapBits, AliasToAddressSpace(data, nRequired), address, output);
+    }
+
+    /// Toffoli cost of the *forward* clean select-swap load only.
+    ///
+    /// `SelectSwapCost1D` prices a compute/uncompute pair, which is the right model when the
+    /// swap network erases itself. A streamed rotation batch is erased by measurement instead,
+    /// so only the forward pass is paid for and the optimal width is wider than that model
+    /// would choose.
+    internal function SelectSwapForwardCost(numSwapBits : Int, numData : Int, numBits : Int) : Int {
+        if numSwapBits <= 0 {
+            return numData - 1;
+        }
+        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+        2^(addressBits - numSwapBits) - 2 + (2^numSwapBits - 1) * numBits
+    }
+
+    /// Best clean swap width when only the forward load is paid for, and the ancilla it costs.
+    ///
+    /// Returns 0 when no network beats the plain lookup, in which case the caller should stay on
+    /// `Select` rather than allocate scratch for nothing.
+    function ComputeOptimalSwapBits(numData : Int, numBits : Int) : Int {
+        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
+        mutable bestBits = 0;
+        mutable best = SelectSwapForwardCost(0, numData, numBits);
+        for k in 1..addressBits {
+            let cost = SelectSwapForwardCost(k, numData, numBits);
+            if cost < best {
+                set best = cost;
+                set bestBits = k;
+            }
+        }
+        bestBits
+    }
+
+    /// Clean scratch qubits a `SelectSwapAliased` load allocates at a given swap width.
+    function SelectSwapScratchQubits(numSwapBits : Int, numBits : Int) : Int {
+        if numSwapBits <= 0 { 0 } else { numBits * (2^numSwapBits - 1) }
     }
 
     //  2D SELECT-SWAP (single select-swap over the combined outer×inner address)
@@ -474,6 +540,46 @@ namespace QDKChemistry.Utils.SelectSwap {
         All(r -> r == Zero, MResetEachZ(address))
     }
 
+    /// Cross-checks `SelectSwapAliased` against a bare `Select` on every address, by value.
+    ///
+    /// The comparison is deliberately against `Select` and not `SelectSwap(0, ...)`: the zero-pad
+    /// and the alias differ precisely at the surplus addresses, which is the disagreement this
+    /// operation exists to catch.
+    ///
+    /// It compares loaded values rather than phases because `Select` erases a ragged table by
+    /// measurement, so `within { Select(...) } apply { Z(...) }` is not a phase oracle there --
+    /// it disagrees even with itself. The forward load is the only thing the streamed rotation
+    /// path uses `Select` for, and the forward load is what this checks.
+    internal operation TestSelectSwapAliasedMatchesSelect1D(data : Bool[][], numSwapBits : Int) : Bool {
+        let m = Length(data[0]);
+        let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
+
+        mutable allCorrect = true;
+        for addr in 0..2^nAddr - 1 {
+            use address = Qubit[nAddr];
+            use swapped = Qubit[m];
+            use plain = Qubit[m];
+
+            ApplyXorInPlace(addr, address);
+            SelectSwapAliased(numSwapBits, data, address, swapped);
+            Select(data, address, plain);
+            ApplyXorInPlace(addr, address);
+
+            let swappedWord = Mapped(ResultAsBool, MResetEachZ(swapped));
+            let plainWord = Mapped(ResultAsBool, MResetEachZ(plain));
+            if swappedWord != plainWord {
+                Message($"FAIL: addr={addr}, select-swap={swappedWord}, select={plainWord}");
+                set allCorrect = false;
+            }
+            if not All(r -> r == Zero, MResetEachZ(address)) {
+                Message($"FAIL: addr={addr} left the address register disturbed");
+                set allCorrect = false;
+            }
+        }
+
+        allCorrect
+    }
+
     /// `SelectSwap2D` loads the addressed word into a one-word target, at every split.
     internal operation TestSelectSwap2DCorrectness(
         data : Bool[][][],
@@ -655,10 +761,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     /// Row `i` holds chunk `p` = `data[i + p * 2^k]`, matching the little-endian split of the
     /// address into `k` select bits and `numSwapBits` swap bits.
     internal function CreateAliasedData(data : Bool[][], nRequired : Int, k : Int) : Bool[][] {
-        let aliased = MappedOverRange(
-            i -> data[UnaryIterationActionIndex(Length(data), i)],
-            0..2^nRequired - 1
-        );
+        let aliased = AliasToAddressSpace(data, nRequired);
         MappedOverRange(i -> Flattened(aliased[i..2^k..2^nRequired - 1]), 0..2^k - 1)
     }
 
