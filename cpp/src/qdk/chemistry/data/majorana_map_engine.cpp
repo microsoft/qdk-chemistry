@@ -16,12 +16,15 @@
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "two_body_symmetry.hpp"
 
 namespace qdk::chemistry::data {
 namespace detail {
@@ -184,11 +187,10 @@ class PackedAccumulator {
 // The spin_symmetric flag selects one of two evaluation strategies:
 //
 //   spin_symmetric = true   (restricted orbitals)
-//     All spin channels share the same integrals (h_alpha == h_beta,
-//     eri_aaaa == eri_bbbb == eri_aabb).  The engine precomputes
-//     spin-summed E_pq = E^α_pq + E^β_pq and exploits 8-fold ERI
-//     symmetry, roughly halving the two-body work.  The δ_{qr}
-//     two-body contraction is folded into the one-body integrals.
+//     The caller guarantees that all spin channels share the same integrals
+//     (h_alpha == h_beta, eri_aaaa == eri_bbbb == eri_aabb).  The spin-summed
+//     fast path additionally requires 8-fold ERI symmetry, so callers must
+//     classify the tensor before selecting it.
 //
 //   spin_symmetric = false  (unrestricted orbitals)
 //     Each spin channel (αα, ββ, αβ, βα) is handled independently
@@ -196,7 +198,9 @@ class PackedAccumulator {
 //     where h^α ≠ h^β and the ERI channels differ — even though the
 //     underlying Hamiltonian is still spin-free.  The αβ and βα
 //     cross-spin channels are related by Coulomb symmetry (pq|rs) =
-//     (rs|pq) and are handled in a single merged loop.
+//     (rs|pq) and are handled in a single merged loop.  That merge, plus the
+//     (pq|rs) = (qp|sr) fold, makes this path exact on the 4-fold subgroup
+//     and no wider: it silently symmetrizes anything outside it.
 
 // ─── ERI providers ─────────────────────────────────────────────────
 //
@@ -928,8 +932,33 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold) {
   detail::DenseEriProvider provider{eri_aaaa, eri_aabb, eri_bbbb, n_spatial};
+  bool use_spin_symmetric = spin_symmetric;
+  if (spin_symmetric) {
+    const auto symmetry = detail::classify_two_body_symmetry(
+        eri_aaaa, n_spatial, detail::two_body_symmetry_tolerance);
+    if (symmetry == detail::TwoBodySymmetry::NonHermitian) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: (pq|rs) + (rs|pq) != (qp|sr) + (sr|qp), "
+          "so the two-body integrals define a non-Hermitian operator, which "
+          "this engine cannot map.");
+    }
+    if (symmetry == detail::TwoBodySymmetry::NotBraKetSymmetric) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: the two-body integrals are Hermitian but "
+          "not stored with (pq|rs) = (rs|pq). That swap leaves the operator "
+          "unchanged, so replace the tensor by its bra-ket average "
+          "((pq|rs) + (rs|pq)) / 2 before mapping.");
+    }
+    use_spin_symmetric = symmetry == detail::TwoBodySymmetry::EightFold;
+    if (!use_spin_symmetric) {
+      QDK_LOGGER().debug(
+          "Two-body integrals carry only 4-fold permutation symmetry; using "
+          "the general spin-channel path instead of the spin-summed fast "
+          "path.");
+    }
+  }
   return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
-                                   provider, n_spatial, spin_symmetric,
+                                   provider, n_spatial, use_spin_symmetric,
                                    threshold, integral_threshold);
 }
 
@@ -938,6 +967,18 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const double* h1_beta, const double* three_center_aa,
     const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
     bool spin_symmetric, double threshold, double integral_threshold) {
+  // Verifying the weaker 4-fold symmetry the general path needs would mean
+  // materializing the dense tensor, which is exactly what this entry point
+  // exists to avoid, so reject instead of falling back.
+  if (spin_symmetric && !detail::cholesky_factors_are_pair_symmetric(
+                            three_center_aa, n_spatial, naux,
+                            detail::two_body_symmetry_tolerance)) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian_cholesky: the three-center factors are not "
+        "symmetric in their orbital pair, so the reconstructed integrals lack "
+        "8-fold permutation symmetry; map such Hamiltonians from dense "
+        "storage instead.");
+  }
   detail::CholeskyEriProvider provider{three_center_aa, three_center_bb,
                                        n_spatial, naux};
   return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
@@ -970,34 +1011,16 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
   //
   // The engine's symmetric two-body loop reads only canonical positions
   // (p<=q, r<=s, (p,q)<=(r,s) lexicographically), so every stored entry
-  // is reduced to its canonical representative here.  This makes the
-  // result independent of which symmetry-related permutation(s) a
-  // container chose to store — unique representatives, partially
-  // redundant storage (e.g. both (ii|jj) and (jj|ii) as the PPP builder
-  // emits), or a fully expanded tensor all map to the same operator.
-  //
-  // When several stored permutations fall into the same symmetry class,
-  // the value at the exact canonical position wins (this is the position
-  // a dense materialization of the container would expose to the
-  // engine's symmetric loop); among non-canonical partners, the smallest
-  // flattened position wins, so the outcome never depends on input order.
-  using Key4 = std::array<std::size_t, 4>;
-  auto canonical = [](Key4 k) {
-    if (k[0] > k[1]) std::swap(k[0], k[1]);
-    if (k[2] > k[3]) std::swap(k[2], k[3]);
-    if (k[0] > k[2] || (k[0] == k[2] && k[1] > k[3])) {
-      std::swap(k[0], k[2]);
-      std::swap(k[1], k[3]);
-    }
-    return k;
-  };
+  // is reduced to its canonical representative here and then expanded
+  // over its whole permutation class.  See the header for which storage
+  // layouts that expansion can reproduce.
+  using Key4 = detail::TwoBodyKey;
 
-  std::map<Key4, double> canon;
-  struct Partner {
-    std::uint64_t position;
-    double value;
-  };
-  std::map<Key4, Partner> partners;
+  // Iterating in key order sees the canonical member of a class first when it
+  // was stored, and otherwise the smallest stored position, so the chosen
+  // representative never depends on the caller's entry order.
+  std::map<Key4, double> stored;
+  double scale = 0.0;
   for (std::size_t e = 0; e < num_entries; ++e) {
     // Validate before the int -> size_t cast: a negative index would wrap
     // to a huge value and read out of bounds downstream (e.g. in sym_map).
@@ -1014,7 +1037,6 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
                  static_cast<std::size_t>(two_body_indices[4 * e + 1]),
                  static_cast<std::size_t>(two_body_indices[4 * e + 2]),
                  static_cast<std::size_t>(two_body_indices[4 * e + 3])};
-    const Key4 c = canonical(k);
     const double v = two_body_values[e];
     // Duplicate entries for the same position are tolerated only when they
     // agree exactly (bitwise): duplicates can only originate from a caller
@@ -1022,39 +1044,60 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
     // contract.  A tolerance would silently keep one of two genuinely
     // different values — and which one would depend on input order, the
     // very non-determinism this path is designed to exclude.
-    auto reject_conflict = [&](double existing) {
-      if (existing != v) {
-        throw std::invalid_argument(
-            "majorana_map_hamiltonian_sparse: conflicting duplicate values "
-            "for two-body entry (" +
-            std::to_string(k[0]) + ", " + std::to_string(k[1]) + ", " +
-            std::to_string(k[2]) + ", " + std::to_string(k[3]) + ").");
-      }
-    };
-    if (k == c) {
-      auto [it, inserted] = canon.try_emplace(c, v);
-      if (!inserted) reject_conflict(it->second);
-    } else {
-      const std::uint64_t position = provider.key(k[0], k[1], k[2], k[3]);
-      auto [it, inserted] = partners.try_emplace(c, Partner{position, v});
-      if (!inserted) {
-        if (position == it->second.position) {
-          reject_conflict(it->second.value);
-        } else if (position < it->second.position) {
-          it->second = {position, v};
-        }
-      }
+    auto [it, inserted] = stored.try_emplace(k, v);
+    if (!inserted && it->second != v) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian_sparse: conflicting duplicate values "
+          "for two-body entry (" +
+          std::to_string(k[0]) + ", " + std::to_string(k[1]) + ", " +
+          std::to_string(k[2]) + ", " + std::to_string(k[3]) + ").");
     }
+    scale = std::max(scale, std::abs(v));
   }
-  for (const auto& [c, partner] : partners) {
-    canon.emplace(c, partner.value);  // no-op if the canonical position won
+
+  const double tolerance = detail::two_body_symmetry_tolerance * scale;
+  struct SymmetryClass {
+    double value;
+    std::size_t stored_positions;
+  };
+  std::map<Key4, SymmetryClass> classes;
+  for (const auto& [k, v] : stored) {
+    const Key4 c = detail::eightfold_canonical(k);
+    auto [it, inserted] = classes.try_emplace(c, SymmetryClass{v, 1});
+    if (inserted) continue;
+    if (std::abs(it->second.value - v) > tolerance) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian_sparse: two-body entry (" +
+          std::to_string(k[0]) + ", " + std::to_string(k[1]) + ", " +
+          std::to_string(k[2]) + ", " + std::to_string(k[3]) +
+          ") breaks 8-fold permutation symmetry; the sparse path keeps one "
+          "representative per permutation class, so reduced-symmetry tensors "
+          "must use dense storage.");
+    }
+    ++it->second.stored_positions;
+  }
+  for (const auto& [c, symmetry_class] : classes) {
+    const std::size_t members = detail::eightfold_class_size(c);
+    if (symmetry_class.stored_positions != 1 &&
+        symmetry_class.stored_positions != members) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian_sparse: the permutation class of (" +
+          std::to_string(c[0]) + ", " + std::to_string(c[1]) + ", " +
+          std::to_string(c[2]) + ", " + std::to_string(c[3]) + ") has " +
+          std::to_string(members) + " members but only " +
+          std::to_string(symmetry_class.stored_positions) +
+          " are stored; the sparse path symmetry-expands one representative, "
+          "which would overwrite the zeros implied at the missing positions. "
+          "Store one representative or the whole class, or use dense storage "
+          "for a reduced-symmetry tensor.");
+    }
   }
 
   // Canonical entries in lexicographic (std::map) order, so the two-body
   // accumulation order is deterministic for any input ordering.
-  provider.entries_.reserve(canon.size());
-  for (const auto& [c, v] : canon) {
-    provider.entries_.push_back({c[0], c[1], c[2], c[3], v});
+  provider.entries_.reserve(classes.size());
+  for (const auto& [c, symmetry_class] : classes) {
+    provider.entries_.push_back({c[0], c[1], c[2], c[3], symmetry_class.value});
   }
 
   // Symmetry-expand into the position -> value map (all 8 index
@@ -1064,8 +1107,9 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
   // position; within one class, repeated indices (p==q and/or r==s) make
   // some permutations coincide, which is benign because every write of a
   // class carries the same value.
-  provider.map_.reserve(canon.size() * 8);
-  for (const auto& [c, v] : canon) {
+  provider.map_.reserve(classes.size() * 8);
+  for (const auto& [c, symmetry_class] : classes) {
+    const double v = symmetry_class.value;
     const std::size_t pq[2][2] = {{c[0], c[1]}, {c[1], c[0]}};
     const std::size_t rs[2][2] = {{c[2], c[3]}, {c[3], c[2]}};
     for (auto& a : pq) {

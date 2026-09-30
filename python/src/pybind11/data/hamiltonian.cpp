@@ -538,6 +538,12 @@ Args:
     filename (str): Path to FCIDUMP file to create/overwrite
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
+
+Raises:
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
+        readers reconstruct.
+    ValueError: If the active space has differing alpha and beta sizes.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -761,6 +767,12 @@ Args:
     filename (str): Path to FCIDUMP file to create/overwrite
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
+
+Raises:
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
+        readers reconstruct.
+    ValueError: If the active space has differing alpha and beta sizes.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -982,6 +994,11 @@ Args:
     filename (str): Path to the output file.
     nalpha (int): Number of alpha electrons.
     nbeta (int): Number of beta electrons.
+
+Raises:
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or a
+        two-body permutation class is stored partially or with disagreeing
+        values, which FCIDUMP readers would expand into contradictory records.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -1551,7 +1568,10 @@ Args:
     nbeta (int): Number of beta electrons
 
 Raises:
-    RuntimeError: If I/O error occurs
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
+        readers reconstruct.
+    ValueError: If the active space has differing alpha and beta sizes.
 
 Examples:
     >>> hamiltonian.to_fcidump_file("water.fcidump", 5, 5)
