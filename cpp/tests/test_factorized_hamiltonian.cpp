@@ -46,8 +46,8 @@ class FactorizedHamiltonianTest : public ::testing::Test {
     std::filesystem::remove("test_factorized.hamiltonian.h5");
   }
 
-  std::unique_ptr<FactorizedHamiltonianContainer> make_container() const {
-    return std::make_unique<FactorizedHamiltonianContainer>(
+  std::unique_ptr<DFTHCHamiltonianContainer> make_container() const {
+    return std::make_unique<DFTHCHamiltonianContainer>(
         one_body, u, w, wb, orbitals, core_energy, inactive_fock);
   }
 
@@ -118,6 +118,81 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_NEAR(container->get_lambda(), 2.0800000000000001, 1e-12);
 }
 
+TEST_F(FactorizedHamiltonianTest, OrdinaryDFConstructorMatchesGeneral) {
+  Eigen::VectorXd u_df(2 * N * N);
+  u_df << 0.8, 0.6, -0.6, 0.8, 1.0, 0.0, 0.0, 1.0;
+  Eigen::VectorXd w_df(2 * N);
+  w_df << 0.5, -0.3, 0.25, 0.6;
+  const Eigen::MatrixXd wb_zero = Eigen::MatrixXd::Zero(2, 1);
+  inactive_fock = 0.5 * Eigen::MatrixXd::Identity(N, N);
+
+  DFTHCHamiltonianContainer ordinary(one_body, u_df, w_df, orbitals,
+                                     core_energy, inactive_fock,
+                                     HamiltonianType::NonHermitian);
+  DFTHCHamiltonianContainer general(one_body, u_df, w_df, wb_zero, orbitals,
+                                    core_energy, inactive_fock,
+                                    HamiltonianType::NonHermitian);
+
+  EXPECT_EQ(ordinary.get_num_orbitals(), N);
+  EXPECT_EQ(ordinary.get_num_ranks(), 2);
+  EXPECT_EQ(ordinary.get_num_bases(), N);
+  EXPECT_EQ(ordinary.get_num_copies(), 1);
+  EXPECT_TRUE(ordinary.get_u_matrices().isApprox(u_df));
+  EXPECT_TRUE(ordinary.get_w_matrices().isApprox(w_df));
+  EXPECT_TRUE(ordinary.get_wb_matrix().isZero());
+  EXPECT_TRUE(
+      std::get<0>(ordinary.get_one_body_integrals()).isApprox(one_body));
+  EXPECT_TRUE(
+      ordinary.get_inactive_fock_matrix().first.isApprox(inactive_fock));
+  EXPECT_EQ(ordinary.get_orbitals(), orbitals);
+  EXPECT_DOUBLE_EQ(ordinary.get_core_energy(), core_energy);
+  EXPECT_EQ(ordinary.get_type(), HamiltonianType::NonHermitian);
+  EXPECT_TRUE(ordinary.reconstruct_two_body_integrals().isApprox(
+      general.reconstruct_two_body_integrals()));
+  EXPECT_TRUE(ordinary.get_h1_prime().isApprox(general.get_h1_prime()));
+  EXPECT_DOUBLE_EQ(ordinary.get_lambda(), general.get_lambda());
+  EXPECT_EQ(ordinary.to_json(), general.to_json());
+  EXPECT_EQ(Hamiltonian(ordinary.clone()).content_hash(),
+            Hamiltonian(general.clone()).content_hash());
+}
+
+TEST_F(FactorizedHamiltonianTest, OrdinaryDFConstructorRejectsInvalidShapes) {
+  for (Eigen::Index length : {0, 3, 6}) {
+    EXPECT_THROW(
+        DFTHCHamiltonianContainer(one_body, Eigen::VectorXd::Zero(length), w,
+                                  orbitals, core_energy, inactive_fock),
+        std::invalid_argument);
+  }
+  for (Eigen::Index length : {0, 1, 3}) {
+    EXPECT_THROW(
+        DFTHCHamiltonianContainer(one_body, u, Eigen::VectorXd::Zero(length),
+                                  orbitals, core_energy, inactive_fock),
+        std::invalid_argument);
+  }
+  EXPECT_THROW(DFTHCHamiltonianContainer(Eigen::MatrixXd(0, 0), u, w, orbitals,
+                                         core_energy, inactive_fock),
+               std::invalid_argument);
+  EXPECT_THROW(DFTHCHamiltonianContainer(Eigen::MatrixXd::Zero(2, 3), u, w,
+                                         orbitals, core_energy, inactive_fock),
+               std::invalid_argument);
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, u, w,
+                                         std::make_shared<ModelOrbitals>(N + 1),
+                                         core_energy, inactive_fock),
+               std::invalid_argument);
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, 2.0 * u, w, orbitals,
+                                         core_energy, inactive_fock),
+               std::invalid_argument);
+
+  Eigen::VectorXd u_shared(3 * N);
+  u_shared << 0.8, 0.6, -0.6, 0.8, 1.0, 0.0;
+  const Eigen::VectorXd w_shared = Eigen::VectorXd::Ones(3);
+  EXPECT_NO_THROW(DFTHCHamiltonianContainer(
+      one_body, u_shared, w_shared, wb, orbitals, core_energy, inactive_fock));
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, u_shared, w_shared, orbitals,
+                                         core_energy, inactive_fock),
+               std::invalid_argument);
+}
+
 TEST_F(FactorizedHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
   // The fixture is R=1, C=1, where every stride into the flattened [R,B,N] and
   // [R,B,C] buffers collapses onto the same offset, so an indexing mistake
@@ -135,9 +210,8 @@ TEST_F(FactorizedHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
   Eigen::MatrixXd wb_multi(ranks, copies);
   wb_multi << 0.2, -0.1, 0.05, 0.3;
 
-  FactorizedHamiltonianContainer container(one_body, u_multi, w_multi, wb_multi,
-                                           orbitals, core_energy,
-                                           inactive_fock);
+  DFTHCHamiltonianContainer container(one_body, u_multi, w_multi, wb_multi,
+                                      orbitals, core_energy, inactive_fock);
 
   ASSERT_EQ(container.get_num_ranks(), ranks);
   ASSERT_EQ(container.get_num_bases(), bases);
@@ -219,9 +293,8 @@ TEST_F(FactorizedHamiltonianTest, ElementAgreesWithTheCachedTensor) {
   Eigen::MatrixXd wb_multi(ranks, copies);
   wb_multi << 0.2, -0.1, 0.05, 0.3;
 
-  FactorizedHamiltonianContainer container(one_body, u_multi, w_multi, wb_multi,
-                                           orbitals, core_energy,
-                                           inactive_fock);
+  DFTHCHamiltonianContainer container(one_body, u_multi, w_multi, wb_multi,
+                                      orbitals, core_energy, inactive_fock);
 
   const size_t total = N * N * N * N;
   Eigen::VectorXd cold(static_cast<Eigen::Index>(total));
@@ -271,10 +344,9 @@ TEST_F(FactorizedHamiltonianTest, RejectsAnUnnormalizedBasisRow) {
   // notice the difference, so construction has to reject it.
   Eigen::VectorXd u_scaled = u;
   u_scaled *= 2.0;
-  EXPECT_THROW(
-      FactorizedHamiltonianContainer(one_body, u_scaled, w, wb, orbitals,
-                                     core_energy, inactive_fock),
-      std::invalid_argument);
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, u_scaled, w, wb, orbitals,
+                                         core_energy, inactive_fock),
+               std::invalid_argument);
 }
 
 TEST_F(FactorizedHamiltonianTest, RejectsNonFiniteFactorEntries) {
@@ -284,27 +356,27 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonFiniteFactorEntries) {
 
   Eigen::VectorXd u_nan = u;
   u_nan(0) = nan;
-  EXPECT_THROW(FactorizedHamiltonianContainer(one_body, u_nan, w, wb, orbitals,
-                                              core_energy, inactive_fock),
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, u_nan, w, wb, orbitals,
+                                         core_energy, inactive_fock),
                std::invalid_argument);
 
   // A NaN in W or wB never reaches the normalization check at all.
   Eigen::VectorXd w_nan = w;
   w_nan(0) = nan;
-  EXPECT_THROW(FactorizedHamiltonianContainer(one_body, u, w_nan, wb, orbitals,
-                                              core_energy, inactive_fock),
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, u, w_nan, wb, orbitals,
+                                         core_energy, inactive_fock),
                std::invalid_argument);
 
   Eigen::MatrixXd wb_nan = wb;
   wb_nan(0, 0) = nan;
-  EXPECT_THROW(FactorizedHamiltonianContainer(one_body, u, w, wb_nan, orbitals,
-                                              core_energy, inactive_fock),
+  EXPECT_THROW(DFTHCHamiltonianContainer(one_body, u, w, wb_nan, orbitals,
+                                         core_energy, inactive_fock),
                std::invalid_argument);
 
   // The fixture itself is finite, so the new guard cannot be what makes the
   // cases above throw.
-  EXPECT_NO_THROW(FactorizedHamiltonianContainer(one_body, u, w, wb, orbitals,
-                                                 core_energy, inactive_fock));
+  EXPECT_NO_THROW(DFTHCHamiltonianContainer(one_body, u, w, wb, orbitals,
+                                            core_energy, inactive_fock));
 }
 
 TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
@@ -317,8 +389,8 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
   for (double wb_value : wb_values) {
     Eigen::MatrixXd wb_alt(R, C);
     wb_alt(0, 0) = wb_value;
-    FactorizedHamiltonianContainer shifted(one_body, u, w, wb_alt, orbitals,
-                                           core_energy, inactive_fock);
+    DFTHCHamiltonianContainer shifted(one_body, u, w, wb_alt, orbitals,
+                                      core_energy, inactive_fock);
 
     const Eigen::VectorXd h2_alt = shifted.reconstruct_two_body_integrals();
     ASSERT_EQ(h2_alt.size(), h2_ref.size());
@@ -351,8 +423,8 @@ TEST_F(FactorizedHamiltonianTest, H1PrimeMatchesClosedForm) {
     Eigen::MatrixXd wb_alt(R, C);
     wb_alt(0, 0) = wb_value;
 
-    FactorizedHamiltonianContainer container(one_body, u, w, wb_alt, orbitals,
-                                             core_energy, inactive_fock);
+    DFTHCHamiltonianContainer container(one_body, u, w, wb_alt, orbitals,
+                                        core_energy, inactive_fock);
 
     Eigen::MatrixXd expected = one_body;
     expected -= 0.5 * (m * m);
@@ -375,8 +447,8 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
   from_upper(1, 0) = asymmetric(0, 1);
 
   auto lambda_of = [&](const Eigen::MatrixXd& h1) {
-    return FactorizedHamiltonianContainer(h1, u, w, wb, orbitals, core_energy,
-                                          inactive_fock)
+    return DFTHCHamiltonianContainer(h1, u, w, wb, orbitals, core_energy,
+                                     inactive_fock)
         .get_lambda();
   };
 
@@ -384,8 +456,8 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
       << "the two triangles must disagree, otherwise this input cannot "
          "demonstrate the ambiguity the guard exists to reject";
 
-  FactorizedHamiltonianContainer container(asymmetric, u, w, wb, orbitals,
-                                           core_energy, inactive_fock);
+  DFTHCHamiltonianContainer container(asymmetric, u, w, wb, orbitals,
+                                      core_energy, inactive_fock);
   EXPECT_THROW(container.get_lambda(), std::runtime_error);
 }
 
@@ -395,10 +467,10 @@ TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
   auto h2 = Hamiltonian::from_json(j);
 
   EXPECT_EQ(h2->get_container_type(), "factorized");
-  EXPECT_TRUE(h2->has_container_type<FactorizedHamiltonianContainer>());
+  EXPECT_TRUE(h2->has_container_type<DFTHCHamiltonianContainer>());
   EXPECT_EQ(h2->get_core_energy(), core_energy);
   EXPECT_TRUE(
-      h2->get_container<FactorizedHamiltonianContainer>()
+      h2->get_container<DFTHCHamiltonianContainer>()
           .reconstruct_two_body_integrals()
           .isApprox(make_container()->reconstruct_two_body_integrals()));
 
@@ -412,17 +484,17 @@ TEST_F(FactorizedHamiltonianTest, RejectsInconsistentSerializedShape) {
 
   auto wrong_ranks = serialized;
   wrong_ranks["num_ranks"] = R + 1;
-  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(wrong_ranks),
+  EXPECT_THROW(DFTHCHamiltonianContainer::from_json(wrong_ranks),
                std::invalid_argument);
 
   auto wrong_bases = serialized;
   wrong_bases["num_bases"] = B + 1;
-  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(wrong_bases),
+  EXPECT_THROW(DFTHCHamiltonianContainer::from_json(wrong_bases),
                std::invalid_argument);
 
   auto wrong_copies = serialized;
   wrong_copies["num_copies"] = C + 1;
-  EXPECT_THROW(FactorizedHamiltonianContainer::from_json(wrong_copies),
+  EXPECT_THROW(DFTHCHamiltonianContainer::from_json(wrong_copies),
                std::invalid_argument);
 }
 
@@ -436,10 +508,10 @@ TEST_F(FactorizedHamiltonianTest, HDF5FileRoundTripViaHamiltonian) {
   auto h2 = Hamiltonian::from_hdf5_file(filename);
 
   EXPECT_EQ(h2->get_container_type(), "factorized");
-  EXPECT_TRUE(h2->has_container_type<FactorizedHamiltonianContainer>());
+  EXPECT_TRUE(h2->has_container_type<DFTHCHamiltonianContainer>());
   EXPECT_DOUBLE_EQ(h2->get_core_energy(), core_energy);
 
-  auto& fc = h2->get_container<FactorizedHamiltonianContainer>();
+  auto& fc = h2->get_container<DFTHCHamiltonianContainer>();
   EXPECT_EQ(fc.get_num_ranks(), R);
   EXPECT_EQ(fc.get_num_bases(), B);
   EXPECT_EQ(fc.get_num_copies(), C);
