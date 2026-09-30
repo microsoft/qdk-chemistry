@@ -33,6 +33,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     import Std.Math.AbsD;
     import Std.Math.MaxI;
+    import Std.Math.MinI;
     import Std.Math.PI;
     import Std.Math.Round;
     import Std.Measurement.MeasureEachZ;
@@ -44,6 +45,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
+    import QDKChemistry.Utils.SelectSwap.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwap.DirtyQROAMBorrowedQubits, QDKChemistry.Utils.SelectSwap.SelectSwapDirty;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -60,6 +62,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         OneBodyRotationAngles : Double[][],
         TwoBodyRotationAngles : Double[][],
         rotationBitPrecision : Int,
+        /// Number of Givens angles held in the rotation register at once (the paper's lambda).
+        /// Zero, or any value at or above `N - 1`, keeps the whole angle word resident, which is
+        /// the fastest setting and the historical behaviour. Smaller values stream the angles in
+        /// batches, trading Toffolis for a rotation register of `rotationBatchSize * b_rot`
+        /// qubits instead of `(N - 1) * b_rot`.
+        /// :cite:`Low2026` Appendix E 3.
+        rotationBatchSize : Int,
+        /// Whether a streamed batch borrows wavefunction qubits for a select-swap network
+        /// rather than loading the batch with a plain unary-iteration `Select`.
+        /// Only consulted when the angles are actually streamed; a resident angle word is
+        /// already wide enough that no swap network fits.
+        useDirtyQROAM : Bool,
         /// Number of free-rider bits at the end of innerReg loaded by inner PREPARE QROM.
         /// Must be at least 2.
         /// Layout: [sf_vs_dq(1), d_vs_q(1), r_bits(⌈log₂ R⌉)].
@@ -122,6 +136,19 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numRotAngles : Int,
         bRot : Int,
     ) : Bool[][] {
+        BuildDQRotationBatch(params, N, 0, numRotAngles - 1, bRot)
+    }
+
+    /// Angles `first..last` of the DQ table, quantized and concatenated low-index first.
+    ///
+    /// `BuildDQBulkRotationData` is the whole-range case; a streamed batch asks for a window.
+    internal function BuildDQRotationBatch(
+        params : SelectParams,
+        N : Int,
+        first : Int,
+        last : Int,
+        bRot : Int,
+    ) : Bool[][] {
         MappedOverRange(
             xo -> Flattened(
                 MappedOverRange(
@@ -136,7 +163,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                         ),
                         bRot
                     ),
-                    0..numRotAngles - 1
+                    first..last
                 )
             ),
             0..N - 1
@@ -194,6 +221,66 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             set table += [angleBits + [b == params.numBases]];
         }
         return table;
+    }
+
+    /// Angles `first..last` of the SF table, without the trailing `bEqB` flag.
+    ///
+    /// The bulk table carries that flag for free, because unary iteration costs the same at any
+    /// output width. A streamed batch is loaded once per batch, so the flag is set arithmetically
+    /// by the caller instead of being paid for on every batch.
+    internal function BuildSFRotationBatch(
+        params : SelectParams,
+        R : Int,
+        first : Int,
+        last : Int,
+        bRot : Int,
+        bBits : Int,
+        rankBits : Int,
+        rankFirst : Bool,
+    ) : Bool[][] {
+        let bSlots = 1 <<< bBits;
+        let rSlots = 1 <<< rankBits;
+        let tableSize = if rankFirst { (params.numBases + 1) * rSlots } else { R * bSlots };
+
+        mutable table : Bool[][] = [];
+        for idx in 0..tableSize - 1 {
+            let b = if rankFirst { idx / rSlots } else { idx % bSlots };
+            let r = if rankFirst { idx % rSlots } else { idx / bSlots };
+            let angleIdx = b * params.numRanks + r;
+
+            set table += [
+                Flattened(
+                    MappedOverRange(
+                        j -> IntAsBoolArray(
+                            QuantizeGivensAngle(
+                                if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
+                                    params.TwoBodyRotationAngles[angleIdx][j]
+                                } else {
+                                    0.0
+                                },
+                                bRot
+                            ),
+                            bRot
+                        ),
+                        first..last
+                    )
+                )
+            ];
+        }
+        return table;
+    }
+
+    /// Number of Givens angles a single streamed batch holds, clamped to the sane range.
+    ///
+    /// Returns `numRotAngles` — a single resident batch, the historical behaviour — for the
+    /// zero/negative/oversized settings.
+    internal function RotationBatchSize(params : SelectParams, numRotAngles : Int) : Int {
+        let requested = params.rotationBatchSize;
+        if requested <= 0 or requested >= numRotAngles {
+            numRotAngles
+        } else {
+            requested
+        }
     }
 
     /// One-bit sign table for the inner PREPARE, addressed by `bReg + outerReg`.
@@ -316,6 +403,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     bReg,
                     rBits,
                     sysRegDown,
+                    sysRegUp,
                     phaseGradientReg,
                     bEqBQubit,
                     majoranaStep
@@ -532,20 +620,41 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Loads the branch-selected Givens angle word; the adjoint erases it by measurement.
     /// Both tables write the same `target` and measuring consumes it, so the adjoint measures once
     /// and repairs each branch's phase; letting `within` uncompute instead costs a second lookup.
+    ///
+    /// `dirty` plus the two swap widths select the forward loader, per table: at width 0 a branch
+    /// is a plain unary-iteration `Select`, and above that it is a `SelectSwapDirty` that borrows
+    /// `dirty` for its swap network and hands it back. The widths are separate because the two
+    /// tables differ in row count, often by an order of magnitude, so one shared width would hold
+    /// the larger table to the smaller one's optimum.
+    ///
+    /// Either way the loaded state is identical to the plain load, which is why the
+    /// measurement-based adjoint below is shared unchanged.
     internal operation ControlledSelectWithUnlookup(
         sfData : Bool[][],
         sfAddress : Qubit[],
         dqData : Bool[][],
         dqAddress : Qubit[],
         isSF : Qubit,
+        dirty : Qubit[],
+        sfSwapBits : Int,
+        dqSwapBits : Int,
         target : Qubit[],
     ) : Unit is Adj {
         body (...) {
             // `Select` tolerates a table length that is not a power of two -- it never reads an
             // address at or above `Length(data)` -- so both tables are used as built.
-            Controlled Select([isSF], (sfData, sfAddress, target));
+            if sfSwapBits == 0 {
+                Controlled Select([isSF], (sfData, sfAddress, target));
+            } else {
+                Controlled SelectSwapDirty([isSF], (sfSwapBits, sfData, sfAddress, dirty, target));
+            }
+            let dqTarget = target[0..Length(dqData[0]) - 1];
             within { X(isSF); } apply {
-                Controlled Select([isSF], (dqData, dqAddress, target[0..Length(dqData[0]) - 1]));
+                if dqSwapBits == 0 {
+                    Controlled Select([isSF], (dqData, dqAddress, dqTarget));
+                } else {
+                    Controlled SelectSwapDirty([isSF], (dqSwapBits, dqData, dqAddress, dirty, dqTarget));
+                }
             }
         }
         adjoint (...) {
@@ -589,6 +698,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         bReg : Qubit[],
         rBits : Qubit[],
         sysRegDown : Qubit[],
+        sysRegUp : Qubit[],
         phaseGradientReg : Qubit[],
         bEqBQubit : Qubit,
         action : (Unit => Unit is Adj + Ctl),
@@ -596,51 +706,155 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let bRot = params.rotationBitPrecision;
         let bBits = Length(bReg);
         let R = params.numRanks;
-        let nRotBits = numRotAngles * bRot;
         let nDQBits = MaxI(1, AddressQubits(N));
-
-        // DQ table: N entries × (N-1)*bRot bits, addressed by xoReg[0..nDQBits-1]
-        let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
+        let dqAddress = xoReg[0..nDQBits - 1];
 
         // SF table: addressed by (bReg ++ rBits) or (rBits ++ bReg), whichever is smaller.
         let rankFirst = SFTableRankAddressedFirst(R, params.numBases, bBits, Length(rBits));
-        let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits, Length(rBits), rankFirst);
         let sfAddress = if rankFirst { rBits + bReg } else { bReg + rBits };
 
-        // Allocate rotation target register: (N-1)*bRot rotation bits + 1 bEqB flag bit.
-        use rotTarget = Qubit[nRotBits + 1];
+        let batch = RotationBatchSize(params, numRotAngles);
 
+        if batch >= numRotAngles {
+            let nRotBits = numRotAngles * bRot;
+            let dqData = BuildDQBulkRotationData(params, N, numRotAngles, bRot);
+            let sfData = BuildSFBulkRotationData(params, R, numRotAngles, bRot, bBits, Length(rBits), rankFirst);
+
+            // Allocate rotation target register: (N-1)*bRot rotation bits + 1 bEqB flag bit.
+            use rotTarget = Qubit[nRotBits + 1];
+
+            within {
+                ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, [], 0, 0, rotTarget);
+            } apply {
+                within {
+                    CNOT(rotTarget[nRotBits], bEqBQubit);
+                    ApplyGivensRotationWords(rotTarget, 0, numRotAngles - 1, bRot, sysRegDown, phaseGradientReg);
+                } apply {
+                    action();
+                }
+            }
+        } else {
+            let numBatches = (numRotAngles + batch - 1) / batch;
+            within {
+                // The bEqB flag rides the bulk table for free, but a streamed table would pay for
+                // it once per batch, so it is computed directly from b and isSF instead.
+                ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
+
+                // Descending batch order keeps the global angle order of the resident path: the
+                // rotation chain must run from the highest index down to zero.
+                for t in numBatches - 1..-1..0 {
+                    let first = t * batch;
+                    let last = MinI(first + batch, numRotAngles) - 1;
+                    ApplyGivensRotationBatch(
+                        params,
+                        N,
+                        R,
+                        first,
+                        last,
+                        bRot,
+                        bBits,
+                        rankFirst,
+                        isSF,
+                        dqAddress,
+                        sfAddress,
+                        sysRegDown,
+                        sysRegUp,
+                        phaseGradientReg
+                    );
+                }
+            } apply {
+                action();
+            }
+        }
+    }
+
+    /// Applies the neighbour-gated Givens rotations for angles `first..last`, reading the angle
+    /// words out of `rotTarget` (which holds exactly that window, low index first).
+    internal operation ApplyGivensRotationWords(
+        rotTarget : Qubit[],
+        first : Int,
+        last : Int,
+        bRot : Int,
+        sysRegDown : Qubit[],
+        phaseGradientReg : Qubit[],
+    ) : Unit is Adj + Ctl {
+        for j in last..-1..first {
+            let word = rotTarget[(j - first) * bRot..(j - first + 1) * bRot - 1];
+            within {
+                CNOT(sysRegDown[j], sysRegDown[j + 1]);
+            } apply {
+                // :cite:`Low2026` FIG. 40. Implementation of a controlled RZ(2θ)
+                // gate using two parallel RZ(θ) gates without controls.
+                within {
+                    CNOT(sysRegDown[j + 1], sysRegDown[j]);
+                } apply {
+                    Adjoint RyViaPhaseGradient(sysRegDown[j], word, phaseGradientReg);
+                }
+                RyViaPhaseGradient(sysRegDown[j], word, phaseGradientReg);
+            }
+        }
+    }
+
+    /// Loads one streamed window of Givens angles, applies its rotations, and releases the word.
+    ///
+    /// The rotations survive the release because they act on `sysRegDown`, so only
+    /// `(last - first + 1) * bRot` angle qubits are ever resident instead of `(N - 1) * bRot`.
+    /// The cost is that the window has to be looked up again on the way out, which `within`
+    /// arranges when the caller's conjugation is inverted.
+    ///
+    /// Qubits lent to the swap network are the spin-up half of the wavefunction plus the part of
+    /// the spin-down half this window does not rotate — live data that `SelectSwapDirty` restores
+    /// exactly. :cite:`Low2026` Appendix E 3 notes these registers as the dirty-ancilla source.
+    internal operation ApplyGivensRotationBatch(
+        params : SelectParams,
+        N : Int,
+        R : Int,
+        first : Int,
+        last : Int,
+        bRot : Int,
+        bBits : Int,
+        rankFirst : Bool,
+        isSF : Qubit,
+        dqAddress : Qubit[],
+        sfAddress : Qubit[],
+        sysRegDown : Qubit[],
+        sysRegUp : Qubit[],
+        phaseGradientReg : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let width = last - first + 1;
+        let m = width * bRot;
+        let dqData = BuildDQRotationBatch(params, N, first, last, bRot);
+        let sfData = BuildSFRotationBatch(params, R, first, last, bRot, bBits, Length(sfAddress) - bBits, rankFirst);
+
+        // Angles first..last rotate sysRegDown[first..last+1]; everything else may be borrowed.
+        let untouched = sysRegDown[0..first - 1] + sysRegDown[last + 2..N - 1];
+        let dirty = sysRegUp + untouched;
+        let sfSwapBits = if params.useDirtyQROAM {
+            ComputeOptimalDirtySwapBits(Length(sfData), m, Length(dirty))
+        } else {
+            0
+        };
+        let dqSwapBits = if params.useDirtyQROAM {
+            ComputeOptimalDirtySwapBits(Length(dqData), m, Length(dirty))
+        } else {
+            0
+        };
+
+        use rotTarget = Qubit[m];
         within {
             ControlledSelectWithUnlookup(
                 sfData,
                 sfAddress,
                 dqData,
-                xoReg[0..nDQBits - 1],
+                dqAddress,
                 isSF,
+                dirty,
+                sfSwapBits,
+                dqSwapBits,
                 rotTarget
             );
         } apply {
-            within {
-                CNOT(rotTarget[nRotBits], bEqBQubit);
-
-                for j in numRotAngles - 1..-1..0 {
-                    let word = rotTarget[j * bRot..(j + 1) * bRot - 1];
-                    within {
-                        CNOT(sysRegDown[j], sysRegDown[j + 1]);
-                    } apply {
-                        // :cite:`Low2026` FIG. 40. Implementation of a controlled RZ(2θ)
-                        // gate using two parallel RZ(θ) gates without controls.
-                        within {
-                            CNOT(sysRegDown[j + 1], sysRegDown[j]);
-                        } apply {
-                            Adjoint RyViaPhaseGradient(sysRegDown[j], word, phaseGradientReg);
-                        }
-                        RyViaPhaseGradient(sysRegDown[j], word, phaseGradientReg);
-                    }
-                }
-            } apply {
-                action();
-            }
+            ApplyGivensRotationWords(rotTarget, first, last, bRot, sysRegDown, phaseGradientReg);
         }
     }
 
@@ -988,25 +1202,58 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// what a fixup table that disagreed with the forward load would produce. Tables whose row
     /// count is not a power of two are the case worth covering: `Select` aliases the surplus
     /// addresses onto real rows instead of leaving them unloaded.
+    ///
+    /// The borrowed register is conjugated along with the addresses, so a dirty forward pass that
+    /// returned it in a different state -- or merely entangled with the angle word -- fails here
+    /// too. Swap width 0 runs the plain loader for that branch.
     operation TestBranchedRotationWordRoundTrip(
         sfData : Bool[][],
         dqData : Bool[][],
         numSFAddressQubits : Int,
         numDQAddressQubits : Int,
+        sfSwapBits : Int,
+        dqSwapBits : Int,
     ) : Bool {
         use isSF = Qubit();
         use sfAddress = Qubit[numSFAddressQubits];
         use dqAddress = Qubit[numDQAddressQubits];
         use target = Qubit[Length(sfData[0])];
+        use dirty = Qubit[
+            MaxI(
+                if sfSwapBits == 0 { 0 } else { DirtyQROAMBorrowedQubits(sfSwapBits, Length(sfData[0])) },
+                if dqSwapBits == 0 { 0 } else { DirtyQROAMBorrowedQubits(dqSwapBits, Length(dqData[0])) }
+            )
+        ];
         let addressReg = [isSF] + sfAddress + dqAddress;
+        let conjugated = addressReg + dirty;
 
-        ApplyToEachCA(H, addressReg);
-        ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, target);
-        Adjoint ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, target);
-        ApplyToEachCA(H, addressReg);
+        ApplyToEachCA(H, conjugated);
+        ControlledSelectWithUnlookup(
+            sfData,
+            sfAddress,
+            dqData,
+            dqAddress,
+            isSF,
+            dirty,
+            sfSwapBits,
+            dqSwapBits,
+            target
+        );
+        Adjoint ControlledSelectWithUnlookup(
+            sfData,
+            sfAddress,
+            dqData,
+            dqAddress,
+            isSF,
+            dirty,
+            sfSwapBits,
+            dqSwapBits,
+            target
+        );
+        ApplyToEachCA(H, conjugated);
 
-        let results = MeasureEachZ(addressReg + target);
-        ResetAll(addressReg + target);
+        let results = MeasureEachZ(conjugated + target);
+        ResetAll(conjugated + target);
         All(result -> result == Zero, results)
     }
 

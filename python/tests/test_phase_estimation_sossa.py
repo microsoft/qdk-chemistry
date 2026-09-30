@@ -305,8 +305,14 @@ def _sossa_circuit_mapper_ref(
     select_algorithm: str = "direct",
     coefficient_bit_precision: int = 10,
     rotation_bit_precision: int = 10,
+    **settings,
 ) -> AlgorithmRef:
-    """Return an AlgorithmRef for the SOSSA circuit mapper."""
+    """Return an AlgorithmRef for the SOSSA circuit mapper.
+
+    Extra keyword arguments are passed through to the mapper's settings, so a caller can
+    vary one knob -- ``rotation_batch_size``, say -- without this helper having to know
+    about it.
+    """
     return AlgorithmRef(
         "circuit_mapper",
         "sossa",
@@ -315,6 +321,7 @@ def _sossa_circuit_mapper_ref(
         select_algorithm=select_algorithm,
         coefficient_bit_precision=coefficient_bit_precision,
         rotation_bit_precision=rotation_bit_precision,
+        **settings,
     )
 
 
@@ -735,8 +742,16 @@ class TestSOSSAQPEScope:
 class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
-    def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
+    # Widest rotation batch that still reaches the floor the peak width can be pushed to.
+    # At this shape (N = 20, so 19 angles) every lambda from 1 to 15 lands on the same qubit
+    # count, because a different stage of the walk becomes the widest one; 16 and above give
+    # part of the saving back. Measured, not derived, so it is a constant rather than a
+    # formula -- the tests below only rely on it being on the flat part of that curve.
+    _FE2S2_BATCH_KNEE = 15
+
+    @staticmethod
+    def _fe2s2_logical_counts(**select_settings):
+        """Estimate the Fe2S2-20 circuit, varying only the SELECT rotation settings.
 
         Uses a random factorized Hamiltonian rather than the H2 data because the point is
         to exercise the register widths at ``(N, R, B, C) = (20, 14, 15, 5)``, not to
@@ -764,14 +779,73 @@ class TestSOSSAResourceEstimation:
                 select_algorithm="qrom_phase_gradient",
                 coefficient_bit_precision=11,
                 rotation_bit_precision=15,
+                **select_settings,
             ),
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
         )
         circuit = builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
 
-        logical_counts = circuit.estimate().logical_counts
+        counts = circuit.estimate().logical_counts
+        return counts["numQubits"], counts["cczCount"] + counts["ccixCount"]
 
-        toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
+    def test_fe2s2_logical_resource_estimate(self):
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs."""
+        num_qubits, toffoli_count = self._fe2s2_logical_counts()
 
         assert toffoli_count == pytest.approx(42_558_509, rel=0.01)
-        assert logical_counts["numQubits"] == 486
+        assert num_qubits == 486
+
+    def test_streaming_the_rotation_angles_trades_toffolis_for_qubits(self):
+        """Streaming is a Pareto move, not a free win, and the default must stay put.
+
+        Inside SELECT the resident angle register is the dominant cost -- all ``N - 1``
+        words at once, 285 of its qubits at ``b_rot = 15``. Across the whole walk it is not
+        the only wide stage, so streaming lowers the peak until a different stage becomes
+        the bottleneck and then stops helping. What is pinned here is the direction of both
+        axes, not the magnitude of either, so the lookup cost model stays free to change.
+        """
+        resident_qubits, resident_toffolis = self._fe2s2_logical_counts()
+        streamed_qubits, streamed_toffolis = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
+
+        assert streamed_qubits < resident_qubits, (
+            f"streaming should lower the peak width: {resident_qubits} -> {streamed_qubits}"
+        )
+        assert streamed_toffolis > resident_toffolis, (
+            "streaming reloads each batch to uncompute, so it cannot be free in Toffolis"
+        )
+
+    def test_the_tightest_batch_is_dominated_by_the_widest_one_that_saves_as_much(self):
+        """Over-shrinking the batch buys nothing, which is the whole usage guidance.
+
+        The Toffoli penalty tracks the *number* of batches, ``ceil((N - 1) / lambda)``, not
+        ``lambda`` itself, while the qubit saving stops once some other stage sets the peak
+        width. At Fe2S2 that makes every ``lambda`` from 1 up to the knee land on the same
+        qubit count, so the smallest one is strictly worse than the largest one -- same
+        width, several times the Toffolis. Callers should pick the *widest* batch that meets
+        their qubit budget, and a regression that inverted this relation would quietly push
+        them the other way.
+        """
+        tight_qubits, tight_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1)
+        knee_qubits, knee_toffolis = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
+
+        assert knee_qubits == tight_qubits, (
+            f"lambda=1 bought extra width over lambda={self._FE2S2_BATCH_KNEE}: {tight_qubits} vs {knee_qubits}"
+        )
+        assert knee_toffolis < tight_toffolis, (
+            f"lambda=1 should cost strictly more than lambda={self._FE2S2_BATCH_KNEE} for the "
+            f"same width: {tight_toffolis} vs {knee_toffolis}"
+        )
+
+    def test_dirty_qroam_is_never_worse_than_the_plain_lookup(self):
+        """Borrowing must be opt-out-able by the cost model, not unconditional.
+
+        At the Fe2S2 table shape the SF lookup is only 224 rows against a 15-bit angle word,
+        well under the ``numData > 32 * numBits`` point where a borrowed swap network starts
+        to pay. ``ComputeOptimalDirtySwapBits`` is expected to decline it and leave the plain
+        lookup in place, so enabling the setting must cost nothing here.
+        See ``TestDirtyQROAMCostModel`` for the regime where it does pay.
+        """
+        plain = self._fe2s2_logical_counts(rotation_batch_size=1, rotation_dirty_qroam=False)
+        dirty = self._fe2s2_logical_counts(rotation_batch_size=1, rotation_dirty_qroam=True)
+
+        assert dirty <= plain, f"enabling dirty QROAM made SELECT worse: {plain} -> {dirty}"
