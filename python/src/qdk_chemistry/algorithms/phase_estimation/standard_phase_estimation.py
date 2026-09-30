@@ -114,6 +114,7 @@ class StandardPhaseEstimation(PhaseEstimation):
             phase_fraction=raw_phase,
             eigenvalue_from_phase=container.eigenvalue_from_phase,
             bits_msb_first=dominant_bitstring,
+            bitstring_counts=counts,
         )
 
     def name(self) -> str:

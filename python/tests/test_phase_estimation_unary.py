@@ -211,6 +211,7 @@ class TestPhaseDecoding:
         # The reported bin and its fraction name the folded phase, so both branches agree.
         assert result.bitstring_msb_first == "010"
         assert result.phase_fraction == pytest.approx(0.25)
+        assert result.bitstring_counts == counts
 
     @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
     def test_the_two_sign_branches_partition_the_spectrum(self, num_bits):
