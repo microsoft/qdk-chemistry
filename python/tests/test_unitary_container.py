@@ -68,6 +68,11 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
 
+    def test_stored_term_sequences_are_read_only(self, container):
+        """Stored term sequences cannot change after their layout is validated."""
+        with pytest.raises(AttributeError, match="append"):
+            container.end.append(container.step_terms[0])
+
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
         """A step repeated zero or fewer times has no defined unitary."""
@@ -259,7 +264,7 @@ class TestPauliProductFormulaContainer:
         result = container.combine(inverse)
         assert result.step_reps == 1
         assert result.scale == container.scale
-        assert result.step_terms == list(container.step_terms) * (4 - inverse_reps)
+        assert result.step_terms == container.step_terms * (4 - inverse_reps)
 
     @pytest.mark.parametrize("cancel", [False, True])
     def test_group_boundary_fusion_stays_compact(self, cancel: bool) -> None:
@@ -273,8 +278,8 @@ class TestPauliProductFormulaContainer:
         fused = formula.combine(atol=0.0)
         assert fused.num_pauli_exponentials == 5 * 10**9 - (4 if cancel else 2) * (10**9 - 1)
         assert fused.num_stored_terms <= 8
-        assert fused.beginning == left
-        assert fused.end == middle + right
+        assert fused.beginning == tuple(left)
+        assert fused.end == tuple(middle + right)
         assert fused.combine(fused, atol=0.0).num_stored_terms <= 8
 
     def test_combine_different_bodies_includes_endpoints(self) -> None:
@@ -286,5 +291,5 @@ class TestPauliProductFormulaContainer:
         second = PauliProductFormulaContainer([x], 3, 1, beginning=[inverse_y], end=[phase], layer_offsets=(0, 1, 2, 3))
         combined = first.combine(second)
         assert combined.step_reps == 1
-        assert combined.beginning == combined.end == []
-        assert combined.step_terms == [phase, x, z, x, z, ExponentiatedPauliTerm(x.pauli_term, 0.375), phase]
+        assert combined.beginning == combined.end == ()
+        assert combined.step_terms == (phase, x, z, x, z, ExponentiatedPauliTerm(x.pauli_term, 0.375), phase)

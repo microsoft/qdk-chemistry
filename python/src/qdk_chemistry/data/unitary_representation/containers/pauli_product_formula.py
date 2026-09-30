@@ -122,7 +122,7 @@ def _merged_layer_offsets(
 
 def _merge_groups(
     left: Sequence[ExponentiatedPauliTerm], right: Sequence[ExponentiatedPauliTerm], atol: float
-) -> list[ExponentiatedPauliTerm] | None:
+) -> tuple[ExponentiatedPauliTerm, ...] | None:
     """Merge equal canonical word sets only when all words commute; None means no match."""
     words = [tuple(sorted((q, p) for q, p in t.pauli_term.items() if p != "I")) for t in chain(left, right)]
     if set(words[: len(left)]) != set(words[len(left) :]) or not _commute(left):
@@ -130,7 +130,7 @@ def _merge_groups(
     angles: dict[tuple[tuple[int, str], ...], float] = {}
     for word, term in zip(words, chain(left, right), strict=True):
         angles[word] = _finite(angles.get(word, 0.0) + _finite(term.angle))
-    return [ExponentiatedPauliTerm(dict(word), angle) for word, angle in angles.items() if abs(angle) > atol]
+    return tuple(ExponentiatedPauliTerm(dict(word), angle) for word, angle in angles.items() if abs(angle) > atol)
 
 
 class PauliProductFormulaContainer(UnitaryContainer):
@@ -149,7 +149,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
     where ``step_reps = r`` is the number of repeated steps.
 
     Optional ``beginning`` and ``end`` terms execute once before and after the repeated steps.
-    All three term lists are stored explicitly without expanding repetitions;
+    All three term sequences are stored as tuples without expanding repetitions;
     ``group_offsets`` certify commuting intervals of ``step_terms`` only.
     Optional ``layer_offsets`` delimit disjoint-support layers over the stored concatenation
     ``beginning + step_terms + end``, including both endpoint/body boundaries.
@@ -203,9 +203,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
-        self.step_terms = [ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in step_terms]
-        self.beginning = [ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in beginning]
-        self.end = [ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in end]
+        self.step_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in step_terms)
+        self.beginning = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in beginning)
+        self.end = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in end)
         self.group_offsets = None if group_offsets is None else tuple(group_offsets)
         if self.group_offsets is not None:
             _validate_groups(self.step_terms, self.group_offsets)
@@ -392,9 +392,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
             offsets = self.group_offsets if self.group_offsets is not None else tuple(range(len(self.step_terms) + 1))
             _validate_groups(self.step_terms, offsets)
             if len(offsets) == 2:
-                terms = [
+                terms = tuple(
                     ExponentiatedPauliTerm(t.pauli_term, _finite(t.angle * self.step_reps)) for t in self.step_terms
-                ]
+                )
                 return PauliProductFormulaContainer(
                     terms, 1, self.num_qubits, self.scale, group_offsets=offsets, layer_offsets=self.layer_offsets
                 )
@@ -476,7 +476,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
                                     boundary_terms,
                                 ),
                             )
-                if join in ([], self.step_terms) and (
+                if join in ((), self.step_terms) and (
                     self.layer_offsets is None
                     or not join
                     or join_layers == _slice_layer_offsets(self.layer_offsets, n, n + len(self.step_terms))
