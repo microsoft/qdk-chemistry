@@ -1,15 +1,13 @@
 #!/bin/bash
 set -e
 
-# install-cpp-deps.sh — build and install qdk-chemistry's C++ dependencies for CI pipelines.
+# install-cpp-deps.sh — shared C++ dependency build used by CI and the devcontainer.
 #
 # Builds from source: nlohmann_json, googletest, Catch2, spdlog, BLAS++, LAPACK++, LibInt2, ECPint, GauXC.
-# The actual BLAS/LAPACK implementation (OpenBLAS via apt, or Apple Accelerate on macOS) is reused from the
-# system, not built here.
+# The BLAS/LAPACK implementation is provided by the caller (OpenBLAS or Apple Accelerate) and is not built here.
 #
 # GoogleTest/Catch2 are installed here so qdk-chemistry's own find_package() calls succeed, avoiding a
-# redundant per-job FetchContent rebuild. Eigen3/HDF5/Boost/OpenMP/MPI are installed separately by the
-# pipeline (apt/brew), not by this script.
+# redundant per-job FetchContent rebuild. Eigen3/HDF5/Boost/OpenMP/MPI are provided by the caller (apt/brew).
 #
 # Usage: install-cpp-deps.sh <cpp_cgmanifest_path> <macis_cgmanifest_path> [blas_vendor]
 #
@@ -60,9 +58,8 @@ if command -v nproc >/dev/null 2>&1; then
 else
     DEFAULT_JOBS=$(sysctl -n hw.logicalcpu) # macOS
 fi
-# Falls back to the pipeline's own memory-aware CMAKE_BUILD_PARALLEL_LEVEL (see build-and-test.yaml's "Set
-# memory-aware build parallelism" step) when JOBS isn't set explicitly, so this script doesn't independently
-# re-derive a job count that could exceed what the runner's memory actually supports.
+# Respect a caller-supplied job limit, including CMAKE_BUILD_PARALLEL_LEVEL, so the devcontainer and CI can apply
+# their own memory-aware parallelism policies.
 JOBS="${JOBS:-${CMAKE_BUILD_PARALLEL_LEVEL:-$DEFAULT_JOBS}}"
 LIBINT_JOBS="${LIBINT_JOBS:-$JOBS}"
 MAC_BUILD="OFF"

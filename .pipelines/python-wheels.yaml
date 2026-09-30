@@ -165,6 +165,7 @@ extends:
 
       # Same rationale for Windows ARM64, on the 1ES ARM64 pool. hostArchitecture
       # avoids the 1ES template defaulting to an x64-emulated agent.
+      # Gated on windows_aarch64 being present so matrix overrides don't build unused dependencies.
         - ${{ if eq(target.name, 'windows_aarch64') }}:
           - job: Build_windows_aarch64_deps
             pool:
