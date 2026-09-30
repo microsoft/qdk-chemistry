@@ -30,6 +30,10 @@ from .test_phase_estimation_sossa import (
     _python_to_qsharp_sign,
 )
 
+# The branched angle-word erasure measures, so a mismatched row only shows up for the
+# outcomes whose parity it changes; repeat to keep the check from passing by luck.
+_ROUND_TRIP_TRIALS = 8
+
 
 def _build_sossa_unitary(
     num_orbitals: int = 2,
@@ -402,26 +406,55 @@ class TestSOSSAMapper:
             (2, 1, 7, 3),
         ],
     )
+    @pytest.mark.parametrize("swap_bits", [(0, 0), (1, 0), (0, 1), (1, 1)])
     def test_branched_angle_word_erasure_restores_the_address_register(
         self,
         sf_rows: int,
         sf_address_qubits: int,
         dq_rows: int,
         dq_address_qubits: int,
+        swap_bits: tuple[int, int],
     ) -> None:
-        """The measurement-based erasure must phase exactly what the forward load wrote."""
+        """The measurement-based erasure must phase exactly what the forward load wrote.
+
+        Swept over the dirty-QROAM widths as well: a borrowed swap network has to leave the
+        angle word in the state the plain lookup would, or the shared erasure stops matching.
+        The borrowed register is conjugated along with the addresses, so it also has to come
+        back unentangled.
+
+        One swap bit is the widest setting every shape here can take -- the narrowest table
+        has two rows, so a single address bit -- and it keeps the borrowed block out of the
+        simulated statevector. ``test_a_wider_borrowed_network_survives_the_erasure`` covers
+        a deeper network on a shape that can afford one.
+        """
         width = 3
         sf_data = [[(i + j) % 3 == 0 for j in range(width)] for i in range(sf_rows)]
         dq_data = [[bool((i >> j) & 1) for j in range(width - 1)] for i in range(dq_rows)]
+        sf_swap_bits, dq_swap_bits = swap_bits
 
-        # The erasure measures, so a mismatched row only shows up for the outcomes whose
-        # parity it changes; repeat to keep the check from passing by luck.
-        for _ in range(8):
-            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+        for _ in range(_ROUND_TRIP_TRIALS):
+            assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
                 sf_data,
                 dq_data,
                 sf_address_qubits,
                 dq_address_qubits,
+                sf_swap_bits,
+                dq_swap_bits,
+            )
+
+    @pytest.mark.parametrize("dq_swap_bits", [2, 3])
+    def test_a_wider_borrowed_network_survives_the_erasure(self, dq_swap_bits: int) -> None:
+        """A multi-level butterfly still hands back the same angle word the erasure expects.
+
+        Kept to the single-bit DQ word so that ``numBits * 2**numSwapBits`` borrowed qubits
+        stay cheap to simulate as the network gets deeper.
+        """
+        sf_data = [[(i + j) % 3 == 0 for j in range(1)] for i in range(4)]
+        dq_data = [[bool((i >> j) & 1) for j in range(1)] for i in range(8)]
+
+        for _ in range(_ROUND_TRIP_TRIALS):
+            assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+                sf_data, dq_data, 2, 3, 1, dq_swap_bits
             )
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
@@ -537,9 +570,12 @@ class TestSelectFullFidelity:
     def _select_data(
         N: int,  # noqa: N803
         rotation_bit_precision: int,
+        *,
         num_ranks: int = 1,
         num_bases: int = 1,
         num_copies: int = 1,
+        rotation_batch_size: int = 0,
+        use_dirty_qroam: bool = False,
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -558,6 +594,8 @@ class TestSelectFullFidelity:
             # Indexed b * R + r, matching both BuildSFBulkRotationData and the direct path.
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
+            "rotationBatchSize": rotation_batch_size,
+            "useDirtyQROAM": use_dirty_qroam,
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -595,6 +633,8 @@ class TestSelectFullFidelity:
             "OneBodyRotationAngles": [_vector_to_givens_angles(u)] + [_vector_to_givens_angles(other)] * (N - 1),
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
+            "rotationBatchSize": 0,
+            "useDirtyQROAM": False,
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
@@ -660,6 +700,71 @@ class TestSelectFullFidelity:
         assert fidelity == pytest.approx(1.0, abs=3e-3), (
             f"phase-gradient and direct SELECT backends disagree: fidelity={fidelity}"
         )
+
+    @pytest.mark.parametrize(
+        ("dims", "bit_precision"),
+        [
+            ((3, 1, 1, 1), 4),
+            ((4, 1, 2, 1), 4),
+        ],
+        ids=["N3R1B1", "N4R1B2"],
+    )
+    @pytest.mark.parametrize("use_dirty_qroam", [False, True])
+    def test_streamed_rotation_angles_match_the_resident_register(
+        self,
+        dims: tuple[int, int, int, int],
+        bit_precision: int,
+        use_dirty_qroam: bool,
+    ):
+        """Streaming the Givens angles must not change what SELECT does, only what it costs.
+
+        Covers both branches of the angle lookup -- ``xo = 0`` takes the one-body DQ table and
+        ``xo = N`` takes the two-body SF table -- at both ``b`` values that matter, since
+        ``b = numBases`` is the one that sets the ``bEqB`` flag. That flag rides the resident
+        table for free but is computed arithmetically on the streamed path, so it needs a
+        branch of its own here.
+
+        Every streaming batch size is compared against the resident reference. The angle
+        chain is order sensitive, so a batch loop that walked the windows the wrong way would
+        show up immediately.
+        """
+        num_orbitals, num_ranks, num_bases, num_copies = dims
+        kwargs = {
+            "rotation_bit_precision": bit_precision,
+            "num_ranks": num_ranks,
+            "num_bases": num_bases,
+            "num_copies": num_copies,
+        }
+        num_rot_angles = num_orbitals - 1
+
+        for xo_value in (0, num_orbitals):
+            for b_value in (0, num_bases):
+                reference = self._run_select(
+                    self._select_data(num_orbitals, **kwargs),
+                    xo_value=xo_value,
+                    b_value=b_value,
+                    use_phase_gradient=True,
+                )
+                for batch in range(1, num_rot_angles):
+                    streamed = self._run_select(
+                        self._select_data(
+                            num_orbitals,
+                            rotation_batch_size=batch,
+                            use_dirty_qroam=use_dirty_qroam,
+                            **kwargs,
+                        ),
+                        xo_value=xo_value,
+                        b_value=b_value,
+                        use_phase_gradient=True,
+                    )
+                    # The angle word is erased by measurement and the per-branch fixup restores
+                    # the state only up to an outcome-dependent global phase, so overlap
+                    # magnitude is the comparison that means anything here.
+                    fidelity = abs(np.vdot(reference, streamed))
+                    assert fidelity == pytest.approx(1.0, abs=1e-9), (
+                        f"lambda={batch} dirty={use_dirty_qroam} xo={xo_value} b={b_value} "
+                        f"disagrees with the resident register: fidelity={fidelity}"
+                    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

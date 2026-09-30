@@ -54,6 +54,27 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
+            "rotation_batch_size",
+            "int",
+            0,
+            "Number of Givens angles held in the rotation register at once (the SOSSA lambda). "
+            "0 keeps all N-1 angles resident, which is the cheapest in Toffolis. Smaller values "
+            "stream the angles in batches, cutting the rotation register to lambda*b_rot qubits "
+            "at the cost of one extra table lookup per batch, in each direction. The Toffoli "
+            "penalty follows the batch count, ceil((N-1)/lambda), while the qubit saving stops "
+            "once another stage of the walk becomes the widest, so prefer the largest value that "
+            "meets the qubit budget; shrinking further costs Toffolis for no extra saving.",
+            (0, 4096),
+        )
+        self._set_default(
+            "rotation_dirty_qroam",
+            "bool",
+            True,
+            "Whether streamed rotation batches borrow wavefunction qubits for a select-swap "
+            "network instead of a plain unary-iteration lookup. Has no effect unless "
+            "'rotation_batch_size' streams the angles.",
+        )
+        self._set_default(
             "coefficient_bit_precision",
             "int",
             10,
@@ -188,6 +209,8 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
+            "rotationBatchSize": int(self._settings.get("rotation_batch_size")),
+            "useDirtyQROAM": bool(self._settings.get("rotation_dirty_qroam")),
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
