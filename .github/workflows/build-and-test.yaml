@@ -66,6 +66,7 @@ jobs:
           python-version: '3.14'
           cpp-test-threads: 4
           python-test-threads: 4
+          build-documentation: true
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
@@ -328,7 +329,7 @@ jobs:
 
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
-        if [ "${{ matrix.python-version }}" = "3.13" ]; then
+        if [ "${{ matrix.build-documentation }}" = "true" ]; then
           python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
         else
           python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
@@ -529,7 +530,7 @@ jobs:
         fail-on-error: false
 
     - name: Build documentation
-      if: matrix.python-version == '3.13'
+      if: matrix.build-documentation
       working-directory: docs
       run: |
         set +e
