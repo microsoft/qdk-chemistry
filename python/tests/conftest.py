@@ -93,11 +93,7 @@ def isolate_worker_temporary_directory(tmp_path_factory):
 
 
 def pytest_collection_modifyitems(items):
-    """Gate ``@pytest.mark.slow`` on QDK_CHEMISTRY_RUN_SLOW_TESTS.
-
-    The marker is the sole slow-test switch, so applying it is enough to keep a test out
-    of the default run and no test needs its own environment check.
-    """
+    """Skip slow-marked tests unless QDK_CHEMISTRY_RUN_SLOW_TESTS is set."""
     if _RUN_SLOW_TESTS:
         return
 

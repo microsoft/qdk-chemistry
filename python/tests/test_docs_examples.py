@@ -31,6 +31,7 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 GEOMETRIC_AVAILABLE = importlib.util.find_spec("geometric") is not None
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # Release-note example scripts are snapshots that only work with the matching
 # library version.  Parse the major.minor from the filename (e.g.
@@ -283,6 +284,9 @@ def _create_test_methods():
             )
             if is_slow:
                 generated_test = pytest.mark.slow(generated_test)
+                generated_test = unittest.skipUnless(
+                    _RUN_SLOW_TESTS, "Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable."
+                )(generated_test)
 
             setattr(TestExampleScripts, test_name, generated_test)
 
