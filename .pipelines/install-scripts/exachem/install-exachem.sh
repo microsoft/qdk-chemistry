@@ -273,7 +273,7 @@ SMOKE_TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "${SMOKE_TEST_DIR}"' EXIT
 echo "==> Running minimal ExaChem example: ${SMOKE_TEST_INPUT}"
 ( cd "${SMOKE_TEST_DIR}" && OMP_NUM_THREADS=1 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
-    mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" )
+    LIBINT_DATA_PATH="${INSTALL_PREFIX}/basis" mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" )
 # (cleanup of SMOKE_TEST_DIR is handled by the trap above, on every exit path -- including a failed mpirun run)
 
 echo "==> Smoke test OK: ${INSTALL_PREFIX}/bin/ExaChem installed, fully linked, and ran a minimal example."

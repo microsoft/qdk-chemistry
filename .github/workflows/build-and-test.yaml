@@ -362,8 +362,9 @@ jobs:
       working-directory: python
       run: |
         set -e
-        # Prepend ExaChem to PATH/LD_LIBRARY_PATH at runtime, preserving all prior setup (cpp_deps, setup-python).
+        # Set ExaChem's basis directory and prepend its runtime paths after all prior setup.
         if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          export LIBINT_DATA_PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/basis"
           export PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/bin:${PATH}"
           export LD_LIBRARY_PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/lib:${{ env.EXACHEM_INSTALL_PREFIX }}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
         fi

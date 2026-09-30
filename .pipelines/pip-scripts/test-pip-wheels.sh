@@ -135,6 +135,8 @@ export QSHARP_PYTHON_TELEMETRY=false
 if [ -d "/workspace/exachem_install" ]; then
     EXACHEM_INSTALL_DIR="/workspace/exachem_install"
 
+    # Libint expects the directory containing basis files, not the install prefix.
+    export LIBINT_DATA_PATH="${EXACHEM_INSTALL_DIR}/basis"
     # Scoped to just this pytest invocation, for the (upcoming, PR #611) ExaChem CCSD integration test's
     # shutil.which("ExaChem") lookup.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
