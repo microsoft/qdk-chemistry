@@ -28,7 +28,7 @@ if [ -d "${INSTALL_PREFIX}/hdf5" ]; then
     exit 0
 fi
 
-# Download HDF5 source (URL + SHA-1 come from cgmanifest.json, the single source of truth for this pin).
+# Download HDF5 source (URL + SHA-256 come from cgmanifest.json, the single source of truth for this pin).
 # Clean up any leftover state from a previous (possibly failed) attempt on
 # this self-hosted agent — the workspace persists across builds and retries.
 echo "Downloading HDF5 ${HDF5_VERSION}..."

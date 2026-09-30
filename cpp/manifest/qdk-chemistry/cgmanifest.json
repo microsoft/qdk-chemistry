@@ -9,7 +9,7 @@
           "name": "Boost",
           "version": "1.86.0",
           "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2",
-          "hash": "fd0d26a7d5eadf454896942124544120e3b7a38f"
+          "hash": "1bed88e40401b2cb7a1f76d4bab499e352fa4d0c5f31c0dbae64e24d34d7513b"
         }
       },
       "developmentDependency": false
@@ -43,7 +43,7 @@
           "name": "Libint",
           "version": "2.13.1",
           "downloadUrl": "https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz",
-          "hash": "d22f42c475bd487c07cb41f0e76c109568d0d4ca"
+          "hash": "890f568142ee330ad474699e703d342c85427568e9c6d8e9bee6de9a4644782d"
         }
       },
       "developmentDependency": false
@@ -184,7 +184,7 @@
           "name": "HDF5",
           "version": "1.13.0",
           "downloadUrl": "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.0/src/hdf5-1.13.0.tar.bz2",
-          "hash": "f47d88abcbdacbc05419be9b69d96da8c585ebe0"
+          "hash": "1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec"
         }
       },
       "developmentDependency": false

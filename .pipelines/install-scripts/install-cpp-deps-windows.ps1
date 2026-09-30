@@ -290,7 +290,7 @@ function Get-ShallowCheckout([string]$RepoUrl, [string]$Commit, [string]$Dest) {
     if ($LASTEXITCODE -ne 0) { throw "git checkout failed for $RepoUrl @ $Commit" }
 }
 
-# Download an "other" type cgmanifest component and verify its SHA-1 against the declared `hash`, so a
+# Download an "other" type cgmanifest component and verify its SHA-256 against the declared `hash`, so a
 # compromised or silently-changed upstream release asset is caught before it's extracted and built. Mirrors
 # .pipelines/install-scripts/common.sh's download_and_verify for Linux/macOS.
 function Get-DownloadAndVerify([string]$ManifestPath, [string]$Name, [string]$Dest) {
@@ -299,10 +299,10 @@ function Get-DownloadAndVerify([string]$ManifestPath, [string]$Name, [string]$De
     if (-not $hash) { throw "No hash declared for '$Name' in $ManifestPath -- cannot verify the download" }
 
     Invoke-WebRequest $url -OutFile $Dest
-    $actual = (Get-FileHash $Dest -Algorithm SHA1).Hash
+    $actual = (Get-FileHash $Dest -Algorithm SHA256).Hash
     if ($actual -ine $hash) {
         Remove-Item $Dest -Force -ErrorAction SilentlyContinue
-        throw "SHA-1 mismatch for '$Name' ($url): expected $hash, got $actual"
+        throw "SHA-256 mismatch for '$Name' ($url): expected $hash, got $actual"
     }
 }
 

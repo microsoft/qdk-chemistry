@@ -63,7 +63,7 @@ for reg in data['registrations']:
 "
 }
 
-# Resolve the declared SHA-1 (`hash`) for an "other" (non-git) type component from cgmanifest.json, by
+# Resolve the declared SHA-256 (`hash`) for an "other" (non-git) type component from cgmanifest.json, by
 # component name. Not every "other" entry declares one; callers must check for empty.
 get_hash() {
     local manifest="$1" name="$2"
@@ -94,7 +94,7 @@ for reg in data['registrations']:
 "
 }
 
-# Download an "other" type cgmanifest component and verify its SHA-1 against the declared `hash`, so a
+# Download an "other" type cgmanifest component and verify its SHA-256 against the declared `hash`, so a
 # compromised or silently-changed upstream release asset is caught before it's extracted and built. Fails
 # loudly if the component has no downloadUrl or no declared hash. Downloads into the current directory (or
 # $3 if given) and prints the downloaded file's path on success, for capture via command substitution.
@@ -118,13 +118,13 @@ download_and_verify() {
     wget -q "$url" -O "$dest"
 
     # shasum is the fallback for macOS
-    if command -v sha1sum >/dev/null 2>&1; then
-        actual="$(sha1sum "$dest" | awk '{print $1}')"
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual="$(sha256sum "$dest" | awk '{print $1}')"
     else
-        actual="$(shasum -a 1 "$dest" | awk '{print $1}')"
+        actual="$(shasum -a 256 "$dest" | awk '{print $1}')"
     fi
     if [[ "$actual" != "$hash" ]]; then
-        echo "ERROR: SHA-1 mismatch for '$name' ($url): expected $hash, got $actual" >&2
+        echo "ERROR: SHA-256 mismatch for '$name' ($url): expected $hash, got $actual" >&2
         rm -f "$dest"
         return 1
     fi
