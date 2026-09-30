@@ -23,8 +23,11 @@ from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition imp
     SparsePauliTerms,
 )
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition
+from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+_requires_networkx = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed")
 
 
 def _pauli_matrix(label):
@@ -892,7 +895,31 @@ class TestSparseQubitOperator:
         with pytest.raises(ValueError, match="read-only"):
             sparse.coefficients[0] = 0
         assert sparse.content_hash() == before
-        assert list(sparse.iter_sparse_terms()) == [(((0, "Y"),), -1.25 + 0j), ((), 0.5 + 0j)]
+        terms = list(sparse.iter_sparse_terms())
+        assert terms == [(((0, "Y"),), -1.25), ((), 0.5)]
+        assert all(type(coefficient) is type(sparse.coefficients.item(0)) for _, coefficient in terms)
+
+    def test_sparse_labels_do_not_equal_a_string(self):
+        """The label view compares as a sequence of labels, never as one scalar string."""
+        labels = QubitOperator.from_sparse_terms(1, [{0: "X"}], np.array([1.0])).pauli_strings
+        assert labels == ["X"]
+        assert labels != "X"
+
+    def test_equiv_sums_duplicates_per_operand(self):
+        """Duplicate terms are summed within each operand, so a large coefficient cannot absorb a small one."""
+        sparse = QubitOperator.from_sparse_terms(1, [{0: "X"}, {0: "X"}], np.array([1e16, 1.0]))
+        assert sparse.equiv(sparse)
+
+    @pytest.mark.parametrize("coefficient", [0.0, 1e-14])
+    def test_equiv_requires_equal_width_in_both_orders(self, coefficient):
+        """Operators of different widths are never equivalent, whichever storage is compared first."""
+        dense = QubitOperator(pauli_strings=["XI"], coefficients=np.array([coefficient]))
+        wider = QubitOperator.from_sparse_terms(3, [{1: "X"}], np.array([coefficient]))
+        same_width = QubitOperator.from_sparse_terms(2, [{1: "X"}], np.array([coefficient]))
+        assert not dense.equiv(wider)
+        assert not wider.equiv(dense)
+        assert dense.equiv(same_width)
+        assert same_width.equiv(dense)
 
     @pytest.mark.parametrize("term", [[(True, "X")], [(0.5, "X")], [(2**32, "X")], [(0, "I")], [(0, "X"), (0, "Y")]])
     def test_sparse_factors_reject_invalid_values(self, term):
@@ -935,7 +962,17 @@ class TestSparseQubitOperator:
         with pytest.raises(ValueError, match="matching shapes"):
             QubitOperator.from_json(payload)
 
-    @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity"])
+    @pytest.mark.parametrize(
+        "strategy",
+        [
+            "commuting",
+            "qubit_wise_commuting",
+            "identity",
+            "vacuum_annihilating",
+            pytest.param("nx_commuting", marks=_requires_networkx),
+            pytest.param("nx_qubit_wise_commuting", marks=_requires_networkx),
+        ],
+    )
     def test_term_groupers_keep_sparse_storage_without_labels(self, strategy, monkeypatch):
         """Groupers compare sparse words and return operators sharing the input's terms."""
         sparse = QubitOperator.from_sparse_terms(

@@ -17,6 +17,7 @@ import openfermion as of
 
 from qdk_chemistry import data
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -259,7 +260,8 @@ def qubit_hamiltonian_to_qubit_operator(
     """Convert a QDK/Chemistry QubitOperator to an OpenFermion QubitOperator.
 
     Translates the dense Pauli string format (e.g., ``"XZII"``) to OpenFermion's
-    sparse tuple format (e.g., ``((0, 'X'), (1, 'Z'))``).
+    sparse tuple format (e.g., ``((0, 'X'), (1, 'Z'))``).  Sparse storage is
+    converted from its factors without building labels.
 
     Args:
         qubit_hamiltonian: The QDK/Chemistry QubitOperator to convert.
@@ -282,6 +284,12 @@ def qubit_hamiltonian_to_qubit_operator(
         )
 
     qubit_op = of.QubitOperator()
+
+    container = qubit_hamiltonian.get_container()
+    if isinstance(container, SparsePauliDecompositionContainer):
+        for word, coeff in container.iter_sparse_terms():
+            qubit_op += of.QubitOperator(word, coeff)
+        return qubit_op
 
     for pauli_str, coeff in zip(
         qubit_hamiltonian.pauli_strings,

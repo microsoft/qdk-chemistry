@@ -26,8 +26,11 @@ import numpy as np
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper, TermGrouperSettings
 from qdk_chemistry.data import FlatPartition
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from qdk_chemistry.data import QubitOperator
 
 __all__ = ["VacuumAnnihilatingTermGrouper", "VacuumAnnihilatingTermGrouperSettings"]
@@ -113,11 +116,21 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                 "amplitudes are compared against a real cancellation tolerance."
             )
 
-        buckets: dict[tuple[int, int], list[tuple[int, float]]] = {}
-        for index, label in enumerate(qubit_hamiltonian.pauli_strings):
+        container = qubit_hamiltonian.get_container()
+        supports: Iterable[tuple[int, int]]
+        if isinstance(container, SparsePauliDecompositionContainer):
+            supports = (
+                (sum(1 << qubit for qubit, axis in word if axis != "Z"), sum(axis == "Y" for _, axis in word))
+                for word, _ in container.iter_sparse_terms()
+            )
+        else:
             # Labels follow the Qiskit convention: the rightmost character is qubit 0.
-            flipped = int(label.translate(flipped_qubits), 2)
-            n_y = label.count("Y")
+            supports = (
+                (int(label.translate(flipped_qubits), 2), label.count("Y")) for label in qubit_hamiltonian.pauli_strings
+            )
+
+        buckets: dict[tuple[int, int], list[tuple[int, float]]] = {}
+        for index, (flipped, n_y) in enumerate(supports):
             # Same-support strings anticommute exactly when their Y counts differ in parity.
             # Within one parity i^{n_Y} is a common factor of 1 or i times this sign.
             amplitude = float(coefficients[index].real) * (-1) ** (n_y // 2)

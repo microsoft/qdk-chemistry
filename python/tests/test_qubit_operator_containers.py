@@ -43,6 +43,7 @@ from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     SumOfSquaresContainer,
     SumOfSquaresMetadata,
 )
+from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
 
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
@@ -631,6 +632,14 @@ class TestPauliOnlyAlgorithmsAcceptSparseStorage:
             partial(_run_term_grouper, strategy="qubit_wise_commuting"),
             partial(_run_term_grouper, strategy="identity"),
             partial(_run_term_grouper, strategy="vacuum_annihilating"),
+            pytest.param(
+                partial(_run_term_grouper, strategy="nx_commuting"),
+                marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed"),
+            ),
+            pytest.param(
+                partial(_run_term_grouper, strategy="nx_qubit_wise_commuting"),
+                marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed"),
+            ),
             commutator_bound_first_order,
             partial(qdrift_samples_campbell, time=1.0, target_accuracy=1e-3),
             partial(trotter_steps_naive, time=1.0, target_accuracy=1e-3),
@@ -646,6 +655,8 @@ class TestPauliOnlyAlgorithmsAcceptSparseStorage:
             "term_grouper_qubit_wise_commuting",
             "term_grouper_identity",
             "term_grouper_vacuum_annihilating",
+            "term_grouper_nx_commuting",
+            "term_grouper_nx_qubit_wise_commuting",
             "commutator_bound",
             "qdrift_samples",
             "trotter_steps",
