@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from typing import Any
 
 import numpy as np
 import pytest
@@ -735,7 +736,10 @@ class TestSelectFullFidelity:
         show up immediately.
         """
         num_orbitals, num_ranks, num_bases, num_copies = dims
-        kwargs = {
+        # Annotated rather than inferred: mypy widens the literal dict to dict[str, int] and
+        # then checks it against every remaining keyword of _select_data, including the str
+        # lookup_method, which the ints cannot satisfy.
+        kwargs: dict[str, Any] = {
             "rotation_bit_precision": bit_precision,
             "num_ranks": num_ranks,
             "num_bases": num_bases,
