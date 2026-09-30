@@ -2385,14 +2385,14 @@ class TestPyscfPlugin:
         assert scf_ecp.mol.nelectron == 19
 
     @pytest.mark.parametrize("constructor", ["qdk", "qdk_cholesky"])
-    @pytest.mark.parametrize("integral_dressing", ["x2c_1e", "x2c_1e_contracted"])
-    def test_hamiltonian_to_scf_preserves_x2c_hamiltonian(self, constructor: str, integral_dressing: str) -> None:
+    @pytest.mark.parametrize("relativity", ["sf-x2c", "sf-x2c-contracted"])
+    def test_hamiltonian_to_scf_preserves_x2c_hamiltonian(self, constructor: str, relativity: str) -> None:
         """Preserve the X2C one-body operator and scalar core when converting to PySCF."""
         solver = algorithms.create("scf_solver", "qdk", enable_gdm=False)
         _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
-        hamiltonian = algorithms.create(
-            "hamiltonian_constructor", constructor, integral_dressing=integral_dressing
-        ).run(wavefunction.get_orbitals())
+        hamiltonian = algorithms.create("hamiltonian_constructor", constructor, relativity=relativity).run(
+            wavefunction.get_orbitals()
+        )
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
         mf = hamiltonian_to_scf(hamiltonian, occ_a, occ_b)
         coeff = spin_channel_matrix(wavefunction.get_orbitals().coefficients(), axes.alpha())

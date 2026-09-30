@@ -611,8 +611,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     """Convert a QDK/Chemistry Hamiltonian object to a PySCF mean-field reference.
 
     The conversion respects the :class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals
-    and scalar core energy, rather than using only its orbitals. This applies to nonrelativistic and dressed
-    Hamiltonians alike. No SCF optimization is performed.
+    and scalar core energy, rather than using only its orbitals. This applies equally to
+    nonrelativistic and relativistically corrected Hamiltonians. No SCF optimization is performed.
 
     Args:
         hamiltonian: QDK/Chemistry Hamiltonian containing integrals, core energy, and orbital data.

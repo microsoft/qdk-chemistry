@@ -68,15 +68,15 @@ print(hamiltonian.get_summary())
 x2c_constructor = create(
     "hamiltonian_constructor",
     "qdk",
-    integral_dressing="x2c_1e",
+    relativity="sf-x2c",
 )
 x2c_hamiltonian = x2c_constructor.run(orbitals)
 
-# The same integral dressing can be combined with Cholesky storage.
+# The same relativistic treatment can be combined with Cholesky storage.
 x2c_cholesky_constructor = create(
     "hamiltonian_constructor",
     "qdk_cholesky",
-    integral_dressing="x2c_1e",
+    relativity="sf-x2c",
 )
 x2c_cholesky_hamiltonian = x2c_cholesky_constructor.run(orbitals)
 # end-cell-x2c

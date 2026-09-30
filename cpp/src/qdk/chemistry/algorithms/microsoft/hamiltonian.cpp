@@ -22,14 +22,26 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
+HamiltonianSettings::HamiltonianSettings() {
+  set_default("relativity", std::string(""),
+              "Relativistic treatment: '' for nonrelativistic, "
+              "'sf-x2c' for spin-free X2C with basis decontraction and "
+              "recontraction, or 'sf-x2c-contracted' for spin-free X2C in "
+              "the supplied contracted basis. Both X2C options use "
+              "the one-electron approximation",
+              data::ListConstraint<std::string>{
+                  {utils::microsoft::relativity_labels()}});
+}
+
 std::pair<std::shared_ptr<qcs::BasisSet>, Eigen::MatrixXd>
 detail::build_one_body_ao(const data::BasisSet& basis_set,
-                          const std::string& integral_dressing) {
-  const bool use_x2c =
-      integral_dressing == "x2c_1e" || integral_dressing == "x2c_1e_contracted";
+                          qcs::Relativity relativity) {
+  const bool use_x2c = relativity == qcs::Relativity::SFX2C ||
+                       relativity == qcs::Relativity::SFX2CContracted;
   if (use_x2c &&
       basis_set.get_atomic_orbital_type() == data::AOType::Cartesian) {
-    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
+    throw std::invalid_argument(
+        "Spin-free X2C currently supports spherical AOs only");
   }
 
   auto internal_basis_set =
@@ -38,12 +50,8 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
 
   if (use_x2c) {
     return {internal_basis_set,
-            detail::build_x2c_one_body_ao(internal_basis_set,
-                                          integral_dressing == "x2c_1e")};
-  }
-  if (!integral_dressing.empty()) {
-    throw std::invalid_argument("Unsupported integral dressing '" +
-                                integral_dressing + "'");
+            detail::build_x2c_one_body_ao(
+                internal_basis_set, relativity == qcs::Relativity::SFX2C)};
   }
 
   const size_t dimension = basis_set.get_num_atomic_orbitals();
@@ -447,7 +455,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   auto basis_set = orbitals->get_basis_set();
   auto [internal_basis_set, one_body_ao] = detail::build_one_body_ao(
-      *basis_set, _settings->get<std::string>("integral_dressing"));
+      *basis_set, utils::microsoft::parse_relativity(
+                      _settings->get<std::string>("relativity")));
 
   return detail::construct_canonical_hamiltonian(
       std::move(orbitals), internal_basis_set, one_body_ao,

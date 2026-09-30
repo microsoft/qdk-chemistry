@@ -133,7 +133,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
 // Helper lambda to run unrestricted O2 triplet calculation
 auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk",
-                              const std::string& integral_dressing = "") {
+                              const std::string& relativity = "") {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0),
                                               Eigen::Vector3d(2.3, 0.0, 0.0)};
   std::vector<std::string> symbols = {"O", "O"};
@@ -149,7 +149,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk",
   auto uhf_orbitals = uhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
-  ham_factory->settings().set("integral_dressing", integral_dressing);
+  ham_factory->settings().set("relativity", relativity);
   if (factory_name == "qdk_cholesky") {
     ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
@@ -159,10 +159,9 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk",
 };
 
 auto make_x2c_constructor = [](const std::string& factory_name = "qdk",
-                               const std::string& integral_dressing =
-                                   "x2c_1e") {
+                               const std::string& relativity = "sf-x2c") {
   auto constructor = HamiltonianConstructorFactory::create(factory_name);
-  constructor->settings().set("integral_dressing", integral_dressing);
+  constructor->settings().set("relativity", relativity);
   return constructor;
 };
 
@@ -2782,17 +2781,17 @@ TEST_F(HamiltonianConstructorTest, ContiguousIndicesRequireSortedUniqueInput) {
   EXPECT_FALSE(indices_are_contiguous({3, 2}));
 }
 
-// X2C-1e integral dressing tests
+// Spin-free X2C relativistic treatment tests
 
 using WaterX2CResult =
     std::tuple<std::shared_ptr<Hamiltonian>, std::shared_ptr<Hamiltonian>,
                std::shared_ptr<Orbitals>>;
 
-// Run each immutable water fixture once per dressing mode.
+// Run each immutable water fixture once per relativistic treatment.
 const WaterX2CResult& run_water_nr_and_x2c(
-    const std::string& integral_dressing = "x2c_1e") {
+    const std::string& relativity = "sf-x2c") {
   static std::map<std::string, WaterX2CResult> cache;
-  if (const auto found = cache.find(integral_dressing); found != cache.end()) {
+  if (const auto found = cache.find(relativity); found != cache.end()) {
     return found->second;
   }
 
@@ -2810,23 +2809,25 @@ const WaterX2CResult& run_water_nr_and_x2c(
   auto ham_nr = HamiltonianConstructorFactory::create("qdk");
   auto h_nr = ham_nr->run(orbitals);
 
-  auto ham_x2c = make_x2c_constructor("qdk", integral_dressing);
+  auto ham_x2c = make_x2c_constructor("qdk", relativity);
   auto h_x2c = ham_x2c->run(orbitals);
 
   return cache
-      .emplace(integral_dressing,
-               WaterX2CResult{std::move(h_nr), std::move(h_x2c),
-                              std::move(orbitals)})
+      .emplace(relativity, WaterX2CResult{std::move(h_nr), std::move(h_x2c),
+                                          std::move(orbitals)})
       .first->second;
 }
 
 TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
     auto constructor = HamiltonianConstructorFactory::create(factory_name);
-    EXPECT_EQ(constructor->settings().get<std::string>("integral_dressing"),
-              "");
-    EXPECT_ANY_THROW(
-        constructor->settings().set("integral_dressing", "unsupported"));
+    EXPECT_EQ(constructor->settings().get<std::string>("relativity"), "");
+    for (const std::string relativity : {"sf-x2c", "sf-x2c-contracted", ""}) {
+      constructor->settings().set("relativity", relativity);
+      EXPECT_EQ(constructor->settings().get<std::string>("relativity"),
+                relativity);
+    }
+    EXPECT_ANY_THROW(constructor->settings().set("relativity", "unsupported"));
   }
 }
 
@@ -2836,7 +2837,7 @@ TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
   Structure structure(coordinates, symbols);
 
   auto build_one_body = [&](const std::vector<double>& exponents,
-                            const std::string& integral_dressing) {
+                            const std::string& relativity) {
     std::vector<Shell> shells;
     for (const double exponent : exponents) {
       shells.emplace_back(0, OrbitalType::S, std::vector<double>{exponent},
@@ -2852,7 +2853,7 @@ TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
         std::nullopt, basis_set,
         testing::restricted_index_set(dimension, all_indices),
         testing::restricted_index_set(dimension, {}));
-    auto constructor = make_x2c_constructor("qdk", integral_dressing);
+    auto constructor = make_x2c_constructor("qdk", relativity);
     auto hamiltonian = constructor->run(orbitals);
     auto [one_body_alpha, one_body_beta] =
         hamiltonian->get_one_body_integrals();
@@ -2860,13 +2861,13 @@ TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
   };
 
   constexpr double diffuse_exponent = 1e-4;
-  for (const std::string integral_dressing : {"x2c_1e_contracted", "x2c_1e"}) {
+  for (const std::string relativity : {"sf-x2c-contracted", "sf-x2c"}) {
     const std::vector<double> duplicate_exponents{1.0, 1.0, diffuse_exponent};
     const std::vector<double> unique_exponents{1.0, diffuse_exponent};
     const Eigen::MatrixXd duplicate_one_body =
-        build_one_body(duplicate_exponents, integral_dressing);
+        build_one_body(duplicate_exponents, relativity);
     const Eigen::MatrixXd unique_one_body =
-        build_one_body(unique_exponents, integral_dressing);
+        build_one_body(unique_exponents, relativity);
     Eigen::Matrix<double, 2, 3> duplicate_expansion;
     duplicate_expansion << 1.0, 1.0, 0.0, 0.0, 0.0, 1.0;
     const Eigen::Matrix3d expected_duplicate =
@@ -3032,8 +3033,8 @@ TEST_F(HamiltonianConstructorTest, X2CRejectsCartesianAtomicOrbitals) {
       testing::restricted_index_set(6, {0, 1, 2, 3, 4, 5}),
       testing::restricted_index_set(6, {}));
 
-  for (const std::string integral_dressing : {"x2c_1e", "x2c_1e_contracted"}) {
-    auto x2c = make_x2c_constructor("qdk", integral_dressing);
+  for (const std::string relativity : {"sf-x2c", "sf-x2c-contracted"}) {
+    auto x2c = make_x2c_constructor("qdk", relativity);
     EXPECT_THROW(x2c->run(orbitals), std::invalid_argument);
   }
 }
@@ -3115,7 +3116,7 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
   };
 
   const std::map<std::string, Eigen::MatrixXd> references = {
-      {"x2c_1e_contracted",
+      {"sf-x2c-contracted",
        symmetric_matrix({
            -32.59573593678715,      -7.5764994100077967,
            5.42284887913705e-17,    -0.014500537922483982,
@@ -3132,7 +3133,7 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
            4.6479488472421802e-13,  -4.5404154142637934,
            -1.0712123442635384,     -4.5404154142635171,
        })},
-      {"x2c_1e", symmetric_matrix({
+      {"sf-x2c", symmetric_matrix({
                      -32.594395077618017,     -7.5765291579454868,
                      1.5563620847649365e-13,  -0.014474177022443718,
                      -2.6676019849563857e-15, -1.2399538882165906,
@@ -3151,11 +3152,10 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
   };
 
   for (const std::string factory_name : {"qdk", "qdk_cholesky"}) {
-    for (const auto& [integral_dressing, expected_ao] : references) {
-      auto [h_nr, h_x2c, orbitals] = run_water_nr_and_x2c(integral_dressing);
+    for (const auto& [relativity, expected_ao] : references) {
+      auto [h_nr, h_x2c, orbitals] = run_water_nr_and_x2c(relativity);
       if (factory_name == "qdk_cholesky") {
-        auto constructor =
-            make_x2c_constructor(factory_name, integral_dressing);
+        auto constructor = make_x2c_constructor(factory_name, relativity);
         h_x2c = constructor->run(orbitals);
       }
       auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
@@ -3174,7 +3174,7 @@ TEST_F(HamiltonianConstructorTest, X2CAbsoluteOneBodyReferences) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CUnrestrictedO2Reference) {
-  auto [energy, h_x2c] = run_unrestricted_o2("qdk", "x2c_1e");
+  auto [energy, h_x2c] = run_unrestricted_o2("qdk", "sf-x2c");
   ASSERT_TRUE(h_x2c->is_unrestricted());
 
   auto [one_body_alpha, one_body_beta] = h_x2c->get_one_body_integrals();
@@ -3212,7 +3212,7 @@ TEST_F(HamiltonianConstructorTest, X2CArgonDihydrideAllElectronReferences) {
       testing::restricted_index_set(dimension, {}));
 
   const std::map<std::string, Eigen::VectorXd> reference_spectra = {
-      {"x2c_1e_contracted",
+      {"sf-x2c-contracted",
        (Eigen::VectorXd(17) << -163.6248984392942, -40.47617108701198,
         -39.803974232754214, -39.77268582436207, -39.750811174993736,
         -16.033296164440962, -14.905978858744085, -14.720154937852454,
@@ -3220,7 +3220,7 @@ TEST_F(HamiltonianConstructorTest, X2CArgonDihydrideAllElectronReferences) {
         -7.560111340990473, -6.865510537675951, -6.8054633111509135,
         -6.747974053857274, -5.072727698265831, -4.933951088798542)
            .finished()},
-      {"x2c_1e",
+      {"sf-x2c",
        (Eigen::VectorXd(17) << -163.51957015609702, -40.463172489494546,
         -39.79846465639268, -39.76703291575807, -39.74530829380297,
         -16.03208802481571, -14.905187861617721, -14.719337181608951,
@@ -3230,8 +3230,8 @@ TEST_F(HamiltonianConstructorTest, X2CArgonDihydrideAllElectronReferences) {
            .finished()},
   };
 
-  for (const auto& [integral_dressing, expected] : reference_spectra) {
-    auto constructor = make_x2c_constructor("qdk", integral_dressing);
+  for (const auto& [relativity, expected] : reference_spectra) {
+    auto constructor = make_x2c_constructor("qdk", relativity);
     auto hamiltonian = constructor->run(orbitals);
     auto [one_body_alpha, one_body_beta] =
         hamiltonian->get_one_body_integrals();
@@ -3265,7 +3265,7 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
       identity, std::nullopt, std::nullopt, basis_set,
       testing::restricted_index_set(3, {0, 1, 2}),
       testing::restricted_index_set(3, {}));
-  auto restricted_x2c = make_x2c_constructor("qdk", "x2c_1e_contracted");
+  auto restricted_x2c = make_x2c_constructor("qdk", "sf-x2c-contracted");
   auto restricted_hamiltonian = restricted_x2c->run(restricted_orbitals);
   auto [reference_one_body, reference_beta] =
       restricted_hamiltonian->get_one_body_integrals();
@@ -3276,7 +3276,7 @@ TEST_F(HamiltonianConstructorTest, X2CUnrestrictedSpinChannelProjection) {
       identity, permutation, std::nullopt, std::nullopt, std::nullopt,
       basis_set, testing::unrestricted_index_set(3, {0, 1, 2}, {0, 1, 2}),
       testing::unrestricted_index_set(3, {}, {}));
-  auto unrestricted_x2c = make_x2c_constructor("qdk", "x2c_1e_contracted");
+  auto unrestricted_x2c = make_x2c_constructor("qdk", "sf-x2c-contracted");
   auto unrestricted_hamiltonian = unrestricted_x2c->run(unrestricted_orbitals);
   auto [one_body_alpha, one_body_beta] =
       unrestricted_hamiltonian->get_one_body_integrals();
