@@ -4,13 +4,25 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
-    import QDKChemistry.Utils.CircuitComposition.MaxInt;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
     import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
     import Std.Arrays.IndexOf;
     import Std.Arrays.Subarray;
+    import Std.Canon.MapPauliAxis;
+    import Std.Math.Max;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
+
+    /// Returns the summed coefficient of the identity terms in `first..last`.
+    function LayerIdentityPhase(params : SparseRepPauliExpParams, first : Int, last : Int) : Double {
+        mutable phase = 0.0;
+        for term in first..last {
+            if Length(params.pauliIndices[term]) == 0 {
+                set phase += params.pauliCoefficients[term];
+            }
+        }
+        phase
+    }
 
     /// Applies the producer's disjoint layers without changing their boundaries.
     operation ControlledPauliLayers(
@@ -23,27 +35,17 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
             let first = layerOffsets[layer];
             let last = layerOffsets[layer + 1] - 1;
             if first == last {
-                if Length(params.pauliIndices[first]) == 0 {
-                    R1(-params.pauliCoefficients[first], control);
-                } else {
-                    Controlled Exp([control], (
-                        params.pauliOps[first], -params.pauliCoefficients[first],
-                        Subarray(params.pauliIndices[first], systems)
-                    ));
-                }
+                Controlled Exp([control], (
+                    params.pauliOps[first], -params.pauliCoefficients[first],
+                    Subarray(params.pauliIndices[first], systems)
+                ));
             } else {
                 within {
                     for term in first..last {
                         let indices = params.pauliIndices[term];
                         let paulis = params.pauliOps[term];
                         for position in 0..Length(indices) - 1 {
-                            let q = systems[indices[position]];
-                            if paulis[position] == PauliX {
-                                H(q);
-                            } elif paulis[position] == PauliY {
-                                Adjoint S(q);
-                                H(q);
-                            }
+                            MapPauliAxis(PauliZ, paulis[position], systems[indices[position]]);
                         }
                         if Length(indices) > 0 {
                             for position in 1..Length(indices) - 1 {
@@ -53,12 +55,14 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
                     }
                 } apply {
                     // Rotations share two rounds, but the CNOTs still share one control.
+                    let identityPhase = LayerIdentityPhase(params, first, last);
+                    if identityPhase != 0.0 {
+                        // One control phase keeps every identity term's relative phase, also under further controls.
+                        R1(-identityPhase, control);
+                    }
                     for term in first..last {
                         let indices = params.pauliIndices[term];
-                        if Length(indices) == 0 {
-                            // Identity terms retain their relative phase, including under further controls.
-                            R1(-params.pauliCoefficients[term], control);
-                        } else {
+                        if Length(indices) > 0 {
                             Rz(params.pauliCoefficients[term], systems[indices[0]]);
                         }
                     }
@@ -137,7 +141,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         control : Int,
         systems : Int[]
     ) : Unit {
-        use qs = Qubit[MaxInt([control] + systems) + 1];
+        use qs = Qubit[Max([control] + systems) + 1];
         RepControlledPauliExp(params, layerOffsets, qs[control], Subarray(systems, qs));
     }
 

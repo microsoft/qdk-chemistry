@@ -182,7 +182,7 @@ class TestTrotter:
         builder = Trotter()
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=2.0)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=2.0)[0]
 
         assert len(terms) == 2
 
@@ -197,7 +197,7 @@ class TestTrotter:
             coefficients=[1e-15, 1.0],
         )
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=1.0, atol=1e-12)[0]
 
         assert len(terms) == 1
         assert terms[0].pauli_term == {0: "Z"}
@@ -211,7 +211,7 @@ class TestTrotter:
         )
 
         with pytest.raises(ValueError, match="Non-Hermitian"):
-            builder._decompose_trotter_step(hamiltonian, time=1.0)
+            builder._decompose_grouped_trotter_step(hamiltonian, time=1.0)
 
     def test_not_implemented_order(self):
         """Test that unsupported Trotter orders raise NotImplementedError."""
@@ -308,7 +308,7 @@ class TestTrotter:
         builder = Trotter(order=2)
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[3.0, 0.5])
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=2.0)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=2.0)[0]
 
         assert len(terms) == 3
 
@@ -324,7 +324,7 @@ class TestTrotter:
             coefficients=[1e-15, 1.0],
         )
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=1.0, atol=1e-12)[0]
 
         assert len(terms) == 1
         assert terms[0].pauli_term == {0: "Z"}
@@ -554,7 +554,7 @@ class TestTrotter:
             coefficients=[1e-15, 1.0],
         )
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=1.0, atol=1e-12)[0]
 
         # All terms should be Z only (X filtered out).
         # After Suzuki recursion and schedule reduction, the total rotation

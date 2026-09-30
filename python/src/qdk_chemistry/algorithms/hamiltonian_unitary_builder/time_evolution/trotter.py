@@ -291,29 +291,6 @@ class Trotter(TimeEvolutionBuilder):
             )
         return max(manual, auto)
 
-    def _decompose_trotter_step(
-        self,
-        qubit_hamiltonian: QubitOperator,
-        time: float,
-        *,
-        atol: float = 1e-12,
-    ) -> list[ExponentiatedPauliTerm]:
-        """Decompose a single Trotter step into exponentiated Pauli terms.
-
-        The order of the Trotter decomposition is taken from the settings associated
-        with this builder.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
-            time: The evolution time for the single step.
-            atol: Absolute tolerance for filtering small coefficients.
-
-        Returns:
-            A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
-
-        """
-        return self._decompose_grouped_trotter_step(qubit_hamiltonian, time, atol=atol)[0]
-
     def _decompose_grouped_trotter_step(
         self,
         qubit_hamiltonian: QubitOperator,

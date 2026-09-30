@@ -357,3 +357,16 @@ def test_declared_layers_reduce_rotation_depth_without_changing_default() -> Non
     assert counts[0]["rotationCount"] == counts[1]["rotationCount"] == 24
     assert counts[1]["rotationDepth"] == 4
     assert counts[1]["rotationDepth"] < counts[0]["rotationDepth"]
+
+
+def test_identity_terms_share_one_control_phase_per_layer() -> None:
+    """Identity terms in one declared layer cost the same rotations and depth as their merged term."""
+    system = [ExponentiatedPauliTerm({0: "X"}, 0.123), ExponentiatedPauliTerm({1: "Z"}, 0.321)]
+    counts = []
+    for identities in ([0.2, -0.05], [0.15]):
+        terms = [system[0], *(ExponentiatedPauliTerm({}, angle) for angle in identities), system[1]]
+        circuit = _map_sparse_formula(terms, 1, num_qubits=2, layer_offsets=(0, len(terms)))
+        application = circuit.get_qre_application()
+        logical = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
+        counts.append((logical["rotationCount"], logical["rotationDepth"]))
+    assert counts[0] == counts[1]

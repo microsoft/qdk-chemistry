@@ -545,13 +545,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """
         data: dict[str, Any] = {
             "container_type": self.type,
-            "step_terms": [
-                {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
-                for term in self.step_terms
-            ],
+            "step_reps": self.step_reps,
+            "num_qubits": self.num_qubits,
+            "scale": self.scale,
         }
-        data.update(step_reps=self.step_reps, num_qubits=self.num_qubits, scale=self.scale)
-        for name in ("beginning", "end"):
+        for name in ("step_terms", "beginning", "end"):
             data[name] = [
                 {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
                 for term in getattr(self, name)

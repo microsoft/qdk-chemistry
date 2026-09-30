@@ -4,8 +4,8 @@
 
 namespace QDKChemistry.Utils.PauliExp {
 
-    import QDKChemistry.Utils.CircuitComposition.MaxInt;
     import Std.Arrays.Subarray;
+    import Std.Math.Max;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
 
@@ -163,7 +163,7 @@ namespace QDKChemistry.Utils.PauliExp {
         if Length(system) == 0 {
             return ();
         }
-        use qs = Qubit[MaxInt(system) + 1];
+        use qs = Qubit[Max(system) + 1];
         SparseRepPauliExp(params, Subarray(system, qs));
     }
 
