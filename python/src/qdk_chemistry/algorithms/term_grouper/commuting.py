@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
 from qdk_chemistry.data import FlatPartition
@@ -21,16 +21,17 @@ from qdk_chemistry.utils.pauli_commutation import (
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
-    from typing import Any
 
     from qdk_chemistry.data import QubitOperator
 
 __all__ = ["FullCommutingTermGrouper", "QubitWiseCommutingTermGrouper"]
 
+_Term = TypeVar("_Term")
+
 
 def _color_non_commutation_graph(
-    terms: Sequence[Any],
-    commutes: Callable[[Any, Any], bool],
+    terms: Sequence[_Term],
+    commutes: Callable[[_Term, _Term], bool],
 ) -> tuple[tuple[int, ...], ...]:
     """Partition Pauli terms into commuting groups via greedy graph coloring.
 
@@ -81,8 +82,9 @@ def _partition_by_commutation(
     map_commutes: Callable[[dict[int, str], dict[int, str]], bool],
 ) -> tuple[tuple[int, ...], ...]:
     """Color the non-commutation graph, comparing sparse words without building labels."""
-    if isinstance(qubit_hamiltonian.get_container(), SparsePauliDecompositionContainer):
-        maps = [dict(word) for word in qubit_hamiltonian.pauli_strings.words]
+    container = qubit_hamiltonian.get_container()
+    if isinstance(container, SparsePauliDecompositionContainer):
+        maps = [dict(word) for word, _ in container.iter_sparse_terms()]
         return _color_non_commutation_graph(maps, map_commutes)
     return _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, label_commutes)
 

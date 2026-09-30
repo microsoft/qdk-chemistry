@@ -34,7 +34,11 @@ if TYPE_CHECKING:
     import qdk_chemistry.data.enums.fermion_mode_order
     import qdk_chemistry.data.term_partition
 
-__all__ = ["SparsePauliDecompositionContainer", "SparsePauliTerms"]
+__all__ = ["PauliFactor", "PauliWord", "SparsePauliDecompositionContainer", "SparsePauliTerms"]
+
+# A (qubit, axis) pair, and a term's non-identity factors sorted by qubit (the empty word is identity).
+PauliFactor = tuple[int, str]
+PauliWord = tuple[PauliFactor, ...]
 
 
 @dataclass(frozen=True, eq=False, init=False)
@@ -47,9 +51,9 @@ class SparsePauliTerms(Sequence[str]):
     """
 
     num_qubits: int
-    words: tuple[tuple[tuple[int, str], ...], ...]
+    words: tuple[PauliWord, ...]
 
-    def __init__(self, num_qubits: int, terms: Iterable[Mapping[int, str] | Iterable[tuple[int, str]]]) -> None:
+    def __init__(self, num_qubits: int, terms: Iterable[Mapping[int, str] | Iterable[PauliFactor]]) -> None:
         """Copy and validate sparse words without combining terms or constructing dense labels."""
         if (
             isinstance(num_qubits, bool | np.bool_)
@@ -76,7 +80,7 @@ class SparsePauliTerms(Sequence[str]):
         object.__setattr__(self, "num_qubits", int(num_qubits))
         object.__setattr__(self, "words", tuple(words))
 
-    def factors(self, index: int) -> tuple[tuple[int, str], ...]:
+    def factors(self, index: int) -> PauliWord:
         """Access one word without materializing a label."""
         return self.words[index]
 
@@ -102,6 +106,7 @@ class SparsePauliTerms(Sequence[str]):
             return self.num_qubits == other.num_qubits and self.words == other.words
         return (
             isinstance(other, Sequence)
+            and not isinstance(other, str | bytes)
             and len(self) == len(other)
             and all(a == b for a, b in zip(self, other, strict=True))
         )
@@ -183,7 +188,7 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
     def from_sparse_terms(
         cls,
         num_qubits: int,
-        terms: Iterable[Mapping[int, str] | Iterable[tuple[int, str]]],
+        terms: Iterable[Mapping[int, str] | Iterable[PauliFactor]],
         coefficients: np.ndarray,
         *,
         encoding: str | None = None,
@@ -222,15 +227,14 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         """Return the register width."""
         return self.pauli_strings.num_qubits
 
-    def iter_sparse_terms(self) -> Iterator[tuple[tuple[tuple[int, str], ...], complex]]:
+    def iter_sparse_terms(self) -> Iterator[tuple[PauliWord, complex]]:
         """Iterate over terms as sorted non-identity factors with their coefficients, without building labels.
 
         Yields:
-            Pairs of ``((qubit_index, Pauli), ...)`` factors and complex coefficients; identity has no factors.
+            Pairs of ``((qubit, axis), ...)`` factors and coefficients as Python numbers of the stored type.
 
         """
-        for word, coefficient in zip(self.pauli_strings.words, self.coefficients, strict=True):
-            yield word, complex(coefficient)
+        yield from zip(self.pauli_strings.words, self.coefficients.tolist(), strict=True)
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher, hashing the width and sparse words instead of labels."""
@@ -245,7 +249,7 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         _hash_optional(h, self.tapering, _hash_tapering)
 
     def equiv(self, other: PauliDecompositionContainer, atol: float = 1e-12) -> bool:
-        """Check equivalence by summing coefficients per non-identity word, without building labels.
+        """Check equivalence by summing each operand's coefficients per non-identity word, without building labels.
 
         Args:
             other: The Pauli decomposition to compare against.
@@ -257,11 +261,12 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         """
         if not isinstance(other, PauliDecompositionContainer) or self.num_qubits != other.num_qubits:
             return False
-        difference: dict[tuple[tuple[int, str], ...], complex] = {}
-        for sign, operator in ((1, self), (-1, other)):
+        totals: tuple[dict[PauliWord, complex], dict[PauliWord, complex]] = ({}, {})
+        for operator, total in zip((self, other), totals, strict=True):
             for word, coefficient in _sparse_terms(operator):
-                difference[word] = difference.get(word, 0) + sign * coefficient
-        return all(abs(value) <= atol for value in difference.values())
+                total[word] = total.get(word, 0) + coefficient
+        mine, theirs = totals
+        return all(abs(mine.get(word, 0) - theirs.get(word, 0)) <= atol for word in mine.keys() | theirs.keys())
 
     def __add__(self, other: PauliDecompositionContainer) -> SparsePauliDecompositionContainer:
         """Return the sum with sparse storage, under the dense container's metadata rules.
@@ -489,13 +494,13 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         )
 
 
-def _sparse_terms(operator: PauliDecompositionContainer) -> Iterator[tuple[tuple[tuple[int, str], ...], complex]]:
+def _sparse_terms(operator: PauliDecompositionContainer) -> Iterator[tuple[PauliWord, complex]]:
     """Yield sorted non-identity factors and coefficients, converting dense labels when needed."""
     if isinstance(operator, SparsePauliDecompositionContainer):
         yield from operator.iter_sparse_terms()
         return
-    for label, coefficient in zip(operator.pauli_strings, operator.coefficients, strict=True):
-        yield tuple((q, "IXYZ"[code]) for q, code in label_to_sparse_pauli_word(label)), complex(coefficient)
+    for label, coefficient in zip(operator.pauli_strings, np.asarray(operator.coefficients).tolist(), strict=True):
+        yield tuple((q, "IXYZ"[code]) for q, code in label_to_sparse_pauli_word(label)), coefficient
 
 
 def _decoded(value: Any) -> Any:
