@@ -13,7 +13,7 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     AlgorithmRef,
     Configuration,
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
     ModelOrbitals,
@@ -166,7 +166,7 @@ def make_fake_hamiltonian(
     basis_vectors = rng.standard_normal((r, b, n))
     basis_vectors /= np.linalg.norm(basis_vectors, axis=-1, keepdims=True)
 
-    container = FactorizedHamiltonianContainer(
+    container = DFTHCHamiltonianContainer(
         one_body_integrals=one_body,
         u_matrices=basis_vectors.ravel(),
         w_matrices=rng.standard_normal((r, b, c)).ravel() * 0.1,
