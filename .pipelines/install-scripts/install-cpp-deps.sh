@@ -31,7 +31,8 @@ MACIS_CGMANIFEST="$2"
 BLAS_VENDOR="${3:-auto}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/common.sh"
+INSTALL_SCRIPTS="${INSTALL_SCRIPTS:-$SCRIPT_DIR}"
+source "${INSTALL_SCRIPTS}/common.sh"
 
 if [[ ! -f "$CGMANIFEST" ]]; then
     echo "Error: cgmanifest.json not found at $CGMANIFEST"
@@ -63,6 +64,7 @@ fi
 # memory-aware build parallelism" step) when JOBS isn't set explicitly, so this script doesn't independently
 # re-derive a job count that could exceed what the runner's memory actually supports.
 JOBS="${JOBS:-${CMAKE_BUILD_PARALLEL_LEVEL:-$DEFAULT_JOBS}}"
+LIBINT_JOBS="${LIBINT_JOBS:-$JOBS}"
 MAC_BUILD="OFF"
 if [[ "$OSTYPE" == "darwin"* ]]; then
     MAC_BUILD="ON"
@@ -220,10 +222,10 @@ rm -rf spdlog
 
 # Install blaspp / lapackpp
 echo "=== Installing blaspp ==="
-bash "${SCRIPT_DIR}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
+bash "${INSTALL_SCRIPTS}/install-blaspp.sh" "$INSTALL_PREFIX" "$BLASPP_COMMIT" "$BLAS_VENDOR" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
 
 echo "=== Installing lapackpp ==="
-bash "${SCRIPT_DIR}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
+bash "${INSTALL_SCRIPTS}/install-lapackpp.sh" "$INSTALL_PREFIX" "$LAPACKPP_COMMIT" "$MARCH" "$BUILD_SHARED_LIBS" "$BUILD_TYPE"
 
 # Install libint2
 echo "=== Installing libint2 ==="
@@ -249,7 +251,7 @@ cmake .. -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
          -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
          -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
          -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
-make -j"$JOBS"
+make -j"$LIBINT_JOBS"
 make install
 cd "$BUILD_DIR"
 rm -rf "$LIBINT_DIR" "$LIBINT_TARBALL"

@@ -38,12 +38,9 @@ RUN apt-get update && \
     python3-pip \
     python-is-python3 \
     libeigen3-dev \
-    nlohmann-json3-dev \
     libhdf5-dev \
     libopenblas-dev \
     libboost-all-dev \
-    libgtest-dev \
-    libgmock-dev \
     libfmt-dev \
     ninja-build \
     gcovr \
@@ -58,19 +55,19 @@ RUN apt-get update && \
 # interactive shells.
 COPY .devcontainer/scripts/parallelism.sh /usr/local/share/qdk/parallelism.sh
 
-# Install C++ dependencies
-# Keep the shared installers at the path used by the devcontainer script.
-COPY .pipelines/install-scripts/common.sh /.pipelines/install-scripts/common.sh
-COPY .pipelines/install-scripts/install-blaspp.sh /.pipelines/install-scripts/install-blaspp.sh
-COPY .pipelines/install-scripts/install-lapackpp.sh /.pipelines/install-scripts/install-lapackpp.sh
+# Share the dependency build implementation with CI while keeping devcontainer settings in its wrapper.
+COPY .pipelines/install-scripts/common.sh /tmp/install-scripts/common.sh
+COPY .pipelines/install-scripts/install-cpp-deps.sh /tmp/install-scripts/install-cpp-deps.sh
+COPY .pipelines/install-scripts/install-blaspp.sh /tmp/install-scripts/install-blaspp.sh
+COPY .pipelines/install-scripts/install-lapackpp.sh /tmp/install-scripts/install-lapackpp.sh
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
 COPY cpp/manifest/qdk-chemistry/cgmanifest.json /tmp/cpp_cgmanifest.json
 COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Delete build directory after installation
 ENV KEEP_BUILD_DIR=0
-RUN bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
-    rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
+RUN INSTALL_SCRIPTS=/tmp/install-scripts bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
+    rm -rf /tmp/install-scripts /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
