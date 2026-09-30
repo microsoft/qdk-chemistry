@@ -457,14 +457,16 @@ TEST_F(LatticeGraphTest, CustomGraphsAcceptEdgeLabels) {
   EXPECT_EQ(restored.edge_labels(), labels);
   EXPECT_EQ(restored.content_hash(), graph.content_hash());
 
-  // Labels must cover exactly the stored pairs, each with a positive shell.
+  // Labels must cover exactly the stored pairs, each with a shell in [1, 2^53].
   auto missing = labels;
   missing.erase({0, 2});
   auto extra = labels;
   extra[{1, 3}] = {2, std::nullopt};
   auto zero_shell = labels;
   zero_shell.at({0, 1}).shell = 0;
-  for (const auto& invalid : {missing, extra, zero_shell}) {
+  auto huge_shell = labels;
+  huge_shell.at({0, 1}).shell = (std::uint64_t{1} << 53) + 1;
+  for (const auto& invalid : {missing, extra, zero_shell, huge_shell}) {
     EXPECT_THROW((LatticeGraph(upper, 0, invalid)), std::invalid_argument);
     EXPECT_THROW(
         LatticeGraph::from_dense_matrix(graph.adjacency_matrix(), invalid),
@@ -473,6 +475,37 @@ TEST_F(LatticeGraphTest, CustomGraphsAcceptEdgeLabels) {
                      graph.sparse_adjacency_matrix(), invalid),
                  std::invalid_argument);
   }
+  auto largest = labels;
+  largest.at({0, 1}).shell = std::uint64_t{1} << 53;
+  const LatticeGraph exact(upper, 0, largest);
+  const std::string filename = "test_largest_shell.lattice_graph.h5";
+  exact.to_hdf5_file(filename);
+  const auto hdf5 = LatticeGraph::from_hdf5_file(filename);
+  std::filesystem::remove(filename);
+  EXPECT_EQ(hdf5.edge_labels(), largest);
+  EXPECT_EQ(LatticeGraph::from_json(exact.to_json()).edge_labels(), largest);
+}
+
+TEST_F(LatticeGraphTest, LabelsFollowEdgesStoredInEitherDirection) {
+  // Swapping the endpoints of a directed labelled edge keeps its label.
+  const LatticeGraph directed({{{0, 1}, 1.0}}, 2, {{{0, 1}, {2, flavor_x}}});
+  const auto swapped = LatticeGraph::permute(directed, {1, 0});
+  EXPECT_DOUBLE_EQ(swapped.weight(1, 0), 1.0);
+  EXPECT_EQ(swapped.edge_labels(), directed.edge_labels());
+  const auto restored = LatticeGraph::from_json(swapped.to_json());
+  EXPECT_EQ(restored.content_hash(), swapped.content_hash());
+
+  // Pair (1, 2) is stored only as (2, 1) and is still keyed with i < j.
+  const EdgeLabels labels = {{{0, 1}, {1, std::nullopt}},
+                             {{1, 2}, {2, flavor_y}}};
+  const LatticeGraph mixed({{{0, 1}, 1.0}, {{2, 1}, 1.0}}, 3, labels);
+  EXPECT_EQ(LatticeGraph::from_json(mixed.to_json()).edge_labels(), labels);
+  const auto bidirectional = LatticeGraph::make_bidirectional(mixed);
+  EXPECT_TRUE(bidirectional.is_symmetric());
+  EXPECT_EQ(bidirectional.edge_labels(), labels);
+  EXPECT_THROW(LatticeGraph({{{0, 1}, 1.0}, {{2, 1}, 1.0}}, 3,
+                            {{{0, 1}, {1, std::nullopt}}}),
+               std::invalid_argument);
 }
 
 TEST_F(LatticeGraphTest, FromGeometryRejectsInvalidInputs) {
@@ -484,11 +517,24 @@ TEST_F(LatticeGraphTest, FromGeometryRejectsInvalidInputs) {
     EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1}, {}, value),
                  std::invalid_argument);
   }
-  for (double tolerance : {0.0, -1.0, std::numeric_limits<double>::infinity(),
-                           std::numeric_limits<double>::quiet_NaN()}) {
+  for (double tolerance :
+       {0.0, -1.0, 1.0, 2.0, std::numeric_limits<double>::infinity(),
+        std::numeric_limits<double>::quiet_NaN()}) {
     EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1}, {}, 1.0, tolerance),
                  std::invalid_argument);
   }
+  // Axis normalization uses its own bound, but still rejects subnormal axes.
+  EXPECT_EQ(
+      LatticeGraph::from_geometry(LatticeGeometry::square(2, 2), {2},
+                                  {{2, Vec2(1.0, 1.0), flavor_x}}, 1.0, 1.0e-16)
+          .edge_labels()
+          .at({0, 3})
+          .flavor,
+      flavor_x);
+  const double subnormal = std::numeric_limits<double>::denorm_min();
+  EXPECT_THROW(LatticeGraph::from_geometry(
+                   geometry, {1}, {{1, Vec2(subnormal, subnormal), flavor_x}}),
+               std::invalid_argument);
   EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
                                            {{0, Vec2(1.0, 0.0), flavor_x}}),
                std::invalid_argument);
@@ -1080,6 +1126,12 @@ TEST_F(LatticeGraphTest, FromGeometryStoresTopologyColoring) {
   const auto empty = LatticeGraph::from_geometry(geometry, {});
   ASSERT_TRUE(empty.edge_coloring());
   EXPECT_TRUE(empty.edge_coloring()->empty());
+  for (int seed : {0, 5}) {
+    const auto seeded =
+        LatticeGraph::from_geometry(geometry, {1, 2}, {}, 1.0, 1.0e-9, seed);
+    EXPECT_EQ(*seeded.edge_coloring(),
+              greedy_edge_coloring(unit.sparse_adjacency_matrix(), seed, 32));
+  }
 }
 
 TEST_F(LatticeGraphTest, Permute) {

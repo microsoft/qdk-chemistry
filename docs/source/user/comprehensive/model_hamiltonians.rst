@@ -247,7 +247,7 @@ The spin builders accept shell mappings that **filter already-selected graph con
 A scalar or array coupling ``J`` is the same as the mapping ``{1: J}``, and every edge of a graph without edge labels, such as a factory lattice, is a shell-1 edge.
 Choose the union of active shells after resolving parameter defaults and component-specific overrides, then construct one :class:`~qdk_chemistry.data.LatticeGraph` for that union.
 A scalar coupling is active when nonzero; an array coupling is active when any entry is nonzero.
-An active shell with no graph edges raises an error, even if the geometry contains that distance.
+On a labelled graph, an active shell with no labelled edges raises an error, even if the geometry contains that distance; a graph without edge labels always provides shell 1, even when it has no edges.
 Empty or all-zero mappings require no edge labels.
 
 For example, a physical-spin first- and second-neighbor Heisenberg model can be written as:

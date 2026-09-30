@@ -63,10 +63,10 @@ Use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` to materialize the re
       :start-after: // start-cell-from-geometry
       :end-before: // end-cell-from-geometry
 
-The Python call is ``LatticeGraph.from_geometry(geometry, shells, bond_flavors=[], weight=1.0, tolerance=1e-9)``.
+The Python call is ``LatticeGraph.from_geometry(geometry, shells, bond_flavors=[], weight=1.0, tolerance=1e-9, coloring_seed=0)``.
 ``shells`` is deduplicated; an empty selection or unavailable finite shells create no edges.
 Each physical connection becomes one edge whose weight is the finite ``weight``.
-``tolerance`` must be finite and positive and controls distance and axis comparisons.
+``tolerance`` must be positive and less than 1, the lattice unit length, and controls distance and axis comparisons.
 Optional :class:`~qdk_chemistry.data.BondFlavorDefinition` objects assign semantic labels while constructing the graph.
 The graph does not retain the geometry.
 Each edge is a single bond, so small periodic cells where several periodic images join one pair, or a site neighbors its own image, are rejected.
@@ -295,8 +295,8 @@ Custom edge labels
 ~~~~~~~~~~~~~~~~~~
 
 Graphs built from adjacency data can carry the same labels, which defines neighbor shells and flavors for connectivity that no built-in geometry describes.
-Pass ``edge_labels``, a mapping from every stored pair ``(i, j)`` with ``i < j`` to an :class:`~qdk_chemistry.data.EdgeLabel`, to the edge-weight constructor, :meth:`~qdk_chemistry.data.LatticeGraph.from_dense_matrix`, or :meth:`~qdk_chemistry.data.LatticeGraph.from_sparse_matrix`.
-The labels must cover exactly the stored pairs, each with a positive shell; an empty mapping leaves the graph unlabelled.
+Pass ``edge_labels``, a mapping from every stored pair, keyed by ``(i, j)`` with ``i < j`` whichever direction stores it, to an :class:`~qdk_chemistry.data.EdgeLabel`, to the edge-weight constructor, :meth:`~qdk_chemistry.data.LatticeGraph.from_dense_matrix`, or :meth:`~qdk_chemistry.data.LatticeGraph.from_sparse_matrix`.
+The labels must cover exactly the stored pairs, each with a shell from 1 to :math:`2^{53}`; an empty mapping leaves the graph unlabelled.
 Model builders then select shells and flavors exactly as for graphs built from a geometry.
 
 .. tab:: Python API
@@ -420,7 +420,7 @@ Zero weights do not remove pairs from this coloring.
 A geometry graph with no edges has an empty coloring, not ``None``.
 Nearest-neighbor convenience factories retain their existing topology colorings; raw-adjacency constructors do not assign one.
 
-:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` uses the native greedy search with ``seed=0`` and ``trials=32``; it is deterministic but is not guaranteed to be optimal.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` uses the native greedy search with its ``coloring_seed`` (default ``0``) and 32 trials, like the other factories that color greedily; it is deterministic for a given seed but is not guaranteed to be optimal.
 Edges sharing a color have disjoint vertices, enabling parallel Pauli exponentials in a :doc:`Trotter step <../algorithms/hamiltonian_unitary_builder>`.
 :meth:`~qdk_chemistry.data.LatticeGraph.permute` relabels their endpoints without recoloring.
 Serialization retains the stored assignment.

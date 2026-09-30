@@ -275,7 +275,7 @@ def create_heisenberg_hamiltonian(
         QubitOperator: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
 
     Raises:
-        ValueError: If the graph is asymmetric, a shell index is invalid, or an active shell has no graph edges.
+        ValueError: If the graph is asymmetric, a shell index is invalid, or an active shell has no labelled edges.
 
     """
     if not graph.is_symmetric:

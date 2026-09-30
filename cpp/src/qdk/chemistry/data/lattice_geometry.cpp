@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <Eigen/SVD>
 #include <algorithm>
 #include <array>
 #include <blas.hh>
@@ -78,9 +79,9 @@ std::vector<LatticeGeometry::ShellBond> LatticeGeometry::_shell_bonds(
     }
     requested_shells.insert(shell);
   }
-  if (!std::isfinite(tolerance) || tolerance <= 0.0) {
+  if (!std::isfinite(tolerance) || tolerance <= 0.0 || tolerance >= 1.0) {
     throw std::invalid_argument(
-        "Neighbor connection tolerance must be positive.");
+        "Neighbor connection tolerance must be positive and less than 1.");
   }
   if (requested_shells.empty()) return {};
   const auto& embedding = _embedding;
@@ -111,93 +112,142 @@ std::vector<LatticeGeometry::ShellBond> LatticeGeometry::_shell_bonds(
     std::uint64_t shell = 0;
     Eigen::RowVector2d axis;
   };
-  std::vector<Stencil> stencils;
-  int max_shell = 0;
-  if (embedding.periodic_x || embedding.periodic_y) {
-    const auto limit = static_cast<std::uint64_t>(
-        std::numeric_limits<int>::max() - std::max(embedding.nx, embedding.ny));
-    if (*requested_shells.rbegin() > limit) {
-      throw std::overflow_error(
-          "Neighbor connection stencil exceeds the supported integer range.");
-    }
-    max_shell = static_cast<int>(*requested_shells.rbegin());
-  }
-  const int min_dx = embedding.periodic_x ? -max_shell : 1 - embedding.nx;
-  const int max_dx = embedding.periodic_x ? max_shell : embedding.nx - 1;
-  const int min_dy = embedding.periodic_y ? -max_shell : 1 - embedding.ny;
-  const int max_dy = embedding.periodic_y ? max_shell : embedding.ny - 1;
-  for (int source_basis = 0; source_basis < basis_size; ++source_basis) {
-    const Eigen::RowVector2d source_offset = embedding.basis.row(source_basis);
-    for (int target_basis = 0; target_basis < basis_size; ++target_basis) {
-      const Eigen::RowVector2d target_offset =
-          embedding.basis.row(target_basis);
-      for (int dy = min_dy; dy <= max_dy; ++dy) {
-        for (int dx = min_dx; dx <= max_dx; ++dx) {
-          if (dx > 0 ||
-              (dx == 0 &&
-               (dy > 0 || (dy == 0 && source_basis >= target_basis)))) {
-            continue;
-          }
+  const auto enumerate = [&](int window) {
+    std::vector<Stencil> stencils;
+    const int min_dx = embedding.periodic_x ? -window : 1 - embedding.nx;
+    const int max_dx = embedding.periodic_x ? window : embedding.nx - 1;
+    const int min_dy = embedding.periodic_y ? -window : 1 - embedding.ny;
+    const int max_dy = embedding.periodic_y ? window : embedding.ny - 1;
+    for (int source_basis = 0; source_basis < basis_size; ++source_basis) {
+      const Eigen::RowVector2d source_offset =
+          embedding.basis.row(source_basis);
+      for (int target_basis = 0; target_basis < basis_size; ++target_basis) {
+        const Eigen::RowVector2d target_offset =
+            embedding.basis.row(target_basis);
+        for (int dy = min_dy; dy <= max_dy; ++dy) {
+          for (int dx = min_dx; dx <= max_dx; ++dx) {
+            if (dx > 0 ||
+                (dx == 0 &&
+                 (dy > 0 || (dy == 0 && source_basis >= target_basis)))) {
+              continue;
+            }
 
-          // Finite shells count only displacements realized by actual sites,
-          // including the missing corners of an open plaquette patch.
-          bool exists = false;
-          const int y_begin = embedding.periodic_y ? 0 : std::max(0, -dy);
-          const int y_end =
-              embedding.ny - (embedding.periodic_y ? 0 : std::max(0, dy));
-          const int x_begin = embedding.periodic_x ? 0 : std::max(0, -dx);
-          const int x_end =
-              embedding.nx - (embedding.periodic_x ? 0 : std::max(0, dx));
-          for (int y = y_begin; !exists && y < y_end; ++y) {
-            for (int x = x_begin; x < x_end; ++x) {
-              const int target_x = embedding.periodic_x
-                                       ? wrap(x + dx, embedding.nx).first
-                                       : x + dx;
-              const int target_y = embedding.periodic_y
-                                       ? wrap(y + dy, embedding.ny).first
-                                       : y + dy;
-              if (site_at(x, y, source_basis) >= 0 &&
-                  site_at(target_x, target_y, target_basis) >= 0) {
-                exists = true;
-                break;
+            // Finite shells count only displacements realized by actual
+            // sites, including the missing corners of an open plaquette patch.
+            bool exists = false;
+            const int y_begin = embedding.periodic_y ? 0 : std::max(0, -dy);
+            const int y_end =
+                embedding.ny - (embedding.periodic_y ? 0 : std::max(0, dy));
+            const int x_begin = embedding.periodic_x ? 0 : std::max(0, -dx);
+            const int x_end =
+                embedding.nx - (embedding.periodic_x ? 0 : std::max(0, dx));
+            for (int y = y_begin; !exists && y < y_end; ++y) {
+              for (int x = x_begin; x < x_end; ++x) {
+                const int target_x = embedding.periodic_x
+                                         ? wrap(x + dx, embedding.nx).first
+                                         : x + dx;
+                const int target_y = embedding.periodic_y
+                                         ? wrap(y + dy, embedding.ny).first
+                                         : y + dy;
+                if (site_at(x, y, source_basis) >= 0 &&
+                    site_at(target_x, target_y, target_basis) >= 0) {
+                  exists = true;
+                  break;
+                }
               }
             }
-          }
-          if (!exists) continue;
+            if (!exists) continue;
 
-          const Eigen::RowVector2d displacement = static_cast<double>(dx) * a1 +
-                                                  static_cast<double>(dy) * a2 +
-                                                  target_offset - source_offset;
-          const double distance = blas::nrm2(2, displacement.data(), 1);
-          if (!std::isfinite(distance)) {
-            throw std::overflow_error(
-                "Neighbor connection distance exceeds the supported range.");
+            const Eigen::RowVector2d displacement =
+                static_cast<double>(dx) * a1 + static_cast<double>(dy) * a2 +
+                target_offset - source_offset;
+            const double distance = blas::nrm2(2, displacement.data(), 1);
+            if (!std::isfinite(distance)) {
+              throw std::overflow_error(
+                  "Neighbor connection distance exceeds the supported range.");
+            }
+            if (distance == 0.0) continue;
+            stencils.push_back(
+                {source_basis, target_basis, dx, dy, distance, 0,
+                 canonical_axis(displacement, distance, tolerance)});
           }
-          if (distance == 0.0) continue;
-          stencils.push_back(
-              {source_basis, target_basis, dx, dy, distance, 0,
-               canonical_axis(displacement, distance, tolerance)});
         }
       }
     }
-  }
 
-  std::sort(
-      stencils.begin(), stencils.end(), [](const auto& lhs, const auto& rhs) {
-        return std::tie(lhs.distance, lhs.dx, lhs.dy, lhs.source_basis,
-                        lhs.target_basis) < std::tie(rhs.distance, rhs.dx,
-                                                     rhs.dy, rhs.source_basis,
-                                                     rhs.target_basis);
-      });
-  std::uint64_t shell = 0;
-  double shell_distance = 0.0;
-  for (auto& stencil : stencils) {
-    if (shell == 0 ||
-        !same_distance(stencil.distance, shell_distance, tolerance)) {
-      ++shell;
-      shell_distance = stencil.distance;
+    std::sort(
+        stencils.begin(), stencils.end(), [](const auto& lhs, const auto& rhs) {
+          return std::tie(lhs.distance, lhs.dx, lhs.dy, lhs.source_basis,
+                          lhs.target_basis) < std::tie(rhs.distance, rhs.dx,
+                                                       rhs.dy, rhs.source_basis,
+                                                       rhs.target_basis);
+        });
+    std::uint64_t shell = 0;
+    double shell_distance = 0.0;
+    for (auto& stencil : stencils) {
+      if (shell == 0 ||
+          !same_distance(stencil.distance, shell_distance, tolerance)) {
+        ++shell;
+        shell_distance = stencil.distance;
+      }
+      stencil.shell = shell;
     }
-    stencil.shell = shell;
+    return stencils;
+  };
+
+  const std::uint64_t max_shell = *requested_shells.rbegin();
+  std::vector<Stencil> stencils;
+  if (!embedding.periodic_x && !embedding.periodic_y) {
+    stencils = enumerate(0);
+  } else {
+    const auto limit = static_cast<std::uint64_t>(
+        std::numeric_limits<int>::max() - std::max(embedding.nx, embedding.ny));
+    const auto checked_window = [limit](double cells) {
+      if (!(cells <= static_cast<double>(limit))) {
+        throw std::overflow_error(
+            "Neighbor connection stencil exceeds the supported integer range.");
+      }
+      return static_cast<int>(std::ceil(cells));
+    };
+    double spread = 0.0;
+    for (int source = 0; source < basis_size; ++source) {
+      for (int target = 0; target < basis_size; ++target) {
+        spread = std::max(
+            spread,
+            (embedding.basis.row(target) - embedding.basis.row(source)).norm());
+      }
+    }
+    const double smallest_singular_value =
+        Eigen::JacobiSVD<Eigen::Matrix2d>(embedding.primitive_vectors)
+            .singularValues()(1);
+    // Cell offsets reaching distance r are at most (r + spread) / s_min.
+    const auto offsets_within = [&](double radius) {
+      const double lattice = (radius + spread) / smallest_singular_value;
+      if (embedding.periodic_x && embedding.periodic_y) return lattice;
+      // The open direction's offset is bounded by the patch instead.
+      const double direct =
+          embedding.periodic_x
+              ? (radius + spread + (embedding.ny - 1) * a2.norm()) / a1.norm()
+              : (radius + spread + (embedding.nx - 1) * a1.norm()) / a2.norm();
+      return std::min(lattice, direct);
+    };
+    int window = checked_window(static_cast<double>(max_shell));
+    while (true) {
+      stencils = enumerate(window);
+      const auto first = std::find_if(stencils.begin(), stencils.end(),
+                                      [max_shell](const auto& stencil) {
+                                        return stencil.shell == max_shell;
+                                      });
+      if (first == stencils.end()) {
+        window = checked_window(2.0 * window);
+        continue;
+      }
+      // Relative merging extends a shell to its first distance / (1 - tol).
+      const int needed =
+          checked_window(offsets_within(first->distance / (1.0 - tolerance)));
+      if (needed <= window) break;
+      window = needed;
+    }
   }
 
   std::vector<ShellBond> result;
@@ -545,10 +595,13 @@ LatticeGeometry LatticeGeometry::from_hdf5(H5::Group& group) {
       return load_matrix_from_group(source, name);
     };
     const auto read_ints = [](H5::Group& source, const std::string& name) {
-      // The shared loader reads a single extent without checking the rank.
-      if (source.openDataSet(name).getSpace().getSimpleExtentNdims() != 1) {
+      // The shared loader reads one extent and converts any numeric type.
+      const auto dataset = source.openDataSet(name);
+      if (dataset.getSpace().getSimpleExtentNdims() != 1 ||
+          dataset.getTypeClass() != H5T_INTEGER) {
         throw std::invalid_argument(
-            "Integer embedding dataset must have rank one: " + name);
+            "Integer embedding dataset must be a rank-one integer array: " +
+            name);
       }
       return load_std_vector_from_group<int>(source, name);
     };
@@ -565,13 +618,14 @@ LatticeGeometry LatticeGeometry::from_hdf5(H5::Group& group) {
     }
     auto layout = group.openGroup("integer_embedding");
     const auto shape = read_ints(layout, "shape");
-    if (shape.size() != 4) {
+    if (shape.size() != 4 || (shape[2] != 0 && shape[2] != 1) ||
+        (shape[3] != 0 && shape[3] != 1)) {
       throw std::invalid_argument("Invalid lattice integer embedding.");
     }
     return _from_integer_embedding(
         shape[0], shape[1], read_matrix(layout, "primitive_vectors"),
         read_matrix(layout, "basis"), read_ints(layout, "site_by_coordinate"),
-        shape[2] != 0, shape[3] != 0);
+        shape[2] == 1, shape[3] == 1);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGeometry::from_hdf5: " +
                              std::string(e.getCDetailMsg()));

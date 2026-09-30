@@ -31,6 +31,12 @@ class TestLatticeGeometry:
             with pytest.raises(TypeError):
                 LatticeGraph.from_geometry(geometry, [shell])
 
+    @pytest.mark.parametrize("tolerance", [1.0, 2.0])
+    def test_shell_selection_requires_tolerance_below_unit_length(self, tolerance: float) -> None:
+        """Tolerances of at least the lattice unit length would merge every distance into one shell."""
+        with pytest.raises(ValueError, match="less than 1"):
+            LatticeGraph.from_geometry(LatticeGeometry.chain(3, periodic=True), [1], tolerance=tolerance)
+
     def test_properties_return_copies(self) -> None:
         """Mutating returned arrays leaves stored positions and periods unchanged."""
         geometry = LatticeGeometry.square(2, 1, periodic_x=True)
@@ -88,6 +94,17 @@ class TestSelectedLatticeGraph:
         assert {pair: label.shell for pair, label in labels.items()} == {(0, 1): 1, (0, 2): 2, (1, 2): 1}
         assert all(label.flavor == 1000 + label.shell for label in labels.values())
         np.testing.assert_array_equal(graph.adjacency_matrix(), 2.5 * (np.ones((3, 3)) - np.eye(3)))
+
+    def test_from_geometry_forwards_coloring_seed(self) -> None:
+        """The coloring seed only changes the greedy coloring, and seed 0 is the default."""
+        geometry = LatticeGeometry.triangular(4, 4, periodic_x=True, periodic_y=True)
+        default = LatticeGraph.from_geometry(geometry, [1])
+        seeded = LatticeGraph.from_geometry(geometry, [1], coloring_seed=7)
+
+        assert LatticeGraph.from_geometry(geometry, [1], coloring_seed=0).edge_coloring == default.edge_coloring
+        assert LatticeGraph.from_geometry(geometry, [1], coloring_seed=7).edge_coloring == seeded.edge_coloring
+        assert seeded.edge_labels == default.edge_labels
+        assert seeded.edge_coloring.keys() == default.edge_coloring.keys()
 
     def test_custom_graphs_accept_edge_labels(self) -> None:
         """Adjacency-built graphs retain user shells and flavors through data operations."""

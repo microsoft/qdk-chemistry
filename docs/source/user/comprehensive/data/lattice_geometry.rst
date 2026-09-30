@@ -75,7 +75,7 @@ For example, the first three shells on sufficiently large open square lattices h
 A thin patch has its own shells: ``square(1, 5)`` has the same shells as ``chain(5)``, and ``square(2, 8)`` has no :math:`2\sqrt{2}` distance, so its fifth shell is distance :math:`3`.
 
 :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` materializes the requested shells as labelled edges.
-Its ``tolerance`` (default ``1e-9``) applies to relative distance and absolute axis comparisons, and unavailable finite shells contribute no edges.
+Its ``tolerance`` (default ``1e-9``) applies to relative distance and absolute axis comparisons and must be less than 1, the lattice unit length; unavailable finite shells contribute no edges.
 Factories retain their integer unit-cell layout, so shell searches do not compare all site pairs.
 
 .. tab:: Python API

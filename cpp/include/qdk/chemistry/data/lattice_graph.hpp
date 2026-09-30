@@ -30,6 +30,7 @@ using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 
 /** @brief Geometric shell and optional semantic flavor of one edge. */
 struct EdgeLabel {
+  /// One-based neighbor shell, at most 2^53 so that HDF5 stores it exactly.
   std::uint64_t shell;
   std::optional<BondFlavorId> flavor;
   bool operator==(const EdgeLabel&) const = default;
@@ -133,10 +134,11 @@ class LatticeGraph : public DataClass {
    * @param edge_weights Map of (source, target) -> weight.
    * @param num_sites   Total number of sites. If 0, inferred from the
    *                    largest index in edge_weights.
-   * @param edge_labels Shell and optional flavor of every stored pair (i, j)
-   *                    with i < j, or empty for an unlabelled graph.
+   * @param edge_labels Shell and optional flavor of every stored pair, keyed
+   *                    by (i, j) with i < j whichever direction stores it, or
+   *                    empty for an unlabelled graph.
    * @throws std::invalid_argument If nonempty edge_labels do not label exactly
-   *         the stored pairs with positive shells.
+   *         the stored pairs with shells from 1 to 2^53.
    */
   LatticeGraph(const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
                    edge_weights,
@@ -146,8 +148,9 @@ class LatticeGraph : public DataClass {
    * @brief Create a lattice graph from a dense adjacency matrix.
    *
    * @param adjacency_matrix Square dense matrix of edge weights.
-   * @param edge_labels Shell and optional flavor of every nonzero pair (i, j)
-   *                    with i < j, or empty for an unlabelled graph.
+   * @param edge_labels Shell and optional flavor of every nonzero pair, keyed
+   *                    by (i, j) with i < j whichever direction stores it, or
+   *                    empty for an unlabelled graph.
    * @return LatticeGraph with the given adjacency.
    * @throws std::invalid_argument If the matrix is not square or the labels
    *         are invalid.
@@ -159,8 +162,9 @@ class LatticeGraph : public DataClass {
    * @brief Create a lattice graph from a sparse adjacency matrix.
    *
    * @param sparse Sparse square matrix of edge weights.
-   * @param edge_labels Shell and optional flavor of every stored pair (i, j)
-   *                    with i < j, or empty for an unlabelled graph.
+   * @param edge_labels Shell and optional flavor of every stored pair, keyed
+   *                    by (i, j) with i < j whichever direction stores it, or
+   *                    empty for an unlabelled graph.
    * @return LatticeGraph with the given adjacency.
    * @throws std::invalid_argument If the matrix is not square or the labels
    *         are invalid.
@@ -174,14 +178,16 @@ class LatticeGraph : public DataClass {
    * Shells rank the distinct distances present on this geometry, including
    * periodic images, so a thin patch can lack a bulk-lattice shell and number
    * the longer distances differently. Each physical connection becomes one
-   * edge of weight `weight`. Edges are colored with greedy coloring, seed 0
-   * and 32 trials.
+   * edge of weight `weight`. Edges are colored greedily with seed
+   * `coloring_seed` and 32 trials.
    *
    * @param geometry Source geometry; it is not retained.
    * @param shells Positive shell indices; duplicates are ignored.
    * @param definitions Optional shell-axis flavor assignments.
    * @param weight Finite weight of every edge.
-   * @param tolerance Positive finite distance and axis tolerance.
+   * @param tolerance Positive distance and axis tolerance, less than 1, the
+   *                  lattice unit length.
+   * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
    * @return Graph whose edges carry their shell and flavor.
    * @throws std::invalid_argument If a site neighbors its own periodic image
    *         or several periodic images join one site pair.
@@ -190,7 +196,7 @@ class LatticeGraph : public DataClass {
       const LatticeGeometry& geometry,
       const std::vector<std::uint64_t>& shells = {1},
       const std::vector<BondFlavorDefinition>& definitions = {},
-      double weight = 1.0, double tolerance = 1.0e-9);
+      double weight = 1.0, double tolerance = 1.0e-9, int coloring_seed = 0);
 
   /**
    * @brief Return a new lattice graph with reverse edges added.

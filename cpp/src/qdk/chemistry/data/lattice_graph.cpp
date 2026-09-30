@@ -34,6 +34,9 @@ constexpr const char* kUnversionedGraphMessage =
     "by an older qdk-chemistry release, migrate it with: python -m "
     "qdk_chemistry.migrate <old_file> <new_file>.";
 
+// HDF5 stores label columns as doubles, which hold every shell up to 2^53.
+constexpr std::uint64_t kMaxEdgeLabelShell = std::uint64_t{1} << 53;
+
 static EdgeColoring color_edges(
     std::uint64_t num_sites,
     const std::vector<std::pair<std::uint64_t, std::uint64_t>>& edges_in,
@@ -70,8 +73,10 @@ static std::vector<BondFlavorDefinition> prepare_flavors(
     }
     definition.axis /=
         blas::nrm2(definition.axis.size(), definition.axis.data(), 1);
+    // BLAS normalization is exact to a few ulps unless the axis is subnormal.
     if (!definition.axis.allFinite() ||
-        std::abs(definition.axis.squaredNorm() - 1.0) > tolerance) {
+        std::abs(definition.axis.squaredNorm() - 1.0) >
+            8.0 * std::numeric_limits<double>::epsilon()) {
       throw std::invalid_argument("Bond-flavor axis normalization failed.");
     }
     orient_axis(definition.axis, tolerance);
@@ -280,22 +285,27 @@ void LatticeGraph::_validate_coloring() const {
 
 void LatticeGraph::_validate_edge_labels() const {
   if (_edge_labels.empty()) return;
-  // Every stored upper-triangular pair has exactly one label.
-  std::size_t labelled = 0;
+  // A pair stored in either direction has one label, keyed with i < j.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> pairs;
   for (int k = 0; k < adjacency_.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(adjacency_, k); it;
          ++it) {
-      if (it.row() >= it.col()) continue;
-      if (!_edge_labels.contains({static_cast<std::uint64_t>(it.row()),
-                                  static_cast<std::uint64_t>(it.col())})) {
+      if (it.row() == it.col()) continue;
+      const auto row = static_cast<std::uint64_t>(it.row());
+      const auto col = static_cast<std::uint64_t>(it.col());
+      const std::pair pair{std::min(row, col), std::max(row, col)};
+      if (!_edge_labels.contains(pair)) {
         throw std::invalid_argument("Adjacency edge missing an edge label.");
       }
-      ++labelled;
+      pairs.insert(pair);
     }
   }
-  if (labelled != _edge_labels.size() ||
+  if (pairs.size() != _edge_labels.size() ||
       std::any_of(_edge_labels.begin(), _edge_labels.end(),
-                  [](const auto& item) { return item.second.shell == 0; })) {
+                  [](const auto& item) {
+                    return item.second.shell == 0 ||
+                           item.second.shell > detail::kMaxEdgeLabelShell;
+                  })) {
     throw std::invalid_argument("Invalid lattice edge label.");
   }
 }
@@ -370,7 +380,7 @@ const EdgeLabels& LatticeGraph::edge_labels() const { return _edge_labels; }
 LatticeGraph LatticeGraph::from_geometry(
     const LatticeGeometry& geometry, const std::vector<std::uint64_t>& shells,
     const std::vector<BondFlavorDefinition>& definitions, double weight,
-    double tolerance) {
+    double tolerance, int coloring_seed) {
   if (!std::isfinite(weight)) {
     throw std::invalid_argument("Connection weight must be finite.");
   }
@@ -403,15 +413,17 @@ LatticeGraph LatticeGraph::from_geometry(
   Eigen::SparseMatrix<double> adjacency(n, n);
   adjacency.setFromTriplets(triplets.begin(), triplets.end());
   adjacency.makeCompressed();
-  // Color labelled pairs, not weights: shell couplings ignore edge weights.
-  // Match the native sparse-adjacency traversal before shuffled trials.
+  // Color every labelled pair, including zero-weight pairs kept in the
+  // topology. Match the native sparse-adjacency traversal before shuffled
+  // trials.
   std::vector<std::pair<std::uint64_t, std::uint64_t>> pairs;
   pairs.reserve(labels.size());
   for (const auto& [pair, label] : labels) pairs.push_back(pair);
   std::sort(pairs.begin(), pairs.end(), [](const auto& lhs, const auto& rhs) {
     return std::tie(lhs.second, lhs.first) < std::tie(rhs.second, rhs.first);
   });
-  auto coloring = detail::color_edges(geometry.num_sites(), pairs, 0, 32);
+  auto coloring =
+      detail::color_edges(geometry.num_sites(), pairs, coloring_seed, 32);
   return LatticeGraph(std::move(adjacency), std::move(coloring),
                       std::move(labels));
 }
@@ -751,46 +763,50 @@ static EdgeColoring color_edges(
   }
   int max_degree = *std::max_element(degree.begin(), degree.end());
   int max_colors = 2 * max_degree;  // upper bound: 2*Δ - 1 rounded up
+  const auto row_size = static_cast<std::size_t>(max_colors);
 
-  EdgeColoring best;
+  std::vector<int> best;
   int best_count = std::numeric_limits<int>::max();
   std::mt19937 rng(static_cast<std::uint32_t>(seed));
 
   std::vector<std::size_t> order(edges_in.size());
   std::iota(order.begin(), order.end(), 0);
+  // Trials reuse one color row per vertex and record colors by edge index.
+  std::vector<char> vertex_used(num_vertices * row_size);
+  std::vector<int> coloring(edges_in.size());
 
   for (int trial = 0; trial < trials; ++trial) {
     if (trial > 0) {
       std::shuffle(order.begin(), order.end(), rng);
     }
-
-    EdgeColoring coloring;
-    // For each vertex, a bitset of colours already incident to it.
-    std::vector<std::vector<bool>> vertex_used(
-        num_vertices, std::vector<bool>(max_colors, false));
+    std::fill(vertex_used.begin(), vertex_used.end(), 0);
     int max_color = -1;
 
     for (std::size_t pos : order) {
       const auto& edge = edges_in[pos];
-      const auto& used_i = vertex_used[edge.first];
-      const auto& used_j = vertex_used[edge.second];
+      char* used_i = vertex_used.data() + edge.first * row_size;
+      char* used_j = vertex_used.data() + edge.second * row_size;
       int chosen = 0;
       while (chosen < max_colors && (used_i[chosen] || used_j[chosen])) {
         ++chosen;
       }
-      coloring[edge] = chosen;
-      vertex_used[edge.first][chosen] = true;
-      vertex_used[edge.second][chosen] = true;
+      coloring[pos] = chosen;
+      used_i[chosen] = 1;
+      used_j[chosen] = 1;
       if (chosen > max_color) max_color = chosen;
     }
 
     int distinct = max_color + 1;
     if (distinct < best_count) {
       best_count = distinct;
-      best = std::move(coloring);
+      best = coloring;
     }
   }
-  return best;
+  EdgeColoring result;
+  for (std::size_t pos = 0; pos < edges_in.size(); ++pos) {
+    result.emplace(edges_in[pos], best[pos]);
+  }
+  return result;
 }
 
 }  // namespace detail
@@ -1424,12 +1440,13 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
     new_coloring = std::move(coloring);
   }
 
-  LatticeGraph result(std::move(new_adj), std::move(new_coloring));
+  EdgeLabels new_labels;
   for (const auto& [edge, label] : graph._edge_labels) {
     const auto new_edge = std::minmax(inv_p[edge.first], inv_p[edge.second]);
-    result._edge_labels[{new_edge.first, new_edge.second}] = label;
+    new_labels.emplace(std::pair{new_edge.first, new_edge.second}, label);
   }
-  return result;
+  return LatticeGraph(std::move(new_adj), std::move(new_coloring),
+                      std::move(new_labels));
 }
 
 }  // namespace qdk::chemistry::data

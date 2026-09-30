@@ -210,6 +210,47 @@ TEST_F(LatticeGeometryTest, ShellsMatchBruteForceDistanceRanking) {
   }
 }
 
+TEST_F(LatticeGeometryTest, PeriodicShellsDoNotDependOnPrimitiveVectors) {
+  // a2 = (3, 1) spans the same 6 x 6 torus, placing cell (x, y) at square site
+  // ((x + 3y) mod 6, y), so its nearest neighbors are three cells away.
+  const auto square = LatticeGeometry::square(6, 6, true, true);
+  auto json = square.to_json();
+  json["integer_embedding"]["primitive_vectors"] = {{1.0, 0.0}, {3.0, 1.0}};
+  const auto skewed = LatticeGeometry::from_json(json);
+  const auto to_square = [](std::uint64_t site) {
+    return (site % 6 + 3 * (site / 6)) % 6 + 6 * (site / 6);
+  };
+  const auto graph = LatticeGraph::from_geometry(skewed, {1, 2, 3});
+  EdgeLabels mapped;
+  for (const auto& [edge, label] : graph.edge_labels()) {
+    const auto i = to_square(edge.first);
+    const auto j = to_square(edge.second);
+    mapped.emplace(Edge{std::min(i, j), std::max(i, j)}, label);
+  }
+  EXPECT_EQ(mapped,
+            LatticeGraph::from_geometry(square, {1, 2, 3}).edge_labels());
+  for (std::uint64_t shell : {1, 2, 3}) {
+    SCOPED_TRACE(shell);
+    const auto single = LatticeGraph::from_geometry(skewed, {shell});
+    for (const auto& [edge, label] : single.edge_labels()) {
+      EXPECT_EQ(graph.edge_labels().at(edge), label);
+    }
+    EXPECT_EQ(single.edge_labels().size(), 72);
+  }
+}
+
+TEST_F(LatticeGeometryTest, MergedPeriodicShellsDoNotDependOnSelection) {
+  // At tolerance 0.5, distances 1 and 2 form shell 1 wherever it is requested.
+  const auto ring = LatticeGeometry::chain(20, true);
+  const auto first = LatticeGraph::from_geometry(ring, {1}, {}, 1.0, 0.5);
+  const auto both = LatticeGraph::from_geometry(ring, {1, 2}, {}, 1.0, 0.5);
+  EXPECT_EQ(first.edge_labels().size(), 40);
+  EXPECT_EQ(both.edge_labels().size(), 120);
+  for (const auto& [edge, label] : first.edge_labels()) {
+    EXPECT_EQ(both.edge_labels().at(edge), label);
+  }
+}
+
 TEST_F(LatticeGeometryTest, SerializationRetainsLayoutAndHash) {
   for (const auto& [px, py] : boundary_modes) {
     const auto geometry = LatticeGeometry::honeycomb_plaquettes(2, 2, px, py);
@@ -361,4 +402,28 @@ TEST_F(LatticeGeometryTest, Hdf5RejectsInvalidLayout) {
                        H5::DataSpace(1, &size))
         .write(values, H5::PredType::NATIVE_INT);
   });
+  // Integer fields must have an integer type, and periodic flags must be 0/1.
+  expect_invalid([](H5::Group& root) {
+    auto layout = root.openGroup("integer_embedding");
+    layout.unlink("shape");
+    const double values[4] = {2.0, 2.0, 1.0, 0.0};
+    const hsize_t size = 4;
+    layout
+        .createDataSet("shape", H5::PredType::NATIVE_DOUBLE,
+                       H5::DataSpace(1, &size))
+        .write(values, H5::PredType::NATIVE_DOUBLE);
+  });
+  for (int flag : {2, -1}) {
+    SCOPED_TRACE(flag);
+    expect_invalid([flag](H5::Group& root) {
+      auto layout = root.openGroup("integer_embedding");
+      layout.unlink("shape");
+      const int values[4] = {2, 2, flag, 0};
+      const hsize_t size = 4;
+      layout
+          .createDataSet("shape", H5::PredType::NATIVE_INT,
+                         H5::DataSpace(1, &size))
+          .write(values, H5::PredType::NATIVE_INT);
+    });
+  }
 }

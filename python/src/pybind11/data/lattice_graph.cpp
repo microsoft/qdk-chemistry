@@ -87,12 +87,12 @@ Args:
 Label one edge with its neighbor shell and optional semantic flavor.
 
 Args:
-    shell (int): One-based neighbor shell index.
+    shell (int): One-based neighbor shell index, at most ``2**53``.
     flavor (int | None, optional): Opaque non-negative semantic label. Defaults to None.
 )")
       .def_property_readonly(
           "shell", [](const EdgeLabel &self) { return self.shell; },
-          "int: One-based radial shell index.")
+          "int: One-based radial shell index, at most ``2**53``.")
       .def_property_readonly(
           "flavor", [](const EdgeLabel &self) { return self.flavor; },
           "int | None: Opaque non-negative semantic label, or None.")
@@ -169,10 +169,10 @@ Args:
         to edge weights.
     num_sites (int, optional): Number of sites. If 0, inferred from edge indices.
         Defaults to 0.
-    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every stored pair ``(i, j)`` with ``i < j``, or empty for an unlabelled graph. Defaults to {}.
+    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every stored pair, keyed by ``(i, j)`` with ``i < j`` whichever direction stores it, or empty for an unlabelled graph. Defaults to {}.
 
 Raises:
-    ValueError: If nonempty edge labels do not label exactly the stored pairs with positive shells.
+    ValueError: If nonempty edge labels do not label exactly the stored pairs with shells from 1 to ``2**53``.
 )",
       py::arg("edge_weights"), py::arg("num_sites") = 0,
       py::arg("edge_labels") = EdgeLabels{});
@@ -186,7 +186,7 @@ Create a lattice graph from a dense adjacency matrix.
 Args:
     adjacency_matrix (numpy.ndarray): Dense adjacency matrix [n x n]. Non-zero
         entries indicate edges with that weight.
-    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every nonzero pair ``(i, j)`` with ``i < j``, or empty for an unlabelled graph. Defaults to {}.
+    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every nonzero pair, keyed by ``(i, j)`` with ``i < j`` whichever direction stores it, or empty for an unlabelled graph. Defaults to {}.
 
 Returns:
     LatticeGraph: A new lattice graph.
@@ -203,7 +203,7 @@ Create a lattice graph from a sparse adjacency matrix.
 
 Args:
     sparse_adjacency_matrix (scipy.sparse matrix): Sparse adjacency matrix [n x n].
-    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every stored pair ``(i, j)`` with ``i < j``, or empty for an unlabelled graph. Defaults to {}.
+    edge_labels (dict[tuple[int, int], EdgeLabel], optional): Label of every stored pair, keyed by ``(i, j)`` with ``i < j`` whichever direction stores it, or empty for an unlabelled graph. Defaults to {}.
 
 Returns:
     LatticeGraph: A new lattice graph.
@@ -222,14 +222,16 @@ Materialize selected geometric shells as labelled edges.
 Shells rank the distinct distances present on this geometry, including periodic
 images, so a thin patch can lack a bulk-lattice shell and number the longer
 distances differently. Each physical connection becomes one edge of weight
-``weight``; the geometry is not retained.
+``weight``; the geometry is not retained. Edges are colored greedily with
+``coloring_seed`` and 32 trials.
 
 Args:
     geometry (LatticeGeometry): Source Cartesian geometry.
     shells (list[int], optional): Positive shell indices; duplicates are ignored. Defaults to [1].
     bond_flavors (list[BondFlavorDefinition], optional): Shell-axis labels resolved onto edges. Defaults to [].
     weight (float, optional): Finite weight of every edge. Defaults to 1.0.
-    tolerance (float, optional): Positive finite distance and axis tolerance. Defaults to 1e-9.
+    tolerance (float, optional): Positive distance and axis tolerance, less than 1, the lattice unit length. Defaults to 1e-9.
+    coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
 Returns:
     LatticeGraph: Graph whose edges carry their shell and flavor.
@@ -239,7 +241,8 @@ Raises:
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},
-      py::arg("weight") = 1.0, py::arg("tolerance") = 1.0e-9);
+      py::arg("weight") = 1.0, py::arg("tolerance") = 1.0e-9,
+      py::arg("coloring_seed") = 0);
 
   lattice_graph.def_static("permute", &LatticeGraph::permute, R"(
 Relabel sites, edge labels, and topology colors together.
@@ -634,7 +637,7 @@ Returns:
 Load a lattice graph from a JSON string.
 
 Args:
-    json_str (str): Record-based or legacy adjacency JSON, including the site count.
+    json_str (str): Versioned lattice-graph JSON; migrate older files with ``python -m qdk_chemistry.migrate``.
 
 Returns:
     LatticeGraph: New LatticeGraph instance.
