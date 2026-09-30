@@ -48,14 +48,12 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(j, i, t);
 }
 
-// An axis and its negation describe one unoriented bond class. The first
-// component exceeding the tolerance selects the representative sign.
+// An axis and its negation describe one unoriented bond class; this is the
+// sign rule of canonical_axis in lattice_geometry.cpp.
 static void orient_axis(Eigen::RowVectorXd& axis, double tolerance) {
-  for (Eigen::Index k = 0; k < axis.size(); ++k) {
-    if (std::abs(axis[k]) > tolerance) {
-      if (axis[k] < 0.0) axis = -axis;
-      return;
-    }
+  if (axis[0] < -tolerance ||
+      (std::abs(axis[0]) <= tolerance && axis[1] < 0.0)) {
+    axis = -axis;
   }
 }
 

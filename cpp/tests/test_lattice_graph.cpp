@@ -332,6 +332,25 @@ TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
   }
 }
 
+TEST_F(LatticeGraphTest, OppositeFlavorAxesMatchAboveHalfRootTwoTolerance) {
+  // Above 1/sqrt(2), both diagonal components lie within the tolerance of 0.
+  auto json = LatticeGeometry::square(3, 3).to_json();
+  json["integer_embedding"]["primitive_vectors"] = {{1.0, 1.0}, {1.0, -1.0}};
+  const auto geometry = LatticeGeometry::from_json(json);
+  const auto flavored = [&](const Vec2& axis) {
+    return LatticeGraph::from_geometry(geometry, {1}, {{1, axis, flavor_x}},
+                                       1.0, 0.72)
+        .edge_labels();
+  };
+  for (const auto& axis : {Vec2(1.0, -1.0), Vec2(1.0, 1.0)}) {
+    const auto labels = flavored(axis);
+    EXPECT_EQ(flavored(-axis), labels);
+    EXPECT_TRUE(std::any_of(labels.begin(), labels.end(), [](const auto& item) {
+      return item.second.flavor == flavor_x;
+    }));
+  }
+}
+
 TEST_F(LatticeGraphTest, JsonRejectsMalformedEdgeLabels) {
   const auto valid =
       LatticeGraph::from_geometry(LatticeGeometry::chain(3)).to_json();
