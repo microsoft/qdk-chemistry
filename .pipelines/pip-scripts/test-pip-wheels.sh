@@ -13,6 +13,14 @@ else
     PYTHON_DIR="$REPO_ROOT/python"
 fi
 
+EXACHEM_INSTALL_DIR="/workspace/exachem_install"
+EXACHEM_REQUIRED="${EXACHEM_REQUIRED:-false}"
+if [ "${EXACHEM_REQUIRED,,}" = "true" ] &&
+    { [ ! -x "${EXACHEM_INSTALL_DIR}/bin/ExaChem" ] || [ ! -d "${EXACHEM_INSTALL_DIR}/basis" ]; }; then
+    echo "ERROR: ExaChem is required, but ${EXACHEM_INSTALL_DIR} is missing or incomplete." >&2
+    exit 1
+fi
+
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
@@ -63,10 +71,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         xz-utils \
         zlib1g-dev
 
-    # ExaChem runs as a separate MPI process in a fresh container, so it needs its own runtime deps here --
-    # matches build-exachem-linux.sh's package set. Checks the directory directly (not $EXACHEM_INSTALL_DIR,
-    # assigned later below) so this doesn't silently no-op under `set -e`.
-    if [ -d "/workspace/exachem_install" ]; then
+    # ExaChem runs as a separate process in a fresh container, so install its runtime dependencies here.
+    if [ -d "$EXACHEM_INSTALL_DIR" ]; then
         echo "Installing ExaChem runtime apt dependencies..."
         apt-get install -y -q \
             gfortran \
@@ -132,8 +138,7 @@ python3 -m pip install --dry-run --ignore-installed --quiet \
 export QSHARP_PYTHON_TELEMETRY=false
 
 # ExaChem/TAMM is optional: only present for the Linux x86_64 leg (built separately, downloaded as an artifact).
-if [ -d "/workspace/exachem_install" ]; then
-    EXACHEM_INSTALL_DIR="/workspace/exachem_install"
+if [ -d "$EXACHEM_INSTALL_DIR" ]; then
 
     # Libint expects the directory containing basis files, not the install prefix.
     export LIBINT_DATA_PATH="${EXACHEM_INSTALL_DIR}/basis"

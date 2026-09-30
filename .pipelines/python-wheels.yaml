@@ -273,6 +273,7 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                exachemRequired: true
                 condition: succeeded()
 
           # Build - Linux ARM64
