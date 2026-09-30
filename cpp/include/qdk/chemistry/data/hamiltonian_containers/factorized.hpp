@@ -16,14 +16,14 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class FactorizedHamiltonianContainer
+ * @class DFTHCHamiltonianContainer
  * @brief Restricted, spin-free double-factorized tensor hypercontraction(DFTHC)
  *        Hamiltonian container :cite:`Low2025`.
  *
  * @note The two-body tensor is stored as a plain sum of squares, so it is
  * positive semi-definite by construction.
  */
-class FactorizedHamiltonianContainer : public HamiltonianContainer {
+class DFTHCHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Construct a restricted factorized Hamiltonian.
@@ -41,15 +41,38 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @throws std::invalid_argument if dimensions or required data are invalid,
    *         or if a basis row of U is not normalized.
    */
-  FactorizedHamiltonianContainer(
-      const Eigen::MatrixXd& one_body_integrals,
-      const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
-      const Eigen::MatrixXd& wb_matrix, std::shared_ptr<Orbitals> orbitals,
-      double core_energy, const Eigen::MatrixXd& inactive_fock_matrix,
-      HamiltonianType type = HamiltonianType::Hermitian);
+  DFTHCHamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
+                            const Eigen::VectorXd& u_matrices,
+                            const Eigen::VectorXd& w_matrices,
+                            const Eigen::MatrixXd& wb_matrix,
+                            std::shared_ptr<Orbitals> orbitals,
+                            double core_energy,
+                            const Eigen::MatrixXd& inactive_fock_matrix,
+                            HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief Construct an ordinary double-factorized Hamiltonian with zero WB.
+   *
+   * @param one_body_integrals Conventional one-body integrals [N,N].
+   * @param u_matrices U factors, flattened as [R,N,N].
+   * @param w_matrices W factors, flattened as [R,N].
+   * @param orbitals Restricted orbitals with N active spatial orbitals.
+   * @param core_energy Nuclear and inactive-core energy.
+   * @param inactive_fock_matrix Full-space inactive Fock matrix.
+   * @param type Hamiltonian type.
+   * @throws std::invalid_argument if the factors do not have ordinary DF
+   *         dimensions or the general constructor rejects the data.
+   */
+  DFTHCHamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
+                            const Eigen::VectorXd& u_matrices,
+                            const Eigen::VectorXd& w_matrices,
+                            std::shared_ptr<Orbitals> orbitals,
+                            double core_energy,
+                            const Eigen::MatrixXd& inactive_fock_matrix,
+                            HamiltonianType type = HamiltonianType::Hermitian);
 
   /** @brief Destructor. */
-  ~FactorizedHamiltonianContainer() override = default;
+  ~DFTHCHamiltonianContainer() override = default;
 
   /** @brief Create a deep copy. */
   std::unique_ptr<HamiltonianContainer> clone() const override final;
@@ -101,7 +124,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param j Serialized data.
    * @return The reconstructed container.
    */
-  static std::unique_ptr<FactorizedHamiltonianContainer> from_json(
+  static std::unique_ptr<DFTHCHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
   /**
@@ -109,8 +132,7 @@ class FactorizedHamiltonianContainer : public HamiltonianContainer {
    * @param group Serialized data.
    * @return The reconstructed container.
    */
-  static std::unique_ptr<FactorizedHamiltonianContainer> from_hdf5(
-      H5::Group& group);
+  static std::unique_ptr<DFTHCHamiltonianContainer> from_hdf5(H5::Group& group);
 
   /** @return U flattened in [R,B,N] order. */
   const Eigen::VectorXd& get_u_matrices() const;

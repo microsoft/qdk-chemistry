@@ -17,7 +17,7 @@
 
 namespace qdk::chemistry::data {
 
-FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
+DFTHCHamiltonianContainer::DFTHCHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
     const Eigen::MatrixXd& wb_matrix, std::shared_ptr<Orbitals> orbitals,
@@ -70,10 +70,29 @@ FactorizedHamiltonianContainer::FactorizedHamiltonianContainer(
   }
 }
 
+DFTHCHamiltonianContainer::DFTHCHamiltonianContainer(
+    const Eigen::MatrixXd& one_body_integrals,
+    const Eigen::VectorXd& u_matrices, const Eigen::VectorXd& w_matrices,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
+    : DFTHCHamiltonianContainer(
+          one_body_integrals, u_matrices, w_matrices,
+          Eigen::MatrixXd::Zero(
+              one_body_integrals.rows() > 0
+                  ? w_matrices.size() / one_body_integrals.rows()
+                  : 0,
+              1),
+          orbitals, core_energy, inactive_fock_matrix, type) {
+  QDK_LOG_TRACE_ENTERING();
+  if (get_num_bases() != get_num_orbitals()) {
+    throw std::invalid_argument(
+        "Ordinary DF requires U of size R*N*N and W of size R*N.");
+  }
+}
+
 // === HamiltonianContainer overrides ===
 
-std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
-    const {
+std::unique_ptr<HamiltonianContainer> DFTHCHamiltonianContainer::clone() const {
   QDK_LOG_TRACE_ENTERING();
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
   Eigen::MatrixXd fock_alpha = Eigen::MatrixXd::Zero(0, 0);
@@ -81,18 +100,18 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
     auto [fa, fb] = get_inactive_fock_matrix();
     fock_alpha = fa;
   }
-  return std::make_unique<FactorizedHamiltonianContainer>(
+  return std::make_unique<DFTHCHamiltonianContainer>(
       h1_alpha, _u, _w, _wb, _orbitals, _core_energy, fock_alpha, _type);
 }
 
-std::string FactorizedHamiltonianContainer::get_container_type() const {
+std::string DFTHCHamiltonianContainer::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
   return "factorized";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-FactorizedHamiltonianContainer::get_two_body_integrals() const {
+DFTHCHamiltonianContainer::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error(
@@ -107,8 +126,9 @@ FactorizedHamiltonianContainer::get_two_body_integrals() const {
                          std::cref(*_cached_two_body));
 }
 
-double FactorizedHamiltonianContainer::get_two_body_element(
-    unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel) const {
+double DFTHCHamiltonianContainer::get_two_body_element(unsigned i, unsigned j,
+                                                       unsigned k, unsigned l,
+                                                       SpinChannel) const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error(
@@ -149,17 +169,17 @@ double FactorizedHamiltonianContainer::get_two_body_element(
   return element;
 }
 
-bool FactorizedHamiltonianContainer::has_two_body_integrals() const {
+bool DFTHCHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   return _u.size() > 0 && _w.size() > 0;
 }
 
-bool FactorizedHamiltonianContainer::is_restricted() const {
+bool DFTHCHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
   return true;  // Factorized container is always restricted (spin-free)
 }
 
-bool FactorizedHamiltonianContainer::is_valid() const {
+bool DFTHCHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals()) return false;
@@ -178,7 +198,7 @@ bool FactorizedHamiltonianContainer::is_valid() const {
 
 // === Two-body reconstruction ===
 
-Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
+Eigen::VectorXd DFTHCHamiltonianContainer::reconstruct_two_body_integrals()
     const {
   //   h2_{pqrs} = Σ_{t,c} M^{tc}_{pq} M^{tc}_{rs},
   //   M^{tc}_{pq} = Σ_b W^{tc}_b U^t_{bp} U^t_{bq},
@@ -219,7 +239,7 @@ Eigen::VectorXd FactorizedHamiltonianContainer::reconstruct_two_body_integrals()
   return h2;
 }
 
-void FactorizedHamiltonianContainer::_build_two_body_cache() const {
+void DFTHCHamiltonianContainer::_build_two_body_cache() const {
   QDK_LOG_TRACE_ENTERING();
   _cached_two_body =
       std::make_shared<Eigen::VectorXd>(reconstruct_two_body_integrals());
@@ -227,37 +247,37 @@ void FactorizedHamiltonianContainer::_build_two_body_cache() const {
 
 // === Factorized-specific accessors ===
 
-const Eigen::VectorXd& FactorizedHamiltonianContainer::get_u_matrices() const {
+const Eigen::VectorXd& DFTHCHamiltonianContainer::get_u_matrices() const {
   return _u;
 }
 
-const Eigen::VectorXd& FactorizedHamiltonianContainer::get_w_matrices() const {
+const Eigen::VectorXd& DFTHCHamiltonianContainer::get_w_matrices() const {
   return _w;
 }
 
-const Eigen::MatrixXd& FactorizedHamiltonianContainer::get_wb_matrix() const {
+const Eigen::MatrixXd& DFTHCHamiltonianContainer::get_wb_matrix() const {
   return _wb;
 }
 
-size_t FactorizedHamiltonianContainer::get_num_orbitals() const {
+size_t DFTHCHamiltonianContainer::get_num_orbitals() const {
   return static_cast<size_t>(std::get<0>(get_one_body_integrals()).rows());
 }
 
-size_t FactorizedHamiltonianContainer::get_num_ranks() const {
+size_t DFTHCHamiltonianContainer::get_num_ranks() const {
   return static_cast<size_t>(_wb.rows());
 }
 
-size_t FactorizedHamiltonianContainer::get_num_bases() const {
+size_t DFTHCHamiltonianContainer::get_num_bases() const {
   // Inferred from U [R*B*N]; guard against an empty factorization.
   size_t denom = get_num_ranks() * get_num_orbitals();
   return denom == 0 ? 0 : static_cast<size_t>(_u.size()) / denom;
 }
 
-size_t FactorizedHamiltonianContainer::get_num_copies() const {
+size_t DFTHCHamiltonianContainer::get_num_copies() const {
   return static_cast<size_t>(_wb.cols());
 }
 
-Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
+Eigen::MatrixXd DFTHCHamiltonianContainer::get_h1_prime() const {
   // Adjusted one-body matrix h^(1)' :cite:`Low2025` (Eq. 36).
   // Writing the rank-r copy-c leaf as
   //   M^{rc}_{pq} = Σ_{b∈[B]} w_b^{rc} u^r_{b,p} u^r_{b,q},
@@ -302,7 +322,7 @@ Eigen::MatrixXd FactorizedHamiltonianContainer::get_h1_prime() const {
   return h1;
 }
 
-double FactorizedHamiltonianContainer::get_lambda() const {
+double DFTHCHamiltonianContainer::get_lambda() const {
   Eigen::MatrixXd h1p = get_h1_prime();
 
   if (!h1p.isApprox(h1p.transpose())) {
@@ -314,7 +334,7 @@ double FactorizedHamiltonianContainer::get_lambda() const {
   Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(h1p);
   if (solver.info() != Eigen::Success) {
     throw std::runtime_error(
-        "FactorizedHamiltonianContainer::get_lambda: failed to diagonalize the "
+        "DFTHCHamiltonianContainer::get_lambda: failed to diagonalize the "
         "adjusted one-body matrix.");
   }
   double one_body_norm = solver.eigenvalues().array().abs().sum();
@@ -343,7 +363,7 @@ double FactorizedHamiltonianContainer::get_lambda() const {
 }
 // === Serialization ===
 
-nlohmann::json FactorizedHamiltonianContainer::to_json() const {
+nlohmann::json DFTHCHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
   j["version"] = SERIALIZATION_VERSION;
@@ -373,8 +393,8 @@ nlohmann::json FactorizedHamiltonianContainer::to_json() const {
   return j;
 }
 
-std::unique_ptr<FactorizedHamiltonianContainer>
-FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
+std::unique_ptr<DFTHCHamiltonianContainer> DFTHCHamiltonianContainer::from_json(
+    const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   validate_serialization_version(SERIALIZATION_VERSION, j.at("version"));
 
@@ -400,19 +420,19 @@ FactorizedHamiltonianContainer::from_json(const nlohmann::json& j) {
     fock = json_to_matrix(j.at("inactive_fock_matrix"));
   }
 
-  auto container = std::make_unique<FactorizedHamiltonianContainer>(
+  auto container = std::make_unique<DFTHCHamiltonianContainer>(
       h1, u, w, wb, orbitals, core_energy, fock, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
     throw std::invalid_argument(
-        "FactorizedHamiltonianContainer: serialized shape does not match the "
+        "DFTHCHamiltonianContainer: serialized shape does not match the "
         "factor buffers.");
   }
   return container;
 }
 
-void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
+void DFTHCHamiltonianContainer::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
@@ -479,8 +499,8 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   _orbitals->to_hdf5(orb_group);
 }
 
-std::unique_ptr<FactorizedHamiltonianContainer>
-FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
+std::unique_ptr<DFTHCHamiltonianContainer> DFTHCHamiltonianContainer::from_hdf5(
+    H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
 
   H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -526,13 +546,13 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
     fock = load_matrix_from_group(group, "inactive_fock_matrix");
   }
 
-  auto container = std::make_unique<FactorizedHamiltonianContainer>(
+  auto container = std::make_unique<DFTHCHamiltonianContainer>(
       h1, u, w, wb, orbitals, core_energy, fock, type);
   if (container->get_num_ranks() != num_ranks ||
       container->get_num_bases() != num_bases ||
       container->get_num_copies() != num_copies) {
     throw std::invalid_argument(
-        "FactorizedHamiltonianContainer: serialized shape does not match the "
+        "DFTHCHamiltonianContainer: serialized shape does not match the "
         "factor buffers.");
   }
   return container;
@@ -540,7 +560,7 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
 
 // === Validation ===
 
-void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
+void DFTHCHamiltonianContainer::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   HamiltonianContainer::validate_integral_dimensions();
 
@@ -581,7 +601,7 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
 
 // === Hashing ===
 
-void FactorizedHamiltonianContainer::hash_update(
+void DFTHCHamiltonianContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   HamiltonianContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
