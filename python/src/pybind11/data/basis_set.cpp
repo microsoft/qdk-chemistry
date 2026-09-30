@@ -1243,13 +1243,13 @@ Examples:
 Get orbital type for angular momentum quantum number.
 
 Args:
-    l (int): Angular momentum quantum number
+    l (int): Angular momentum quantum number, or -1 for the local ECP term
 
 Returns:
-    OrbitalType: Corresponding orbital type (S, P, D, etc.);
+    OrbitalType: Corresponding orbital type (UL, S, P, D, etc.);
 
 Raises:
-    ValueError: If l is negative or exceeds supported range
+    ValueError: If l is below -1 or exceeds supported range
 
 Examples:
     >>> orbital_type = BasisSet.l_to_orbital_type(2)

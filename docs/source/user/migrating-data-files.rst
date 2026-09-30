@@ -61,7 +61,10 @@ registered make the following changes:
   other files, such as orbitals, Hamiltonians, and wavefunctions, are migrated
   as well, even when the enclosing file is otherwise current. Older basis sets
   also load directly, with the same relabeling and a warning; migrating updates
-  the files themselves.
+  the files themselves. Older files could not mark an ECP without a local term,
+  so one imported from PySCF without it gets the same relabeling, matching how
+  older releases computed with it; import such ECPs again instead of migrating
+  them.
 - :class:`~qdk_chemistry.data.Orbitals` — molecular-orbital coefficients and
   energies are re-expressed as symmetry-blocked tensors. Active/inactive index
   sets and the AO overlap are carried across unchanged.
