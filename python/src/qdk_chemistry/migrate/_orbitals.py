@@ -2,8 +2,9 @@
 
 The only fields whose representation changed are ``coefficients`` and
 ``energies`` (dense per-spin arrays -> ``SymmetryBlockedTensor``). Everything
-else (active/inactive index sets, AO overlap, basis set, scalar metadata) is
-schema-stable and carried through unchanged.
+else (active/inactive index sets, AO overlap, scalar metadata) is schema-stable
+and carried through unchanged; the embedded basis set is migrated beforehand by
+``_basis_set``.
 """
 
 # --------------------------------------------------------------------------------------------
