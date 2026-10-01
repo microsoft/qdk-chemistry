@@ -19,10 +19,28 @@ using namespace qdk::chemistry::python;
 void bind_double_factorization(py::module &m) {
   py::class_<DoubleFactorization, HamiltonianFactorization, py::smart_holder>
       double_factorization(m, "DoubleFactorization", R"(
-  Produces a double-factorized Hamiltonian.
+  Double-factorize a restricted Cholesky Hamiltonian into low-rank two-electron fragments.
 
   The input must be a restricted :class:`qdk_chemistry.data.Hamiltonian`
-  backed by a :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`.
+  backed by a :class:`qdk_chemistry.data.CholeskyHamiltonianContainer`. Its MO
+  Cholesky vectors ``L`` (``norb**2`` rows in pair order ``p*norb+q``, one
+  column per vector) give the two-electron integrals as
+  ``(pq|rs) = sum_l L[pq, l] * L[rs, l]``. This is the first factorization; its
+  accuracy is set by whatever produced the vectors (for example
+  ``cholesky_tolerance`` on the ``qdk_cholesky`` Hamiltonian constructor), not
+  by this algorithm. Dense four-index integrals must be converted to Cholesky
+  form first.
+
+  The second factorization diagonalizes each Cholesky vector, read as a
+  symmetric ``norb`` by ``norb`` matrix: ``L_l = U_l diag(w_l) U_l^T``. Each
+  two-electron fragment is then the square of a one-body operator that is
+  diagonal in the orbitals rotated by ``U_l``, with weights ``w_l``. Every
+  vector and every eigenpair is kept, so the factorized integrals reproduce
+  the input Cholesky product up to floating-point error.
+
+  The result is backed by a :class:`qdk_chemistry.data.DFTHCHamiltonianContainer`
+  with one rank per Cholesky vector. One-body integrals, core energy, orbitals,
+  inactive Fock data, and Hamiltonian type are carried over unchanged.
 
 See Also:
     :class:`qdk_chemistry.data.DFTHCHamiltonianContainer`

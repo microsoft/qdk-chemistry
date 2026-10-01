@@ -31,7 +31,20 @@ class DoubleFactorizationSettings : public qdk::chemistry::data::Settings {
  * @brief Produces a double-factorized Hamiltonian :cite:`vonBurg2021`.
  *
  * @details The input must be a restricted qdk::chemistry::data::Hamiltonian
- * backed by a qdk::chemistry::data::CholeskyHamiltonianContainer.
+ * backed by a qdk::chemistry::data::CholeskyHamiltonianContainer. Its MO
+ * Cholesky vectors L (norb^2 rows in pair order p*norb+q, one column per
+ * vector) give the two-electron integrals as (pq|rs) = sum_l L[pq,l] L[rs,l].
+ * This is the first factorization; its accuracy is set by whatever produced
+ * the vectors, not by this algorithm.
+ *
+ * The second factorization diagonalizes each Cholesky vector, read as a
+ * symmetric norb-by-norb matrix: L_l = U_l diag(w_l) U_l^T. Each two-electron
+ * fragment is then the square of a one-body operator that is diagonal in the
+ * orbitals rotated by U_l, with weights w_l. Every vector and every eigenpair
+ * is kept, so the factorized integrals reproduce the input Cholesky product up
+ * to floating-point error. The result has one rank per Cholesky vector and
+ * carries the one-body integrals, core energy, orbitals, inactive Fock data,
+ * and Hamiltonian type over unchanged.
  *
  * @see qdk::chemistry::data::DFTHCHamiltonianContainer
  */
