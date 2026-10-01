@@ -393,6 +393,7 @@ class TestSOSSAMapper:
             coefficients,
             free_rider_data,
             1,
+            -1,
         )
 
         assert load_separately is False
@@ -881,3 +882,32 @@ class TestRotationBatchSizeFor:
         """
         with pytest.raises(ValueError, match=match):
             rotation_batch_size_for(num_orbitals, num_batches)
+
+
+class TestInnerPrepareSwapBitsSetting:
+    """The ``inner_prepare_swap_bits`` setting's contract, without paying for an estimate."""
+
+    def test_it_defaults_to_letting_the_library_choose(self):
+        """The knob must be opt-in: shipping it may not move anyone's existing numbers.
+
+        ``-1`` is the sentinel the Q# side already understood before this setting existed,
+        so the default routes to exactly the same selector that was hard-coded there.
+        """
+        assert SOSSAMapper().settings().get("inner_prepare_swap_bits") == -1
+
+    @pytest.mark.parametrize("swap_bits", [-1, 0, 1, 2, 3, 30])
+    def test_it_accepts_the_sentinel_and_real_widths(self, swap_bits):
+        """``-1`` auto, ``0`` plain select, and positive widths are all meaningful."""
+        ref = AlgorithmRef("circuit_mapper", "sossa", inner_prepare_swap_bits=swap_bits)
+
+        assert ref.settings.get("inner_prepare_swap_bits") == swap_bits
+
+    @pytest.mark.parametrize("swap_bits", [-2, 31])
+    def test_it_rejects_widths_outside_the_declared_range(self, swap_bits):
+        """Below the sentinel is meaningless and far above it is certainly a mistake.
+
+        The Q# side clamps an over-wide request to the table instead of faulting, so this
+        bound is about catching nonsense early rather than about safety.
+        """
+        with pytest.raises(ValueError, match="out of allowed range"):
+            AlgorithmRef("circuit_mapper", "sossa", inner_prepare_swap_bits=swap_bits)
