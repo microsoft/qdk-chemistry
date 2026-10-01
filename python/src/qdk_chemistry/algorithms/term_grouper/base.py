@@ -8,7 +8,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitOperator, Settings, TaperingSpecification, TermPartition
+from qdk_chemistry.data import QubitOperator, Settings, TermPartition
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 
@@ -67,10 +67,8 @@ class TermGrouper(Algorithm):
         return super().run(qubit_hamiltonian)
 
     @staticmethod
-    def _with_partition(
-        qubit_hamiltonian: QubitOperator, partition: TermPartition, tapering: TaperingSpecification | None = None
-    ) -> QubitOperator:
-        """Copy the terms, coefficients, encoding and mode order with *partition*, keeping sparse storage sparse."""
+    def _with_partition(qubit_hamiltonian: QubitOperator, partition: TermPartition) -> QubitOperator:
+        """Copy the terms, coefficients and operator metadata with *partition*, keeping sparse storage sparse."""
         if isinstance(qubit_hamiltonian.get_container(), SparsePauliDecompositionContainer):
             return QubitOperator(
                 container=SparsePauliDecompositionContainer(
@@ -79,7 +77,7 @@ class TermGrouper(Algorithm):
                     qubit_hamiltonian.encoding,
                     qubit_hamiltonian.fermion_mode_order,
                     partition,
-                    tapering,
+                    qubit_hamiltonian.tapering,
                 )
             )
         return QubitOperator(
@@ -88,7 +86,7 @@ class TermGrouper(Algorithm):
             encoding=qubit_hamiltonian.encoding,
             fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
             term_partition=partition,
-            tapering=tapering,
+            tapering=qubit_hamiltonian.tapering,
         )
 
     @abstractmethod

@@ -212,6 +212,15 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         Returns:
             A new container owning copies of the terms and coefficients.
 
+        Examples:
+            >>> container = SparsePauliDecompositionContainer.from_sparse_terms(
+            ...     1000, [{0: "X", 999: "X"}, [(0, "Y"), (999, "Y")], {}], np.array([0.5, 0.5, -1.0])
+            ... )
+            >>> container.num_qubits, len(container.coefficients)
+            (1000, 3)
+            >>> next(container.iter_sparse_terms())
+            (((0, 'X'), (999, 'X')), 0.5)
+
         """
         return cls(
             SparsePauliTerms(num_qubits, terms), coefficients, encoding, fermion_mode_order, term_partition, tapering
@@ -263,7 +272,8 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
             return False
         totals: tuple[dict[PauliWord, complex], dict[PauliWord, complex]] = ({}, {})
         for operator, total in zip((self, other), totals, strict=True):
-            for word, coefficient in _sparse_terms(operator):
+            # Sum the stored NumPy values, as the dense container does, so both storages round alike.
+            for (word, _), coefficient in zip(_sparse_terms(operator), operator.coefficients, strict=True):
                 total[word] = total.get(word, 0) + coefficient
         mine, theirs = totals
         return all(abs(mine.get(word, 0) - theirs.get(word, 0)) <= atol for word in mine.keys() | theirs.keys())

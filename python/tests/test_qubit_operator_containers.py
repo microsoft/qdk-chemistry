@@ -535,9 +535,9 @@ class TestPauliOnlyAlgorithmsRejectSumOfSquares:
             invoke(operator)
 
 
-def _sparse_and_dense_operators() -> tuple[QubitOperator, QubitOperator]:
+def _sparse_and_dense_operators(dtype: type = np.float64) -> tuple[QubitOperator, QubitOperator]:
     """Build one vacuum-preserving Hermitian operator with sparse and with dense storage."""
-    coefficients = np.array([0.5, 0.5, 0.25, -0.25, 0.1])
+    coefficients = np.array([0.5, 0.5, 0.25, -0.25, 0.1], dtype=dtype)
     sparse = QubitOperator.from_sparse_terms(
         2, [{0: "X", 1: "X"}, {0: "Y", 1: "Y"}, {1: "Z"}, {0: "Z"}, {}], coefficients
     )
@@ -557,6 +557,35 @@ class TestSparsePauliDecompositionContainer:
         )
         assert sparse.equiv(dense)
         assert dense.equiv(sparse)
+
+    @pytest.mark.parametrize("dtype", [np.float64, np.complex128, np.float32])
+    @pytest.mark.parametrize("left_sparse", [False, True])
+    @pytest.mark.parametrize("right_sparse", [False, True])
+    def test_arithmetic_and_equivalence_across_storages(self, left_sparse, right_sparse, dtype) -> None:
+        """Sums, scalar products and equivalence agree for every storage pairing and coefficient dtype."""
+        sparse, dense = _sparse_and_dense_operators(dtype)
+        left = sparse if left_sparse else dense
+        right = sparse if right_sparse else dense
+        doubled = QubitOperator(list(dense.pauli_strings), 2 * dense.coefficients)
+
+        total = left + right
+        assert total.get_container_type() == left.get_container_type()
+        assert total.equiv(doubled)
+        assert doubled.equiv(total)
+        assert (2.0 * left).equiv(doubled)
+        assert (left * 2.0).equiv(doubled)
+        assert left.equiv(right)
+        assert right.equiv(left)
+        assert not left.equiv(doubled)
+
+    def test_equivalence_rounds_like_dense_storage(self) -> None:
+        """Both storages sum float32 coefficients in float32, so they agree on sub-resolution terms."""
+        coefficients = np.array([1.0, 1e-8], dtype=np.float32)
+        reference = QubitOperator(["ZZ"], np.array([1.0]))
+        dense = QubitOperator(["ZZ", "ZZ"], coefficients)
+        sparse = QubitOperator.from_sparse_terms(2, [{0: "Z", 1: "Z"}] * 2, coefficients)
+
+        assert dense.equiv(reference) == sparse.equiv(reference) == reference.equiv(sparse)
 
     def test_json_layout(self) -> None:
         """JSON keeps the width and each term's factors, and dispatches back to sparse storage."""
