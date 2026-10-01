@@ -97,6 +97,21 @@ Examples:
 
 )");
 
+  shifter.def(py::init<>(),
+              R"(
+Create a SymmetryShifter instance.
+
+Default constructor for the abstract base class.
+This should typically be called from derived class constructors.
+
+Examples:
+    >>> # In a derived class:
+    >>> class MyShifter(alg.SymmetryShifter):
+    ...     def __init__(self):
+    ...         super().__init__()  # Calls parent constructor
+
+)");
+
   shifter.def("run", &SymmetryShifter::run,
               R"(
 Shift a Hamiltonian for a target electron count.

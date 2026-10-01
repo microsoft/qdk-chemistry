@@ -444,14 +444,19 @@ std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(
 
   const FermionicLowRankSolution solution = solve_fermionic_low_rank_shift(
       *hamiltonian, n_alpha_electrons, n_beta_electrons);
-  _record_shift(solution.shift);
 
   // solve_fermionic_low_rank_shift() has already validated the container.
   const auto& container = hamiltonian->get_container<
       qdk::chemistry::data::FactorizedHamiltonianContainer>();
 
-  return rebuild_shifted_factorized_hamiltonian(
+  auto shifted = rebuild_shifted_factorized_hamiltonian(
       *hamiltonian, container, solution, n_alpha_electrons + n_beta_electrons);
+
+  // Record only after the shift has actually been applied, so a failed
+  // rebuild cannot leave last_shift() reporting a shift that never happened.
+  _record_shift(solution.shift);
+
+  return shifted;
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
