@@ -166,6 +166,10 @@ where :math:`b_k` is the bit measured at iteration :math:`k`.
 
 Each bit is determined by a majority vote over multiple circuit executions (controlled by ``shots_per_bit``).
 
+When the circuit builder sets ``combine_iterations``, every round instead runs inside a single circuit that
+feeds each measured bit forward on the device. There is then no per-bit vote: ``shots_per_bit`` counts
+executions of that whole circuit, and the most frequently measured full bitstring is decoded as the phase.
+
 .. rubric:: Settings
 
 Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimation`:
@@ -179,7 +183,9 @@ Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.iterative_
      - Description
    * - ``shots_per_bit``
      - int
-     - Number of circuit executions per bit, used for majority-vote determination. Default is 3.
+     - Number of circuit executions per bit, used for majority-vote determination. With
+       ``combine_iterations`` enabled it counts executions of the single combined circuit instead.
+       Default is 3.
 
 Nested algorithm configuration (via ``qpe_circuit_builder``):
 

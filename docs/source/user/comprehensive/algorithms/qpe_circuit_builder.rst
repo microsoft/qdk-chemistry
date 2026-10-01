@@ -102,6 +102,11 @@ Constructs circuits for Kitaev's iterative phase estimation algorithm, which ext
    * - ``num_iteration``
      - int
      - Specific iteration to build (0-based). If negative, builds all iterations. Default: ``-1``.
+   * - ``combine_iterations``
+     - bool
+     - Build every round into one circuit that carries the phase correction forward with mid-circuit
+       measurement and classical feed-forward, instead of one circuit per bit. Requires an Adaptive-profile
+       target. Changes how ``shots_per_bit`` is spent — see :doc:`phase_estimation`. Default: ``False``.
 
 **Usage example:**
 

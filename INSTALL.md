@@ -122,6 +122,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
+| `azure-quantum` | Azure Quantum circuit executor backend | azure-identity, azure-quantum (no win-arm64 wheels) |
 | `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
 | `discovery` | Microsoft Discovery remote backend | azure-ai-discovery, azure-identity, azure-storage-blob |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
@@ -133,7 +134,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
 | `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.31.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[azure-quantum,coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
 | `all` | Union of all defined extras | coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
 To build the documentation, install the `docs` extra (for example,
@@ -177,7 +178,7 @@ to native Windows installs; none of them apply under
 |-------|--------|
 | Visual C++ runtime | Install the current [Microsoft Visual C++ v14 Redistributable x64 package](https://aka.ms/vc14/vc_redist.x64.exe), which includes both x64 and ARM64 runtimes. It is a machine-level prerequisite and may require administrator approval. |
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
-| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
+| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well, as is the Azure Quantum backend (`azure-quantum`, `azure-identity`), which depends on the same `cryptography` wheel. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
 ---

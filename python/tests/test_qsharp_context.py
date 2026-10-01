@@ -192,6 +192,16 @@ class TestTargetProfiles:
         vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")}
         assert vendored == set(_PORTABLE_MODULES) | set(_ADAPTIVE_ONLY_MODULES)
 
+    def test_adaptive_ri_loads_the_whole_project(self) -> None:
+        """Every non-Base profile compiles all sources, so one dynamic double breaks them all.
+
+        ``CombinedIterationPhaseEstimation`` once summed its feed-forward correction into a
+        mutable ``Double``, which Adaptive_RI rejects, taking down contexts that never touch
+        combined IQPE -- including ``target_name`` targets that infer the RI profile.
+        """
+        context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RI)
+        assert hasattr(context.code.QDKChemistry.Utils, "CombinedIterationPhaseEstimation")
+
     def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
         """The Base build exists to be lowered through QIR, so prove that it compiles."""
         utils = base_context.code.QDKChemistry.Utils

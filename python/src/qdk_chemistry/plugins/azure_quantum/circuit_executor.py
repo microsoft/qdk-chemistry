@@ -19,7 +19,7 @@ from azure.quantum import Workspace
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
-from qdk_chemistry.plugins._azure_auth import create_credential
+from qdk_chemistry.plugins._azure_auth import AUTH_MODES, create_credential
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
@@ -28,6 +28,10 @@ if TYPE_CHECKING:
 __all__: list[str] = ["AzureQuantumBackend", "AzureQuantumBackendSettings"]
 
 _WORKSPACE_SETTINGS = ("subscription_id", "resource_group", "workspace_name", "target_name")
+
+#: Outcome values the ``microsoft.quantum-results.v2`` histogram may carry, mapped to the
+#: bitstring characters used by the other executors. ``'-'`` marks a lost qubit.
+_OUTCOME_BITS = {0: "0", 1: "1", "0": "0", "1": "1", "-": "L"}
 
 
 def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, int]]:
@@ -50,18 +54,29 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
     Returns:
         A ``(bitstring_counts, loss_bitstrings)`` tuple of label-to-count dicts; the latter is empty absent qubit loss.
 
+    Raises:
+        ValueError: If an outcome holds anything other than ``0``, ``1``, or ``'-'``, which
+            is how a failed or malformed shot arrives.
+
     """
     counts: dict[str, int] = {}
     loss: dict[str, int] = {}
     for entry in raw_results.values():
         outcome = entry["outcome"]
         count = entry["count"]
-        outcome_bits = outcome if isinstance(outcome, (list | tuple)) else (outcome,)
-        if "-" in outcome_bits:
-            key = "".join("L" if bit == "-" else str(bit) for bit in reversed(outcome_bits))
+        outcome_bits = outcome if isinstance(outcome, list | tuple) else (outcome,)
+        chars = []
+        for bit in reversed(outcome_bits):
+            char = _OUTCOME_BITS.get(bit) if isinstance(bit, int | str) else None
+            if char is None:
+                raise ValueError(
+                    f"Unexpected measurement outcome {bit!r} in Azure Quantum results; expected 0, 1, or '-'."
+                )
+            chars.append(char)
+        key = "".join(chars)
+        if "L" in key:
             loss[key] = loss.get(key, 0) + count
         else:
-            key = "".join(str(bit) for bit in reversed(outcome_bits))
             counts[key] = counts.get(key, 0) + count
     return counts, loss
 
@@ -81,7 +96,7 @@ class AzureQuantumBackendSettings(Settings):
         self._set_default("workspace_name", "string", "", "Azure Quantum workspace name")
         self._set_default("location", "string", "", "Azure Quantum workspace region")
         self._set_default("target_name", "string", "", "Azure Quantum target to submit to")
-        self._set_default("auth_mode", "string", "azure-cli", "Azure credential mode: 'azure-cli' or 'default'")
+        self._set_default("auth_mode", "string", "azure-cli", "Azure credential mode", list(AUTH_MODES))
         self._set_default("output_dir", "string", "", "Local directory to save job attachments into; empty disables")
         self._set_default(
             "attachments",
@@ -104,7 +119,7 @@ class AzureQuantumBackend(CircuitExecutor):
         auth_mode: str | None = None,
         job_name: str | None = None,
         timeout_secs: int | None = None,
-        input_params: dict | str | None = None,
+        input_params: str | None = None,
         output_dir: str | None = None,
         attachments: list[str] | None = None,
     ) -> None:
@@ -119,7 +134,7 @@ class AzureQuantumBackend(CircuitExecutor):
             auth_mode: Credential mode, ``"azure-cli"`` (default) or ``"default"``.
             job_name: Name for the submitted Azure Quantum job.
             timeout_secs: Maximum seconds to wait for job completion.
-            input_params: Job input parameters as a dict or JSON object string.
+            input_params: Job input parameters as a JSON object string.
             output_dir: Local directory to save job attachments into; empty or None disables saving.
             attachments: Attachment names to download from the job container; empty or None disables saving.
 
@@ -136,16 +151,13 @@ class AzureQuantumBackend(CircuitExecutor):
             "auth_mode": auth_mode,
             "job_name": job_name,
             "timeout_secs": timeout_secs,
+            "input_params": input_params,
             "output_dir": output_dir,
             "attachments": attachments,
         }
         for key, value in explicit.items():
             if value is not None:
                 self._settings.set(key, value)
-        if input_params is not None:
-            if not isinstance(input_params, str):
-                input_params = json.dumps(input_params)
-            self._settings.set("input_params", input_params)
 
     def _run_impl(
         self,
@@ -165,7 +177,8 @@ class AzureQuantumBackend(CircuitExecutor):
 
         Raises:
             NotImplementedError: If a noise profile is supplied.
-            ValueError: If the connection settings are incomplete or ``input_params`` is not a JSON object.
+            ValueError: If the connection settings are incomplete, the target name does not
+                resolve to a single target, or ``input_params`` is not a JSON object.
 
         """
         Logger.trace_entering()
@@ -191,6 +204,11 @@ class AzureQuantumBackend(CircuitExecutor):
             credential=create_credential(self._settings.get("auth_mode")),
         )
         target = workspace.get_targets(name=coordinates["target_name"])
+        if isinstance(target, list):
+            raise ValueError(
+                f"Azure Quantum target {coordinates['target_name']!r} did not resolve to a single target;"
+                f" {len(target)} matched."
+            )
 
         try:
             input_params = json.loads(self._settings.get("input_params"))

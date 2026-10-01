@@ -53,18 +53,19 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
 
         for k in 0..numBits - 1 {
             statePrep(system);
-            // Compute accumulated phase correction from previously measured bits.
-            mutable accumulatePhase = 0.0;
-            for j in 0..k - 1 {
-                if results[j] == One {
-                    set accumulatePhase += 2.0 * PI() / IntAsDouble(1 <<< (k - j + 1));
-                }
-            }
 
             within {
                 H(phase);
             } apply {
-                Rz(-accumulatePhase, phase);
+                // Apply the phase correction from previously measured bits as one fixed-angle
+                // rotation per bit. Summing them into a mutable Double would make that Double
+                // measurement-dependent, which Adaptive_RI rejects (UseOfDynamicDouble); here
+                // only the branch depends on a measurement, and Rz angles add under composition.
+                for j in 0..k - 1 {
+                    if results[j] == One {
+                        Rz(-2.0 * PI() / IntAsDouble(1 <<< (k - j + 1)), phase);
+                    }
+                }
                 controlledUnitary[k](phase, allTargets);
             }
 

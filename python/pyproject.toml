@@ -141,7 +141,7 @@ test = [
 azure-quantum = [
   # azure-quantum requires azure-identity and azure-storage-blob, which both pull in cryptography; no win-arm64 wheel
   "azure-identity>=1.19.0,<2; sys_platform != 'win32' or platform_machine != 'ARM64'",
-  "azure-quantum; sys_platform != 'win32' or platform_machine != 'ARM64'"
+  "azure-quantum>=2.1.0; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 
 [project.urls]

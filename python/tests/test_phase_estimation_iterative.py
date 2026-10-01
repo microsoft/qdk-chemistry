@@ -668,7 +668,7 @@ def test_iterative_qpe_builder_pairs_largest_power_with_first_iteration(
 
 @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
 def test_combined_iqpe_matches_per_bit_on_ising_chain(power_strategy: str) -> None:
-    """Mirror the Azure Quantum backend notebook, run on the QDK simulator.
+    """Combined single-circuit IQPE matches the per-bit path on the QDK simulator.
 
     A two-site transverse-field Ising chain with the exact eigenstate
     ``(|00> - |11>)/sqrt(2)``. At ``t = pi/2`` every rotation is Clifford, so the
