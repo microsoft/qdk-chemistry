@@ -16,24 +16,34 @@ from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorConta
 if TYPE_CHECKING:
     import h5py
 
-    from qdk_chemistry.data import LatticeGraph
+    from qdk_chemistry.data import LatticeGeometry
 
 __all__ = ["LatticeContainer"]
 
 
 class LatticeContainer(QubitOperatorContainer):
-    """A qubit operator defined by the lattice it lives on.
+    """A qubit operator defined by the lattice geometry it lives on.
 
     The container carries the geometry only. Model parameters such as the hopping
-    amplitude belong to the algorithm consuming it.
-    Each site carries two spin orbitals, so the register is twice the site count.
+    amplitude belong to the algorithm consuming it, so the geometry assigns no edge
+    weights. Each site carries two spin orbitals, so the register is twice the site count.
+
+    The geometry is a :class:`~qdk_chemistry.data.LatticeGeometry`, whose factories
+    document what their ``nx`` and ``ny`` count: sites for
+    :meth:`~qdk_chemistry.data.LatticeGeometry.square` and
+    :meth:`~qdk_chemistry.data.LatticeGeometry.triangular`, and unit cells for
+    :meth:`~qdk_chemistry.data.LatticeGeometry.honeycomb` and
+    :meth:`~qdk_chemistry.data.LatticeGeometry.kagome`. Because the geometry stores
+    site positions rather than an edge list, it carries no site numbering that could
+    drift out of step with the shape it reports, and loading one validates its layout.
 
     Args:
-        lattice: Connectivity and edge weights of the lattice.
+        geometry: Site positions and periodic supercell vectors of the lattice.
         encoding: Rejected; the container stores geometry and fixes no encoding.
         fermion_mode_order: Rejected; the container stores geometry and fixes no ordering.
 
     Raises:
+        TypeError: If *geometry* is not a :class:`~qdk_chemistry.data.LatticeGeometry`.
         ValueError: If *encoding* or *fermion_mode_order* is supplied.
 
     """
@@ -53,12 +63,12 @@ class LatticeContainer(QubitOperatorContainer):
 
     def __init__(
         self,
-        lattice: LatticeGraph,
+        geometry: LatticeGeometry,
         *,
         encoding: str | None = None,
         fermion_mode_order: object | None = None,
     ) -> None:
-        """Initialize the container from a lattice."""
+        """Initialize the container from a lattice geometry."""
         if encoding is not None:
             raise ValueError(
                 "LatticeContainer stores lattice geometry and fixes no fermion-to-qubit encoding, "
@@ -69,7 +79,15 @@ class LatticeContainer(QubitOperatorContainer):
                 "LatticeContainer stores lattice geometry and fixes no fermion mode ordering, "
                 f"so 'fermion_mode_order' would be ignored; drop it (got {fermion_mode_order!r})."
             )
-        self.lattice = lattice
+        from qdk_chemistry.data import LatticeGeometry  # noqa: PLC0415  (avoids an import cycle)
+
+        if not isinstance(geometry, LatticeGeometry):
+            raise TypeError(
+                "LatticeContainer stores a LatticeGeometry, which carries the site positions the "
+                f"consuming algorithm needs, but got a {type(geometry).__name__}; build one with a "
+                "factory such as LatticeGeometry.square(nx, ny)."
+            )
+        self.geometry = geometry
         super().__init__(None, None)
 
     @property
@@ -80,7 +98,7 @@ class LatticeContainer(QubitOperatorContainer):
     @property
     def num_qubits(self) -> int:
         """Return the register width, two spin orbitals per site."""
-        return 2 * int(self.lattice.num_sites)
+        return 2 * int(self.geometry.num_sites)
 
     def to_matrix(self, sparse: bool = False) -> NoReturn:
         """Reject matrix conversion, which this representation does not implement.
@@ -107,7 +125,7 @@ class LatticeContainer(QubitOperatorContainer):
         return self._add_json_version(
             {
                 "container_type": self.type,
-                "lattice": json.loads(self.lattice.to_json()),
+                "geometry": json.loads(self.geometry.to_json()),
             }
         )
 
@@ -121,6 +139,10 @@ class LatticeContainer(QubitOperatorContainer):
     def from_json(cls, json_data: dict[str, Any]) -> LatticeContainer:
         """Create a lattice container from JSON.
 
+        The geometry is rebuilt through :meth:`LatticeGeometry.from_json`, which
+        validates the stored layout, so a document whose site positions and lattice
+        dimensions disagree is rejected here rather than in the consuming algorithm.
+
         Args:
             json_data: The serialized container.
 
@@ -128,10 +150,10 @@ class LatticeContainer(QubitOperatorContainer):
             LatticeContainer: The reconstructed container.
 
         """
-        from qdk_chemistry.data import LatticeGraph  # noqa: PLC0415  (avoids an import cycle)
+        from qdk_chemistry.data import LatticeGeometry  # noqa: PLC0415  (avoids an import cycle)
 
         cls._validate_json_version(cls._serialization_version, json_data)
-        return cls(LatticeGraph.from_json(json.dumps(json_data["lattice"])))
+        return cls(LatticeGeometry.from_json(json.dumps(json_data["geometry"])))
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> LatticeContainer:
@@ -149,6 +171,9 @@ class LatticeContainer(QubitOperatorContainer):
 
     def get_summary(self) -> str:
         """Return a human-readable summary of the container."""
-        dims = tuple(int(d) for d in self.lattice.dims)
-        geometry = "x".join(str(d) for d in dims) if dims else f"{self.lattice.num_sites} sites"
-        return f"Lattice qubit operator ({geometry}, {self.num_qubits} qubits)"
+        periods = self.geometry.periods
+        directions = 0 if periods is None else int(periods.shape[0])
+        return (
+            f"Lattice qubit operator ({self.geometry.num_sites} sites, "
+            f"{directions} periodic direction(s), {self.num_qubits} qubits)"
+        )
