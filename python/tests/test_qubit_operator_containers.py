@@ -578,14 +578,25 @@ class TestSparsePauliDecompositionContainer:
         assert right.equiv(left)
         assert not left.equiv(doubled)
 
-    def test_equivalence_rounds_like_dense_storage(self) -> None:
-        """Both storages sum float32 coefficients in float32, so they agree on sub-resolution terms."""
-        coefficients = np.array([1.0, 1e-8], dtype=np.float32)
-        reference = QubitOperator(["ZZ"], np.array([1.0]))
+    @pytest.mark.parametrize(
+        ("coefficients", "total"),
+        [
+            (np.array([1.0, 1e-8], dtype=np.float32), 1.0),
+            (np.array([100, 100], dtype=np.int8), 200),
+            (np.array([200, 100], dtype=np.uint8), 300),
+        ],
+        ids=["float32", "int8", "uint8"],
+    )
+    def test_equivalence_sums_like_dense_storage(self, coefficients, total) -> None:
+        """Both storages sum floats in their stored precision and integers exactly, without overflow."""
+        reference = QubitOperator(["ZZ"], np.array([total]))
         dense = QubitOperator(["ZZ", "ZZ"], coefficients)
         sparse = QubitOperator.from_sparse_terms(2, [{0: "Z", 1: "Z"}] * 2, coefficients)
 
-        assert dense.equiv(reference) == sparse.equiv(reference) == reference.equiv(sparse)
+        assert dense.equiv(reference)
+        assert sparse.equiv(reference)
+        assert reference.equiv(dense)
+        assert reference.equiv(sparse)
 
     def test_json_layout(self) -> None:
         """JSON keeps the width and each term's factors, and dispatches back to sparse storage."""
@@ -647,6 +658,17 @@ class TestSparsePauliDecompositionContainer:
             with pytest.raises(ValueError, match="Invalid sparse Pauli term arrays"):
                 QubitOperator.from_hdf5(group)
 
+    def test_hdf5_rejects_fractional_width(self, tmp_path) -> None:
+        """A non-integer register width fails instead of being truncated."""
+        sparse, _ = _sparse_and_dense_operators()
+
+        with h5py.File(tmp_path / "width.h5", "w") as handle:
+            group = handle.create_group("operator")
+            sparse.to_hdf5(group)
+            group.attrs["num_qubits"] = 2.5
+            with pytest.raises(ValueError, match="num_qubits"):
+                QubitOperator.from_hdf5(group)
+
 
 class TestPauliOnlyAlgorithmsAcceptSparseStorage:
     """Algorithms written against Pauli terms treat sparse storage as a Pauli decomposition."""
@@ -657,6 +679,8 @@ class TestPauliOnlyAlgorithmsAcceptSparseStorage:
             partial(_run_builder, builder_type=LCUBuilder),
             partial(_run_builder, builder_type=Trotter, time=1.0),
             partial(_run_builder, builder_type=Zassenhaus, time=1.0),
+            partial(_run_builder, builder_type=QDrift, time=1.0, seed=7),
+            partial(_run_builder, builder_type=PartiallyRandomized, time=1.0, seed=7),
             partial(_run_term_grouper, strategy="commuting"),
             partial(_run_term_grouper, strategy="qubit_wise_commuting"),
             partial(_run_term_grouper, strategy="identity"),
@@ -680,6 +704,8 @@ class TestPauliOnlyAlgorithmsAcceptSparseStorage:
             "lcu",
             "trotter",
             "zassenhaus",
+            "qdrift_seeded",
+            "partially_randomized_seeded",
             "term_grouper_commuting",
             "term_grouper_qubit_wise_commuting",
             "term_grouper_identity",
@@ -707,10 +733,3 @@ class TestPauliOnlyAlgorithmsAcceptSparseStorage:
             assert sparse_result.get_container().to_json() == dense_result.get_container().to_json()
         else:
             np.testing.assert_array_equal(sparse_result, dense_result)
-
-    @pytest.mark.parametrize("builder_type", [QDrift, PartiallyRandomized])
-    def test_randomized_builders_accept_sparse_storage(self, builder_type) -> None:
-        """Sampling builders run on sparse storage."""
-        sparse, _ = _sparse_and_dense_operators()
-
-        assert isinstance(_run_builder(sparse, builder_type=builder_type, time=1.0), UnitaryRepresentation)

@@ -64,6 +64,12 @@ def _hash_tapering(h, tapering: TaperingSpecification) -> None:
     _hash_arg(h, tapering.to_json())
 
 
+def _summands(coefficients: np.ndarray) -> list[Any] | np.ndarray:
+    """Return coefficients for summation: exact Python ints for integer dtypes, else the stored floating values."""
+    values = np.asarray(coefficients)
+    return values.tolist() if values.dtype.kind in "biu" else values
+
+
 class PauliDecompositionContainer(QubitOperatorContainer):
     """Container representing an operator as a weighted sum of Pauli strings.
 
@@ -244,7 +250,7 @@ class PauliDecompositionContainer(QubitOperatorContainer):
 
         def _sum_terms(qh: PauliDecompositionContainer) -> dict[str, complex]:
             d: dict[str, complex] = {}
-            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
+            for ps, c in zip(qh.pauli_strings, _summands(qh.coefficients), strict=True):
                 d[ps] = d.get(ps, 0) + c
             return d
 

@@ -23,6 +23,7 @@ from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import (
     PauliDecompositionContainer,
     _hash_tapering,
     _merge_term_partitions,
+    _summands,
 )
 from qdk_chemistry.data.term_partition import TermPartition
 
@@ -272,8 +273,8 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
             return False
         totals: tuple[dict[PauliWord, complex], dict[PauliWord, complex]] = ({}, {})
         for operator, total in zip((self, other), totals, strict=True):
-            # Sum the stored NumPy values, as the dense container does, so both storages round alike.
-            for (word, _), coefficient in zip(_sparse_terms(operator), operator.coefficients, strict=True):
+            # Sum as the dense container does, so both storages round alike.
+            for (word, _), coefficient in zip(_sparse_terms(operator), _summands(operator.coefficients), strict=True):
                 total[word] = total.get(word, 0) + coefficient
         mine, theirs = totals
         return all(abs(mine.get(word, 0) - theirs.get(word, 0)) <= atol for word in mine.keys() | theirs.keys())
@@ -472,7 +473,7 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
 
         Raises:
             RuntimeError: If the version attribute is missing or incompatible.
-            ValueError: If the factor arrays are malformed.
+            ValueError: If the register width or factor arrays are malformed.
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)
@@ -490,7 +491,7 @@ class SparsePauliDecompositionContainer(PauliDecompositionContainer):
         qubit_list = qubits.tolist()
         axes = ["IXYZ"[code] for code in codes.tolist()]
         terms = SparsePauliTerms(
-            int(group.attrs["num_qubits"]),
+            group.attrs["num_qubits"],
             (zip(qubit_list[begin:end], axes[begin:end], strict=True) for begin, end in pairwise(offsets.tolist())),
         )
         partition, tapering = (_decoded(group.attrs.get(name)) for name in ("term_partition", "tapering"))
