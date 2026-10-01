@@ -17,7 +17,7 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianConta
 from qdk_chemistry.data.circuit import CircuitMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context, use_qsharp_context
 
 from .test_helpers import (
     create_random_factorized_hamiltonian,
@@ -237,19 +237,21 @@ class TestInnerPrep:
 
     @pytest.mark.slow
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_build_inner_prep_fidelity(self, algorithm):
+    def test_build_inner_prep_fidelity(self, qsharp_test_context, qsharp_test_utils, algorithm):
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         sossa_unitary = _build_sossa_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
         container = sossa_unitary.get_container()
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op = outer_mapper._build_outer_prepare_circuit(container)._qsharp_op
+        with use_qsharp_context(qsharp_test_context):
+            outer_op = outer_mapper._build_outer_prepare_circuit(container)._qsharp_op
 
         # Build inner prep
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
-        inner_op, _ = inner_mapper._build_inner_oracles(container)
+        with use_qsharp_context(qsharp_test_context):
+            inner_op, _ = inner_mapper._build_inner_oracles(container)
 
         # Compute register sizes
         outer_coeffs = np.asarray(container.outer_prepare.get_coefficients())
@@ -271,9 +273,9 @@ class TestInnerPrep:
         # Apply outer + inner prep
         full_sv = np.array(
             dump_operation_on_state(
-                QSHARP_UTILS.SOSSAWalk.MakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
+                qsharp_test_utils.SOSSAWalkTests.TestMakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
                 num_outer_qubits + num_inner_qubits,
-                context=get_qsharp_context(),
+                context=qsharp_test_context,
             )
         )
 
@@ -376,7 +378,7 @@ class TestSOSSAMapper:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
-    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self):
+    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self, qsharp_test_utils):
         """One block applies two inner PREPARE pairs against a single free-rider pair."""
         coefficients = [[1.0, 1.0, 1.0, 1.0] for _ in range(6)]
         free_rider_data = [[False, True] for _ in range(6)]
@@ -385,7 +387,7 @@ class TestSOSSAMapper:
         # 2:1 pair ratio splitting costs 2*25 + 5 = 55 against 2*27 = 54, so the word stays
         # inline; at 4:1 it was 4*25 + 5 = 105 against 4*27 = 108 and was split out. Both
         # clear by a margin, so the case does not rest on a tie-break.
-        load_separately = QSHARP_UTILS.SOSSAWalk.TestShouldLoadFreeRiderSeparately(
+        load_separately = qsharp_test_utils.SOSSAWalkTests.TestShouldLoadFreeRiderSeparately(
             coefficients,
             free_rider_data,
             1,
@@ -404,6 +406,7 @@ class TestSOSSAMapper:
     )
     def test_branched_angle_word_erasure_restores_the_address_register(
         self,
+        qsharp_test_utils,
         sf_rows: int,
         sf_address_qubits: int,
         dq_rows: int,
@@ -417,7 +420,7 @@ class TestSOSSAMapper:
         # The erasure measures, so a mismatched row only shows up for the outcomes whose
         # parity it changes; repeat to keep the check from passing by luck.
         for _ in range(8):
-            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+            assert qsharp_test_utils.SOSSAWalkTests.TestBranchedRotationWordRoundTrip(
                 sf_data,
                 dq_data,
                 sf_address_qubits,
@@ -564,22 +567,22 @@ class TestSelectFullFidelity:
 
     @staticmethod
     def _run_select(
-        select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
+        context_factory, select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
     ) -> np.ndarray:
-        ctx = create_qsharp_context()
-        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
+        ctx = context_factory()
+        ctx.code.QDKChemistry.TestUtils.SOSSAWalkTests.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
         return np.array(ctx.dump_machine().as_dense_state())
 
     @pytest.mark.parametrize("num_free_rider_bits", [0, 1])
-    def test_select_rejects_missing_generator_bits(self, num_free_rider_bits):
+    def test_select_rejects_missing_generator_bits(self, qsharp_test_context_factory, num_free_rider_bits):
         select_data = self._select_data(2, rotation_bit_precision=10)
         select_data["numFreeRiderBits"] = num_free_rider_bits
 
         with pytest.raises(Exception, match="SelectImpl requires at least two free-rider bits"):
-            self._run_select(select_data)
+            self._run_select(qsharp_test_context_factory, select_data)
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_applies_the_analytic_rotated_majorana(self, N):  # noqa: N803
+    def test_select_dq_applies_the_analytic_rotated_majorana(self, qsharp_test_context_factory, N):  # noqa: N803
         rng = np.random.default_rng(2024)
         u = rng.standard_normal(N)
         u /= np.linalg.norm(u)
@@ -598,7 +601,7 @@ class TestSelectFullFidelity:
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
-        sv = self._run_select(select_data, xo_value=0, b_value=0)
+        sv = self._run_select(qsharp_test_context_factory, select_data, xo_value=0, b_value=0)
         assert np.linalg.norm(sv) == pytest.approx(1.0, abs=1e-10)
 
         total = round(math.log2(len(sv)))
@@ -632,6 +635,7 @@ class TestSelectFullFidelity:
     )
     def test_phase_gradient_backend_matches_direct(
         self,
+        qsharp_test_context_factory,
         dims: tuple[int, int, int, int],
         xo_value: int,
         b_value: int,
@@ -647,10 +651,12 @@ class TestSelectFullFidelity:
             num_copies=num_copies,
         )
 
-        direct = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False)
-        qrom = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True)[
-            :: 1 << bit_precision
-        ]
+        direct = self._run_select(
+            qsharp_test_context_factory, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False
+        )
+        qrom = self._run_select(
+            qsharp_test_context_factory, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True
+        )[:: 1 << bit_precision]
 
         # The gradient is conjugated back to |0...0>, so restricting to it keeps the full norm.
         assert len(qrom) == len(direct)
