@@ -24,7 +24,7 @@ import numpy as np
 _JSON_SUFFIXES = {".json"}
 _HDF5_SUFFIXES = {".h5", ".hdf5", ".he5"}
 
-_TYPE_TOKENS = ("orbitals", "hamiltonian", "wavefunction", "ansatz", "qpe_result")
+_TYPE_TOKENS = ("basis_set", "orbitals", "hamiltonian", "wavefunction", "ansatz", "qpe_result")
 
 
 def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:
@@ -114,13 +114,12 @@ def read_attr(obj, name: str, default=None):
 
 
 def subgroup_to_json(group: h5py.Group, data_class, type_token: str) -> dict:
-    """Serialize an embedded, schema-unchanged sub-object to JSON.
+    """Serialize an embedded, current-schema sub-object to JSON.
 
     Copies ``group`` into a standalone temporary HDF5 file and loads it with the
-    given data class' (current, unchanged-schema) ``from_hdf5_file``, then emits
-    JSON. Used for nested objects whose serialization schema is unchanged across the
-    migrated versions (e.g. ``BasisSet``), so the migration need not know their
-    internal layout.
+    given data class' current ``from_hdf5_file``, then emits JSON. Used for nested
+    objects already in the current schema (e.g. ``Structure``, or a ``BasisSet``
+    migrated beforehand), so the migration need not know their internal layout.
     """
     with tempfile.TemporaryDirectory() as tmp:
         h5_path = Path(tmp) / f"sub.{type_token}.h5"

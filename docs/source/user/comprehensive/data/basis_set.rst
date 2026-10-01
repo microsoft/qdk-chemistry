@@ -55,6 +55,8 @@ The :class:`~qdk_chemistry.data.BasisSet` class supports various orbital types w
 - F orbital (angular momentum :math:`l=3`): 7 functions (spherical) or 10 functions (Cartesian) per shell
 - G, H, I orbitals: Higher angular momentum orbitals
 
+:term:`ECP` shells use the same orbital types for their angular-momentum projected terms, plus ``UL`` (:math:`l=-1`) for the local term.
+
 Basis types
 ~~~~~~~~~~~
 
