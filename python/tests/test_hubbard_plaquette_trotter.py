@@ -100,60 +100,6 @@ def _evolution_circuit(
     return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(_plaquette_parameters(container))
 
 
-def _plaquette_operation_from_angles(
-    width: int,
-    height: int,
-    *,
-    interaction_angle: float,
-    hopping_angle: float,
-    repetitions: int,
-    controlled: bool = False,
-    forced_legacy: bool = False,
-):
-    """Return a direct Q# callable for a plaquette evolution with exact test angles."""
-    operation = "RepPlaquetteExpWithForcedLegacyCostsForTest" if forced_legacy else "RepPlaquetteExp"
-    params = (
-        f"{_PLAQUETTE}.HubbardPlaquetteParams("
-        f"{width}, {height}, {interaction_angle:.17g}, {hopping_angle:.17g}, {repetitions}, -1)"
-    )
-    if controlled:
-        return get_qsharp_context().eval(
-            f"qs => {{ Controlled {_PLAQUETTE}.{operation}([qs[0]], ({params}, qs[1...])); }}"
-        )
-    return get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.{operation}({params}, qs); }}")
-
-
-def _basis_state(num_qubits: int, occupied_modes: tuple[int, ...], *, control: bool | None = None) -> np.ndarray:
-    """Return a computational basis state, optionally with a leading control qubit."""
-    total_qubits = num_qubits + (control is not None)
-    index = 0
-    if control:
-        index |= 1 << (total_qubits - 1)
-    offset = 1 if control is not None else 0
-    for mode in occupied_modes:
-        index |= 1 << (total_qubits - 1 - offset - mode)
-    state = np.zeros(2**total_qubits)
-    state[index] = 1.0
-    return state
-
-
-def _legacy_particle_number_phase(index: int, *, u: float, sites: int, time: float) -> complex:
-    """Return the conventional-vs-symmetric phase for one system-register basis index."""
-    electrons = index.bit_count()
-    return np.exp(-1j * (0.5 * u * electrons - 0.25 * u * sites) * time)
-
-
-def _apply_legacy_particle_number_phase(state: np.ndarray, *, u: float, sites: int, time: float) -> np.ndarray:
-    """Apply the conventional-vs-symmetric particle-number phase to a system-register state."""
-    return np.asarray(
-        [
-            amplitude * _legacy_particle_number_phase(index, u=u, sites=sites, time=time)
-            for index, amplitude in enumerate(state)
-        ],
-        dtype=complex,
-    )
-
-
 def _applied_state(operation, state: np.ndarray) -> np.ndarray:
     """Return the state the operation produces from *state*."""
     num_qubits = round(math.log2(len(state)))
@@ -501,30 +447,14 @@ def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
     return scipy.linalg.expm(1j * angle * generator)
 
 
-def _apply_hopping_tower(angle: float, num_pairs: int, state: np.ndarray) -> np.ndarray:
-    """Apply the same adjacent-pair hopping tower without materializing a 2**n by 2**n matrix."""
-    pauli_pair = np.kron(_PAULI_X, _PAULI_X) + np.kron(_PAULI_Y, _PAULI_Y)
-    pair_gate = scipy.linalg.expm(1j * angle * pauli_pair)
-    num_qubits = 2 * num_pairs
-    evolved = state.astype(complex)
-    for pair in range(num_pairs):
-        q0, q1 = 2 * pair, 2 * pair + 1
-        axes = [q0, q1] + [axis for axis in range(num_qubits) if axis not in (q0, q1)]
-        inverse = np.argsort(axes)
-        moved = np.transpose(evolved.reshape([2] * num_qubits), axes).reshape(4, -1)
-        evolved = np.transpose((pair_gate @ moved).reshape([2, 2] + [2] * (num_qubits - 2)), inverse).reshape(-1)
-    return evolved
-
-
-def _hopping_phases(angle: float, control: str | None = None, *, forced_legacy: bool = False) -> str:
+def _hopping_phases(angle: float, control: str | None = None) -> str:
     """Return Q# applying ``HoppingPhases``, optionally controlled."""
     register = "qs" if control is None else "qs[1...]"
     arguments = f"({angle}, Std.Arrays.Chunks(2, {register}), -1)"
-    operation = "HoppingPhasesWithForcedLegacyCostsForTest" if forced_legacy else "HoppingPhases"
     tower = (
-        f"{_PLAQUETTE}.{operation}{arguments}"
+        f"{_PLAQUETTE}.HoppingPhases{arguments}"
         if control is None
-        else f"Controlled {_PLAQUETTE}.{operation}([{control}], {arguments})"
+        else f"Controlled {_PLAQUETTE}.HoppingPhases([{control}], {arguments})"
     )
     return f"qs => {{ {tower}; }}"
 
@@ -550,16 +480,6 @@ class TestHoppingPhases:
         state = _random_state(2 * num_pairs + 1, seed=21)
         half = len(state) // 2
         expected = np.concatenate([state[:half], _hopping_tower(angle, num_pairs) @ state[half:]])
-        assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
-
-    def test_forced_legacy_tower_matches_the_same_hopping_evolution(self):
-        """The resource-estimation legacy XX/YY split is unitary-equivalent above the HWP break-even."""
-        angle, num_pairs = 3 * _ANGLE_QUANTUM, 8
-        operation = _hopping_phases(angle, forced_legacy=True)
-
-        state = _random_state(2 * num_pairs, seed=91)
-        expected = _apply_hopping_tower(angle, num_pairs, state)
-
         assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
 
 
@@ -725,70 +645,6 @@ class TestPlaquetteEvolutionOnAState:
         )
 
         assert _infidelity(actual, expected) < 1e-9
-
-
-class TestForcedLegacyPlaquetteCosts:
-    """The resource-estimation-only legacy branches cost the conventional-model unitary."""
-
-    @staticmethod
-    def _operations(controlled: bool):
-        width = height = 2
-        time, t, u, repetitions = 0.05, 1.0, 4.0, 1
-        delta = time / repetitions
-        interaction_angle = 0.25 * u * delta
-        hopping_angle = 2.0 * t * delta
-        normal = _plaquette_operation_from_angles(
-            width,
-            height,
-            interaction_angle=interaction_angle,
-            hopping_angle=hopping_angle,
-            repetitions=repetitions,
-            controlled=controlled,
-        )
-        forced = _plaquette_operation_from_angles(
-            width,
-            height,
-            interaction_angle=interaction_angle,
-            hopping_angle=hopping_angle,
-            repetitions=repetitions,
-            controlled=controlled,
-            forced_legacy=True,
-        )
-        return normal, forced, time, u, width * height
-
-    def test_forced_legacy_plaquette_matches_normal_in_fixed_particle_number_sectors(self):
-        """The legacy path differs only by a global phase on definite-N basis states."""
-        occupations = [(), (0,), (0, 4), (0, 1, 2, 3), tuple(range(8))]
-        num_qubits = 8
-
-        for controlled in (False, True):
-            normal, forced, *_ = self._operations(controlled)
-            for occupied in occupations:
-                state = _basis_state(num_qubits, occupied, control=True if controlled else None)
-                assert _infidelity(_applied_state(forced, state), _applied_state(normal, state)) < 1e-12
-
-    @pytest.mark.parametrize("controlled", [False, True])
-    def test_forced_legacy_plaquette_difference_is_the_particle_number_phase(self, controlled):
-        """On a particle-number superposition, the legacy path differs by the known N-sector phase."""
-        normal, forced, time, u, sites = self._operations(controlled)
-        num_qubits = 2 * sites
-        state = _random_state(num_qubits + int(controlled), seed=102 + int(controlled))
-        normal_state = _applied_state(normal, state)
-        forced_state = _applied_state(forced, state)
-
-        if controlled:
-            half = len(state) // 2
-            corrected = np.concatenate(
-                [
-                    normal_state[:half],
-                    _apply_legacy_particle_number_phase(normal_state[half:], u=u, sites=sites, time=time),
-                ]
-            )
-        else:
-            corrected = _apply_legacy_particle_number_phase(normal_state, u=u, sites=sites, time=time)
-
-        assert _infidelity(forced_state, normal_state) > 1e-4
-        assert _infidelity(forced_state, corrected) < 1e-12
 
 
 class TestPlaquettePhaseEstimation:
@@ -1193,9 +1049,6 @@ _PLATFORM_RELATIVE_TOLERANCE = 1e-4
 
 #: L=2 has four sites, which is below the Hamming-weight-phasing break-even of eight terms, so
 #: every tower rotates term by term: no adder tree, and therefore no Toffolis at all.
-#:
-#: TEMPORARY (legacy parity): resource estimates include the legacy circuit's extra work, whose
-#: single-mode tower over eight modes did reach the break-even, so these are the legacy counts.
 _HUBBARD_L2_FULL_CIRCUIT = {
     "L": 2,
     "sites": 4,
@@ -1206,14 +1059,14 @@ _HUBBARD_L2_FULL_CIRCUIT = {
     "trotter_budget": 0.0068000000000000005,
     "qpe_bits": 10,
     "base_time": 0.2253660323553513,
-    "logical_qubits": 25,
-    "rotations": 2224986,
-    "rotation_depth": 1483458,
+    "logical_qubits": 18,
+    "rotations": 1047435,
+    "rotation_depth": 698444,
     "t_gates": 697995,
-    "ccz_count": 610582,
+    "ccz_count": 0,
     "ccix_count": 0,
-    "toffolis": 610582,
-    "measurements": 610592,
+    "toffolis": 0,
+    "measurements": 10,
 }
 
 
@@ -1221,8 +1074,6 @@ _HUBBARD_L2_FULL_CIRCUIT = {
 #: Hamming-weight-phasing path: an adder tree compresses sixteen same-angle rotations into a
 #: five-bit weight, and each place value takes one synthesized ``Rz``. This is the case that
 #: exercises the construction, which is why it is pinned.
-#:
-#: TEMPORARY (legacy parity): these are the legacy circuit's counts, which the estimates reproduce exactly.
 _HUBBARD_L4_FULL_CIRCUIT = {
     "L": 4,
     "sites": 16,
@@ -1233,14 +1084,14 @@ _HUBBARD_L4_FULL_CIRCUIT = {
     "trotter_budget": 0.027200000000000002,
     "qpe_bits": 10,
     "base_time": 0.056341508088837824,
-    "logical_qubits": 73,
-    "rotations": 729063,
-    "rotation_depth": 551326,
+    "logical_qubits": 57,
+    "rotations": 261233,
+    "rotation_depth": 190086,
     "t_gates": 758427,
-    "ccz_count": 710540,
+    "ccz_count": 355350,
     "ccix_count": 0,
-    "toffolis": 710540,
-    "measurements": 710550,
+    "toffolis": 355350,
+    "measurements": 355360,
 }
 
 
@@ -1337,9 +1188,8 @@ class TestBenchmarkLogicalResources:
         mismatches = _compare_counts(actual, _HUBBARD_L2_FULL_CIRCUIT)
         assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
 
-        # TEMPORARY (legacy parity): the legacy single-mode tower brings its adder tree back;
-        # restore the zero-Toffoli check with the revert.
-        assert actual["toffolis"] == _HUBBARD_L2_FULL_CIRCUIT["toffolis"]
+        # Below the break-even zero Toffolis is the correct answer, not a collapsed circuit.
+        assert actual["toffolis"] == 0, "the 2x2 lattice is below the break-even and phases term by term"
 
     def test_lattice_above_the_break_even(self):
         """L=4 is the case that exercises the adder tree and the Hamming-weight rotation ladder."""
@@ -1354,9 +1204,7 @@ class TestBenchmarkLogicalResources:
 
     def test_a_cap_at_least_the_tower_length_changes_nothing(self):
         """The 4x4 towers are sixteen terms long, so a cap of sixteen cannot split any of them."""
-        # TEMPORARY (legacy parity): the legacy single-mode tower spans all 32 modes, so the cap that
-        # splits nothing is 32 until the revert; restore max_batch_size=16 with it.
-        assert _benchmark_logical_counts(4, max_batch_size=32) == _benchmark_logical_counts(4)
+        assert _benchmark_logical_counts(4, max_batch_size=16) == _benchmark_logical_counts(4)
 
     def test_capping_trades_qubits_for_rotations(self):
         """Halving the batch releases the adder-tree scratch sooner and pays for it in rotations."""
