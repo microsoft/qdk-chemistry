@@ -197,14 +197,13 @@ class TestPauliDecompositionContainer:
 class TestSumOfSquaresContainer:
     """Serialization and the validation the SOS blocks and metadata enforce."""
 
-    def test_summary_describes_system_factorization_and_generators(self) -> None:
+    def test_summary_describes_system_and_generators(self) -> None:
         """The summary explains the SOS structure and counts SF generators by rank-copy pairs."""
         container = _sum_of_squares_container()
 
         assert container.get_summary() == (
             "Sum-of-Squares Qubit Operator\n"
-            "  System size: 2 spatial orbitals, 4 spin-orbital qubits\n"
-            "  DFTHC dimensions: R=1, B=1, C=1\n"
+            "  System size: 4 qubits\n"
             "  One-body generators: 2 total (1 D1 particle, 1 Q1 hole)\n"
             "  Spin-free generators: 1 (R x C), B + 1 = 2 terms each (1 orbital + 1 identity)\n"
             "  Qubit representation: jordan-wigner encoding, blocked fermion-mode order\n"
