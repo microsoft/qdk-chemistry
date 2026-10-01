@@ -121,6 +121,37 @@ def _plaquette_operation_from_angles(
     return get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.{operation}({params}, qs); }}")
 
 
+def _basis_state(num_qubits: int, occupied_modes: tuple[int, ...], *, control: bool | None = None) -> np.ndarray:
+    """Return a computational basis state, optionally with a leading control qubit."""
+    total_qubits = num_qubits + (control is not None)
+    index = 0
+    if control:
+        index |= 1 << (total_qubits - 1)
+    offset = 1 if control is not None else 0
+    for mode in occupied_modes:
+        index |= 1 << (total_qubits - 1 - offset - mode)
+    state = np.zeros(2**total_qubits)
+    state[index] = 1.0
+    return state
+
+
+def _legacy_particle_number_phase(index: int, *, u: float, sites: int, time: float) -> complex:
+    """Return the conventional-vs-symmetric phase for one system-register basis index."""
+    electrons = index.bit_count()
+    return np.exp(-1j * (0.5 * u * electrons - 0.25 * u * sites) * time)
+
+
+def _apply_legacy_particle_number_phase(state: np.ndarray, *, u: float, sites: int, time: float) -> np.ndarray:
+    """Apply the conventional-vs-symmetric particle-number phase to a system-register state."""
+    return np.asarray(
+        [
+            amplitude * _legacy_particle_number_phase(index, u=u, sites=sites, time=time)
+            for index, amplitude in enumerate(state)
+        ],
+        dtype=complex,
+    )
+
+
 def _applied_state(operation, state: np.ndarray) -> np.ndarray:
     """Return the state the operation produces from *state*."""
     num_qubits = round(math.log2(len(state)))
@@ -611,53 +642,57 @@ class TestPlaquetteEvolutionOnAState:
         assert _infidelity(actual, expected) < 1e-9
 
 
-@pytest.mark.xfail(
-    reason="Forcing the resource-estimation legacy branches changes the simulated plaquette unitary.",
-    strict=True,
-)
 class TestForcedLegacyPlaquetteCosts:
-    """The resource-estimation-only legacy branches must not change the simulated unitary."""
+    """The resource-estimation-only legacy branches cost the conventional-model unitary."""
 
-    def test_forced_legacy_plaquette_matches_expm_uncontrolled(self):
-        """Forcing the legacy branches on in simulation still gives the same 2x2 evolution."""
+    @staticmethod
+    def _operations(controlled: bool):
         width = height = 2
-        time, t, u, repetitions = 0.05, 1.0, 4.0, 8
+        time, t, u, repetitions = 0.05, 1.0, 4.0, 1
         delta = time / repetitions
-        operation = _plaquette_operation_from_angles(
-            width,
-            height,
-            interaction_angle=0.25 * u * delta,
-            hopping_angle=2.0 * t * delta,
-            repetitions=repetitions,
-            forced_legacy=True,
-        )
-        hamiltonian = _reference_hamiltonian(width, height, t=t, u=u)
-        state = _random_state(2 * width * height, seed=101)
-        expected = scipy.linalg.expm(-1j * time * hamiltonian) @ state
+        kwargs = {
+            "interaction_angle": 0.25 * u * delta,
+            "hopping_angle": 2.0 * t * delta,
+            "repetitions": repetitions,
+            "controlled": controlled,
+        }
+        normal = _plaquette_operation_from_angles(width, height, **kwargs)
+        forced = _plaquette_operation_from_angles(width, height, **kwargs, forced_legacy=True)
+        return normal, forced, time, u, width * height
 
-        assert _infidelity(_applied_state(operation, state), expected) < 1e-8
+    def test_forced_legacy_plaquette_matches_normal_in_fixed_particle_number_sectors(self):
+        """The legacy path differs only by a global phase on definite-N basis states."""
+        occupations = [(), (0,), (0, 4), (0, 1, 2, 3), tuple(range(8))]
+        num_qubits = 8
 
-    def test_forced_legacy_plaquette_matches_expm_under_control(self):
-        """The legacy identity rotations remain harmless as controlled relative phases."""
-        width = height = 2
-        time, t, u, repetitions = 0.05, 1.0, 4.0, 8
-        delta = time / repetitions
-        operation = _plaquette_operation_from_angles(
-            width,
-            height,
-            interaction_angle=0.25 * u * delta,
-            hopping_angle=2.0 * t * delta,
-            repetitions=repetitions,
-            controlled=True,
-            forced_legacy=True,
-        )
-        hamiltonian = _reference_hamiltonian(width, height, t=t, u=u)
-        evolution = scipy.linalg.expm(-1j * time * hamiltonian)
-        state = _random_state(2 * width * height + 1, seed=102)
-        half = len(state) // 2
-        expected = np.concatenate([state[:half], evolution @ state[half:]])
+        for controlled in (False, True):
+            normal, forced, *_ = self._operations(controlled)
+            for occupied in occupations:
+                state = _basis_state(num_qubits, occupied, control=True if controlled else None)
+                assert _infidelity(_applied_state(forced, state), _applied_state(normal, state)) < 1e-12
 
-        assert _infidelity(_applied_state(operation, state), expected) < 1e-8
+    @pytest.mark.parametrize("controlled", [False, True])
+    def test_forced_legacy_plaquette_difference_is_the_particle_number_phase(self, controlled):
+        """On a particle-number superposition, the legacy path differs by the known N-sector phase."""
+        normal, forced, time, u, sites = self._operations(controlled)
+        num_qubits = 2 * sites
+        state = _random_state(num_qubits + int(controlled), seed=102 + int(controlled))
+        normal_state = _applied_state(normal, state)
+        forced_state = _applied_state(forced, state)
+
+        if controlled:
+            half = len(state) // 2
+            corrected = np.concatenate(
+                [
+                    normal_state[:half],
+                    _apply_legacy_particle_number_phase(normal_state[half:], u=u, sites=sites, time=time),
+                ]
+            )
+        else:
+            corrected = _apply_legacy_particle_number_phase(normal_state, u=u, sites=sites, time=time)
+
+        assert _infidelity(forced_state, normal_state) > 1e-4
+        assert _infidelity(forced_state, corrected) < 1e-12
 
 
 class TestPlaquettePhaseEstimation:
