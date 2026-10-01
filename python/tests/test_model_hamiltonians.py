@@ -325,6 +325,15 @@ class TestModelHamiltonians:
                 ps[3 - 1 - edge[1]] = pauli_char
                 assert terms_w["".join(ps)] == pytest.approx(2.0, abs=float_comparison_absolute_tolerance)
 
+    @pytest.mark.parametrize("include_term_groups", [False, True])
+    @pytest.mark.parametrize("name", ["hx", "hy", "hz"])
+    def test_heisenberg_field_shape_errors_name_the_argument(self, name: str, include_term_groups: bool) -> None:
+        """A wrong-length field names its own argument on both the grouped and ungrouped paths."""
+        with pytest.raises(ValueError, match=f"^{name} vector size"):
+            create_heisenberg_hamiltonian(
+                LatticeGraph.chain(3), 1.0, 1.0, 1.0, include_term_groups=include_term_groups, **{name: np.ones(2)}
+            )
+
     def test_heisenberg_geometric_neighbor_shells(self) -> None:
         n = 3
         j1 = 1.25
