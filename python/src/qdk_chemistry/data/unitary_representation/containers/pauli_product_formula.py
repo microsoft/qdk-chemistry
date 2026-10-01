@@ -144,15 +144,16 @@ class PauliProductFormulaContainer(UnitaryContainer):
     * :math:`\theta_j` is the rotation angle for that term
     * :math:`\prod_{j \in \pi}` is a permutation defining the multiplication order
 
-    Without endpoints, the full time-evolution unitary is:
+    Without prefix or suffix terms, the full time-evolution unitary is:
     :math:`U(t) \approx \left[ U_{\mathrm{step}}\!\left(\tfrac{t}{r}\right) \right]^{r}`,
     where ``step_reps = r`` is the number of repeated steps.
 
-    Optional ``beginning`` and ``end`` terms execute once before and after the repeated steps.
+    ``step_terms`` is the repeated block: one product-formula step, or a rewritten block after
+    :meth:`fuse_boundaries`. Optional ``prefix_terms`` and ``suffix_terms`` execute once before and after it.
     All three term sequences are stored as tuples without expanding repetitions;
     ``group_offsets`` certify commuting intervals of ``step_terms`` only.
     Optional ``layer_offsets`` delimit disjoint-support layers over the stored concatenation
-    ``beginning + step_terms + end``, including both endpoint/body boundaries.
+    ``prefix_terms + step_terms + suffix_terms``, including both prefix/body and body/suffix boundaries.
     """
 
     @staticmethod
@@ -175,22 +176,22 @@ class PauliProductFormulaContainer(UnitaryContainer):
         num_qubits: int,
         scale: float = 1.0,
         *,
-        beginning: Sequence[ExponentiatedPauliTerm] = (),
-        end: Sequence[ExponentiatedPauliTerm] = (),
-        group_offsets: tuple[int, ...] | None = None,
-        layer_offsets: tuple[int, ...] | None = None,
+        prefix_terms: Sequence[ExponentiatedPauliTerm] = (),
+        suffix_terms: Sequence[ExponentiatedPauliTerm] = (),
+        group_offsets: Sequence[int] | None = None,
+        layer_offsets: Sequence[int] | None = None,
     ) -> None:
         """Initialize a PauliProductFormulaContainer.
 
         Args:
-            step_terms: The sequence of exponentiated Pauli terms in a single step.
-            step_reps: The number of repetitions of the single step.
+            step_terms: The repeated block of exponentiated Pauli terms, one product-formula step unless fused.
+            step_reps: The number of repetitions of the repeated block.
             num_qubits: The number of qubits the unitary acts on.
             scale: The evolution time used for eigenvalue-phase conversion.
-            beginning: Terms executed once before the repeated steps.
-            end: Terms executed once after the repeated steps.
+            prefix_terms: Terms executed once before the repeated block.
+            suffix_terms: Terms executed once after the repeated block.
             group_offsets: Strictly increasing commuting-group boundaries spanning step_terms, starting at zero.
-            layer_offsets: Disjoint-layer boundaries over all stored terms, including beginning/body/end boundaries.
+            layer_offsets: Disjoint-layer boundaries over all stored terms, including prefix/body/suffix boundaries.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
@@ -204,8 +205,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
         self.step_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in step_terms)
-        self.beginning = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in beginning)
-        self.end = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in end)
+        self.prefix_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in prefix_terms)
+        self.suffix_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in suffix_terms)
         self.group_offsets = None if group_offsets is None else tuple(group_offsets)
         if self.group_offsets is not None:
             _validate_groups(self.step_terms, self.group_offsets)
@@ -213,19 +214,19 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self.layer_offsets = None if layer_offsets is None else tuple(layer_offsets)
         if self.layer_offsets is not None:
             offsets = self.layer_offsets
-            beginning_end = len(self.beginning)
-            body_end = beginning_end + len(self.step_terms)
+            prefix_end = len(self.prefix_terms)
+            body_end = prefix_end + len(self.step_terms)
             if (
                 not offsets
                 or any(isinstance(i, bool | np.bool_) or not isinstance(i, int | np.integer) for i in offsets)
                 or offsets[0] != 0
-                or offsets[-1] != body_end + len(self.end)
+                or offsets[-1] != body_end + len(self.suffix_terms)
                 or any(b <= a for a, b in pairwise(offsets))
-                or beginning_end not in offsets
+                or prefix_end not in offsets
                 or body_end not in offsets
             ):
-                raise ValueError("layer_offsets must span all stored terms and include beginning/body/end boundaries.")
-            terms = iter(chain(self.beginning, self.step_terms, self.end))
+                raise ValueError("layer_offsets must span all stored terms and include prefix/body/suffix boundaries.")
+            terms = iter(chain(self.prefix_terms, self.step_terms, self.suffix_terms))
             for start, stop in pairwise(offsets):
                 occupied: set[int] = set()
                 for _ in range(start, stop):
@@ -268,7 +269,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 _hash_int(h, qubit_idx)
                 _hash_str(h, term.pauli_term[qubit_idx])
             _hash_float(h, term.angle)
-        for name, terms in (("beginning", self.beginning), ("end", self.end)):
+        for name, terms in (("prefix_terms", self.prefix_terms), ("suffix_terms", self.suffix_terms)):
             if not terms:
                 continue
             _hash_str(h, name)
@@ -313,17 +314,18 @@ class PauliProductFormulaContainer(UnitaryContainer):
     @property
     def num_pauli_exponentials(self) -> int:
         """Count executed exponentials without expanding the repeated body."""
-        return len(self.beginning) + self.step_reps * len(self.step_terms) + len(self.end)
+        return len(self.prefix_terms) + self.step_reps * len(self.step_terms) + len(self.suffix_terms)
 
     @property
     def num_stored_terms(self) -> int:
         """Count stored terms, independently of the repetition count."""
-        return len(self.beginning) + len(self.step_terms) + len(self.end)
+        return len(self.prefix_terms) + len(self.step_terms) + len(self.suffix_terms)
 
     def reorder_terms(self, permutation: list[int]) -> "PauliProductFormulaContainer":
         """Reorder the Pauli terms according to a given permutation.
 
-        Only ``step_terms`` are permuted; endpoints are preserved and body group/layer certificates discarded.
+        Only ``step_terms`` are permuted; prefix and suffix terms are preserved and body group/layer certificates
+        discarded.
 
         Args:
             permutation: A list where ``permutation[i]`` gives the old index of the term for new position ``i``.
@@ -348,36 +350,28 @@ class PauliProductFormulaContainer(UnitaryContainer):
             self.step_reps,
             self.num_qubits,
             self.scale,
-            beginning=self.beginning,
-            end=self.end,
+            prefix_terms=self.prefix_terms,
+            suffix_terms=self.suffix_terms,
             layer_offsets=None
             if self.layer_offsets is None
             else _join_layer_offsets(
-                _slice_layer_offsets(self.layer_offsets, 0, len(self.beginning)),
+                _slice_layer_offsets(self.layer_offsets, 0, len(self.prefix_terms)),
                 range(len(self.step_terms) + 1),
                 _slice_layer_offsets(
-                    self.layer_offsets, len(self.beginning) + len(self.step_terms), self.num_stored_terms
+                    self.layer_offsets, len(self.prefix_terms) + len(self.step_terms), self.num_stored_terms
                 ),
             ),
         )
 
-    def combine(  # noqa: PLR0911 - Keep compact cases and the original fallback together.
-        self, other_container: "PauliProductFormulaContainer | None" = None, atol: float = 1e-12
-    ) -> "PauliProductFormulaContainer":
-        """Fuse repetition boundaries, or append another formula.
+    def fuse_boundaries(self, atol: float = 1e-12) -> "PauliProductFormulaContainer":
+        """Fuse the boundary between consecutive repetitions of the repeated block.
 
-        With no other formula, rewrite (L C R)^r as L (C merge(R,L))^(r-1) C R
-        when L and R have equal commuting word sets. Missing metadata means
-        singleton groups. A single commuting group instead scales its angles.
-        Existing endpoints are left unchanged to avoid repeated endpoint growth;
-        no within-step normalization or recursive optimization is performed.
-
-        Identical stored bodies with matching layer schedules have compact fast paths. Otherwise the original
-        flatten-and-adjacent-merge algorithm returns step_reps=1, using memory
-        proportional to the expanded output. Endpoints participate in that fallback.
+        Rewrite (L C R)^r as L (C merge(R,L))^(r-1) C R when L and R have equal commuting word sets.
+        Missing metadata means singleton groups. A single commuting group instead scales its angles.
+        Formulas that already have prefix or suffix terms are returned unchanged, avoiding repeated endpoint
+        growth; no within-step normalization or recursive optimization is performed.
 
         Args:
-            other_container: Optional evolution to append, with matching width and compatible finite scale.
             atol: Finite nonnegative tolerance for dropping only merged near-zero angles.
 
         Returns:
@@ -386,49 +380,67 @@ class PauliProductFormulaContainer(UnitaryContainer):
         """
         if not isfinite(atol) or atol < 0:
             raise ValueError("atol must be finite and nonnegative.")
-        if other_container is None:
-            if self.step_reps == 1 or not self.step_terms or self.beginning or self.end:
-                return self
-            offsets = self.group_offsets if self.group_offsets is not None else tuple(range(len(self.step_terms) + 1))
-            _validate_groups(self.step_terms, offsets)
-            if len(offsets) == 2:
-                terms = tuple(
-                    ExponentiatedPauliTerm(t.pauli_term, _finite(t.angle * self.step_reps)) for t in self.step_terms
-                )
-                return PauliProductFormulaContainer(
-                    terms, 1, self.num_qubits, self.scale, group_offsets=offsets, layer_offsets=self.layer_offsets
-                )
-            left, right = self.step_terms[: offsets[1]], self.step_terms[offsets[-2] :]
-            boundary_terms = _merge_groups(right, left, atol)
-            if boundary_terms is None:
-                return self
-            center = self.step_terms[offsets[1] : offsets[-2]]
-            body_offsets = tuple(i - offsets[1] for i in offsets[1:-1])
-            if boundary_terms:
-                body_offsets += (len(center) + len(boundary_terms),)
-            fused_layers = None
-            if self.layer_offsets is not None:
-                left_layers = _slice_layer_offsets(self.layer_offsets, 0, offsets[1])
-                center_layers = _slice_layer_offsets(self.layer_offsets, offsets[1], offsets[-2])
-                right_layers = _slice_layer_offsets(self.layer_offsets, offsets[-2], offsets[-1])
-                fused_layers = _join_layer_offsets(
-                    left_layers,
-                    center_layers,
-                    _merged_layer_offsets(right, right_layers, boundary_terms),
-                    center_layers,
-                    right_layers,
-                )
-            return PauliProductFormulaContainer(
-                center + boundary_terms,
-                self.step_reps - 1,
-                self.num_qubits,
-                self.scale,
-                beginning=left,
-                end=center + right,
-                group_offsets=body_offsets,
-                layer_offsets=fused_layers,
+        if self.step_reps == 1 or not self.step_terms or self.prefix_terms or self.suffix_terms:
+            return self
+        offsets = self.group_offsets if self.group_offsets is not None else tuple(range(len(self.step_terms) + 1))
+        _validate_groups(self.step_terms, offsets)
+        if len(offsets) == 2:
+            terms = tuple(
+                ExponentiatedPauliTerm(t.pauli_term, _finite(t.angle * self.step_reps)) for t in self.step_terms
             )
+            return PauliProductFormulaContainer(
+                terms, 1, self.num_qubits, self.scale, group_offsets=offsets, layer_offsets=self.layer_offsets
+            )
+        left, right = self.step_terms[: offsets[1]], self.step_terms[offsets[-2] :]
+        boundary_terms = _merge_groups(right, left, atol)
+        if boundary_terms is None:
+            return self
+        center = self.step_terms[offsets[1] : offsets[-2]]
+        body_offsets = tuple(i - offsets[1] for i in offsets[1:-1])
+        if boundary_terms:
+            body_offsets += (len(center) + len(boundary_terms),)
+        fused_layers = None
+        if self.layer_offsets is not None:
+            left_layers = _slice_layer_offsets(self.layer_offsets, 0, offsets[1])
+            center_layers = _slice_layer_offsets(self.layer_offsets, offsets[1], offsets[-2])
+            right_layers = _slice_layer_offsets(self.layer_offsets, offsets[-2], offsets[-1])
+            fused_layers = _join_layer_offsets(
+                left_layers,
+                center_layers,
+                _merged_layer_offsets(right, right_layers, boundary_terms),
+                center_layers,
+                right_layers,
+            )
+        return PauliProductFormulaContainer(
+            center + boundary_terms,
+            self.step_reps - 1,
+            self.num_qubits,
+            self.scale,
+            prefix_terms=left,
+            suffix_terms=center + right,
+            group_offsets=body_offsets,
+            layer_offsets=fused_layers,
+        )
 
+    def combine(
+        self, other_container: "PauliProductFormulaContainer", atol: float = 1e-12
+    ) -> "PauliProductFormulaContainer":
+        """Append another formula.
+
+        Identical stored bodies with matching layer schedules have compact fast paths. Otherwise the original
+        flatten-and-adjacent-merge algorithm returns step_reps=1, using memory
+        proportional to the expanded output. Prefix and suffix terms participate in that fallback.
+
+        Args:
+            other_container: Evolution to append, with matching width and compatible finite scale.
+            atol: Finite nonnegative tolerance for dropping only merged near-zero angles.
+
+        Returns:
+            An equivalent formula retaining this container's scale.
+
+        """
+        if not isfinite(atol) or atol < 0:
+            raise ValueError("atol must be finite and nonnegative.")
         if self.num_qubits != other_container.num_qubits:
             raise ValueError(
                 f"Cannot combine PauliProductFormulaContainer instances with different "
@@ -445,7 +457,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
             )
         if self.step_terms == other_container.step_terms and self.layer_offsets == other_container.layer_offsets:
-            if not (self.beginning or self.end or other_container.beginning or other_container.end):
+            if not (
+                self.prefix_terms or self.suffix_terms or other_container.prefix_terms or other_container.suffix_terms
+            ):
                 return PauliProductFormulaContainer(
                     self.step_terms,
                     self.step_reps + other_container.step_reps,
@@ -453,25 +467,25 @@ class PauliProductFormulaContainer(UnitaryContainer):
                     self.scale,
                     group_offsets=self.group_offsets or other_container.group_offsets,
                     layer_offsets=self.layer_offsets,
-                ).combine(atol=atol)
-            if self.beginning == other_container.beginning and self.end == other_container.end:
-                n = len(self.beginning)
-                join = self.end if n == 0 else None
+                ).fuse_boundaries(atol)
+            if self.prefix_terms == other_container.prefix_terms and self.suffix_terms == other_container.suffix_terms:
+                n = len(self.prefix_terms)
+                join = self.suffix_terms if n == 0 else None
                 join_layers = None
                 if self.layer_offsets is not None:
                     join_layers = _slice_layer_offsets(
                         self.layer_offsets, n + len(self.step_terms), self.num_stored_terms
                     )
-                if n and len(self.end) >= n:
-                    boundary_terms = _merge_groups(self.end[-n:], self.beginning, atol)
+                if n and len(self.suffix_terms) >= n:
+                    boundary_terms = _merge_groups(self.suffix_terms[-n:], self.prefix_terms, atol)
                     if boundary_terms is not None:
-                        join = self.end[:-n] + boundary_terms
+                        join = self.suffix_terms[:-n] + boundary_terms
                         if self.layer_offsets is not None:
                             tail = self.num_stored_terms - n
                             join_layers = _join_layer_offsets(
                                 _slice_layer_offsets(self.layer_offsets, n + len(self.step_terms), tail),
                                 _merged_layer_offsets(
-                                    self.end[-n:],
+                                    self.suffix_terms[-n:],
                                     _slice_layer_offsets(self.layer_offsets, tail, self.num_stored_terms),
                                     boundary_terms,
                                 ),
@@ -486,8 +500,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
                         self.step_reps + other_container.step_reps + int(bool(join)),
                         self.num_qubits,
                         self.scale,
-                        beginning=self.beginning,
-                        end=self.end,
+                        prefix_terms=self.prefix_terms,
+                        suffix_terms=self.suffix_terms,
                         group_offsets=self.group_offsets,
                         layer_offsets=self.layer_offsets,
                     )
@@ -497,9 +511,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         for container in (self, other_container):
             start = 0
             for terms, repetitions in (
-                (container.beginning, 1),
+                (container.prefix_terms, 1),
                 (container.step_terms, container.step_reps),
-                (container.end, 1),
+                (container.suffix_terms, 1),
             ):
                 section_offsets: Sequence[int] = (
                     _slice_layer_offsets(container.layer_offsets, start, start + len(terms))
@@ -549,7 +563,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
             "num_qubits": self.num_qubits,
             "scale": self.scale,
         }
-        for name in ("step_terms", "beginning", "end"):
+        for name in ("step_terms", "prefix_terms", "suffix_terms"):
             data[name] = [
                 {"pauli_term": {str(k): v for k, v in term.pauli_term.items()}, "angle": term.angle}
                 for term in getattr(self, name)
@@ -573,7 +587,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         group.attrs["num_qubits"] = self.num_qubits
         group.attrs["scale"] = self.scale
 
-        for name in ("step_terms", "beginning", "end"):
+        for name in ("step_terms", "prefix_terms", "suffix_terms"):
             terms_group = group.create_group(name)
             for i, term in enumerate(getattr(self, name)):
                 term_group = terms_group.create_group(f"term_{i}")
@@ -601,7 +615,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if "segments" in json_data:
             raise ValueError("Recursive segments are not a supported product-formula format.")
         lists: dict[str, list[ExponentiatedPauliTerm]] = {}
-        for name in ("step_terms", "beginning", "end"):
+        for name in ("step_terms", "prefix_terms", "suffix_terms"):
             step_terms = []
             for i, term_data in enumerate(json_data[name] if name == "step_terms" else json_data.get(name, [])):
                 pauli_term: dict[int, str] = {}
@@ -629,8 +643,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps=step_reps,
             num_qubits=num_qubits,
             scale=json_data.get("scale", 1.0),
-            beginning=lists["beginning"],
-            end=lists["end"],
+            prefix_terms=lists["prefix_terms"],
+            suffix_terms=lists["suffix_terms"],
             group_offsets=json_data.get("group_offsets"),
             layer_offsets=json_data.get("layer_offsets"),
         )
@@ -653,7 +667,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         num_qubits = group.attrs["num_qubits"]
 
         lists: dict[str, list[ExponentiatedPauliTerm]] = {}
-        for name in ("step_terms", "beginning", "end"):
+        for name in ("step_terms", "prefix_terms", "suffix_terms"):
             step_terms: list[ExponentiatedPauliTerm] = []
             step_terms_group = group[name] if name == "step_terms" else group.get(name, {})
             for i in range(len(step_terms_group)):
@@ -673,8 +687,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps=step_reps,
             num_qubits=num_qubits,
             scale=float(group.attrs.get("scale", 1.0)),
-            beginning=lists["beginning"],
-            end=lists["end"],
+            prefix_terms=lists["prefix_terms"],
+            suffix_terms=lists["suffix_terms"],
             group_offsets=tuple(group["group_offsets"][()]) if "group_offsets" in group else None,
             layer_offsets=tuple(group["layer_offsets"][()]) if "layer_offsets" in group else None,
         )

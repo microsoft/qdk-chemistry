@@ -54,8 +54,8 @@ Settings
 .. rubric:: Compact product-formula support
 
 :ref:`Compact product-formula containers <compact-product-formulas>` are supported by :class:`~qdk_chemistry.algorithms.circuit_mapper.PauliSequenceMapper` and :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`.
-They execute ``beginning`` and ``end`` once, preserving the body's symbolic ``step_reps``; declared layers do not cross these segment boundaries.
-The :ref:`CSWAP mapper <cswap-pauli-sequence-mapper>` also supports nonempty endpoints, subject to independent section-wise vacuum validation.
+They execute ``prefix_terms`` and ``suffix_terms`` once, preserving the body's symbolic ``step_reps``; declared layers do not cross these segment boundaries.
+The :ref:`CSWAP mapper <cswap-pauli-sequence-mapper>` also supports nonempty prefix and suffix terms, subject to independent section-wise vacuum validation.
 
 .. rubric:: Creating a mapper
 
@@ -171,7 +171,7 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 
 .. important::
 
-   Compact formulas support nonempty ``beginning`` and ``end``; each executes once around the repeated body inside the same CSWAP sandwich.
+   Compact formulas support nonempty ``prefix_terms`` and ``suffix_terms``; each executes once around the repeated body inside the same CSWAP sandwich.
    The prefix, body, and suffix are independently validated for vacuum preservation, sharing one leakage tolerance across repetition counts ``1``, ``step_reps``, and ``1``.
 
 .. rubric:: Worked example

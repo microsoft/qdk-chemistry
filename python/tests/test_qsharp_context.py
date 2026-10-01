@@ -202,7 +202,7 @@ class TestTargetProfiles:
             pauliOps=[[Pauli.X, Pauli.Z]],
             pauliCoefficients=[0.5],
             repetitions=2,
-            beginning=0,
-            end=0,
+            numPrefixTerms=0,
+            numSuffixTerms=0,
         )
         assert "define" in str(base_context.compile(pauli_exp, params, [0, 1], 0, [1, 2]))

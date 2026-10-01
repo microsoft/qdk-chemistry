@@ -221,7 +221,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
 
     def _vacuum_phase(self, container: PauliProductFormulaContainer) -> float:
-        r"""Return the vacuum phase of the beginning, repeated body, and end.
+        r"""Return the vacuum phase of the prefix terms, repeated body, and suffix terms.
 
         Each section must preserve the vacuum independently. Cross-section cancellations
         are not certified; the leakage tolerance is shared over all section executions.
@@ -230,13 +230,17 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             container: The Pauli product formula to validate.
 
         Returns:
-            The total phase, counting endpoints once and the body ``step_reps`` times.
+            The total phase, counting prefix and suffix terms once and the body ``step_reps`` times.
 
         Raises:
             ValueError: If a section is not vacuum preserving.
 
         """
-        sections = ((container.beginning, 1), (container.step_terms, container.step_reps), (container.end, 1))
+        sections = (
+            (container.prefix_terms, 1),
+            (container.step_terms, container.step_reps),
+            (container.suffix_terms, 1),
+        )
         atol = self._settings.get("vacuum_preservation_tolerance") / max(
             1, sum(repetitions for terms, repetitions in sections if terms)
         )

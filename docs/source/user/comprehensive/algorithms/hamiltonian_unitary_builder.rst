@@ -302,27 +302,28 @@ Example::
 Compact product-formula containers
 ----------------------------------
 
-A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` executes ``beginning`` once, then ``step_terms`` repeated ``step_reps`` times, then ``end`` once.
-:attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials` counts ``len(beginning) + step_reps * len(step_terms) + len(end)``; :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms` counts ``len(beginning) + len(step_terms) + len(end)``.
+A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` executes ``prefix_terms`` once, then ``step_terms`` repeated ``step_reps`` times, then ``suffix_terms`` once.
+``step_terms`` is the repeated block: one product-formula step, or a rewritten block after boundary fusion.
+:attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials` counts ``len(prefix_terms) + step_reps * len(step_terms) + len(suffix_terms)``; :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms` counts ``len(prefix_terms) + len(step_terms) + len(suffix_terms)``.
 These are structural counts, not synthesized gate counts.
 
 Optional ``group_offsets`` delimit validated commuting groups in ``step_terms`` only, increasing strictly from zero to the body length.
 Without this metadata, boundary fusion treats each term as a singleton group.
 
-Optional ``layer_offsets`` delimit validated disjoint-support layers over the stored concatenation ``beginning + step_terms + end``.
-They increase strictly from zero to the stored term count and include both endpoint/body boundaries; an empty formula uses ``(0,)``.
+Optional ``layer_offsets`` delimit validated disjoint-support layers over the stored concatenation ``prefix_terms + step_terms + suffix_terms``.
+They increase strictly from zero to the stored term count and include both prefix/body and body/suffix boundaries; an empty formula uses ``(0,)``.
 Fusion and composition retain the surviving terms' declared layers without merging neighboring layers; arbitrary body reordering falls back to singleton body layers.
 Formulas without this metadata retain term-by-term controlled mapping.
 
-With no argument, :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` fuses repetition boundaries with equal commuting Pauli-word sets by adding signed angles, without unrolling.
-A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``beginning`` or ``end`` are returned unchanged, making the rewrite idempotent.
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.fuse_boundaries` fuses repetition boundaries with equal commuting Pauli-word sets by adding signed angles, without unrolling.
+A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``prefix_terms`` or ``suffix_terms`` are returned unchanged, making the rewrite idempotent.
 The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
 
-With another formula, ``combine(other_container, atol=1e-12)`` appends its evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
-It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including endpoints, and returns ``step_reps=1``.
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
+It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
 
 :doc:`JSON and HDF5 serialization <../data/serialization>` write schema ``0.3.0`` without expanding repetitions; convert ``0.2.0`` files from earlier releases with the :doc:`migration tool <../../migrating-data-files>`.
-Plain formulas without endpoints or group/layer metadata retain their legacy content hashes.
+Plain formulas without prefix or suffix terms or group/layer metadata retain their legacy content hashes.
 Compact storage and :ref:`mapping <compact-formula-mappers>` do not guarantee compact circuit export, simulation, or resource estimation.
 
 

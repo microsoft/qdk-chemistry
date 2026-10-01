@@ -278,8 +278,8 @@ def test_pauli_product_formula(tmp_path, type_token, source_format, output_forma
         "step_reps": 3,
         "num_qubits": 3,
         "scale": 1.7,
-        "beginning": [],
-        "end": [],
+        "prefix_terms": [],
+        "suffix_terms": [],
     }
 
     with pytest.raises(migrate.MigrationError, match="No migration step"):

@@ -335,8 +335,8 @@ def test_wide_controlled_transport_stays_sparse(layered: bool) -> None:
         "pauliOps": [[qsharp.Pauli.Y, qsharp.Pauli.X], [qsharp.Pauli.Z], []],
         "pauliCoefficients": [-0.31, 0.27, -0.19],
         "repetitions": 1_000_000,
-        "beginning": 0,
-        "end": 0,
+        "numPrefixTerms": 0,
+        "numSuffixTerms": 0,
     }
     assert isinstance(params["repetitions"], int)
     assert payload["control"] == num_qubits

@@ -1,4 +1,4 @@
-"""Migrate Pauli product formulas written before beginning and end segments existed."""
+"""Migrate Pauli product formulas written before prefix and suffix term segments existed."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -42,9 +42,9 @@ def from_hdf5_file(path) -> dict:
 
 
 def to_new_json(old: dict) -> dict:
-    """Add empty beginning and end segments; the repeated body is unchanged."""
+    """Add empty prefix and suffix term segments; the repeated body is unchanged."""
     new = {key: value for key, value in old.items() if key != "_source_version"}
-    new.update(beginning=[], end=[], version=PRODUCT_FORMULA_VERSION)
+    new.update(prefix_terms=[], suffix_terms=[], version=PRODUCT_FORMULA_VERSION)
     return new
 
 

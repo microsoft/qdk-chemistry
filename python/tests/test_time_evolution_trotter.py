@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from itertools import permutations
+
 import numpy as np
 import pytest
 import scipy
@@ -980,7 +982,7 @@ class TestPartitionGrouping:
 
     @pytest.mark.parametrize("order", [2, 4])
     def test_minimize_rotations_requires_a_strict_reduction(self, order):
-        """Tied group sizes keep the declared order; a larger first group moves to the center."""
+        """Ties keep the declared order; unequal groups reach the fewest Pauli factors over all group orders."""
 
         def step_terms(hamiltonian: QubitOperator, minimize: bool) -> list[ExponentiatedPauliTerm]:
             builder = Trotter(order=order, time=1.0, minimize_rotations=minimize)
@@ -1001,6 +1003,19 @@ class TestPartitionGrouping:
             term_partition=LayeredPartition(strategy="commuting", groups=(((0, 1),), ((2,),), ((3,),))),
         )
         assert len(step_terms(larger_first, True)) < len(step_terms(larger_first, False))
+
+        def unequal(groups) -> QubitOperator:
+            return QubitOperator.from_sparse_terms(
+                6,
+                [{0: "X"}, {1: "X"}, {2: "X"}, {3: "Z"}, {4: "Y"}, {5: "Y"}],
+                np.ones(6),
+                term_partition=LayeredPartition(strategy="commuting", groups=groups),
+            )
+
+        declared = (((0, 1, 2),), ((3,),), ((4, 5),))
+        minimized = len(step_terms(unequal(declared), True))
+        assert minimized == min(len(step_terms(unequal(groups), False)) for groups in permutations(declared))
+        assert minimized < len(step_terms(unequal(declared), False))
 
     def test_flat_partition_groups_commuting_terms(self):
         """Test that a FlatPartition groups commuting terms into parallelizable layers."""

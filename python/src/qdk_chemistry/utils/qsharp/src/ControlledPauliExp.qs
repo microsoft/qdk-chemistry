@@ -108,8 +108,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         if Length(layerOffsets) == 0 {
             Controlled SparseRepPauliExp([control], (params, systems));
         } else {
-            let first = IndexOf(offset -> offset == params.beginning, layerOffsets);
-            let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.end, layerOffsets);
+            let first = IndexOf(offset -> offset == params.numPrefixTerms, layerOffsets);
+            let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
             let stepOffsets = layerOffsets[first..last];
             ControlledPauliLayers(params, layerOffsets[0..first], control, systems);
             if IsResourceEstimating() {

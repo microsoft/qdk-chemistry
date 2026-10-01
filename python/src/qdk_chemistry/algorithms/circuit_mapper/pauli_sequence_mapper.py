@@ -28,7 +28,7 @@ def _pauli_evolution_parameters(container: PauliProductFormulaContainer) -> dict
     # Higher-order formulas reuse words; convert each ordered support only once per call.
     converted = {}
     indices, ops, angles = [], [], []
-    for term in chain(container.beginning, container.step_terms, container.end):
+    for term in chain(container.prefix_terms, container.step_terms, container.suffix_terms):
         word = tuple(term.pauli_term.items())
         if word not in converted:
             converted[word] = (
@@ -44,8 +44,8 @@ def _pauli_evolution_parameters(container: PauliProductFormulaContainer) -> dict
         "pauliOps": ops,
         "pauliCoefficients": angles,
         "repetitions": container.step_reps,
-        "beginning": len(container.beginning),
-        "end": len(container.end),
+        "numPrefixTerms": len(container.prefix_terms),
+        "numSuffixTerms": len(container.suffix_terms),
     }
 
 

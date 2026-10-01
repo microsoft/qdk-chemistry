@@ -120,7 +120,9 @@ def test_fused_formula_matrix(profile: TargetProfile, variant: str) -> None:
             if variant == "uncontrolled"
             else create("controlled_circuit_mapper", variant, control_indices=[2], target_indices=[0, 1])
         )
-        actual = Operator(mapper.run(UnitaryRepresentation(formula.combine(atol=0.0))).get_qiskit_circuit()).data
+        actual = Operator(
+            mapper.run(UnitaryRepresentation(formula.fuse_boundaries(atol=0.0))).get_qiskit_circuit()
+        ).data
     axes = {
         "I": np.eye(2),
         "X": np.array([[0, 1], [1, 0]]),

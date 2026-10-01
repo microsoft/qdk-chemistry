@@ -18,6 +18,24 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
+_PAULIS = {"X": np.array([[0, 1], [1, 0]]), "Y": np.array([[0, -1j], [1j, 0]]), "Z": np.diag([1, -1])}
+
+
+def _formula_unitary(container: PauliProductFormulaContainer) -> np.ndarray:
+    """Multiply out the formula, expanding its repetitions; exp(-i angle P) = cos(angle) I - i sin(angle) P."""
+
+    def product(terms) -> np.ndarray:
+        unitary = np.eye(2**container.num_qubits, dtype=complex)
+        for term in terms:
+            pauli = np.eye(1)
+            for qubit in reversed(range(container.num_qubits)):
+                pauli = np.kron(pauli, _PAULIS.get(term.pauli_term.get(qubit, "I"), np.eye(2)))
+            unitary = (np.cos(term.angle) * np.eye(len(pauli)) - 1j * np.sin(term.angle) * pauli) @ unitary
+        return unitary
+
+    repeated = np.linalg.matrix_power(product(container.step_terms), container.step_reps)
+    return product(container.suffix_terms) @ repeated @ product(container.prefix_terms)
+
 
 @pytest.fixture
 def step_terms():
@@ -71,7 +89,7 @@ class TestPauliProductFormulaContainer:
     def test_stored_term_sequences_are_read_only(self, container):
         """Stored term sequences cannot change after their layout is validated."""
         with pytest.raises(AttributeError, match="append"):
-            container.end.append(container.step_terms[0])
+            container.suffix_terms.append(container.step_terms[0])
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
@@ -161,8 +179,8 @@ class TestPauliProductFormulaContainer:
             container.step_reps,
             container.num_qubits,
             container.scale,
-            beginning=container.step_terms[:1] if with_endpoints else (),
-            end=container.step_terms[-1:] if with_endpoints else (),
+            prefix_terms=container.step_terms[:1] if with_endpoints else (),
+            suffix_terms=container.step_terms[-1:] if with_endpoints else (),
             group_offsets=tuple(range(14)) if with_endpoints else None,
             layer_offsets=tuple(range(16)) if with_endpoints else None,
         )
@@ -266,30 +284,39 @@ class TestPauliProductFormulaContainer:
         assert result.scale == container.scale
         assert result.step_terms == container.step_terms * (4 - inverse_reps)
 
+    @pytest.mark.parametrize("repetitions", [3, 10**9])
     @pytest.mark.parametrize("cancel", [False, True])
-    def test_group_boundary_fusion_stays_compact(self, cancel: bool) -> None:
-        """Fuse reordered commuting boundaries without storing each repetition."""
+    def test_group_boundary_fusion_stays_compact(self, cancel: bool, repetitions: int) -> None:
+        """Fuse reordered commuting boundaries without storing each repetition or changing the evolution."""
         left = [ExponentiatedPauliTerm({0: "X"}, 0.125), ExponentiatedPauliTerm({1: "X"}, 0.25)]
         middle = [ExponentiatedPauliTerm({0: "Z"}, 0.3)]
         right = [ExponentiatedPauliTerm(t.pauli_term, -t.angle if cancel else t.angle) for t in reversed(left)]
         formula = PauliProductFormulaContainer(
-            left + middle + right, 10**9, 2, group_offsets=(0, 2, 3, 5), layer_offsets=(0, 2, 3, 5)
+            left + middle + right, repetitions, 2, group_offsets=(0, 2, 3, 5), layer_offsets=(0, 2, 3, 5)
         )
-        fused = formula.combine(atol=0.0)
-        assert fused.num_pauli_exponentials == 5 * 10**9 - (4 if cancel else 2) * (10**9 - 1)
+        fused = formula.fuse_boundaries(atol=0.0)
+        assert fused.num_pauli_exponentials == 5 * repetitions - (4 if cancel else 2) * (repetitions - 1)
         assert fused.num_stored_terms <= 8
-        assert fused.beginning == tuple(left)
-        assert fused.end == tuple(middle + right)
+        assert fused.prefix_terms == tuple(left)
+        assert fused.suffix_terms == tuple(middle + right)
         assert fused.combine(fused, atol=0.0).num_stored_terms <= 8
+        if repetitions < 10**9:  # Only small repetition counts can be multiplied out.
+            np.testing.assert_allclose(
+                _formula_unitary(fused), _formula_unitary(formula), atol=float_comparison_absolute_tolerance
+            )
 
     def test_combine_different_bodies_includes_endpoints(self) -> None:
         """The general flatten-and-merge fallback preserves both formulas' endpoints."""
         x, y, z = [ExponentiatedPauliTerm({0: axis}, 0.125) for axis in "XYZ"]
         phase = ExponentiatedPauliTerm({}, 0.125)
         inverse_y = ExponentiatedPauliTerm(y.pauli_term, -y.angle)
-        first = PauliProductFormulaContainer([x, z], 2, 1, beginning=[phase], end=[y], layer_offsets=(0, 1, 2, 3, 4))
-        second = PauliProductFormulaContainer([x], 3, 1, beginning=[inverse_y], end=[phase], layer_offsets=(0, 1, 2, 3))
+        first = PauliProductFormulaContainer(
+            [x, z], 2, 1, prefix_terms=[phase], suffix_terms=[y], layer_offsets=(0, 1, 2, 3, 4)
+        )
+        second = PauliProductFormulaContainer(
+            [x], 3, 1, prefix_terms=[inverse_y], suffix_terms=[phase], layer_offsets=(0, 1, 2, 3)
+        )
         combined = first.combine(second)
         assert combined.step_reps == 1
-        assert combined.beginning == combined.end == ()
+        assert combined.prefix_terms == combined.suffix_terms == ()
         assert combined.step_terms == (phase, x, z, x, z, ExponentiatedPauliTerm(x.pauli_term, 0.375), phase)

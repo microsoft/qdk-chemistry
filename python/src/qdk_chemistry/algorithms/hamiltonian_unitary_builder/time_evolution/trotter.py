@@ -251,7 +251,7 @@ class Trotter(TimeEvolutionBuilder):
         )
 
         if self._settings.get("fuse_group_boundaries"):
-            container = container.combine(atol=0.0)
+            container = container.fuse_boundaries(atol=0.0)
         return UnitaryRepresentation(container=container)
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:

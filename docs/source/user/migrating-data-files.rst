@@ -76,7 +76,7 @@ registered make the following changes:
   coloring are unchanged.
 - :class:`~qdk_chemistry.data.PauliProductFormulaContainer` — product formulas,
   saved alone or as a :class:`~qdk_chemistry.data.UnitaryRepresentation`, gain
-  empty beginning and end segments; the repeated terms, repetition count, and scale
+  empty prefix and suffix term segments; the repeated terms, repetition count, and scale
   are unchanged. Other unitary containers load without conversion.
 
 Data classes whose serialization schema has not changed (for example
