@@ -106,7 +106,7 @@ std::unique_ptr<HamiltonianContainer> DFTHCHamiltonianContainer::clone() const {
 
 std::string DFTHCHamiltonianContainer::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
-  return "factorized";
+  return "dfthc";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
@@ -365,7 +365,7 @@ nlohmann::json DFTHCHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
   j["version"] = SERIALIZATION_VERSION;
-  j["container_type"] = "factorized";
+  j["container_type"] = "dfthc";
 
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
   j["one_body_integrals"] = matrix_to_json(h1_alpha);
@@ -441,7 +441,7 @@ void DFTHCHamiltonianContainer::to_hdf5(H5::Group& group) const {
 
   H5::Attribute ct_attr = group.createAttribute("container_type", string_type,
                                                 H5::DataSpace(H5S_SCALAR));
-  std::string ct("factorized");
+  std::string ct("dfthc");
   ct_attr.write(string_type, ct);
 
   // Scalars live in a "metadata" subgroup, matching the other Hamiltonian

@@ -314,7 +314,7 @@ TEST(DoubleFactorizationTest, RunProducesEquivalentFactorizedContainer) {
       HamiltonianFactorizationFactory::create("double_factorization")
           ->run(hamiltonian);
   ASSERT_NE(factorized, nullptr);
-  EXPECT_EQ(factorized->get_container_type(), "factorized");
+  EXPECT_EQ(factorized->get_container_type(), "dfthc");
 
   auto [g_aaaa, g_aabb, g_bbbb] = factorized->get_two_body_integrals();
   EXPECT_TRUE(g_aaaa.isApprox(two_body, kReconstructionTolerance))
