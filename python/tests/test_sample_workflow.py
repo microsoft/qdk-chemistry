@@ -141,16 +141,12 @@ def test_qpe_stretched_n2():
     not _HAS_QRE,
     reason="qdk.qre not available",
 )
-@pytest.mark.skipif(
-    not PYSCF_AVAILABLE,
-    reason="PySCF not available",
-)
 def test_sossa_qre():
     """Test the sequential SOSSA notebook workflow executes without errors.
 
-    The notebook validates the stored H2 circuit, resource-estimates a
-    double-factorized stretched-N2 Hamiltonian, and then estimates synthetic
-    DFTHC examples.
+    The notebook double-factorizes H2 from an SCF calculation, validates the
+    stored H2 DFTHC circuit by simulation, and resource-estimates a synthetic
+    Fe2S2 DFTHC Hamiltonian.
     """
     notebook_path = EXAMPLES_DIR / "sossa_qre.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
