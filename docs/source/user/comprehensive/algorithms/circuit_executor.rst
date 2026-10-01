@@ -200,6 +200,7 @@ Compiles circuits to :term:`QIR` and submits them to an Azure Quantum target, re
 Available through the :doc:`Azure Quantum plugin <../plugins>`; requires ``azure-quantum`` and ``azure-identity``.
 
 The four workspace settings ``subscription_id``, ``resource_group``, ``workspace_name``, and ``target_name`` have no defaults and must be provided. ``location`` is optional.
+
 .. rubric:: Settings
 
 .. list-table::
