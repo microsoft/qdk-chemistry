@@ -366,6 +366,20 @@ TEST_F(LatticeGraphTest, NearbyFlavorAxesMatchAcrossSignFlipPoint) {
   }));
 }
 
+TEST_F(LatticeGraphTest, BondAxisMatchingSeveralFlavorsIsRejected) {
+  // At tolerance 0.8 the diagonals join shell 1, about 0.77 from both axes.
+  const auto geometry = LatticeGeometry::square(3, 3);
+  const std::vector<BondFlavorDefinition> definitions = {
+      {1, Vec2(1.0, 0.0), flavor_x}, {1, Vec2(0.0, 1.0), flavor_y}};
+  EXPECT_THROW(
+      LatticeGraph::from_geometry(geometry, {1}, definitions, 1.0, 0.8),
+      std::invalid_argument);
+  const auto labels =
+      LatticeGraph::from_geometry(geometry, {1}, definitions, 1.0, 0.7)
+          .edge_labels();
+  EXPECT_FALSE(labels.at({0, 4}).flavor.has_value());
+}
+
 TEST_F(LatticeGraphTest, JsonRejectsMalformedEdgeLabels) {
   const auto valid =
       LatticeGraph::from_geometry(LatticeGeometry::chain(3)).to_json();

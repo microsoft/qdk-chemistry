@@ -68,6 +68,7 @@ The Python call is ``LatticeGraph.from_geometry(geometry, shells, bond_flavors=[
 Each physical connection becomes one edge whose weight is the finite ``weight``.
 ``tolerance`` must be positive and less than 1, the lattice unit length, and controls distance and axis comparisons.
 Optional :class:`~qdk_chemistry.data.BondFlavorDefinition` objects assign semantic labels while constructing the graph.
+A bond whose axis lies within ``tolerance`` of several flavor axes of its shell is rejected.
 The graph does not retain the geometry.
 Each edge is a single bond, so small periodic cells where several periodic images join one pair, or a site neighbors its own image, are rejected.
 

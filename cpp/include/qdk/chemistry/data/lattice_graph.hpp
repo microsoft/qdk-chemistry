@@ -189,8 +189,9 @@ class LatticeGraph : public DataClass {
    *                  lattice unit length.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
    * @return Graph whose edges carry their shell and flavor.
-   * @throws std::invalid_argument If a site neighbors its own periodic image
-   *         or several periodic images join one site pair.
+   * @throws std::invalid_argument If a site neighbors its own periodic image,
+   *         several periodic images join one site pair, or a bond axis lies
+   *         within the tolerance of several flavor axes of its shell.
    */
   static LatticeGraph from_geometry(
       const LatticeGeometry& geometry,

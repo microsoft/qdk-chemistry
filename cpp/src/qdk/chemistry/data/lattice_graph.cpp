@@ -100,13 +100,19 @@ static std::vector<BondFlavorDefinition> prepare_flavors(
 static std::optional<BondFlavorId> flavor_of(
     const std::vector<BondFlavorDefinition>& definitions, std::uint64_t shell,
     const Eigen::RowVector2d& axis, double tolerance) {
+  std::optional<BondFlavorId> flavor;
   for (const auto& definition : definitions) {
-    if (definition.shell != shell) continue;
-    if (axis_distance(definition.axis, axis) <= tolerance) {
-      return definition.flavor;
+    if (definition.shell != shell ||
+        axis_distance(definition.axis, axis) > tolerance) {
+      continue;
     }
+    if (flavor.has_value()) {
+      throw std::invalid_argument(
+          "A bond axis lies within the tolerance of several bond flavors.");
+    }
+    flavor = definition.flavor;
   }
-  return std::nullopt;
+  return flavor;
 }
 
 /**

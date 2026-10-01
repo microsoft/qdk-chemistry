@@ -237,7 +237,7 @@ Returns:
     LatticeGraph: Graph whose edges carry their shell and flavor.
 
 Raises:
-    ValueError: If a site neighbors its own periodic image or several periodic images join one site pair.
+    ValueError: If a site neighbors its own periodic image, several periodic images join one site pair, or a bond axis lies within the tolerance of several flavor axes of its shell.
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},
