@@ -5,7 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import copy
 import json
+import pickle
 
 import h5py
 import numpy as np
@@ -86,10 +88,23 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
 
-    def test_stored_term_sequences_are_read_only(self, container):
-        """Stored term sequences cannot change after their layout is validated."""
+    def test_stored_terms_are_read_only(self):
+        """Stored term sequences and Pauli maps cannot change after their layout is validated."""
+        layer = [ExponentiatedPauliTerm({0: "X"}, 0.5), ExponentiatedPauliTerm({1: "Z"}, 0.25)]
+        container = PauliProductFormulaContainer(layer, 1, 2, layer_offsets=(0, 2))
+
         with pytest.raises(AttributeError, match="append"):
-            container.suffix_terms.append(container.step_terms[0])
+            container.suffix_terms.append(layer[0])  # type: ignore[attr-defined]
+        with pytest.raises(TypeError, match="item assignment"):
+            container.step_terms[1].pauli_term[0] = "Z"  # type: ignore[index]
+        assert container.step_terms[1].pauli_term == {1: "Z"}
+
+    def test_stored_terms_pickle_and_copy(self, container):
+        """Read-only stored terms still pickle and deep-copy."""
+        term = container.step_terms[2]
+
+        assert pickle.loads(pickle.dumps(term)) == term
+        assert copy.deepcopy(term) == term
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):

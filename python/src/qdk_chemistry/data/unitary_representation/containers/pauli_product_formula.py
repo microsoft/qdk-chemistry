@@ -6,10 +6,11 @@
 # --------------------------------------------------------------------------------------------
 
 from bisect import bisect_left, bisect_right
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from itertools import chain, pairwise
 from math import isfinite
+from types import MappingProxyType
 from typing import Any
 
 import h5py
@@ -36,11 +37,15 @@ class ExponentiatedPauliTerm:
         * :math:`\theta` is rotation angle
     """
 
-    pauli_term: dict[int, str]
-    """A dictionary mapping qubit indices to Pauli operators ('X', 'Y', 'Z')."""
+    pauli_term: Mapping[int, str]
+    """A mapping from qubit indices to Pauli operators ('X', 'Y', 'Z'), read-only once stored in a container."""
 
     angle: float
     """The rotation angle for the exponentiation."""
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        """Pickle and copy with a plain dict, since a container's read-only maps cannot be pickled."""
+        return type(self), (dict(self.pauli_term), self.angle)
 
 
 def _commute(terms: Sequence[ExponentiatedPauliTerm]) -> bool:
@@ -84,6 +89,11 @@ def _finite(angle: float) -> float:
     if not isfinite(angle):
         raise ValueError("Product-formula fusion requires finite angles and finite merged results.")
     return angle
+
+
+def _read_only_copies(terms: Sequence[ExponentiatedPauliTerm]) -> tuple[ExponentiatedPauliTerm, ...]:
+    """Copy terms with read-only Pauli maps, so validated group and layer offsets stay true."""
+    return tuple(ExponentiatedPauliTerm(MappingProxyType(dict(t.pauli_term)), t.angle) for t in terms)
 
 
 def _slice_layer_offsets(offsets: Sequence[int], start: int, stop: int) -> tuple[int, ...]:
@@ -204,9 +214,9 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
-        self.step_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in step_terms)
-        self.prefix_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in prefix_terms)
-        self.suffix_terms = tuple(ExponentiatedPauliTerm(dict(t.pauli_term), t.angle) for t in suffix_terms)
+        self.step_terms = _read_only_copies(step_terms)
+        self.prefix_terms = _read_only_copies(prefix_terms)
+        self.suffix_terms = _read_only_copies(suffix_terms)
         self.group_offsets = None if group_offsets is None else tuple(group_offsets)
         if self.group_offsets is not None:
             _validate_groups(self.step_terms, self.group_offsets)

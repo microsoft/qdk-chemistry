@@ -37,7 +37,7 @@ from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import Pau
 from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import _sparse_terms
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable
+    from collections.abc import Callable, Iterable, Mapping
 
     from qdk_chemistry.data import QubitOperator
 
@@ -137,7 +137,7 @@ def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
     return "".join(reversed(chars))
 
 
-def pauli_map_to_label(pauli_map: dict[int, str], num_qubits: int) -> str:
+def pauli_map_to_label(pauli_map: Mapping[int, str], num_qubits: int) -> str:
     """Convert a qubit-indexed Pauli map to a Pauli string label.
 
     The rightmost character of the returned string corresponds to qubit 0.
@@ -225,7 +225,7 @@ def do_pauli_labels_qw_commute(label_a: str, label_b: str) -> bool:
     return not any(ca != "I" and cb not in ("I", ca) for ca, cb in zip(label_a, label_b, strict=False))
 
 
-def do_pauli_maps_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+def do_pauli_maps_commute(a: Mapping[int, str], b: Mapping[int, str]) -> bool:
     """Check whether two Pauli terms commute (general/standard commutation).
 
     Two multi-qubit Pauli operators commute if and only if the number
@@ -245,7 +245,7 @@ def do_pauli_maps_commute(a: dict[int, str], b: dict[int, str]) -> bool:
     return anti_commuting % 2 == 0
 
 
-def do_pauli_maps_qw_commute(a: dict[int, str], b: dict[int, str]) -> bool:
+def do_pauli_maps_qw_commute(a: Mapping[int, str], b: Mapping[int, str]) -> bool:
     """Check whether two Pauli terms qubit-wise commute.
 
     Two multi-qubit Pauli operators qubit-wise commute when every

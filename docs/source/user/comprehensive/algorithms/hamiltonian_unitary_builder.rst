@@ -237,7 +237,7 @@ First-order formulas retain the default ordering even when the setting is enable
 
 This is an algorithm :class:`~qdk_chemistry.data.Settings` option: it can be supplied to :func:`~qdk_chemistry.algorithms.create`, updated through ``settings()``, or passed in a nested :class:`~qdk_chemistry.data.AlgorithmRef` used by evolution or QPE builders.
 
-Independently, ``fuse_group_boundaries=True`` retains ``group_offsets`` after ordering and ``weight_threshold`` filtering, with each group spanning all its layers, and calls :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` with ``atol=0.0``.
+Independently, ``fuse_group_boundaries=True`` retains ``group_offsets`` after ordering and ``weight_threshold`` filtering, with each group spanning all its layers, and calls :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.fuse_boundaries` with ``atol=0.0``.
 This preserves group order, requested time, and the Trotter approximation apart from floating-point rounding; see :ref:`compact-product-formulas` and :ref:`mapper compatibility <compact-formula-mappers>`.
 Fusion trades storage for executed rotations: the rewritten formula stores the interior of the step twice, roughly doubling :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms`, while saving about one boundary group per repetition in :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials`.
 The relative saving is small when the boundary group is small compared with the step, as in higher-order Suzuki steps whose internal boundaries are already merged.

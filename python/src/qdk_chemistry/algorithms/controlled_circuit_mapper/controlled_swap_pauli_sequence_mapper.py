@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from collections.abc import Mapping
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import _pauli_evolution_parameters
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
@@ -21,7 +22,7 @@ __all__: list[str] = [
 ]
 
 
-def _vacuum_eigenphase(terms: list[tuple[dict[int, str], float]], atol: float) -> float | None:
+def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float) -> float | None:
     r"""Return the phase an *ordered* product :math:`\prod_j e^{-i\theta_j P_j}` imprints on the vacuum.
 
     That is :math:`\varphi_0` in
