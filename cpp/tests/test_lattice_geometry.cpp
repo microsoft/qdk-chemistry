@@ -301,7 +301,11 @@ TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
       {"/integer_embedding/primitive_vectors/0", {0.0, 0.0}},
       // Fractional values that would otherwise truncate to the valid layout.
       {"/integer_embedding/nx", 2.5},
-      {"/integer_embedding/site_by_coordinate/1", 1.5}};
+      {"/integer_embedding/site_by_coordinate/1", 1.5},
+      // With no sites, the periodic shell search would never find a shell.
+      {"/integer_embedding/site_by_coordinate",
+       std::vector<int>(
+           json.at("integer_embedding").at("site_by_coordinate").size(), -1)}};
   for (const auto& [path, value] : invalid) {
     SCOPED_TRACE(path);
     auto malformed = json;

@@ -327,6 +327,10 @@ LatticeGeometry LatticeGeometry::_from_integer_embedding(
   const auto n = static_cast<std::size_t>(
       std::count_if(site_by_coordinate.begin(), site_by_coordinate.end(),
                     [](int site) { return site != -1; }));
+  if (n == 0) {
+    throw std::invalid_argument(
+        "Integer embedding must keep at least one site.");
+  }
   const Eigen::RowVector2d a1 = primitive_vectors.row(0);
   const Eigen::RowVector2d a2 = primitive_vectors.row(1);
   Eigen::MatrixXd positions(static_cast<Eigen::Index>(n), 2);
