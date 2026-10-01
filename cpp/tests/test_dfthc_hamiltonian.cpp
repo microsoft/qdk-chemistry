@@ -466,7 +466,7 @@ TEST_F(DFTHCHamiltonianTest, JSONRoundTripViaHamiltonian) {
   nlohmann::json j = h.to_json();
   auto h2 = Hamiltonian::from_json(j);
 
-  EXPECT_EQ(h2->get_container_type(), "factorized");
+  EXPECT_EQ(h2->get_container_type(), "dfthc");
   EXPECT_TRUE(h2->has_container_type<DFTHCHamiltonianContainer>());
   EXPECT_EQ(h2->get_core_energy(), core_energy);
   EXPECT_TRUE(
@@ -507,7 +507,7 @@ TEST_F(DFTHCHamiltonianTest, HDF5FileRoundTripViaHamiltonian) {
 
   auto h2 = Hamiltonian::from_hdf5_file(filename);
 
-  EXPECT_EQ(h2->get_container_type(), "factorized");
+  EXPECT_EQ(h2->get_container_type(), "dfthc");
   EXPECT_TRUE(h2->has_container_type<DFTHCHamiltonianContainer>());
   EXPECT_DOUBLE_EQ(h2->get_core_energy(), core_energy);
 
