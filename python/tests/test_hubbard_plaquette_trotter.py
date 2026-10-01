@@ -98,6 +98,29 @@ def _evolution_circuit(
     return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(_plaquette_parameters(container))
 
 
+def _plaquette_operation_from_angles(
+    width: int,
+    height: int,
+    *,
+    interaction_angle: float,
+    hopping_angle: float,
+    repetitions: int,
+    controlled: bool = False,
+    forced_legacy: bool = False,
+):
+    """Return a direct Q# callable for a plaquette evolution with exact test angles."""
+    operation = "RepPlaquetteExpWithForcedLegacyCostsForTest" if forced_legacy else "RepPlaquetteExp"
+    params = (
+        f"{_PLAQUETTE}.HubbardPlaquetteParams("
+        f"{width}, {height}, {interaction_angle:.17g}, {hopping_angle:.17g}, {repetitions}, -1)"
+    )
+    if controlled:
+        return get_qsharp_context().eval(
+            f"qs => {{ Controlled {_PLAQUETTE}.{operation}([qs[0]], ({params}, qs[1...])); }}"
+        )
+    return get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.{operation}({params}, qs); }}")
+
+
 def _applied_state(operation, state: np.ndarray) -> np.ndarray:
     """Return the state the operation produces from *state*."""
     num_qubits = round(math.log2(len(state)))
@@ -362,14 +385,30 @@ def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
     return scipy.linalg.expm(1j * angle * generator)
 
 
-def _hopping_phases(angle: float, control: str | None = None) -> str:
+def _apply_hopping_tower(angle: float, num_pairs: int, state: np.ndarray) -> np.ndarray:
+    """Apply the same adjacent-pair hopping tower without materializing a 2**n by 2**n matrix."""
+    pauli_pair = np.kron(_PAULI_X, _PAULI_X) + np.kron(_PAULI_Y, _PAULI_Y)
+    pair_gate = scipy.linalg.expm(1j * angle * pauli_pair)
+    num_qubits = 2 * num_pairs
+    evolved = state.astype(complex)
+    for pair in range(num_pairs):
+        q0, q1 = 2 * pair, 2 * pair + 1
+        axes = [q0, q1] + [axis for axis in range(num_qubits) if axis not in (q0, q1)]
+        inverse = np.argsort(axes)
+        moved = np.transpose(evolved.reshape([2] * num_qubits), axes).reshape(4, -1)
+        evolved = np.transpose((pair_gate @ moved).reshape([2, 2] + [2] * (num_qubits - 2)), inverse).reshape(-1)
+    return evolved
+
+
+def _hopping_phases(angle: float, control: str | None = None, *, forced_legacy: bool = False) -> str:
     """Return Q# applying ``HoppingPhases``, optionally controlled."""
     register = "qs" if control is None else "qs[1...]"
     arguments = f"({angle}, Std.Arrays.Chunks(2, {register}), -1)"
+    operation = "HoppingPhasesWithForcedLegacyCostsForTest" if forced_legacy else "HoppingPhases"
     tower = (
-        f"{_PLAQUETTE}.HoppingPhases{arguments}"
+        f"{_PLAQUETTE}.{operation}{arguments}"
         if control is None
-        else f"Controlled {_PLAQUETTE}.HoppingPhases([{control}], {arguments})"
+        else f"Controlled {_PLAQUETTE}.{operation}([{control}], {arguments})"
     )
     return f"qs => {{ {tower}; }}"
 
@@ -395,6 +434,16 @@ class TestHoppingPhases:
         state = _random_state(2 * num_pairs + 1, seed=21)
         half = len(state) // 2
         expected = np.concatenate([state[:half], _hopping_tower(angle, num_pairs) @ state[half:]])
+        assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
+
+    def test_forced_legacy_tower_matches_the_same_hopping_evolution(self):
+        """The resource-estimation legacy XX/YY split is unitary-equivalent above the HWP break-even."""
+        angle, num_pairs = 3 * _ANGLE_QUANTUM, 8
+        operation = _hopping_phases(angle, forced_legacy=True)
+
+        state = _random_state(2 * num_pairs, seed=91)
+        expected = _apply_hopping_tower(angle, num_pairs, state)
+
         assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
 
 
@@ -560,6 +609,55 @@ class TestPlaquetteEvolutionOnAState:
         )
 
         assert _infidelity(actual, expected) < 1e-9
+
+
+@pytest.mark.xfail(
+    reason="Forcing the resource-estimation legacy branches changes the simulated plaquette unitary.",
+    strict=True,
+)
+class TestForcedLegacyPlaquetteCosts:
+    """The resource-estimation-only legacy branches must not change the simulated unitary."""
+
+    def test_forced_legacy_plaquette_matches_expm_uncontrolled(self):
+        """Forcing the legacy branches on in simulation still gives the same 2x2 evolution."""
+        width = height = 2
+        time, t, u, repetitions = 0.05, 1.0, 4.0, 8
+        delta = time / repetitions
+        operation = _plaquette_operation_from_angles(
+            width,
+            height,
+            interaction_angle=0.25 * u * delta,
+            hopping_angle=2.0 * t * delta,
+            repetitions=repetitions,
+            forced_legacy=True,
+        )
+        hamiltonian = _reference_hamiltonian(width, height, t=t, u=u)
+        state = _random_state(2 * width * height, seed=101)
+        expected = scipy.linalg.expm(-1j * time * hamiltonian) @ state
+
+        assert _infidelity(_applied_state(operation, state), expected) < 1e-8
+
+    def test_forced_legacy_plaquette_matches_expm_under_control(self):
+        """The legacy identity rotations remain harmless as controlled relative phases."""
+        width = height = 2
+        time, t, u, repetitions = 0.05, 1.0, 4.0, 8
+        delta = time / repetitions
+        operation = _plaquette_operation_from_angles(
+            width,
+            height,
+            interaction_angle=0.25 * u * delta,
+            hopping_angle=2.0 * t * delta,
+            repetitions=repetitions,
+            controlled=True,
+            forced_legacy=True,
+        )
+        hamiltonian = _reference_hamiltonian(width, height, t=t, u=u)
+        evolution = scipy.linalg.expm(-1j * time * hamiltonian)
+        state = _random_state(2 * width * height + 1, seed=102)
+        half = len(state) // 2
+        expected = np.concatenate([state[:half], evolution @ state[half:]])
+
+        assert _infidelity(_applied_state(operation, state), expected) < 1e-8
 
 
 class TestPlaquettePhaseEstimation:

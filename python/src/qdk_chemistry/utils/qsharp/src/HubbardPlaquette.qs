@@ -203,6 +203,16 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         targets : Qubit[][],
         maxBatchSize : Int
     ) : Unit is Adj + Ctl {
+        HammingWeightPhaseWithLegacyCosts(theta, pauliOps, targets, maxBatchSize, false);
+    }
+
+    internal operation HammingWeightPhaseWithLegacyCosts(
+        theta : Double,
+        pauliOps : Pauli[][],
+        targets : Qubit[][],
+        maxBatchSize : Int,
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         let count = Length(targets);
         Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
         if count > 0 {
@@ -211,7 +221,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let opBatches = Chunks(batchSize, pauliOps);
             let targetBatches = Chunks(batchSize, targets);
             for index in 0..Length(targetBatches) - 1 {
-                HammingWeightPhaseBatch(theta, opBatches[index], targetBatches[index]);
+                HammingWeightPhaseBatchWithLegacyCosts(theta, opBatches[index], targetBatches[index], forceLegacyCosts);
             }
         }
     }
@@ -254,6 +264,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         pauliOps : Pauli[][],
         targets : Qubit[][]
     ) : Unit is Adj + Ctl {
+        HammingWeightPhaseBatchWithLegacyCosts(theta, pauliOps, targets, false);
+    }
+
+    internal operation HammingWeightPhaseBatchWithLegacyCosts(
+        theta : Double,
+        pauliOps : Pauli[][],
+        targets : Qubit[][],
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         let count = Length(targets);
         if not UsesHammingWeightPhasing(count) {
             for t in 0..count - 1 {
@@ -280,7 +299,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             } apply {
                 // TEMPORARY (legacy parity): the legacy ladder also phased every place value with an
                 // R(PauliI) and applied the whole batch constant at the end.
-                let legacy = UsesLegacyCosts();
+                let legacy = UsesLegacyCostsWithOverride(forceLegacyCosts);
                 // w = Σ_j 2^j w_j, so e^{2 i theta w} is one rotation per place value, the bit of
                 // place value 2^j taking the angle 2 theta 2^j.
                 for j in 0..places - 1 {
@@ -334,18 +353,35 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[],
         maxBatchSize : Int
     ) : Unit is Adj + Ctl {
+        InteractionLayerWithLegacyCosts(angle, sites, systems, maxBatchSize, false);
+    }
+
+    internal operation InteractionLayerWithLegacyCosts(
+        angle : Double,
+        sites : Int,
+        systems : Qubit[],
+        maxBatchSize : Int,
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         // A negligible angle skips the adder tree, which a hopping-only model would pay for nothing.
         if AbsD(angle) > 1e-12 {
             // TEMPORARY (legacy parity): the legacy layer also phased a single-mode Z tower over
             // every mode, the conventional model's n_up + n_down terms.
-            if UsesLegacyCosts() {
-                HammingWeightPhase(-angle, [[PauliZ], size = Length(systems)], Mapped(q -> [q], systems), maxBatchSize);
+            if UsesLegacyCostsWithOverride(forceLegacyCosts) {
+                HammingWeightPhaseWithLegacyCosts(
+                    -angle,
+                    [[PauliZ], size = Length(systems)],
+                    Mapped(q -> [q], systems),
+                    maxBatchSize,
+                    forceLegacyCosts
+                );
             }
-            HammingWeightPhase(
+            HammingWeightPhaseWithLegacyCosts(
                 angle,
                 [[PauliZ, PauliZ], size = sites],
                 StridedGroups(sites, 2, 1, sites, systems),
-                maxBatchSize
+                maxBatchSize,
+                forceLegacyCosts
             );
         }
     }
@@ -420,6 +456,16 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[],
         maxBatchSize : Int
     ) : Unit is Adj + Ctl {
+        HoppingLayerWithLegacyCosts(kappa, blocks, systems, maxBatchSize, false);
+    }
+
+    internal operation HoppingLayerWithLegacyCosts(
+        kappa : Double,
+        blocks : Int[][],
+        systems : Qubit[],
+        maxBatchSize : Int,
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         within {
             let (swapCount, swaps) = RoutingSwaps(blocks, Length(systems), not IsResourceEstimating());
             if IsResourceEstimating() {
@@ -448,7 +494,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         } apply {
             // The third butterfly is fused into the phases, so the equal-angle family is the
             // middle pair of every plaquette: exp(i angle XX) exp(i angle YY) on each pair.
-            HoppingPhases(kappa / 2.0, StridedGroups(Length(blocks), 2, 4, 1, systems[1...]), maxBatchSize);
+            HoppingPhasesWithLegacyCosts(
+                kappa / 2.0,
+                StridedGroups(Length(blocks), 2, 4, 1, systems[1...]),
+                maxBatchSize,
+                forceLegacyCosts
+            );
         }
     }
 
@@ -463,13 +514,42 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// rotations, and a batch cap short enough to put every batch below the break-even has the
     /// same effect, so the basis change is skipped rather than paid for nothing.
     internal operation HoppingPhases(angle : Double, pairs : Qubit[][], maxBatchSize : Int) : Unit is Adj + Ctl {
+        HoppingPhasesWithLegacyCosts(angle, pairs, maxBatchSize, false);
+    }
+
+    internal operation HoppingPhasesWithForcedLegacyCostsForTest(
+        angle : Double,
+        pairs : Qubit[][],
+        maxBatchSize : Int
+    ) : Unit is Adj + Ctl {
+        HoppingPhasesWithLegacyCosts(angle, pairs, maxBatchSize, true);
+    }
+
+    internal operation HoppingPhasesWithLegacyCosts(
+        angle : Double,
+        pairs : Qubit[][],
+        maxBatchSize : Int,
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         let count = 2 * Length(pairs);
         // Every batch is at most this long, so this decides the path for the whole tower.
         let phasesBatch = count > 0 and UsesHammingWeightPhasing(HammingWeightBatchSize(count, maxBatchSize));
         // TEMPORARY (legacy parity): the legacy layer phased XX and YY as two separate towers.
-        if UsesLegacyCosts() {
-            HammingWeightPhase(-angle, [[PauliX, PauliX], size = Length(pairs)], pairs, maxBatchSize);
-            HammingWeightPhase(-angle, [[PauliY, PauliY], size = Length(pairs)], pairs, maxBatchSize);
+        if UsesLegacyCostsWithOverride(forceLegacyCosts) {
+            HammingWeightPhaseWithLegacyCosts(
+                -angle,
+                [[PauliX, PauliX], size = Length(pairs)],
+                pairs,
+                maxBatchSize,
+                forceLegacyCosts
+            );
+            HammingWeightPhaseWithLegacyCosts(
+                -angle,
+                [[PauliY, PauliY], size = Length(pairs)],
+                pairs,
+                maxBatchSize,
+                forceLegacyCosts
+            );
         } elif not phasesBatch {
             for pair in pairs {
                 Exp([PauliX, PauliX], angle, pair);
@@ -500,18 +580,39 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         pinkAngle : Double,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
+        PlaquetteStepWithPinkAngleAndLegacyCosts(params, pinkAngle, systems, false);
+    }
+
+    internal operation PlaquetteStepWithPinkAngleAndLegacyCosts(
+        params : HubbardPlaquetteParams,
+        pinkAngle : Double,
+        systems : Qubit[],
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, params.maxBatchSize);
-        HoppingLayer(params.hoppingAngle, gold, systems, params.maxBatchSize);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, params.maxBatchSize);
+        InteractionLayerWithLegacyCosts(
+            params.interactionAngle / 2.0,
+            sites,
+            systems,
+            params.maxBatchSize,
+            forceLegacyCosts
+        );
+        HoppingLayerWithLegacyCosts(params.hoppingAngle, gold, systems, params.maxBatchSize, forceLegacyCosts);
+        InteractionLayerWithLegacyCosts(
+            params.interactionAngle / 2.0,
+            sites,
+            systems,
+            params.maxBatchSize,
+            forceLegacyCosts
+        );
         // TEMPORARY (legacy parity): the legacy step also applied the conventional model's scalar,
         // a real rotation under control.
-        if UsesLegacyCosts() and AbsD(params.interactionAngle) > 1e-12 {
+        if UsesLegacyCostsWithOverride(forceLegacyCosts) and AbsD(params.interactionAngle) > 1e-12 {
             R(PauliI, 2.0 * params.interactionAngle * IntAsDouble(sites), systems[0]);
         }
-        HoppingLayer(pinkAngle, pink, systems, params.maxBatchSize);
+        HoppingLayerWithLegacyCosts(pinkAngle, pink, systems, params.maxBatchSize, forceLegacyCosts);
     }
 
     /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P.
@@ -525,7 +626,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's extra work, which
     /// changes no simulated result. Remove this function and every branch on it to revert.
     internal function UsesLegacyCosts() : Bool {
-        return IsResourceEstimating();
+        return UsesLegacyCostsWithOverride(false);
+    }
+
+    internal function UsesLegacyCostsWithOverride(forceLegacyCosts : Bool) : Bool {
+        return forceLegacyCosts or IsResourceEstimating();
     }
 
     /// # Summary
@@ -551,13 +656,29 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         params : HubbardPlaquetteParams,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
+        RepPlaquetteExpWithLegacyCosts(params, systems, false);
+    }
+
+    internal operation RepPlaquetteExpWithForcedLegacyCostsForTest(
+        params : HubbardPlaquetteParams,
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        RepPlaquetteExpWithLegacyCosts(params, systems, true);
+    }
+
+    internal operation RepPlaquetteExpWithLegacyCosts(
+        params : HubbardPlaquetteParams,
+        systems : Qubit[],
+        forceLegacyCosts : Bool
+    ) : Unit is Adj + Ctl {
         if params.repetitions > 0 {
             let pink = PlaquetteSection(params.width, params.height, true);
-            HoppingLayer(
+            HoppingLayerWithLegacyCosts(
                 params.hoppingAngle / 2.0,
                 pink,
                 systems,
-                params.maxBatchSize
+                params.maxBatchSize,
+                forceLegacyCosts
             );
 
             if params.repetitions > 1 {
@@ -565,16 +686,26 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     within {
                         RepeatEstimates(params.repetitions - 1);
                     } apply {
-                        PlaquetteStep(params, systems);
+                        PlaquetteStepWithPinkAngleAndLegacyCosts(
+                            params,
+                            params.hoppingAngle,
+                            systems,
+                            forceLegacyCosts
+                        );
                     }
                 } else {
                     for _ in 1..params.repetitions - 1 {
-                        PlaquetteStep(params, systems);
+                        PlaquetteStepWithPinkAngleAndLegacyCosts(
+                            params,
+                            params.hoppingAngle,
+                            systems,
+                            forceLegacyCosts
+                        );
                     }
                 }
             }
 
-            PlaquetteStepWithPinkAngle(params, params.hoppingAngle / 2.0, systems);
+            PlaquetteStepWithPinkAngleAndLegacyCosts(params, params.hoppingAngle / 2.0, systems, forceLegacyCosts);
         }
     }
 
