@@ -47,15 +47,12 @@ class TestTimeAveragedPropagatorDriven:
         # f_avg = 0, so result should be h0 + 0*h1
         np.testing.assert_allclose(result.coefficients[0], 1.0)
 
-    def test_zero_drive_preserves_h0_partition(self):
-        """Zero drive returns H0 with its term partition."""
+    def test_static_hamiltonian_preserves_h0_partition(self):
+        """Without a drive, the propagator returns H0 with its term partition."""
         partition = LayeredPartition(strategy="geometry_coloring", groups=(((0, 1),),))
         h0 = QubitOperator(["ZI", "IZ"], np.array([1.0, 2.0]), term_partition=partition)
-        h1 = _make_hamiltonian(["IX"], [2.0])
-        td = DrivenQubitHamiltonian(h0, h1, drive=lambda _t: 0.0)
 
-        propagator = MagnusPropagator()
-        result = propagator.run(td, 0.0, 1.0)
+        result = MagnusPropagator().run(DrivenQubitHamiltonian(h0), 0.0, 1.0)
 
         np.testing.assert_allclose(result.coefficients, h0.coefficients)
         assert result.term_partition == partition
