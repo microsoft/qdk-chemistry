@@ -199,9 +199,7 @@ Azure Quantum Backend
 Compiles circuits to :term:`QIR` and submits them to an Azure Quantum target, returning the measurement results.
 Available through the :doc:`Azure Quantum plugin <../plugins>`; requires ``azure-quantum`` and ``azure-identity``.
 
-The connection to the Azure Quantum workspace is established using the provided settings.
-The five workspace settings have no defaults and must be provided.
-
+The four workspace settings ``subscription_id``, ``resource_group``, ``workspace_name``, and ``target_name`` have no defaults and must be provided. ``location`` is optional.
 .. rubric:: Settings
 
 .. list-table::
