@@ -242,6 +242,41 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
     @staticmethod
     @cache
+    def _bond_multiplicity(width: int, height: int) -> int:
+        r"""Return how many times a periodic image joins each pair of neighboring sites.
+
+        On a ring of two sites the neighbor is reached going either way around, so the pair is
+        joined twice and its hopping amplitude is :math:`2t` rather than :math:`t`. Every longer
+        ring joins a pair once. The tiling carries one hopping angle for the whole lattice, so a
+        shape that doubles in one direction and not the other has no single amplitude and is
+        rejected rather than silently evolved under the wrong Hamiltonian.
+
+        ``_periodic_square_bonds`` returns a set, which collapses the doubled bond, so the
+        multiplicity has to be recovered from the extents instead of counted from the bonds.
+
+        Args:
+            width: Number of sites along x.
+            height: Number of sites along y.
+
+        Returns:
+            int: The shared bond multiplicity, 1 or 2.
+
+        Raises:
+            ValueError: If the two directions disagree, which no single angle can express.
+
+        """
+        along_x = 2 if width == 2 else 1
+        along_y = 2 if height == 2 else 1
+        if along_x != along_y:
+            raise ValueError(
+                f"A periodic {width}x{height} lattice joins its neighbors {along_x} time(s) along x but "
+                f"{along_y} time(s) along y, so one hopping angle cannot describe both. Use extents that "
+                "are both two or both greater than two."
+            )
+        return along_x
+
+    @staticmethod
+    @cache
     def _periodic_square_bonds(width: int, height: int) -> frozenset[frozenset[int]]:
         """Return the nearest-neighbor bonds of a periodic square lattice.
 
@@ -383,7 +418,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         width, height, _sections = self._lattice_geometry(qubit_hamiltonian)
 
         # 2. Model parameters
-        hopping = float(self._settings.get("t"))
+        hopping = float(self._settings.get("t")) * self._bond_multiplicity(width, height)
         interaction = float(self._settings.get("u"))
         pair_angle = 0.25 * interaction
         num_electrons = int(self._settings.get("num_electrons"))

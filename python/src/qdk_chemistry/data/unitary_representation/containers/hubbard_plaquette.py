@@ -124,8 +124,53 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         return float((-angle + self.constant_shift * self.step_reps) / self.scale)
 
     def combine(self, other: UnitaryContainer) -> UnitaryContainer:
-        """Reject sequential combination, which plaquette containers do not define."""
-        raise NotImplementedError("HubbardPlaquetteContainer does not support combining sequential evolutions.")
+        r"""Return the evolution that applies this container and then ``other``.
+
+        The body of a plaquette evolution is fixed by the lattice and the four angles, and the
+        container applies it ``step_reps`` times. Appending one evolution to another is therefore
+        a single evolution with the repetitions added, provided both describe the same body:
+        :math:`B^{m} B^{n} = B^{m+n}`.
+
+        Angles are compared exactly rather than within a tolerance. They are derived by the same
+        arithmetic from the same settings, so two containers that mean the same body produce bit-
+        identical angles; a tolerance would instead let two genuinely different evolutions merge
+        into one that matches neither.
+
+        Args:
+            other: The container to append after this one.
+
+        Returns:
+            UnitaryContainer: The combined evolution.
+
+        Raises:
+            TypeError: If ``other`` is not a plaquette container.
+            ValueError: If the two describe different bodies, which no single container can hold.
+
+        """
+        if not isinstance(other, HubbardPlaquetteContainer):
+            raise TypeError(
+                f"A plaquette evolution composes with another plaquette evolution, not with a "
+                f"{type(other).__name__}."
+            )
+
+        body = ("width", "height", "interaction_angle", "hopping_angle", "constant_shift", "scale")
+        differing = [name for name in body if getattr(self, name) != getattr(other, name)]
+        if differing:
+            raise ValueError(
+                "Only repetitions of one body compose into a single plaquette evolution, but the two "
+                f"differ in {', '.join(differing)}. Evolutions with unequal angles, such as the rescaled "
+                "powers of phase estimation, have to stay separate."
+            )
+
+        return HubbardPlaquetteContainer(
+            width=self.width,
+            height=self.height,
+            interaction_angle=self.interaction_angle,
+            constant_shift=self.constant_shift,
+            hopping_angle=self.hopping_angle,
+            step_reps=self.step_reps + other.step_reps,
+            scale=self.scale,
+        )
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
