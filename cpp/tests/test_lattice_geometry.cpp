@@ -290,6 +290,7 @@ TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
 
   const std::vector<std::pair<std::string, nlohmann::json>> invalid = {
       {"/integer_embedding/nx", 0},
+      {"/integer_embedding/site_by_coordinate/0", "text"},
       {"/integer_embedding/site_by_coordinate/0", 99},
       {"/integer_embedding/site_by_coordinate/1", 0},
       {"/integer_embedding/primitive_vectors", {{1.0, 0.0}}},
@@ -297,7 +298,10 @@ TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
        {std::numeric_limits<double>::infinity(), 0.0}},
       {"/integer_embedding/basis/0/0",
        std::numeric_limits<double>::quiet_NaN()},
-      {"/integer_embedding/primitive_vectors/0", {0.0, 0.0}}};
+      {"/integer_embedding/primitive_vectors/0", {0.0, 0.0}},
+      // Fractional values that would otherwise truncate to the valid layout.
+      {"/integer_embedding/nx", 2.5},
+      {"/integer_embedding/site_by_coordinate/1", 1.5}};
   for (const auto& [path, value] : invalid) {
     SCOPED_TRACE(path);
     auto malformed = json;
@@ -329,9 +333,6 @@ TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
            {{"version", json.at("version")}, {"positions", {{0.0, 0.0}}}}}) {
     EXPECT_THROW(LatticeGeometry::from_json(layout), std::invalid_argument);
   }
-  auto text = json;
-  text["integer_embedding"]["site_by_coordinate"][0] = "text";
-  EXPECT_THROW(LatticeGeometry::from_json(text), nlohmann::json::type_error);
 }
 
 TEST_F(LatticeGeometryTest, SerializationRequiresCompatibleVersion) {

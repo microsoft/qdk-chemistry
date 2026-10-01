@@ -534,11 +534,20 @@ LatticeGeometry LatticeGeometry::from_json(const nlohmann::json& j) {
     throw std::invalid_argument("Invalid lattice integer embedding.");
   }
   const auto& embedding = j.at("integer_embedding");
+  const auto& sites = embedding.at("site_by_coordinate");
+  if (!sites.is_array()) {
+    throw std::invalid_argument("Invalid lattice integer embedding.");
+  }
+  std::vector<int> site_by_coordinate;
+  site_by_coordinate.reserve(sites.size());
+  for (const auto& site : sites) {
+    site_by_coordinate.push_back(detail::json_integer<int>(site));
+  }
   return _from_integer_embedding(
-      embedding.at("nx").get<int>(), embedding.at("ny").get<int>(),
+      detail::json_integer<int>(embedding.at("nx")),
+      detail::json_integer<int>(embedding.at("ny")),
       json_to_matrix(embedding.at("primitive_vectors")),
-      json_to_matrix(embedding.at("basis")),
-      embedding.at("site_by_coordinate").get<std::vector<int>>(),
+      json_to_matrix(embedding.at("basis")), std::move(site_by_coordinate),
       embedding.at("periodic_x").get<bool>(),
       embedding.at("periodic_y").get<bool>());
 }

@@ -109,29 +109,6 @@ static std::optional<BondFlavorId> flavor_of(
   return std::nullopt;
 }
 
-template <typename Integer>
-Integer json_integer(const nlohmann::json& value) {
-  bool valid = value.is_number_integer();
-  if (valid && value.is_number_unsigned()) {
-    valid = value.get<std::uint64_t>() <=
-            static_cast<std::uint64_t>(std::numeric_limits<Integer>::max());
-  } else if (valid) {
-    const auto integer = value.get<std::int64_t>();
-    if constexpr (std::is_unsigned_v<Integer>) {
-      valid = integer >= 0 && static_cast<std::uint64_t>(integer) <=
-                                  std::numeric_limits<Integer>::max();
-    } else {
-      valid = integer >= std::numeric_limits<Integer>::min() &&
-              integer <= std::numeric_limits<Integer>::max();
-    }
-  }
-  if (!valid) {
-    throw std::invalid_argument(
-        "Lattice JSON integer is invalid or out of range.");
-  }
-  return value.get<Integer>();
-}
-
 /**
  * @brief Depth-first search (DFS) helper to find a Hamiltonian path in a sparse
  * graph.

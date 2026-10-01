@@ -14,7 +14,6 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from qdk_chemistry.constants import BOHR_MAGNETON, ELEMENTARY_CHARGE
 from qdk_chemistry.data import (
     BondFlavorDefinition,
     EdgeLabel,
@@ -829,7 +828,7 @@ class TestModelHamiltonians:
         gamma_prime = -2.3
         field_abc = np.array([0.0, 10.0, 0.0])
         g_factors = np.array([2.3, 2.3, 1.3])
-        bohr_magneton = BOHR_MAGNETON / ELEMENTARY_CHARGE * 1.0e3  # meV/T
+        bohr_magneton = 0.057883817982  # meV/T, CODATA 2022, fixed so the reference energies hold for any build
 
         actual = create_kitaev_hamiltonian(
             graph,
@@ -905,8 +904,8 @@ class TestModelHamiltonians:
 
         np.testing.assert_allclose(actual.to_matrix(), expected, atol=1e-12, rtol=0.0)
         eigenvalues = np.linalg.eigvalsh(expected)
-        assert eigenvalues[0] == pytest.approx(-31.58122422066271, abs=1e-12)
-        assert eigenvalues[1] - eigenvalues[0] == pytest.approx(4.256994998983597, abs=1e-12)
+        assert eigenvalues[0] == pytest.approx(-31.58122422066394, abs=1e-12)
+        assert eigenvalues[1] - eigenvalues[0] == pytest.approx(4.256994998977316, abs=1e-12)
 
     @pytest.mark.parametrize("include_term_groups", [False, True])
     @pytest.mark.parametrize("as_array", [False, True])
