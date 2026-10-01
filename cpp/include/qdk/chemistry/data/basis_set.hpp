@@ -919,7 +919,7 @@ class BasisSet : public DataClass,
   mutable bool _cache_valid = false;
 
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /**
    * @brief Check if basis set is valid and complete

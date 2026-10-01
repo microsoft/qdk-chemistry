@@ -15,7 +15,7 @@ Python::
     migrate.convert_file("old.hamiltonian.json", "new.hamiltonian.h5")
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
+(``basis_set`` / ``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 Input and output formats may differ.
 
@@ -24,9 +24,13 @@ on a library release: every migratable type exposes a ``STEPS`` table mapping a
 source version to a ``(next_version, transform)`` pair, and the chain is followed
 until it reaches the version the installed library accepts. To support a future
 serialization-version bump for a data class, register the next step in that type's
-``STEPS`` table (``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``);
+``STEPS`` table (``_basis_set``/``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``);
 the migrated document is validated against the live deserializer, so a missing step
 fails loudly.
+
+A ``BasisSet`` keeps its own serialization version wherever another file embeds it,
+so embedded basis sets are migrated first; a file whose own version is already
+current is then complete.
 
 This module lives outside the data classes so that no legacy-schema knowledge
 leaks into the core serialization.
@@ -40,13 +44,14 @@ leaks into the core serialization.
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 
 import h5py
 
-from qdk_chemistry.data import Ansatz, Hamiltonian, Orbitals, QpeResult, Wavefunction
+from qdk_chemistry.data import Ansatz, BasisSet, Hamiltonian, Orbitals, QpeResult, Wavefunction
 
-from . import _ansatz, _hamiltonian, _io, _orbitals, _qpe_result, _wavefunction
+from . import _ansatz, _basis_set, _hamiltonian, _io, _orbitals, _qpe_result, _wavefunction
 
 __all__ = ["MigrationError", "convert_file"]
 
@@ -71,6 +76,7 @@ def _resolves_to_same_file(src: Path, dst: Path) -> bool:
 
 
 _MODULES = {
+    "basis_set": _basis_set,
     "orbitals": _orbitals,
     "hamiltonian": _hamiltonian,
     "wavefunction": _wavefunction,
@@ -79,6 +85,7 @@ _MODULES = {
 }
 
 _CLASSES = {
+    "basis_set": BasisSet,
     "orbitals": Orbitals,
     "hamiltonian": Hamiltonian,
     "wavefunction": Wavefunction,
@@ -117,9 +124,37 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
     except ValueError as error:
         raise MigrationError(str(error)) from error
 
+    with tempfile.TemporaryDirectory() as tmp:
+        # The installed deserializers expect the name.type.ext pattern.
+        staged = Path(tmp) / f"staged.{data_type}.{'json' if src_format == 'json' else 'h5'}"
+        try:
+            upgraded = _basis_set.upgrade_embedded(src_path, staged, src_format)
+        except (KeyError, ValueError, RuntimeError, OSError) as error:
+            raise MigrationError(f"Failed to migrate '{src_path}': {error}") from error
+        obj = _load_current(data_type, staged, src_format) if upgraded else None
+        if obj is None:
+            obj = _migrate(data_type, staged if upgraded else src_path, src_format, src_path)
+
+    try:
+        _io.write_object(obj, dst_path, dst_format)
+    except (OSError, RuntimeError) as error:
+        raise MigrationError(f"Failed to write '{dst_path}': {error}") from error
+    return dst_path
+
+
+def _load_current(data_type: str, path: Path, fmt: str):
+    """Load ``path`` with the installed class, or return None if its own version is outdated."""
+    try:
+        return _CLASSES[data_type].from_file(str(path), fmt)
+    except (RuntimeError, ValueError):
+        return None
+
+
+def _migrate(data_type: str, path: Path, fmt: str, src_path: Path):
+    """Migrate ``path`` through its type's serialization-version steps and load the result."""
     module = _MODULES[data_type]
     try:
-        old_doc = _read_old(module, data_type, src_path, src_format)
+        old_doc = _read_old(module, data_type, path, fmt)
         if data_type == "ansatz":
             # An Ansatz has no version step of its own; it delegates to each
             # embedded payload's serialization-version chain.
@@ -133,18 +168,12 @@ def convert_file(src: _PathLike, dst: _PathLike) -> Path:
 
     try:
         json_input = new_json if data_type == "qpe_result" else json.dumps(new_json)
-        obj = _CLASSES[data_type].from_json(json_input)
+        return _CLASSES[data_type].from_json(json_input)
     except (KeyError, TypeError, ValueError, RuntimeError) as error:
         raise MigrationError(
             f"The installed qdk-chemistry rejected the migrated {data_type} ({error}). If the "
             f"{data_type} serialization schema changed, register the next step in {module.__name__}.STEPS."
         ) from error
-
-    try:
-        _io.write_object(obj, dst_path, dst_format)
-    except (OSError, RuntimeError) as error:
-        raise MigrationError(f"Failed to write '{dst_path}': {error}") from error
-    return dst_path
 
 
 def _read_old(module, data_type: str, src: Path, src_format: str):
