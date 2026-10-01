@@ -85,7 +85,7 @@ docs = [
   "sphinx",
   "sphinx-rtd-theme",
   "myst-parser",
-  "breathe",
+  "breathe==4.36.0",
   "sphinx-autodoc-typehints",
   "sphinx-inline-tabs",
   "sphinxcontrib-napoleon",

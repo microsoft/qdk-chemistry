@@ -958,6 +958,40 @@ TEST_F(HamiltonianConstructorTest, EcpCoreEnergyUsesEffectiveNuclearRepulsion) {
   }
 }
 
+TEST_F(HamiltonianConstructorTest, DirectEriUseAtomicsMatchesDefault) {
+  auto structure = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create("qdk");
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "sto-3g");
+  auto orbitals = wavefunction->get_orbitals();
+
+  auto hc_default = HamiltonianConstructorFactory::create("qdk");
+  hc_default->settings().set("eri_method", "direct");
+  EXPECT_FALSE(hc_default->settings().get<bool>("eri_use_atomics"));
+  auto ham_default = hc_default->run(orbitals);
+
+  auto hc_atomics = HamiltonianConstructorFactory::create("qdk");
+  hc_atomics->settings().set("eri_method", "direct");
+  hc_atomics->settings().set("eri_use_atomics", true);
+  EXPECT_TRUE(hc_atomics->settings().get<bool>("eri_use_atomics"));
+  auto ham_atomics = hc_atomics->run(orbitals);
+
+  EXPECT_NEAR(ham_default->get_core_energy(), ham_atomics->get_core_energy(),
+              testing::numerical_zero_tolerance);
+
+  auto [aa_default, bb_default] = ham_default->get_one_body_integrals();
+  auto [aa_atomics, bb_atomics] = ham_atomics->get_one_body_integrals();
+  EXPECT_TRUE(
+      aa_default.isApprox(aa_atomics, testing::numerical_zero_tolerance));
+
+  auto [aaaa_default, aabb_default, bbbb_default] =
+      ham_default->get_two_body_integrals();
+  auto [aaaa_atomics, aabb_atomics, bbbb_atomics] =
+      ham_atomics->get_two_body_integrals();
+  ASSERT_EQ(aaaa_default.size(), aaaa_atomics.size());
+  EXPECT_LT((aaaa_default - aaaa_atomics).cwiseAbs().maxCoeff(),
+            testing::numerical_zero_tolerance);
+}
+
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
   // Run restricted O2 with cholesky
   auto [energy, hamiltonian] = run_restricted_o2("qdk_cholesky");

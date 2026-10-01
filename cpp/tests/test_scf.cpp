@@ -1192,6 +1192,7 @@ TEST_F(ScfTest, AgHEcpShellIndices) {
 
   // Test that we can retrieve shells by orbital type
   EXPECT_GT(orbital_type_counts.size(), 0);
+  EXPECT_EQ(orbital_type_counts[OrbitalType::UL], 1);
 
   for (const auto& [orbital_type, expected_count] : orbital_type_counts) {
     auto indices =
