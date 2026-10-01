@@ -56,6 +56,21 @@ def _reference_hamiltonian(width: int, height: int, *, t: float, u: float) -> np
     return dense + 0.25 * u * width * height * np.eye(dense.shape[0])
 
 
+def _conventional_hamiltonian(width: int, height: int, *, t: float, u: float) -> np.ndarray:
+    r"""Return the unshifted :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` Hamiltonian, densely.
+
+    This mirrors :func:`_reference_hamiltonian` and differs in exactly one place: the on-site
+    energy is zero rather than :math:`-U/2`, and no :math:`UM/4` is added back. Those two terms
+    are what carry the symmetric model onto the conventional one, so building both from the same
+    mapper keeps the comparison between them an honest one.
+    """
+    lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
+    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=t, U=u)
+    mapped = create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * width * height))
+    labels, coefficients = zip(*mapped.get_real_coefficients(tolerance=1e-14), strict=True)
+    return pauli_to_dense_matrix(list(labels), list(coefficients))
+
+
 def _plaquette_parameters(container, max_batch_size: int = -1):
     """Return the Q# parameter struct for a plaquette container."""
     return QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
@@ -859,6 +874,45 @@ class TestAutomaticStepCount:
         assert shifted.eigenvalue_from_phase(phase_fraction) == pytest.approx(
             unshifted.eigenvalue_from_phase(phase_fraction) + expected_energy_shift
         )
+
+    @pytest.mark.parametrize("num_electrons", [2, 4, 6])
+    def test_the_shift_maps_the_symmetric_spectrum_onto_the_conventional_one(self, num_electrons):
+        r"""Check the offset against exact diagonalization, not against its own formula.
+
+        The circuit evolves the particle-hole-symmetric interaction
+        :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, which is pure :math:`ZZ`,
+        and recovers the conventional :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` by adding
+        :math:`U\eta/2 - UM/4` classically. That identity holds because the two differ by
+        :math:`(U/2)\hat{N} - UM/4`, and :math:`\hat{N}` is conserved, so on a sector of fixed
+        electron count the difference is a number rather than an operator.
+
+        ``test_the_electron_count_shifts_to_the_conventional_model`` checks that
+        ``constant_shift`` implements that formula. It cannot check the formula itself: it
+        recomputes the same expression it is testing, so a sign error or a factor of two would
+        pass. Diagonalizing both Hamiltonians in each particle-number sector does check it.
+        """
+        width = height = 2
+        t, u = 1.0, 8.0
+        sites = width * height
+        num_qubits = 2 * sites
+
+        symmetric = _reference_hamiltonian(width, height, t=t, u=u)
+        conventional = _conventional_hamiltonian(width, height, t=t, u=u)
+
+        sector = [state for state in range(2**num_qubits) if bin(state).count("1") == num_electrons]
+        block = np.ix_(sector, sector)
+        symmetric_levels = np.linalg.eigvalsh(symmetric[block])
+        conventional_levels = np.linalg.eigvalsh(conventional[block])
+
+        shift = u * (0.5 * num_electrons - 0.25 * sites)
+        assert np.allclose(conventional_levels, symmetric_levels + shift, atol=1e-10), (
+            f"the {num_electrons}-electron spectra differ by more than the classical shift {shift}"
+        )
+
+        # The sign matters and is easy to get backwards, so pin the direction too when the
+        # sector has a nonzero offset. At eta = M/2 the two conventions coincide.
+        if not np.isclose(shift, 0.0):
+            assert (conventional_levels[0] > symmetric_levels[0]) == (shift > 0.0), "the shift has the wrong sign"
 
 
 #: Settings of the ``examples/estimation_hubbard_2d.ipynb`` benchmark, repeated here so that the
