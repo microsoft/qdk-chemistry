@@ -757,6 +757,39 @@ def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> fl
     plaquette-splitting term, and Eq. (D6) for their sum.
     """
     num_sites = width * height
+
+    if width < 4 or height < 4:
+        sections = HubbardPlaquetteTrotter._plaquette_sections(width, height)
+        commutator_matrices = []
+        for cycles in sections:
+            matrix = np.zeros((num_sites, num_sites))
+            for cycle in cycles:
+                for index in range(4):
+                    site_a, site_b = cycle[index], cycle[(index + 1) % 4]
+                    matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
+            commutator_matrices.append(matrix)
+        matrix_p, matrix_g = commutator_matrices
+        inner = matrix_p @ matrix_g - matrix_g @ matrix_p
+        outer = inner @ matrix_g - matrix_g @ inner
+        commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * t**3
+    else:
+        cells_x, cells_y = width // 2, height // 2
+        momenta_x = 2.0 * math.pi * np.arange(cells_x) / cells_x
+        momenta_y = 2.0 * math.pi * np.arange(cells_y) / cells_y
+        phase_x = np.exp(1j * momenta_x)[:, None]
+        phase_y = np.exp(1j * momenta_y)[None, :]
+
+        fourier = np.zeros((cells_x, cells_y, 4, 4), dtype=complex)
+        fourier[:, :, 0, 1] = -2.0 + 2.0 / phase_x
+        fourier[:, :, 1, 0] = -2.0 + 2.0 * phase_x
+        fourier[:, :, 0, 2] = -2.0 + 2.0 / phase_y
+        fourier[:, :, 2, 0] = -2.0 + 2.0 * phase_y
+        fourier[:, :, 1, 3] = -2.0 + 2.0 / phase_y
+        fourier[:, :, 3, 1] = -2.0 + 2.0 * phase_y
+        fourier[:, :, 2, 3] = -2.0 + 2.0 / phase_x
+        fourier[:, :, 3, 2] = -2.0 + 2.0 * phase_x
+        commutator_norm = float(np.abs(np.linalg.eigvalsh(fourier)).sum()) * t**3
+
     matrices = []
     for cycles in HubbardPlaquetteTrotter._plaquette_sections(width, height):
         matrix = np.zeros((num_sites, num_sites))
@@ -767,10 +800,7 @@ def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> fl
         matrices.append(matrix)
     matrix_p, matrix_g = matrices
 
-    inner = matrix_p @ matrix_g - matrix_g @ matrix_p
-    outer = inner @ matrix_g - matrix_g @ inner
     hopping_norm = float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum()) * t
-    commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * t**3
 
     w_so2 = u * t**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + u**2 / 24.0 * hopping_norm
     return w_so2 + 3.0 / 24.0 * commutator_norm
