@@ -25,7 +25,7 @@ single file:
    python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
+(``basis_set`` / ``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 The input and output formats may differ, so the same command also converts between
 JSON and HDF5:
@@ -55,9 +55,19 @@ What is converted
 Each data class carries its own ordered migration steps. The steps currently
 registered make the following changes:
 
+- :class:`~qdk_chemistry.data.BasisSet` — each atom's local :term:`ECP` term,
+  formerly stored at the atom's highest ECP angular momentum, is relabeled with
+  the ``UL`` :class:`~qdk_chemistry.data.OrbitalType`. Basis sets stored inside
+  other files, such as orbitals, Hamiltonians, and wavefunctions, are migrated
+  as well, even when the enclosing file is otherwise current. Older basis sets
+  also load directly, with the same relabeling and a warning; migrating updates
+  the files themselves. Older files could not mark an ECP without a local term,
+  so one imported from PySCF without it gets the same relabeling, matching how
+  older releases computed with it; import such ECPs again instead of migrating
+  them.
 - :class:`~qdk_chemistry.data.Orbitals` — molecular-orbital coefficients and
   energies are re-expressed as symmetry-blocked tensors. Active/inactive index
-  sets, the AO overlap, and the basis set are carried across unchanged.
+  sets and the AO overlap are carried across unchanged.
 - :class:`~qdk_chemistry.data.Hamiltonian` — the four-center, Cholesky, and
   sparse containers all upgrade their integral storage to symmetry-blocked form.
 - :class:`~qdk_chemistry.data.Wavefunction` — the single-determinant,
@@ -70,8 +80,8 @@ registered make the following changes:
   the obsolete evolution-time field is removed.
 
 Data classes whose serialization schema has not changed (for example
-:class:`~qdk_chemistry.data.Structure`, :class:`~qdk_chemistry.data.BasisSet`, and
-the remaining qubit-level classes) load directly without conversion.
+:class:`~qdk_chemistry.data.Structure` and the remaining qubit-level classes)
+load directly without conversion.
 
 .. note::
 
