@@ -494,9 +494,10 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// One second-order Trotter step, I^(1/2) G I^(1/2) P.
-    internal operation PlaquetteStep(
+    /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer.
+    internal operation PlaquetteStepWithPinkAngle(
         params : HubbardPlaquetteParams,
+        pinkAngle : Double,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
@@ -510,7 +511,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         if UsesLegacyCosts() and AbsD(params.interactionAngle) > 1e-12 {
             R(PauliI, 2.0 * params.interactionAngle * IntAsDouble(sites), systems[0]);
         }
-        HoppingLayer(params.hoppingAngle, pink, systems, params.maxBatchSize);
+        HoppingLayer(pinkAngle, pink, systems, params.maxBatchSize);
+    }
+
+    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P.
+    internal operation PlaquetteStep(
+        params : HubbardPlaquetteParams,
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, systems);
     }
 
     /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's extra work, which
@@ -525,8 +534,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// # Description
     /// Each step is the symmetric product `pink(s/2) I(s/2) gold(s) I(s/2) pink(s/2)`, so
     /// the adjacent half-angle pink layers of neighbouring steps merge into one full-angle
-    /// layer. Only a single half-angle pink boundary survives at each end, which is what
-    /// the `within` block applies. This is the "PIG" ordering of Eqs. (16a)-(16b) in
+    /// layer. Only a single half-angle pink boundary is emitted at each end. This is the
+    /// "PIG" ordering of Eqs. (16a)-(16b) in
     /// :cite:`Apel2026`, which merges the more expensive hopping layers; it deviates from
     /// Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost instead.
     ///
@@ -542,25 +551,30 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         params : HubbardPlaquetteParams,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        within {
+        if params.repetitions > 0 {
+            let pink = PlaquetteSection(params.width, params.height, true);
             HoppingLayer(
                 params.hoppingAngle / 2.0,
-                PlaquetteSection(params.width, params.height, true),
+                pink,
                 systems,
                 params.maxBatchSize
             );
-        } apply {
-            if IsResourceEstimating() {
-                within {
-                    RepeatEstimates(params.repetitions);
-                } apply {
-                    PlaquetteStep(params, systems);
-                }
-            } else {
-                for _ in 1..params.repetitions {
-                    PlaquetteStep(params, systems);
+
+            if params.repetitions > 1 {
+                if IsResourceEstimating() {
+                    within {
+                        RepeatEstimates(params.repetitions - 1);
+                    } apply {
+                        PlaquetteStep(params, systems);
+                    }
+                } else {
+                    for _ in 1..params.repetitions - 1 {
+                        PlaquetteStep(params, systems);
+                    }
                 }
             }
+
+            PlaquetteStepWithPinkAngle(params, params.hoppingAngle / 2.0, systems);
         }
     }
 
