@@ -41,7 +41,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
         /// See `HammingWeightBatchSize` for what the cap buys and what it costs.
         maxBatchSize : Int,
-        /// Width of the phase gradient register the Hamming-weight rotations are applied through.
+        /// Whether the Hamming-weight place values are rotated through a shared binary phase
+        /// gradient, or each synthesized as its own `Rz` (the original rotation ladder).
+        usePhaseGradient : Bool,
+        /// Width of the phase gradient register the Hamming-weight rotations are applied through;
+        /// unused without the phase gradient.
         rotationBitPrecision : Int,
     }
 
@@ -275,9 +279,10 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// the control when the whole is controlled. This is the construction of :cite:`Kan2025`,
     /// whose Methods diagonalize every
     /// plaquette and every on-site pair into a layer of same-angle R_z gates and synthesize that
-    /// layer collectively with HWP. Each place-value rotation is applied through the shared
-    /// binary phase gradient rather than synthesized. Below the break-even size each term is
-    /// applied as its own rotation instead.
+    /// layer collectively with HWP. Given a phase gradient, each place-value rotation is applied
+    /// through it rather than synthesized; given none, each is synthesized as its own `Rz`, the
+    /// original rotation ladder. Below the break-even size each term is applied as its own
+    /// rotation instead.
     ///
     /// A tower longer than `maxBatchSize` is split into consecutive batches of at most that many
     /// terms, each phased through its own Hamming-weight register. The phases are additive over
@@ -293,8 +298,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// ## maxBatchSize
     /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
     /// ## gradient
-    /// The shared binary phase gradient, prepared by `PreparePhaseGradientState`; unused, and
-    /// permitted to be empty, when every batch is below the break-even size.
+    /// The shared binary phase gradient, prepared by `PreparePhaseGradientState`, or empty to
+    /// synthesize every place-value rotation as an `Rz`. Unused when every batch is below the
+    /// break-even size.
     internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
@@ -323,14 +329,16 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// `n - popcount(n)` scratch qubits held for as long as the weight is needed. Splitting a
     /// tower into batches lets the scratch of one batch be released before the next allocates,
     /// so the peak ancilla count follows the batch rather than the whole tower, while the adder
-    /// tree's Toffoli count stays essentially the same. The price is the place-value phase
-    /// gradient additions, which are paid once per batch instead of once per tower.
+    /// tree's Toffoli count stays essentially the same. The price is the place-value rotations,
+    /// which are paid once per batch instead of once per tower: phase gradient additions
+    /// (Toffolis) with a gradient, synthesized `Rz` rotations without one.
     ///
-    /// It is therefore a qubit-for-Toffolis knob, and the useful setting depends on the device:
-    /// hardware demonstrations of Fermi-Hubbard dynamics run on a fixed and comparatively small
-    /// register, where the adder tree of a full lattice-sized tower may simply not fit, while a
-    /// fault-tolerant estimate is usually better off spending the qubits to save the additions.
-    /// The default is no cap, which reproduces the uncapped construction exactly.
+    /// It is therefore a knob that trades qubits for those place-value rotations, and the useful
+    /// setting depends on the device: hardware demonstrations of Fermi-Hubbard dynamics run on a
+    /// fixed and comparatively small register, where the adder tree of a full lattice-sized tower
+    /// may simply not fit, while a fault-tolerant estimate is usually better off spending the
+    /// qubits to save the rotations. The default is no cap, which reproduces the uncapped
+    /// construction exactly.
     ///
     /// A cap below the break-even of `UsesHammingWeightPhasing` leaves every batch too short to
     /// phase through a register, so the whole tower falls back to one rotation per term.
@@ -345,8 +353,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return maxBatchSize == -1 or maxBatchSize > count ? count | maxBatchSize;
     }
 
-    /// One batch of equal-angle terms, phased through a single Hamming-weight register and the
-    /// shared phase gradient. See `HammingWeightPhase`, which splits a tower into batches of this shape.
+    /// One batch of equal-angle terms, phased through a single Hamming-weight register and, when
+    /// one is given, the shared phase gradient. See `HammingWeightPhase`, which splits a tower
+    /// into batches of this shape.
     internal operation HammingWeightPhaseBatch(
         theta : Double,
         pauliOps : Pauli[][],
@@ -354,10 +363,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = Length(targets);
-        Fact(
-            not UsesHammingWeightPhasing(count) or Length(gradient) > 0,
-            "HammingWeightPhase needs the shared phase gradient at or above the break-even size."
-        );
         if not UsesHammingWeightPhasing(count) {
             for t in 0..count - 1 {
                 Exp(pauliOps[t], -theta, targets[t]);
@@ -366,7 +371,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let inputs = Mapped(term -> Tail(term), targets);
             let (schedule, finalBits, _) = HammingWeightSchedule(count);
             Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
-            let words = BinaryGradientWords(2.0 * theta, Length(finalBits), Length(gradient));
             use scratch = Qubit[Length(schedule)];
             let work = inputs + scratch;
             within {
@@ -381,17 +385,59 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     }
                 }
             } apply {
-                PhaseByBinaryGradient(words, Mapped(bit -> work[bit], finalBits), gradient);
-                // `Rz(a) = e^{-ia/2} R1(a)`, so a layer of words applies an extra
-                // Π_j e^{-i·a_j/2}. `R(PauliI, g)` with g = -Σ_j a_j cancels it exactly.
-                R(
-                    PauliI,
-                    2.0 * theta * IntAsDouble(count)
-                        - 4.0 * PI() * Fold((total, word) -> total + IntAsDouble(word), 0.0, words)
-                            / IntAsDouble(1 <<< Length(gradient)),
-                    inputs[0]
-                );
+                PhaseHammingWeight(theta, count, Mapped(bit -> work[bit], finalBits), inputs[0], gradient);
             }
+        }
+    }
+
+    /// # Summary
+    /// Applies e^{-i·theta·count} e^{2i·theta·w} to the little-endian Hamming weight w of a batch
+    /// of `count` equal-angle terms.
+    ///
+    /// # Description
+    /// w = Σ_j 2^j w_j, so e^{2i·theta·w} is one rotation per place value, the bit of place value
+    /// 2^j taking the angle 2·theta·2^j. With a phase gradient those rotations are applied by
+    /// `PhaseByBinaryGradient`; without one each is synthesized as its own `Rz`. Either way
+    /// `Rz(a) = e^{-ia/2} R1(a)`, so the layer carries an extra Π_j e^{-i·a_j/2}, and a single
+    /// `R(PauliI, g)` on `anchor` both cancels it and supplies the batch constant e^{-i·theta·count}.
+    /// Under control that phase is not global, which is why it is applied rather than dropped.
+    ///
+    /// # Input
+    /// ## theta
+    /// The rotation angle shared by every term of the batch.
+    /// ## count
+    /// Number of terms in the batch.
+    /// ## weight
+    /// The Hamming weight, little-endian, one qubit per place value.
+    /// ## anchor
+    /// Any qubit to carry the `R(PauliI, _)` constant; it is left unchanged.
+    /// ## gradient
+    /// The shared binary phase gradient, or empty to synthesize each place-value rotation.
+    internal operation PhaseHammingWeight(
+        theta : Double,
+        count : Int,
+        weight : Qubit[],
+        anchor : Qubit,
+        gradient : Qubit[]
+    ) : Unit is Adj + Ctl {
+        let places = Length(weight);
+        if Length(gradient) == 0 {
+            for j in 0..places - 1 {
+                Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
+            }
+            // The ladder's angles sum to 2·theta·(2^places - 1).
+            R(PauliI, 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1)), anchor);
+        } else {
+            let words = BinaryGradientWords(2.0 * theta, places, Length(gradient));
+            PhaseByBinaryGradient(words, weight, gradient);
+            // Word x stands for the angle 4π·x/2^bits, rounded from 2·theta·2^j.
+            R(
+                PauliI,
+                2.0 * theta * IntAsDouble(count)
+                    - 4.0 * PI() * Fold((total, word) -> total + IntAsDouble(word), 0.0, words)
+                        / IntAsDouble(1 <<< Length(gradient)),
+                anchor
+            );
         }
     }
 
@@ -643,7 +689,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// ## systems
     /// The system register.
     /// ## gradient
-    /// `PlaquetteGradientSize(params)` qubits holding the binary phase gradient.
+    /// `PlaquetteGradientSize(params)` qubits holding the binary phase gradient; empty when the
+    /// place values are synthesized as a rotation ladder instead.
     operation RepPlaquetteExp(
         params : HubbardPlaquetteParams,
         systems : Qubit[],
@@ -686,12 +733,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// # Description
     /// Both the on-site tower and each hopping tower hold one rotation per site, so a lattice
     /// either phases every layer through the gradient or none of them, and the batch cap applies
-    /// to all of them alike.
+    /// to all of them alike. Without `usePhaseGradient` every place value is synthesized as its
+    /// own `Rz`, so no gradient is consumed at all.
     function PlaquetteGradientSize(params : HubbardPlaquetteParams) : Int {
-        return TowerGradientSize(params.width * params.height, params.maxBatchSize, params.rotationBitPrecision);
+        return params.usePhaseGradient
+            ? TowerGradientSize(params.width * params.height, params.maxBatchSize, params.rotationBitPrecision)
+            | 0;
     }
 
-    /// Prepares the binary phase gradient, or nothing when the lattice is below the break-even.
+    /// Prepares the binary phase gradient, or nothing when no gradient is consumed.
     internal operation PreparePlaquetteGradient(gradient : Qubit[]) : Unit is Adj + Ctl {
         if Length(gradient) > 0 {
             PreparePhaseGradientState(gradient);
