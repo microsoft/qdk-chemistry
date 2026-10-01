@@ -20,7 +20,16 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import migrate
-from qdk_chemistry.data import Ansatz, Configuration, Hamiltonian, Orbitals, QpeResult, Wavefunction
+from qdk_chemistry.data import (
+    Ansatz,
+    BasisSet,
+    Configuration,
+    Hamiltonian,
+    Orbitals,
+    QpeResult,
+    Structure,
+    Wavefunction,
+)
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.migrate import _orbitals, _wavefunction
@@ -863,3 +872,172 @@ def test_library_anchor_requires_step_to_current_schema(tmp_path, monkeypatch):
     src.write_text(json.dumps(_old_orbitals_json(2, 2, True, (np.eye(2), np.eye(2)))))
     with pytest.raises(migrate.MigrationError, match="register the next step"):
         migrate.convert_file(src, tmp_path / "y.orbitals.json")
+
+
+# --------------------------------------------------------------------------- #
+# BasisSet 0.1.0 stored each atom's local ECP term at its highest angular
+# momentum; the current version labels it OrbitalType.UL. Older basis sets load
+# with that relabeling applied, and migration rewrites them wherever embedded.
+# --------------------------------------------------------------------------- #
+_ANGULAR_MOMENTUM = "spdfghi"
+_ECP_BASIS = ("def2-svp", ["H", "I"], [[0.0, 0.0, 0.0], [0.0, 0.0, 3.04]])
+# The I and Ce ECPs have different highest angular momenta.
+_TWO_ECP_BASIS = ("def2-svp", ["I", "Ce"], [[0.0, 0.0, 0.0], [0.0, 0.0, 5.5]])
+_ALL_ELECTRON_BASIS = ("sto-3g", ["H", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+_TEST_DATA = pathlib.Path(__file__).parent / "test_data"
+
+
+def _library_basis(spec):
+    name, symbols, coordinates = spec
+    return BasisSet.from_basis_name(name, Structure(symbols, np.array(coordinates)))
+
+
+def _basis_summary(basis):
+    shells = [
+        (s.atom_index, int(s.orbital_type), list(s.exponents), list(s.coefficients), list(s.rpowers))
+        for s in [*basis.get_shells(), *basis.get_ecp_shells()]
+    ]
+    return basis.get_name(), basis.get_ecp_name(), list(basis.get_ecp_electrons()), shells
+
+
+def _embedded_basis(obj):
+    return (obj if isinstance(obj, Orbitals) else obj.get_orbitals()).get_basis_set()
+
+
+def _reloaded(obj, path, fmt):
+    """Return ``obj`` after a round trip through the current serializer."""
+    obj.to_file(str(path), fmt)
+    return type(obj).from_file(str(path), fmt)
+
+
+def _ecp_orbitals():
+    library = _library_basis(_ECP_BASIS)
+    return Orbitals(np.eye(library.get_num_atomic_orbitals()), None, None, library)
+
+
+def _to_pre_ul_json(basis):
+    for atom in basis["atoms"]:
+        shells = atom.get("ecp_shells", [])
+        semilocal = [_ANGULAR_MOMENTUM.index(s["orbital_type"]) for s in shells if s["orbital_type"] != "ul"]
+        for shell in shells:
+            if shell["orbital_type"] == "ul":
+                shell["orbital_type"] = _ANGULAR_MOMENTUM[max(semilocal) + 1]
+    basis["version"] = "0.1.0"
+
+
+def _to_pre_ul_group(group):
+    if "ecp_shells" in group:
+        atoms = group["ecp_shells/atom_indices"][()]
+        types = group["ecp_shells/orbital_types"][()]
+        for atom in np.unique(atoms):
+            on_atom = atoms == atom
+            types[on_atom & (types == -1)] = types[on_atom & (types != -1)].max() + 1
+        group["ecp_shells/orbital_types"][...] = types
+    group.attrs.modify("version", "0.1.0")
+
+
+def _write_pre_ul(obj, path, fmt):
+    """Write ``obj`` with every basis set in it as version 0.1.0 stored it."""
+    obj.to_file(str(path), fmt)
+    if fmt == "json":
+
+        def downgrade(node):
+            if isinstance(node.get("basis_set"), dict):
+                _to_pre_ul_json(node["basis_set"])
+            return node
+
+        doc = json.loads(path.read_text(), object_hook=downgrade)
+        if isinstance(obj, BasisSet):
+            _to_pre_ul_json(doc)
+        path.write_text(json.dumps(doc))
+        return
+    with h5py.File(path, "r+") as handle:
+        names = []
+        handle.visit(lambda name: names.append(name) if name.rpartition("/")[2] == "basis_set" else None)
+        for name in names:
+            _to_pre_ul_group(handle[name])
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+@pytest.mark.parametrize(
+    "spec", [_ECP_BASIS, _TWO_ECP_BASIS, _ALL_ELECTRON_BASIS], ids=["ecp", "two_ecp_atoms", "all_electron"]
+)
+def test_basis_set(tmp_path, fmt, spec):
+    library = _library_basis(spec)
+    ext = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"old.basis_set.{ext}"
+    _write_pre_ul(library, src, fmt)
+
+    dst = tmp_path / f"new.basis_set.{ext}"
+    migrate.convert_file(src, dst)
+    expected = _reloaded(library, tmp_path / f"current.basis_set.{ext}", fmt)
+    assert _basis_summary(BasisSet.from_file(str(dst), fmt)) == _basis_summary(expected)
+    assert _basis_summary(BasisSet.from_file(str(src), fmt)) == _basis_summary(expected)
+    with pytest.raises(migrate.MigrationError, match="current serialization version"):
+        migrate.convert_file(dst, tmp_path / f"again.basis_set.{ext}")
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_basis_set_already_ul(tmp_path, fmt):
+    # Version 0.1.0 files from the PySCF import already label the local term UL.
+    library = _library_basis(_ECP_BASIS)
+    ext = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"old.basis_set.{ext}"
+    library.to_file(str(src), fmt)
+    if fmt == "json":
+        src.write_text(json.dumps({**json.loads(src.read_text()), "version": "0.1.0"}))
+    else:
+        with h5py.File(src, "r+") as handle:
+            handle["basis_set"].attrs.modify("version", "0.1.0")
+
+    dst = tmp_path / f"new.basis_set.{ext}"
+    migrate.convert_file(src, dst)
+    expected = _basis_summary(_reloaded(library, tmp_path / f"current.basis_set.{ext}", fmt))
+    assert _basis_summary(BasisSet.from_file(str(dst), fmt)) == expected
+    assert _basis_summary(BasisSet.from_file(str(src), fmt)) == expected
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+@pytest.mark.parametrize(
+    ("load", "type_token"),
+    [
+        (_ecp_orbitals, "orbitals"),
+        (lambda: Hamiltonian.from_json_file(str(_TEST_DATA / "ethylene_4e4o_2det.hamiltonian.json")), "hamiltonian"),
+        (
+            lambda: Wavefunction.from_hdf5_file(str(_TEST_DATA / "ozone_sparse_ci_wavefunction.wavefunction.h5")),
+            "wavefunction",
+        ),
+    ],
+    ids=["orbitals", "hamiltonian", "wavefunction"],
+)
+def test_basis_set_in_current_file(tmp_path, fmt, load, type_token):
+    # The enclosing schema is current; only the embedded basis set is old.
+    obj = load()
+    data_class = type(obj)
+    ext = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"old.{type_token}.{ext}"
+    _write_pre_ul(obj, src, fmt)
+
+    dst = tmp_path / f"new.{type_token}.{ext}"
+    migrate.convert_file(src, dst)
+    expected = _basis_summary(_embedded_basis(_reloaded(obj, tmp_path / f"current.{type_token}.{ext}", fmt)))
+    assert _basis_summary(_embedded_basis(data_class.from_file(str(dst), fmt))) == expected
+    assert _basis_summary(_embedded_basis(data_class.from_file(str(src), fmt))) == expected
+    with pytest.raises(migrate.MigrationError):
+        migrate.convert_file(dst, tmp_path / f"again.{type_token}.{ext}")
+
+
+def test_basis_set_in_v1_orbitals(tmp_path):
+    library = _library_basis(_ECP_BASIS)
+    nao = library.get_num_atomic_orbitals()
+    basis_file = tmp_path / "old.basis_set.json"
+    _write_pre_ul(library, basis_file, "json")
+    doc = _old_orbitals_json(nao, nao, True, (np.eye(nao), np.eye(nao)))
+    doc["basis_set"] = json.loads(basis_file.read_text())
+    src = tmp_path / "old.orbitals.json"
+    src.write_text(json.dumps(doc))
+
+    dst = tmp_path / "new.orbitals.json"
+    migrate.convert_file(src, dst)
+    expected = _reloaded(library, tmp_path / "current.basis_set.json", "json")
+    assert _basis_summary(Orbitals.from_json_file(str(dst)).get_basis_set()) == _basis_summary(expected)
