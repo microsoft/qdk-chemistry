@@ -41,13 +41,15 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. A plaquette's
       hopping matrix is diagonalized with :math:`\pm 2t` nonzero eigenvalues.
 
-    * ``constant_shift`` :math:`U\eta/2 - UM/4` offset that shift the interaction terms.
+    * ``constant_shift`` is the per-step scalar phase from the classical energy
+      offset :math:`U\eta/2 - UM/4`. It is not sent to Q#; it is applied only by
+      :meth:`eigenvalue_from_phase` when converting a measured phase back to energy.
 
     Args:
         width: Number of lattice columns.
         height: Number of lattice rows.
         interaction_angle: On-site :math:`Z Z` pair angle for a full interaction layer.
-        constant_shift: Scalar phase applied once per step.
+        constant_shift: Classical per-step scalar phase offset used only in phase-to-energy conversion.
         hopping_angle: :math:`\kappa = 2 t \delta`, shared by both tilings.
         step_reps: Number of repetitions of the body.
         scale: Total evolution time the step count was derived for.
@@ -120,6 +122,10 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         if angle > np.pi:
             angle -= 2 * np.pi
         return float((-angle + self.constant_shift * self.step_reps) / self.scale)
+
+    def combine(self, other: UnitaryContainer) -> UnitaryContainer:
+        """Reject sequential combination, which plaquette containers do not define."""
+        raise NotImplementedError("HubbardPlaquetteContainer does not support combining sequential evolutions.")
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""

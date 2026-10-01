@@ -13,7 +13,7 @@ from functools import cache
 import numpy as np
 import scipy.sparse
 
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter, TrotterSettings
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.data.qubit_operator import QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -26,13 +26,28 @@ __all__: list[str] = [
     "HubbardPlaquetteTrotterSettings",
 ]
 
+_LATTICE_WEIGHT_TOLERANCE = 1e-12
 
-class HubbardPlaquetteTrotterSettings(TrotterSettings):
+
+class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
     """Settings for the plaquette Trotter builder."""
 
     def __init__(self):
-        """Initialize the settings, adding the model parameters to the Trotter defaults."""
+        """Initialize the plaquette-specific settings."""
         super().__init__()
+        self._set_default("order", "int", 2, "The Trotter decomposition order; only 2 is supported.")
+        self._set_default(
+            "target_accuracy",
+            "double",
+            0.0,
+            "Target accuracy for automatic plaquette step computation (0.0 means disabled).",
+        )
+        self._set_default(
+            "num_divisions",
+            "int",
+            0,
+            "Explicit number of plaquette Trotter steps (0 means automatic).",
+        )
         self._set_default("t", "float", 1.0, "Uniform hopping amplitude of the Fermi-Hubbard model.")
         self._set_default("u", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
         self._set_default(
@@ -43,7 +58,7 @@ class HubbardPlaquetteTrotterSettings(TrotterSettings):
         )
 
 
-class HubbardPlaquetteTrotter(Trotter):
+class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     r"""Plaquette Trotterization of the Fermi-Hubbard model on a periodic two-dimensional square lattice.
 
     The builder takes a :class:`~qdk_chemistry.data.QubitOperator` wrapping a
@@ -56,8 +71,8 @@ class HubbardPlaquetteTrotter(Trotter):
     :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model differs by :math:`U\eta/2 - UM/4` on a
     state of :math:`\eta` electrons, with :math:`M` the site count. Setting ``num_electrons``
     records that offset so the phase-to-energy conversion reports the conventional energy;
-    the quantum circuit itself omits the global phase. Leaving it unset reports the symmetric
-    model's energy directly.
+    the Q# circuit omits the scalar identity term. Leaving it unset reports the symmetric model's
+    energy directly.
 
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
@@ -74,8 +89,6 @@ class HubbardPlaquetteTrotter(Trotter):
         time: float = 0.0,
         target_accuracy: float = 0.0,
         num_divisions: int = 0,
-        error_bound: str = "commutator",
-        weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
     ):
@@ -89,8 +102,6 @@ class HubbardPlaquetteTrotter(Trotter):
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto Trotter step computation. Use 0.0 to disable.
             num_divisions: Number of Trotter steps. Max of this and the auto value is used.
-            error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
-            weight_threshold: Threshold for filtering small coefficients.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for ``U^power``: ``"rescale"`` or ``"repeat"``.
 
@@ -101,16 +112,7 @@ class HubbardPlaquetteTrotter(Trotter):
         if order != 2:
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
 
-        super().__init__(
-            order,
-            time=time,
-            target_accuracy=target_accuracy,
-            num_divisions=num_divisions,
-            error_bound=error_bound,
-            weight_threshold=weight_threshold,
-            power=power,
-            power_strategy=power_strategy,
-        )
+        super().__init__()
         settings = HubbardPlaquetteTrotterSettings()
         settings.set("time", time)
         settings.set("power", power)
@@ -118,8 +120,6 @@ class HubbardPlaquetteTrotter(Trotter):
         settings.set("order", order)
         settings.set("target_accuracy", target_accuracy)
         settings.set("num_divisions", num_divisions)
-        settings.set("error_bound", error_bound)
-        settings.set("weight_threshold", weight_threshold)
         settings.set("t", t)
         settings.set("u", u)
         if num_electrons is not None:
@@ -129,6 +129,10 @@ class HubbardPlaquetteTrotter(Trotter):
     def name(self) -> str:
         """Return ``hubbard_plaquette`` as the algorithm name."""
         return "hubbard_plaquette"
+
+    def type_name(self) -> str:
+        """Return ``hamiltonian_unitary_builder`` as the algorithm type name."""
+        return "hamiltonian_unitary_builder"
 
     def _lattice_geometry(self, qubit_hamiltonian: QubitOperator):
         """Return the lattice shape, its edge weight, and its plaquette tilings.
@@ -163,23 +167,38 @@ class HubbardPlaquetteTrotter(Trotter):
         width, height = dims
 
         lattice = container.lattice
-        atol = self._settings.get("weight_threshold")
+        adjacency = lattice.sparse_adjacency_matrix().tocsr()
+        asymmetry = (adjacency - adjacency.T).tocoo()
+        asymmetric_entries = np.flatnonzero(np.abs(asymmetry.data) > _LATTICE_WEIGHT_TOLERANCE)
+        if asymmetric_entries.size:
+            index = int(asymmetric_entries[0])
+            row = int(asymmetry.row[index])
+            col = int(asymmetry.col[index])
+            forward = float(adjacency[row, col])
+            reverse = float(adjacency[col, row])
+            raise ValueError(
+                "HubbardPlaquetteTrotter requires a symmetric lattice adjacency matrix, but entries "
+                f"({row}, {col})={forward} and ({col}, {row})={reverse} differ."
+            )
+
         # upper triangle of the lattice's adjacency matrix, used to enumerate each bond exactly once.
-        upper = scipy.sparse.triu(lattice.sparse_adjacency_matrix(), k=1, format="coo")
+        upper = scipy.sparse.triu(adjacency, k=1, format="coo")
         bonds: set[frozenset[int]] = set()
-        weights: set[float] = set()
+        weights: list[float] = []
         for row, col, value in zip(upper.row, upper.col, upper.data, strict=True):
-            if abs(value) <= atol:
+            if value == 0.0:
                 continue
             bonds.add(frozenset((int(row), int(col))))
-            weights.add(round(float(value), 12))
+            weights.append(float(value))
 
         if not bonds:
             raise ValueError("The lattice carries no bonds.")
-        if len(weights) > 1:
+        min_weight = min(weights)
+        max_weight = max(weights)
+        if max_weight - min_weight > _LATTICE_WEIGHT_TOLERANCE:
             raise ValueError(
                 f"HubbardPlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
-                f"{len(weights)} distinct edge weights: {sorted(weights)}."
+                f"edge weights ranging from {min_weight} to {max_weight}."
             )
 
         sections = self._plaquette_sections(width, height)
@@ -197,7 +216,7 @@ class HubbardPlaquetteTrotter(Trotter):
                 f"{len(bonds - tiled)} graph bond(s) outside the tiling. "
             )
 
-        weight = next(iter(weights))
+        weight = float(np.mean(weights))
         Logger.debug(f"HubbardPlaquetteTrotter: edge weight {weight} over {len(bonds)} bonds per spin.")
         return width, height, weight, sections
 
@@ -391,8 +410,8 @@ class HubbardPlaquetteTrotter(Trotter):
         cells_x, cells_y = width // 2, height // 2
         momenta_x = 2.0 * math.pi * np.arange(cells_x) / cells_x
         momenta_y = 2.0 * math.pi * np.arange(cells_y) / cells_y
-        phase_x = np.exp(2j * momenta_x)[:, None]
-        phase_y = np.exp(2j * momenta_y)[None, :]
+        phase_x = np.exp(1j * momenta_x)[:, None]
+        phase_y = np.exp(1j * momenta_y)[None, :]
 
         fourier = np.zeros((cells_x, cells_y, 4, 4), dtype=complex)
         fourier[:, :, 0, 1] = -2.0 + 2.0 / phase_x
