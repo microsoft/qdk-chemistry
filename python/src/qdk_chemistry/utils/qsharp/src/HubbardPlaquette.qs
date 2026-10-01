@@ -339,7 +339,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             // TEMPORARY (legacy parity): the legacy layer also phased a single-mode Z tower over
             // every mode, the conventional model's n_up + n_down terms.
             if UsesLegacyCosts() {
-                HammingWeightPhase(-angle, [[PauliZ], size = Length(systems)], Mapped(q -> [q], systems));
+                HammingWeightPhase(-angle, [[PauliZ], size = Length(systems)], Mapped(q -> [q], systems), maxBatchSize);
             }
             HammingWeightPhase(
                 angle,

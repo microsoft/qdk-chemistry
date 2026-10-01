@@ -1045,7 +1045,9 @@ class TestBenchmarkLogicalResources:
 
     def test_a_cap_at_least_the_tower_length_changes_nothing(self):
         """The 4x4 towers are sixteen terms long, so a cap of sixteen cannot split any of them."""
-        assert _benchmark_logical_counts(4, max_batch_size=16) == _benchmark_logical_counts(4)
+        # TEMPORARY (legacy parity): the legacy single-mode tower spans all 32 modes, so the cap that
+        # splits nothing is 32 until the revert; restore max_batch_size=16 with it.
+        assert _benchmark_logical_counts(4, max_batch_size=32) == _benchmark_logical_counts(4)
 
     def test_capping_trades_qubits_for_rotations(self):
         """Halving the batch releases the adder-tree scratch sooner and pays for it in rotations."""
