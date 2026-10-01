@@ -241,10 +241,7 @@ class SumOfSquaresContainer(QubitOperatorContainer):
         mode_order = str(self.fermion_mode_order) if self.fermion_mode_order is not None else "unspecified"
         return (
             "Sum-of-Squares Qubit Operator\n"
-            f"  System size: {self.metadata.num_spatial_orbitals} spatial orbitals, "
-            f"{self.num_qubits} spin-orbital qubits\n"
-            f"  DFTHC dimensions: R={self.metadata.num_ranks}, "
-            f"B={self.metadata.num_bases}, C={self.metadata.num_copies}\n"
+            f"  System size: {self.num_qubits} qubits\n"
             f"  One-body generators: {num_d1 + num_q1} total "
             f"({num_d1} D1 particle, {num_q1} Q1 hole)\n"
             f"  Spin-free generators: {num_sf} (R x C), "
