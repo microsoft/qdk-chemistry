@@ -24,7 +24,19 @@ __all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
 
 
 def _pauli_evolution_parameters(container: PauliProductFormulaContainer) -> dict[str, Any]:
-    """Prepare the sparse Q# payload shared by Pauli-sequence mappers, retaining identity terms and repetitions."""
+    """Prepare the Q# ``RepPauliExpParams`` payload shared by the Pauli-sequence mappers.
+
+    Terms use a sparse encoding: each term contributes only the qubit indices it acts on and their
+    Pauli axes, rather than one Pauli per system qubit, and an identity term keeps an empty row.
+    The prefix, step and suffix terms are concatenated with their counts, so Q# repeats only the step.
+
+    Args:
+        container: The product formula to encode.
+
+    Returns:
+        Keyword arguments for the Q# ``RepPauliExpParams`` struct.
+
+    """
     # Higher-order formulas reuse words; convert each ordered support only once per call.
     converted = {}
     indices, ops, angles = [], [], []
@@ -70,9 +82,6 @@ class PauliSequenceMapper(CircuitMapper):
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; R_z(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
 
-    Terms are handed to Q# in a sparse encoding: each term contributes only the qubit
-    indices it acts on and their Pauli axes, rather than one Pauli per system qubit.
-
     Notes:
         * Requires a ``PauliProductFormulaContainer`` for the unitary representation.
 
@@ -112,8 +121,8 @@ class PauliSequenceMapper(CircuitMapper):
             )
 
         evo_params = _pauli_evolution_parameters(unitary_container)
-        program = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpCircuit
-        evolution_op = QSHARP_UTILS.PauliExp.MakeSparseRepPauliExpOp(evo_params)
+        program = QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit
+        evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)
         target_indices = list(range(unitary_container.num_qubits))
 
         factory = QsharpFactoryData(

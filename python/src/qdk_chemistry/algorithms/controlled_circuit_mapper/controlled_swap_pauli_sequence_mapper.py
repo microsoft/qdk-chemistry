@@ -204,7 +204,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         vacuum_phase = self._vacuum_phase(unitary_container)
 
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
-            evolution=QSHARP_UTILS.PauliExp.SparseRepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
+            evolution=QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
             vacuumPhase=vacuum_phase,
             control=control_indices[0],
             systems=target_indices,

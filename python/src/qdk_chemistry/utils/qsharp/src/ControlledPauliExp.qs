@@ -4,8 +4,8 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
-    import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
-    import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
+    import QDKChemistry.Utils.PauliExp.RepPauliExp;
+    import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
     import Std.Arrays.IndexOf;
     import Std.Arrays.Subarray;
     import Std.Canon.MapPauliAxis;
@@ -14,7 +14,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     import Std.ResourceEstimation.RepeatEstimates;
 
     /// Returns the summed coefficient of the identity terms in `first..last`.
-    function LayerIdentityPhase(params : SparseRepPauliExpParams, first : Int, last : Int) : Double {
+    function LayerIdentityPhase(params : RepPauliExpParams, first : Int, last : Int) : Double {
         mutable phase = 0.0;
         for term in first..last {
             if Length(params.pauliIndices[term]) == 0 {
@@ -26,7 +26,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
 
     /// Applies the producer's disjoint layers without changing their boundaries.
     operation ControlledPauliLayers(
-        params : SparseRepPauliExpParams,
+        params : RepPauliExpParams,
         layerOffsets : Int[],
         control : Qubit,
         systems : Qubit[]
@@ -100,13 +100,13 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// - `control`: The control qubit.
     /// - `systems`: The system qubits the evolution acts on.
     operation RepControlledPauliExp(
-        params : SparseRepPauliExpParams,
+        params : RepPauliExpParams,
         layerOffsets : Int[],
         control : Qubit,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         if Length(layerOffsets) == 0 {
-            Controlled SparseRepPauliExp([control], (params, systems));
+            Controlled RepPauliExp([control], (params, systems));
         } else {
             let first = IndexOf(offset -> offset == params.numPrefixTerms, layerOffsets);
             let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
@@ -136,7 +136,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// # Returns
     /// - `Unit`: The operation prepares the repeated controlled time evolution on the allocated qubits.
     operation MakeRepControlledPauliExpCircuit(
-        params : SparseRepPauliExpParams,
+        params : RepPauliExpParams,
         layerOffsets : Int[],
         control : Int,
         systems : Int[]
@@ -147,7 +147,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
 
     /// Returns a single-control callable for repeated sparse Pauli evolution.
     function MakeRepControlledPauliExpOp(
-        params : SparseRepPauliExpParams,
+        params : RepPauliExpParams,
         layerOffsets : Int[]
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         RepControlledPauliExp(params, layerOffsets, _, _)

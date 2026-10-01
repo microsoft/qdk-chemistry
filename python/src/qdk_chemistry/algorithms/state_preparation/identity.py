@@ -25,7 +25,14 @@ def identity_state_prep(num_qubits: int) -> Circuit:
         A ``Circuit`` representing the identity operation on *num_qubits* qubits.
 
     """
-    params = {"pauliExponents": [], "pauliCoefficients": [], "repetitions": 1}
+    params = {
+        "pauliIndices": [],
+        "pauliOps": [],
+        "pauliCoefficients": [],
+        "repetitions": 1,
+        "numPrefixTerms": 0,
+        "numSuffixTerms": 0,
+    }
     targets = list(range(num_qubits))
     return Circuit(
         qsharp_op=QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(params),

@@ -197,7 +197,7 @@ class TestTargetProfiles:
         assert "define" in str(base_context.compile(state_prep, [0], [1.0, 0.0], [], 1))
 
         pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
-        params = utils.PauliExp.SparseRepPauliExpParams(
+        params = utils.PauliExp.RepPauliExpParams(
             pauliIndices=[[0, 1]],
             pauliOps=[[Pauli.X, Pauli.Z]],
             pauliCoefficients=[0.5],

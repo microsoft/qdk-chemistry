@@ -981,11 +981,11 @@ class TestPartitionGrouping:
         assert [term.pauli_term for term in terms] == [{0: "X"}, {1: "Y"}, {2: "Z"}]
 
     @pytest.mark.parametrize("order", [2, 4])
-    def test_minimize_rotations_requires_a_strict_reduction(self, order):
+    def test_minimize_pauli_exponentials_requires_a_strict_reduction(self, order):
         """Ties keep the declared order; unequal groups reach the fewest Pauli factors over all group orders."""
 
         def step_terms(hamiltonian: QubitOperator, minimize: bool) -> list[ExponentiatedPauliTerm]:
-            builder = Trotter(order=order, time=1.0, minimize_rotations=minimize)
+            builder = Trotter(order=order, time=1.0, minimize_pauli_exponentials=minimize)
             return builder.run(hamiltonian).get_container().step_terms
 
         tied = QubitOperator.from_sparse_terms(

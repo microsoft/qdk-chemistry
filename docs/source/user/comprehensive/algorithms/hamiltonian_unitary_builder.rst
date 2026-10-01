@@ -129,9 +129,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``order``
      - int
      - Trotter-Suzuki order (1 for first-order, 2+ for higher even orders). Default is 1.
-   * - ``minimize_rotations``
+   * - ``minimize_pauli_exponentials``
      - bool
-     - Reorder groups to minimize emitted Pauli rotations for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
+     - Reorder groups to minimize the number of Pauli exponentials for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
@@ -146,7 +146,7 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
    * - ``fuse_group_boundaries``
      - bool
-     - Fuse matching commuting-group boundaries without unrolling repetitions. Default is ``False``; independent of ``minimize_rotations``.
+     - Fuse matching commuting-group boundaries without unrolling repetitions. Default is ``False``; independent of ``minimize_pauli_exponentials``.
 
 
 .. _zassenhaus-builder:
@@ -217,12 +217,12 @@ When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :a
 
 The emitted formula retains each nonempty :class:`~qdk_chemistry.data.LayeredPartition` layer in ``layer_offsets``, after coefficient filtering and for every Suzuki schedule occurrence.
 The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper` uses these declared boundaries directly; no downstream regrouping is performed.
-Layer propagation is independent of ``minimize_rotations`` and ``fuse_group_boundaries``.
+Layer propagation is independent of ``minimize_pauli_exponentials`` and ``fuse_group_boundaries``.
 
 By default, groups are sorted by ascending layer count, preserving the historical splitting order.
 This ordering does not generally minimize the number of individual Pauli exponentials.
 
-Set ``minimize_rotations=True`` on the ``"trotter"`` algorithm to place the group with the most active terms centrally and the second-largest group outside the Strang/Suzuki splitting.
+Set ``minimize_pauli_exponentials=True`` on the ``"trotter"`` algorithm to place the group with the most active terms centrally and the second-largest group outside the Strang/Suzuki splitting.
 Group sizes are counted after ``weight_threshold`` filtering, rather than by their number of disjoint layers.
 Groups are moved only when this strictly lowers the structural count below; otherwise, including ties, the declared order and its Trotter error are kept.
 Other groups retain their relative order, and ties between group sizes are resolved stably from the existing order.

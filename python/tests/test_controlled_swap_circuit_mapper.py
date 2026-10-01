@@ -162,7 +162,7 @@ def vacuum_annihilating_unitary(request: pytest.FixtureRequest) -> UnitaryRepres
         num_divisions=3,
         time=0.5,
         fuse_group_boundaries=fuse,
-        minimize_rotations=minimize,
+        minimize_pauli_exponentials=minimize,
     )
     return trotter.run(grouped)
 

@@ -49,7 +49,7 @@ class TrotterSettings(TimeEvolutionSettings):
             num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).
             error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
-            minimize_rotations: Place the largest active groups at the Suzuki endpoints. Defaults to False.
+            minimize_pauli_exponentials: Place the largest active groups at the Suzuki endpoints. Defaults to False.
             fuse_group_boundaries: Fuse repeated commuting group boundaries without unrolling. Defaults to False.
 
         """
@@ -78,10 +78,10 @@ class TrotterSettings(TimeEvolutionSettings):
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
         self._set_default(
-            "minimize_rotations",
+            "minimize_pauli_exponentials",
             "bool",
             False,
-            "Minimize emitted Pauli rotations for a fixed partition and even Suzuki order by reordering groups.",
+            "Reorder groups to minimize the Pauli exponentials of a fixed partition at even Suzuki order.",
         )
         self._set_default(
             "fuse_group_boundaries",
@@ -105,7 +105,7 @@ class Trotter(TimeEvolutionBuilder):
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
-        minimize_rotations: bool = False,
+        minimize_pauli_exponentials: bool = False,
         fuse_group_boundaries: bool = False,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
@@ -144,11 +144,11 @@ class Trotter(TimeEvolutionBuilder):
         directly for schedule-level grouping.  When no partition is present, each Pauli term
         is exponentiated as its own group.
 
-        With ``minimize_rotations=True``, even-order formulas place the group with
+        With ``minimize_pauli_exponentials=True``, even-order formulas place the group with
         the most active Pauli terms centrally and the second-largest group outside
-        when that strictly reduces emitted Pauli factors; otherwise, including ties,
+        when that strictly reduces the formula's Pauli exponentials; otherwise, including ties,
         the declared order is kept. Remaining groups keep their relative order.
-        This minimizes emitted Pauli factors for a fixed partition and step count,
+        This minimizes the Pauli exponentials for a fixed partition and step count,
         not angle-dependent synthesis cost or simulation error. It does not fuse
         repetition boundaries. First-order formulas retain their original ordering.
 
@@ -161,7 +161,7 @@ class Trotter(TimeEvolutionBuilder):
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
-            minimize_rotations: Reorder even-order groups to minimize emitted Pauli factors. Defaults to False.
+            minimize_pauli_exponentials: Reorder even-order groups to minimize Pauli exponentials. Defaults to False.
             fuse_group_boundaries: Return a compact boundary-fused formula with certified groups. Defaults to False.
 
         """
@@ -175,7 +175,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
-        self._settings.set("minimize_rotations", minimize_rotations)
+        self._settings.set("minimize_pauli_exponentials", minimize_pauli_exponentials)
         self._settings.set("fuse_group_boundaries", fuse_group_boundaries)
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
@@ -329,7 +329,7 @@ class Trotter(TimeEvolutionBuilder):
             return terms, (0,), None if layer_offsets is None else (0,)
 
         order = self._settings.get("order")
-        if order > 1 and self._settings.get("minimize_rotations") and len(groups) > 1:
+        if order > 1 and self._settings.get("minimize_pauli_exponentials") and len(groups) > 1:
             # For order 2k, f=5**(k-1): endpoint multiplicities are f+1 (outer) and f
             # (central), versus 2f internally, saving (f-1)*w_outer + f*w_central.
             # Count after filtering, not by layer count.

@@ -4,8 +4,8 @@
 
 namespace QDKChemistry.Utils.ControlledSwapPauliExp {
 
-    import QDKChemistry.Utils.PauliExp.SparseRepPauliExp;
-    import QDKChemistry.Utils.PauliExp.SparseRepPauliExpParams;
+    import QDKChemistry.Utils.PauliExp.RepPauliExp;
+    import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
     import Std.Arrays.Subarray;
     import Std.Math.AbsD;
 
@@ -25,7 +25,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// - `control`: The control qubit.
     /// - `systems`: System qubits indexed by the sparse evolution.
     operation RepControlledSwapPauliExp(
-        evolution : SparseRepPauliExpParams,
+        evolution : RepPauliExpParams,
         vacuumPhase : Double,
         control : Qubit,
         systems : Qubit[]
@@ -36,7 +36,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
                 Controlled SWAP([control], (systems[i], vacuum[i]));
             }
         } apply {
-            SparseRepPauliExp(evolution, vacuum);
+            RepPauliExp(evolution, vacuum);
         }
         // Skipped when negligible so a vacuum-annihilating evolution costs no extra rotation.
         if AbsD(vacuumPhase) > 1e-12 {
@@ -47,7 +47,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// Parameters for the repeated CSWAP-sandwich controlled Pauli evolution.
     /// `control` and `systems` are register indices for circuit allocation.
     struct RepControlledSwapPauliExpParams {
-        evolution : SparseRepPauliExpParams,
+        evolution : RepPauliExpParams,
         vacuumPhase : Double,
         control : Int,
         systems : Int[],
@@ -55,7 +55,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
 
     /// Creates a CSWAP-sandwich circuit at the specified control and system indices.
     operation MakeRepControlledSwapPauliExpCircuit(
-        evolution : SparseRepPauliExpParams,
+        evolution : RepPauliExpParams,
         vacuumPhase : Double,
         control : Int,
         systems : Int[]
