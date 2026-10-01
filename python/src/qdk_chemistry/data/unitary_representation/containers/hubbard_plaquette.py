@@ -124,17 +124,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         return float((-angle + self.constant_shift * self.step_reps) / self.scale)
 
     def combine(self, other: UnitaryContainer) -> UnitaryContainer:
-        r"""Return the evolution that applies this container and then ``other``.
-
-        The body of a plaquette evolution is fixed by the lattice and the four angles, and the
-        container applies it ``step_reps`` times. Appending one evolution to another is therefore
-        a single evolution with the repetitions added, provided both describe the same body:
-        :math:`B^{m} B^{n} = B^{m+n}`.
-
-        Angles are compared exactly rather than within a tolerance. They are derived by the same
-        arithmetic from the same settings, so two containers that mean the same body produce bit-
-        identical angles; a tolerance would instead let two genuinely different evolutions merge
-        into one that matches neither.
+        """Return the evolution that applies this container and then ``other``.
 
         Args:
             other: The container to append after this one.
