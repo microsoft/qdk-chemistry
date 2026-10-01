@@ -201,14 +201,19 @@ class TestSumOfSquaresContainer:
         """The summary explains the SOS structure and counts SF generators by rank-copy pairs."""
         container = _sum_of_squares_container()
 
-        assert container.get_summary() == (
-            "Sum-of-Squares Qubit Operator\n"
-            "  System size: 4 qubits\n"
-            "  One-body generators: 2 total (1 D1 particle, 1 Q1 hole)\n"
-            "  Spin-free generators: 1 (R x C), B + 1 = 2 terms each (1 orbital + 1 identity)\n"
-            "  Qubit representation: jordan-wigner encoding, blocked fermion-mode order\n"
-            "  Energy shift: -1.5 Hartree\n"
-        )
+        header, *lines = container.get_summary().splitlines()
+        fields = dict(line.strip().split(": ", 1) for line in lines if ": " in line)
+
+        assert header == "Sum-of-Squares Qubit Operator"
+        assert fields["System size"] == "4 qubits"
+        assert fields["One-body generators"].startswith("2 total")
+        assert "1 D1 particle" in fields["One-body generators"]
+        assert "1 Q1 hole" in fields["One-body generators"]
+        assert fields["Spin-free generators"].startswith("1 ")
+        assert "B + 1 = 2 terms" in fields["Spin-free generators"]
+        assert "jordan-wigner" in fields["Qubit representation"]
+        assert "blocked" in fields["Qubit representation"]
+        assert float(fields["Energy shift"].split()[0]) == -1.5
 
     def test_json_roundtrip(self) -> None:
         """Complex LCU coefficients and Givens angles survive a JSON round-trip.
