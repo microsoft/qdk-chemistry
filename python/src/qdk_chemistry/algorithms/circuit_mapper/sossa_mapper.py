@@ -138,6 +138,23 @@ class SOSSAMapperSettings(Settings):
             "Number of bits for alias sampling coefficient precision, from 1 to 30 inclusive.",
             (1, 30),
         )
+        self._set_default(
+            "inner_prepare_swap_bits",
+            "int",
+            -1,
+            "Swap width k of the QROAM that loads the inner alias-sampling tables. -1 lets the "
+            "library pick, 0 forces a plain unary-iteration lookup, and a positive value fixes "
+            "k, clamped to the table's address width. The swap network allocates scratch "
+            "proportional to 2^k times the loaded word, and that word carries "
+            "'coefficient_bit_precision', so k multiplies the cost of every coefficient bit. "
+            "The default selector minimises Toffolis with no width term at all, so it can pick "
+            "a k whose scratch sets the peak qubit count of the whole walk. Lowering k by one "
+            "is exact -- it changes only how identical data is routed, never the state "
+            "prepared -- which makes it the one width knob here that costs no accuracy. Expect "
+            "a modest Toffoli increase in return, and re-derive 'rotation_batch_size' "
+            "afterwards, since narrowing PREPARE can put SELECT back on the critical path.",
+            (-1, 30),
+        )
 
 
 class SOSSAMapper(CircuitMapper):
@@ -225,6 +242,7 @@ class SOSSAMapper(CircuitMapper):
                 coefficients,
                 free_rider_data,
                 coeff_bits,
+                self._settings.get("inner_prepare_swap_bits"),
             )
         if algorithm == "direct":
             return (
