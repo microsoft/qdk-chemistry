@@ -45,6 +45,7 @@ class QdkStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "uniform",
             "Phase-register state. 'uniform' prepares a Hadamard superposition. "
             "'sine' prepares the Heisenberg-limited sine window state.",
+            ["uniform", "sine"],
         )
         self._set_default(
             "compute_capacity",
@@ -219,7 +220,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             return QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         if window == "sine":
             params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
-                rowMap=list(range(num_bits - 1, -1, -1)),
+                rowMap=list(range(num_bits)),
                 stateVector=cosine_window_state((1 << num_bits) - 1),
                 expansionOps=[],
                 numQubits=num_bits,

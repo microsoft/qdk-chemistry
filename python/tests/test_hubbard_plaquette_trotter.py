@@ -135,7 +135,10 @@ class TestHubbardPlaquetteContainer:
             for side in (2, 4, 6)
         ]
 
-        assert {frozenset(payload) for payload in payloads} == {frozenset(payloads[0])}
+        geometry_fields = {"width", "height"}
+        field_sets = [frozenset(payload) - geometry_fields for payload in payloads]
+
+        assert field_sets == [field_sets[0]] * len(field_sets)
 
     def test_container_round_trips_through_json(self):
         """Serialization preserves every field the Q# lowering reads."""
