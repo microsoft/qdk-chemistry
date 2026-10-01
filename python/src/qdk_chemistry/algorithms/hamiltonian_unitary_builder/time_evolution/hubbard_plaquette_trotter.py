@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import math
 from functools import cache
+from typing import TYPE_CHECKING
 
 import numpy as np
-import scipy.sparse
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.data.qubit_operator import QubitOperator
@@ -21,12 +21,19 @@ from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette impo
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
+if TYPE_CHECKING:
+    from qdk_chemistry.data import LatticeGeometry
+
 __all__: list[str] = [
     "HubbardPlaquetteTrotter",
     "HubbardPlaquetteTrotterSettings",
 ]
 
-_LATTICE_WEIGHT_TOLERANCE = 1e-12
+#: Absolute tolerance for matching lattice site positions, whose spacing is one.
+_GEOMETRY_TOLERANCE = 1e-9
+
+#: Decimal places the site coordinates are rounded to before they are counted.
+_GEOMETRY_DECIMALS = 9
 
 
 class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
@@ -135,21 +142,22 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         return "hamiltonian_unitary_builder"
 
     def _lattice_geometry(self, qubit_hamiltonian: QubitOperator):
-        """Return the lattice shape, its edge weight, and its plaquette tilings.
+        """Return the lattice shape and its plaquette tilings.
 
-        The bond graph is validated here: the bonds must match the plaquette tiling,
-        and their weights must be uniform.
-        The tilings are resolved from Q# to run the check, so they are returned alongside the shape.
+        The geometry is validated here: it must be a unit-spaced square lattice periodic in
+        both directions and numbered ``y * width + x``, and the tilings resolved from Q# must
+        cover exactly its nearest-neighbor bonds. The tilings are resolved to run that check,
+        so they are returned alongside the shape.
 
         Args:
             qubit_hamiltonian: The operator to inspect.
 
         Returns:
-            A tuple of the lattice width, height, edge weight, and its pink and gold tilings.
+            A tuple of the lattice width, height, and its pink and gold tilings.
 
         Raises:
             TypeError: If the operator does not wrap a ``LatticeContainer``.
-            ValueError: If the lattice is not a periodic square grid tiled by plaquettes with uniform edge weights.
+            ValueError: If the geometry is not a periodic square grid tiled by plaquettes.
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
@@ -161,45 +169,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 f"HubbardPlaquetteTrotter requires a QubitOperator containing a LatticeContainer, but the "
                 f"operator wraps a {container.type!r} container."
             )
-        dims = tuple(int(d) for d in container.lattice.dims)
-        if len(dims) != 2:
-            raise ValueError(f"HubbardPlaquetteTrotter tiles a 2D lattice, but the lattice reports {list(dims)}.")
-        width, height = dims
-
-        lattice = container.lattice
-        adjacency = lattice.sparse_adjacency_matrix().tocsr()
-        asymmetry = (adjacency - adjacency.T).tocoo()
-        asymmetric_entries = np.flatnonzero(np.abs(asymmetry.data) > _LATTICE_WEIGHT_TOLERANCE)
-        if asymmetric_entries.size:
-            index = int(asymmetric_entries[0])
-            row = int(asymmetry.row[index])
-            col = int(asymmetry.col[index])
-            forward = float(adjacency[row, col])
-            reverse = float(adjacency[col, row])
-            raise ValueError(
-                "HubbardPlaquetteTrotter requires a symmetric lattice adjacency matrix, but entries "
-                f"({row}, {col})={forward} and ({col}, {row})={reverse} differ."
-            )
-
-        # upper triangle of the lattice's adjacency matrix, used to enumerate each bond exactly once.
-        upper = scipy.sparse.triu(adjacency, k=1, format="coo")
-        bonds: set[frozenset[int]] = set()
-        weights: list[float] = []
-        for row, col, value in zip(upper.row, upper.col, upper.data, strict=True):
-            if value == 0.0:
-                continue
-            bonds.add(frozenset((int(row), int(col))))
-            weights.append(float(value))
-
-        if not bonds:
-            raise ValueError("The lattice carries no bonds.")
-        min_weight = min(weights)
-        max_weight = max(weights)
-        if max_weight - min_weight > _LATTICE_WEIGHT_TOLERANCE:
-            raise ValueError(
-                f"HubbardPlaquetteTrotter requires a uniform hopping amplitude, but the lattice carries "
-                f"edge weights ranging from {min_weight} to {max_weight}."
-            )
+        width, height = self._square_grid_shape(container.geometry)
 
         sections = self._plaquette_sections(width, height)
         pink, gold = sections
@@ -209,16 +179,89 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             for index, corner in enumerate(cycle):
                 next_corner = cycle[(index + 1) % len(cycle)]
                 tiled.add(frozenset((corner, next_corner)))
+
+        bonds = self._periodic_square_bonds(width, height)
         if bonds != tiled:
             raise ValueError(
-                f"The lattice's bond graph does not match a periodic {width}x{height} "
-                f"square lattice: {len(tiled - bonds)} lattice bond(s) absent from the graph and "
-                f"{len(bonds - tiled)} graph bond(s) outside the tiling. "
+                f"The plaquette tiling does not match a periodic {width}x{height} square lattice: "
+                f"{len(bonds - tiled)} lattice bond(s) absent from the tiling and "
+                f"{len(tiled - bonds)} tiled bond(s) outside the lattice. "
             )
 
-        weight = float(np.mean(weights))
-        Logger.debug(f"HubbardPlaquetteTrotter: edge weight {weight} over {len(bonds)} bonds per spin.")
-        return width, height, weight, sections
+        Logger.debug(f"HubbardPlaquetteTrotter: periodic {width}x{height} square lattice, {len(bonds)} bonds per spin.")
+        return width, height, sections
+
+    @staticmethod
+    def _square_grid_shape(geometry: LatticeGeometry) -> tuple[int, int]:
+        """Return the width and height of a doubly periodic square lattice geometry.
+
+        The shape is read back from the site positions, which is what makes it survive a
+        round trip: the geometry stores no separate dimension field that could disagree
+        with them. A geometry whose positions are not the canonical unit-spaced grid, such
+        as a triangular or honeycomb patch, is rejected rather than silently mis-tiled.
+
+        Args:
+            geometry: The :class:`~qdk_chemistry.data.LatticeGeometry` to inspect.
+
+        Returns:
+            The number of columns and rows of the lattice.
+
+        Raises:
+            ValueError: If the geometry is not a square lattice periodic in both directions.
+
+        """
+        positions = np.asarray(geometry.positions, dtype=float)
+        periods = geometry.periods
+        directions = 0 if periods is None else int(np.asarray(periods).shape[0])
+        if directions != 2:
+            raise ValueError(
+                "HubbardPlaquetteTrotter tiles a lattice periodic in both directions, but the geometry is "
+                f"periodic in {directions} direction(s). Build it with "
+                "LatticeGeometry.square(nx, ny, periodic_x=True, periodic_y=True)."
+            )
+
+        # Unit spacing makes the distinct coordinates along each axis the lattice dimensions.
+        width = int(np.unique(positions[:, 0].round(_GEOMETRY_DECIMALS)).size)
+        height = int(np.unique(positions[:, 1].round(_GEOMETRY_DECIMALS)).size)
+        expected_positions = np.array(
+            [(float(x), float(y)) for y in range(height) for x in range(width)],
+            dtype=float,
+        ).reshape(-1, 2)
+        expected_periods = np.array([(float(width), 0.0), (0.0, float(height))], dtype=float)
+        if (
+            width * height != positions.shape[0]
+            or not np.allclose(positions, expected_positions, rtol=0.0, atol=_GEOMETRY_TOLERANCE)
+            or not np.allclose(np.asarray(periods, dtype=float), expected_periods, rtol=0.0, atol=_GEOMETRY_TOLERANCE)
+        ):
+            raise ValueError(
+                "HubbardPlaquetteTrotter tiles a unit-spaced square lattice numbered y * width + x, which "
+                f"the {positions.shape[0]}-site geometry does not match. Build it with "
+                "LatticeGeometry.square(nx, ny, periodic_x=True, periodic_y=True)."
+            )
+        return width, height
+
+    @staticmethod
+    @cache
+    def _periodic_square_bonds(width: int, height: int) -> frozenset[frozenset[int]]:
+        """Return the nearest-neighbor bonds of a periodic square lattice.
+
+        Args:
+            width: Number of lattice columns.
+            height: Number of lattice rows.
+
+        Returns:
+            Each bond once, as an unordered pair of site indices.
+
+        """
+        return frozenset(
+            frozenset(bond)
+            for row in range(height)
+            for col in range(width)
+            for bond in (
+                (row * width + col, row * width + (col + 1) % width),
+                (row * width + col, ((row + 1) % height) * width + col),
+            )
+        )
 
     @staticmethod
     @cache
@@ -329,7 +372,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             UnitaryRepresentation: The segmented plaquette product formula.
 
         Raises:
-            ValueError: If the order is not 2, or the bonds do not match a periodic square tiling with uniform hopping.
+            ValueError: If the order is not 2, or the geometry is not a periodic square lattice.
 
         """
         order = self._settings.get("order")
@@ -337,10 +380,10 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
 
         # 1. Geometry
-        width, height, weight, _sections = self._lattice_geometry(qubit_hamiltonian)
+        width, height, _sections = self._lattice_geometry(qubit_hamiltonian)
 
         # 2. Model parameters
-        hopping = float(self._settings.get("t")) * weight
+        hopping = float(self._settings.get("t"))
         interaction = float(self._settings.get("u"))
         pair_angle = 0.25 * interaction
         num_electrons = int(self._settings.get("num_electrons"))

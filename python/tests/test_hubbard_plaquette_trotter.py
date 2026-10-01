@@ -22,6 +22,7 @@ from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    LatticeGeometry,
     LatticeGraph,
     MajoranaMapping,
     QubitOperator,
@@ -37,8 +38,8 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 def _lattice_operator(width: int, height: int) -> QubitOperator:
     """Return a periodic square lattice as a lattice-backed qubit operator."""
-    lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
-    return QubitOperator(container=LatticeContainer(lattice))
+    geometry = LatticeGeometry.square(width, height, periodic_x=True, periodic_y=True)
+    return QubitOperator(container=LatticeContainer(geometry))
 
 
 #: Angle unit the layer angles below are built from. Nothing rounds any more, so the value is
@@ -228,12 +229,29 @@ class TestHubbardPlaquetteContainer:
     def test_rejects_a_lattice_that_does_not_tile(self):
         """Open boundaries leave bonds the periodic plaquette tiling cannot cover."""
         open_lattice = QubitOperator(
-            container=LatticeContainer(LatticeGraph.square(4, 4, periodic_x=False, periodic_y=False))
+            container=LatticeContainer(LatticeGeometry.square(4, 4, periodic_x=False, periodic_y=False))
         )
         builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
 
-        with pytest.raises(ValueError, match="bond graph does not match"):
+        with pytest.raises(ValueError, match="periodic in both directions"):
             builder.run(open_lattice)
+
+    @pytest.mark.parametrize(
+        ("factory", "nx", "ny"),
+        [("triangular", 4, 4), ("honeycomb", 2, 2), ("kagome", 2, 2)],
+    )
+    def test_rejects_a_geometry_that_is_not_a_square_grid(self, factory, nx, ny):
+        """Only the square lattice carries the unit-spaced grid the plaquette tiling assumes."""
+        geometry = getattr(LatticeGeometry, factory)(nx, ny, periodic_x=True, periodic_y=True)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
+
+        with pytest.raises(ValueError, match="unit-spaced square lattice"):
+            builder.run(QubitOperator(container=LatticeContainer(geometry)))
+
+    def test_rejects_a_lattice_graph(self):
+        """The container stores geometry, which a graph's renumberable edge list is not."""
+        with pytest.raises(TypeError, match="LatticeGeometry"):
+            LatticeContainer(LatticeGraph.square(4, 4, periodic_x=True, periodic_y=True))
 
     def test_rejects_a_mapped_qubit_operator(self):
         """The tiling needs the lattice structure, which a mapped operator discards."""
