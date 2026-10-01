@@ -236,8 +236,20 @@ class SumOfSquaresContainer(QubitOperatorContainer):
         """Return a summary of the sum-of-squares container."""
         num_d1 = self.metadata.num_positive_one_body_terms
         num_q1 = len(self.one_body.angles) - num_d1
-        num_sf = len(self.two_body.angles)
+        num_sf = self.metadata.num_ranks * self.metadata.num_copies
+        encoding = self.encoding or "unspecified"
+        mode_order = str(self.fermion_mode_order) if self.fermion_mode_order is not None else "unspecified"
         return (
-            f"Sum-of-Squares Qubit Operator\n  Number of qubits: {self.num_qubits}\n"
-            f"  D1/Q1/SF generators: {num_d1}/{num_q1}/{num_sf}\n"
+            "Sum-of-Squares Qubit Operator\n"
+            f"  System size: {self.metadata.num_spatial_orbitals} spatial orbitals, "
+            f"{self.num_qubits} spin-orbital qubits\n"
+            f"  DFTHC dimensions: R={self.metadata.num_ranks}, "
+            f"B={self.metadata.num_bases}, C={self.metadata.num_copies}\n"
+            f"  One-body generators: {num_d1 + num_q1} total "
+            f"({num_d1} D1 particle, {num_q1} Q1 hole)\n"
+            f"  Spin-free generators: {num_sf} (R x C), "
+            f"B + 1 = {self.metadata.num_bases + 1} terms each "
+            f"({self.metadata.num_bases} orbital + 1 identity)\n"
+            f"  Qubit representation: {encoding} encoding, {mode_order} fermion-mode order\n"
+            f"  Energy shift: {self.metadata.energy_shift:.12g} Hartree\n"
         )
