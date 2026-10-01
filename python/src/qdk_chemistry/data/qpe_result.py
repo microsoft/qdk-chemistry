@@ -47,8 +47,8 @@ class QpeResult(DataClass):
         resolved_energy: float | None = None,
         bits_msb_first: tuple[int, ...] | None = None,
         bitstring_msb_first: str | None = None,
-        bitstring_counts: dict[str, int] | None = None,
         metadata: dict[str, object] | None = None,
+        bitstring_counts: dict[str, int] | None = None,
     ) -> None:
         """Initialize a QPE result.
 
@@ -65,8 +65,8 @@ class QpeResult(DataClass):
                 or ``None`` when no resolution was performed.
             bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
             bitstring_msb_first: Measured bitstring representation, when provided.
-            bitstring_counts: Measured bitstring histogram, when provided.
             metadata: Optional metadata dictionary.
+            bitstring_counts: Measured bitstring histogram, when provided.
 
         """
         Logger.trace_entering()
