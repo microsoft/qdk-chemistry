@@ -77,7 +77,7 @@ class DFTHCHamiltonianContainer : public HamiltonianContainer {
   /** @brief Create a deep copy. */
   std::unique_ptr<HamiltonianContainer> clone() const override final;
 
-  /** @return @c "factorized". */
+  /** @return @c "dfthc". */
   std::string get_container_type() const override final;
 
   /**

@@ -521,7 +521,7 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "sparse") {
     return SparseHamiltonianContainer::from_json(j);
   }
-  if (container_type == "factorized") {
+  if (container_type == "dfthc") {
     return DFTHCHamiltonianContainer::from_json(j);
   }
   throw std::runtime_error("Unknown container type: " + container_type);
@@ -552,7 +552,7 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     if (container_type == "sparse") {
       return SparseHamiltonianContainer::from_hdf5(group);
     }
-    if (container_type == "factorized") {
+    if (container_type == "dfthc") {
       return DFTHCHamiltonianContainer::from_hdf5(group);
     }
     throw std::runtime_error("Unknown container type: " + container_type);
