@@ -87,13 +87,19 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 3
         assert isinstance(container.step_reps, int)
 
-    def test_update_ordering(self, container):
+    @pytest.mark.parametrize("scale", [0.4, 1.0, 2.4])
+    def test_update_ordering(self, step_terms, scale):
         """Test setting a new valid evolution ordering."""
+        container = PauliProductFormulaContainer(step_terms, step_reps=4, num_qubits=2, scale=scale)
         updated_container = container.reorder_terms([1, 2, 0])
 
         assert updated_container.step_terms[0] == container.step_terms[1]
         assert updated_container.step_terms[1] == container.step_terms[2]
         assert updated_container.step_terms[2] == container.step_terms[0]
+        assert updated_container.scale == scale
+        assert updated_container.step_reps == container.step_reps
+        assert updated_container.num_qubits == container.num_qubits
+        assert updated_container.eigenvalue_from_phase(0.1) == container.eigenvalue_from_phase(0.1)
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
