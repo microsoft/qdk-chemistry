@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cstddef>
 #include <memory>
-#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/dfthc.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
@@ -40,7 +40,7 @@ DFTHCHamiltonianContainer::DFTHCHamiltonianContainer(
   if (has_two_body_integrals()) {
     if (!_u.allFinite() || !_w.allFinite() || !_wb.allFinite()) {
       throw std::invalid_argument(
-          "Factorized Hamiltonian factors contain a non-finite value.");
+          "DFTHC Hamiltonian factors contain a non-finite value.");
     }
 
     const size_t norb = get_num_orbitals();
@@ -53,7 +53,7 @@ DFTHCHamiltonianContainer::DFTHCHamiltonianContainer(
         const double deviation = std::abs(basis.squaredNorm() - 1.0);
         if (deviation > 1e-8) {
           throw std::invalid_argument(
-              "Factorized Hamiltonian basis row (rank " + std::to_string(r) +
+              "DFTHC Hamiltonian basis row (rank " + std::to_string(r) +
               ", basis " + std::to_string(b) +
               ") is not normalized: its squared norm is " +
               std::to_string(basis.squaredNorm()) +
@@ -66,7 +66,7 @@ DFTHCHamiltonianContainer::DFTHCHamiltonianContainer(
 
   if (!is_valid()) {
     throw std::invalid_argument(
-        "Tried to generate invalid factorized Hamiltonian object.");
+        "Tried to generate invalid DFTHC Hamiltonian object.");
   }
 }
 
@@ -114,8 +114,7 @@ std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
 DFTHCHamiltonianContainer::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
-    throw std::runtime_error(
-        "Factorized Hamiltonian two-body integrals not set");
+    throw std::runtime_error("DFTHC Hamiltonian two-body integrals not set");
   }
   if (!_cached_two_body) {
     _build_two_body_cache();
@@ -131,8 +130,7 @@ double DFTHCHamiltonianContainer::get_two_body_element(unsigned i, unsigned j,
                                                        SpinChannel) const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
-    throw std::runtime_error(
-        "Factorized Hamiltonian two-body integrals not set");
+    throw std::runtime_error("DFTHC Hamiltonian two-body integrals not set");
   }
   size_t norb = get_num_orbitals();
   if (i >= norb || j >= norb || k >= norb || l >= norb) {
@@ -176,7 +174,7 @@ bool DFTHCHamiltonianContainer::has_two_body_integrals() const {
 
 bool DFTHCHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
-  return true;  // Factorized container is always restricted (spin-free)
+  return true;  // DFTHC container is always restricted (spin-free)
 }
 
 bool DFTHCHamiltonianContainer::is_valid() const {
@@ -245,7 +243,7 @@ void DFTHCHamiltonianContainer::_build_two_body_cache() const {
       std::make_shared<Eigen::VectorXd>(reconstruct_two_body_integrals());
 }
 
-// === Factorized-specific accessors ===
+// === DFTHC-specific accessors ===
 
 const Eigen::VectorXd& DFTHCHamiltonianContainer::get_u_matrices() const {
   return _u;
@@ -569,11 +567,11 @@ void DFTHCHamiltonianContainer::validate_integral_dimensions() const {
   size_t C = get_num_copies();
   if (R == 0) {
     throw std::invalid_argument(
-        "Factorized Hamiltonian must have at least one rank, got 0.");
+        "DFTHC Hamiltonian must have at least one rank, got 0.");
   }
   if (C == 0) {
     throw std::invalid_argument(
-        "Factorized Hamiltonian must have at least one copy, got 0.");
+        "DFTHC Hamiltonian must have at least one copy, got 0.");
   }
   if (norb == 0) {
     throw std::invalid_argument("Number of active orbitals must be positive.");
@@ -587,7 +585,7 @@ void DFTHCHamiltonianContainer::validate_integral_dimensions() const {
   size_t B = static_cast<size_t>(_u.size()) / (R * norb);
   if (B == 0) {
     throw std::invalid_argument(
-        "Factorized Hamiltonian must have at least one basis, got 0.");
+        "DFTHC Hamiltonian must have at least one basis, got 0.");
   }
   size_t expected_w = R * B * C;
   if (static_cast<size_t>(_w.size()) != expected_w) {

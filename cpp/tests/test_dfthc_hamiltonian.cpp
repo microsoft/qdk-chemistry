@@ -10,14 +10,14 @@
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/dfthc.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <stdexcept>
 
 using namespace qdk::chemistry::data;
 
-// synthetic factorized Hamiltonian (N=2, R=1, B=2, C=1)
-class FactorizedHamiltonianTest : public ::testing::Test {
+// synthetic DFTHC Hamiltonian (N=2, R=1, B=2, C=1)
+class DFTHCHamiltonianTest : public ::testing::Test {
  protected:
   void SetUp() override {
     N = 2;
@@ -60,7 +60,7 @@ class FactorizedHamiltonianTest : public ::testing::Test {
   std::shared_ptr<Orbitals> orbitals;
 };
 
-TEST_F(FactorizedHamiltonianTest, Properties) {
+TEST_F(DFTHCHamiltonianTest, Properties) {
   auto container = make_container();
 
   // Factorization dimensions.
@@ -118,7 +118,7 @@ TEST_F(FactorizedHamiltonianTest, Properties) {
   EXPECT_NEAR(container->get_lambda(), 2.0800000000000001, 1e-12);
 }
 
-TEST_F(FactorizedHamiltonianTest, OrdinaryDFConstructorMatchesGeneral) {
+TEST_F(DFTHCHamiltonianTest, OrdinaryDFConstructorMatchesGeneral) {
   Eigen::VectorXd u_df(2 * N * N);
   u_df << 0.8, 0.6, -0.6, 0.8, 1.0, 0.0, 0.0, 1.0;
   Eigen::VectorXd w_df(2 * N);
@@ -156,7 +156,7 @@ TEST_F(FactorizedHamiltonianTest, OrdinaryDFConstructorMatchesGeneral) {
             Hamiltonian(general.clone()).content_hash());
 }
 
-TEST_F(FactorizedHamiltonianTest, OrdinaryDFConstructorRejectsInvalidShapes) {
+TEST_F(DFTHCHamiltonianTest, OrdinaryDFConstructorRejectsInvalidShapes) {
   for (Eigen::Index length : {0, 3, 6}) {
     EXPECT_THROW(
         DFTHCHamiltonianContainer(one_body, Eigen::VectorXd::Zero(length), w,
@@ -193,7 +193,7 @@ TEST_F(FactorizedHamiltonianTest, OrdinaryDFConstructorRejectsInvalidShapes) {
                std::invalid_argument);
 }
 
-TEST_F(FactorizedHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
+TEST_F(DFTHCHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
   // The fixture is R=1, C=1, where every stride into the flattened [R,B,N] and
   // [R,B,C] buffers collapses onto the same offset, so an indexing mistake
   // cannot show up. Use two ranks and two copies, and check against loops
@@ -275,7 +275,7 @@ TEST_F(FactorizedHamiltonianTest, MultipleRanksAndCopiesReconstructAndIndex) {
   }
 }
 
-TEST_F(FactorizedHamiltonianTest, ElementAgreesWithTheCachedTensor) {
+TEST_F(DFTHCHamiltonianTest, ElementAgreesWithTheCachedTensor) {
   // get_two_body_element() has two branches: a direct contraction taken while
   // the dense cache is cold, and a lookup into the cache once it is warm. They
   // are separate code paths with different summation orders, so read every
@@ -338,7 +338,7 @@ TEST_F(FactorizedHamiltonianTest, ElementAgreesWithTheCachedTensor) {
   }
 }
 
-TEST_F(FactorizedHamiltonianTest, RejectsAnUnnormalizedBasisRow) {
+TEST_F(DFTHCHamiltonianTest, RejectsAnUnnormalizedBasisRow) {
   // get_lambda() reads the W entries as eigenvalues of the fragment, which
   // only holds when each basis row is a unit vector. Nothing downstream can
   // notice the difference, so construction has to reject it.
@@ -349,7 +349,7 @@ TEST_F(FactorizedHamiltonianTest, RejectsAnUnnormalizedBasisRow) {
                std::invalid_argument);
 }
 
-TEST_F(FactorizedHamiltonianTest, RejectsNonFiniteFactorEntries) {
+TEST_F(DFTHCHamiltonianTest, RejectsNonFiniteFactorEntries) {
   // NaN compares false against the normalization tolerance, so it would pass
   // that check unless the factors are rejected as non-finite first.
   const double nan = std::numeric_limits<double>::quiet_NaN();
@@ -379,7 +379,7 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonFiniteFactorEntries) {
                                             core_energy, inactive_fock));
 }
 
-TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
+TEST_F(DFTHCHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
   auto reference = make_container();
   const Eigen::VectorXd h2_ref = reference->reconstruct_two_body_integrals();
   const Eigen::MatrixXd h1_ref = reference->get_h1_prime();
@@ -406,7 +406,7 @@ TEST_F(FactorizedHamiltonianTest, IdentityWeightDoesNotChangeTwoBodyTensor) {
   }
 }
 
-TEST_F(FactorizedHamiltonianTest, H1PrimeMatchesClosedForm) {
+TEST_F(DFTHCHamiltonianTest, H1PrimeMatchesClosedForm) {
   Eigen::MatrixXd m = Eigen::MatrixXd::Zero(N, N);
   for (size_t b = 0; b < B; ++b) {
     Eigen::VectorXd ub(N);
@@ -436,7 +436,7 @@ TEST_F(FactorizedHamiltonianTest, H1PrimeMatchesClosedForm) {
   }
 }
 
-TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
+TEST_F(DFTHCHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
   Eigen::MatrixXd asymmetric = one_body;
   asymmetric(0, 1) = 0.3;
   asymmetric(1, 0) = -1.5;
@@ -461,7 +461,7 @@ TEST_F(FactorizedHamiltonianTest, RejectsNonSymmetricH1PrimeInLambda) {
   EXPECT_THROW(container.get_lambda(), std::runtime_error);
 }
 
-TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
+TEST_F(DFTHCHamiltonianTest, JSONRoundTripViaHamiltonian) {
   Hamiltonian h(make_container());
   nlohmann::json j = h.to_json();
   auto h2 = Hamiltonian::from_json(j);
@@ -479,7 +479,7 @@ TEST_F(FactorizedHamiltonianTest, JSONRoundTripViaHamiltonian) {
   EXPECT_TRUE(h1a.isApprox(h2_h1a));
 }
 
-TEST_F(FactorizedHamiltonianTest, RejectsInconsistentSerializedShape) {
+TEST_F(DFTHCHamiltonianTest, RejectsInconsistentSerializedShape) {
   const nlohmann::json serialized = make_container()->to_json();
 
   auto wrong_ranks = serialized;
@@ -498,7 +498,7 @@ TEST_F(FactorizedHamiltonianTest, RejectsInconsistentSerializedShape) {
                std::invalid_argument);
 }
 
-TEST_F(FactorizedHamiltonianTest, HDF5FileRoundTripViaHamiltonian) {
+TEST_F(DFTHCHamiltonianTest, HDF5FileRoundTripViaHamiltonian) {
   Hamiltonian h(make_container());
 
   std::string filename = "test_factorized.hamiltonian.h5";

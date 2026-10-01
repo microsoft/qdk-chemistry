@@ -12,7 +12,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/dfthc.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 
 #include "path_utils.hpp"
@@ -999,7 +999,7 @@ Restricted, spin-free, double-factorized tensor hypercontraction Hamiltonian.
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
                HamiltonianType>(),
       R"(
-Constructor for a factorized Hamiltonian.
+Constructor for a DFTHC Hamiltonian.
 
 Args:
     one_body_integrals (numpy.ndarray): One-body integrals with shape [N,N] over the N active spatial orbitals.

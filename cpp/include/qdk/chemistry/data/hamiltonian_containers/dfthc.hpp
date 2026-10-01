@@ -26,7 +26,7 @@ namespace qdk::chemistry::data {
 class DFTHCHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Construct a restricted factorized Hamiltonian.
+   * @brief Construct a restricted DFTHC Hamiltonian.
    *
    * @param one_body_integrals One-body integrals [N,N] over the N active
    *        spatial orbitals.
