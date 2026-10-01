@@ -623,8 +623,10 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         PlaquetteStepWithPinkAngle(params, params.hoppingAngle, systems);
     }
 
-    /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's extra work, which
-    /// changes no simulated result. Remove this function and every branch on it to revert.
+    /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's conventional-model
+    /// terms. These differ from the simulated symmetric model by a particle-number-dependent phase,
+    /// which is global only inside a fixed-particle-number sector. Remove this function and every
+    /// branch on it to revert.
     internal function UsesLegacyCosts() : Bool {
         return UsesLegacyCostsWithOverride(false);
     }
