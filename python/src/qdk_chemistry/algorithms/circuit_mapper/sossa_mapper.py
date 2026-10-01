@@ -18,6 +18,7 @@ from .base import CircuitMapper
 __all__: list[str] = [
     "SOSSAMapper",
     "SOSSAMapperSettings",
+    "rotation_batch_size_for",
 ]
 
 #: Maps the ``rotation_lookup_method`` setting onto the Q# ``RotationLookup*`` constants.
@@ -26,6 +27,47 @@ _ROTATION_LOOKUP_METHODS: dict[str, int] = {
     "select_swap": 1,
     "dirty_select_swap": 2,
 }
+
+
+def rotation_batch_size_for(num_orbitals: int, num_batches: int) -> int:
+    r"""Smallest ``rotation_batch_size`` that still streams the angles in ``num_batches`` passes.
+
+    Choose the number of passes, not :math:`\lambda`. Streaming costs one extra table
+    lookup per batch in each direction, so its Toffoli penalty tracks the batch count
+    :math:`\lceil (N-1)/\lambda \rceil` rather than :math:`\lambda` itself. That makes the
+    penalty a step function: every :math:`\lambda` inside one step buys exactly the same
+    Toffolis, while the rotation register keeps growing at ``b_rot`` qubits per angle. Only
+    the smallest member of each step can be optimal, and that is what this returns.
+
+    Picking :math:`\lambda` directly is how callers pay width for nothing. At Fe2S2-20
+    (:math:`N = 20`, so 19 angles) :math:`\lambda = 16` and :math:`\lambda = 10` both make
+    two passes and cost an identical 60.3M Toffolis, but 16 costs 13 more qubits.
+
+    Args:
+        num_orbitals: Number of spatial orbitals :math:`N`. SELECT holds :math:`N - 1`
+            Givens angles, so that is the number being split into batches.
+        num_batches: Number of passes over the angle table, from 1 to :math:`N - 1`. One
+            pass keeps every angle resident, which is the cheapest in Toffolis and the
+            widest in qubits; more passes trade the one against the other.
+
+    Returns:
+        The value to pass as the ``rotation_batch_size`` setting.
+
+    Raises:
+        ValueError: If ``num_orbitals`` is below 2, or ``num_batches`` is outside
+            ``1..num_orbitals - 1``.
+
+    """
+    if num_orbitals < 2:
+        raise ValueError(f"num_orbitals must be at least 2 to hold a rotation angle, got {num_orbitals}")
+
+    num_angles = num_orbitals - 1
+    if not 1 <= num_batches <= num_angles:
+        raise ValueError(
+            f"num_batches must be between 1 and {num_angles} for {num_orbitals} orbitals, got {num_batches}"
+        )
+
+    return -(-num_angles // num_batches)
 
 
 class SOSSAMapperSettings(Settings):
@@ -68,9 +110,11 @@ class SOSSAMapperSettings(Settings):
             "0 keeps all N-1 angles resident, which is the cheapest in Toffolis. Smaller values "
             "stream the angles in batches, cutting the rotation register to lambda*b_rot qubits "
             "at the cost of one extra table lookup per batch, in each direction. The Toffoli "
-            "penalty follows the batch count, ceil((N-1)/lambda), while the qubit saving stops "
-            "once another stage of the walk becomes the widest, so prefer the largest value that "
-            "meets the qubit budget; shrinking further costs Toffolis for no extra saving.",
+            "penalty follows the batch count, ceil((N-1)/lambda), so it is a step function of "
+            "lambda: every lambda within one step costs the same Toffolis while the register "
+            "keeps growing, making all but the smallest of them strictly wasteful. Choose the "
+            "number of batches and derive lambda with rotation_batch_size_for() rather than "
+            "setting lambda directly.",
             (0, 4096),
         )
         self._set_default(

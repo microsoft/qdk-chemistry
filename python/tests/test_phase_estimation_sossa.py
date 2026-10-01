@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import rotation_batch_size_for
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
 from qdk_chemistry.data import (
@@ -735,11 +736,16 @@ class TestSOSSAQPEScope:
 class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
-    # Widest rotation batch that still reaches the floor the peak width can be pushed to.
-    # At this shape (N = 20, so 19 angles) every lambda from 1 to 15 lands on the same qubit
-    # count, because a different stage of the walk becomes the widest one; 16 and above give
-    # part of the saving back. Measured, not derived, so it is a constant rather than a
-    # formula -- the tests below only rely on it being on the flat part of that curve.
+    # Largest rotation batch that still reaches the floor the peak width can be pushed to.
+    # Derived rather than swept: width falls linearly as angles leave the register, so
+    # W(lambda) = max(W_floor, W_resident - (A - lambda) * b_rot) over A = N - 1 = 19 angles,
+    # and the two branches meet at A - ceil((W_resident - W_floor) / b_rot), here
+    # 19 - ceil((486 - 427) / 15) = 15. Two estimates fix it, not a sweep.
+    #
+    # Note this is where the floor *ends*, not the batch to recommend. Being the largest
+    # lambda that still reaches the floor makes it the one with no headroom left, and
+    # lambda = 10 buys the identical circuit; see
+    # ``test_only_the_smallest_batch_of_each_step_is_worth_choosing``.
     _FE2S2_BATCH_KNEE = 15
 
     @staticmethod
@@ -807,16 +813,19 @@ class TestSOSSAResourceEstimation:
             "streaming reloads each batch to uncompute, so it cannot be free in Toffolis"
         )
 
-    def test_the_tightest_batch_is_dominated_by_the_widest_one_that_saves_as_much(self):
-        """Over-shrinking the batch buys nothing, which is the whole usage guidance.
+    def test_the_tightest_batch_is_dominated_by_larger_ones_at_the_same_width(self):
+        """Over-shrinking the batch buys nothing, which is half of the usage guidance.
 
         The Toffoli penalty tracks the *number* of batches, ``ceil((N - 1) / lambda)``, not
         ``lambda`` itself, while the qubit saving stops once some other stage sets the peak
         width. At Fe2S2 that makes every ``lambda`` from 1 up to the knee land on the same
-        qubit count, so the smallest one is strictly worse than the largest one -- same
-        width, several times the Toffolis. Callers should pick the *widest* batch that meets
-        their qubit budget, and a regression that inverted this relation would quietly push
-        them the other way.
+        qubit count, so the smallest one is strictly worse than larger ones that reach the
+        same floor -- same width, several times the Toffolis.
+
+        The other half is that growing ``lambda`` past the point where the batch count drops
+        is equally pointless, so the rule is neither "smallest" nor "widest": pick the batch
+        count and derive ``lambda``. See
+        ``test_only_the_smallest_batch_of_each_step_is_worth_choosing``.
         """
         tight_qubits, tight_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1)
         knee_qubits, knee_toffolis = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
@@ -827,6 +836,35 @@ class TestSOSSAResourceEstimation:
         assert knee_toffolis < tight_toffolis, (
             f"lambda=1 should cost strictly more than lambda={self._FE2S2_BATCH_KNEE} for the "
             f"same width: {tight_toffolis} vs {knee_toffolis}"
+        )
+
+    def test_only_the_smallest_batch_of_each_step_is_worth_choosing(self):
+        """The usage guidance: choose the batch *count*, then derive lambda from it.
+
+        Streaming reloads once per batch, so the Toffoli cost is a function of
+        ``ceil((N - 1) / lambda)`` and not of ``lambda``, which makes it a step function --
+        every ``lambda`` from 10 to 15 splits the 19 angles into two passes and costs
+        exactly the same. The rotation register, though, keeps growing at ``b_rot`` qubits
+        per angle right across that step. So every ``lambda`` above the smallest in its step
+        pays width for nothing.
+
+        That is why "take the widest batch that fits your budget" is the wrong rule and
+        ``rotation_batch_size_for`` exists: given room for 440 qubits that rule hands back
+        ``lambda = 16``, which is strictly worse than the ``lambda = 10`` derived here --
+        13 qubits more for an identical circuit.
+        """
+        smallest = rotation_batch_size_for(20, num_batches=2)
+        assert smallest == 10, f"two passes over 19 angles needs batches of 10, got {smallest}"
+
+        smallest_qubits, smallest_toffolis = self._fe2s2_logical_counts(rotation_batch_size=smallest)
+        wider_qubits, wider_toffolis = self._fe2s2_logical_counts(rotation_batch_size=16)
+
+        assert wider_toffolis == smallest_toffolis, (
+            f"lambda=16 still makes two passes, so it cannot undercut lambda={smallest}: "
+            f"{wider_toffolis} vs {smallest_toffolis}"
+        )
+        assert wider_qubits > smallest_qubits, (
+            f"the six extra angles lambda=16 keeps resident have to cost width: {wider_qubits} vs {smallest_qubits}"
         )
 
     def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):

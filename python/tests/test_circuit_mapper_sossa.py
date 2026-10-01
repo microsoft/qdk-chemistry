@@ -13,7 +13,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _ROTATION_LOOKUP_METHODS
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _ROTATION_LOOKUP_METHODS, rotation_batch_size_for
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -833,3 +833,54 @@ class TestSOSSAWalkLogicalCounts:
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
+
+
+class TestRotationBatchSizeFor:
+    """The arithmetic behind the ``rotation_batch_size`` guidance."""
+
+    @pytest.mark.parametrize(
+        ("num_batches", "expected"),
+        [(1, 19), (2, 10), (3, 7), (4, 5), (5, 4), (7, 3), (10, 2), (19, 1)],
+    )
+    def test_it_returns_the_smallest_batch_making_that_many_passes(self, num_batches, expected):
+        """Each answer must make exactly the requested number of passes, and one less must not.
+
+        The helper only earns its place if it lands on the *first* lambda of each step, so
+        both halves are checked: the value makes ``num_batches`` passes, and shrinking it by
+        one spills into another pass. The N = 20 shape is the one the resource-estimation
+        pins use.
+        """
+        num_angles = 19
+        batch = rotation_batch_size_for(20, num_batches)
+
+        assert batch == expected
+        assert math.ceil(num_angles / batch) == num_batches
+        assert batch == 1 or math.ceil(num_angles / (batch - 1)) > num_batches, (
+            f"lambda={batch} is not the smallest making {num_batches} passes"
+        )
+
+    def test_one_batch_keeps_every_angle_resident(self):
+        """One pass has to mean the whole table, which is the setting's resident behaviour."""
+        for num_orbitals in (2, 8, 20, 57):
+            assert rotation_batch_size_for(num_orbitals, 1) == num_orbitals - 1
+
+    @pytest.mark.parametrize(
+        ("num_orbitals", "num_batches", "match"),
+        [
+            (1, 1, "num_orbitals must be at least 2"),
+            (0, 1, "num_orbitals must be at least 2"),
+            (20, 0, "num_batches must be between 1 and 19"),
+            (20, 20, "num_batches must be between 1 and 19"),
+            (20, -1, "num_batches must be between 1 and 19"),
+            (2, 2, "num_batches must be between 1 and 1"),
+        ],
+    )
+    def test_it_rejects_shapes_that_cannot_be_batched(self, num_orbitals, num_batches, match):
+        """Out-of-range passes are a caller bug, not something to silently round into range.
+
+        The message is matched as well as the type, because the two bounds fail for
+        different reasons and silently swapping which one fired would hide a sign or
+        off-by-one error in the other.
+        """
+        with pytest.raises(ValueError, match=match):
+            rotation_batch_size_for(num_orbitals, num_batches)
