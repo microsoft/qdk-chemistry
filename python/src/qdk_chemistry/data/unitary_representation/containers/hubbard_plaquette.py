@@ -149,8 +149,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         """
         if not isinstance(other, HubbardPlaquetteContainer):
             raise TypeError(
-                f"A plaquette evolution composes with another plaquette evolution, not with a "
-                f"{type(other).__name__}."
+                f"A plaquette evolution composes with another plaquette evolution, not with a {type(other).__name__}."
             )
 
         body = ("width", "height", "interaction_angle", "hopping_angle", "constant_shift", "scale")
