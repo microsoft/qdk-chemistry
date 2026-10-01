@@ -310,6 +310,20 @@ TEST_F(LatticeGeometryTest, IntegerLayoutSurvivesSerialization) {
   dependent["integer_embedding"]["primitive_vectors"] = {{1.0, 0.0},
                                                          {-2.0, 0.0}};
   EXPECT_THROW(LatticeGeometry::from_json(dependent), std::invalid_argument);
+  // Open directions the patch spans need nonzero, independent vectors too.
+  const auto open = LatticeGeometry::square(2, 2).to_json();
+  for (const auto& vectors :
+       std::vector<nlohmann::json>{{{0.0, 0.0}, {0.0, 1.0}},
+                                   {{1.0, 0.0}, {0.0, 0.0}},
+                                   {{1.0, 0.0}, {-2.0, 0.0}}}) {
+    SCOPED_TRACE(vectors.dump());
+    auto degenerate = open;
+    degenerate["integer_embedding"]["primitive_vectors"] = vectors;
+    EXPECT_THROW(LatticeGeometry::from_json(degenerate), std::invalid_argument);
+  }
+  // A chain never spans its second direction, which stays zero.
+  EXPECT_NO_THROW(
+      LatticeGeometry::from_json(LatticeGeometry::chain(3).to_json()));
   for (const auto& layout : std::vector<nlohmann::json>{
            {{"version", json.at("version")}},
            {{"version", json.at("version")}, {"positions", {{0.0, 0.0}}}}}) {

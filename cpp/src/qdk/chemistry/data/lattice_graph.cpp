@@ -48,13 +48,13 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(j, i, t);
 }
 
-// An axis and its negation describe one unoriented bond class; this is the
-// sign rule of canonical_axis in lattice_geometry.cpp.
-static void orient_axis(Eigen::RowVectorXd& axis, double tolerance) {
-  if (axis[0] < -tolerance ||
-      (std::abs(axis[0]) <= tolerance && axis[1] < 0.0)) {
-    axis = -axis;
-  }
+// An axis and its negation describe one unoriented bond class.
+static double axis_distance(const Eigen::RowVector2d& lhs,
+                            const Eigen::RowVector2d& rhs) {
+  const Eigen::RowVector2d difference = lhs - rhs;
+  const Eigen::RowVector2d sum = lhs + rhs;
+  return std::min(blas::nrm2(2, difference.data(), 1),
+                  blas::nrm2(2, sum.data(), 1));
 }
 
 static std::vector<BondFlavorDefinition> prepare_flavors(
@@ -77,22 +77,18 @@ static std::vector<BondFlavorDefinition> prepare_flavors(
             8.0 * std::numeric_limits<double>::epsilon()) {
       throw std::invalid_argument("Bond-flavor axis normalization failed.");
     }
-    orient_axis(definition.axis, tolerance);
   }
   std::sort(definitions.begin(), definitions.end(),
             [](const auto& lhs, const auto& rhs) {
-              if (lhs.shell != rhs.shell) return lhs.shell < rhs.shell;
-              return std::lexicographical_compare(
-                  lhs.axis.data(), lhs.axis.data() + lhs.axis.size(),
-                  rhs.axis.data(), rhs.axis.data() + rhs.axis.size());
+              return std::tie(lhs.shell, lhs.flavor) <
+                     std::tie(rhs.shell, rhs.flavor);
             });
   for (std::size_t i = 0; i < definitions.size(); ++i) {
     for (std::size_t j = i + 1;
          j < definitions.size() && definitions[j].shell == definitions[i].shell;
          ++j) {
-      const Eigen::RowVectorXd difference =
-          definitions[i].axis - definitions[j].axis;
-      if (blas::nrm2(difference.size(), difference.data(), 1) <= tolerance) {
+      if (axis_distance(definitions[i].axis, definitions[j].axis) <=
+          tolerance) {
         throw std::invalid_argument(
             "Each shell-axis class may have only one bond flavor.");
       }
@@ -101,14 +97,12 @@ static std::vector<BondFlavorDefinition> prepare_flavors(
   return definitions;
 }
 
-// Geometry bond axes already have the orient_axis representative sign.
 static std::optional<BondFlavorId> flavor_of(
     const std::vector<BondFlavorDefinition>& definitions, std::uint64_t shell,
     const Eigen::RowVector2d& axis, double tolerance) {
   for (const auto& definition : definitions) {
     if (definition.shell != shell) continue;
-    const Eigen::RowVector2d difference = definition.axis - axis;
-    if (blas::nrm2(2, difference.data(), 1) <= tolerance) {
+    if (axis_distance(definition.axis, axis) <= tolerance) {
       return definition.flavor;
     }
   }
@@ -260,22 +254,24 @@ void LatticeGraph::_validate_coloring() const {
       throw std::invalid_argument("Invalid lattice edge coloring.");
     }
   }
-  std::size_t matched = 0;
+  // A pair stored in either direction has one color, keyed with i < j.
+  std::set<std::pair<std::uint64_t, std::uint64_t>> colored_pairs;
   for (int k = 0; k < adjacency_.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(adjacency_, k); it;
          ++it) {
-      if (it.row() >= it.col()) continue;
-      const bool colored =
-          _edge_coloring->contains({static_cast<std::uint64_t>(it.row()),
-                                    static_cast<std::uint64_t>(it.col())});
+      if (it.row() == it.col()) continue;
+      const auto row = static_cast<std::uint64_t>(it.row());
+      const auto col = static_cast<std::uint64_t>(it.col());
+      const std::pair pair{std::min(row, col), std::max(row, col)};
+      const bool colored = _edge_coloring->contains(pair);
       if (it.value() != 0.0 && !colored) {
         throw std::invalid_argument("Adjacency edge missing from coloring.");
       }
-      matched += colored;
+      if (colored) colored_pairs.insert(pair);
     }
   }
   // Topology colorings may include stored zero-weight edges, but not new edges.
-  if (matched != _edge_coloring->size()) {
+  if (colored_pairs.size() != _edge_coloring->size()) {
     throw std::invalid_argument(
         "Coloring contains an edge outside the topology.");
   }

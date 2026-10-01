@@ -251,8 +251,6 @@ std::vector<LatticeGeometry::ShellBond> LatticeGeometry::_shell_bonds(
   }
 
   std::vector<ShellBond> result;
-  std::set<std::tuple<std::uint64_t, std::uint64_t, std::int64_t, std::int64_t>>
-      seen;
   for (const auto& stencil : stencils) {
     if (!requested_shells.contains(stencil.shell)) continue;
     const int y_begin = embedding.periodic_y ? 0 : std::max(0, -stencil.dy);
@@ -263,31 +261,16 @@ std::vector<LatticeGeometry::ShellBond> LatticeGeometry::_shell_bonds(
         embedding.nx - (embedding.periodic_x ? 0 : std::max(0, stencil.dx));
     for (int y = y_begin; y < y_end; ++y) {
       for (int x = x_begin; x < x_end; ++x) {
-        const auto [target_x, image_x] =
-            embedding.periodic_x ? wrap(x + stencil.dx, embedding.nx)
-                                 : std::pair{x + stencil.dx, 0};
-        const auto [target_y, image_y] =
-            embedding.periodic_y ? wrap(y + stencil.dy, embedding.ny)
-                                 : std::pair{y + stencil.dy, 0};
+        const int target_x = embedding.periodic_x
+                                 ? wrap(x + stencil.dx, embedding.nx).first
+                                 : x + stencil.dx;
+        const int target_y = embedding.periodic_y
+                                 ? wrap(y + stencil.dy, embedding.ny).first
+                                 : y + stencil.dy;
         int site_i = site_at(x, y, stencil.source_basis);
         int site_j = site_at(target_x, target_y, stencil.target_basis);
         if (site_i < 0 || site_j < 0) continue;
-        std::array<std::int64_t, 2> image_shift{};
-        if (embedding.periodic_x) image_shift[0] = image_x;
-        if (embedding.periodic_y) {
-          image_shift[embedding.periodic_x ? 1 : 0] = image_y;
-        }
-        if (site_i > site_j || (site_i == site_j &&
-                                (image_shift[0] < 0 || (image_shift[0] == 0 &&
-                                                        image_shift[1] < 0)))) {
-          std::swap(site_i, site_j);
-          image_shift[0] = -image_shift[0];
-          image_shift[1] = -image_shift[1];
-        }
-        if (!seen.emplace(site_i, site_j, image_shift[0], image_shift[1])
-                 .second) {
-          continue;
-        }
+        if (site_i > site_j) std::swap(site_i, site_j);
         result.push_back({static_cast<std::uint64_t>(site_i),
                           static_cast<std::uint64_t>(site_j), stencil.shell,
                           stencil.axis});
@@ -372,9 +355,12 @@ LatticeGeometry LatticeGeometry::_from_integer_embedding(
     if (periodic_y) periods->row(periodic_x ? 1 : 0) = ny * a2;
   }
   // Serialized layouts are external input; reject degenerate supercells.
+  // Every direction the patch spans needs a nonzero, independent vector.
+  const bool spans_x = periodic_x || nx > 1;
+  const bool spans_y = periodic_y || ny > 1;
   if (!positions.allFinite() || (periods && !periods->allFinite()) ||
-      (periodic_x && a1.isZero(0.0)) || (periodic_y && a2.isZero(0.0)) ||
-      (periodic_x && periodic_y && a1.x() * a2.y() == a1.y() * a2.x())) {
+      (spans_x && a1.isZero(0.0)) || (spans_y && a2.isZero(0.0)) ||
+      (spans_x && spans_y && a1.x() * a2.y() == a1.y() * a2.x())) {
     throw std::invalid_argument("Invalid lattice integer embedding.");
   }
   return LatticeGeometry(

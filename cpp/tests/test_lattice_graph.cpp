@@ -351,6 +351,21 @@ TEST_F(LatticeGraphTest, OppositeFlavorAxesMatchAboveHalfRootTwoTolerance) {
   }
 }
 
+TEST_F(LatticeGraphTest, NearbyFlavorAxesMatchAcrossSignFlipPoint) {
+  // A per-axis sign rule at tolerance 0.3 flips the bond axis but not the
+  // flavor axis, although they lie about 0.02 apart.
+  auto json = LatticeGeometry::square(3, 3).to_json();
+  json["integer_embedding"]["primitive_vectors"] = {{0.29, -0.957},
+                                                    {0.957, 0.29}};
+  const auto labels =
+      LatticeGraph::from_geometry(LatticeGeometry::from_json(json), {1},
+                                  {{1, Vec2(0.31, -0.95), flavor_x}}, 1.0, 0.3)
+          .edge_labels();
+  EXPECT_TRUE(std::any_of(labels.begin(), labels.end(), [](const auto& item) {
+    return item.second.flavor == flavor_x;
+  }));
+}
+
 TEST_F(LatticeGraphTest, JsonRejectsMalformedEdgeLabels) {
   const auto valid =
       LatticeGraph::from_geometry(LatticeGeometry::chain(3)).to_json();
@@ -647,6 +662,15 @@ TEST_F(LatticeGraphTest, DirectedAdjacencyConstructorsAndRoundTrips) {
       LatticeGraph::from_sparse_matrix(Eigen::SparseMatrix<double>(2, 3)),
       std::invalid_argument);
   EXPECT_THROW((LatticeGraph(edges, 2)), std::invalid_argument);
+}
+
+TEST_F(LatticeGraphTest, PermutedDirectedColoringStaysValid) {
+  auto json = LatticeGraph(std::map<Edge, double>{{{0, 1}, 1.0}}, 2).to_json();
+  json["edge_coloring"] = {{0, 1, 0}};
+  const auto graph = LatticeGraph::from_json(json);
+  const auto permuted = LatticeGraph::permute(graph, {1, 0});
+  EXPECT_DOUBLE_EQ(permuted.weight(1, 0), 1.0);
+  EXPECT_EQ(permuted.edge_coloring(), graph.edge_coloring());
 }
 
 TEST_F(LatticeGraphTest, TriangularConstructor) {
