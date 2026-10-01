@@ -84,7 +84,8 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             raise ValueError(f"max_hwp_batch_size must be -1 or a positive integer. Got {max_batch_size}.")
 
         # Only the lattice shape, the layer angles and the batch cap cross the boundary; the
-        # tilings and spin pairings are derived in Q# from the shape.
+        # tilings and spin pairings are derived in Q# from the shape. The scalar shift stays
+        # classical and is applied by HubbardPlaquetteContainer.eigenvalue_from_phase.
         params = QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
             width=container.width,
             height=container.height,
