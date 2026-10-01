@@ -668,14 +668,25 @@ class TestForcedLegacyPlaquetteCosts:
         width = height = 2
         time, t, u, repetitions = 0.05, 1.0, 4.0, 1
         delta = time / repetitions
-        kwargs = {
-            "interaction_angle": 0.25 * u * delta,
-            "hopping_angle": 2.0 * t * delta,
-            "repetitions": repetitions,
-            "controlled": controlled,
-        }
-        normal = _plaquette_operation_from_angles(width, height, **kwargs)
-        forced = _plaquette_operation_from_angles(width, height, **kwargs, forced_legacy=True)
+        interaction_angle = 0.25 * u * delta
+        hopping_angle = 2.0 * t * delta
+        normal = _plaquette_operation_from_angles(
+            width,
+            height,
+            interaction_angle=interaction_angle,
+            hopping_angle=hopping_angle,
+            repetitions=repetitions,
+            controlled=controlled,
+        )
+        forced = _plaquette_operation_from_angles(
+            width,
+            height,
+            interaction_angle=interaction_angle,
+            hopping_angle=hopping_angle,
+            repetitions=repetitions,
+            controlled=controlled,
+            forced_legacy=True,
+        )
         return normal, forced, time, u, width * height
 
     def test_forced_legacy_plaquette_matches_normal_in_fixed_particle_number_sectors(self):
