@@ -20,6 +20,7 @@ with :math:`F` the flipped-qubit set, :math:`n_Y` the number of :math:`Y` factor
 from __future__ import annotations
 
 import math
+import re
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -107,8 +108,6 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
         if not math.isfinite(tolerance) or tolerance < 0.0:
             raise ValueError(f"tolerance must be finite and non-negative, got {tolerance}.")
 
-        flipped_qubits = str.maketrans("IXYZ", "0110")
-
         coefficients = np.asarray(qubit_hamiltonian.coefficients)
         if np.any(np.iscomplex(coefficients)) or not np.all(np.isfinite(coefficients)):
             raise ValueError(
@@ -117,19 +116,20 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             )
 
         container = qubit_hamiltonian.get_container()
-        supports: Iterable[tuple[int, int]]
+        supports: Iterable[tuple[frozenset[int], int]]
         if isinstance(container, SparsePauliDecompositionContainer):
             supports = (
-                (sum(1 << qubit for qubit, axis in word if axis != "Z"), sum(axis == "Y" for _, axis in word))
+                (frozenset(qubit for qubit, axis in word if axis != "Z"), sum(axis == "Y" for _, axis in word))
                 for word, _ in container.iter_sparse_terms()
             )
         else:
             # Labels follow the Qiskit convention: the rightmost character is qubit 0.
             supports = (
-                (int(label.translate(flipped_qubits), 2), label.count("Y")) for label in qubit_hamiltonian.pauli_strings
+                (frozenset(len(label) - 1 - match.start() for match in re.finditer("[XY]", label)), label.count("Y"))
+                for label in qubit_hamiltonian.pauli_strings
             )
 
-        buckets: dict[tuple[int, int], list[tuple[int, float]]] = {}
+        buckets: dict[tuple[frozenset[int], int], list[tuple[int, float]]] = {}
         for index, (flipped, n_y) in enumerate(supports):
             # Same-support strings anticommute exactly when their Y counts differ in parity.
             # Within one parity i^{n_Y} is a common factor of 1 or i times this sign.
@@ -147,10 +147,9 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             # would otherwise strand a remainder that the set as a whole cancels.
             residual = math.fsum(amplitude for _, amplitude in entries)
             if abs(residual) > tolerance:
-                qubits = [qubit for qubit in range(flipped.bit_length()) if flipped >> qubit & 1]
                 raise ValueError(
                     f"VacuumAnnihilatingTermGrouper cannot group terms {[index for index, _ in entries]}: "
-                    f"they flip qubits {qubits} and leave an uncancelled vacuum amplitude of {residual:.3g}. "
+                    f"they flip qubits {sorted(flipped)} and leave an uncancelled vacuum amplitude of {residual:.3g}. "
                     "The Hamiltonian does not annihilate |0...0> in this encoding, so no ordering of "
                     "its Pauli strings preserves the vacuum under Trotterisation."
                 )
@@ -168,4 +167,4 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
 
         ordered = ([diagonal] if diagonal else []) + sorted(groups, key=lambda group: group[0])
         partition = FlatPartition(strategy="vacuum_annihilating", groups=tuple(ordered))
-        return self._with_partition(qubit_hamiltonian, partition, qubit_hamiltonian.tapering)
+        return self._with_partition(qubit_hamiltonian, partition)

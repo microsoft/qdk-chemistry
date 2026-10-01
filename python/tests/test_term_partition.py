@@ -193,14 +193,20 @@ class TestTermGrouperRegistry:
         assert out.encoding == qh.encoding
         assert out.fermion_mode_order == qh.fermion_mode_order
 
-    def test_vacuum_annihilating_preserves_tapering(self):
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity", "vacuum_annihilating"])
+    def test_grouping_preserves_tapering(self, strategy, sparse):
         """Grouping changes neither the qubits nor the mapped sector."""
-        qh = QubitOperator(
-            ["XX", "YY", "ZZ"],
-            np.array([1.0, 1.0, 3.0]),
-            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
+        tapering = TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1))
+        coefficients = np.array([1.0, 1.0, 3.0])
+        qh = (
+            QubitOperator.from_sparse_terms(
+                2, [{0: "X", 1: "X"}, {0: "Y", 1: "Y"}, {0: "Z", 1: "Z"}], coefficients, tapering=tapering
+            )
+            if sparse
+            else QubitOperator(["XX", "YY", "ZZ"], coefficients, tapering=tapering)
         )
-        out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+        out = registry.create("term_grouper", strategy).run(qh)
 
         assert out.tapering == qh.tapering
 
@@ -291,8 +297,18 @@ class TestVacuumAnnihilatingTermGrouper:
         """Unbalanced coefficients leave a remainder that no grouping can annihilate."""
         qh = QubitOperator(["XX", "YY", "XX"], np.array([0.5, 0.5, 0.25]))
 
-        with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
+        with pytest.raises(ValueError, match=r"flip qubits \[0, 1\].*uncancelled vacuum amplitude"):
             registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+    def test_sparse_keys_hold_flipped_qubits_not_a_register_bitmask(self):
+        """The last qubit of a 2**32-qubit register groups like any other."""
+        last = 2**32 - 1
+        qh = QubitOperator.from_sparse_terms(
+            2**32, [{0: "X", last: "X"}, {0: "Y", last: "Y"}, {5: "Z"}], np.array([0.5, 0.5, 1.0])
+        )
+        out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+        assert out.term_partition.groups == ((2,), (0, 1))
 
     def test_diagonal_group_may_leave_a_vacuum_phase(self):
         """Diagonal terms only phase the vacuum, which a consumer can correct for."""

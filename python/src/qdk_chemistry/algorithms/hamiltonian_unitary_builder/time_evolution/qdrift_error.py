@@ -73,8 +73,9 @@ def qdrift_samples_campbell(
             f"got the {container_type!r} representation."
         )
 
-    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
-    lambda_norm = sum(abs(coeff) for _, coeff in real_terms)
+    # Only magnitudes enter the bound, so skip building Pauli labels.
+    real_parts = (complex(coeff).real for coeff in hamiltonian.coefficients)
+    lambda_norm = sum(abs(real) for real in real_parts if abs(real) > weight_threshold)
 
     if lambda_norm == 0.0 or time == 0.0:
         return 1
