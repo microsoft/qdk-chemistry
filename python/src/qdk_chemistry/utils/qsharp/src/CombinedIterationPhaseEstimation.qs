@@ -17,13 +17,12 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
     /// It therefore requires a target that supports the Adaptive profile (mid-circuit
     /// measurement and classical control) and is not compatible with Base-profile-only
     /// targets.
-    /// Each round is repeated `shotsPerBit` times and the bit fed forward is the majority
-    /// of those repetitions, so one execution of this circuit consumes the same number of
-    /// controlled-unitary applications as a full pass of the per-round path and yields the
-    /// same estimator -- the difference is that it needs a single job rather than one per bit.
+    /// Each round is repeated `midShots` times and the bit fed forward is the majority
+    /// of those repetitions. Each whole-circuit execution returns one voted bitstring;
+    /// the executor independently controls how many times the whole circuit runs.
     /// # Parameters
     /// - `numBits`: Number of phase bits to estimate.
-    /// - `shotsPerBit`: Repetitions of each round that are majority-voted to decide its bit.
+    /// - `midShots`: Repetitions of each round that are majority-voted to decide its bit.
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `controlledUnitary`: An array of controlled-U^(2^k) operations, one per round.
     ///    Each operation already encapsulates the correct power, so the unitary builder's
@@ -36,15 +35,15 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
     /// highest power `2^(numBits - 1)`, matching the round ordering of the per-round builder.
     operation RunFullIQPE(
         numBits : Int,
-        shotsPerBit : Int,
+        midShots : Int,
         statePrep : Qubit[] => Unit,
         controlledUnitary : ((Qubit, Qubit[]) => Unit)[],
         phaseQubit : Int,
         systems : Int[],
         numAncillaQubits : Int,
     ) : Result[] {
-        if shotsPerBit < 1 {
-            fail "shotsPerBit must be a positive integer.";
+        if midShots < 1 {
+            fail "midShots must be a positive integer.";
         }
         use qs = Qubit[Length(systems) + 1 + numAncillaQubits];
         let phase = qs[phaseQubit];
@@ -60,7 +59,7 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
 
         for k in 0..numBits - 1 {
             mutable ones = 0;
-            for _ in 1..shotsPerBit {
+            for _ in 1..midShots {
                 statePrep(system);
 
                 within {
@@ -87,7 +86,7 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
             // Majority vote, matching the host's tie-to-zero rule. The vote is encoded back
             // onto the now-idle phase qubit so the round still reports a Result, keeping the
             // return shape and bit ordering identical to the per-round path.
-            if ones * 2 > shotsPerBit {
+            if ones * 2 > midShots {
                 X(phase);
             }
             set results w/= k <- MResetZ(phase);

@@ -247,6 +247,22 @@ The four workspace settings ``subscription_id``, ``resource_group``, ``workspace
 Set ``output_dir`` and ``attachments`` together to keep backend artifacts such as traces or raw output.
 The saved paths and the job ID appear in the executor metadata.
 
+Failed shots with error or unexpected outcomes are excluded from ``bitstring_counts`` and logged as a warning.
+The entire shot is excluded even if only one measurement contains an error; failed shots are not counted as qubit loss.
+``total_shots`` remains the requested shot count. For a returned executor result, use
+``result.get_executor_metadata()["failed_shots"]`` for the failed-shot count and
+``result.get_executor_metadata()["failed_results"]`` for the original failed histogram
+entries (outcomes and counts, keyed by the SDK's display labels). The full histogram remains
+available under ``"results"``.
+
+If no clean measurement shots remain, the backend raises
+``azure.quantum.job.JobFailedWithResultsError``, even if the service reports the job as
+succeeded. Its ``get_failure_results()`` method provides the same metadata, including the
+job ID, failed outcomes, and paths of saved attachments. No automatic retry is performed.
+Combined IQPE requests ``shots_per_bit`` whole-circuit executions, with ``mid_shots``
+internal samples per phase bit in each execution. If no clean whole-circuit shots remain,
+there is no phase or energy to decode.
+
 .. note::
    Custom :class:`~qdk_chemistry.data.QuantumErrorProfile` noise models are not supported. Configure noise through the target's own ``input_params`` instead.
 

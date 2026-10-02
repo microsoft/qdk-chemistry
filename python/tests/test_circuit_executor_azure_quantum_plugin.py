@@ -8,12 +8,16 @@
 from __future__ import annotations
 
 import json
+from unittest.mock import Mock
 
 import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile, SettingTypeMismatch
 
 pytest.importorskip("azure.quantum", reason="azure-quantum is not installed")
+
+from azure.quantum._client.models import JobDetails
+from azure.quantum.job import Job, JobFailedWithResultsError
 
 from qdk_chemistry.plugins.azure_quantum import circuit_executor
 from qdk_chemistry.plugins.azure_quantum.circuit_executor import (
@@ -30,10 +34,11 @@ class TestProcessRawResults:
         """Scalar outcomes from single-bit measurements are accepted."""
         raw_results = {"0": {"outcome": 0, "count": 3}, "1": {"outcome": 1, "count": 2}}
 
-        counts, loss = _process_raw_results(raw_results)
+        counts, loss, failures = _process_raw_results(raw_results)
 
         assert counts == {"0": 3, "1": 2}
         assert loss == {}
+        assert failures == {}
 
     def test_sequence_outcomes_with_loss(self):
         """Sequence outcomes are reversed to qubit-0-rightmost order, with loss marked 'L'."""
@@ -42,10 +47,78 @@ class TestProcessRawResults:
             "[1, -]": {"outcome": [1, "-"], "count": 2},
         }
 
-        counts, loss = _process_raw_results(raw_results)
+        counts, loss, failures = _process_raw_results(raw_results)
 
         assert counts == {"10": 3}
         assert loss == {"L1": 2}
+        assert failures == {}
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [
+            {"Error": {"Name": "ExecutionFailure"}},
+            [0, {"Error": {"Name": "ExecutionFailure"}}, 1],
+            (1, {"Error": {"Name": "ExecutionFailure"}}),
+            [{"Error": {"Name": "FirstError"}}, {"Error": {"Name": "SecondError"}}],
+            ["-", {"Error": {"Name": "ExecutionFailure"}}],
+            {"Error": {"Name": "OtherFailure", "Message": "Shot execution failed"}},
+            2,
+            "unexpected",
+            None,
+            [],
+            [[0, 1]],
+        ],
+    )
+    def test_failed_outcomes_are_recorded_separately(self, outcome):
+        """An invalid outcome excludes the entire shot, preserving its raw details and count."""
+        raw_results = {
+            "valid": {"outcome": [0, 1], "count": 3},
+            "loss": {"outcome": [1, "-"], "count": 2},
+            "failed": {"outcome": outcome, "count": 5},
+        }
+
+        counts, loss, failures = _process_raw_results(raw_results)
+
+        assert counts == {"10": 3}
+        assert loss == {"L1": 2}
+        assert failures == {"failed": {"outcome": outcome, "count": 5}}
+        assert sum(counts.values()) + sum(loss.values()) + sum(e["count"] for e in failures.values()) == 10
+
+    def test_failure_from_sdk_histogram(self, monkeypatch):
+        """Parse an actual SDK histogram with only its blob download mocked."""
+        outcome = {"Error": {"Name": "ExecutionFailure"}}
+        payload = {
+            "DataFormat": "microsoft.quantum-results.v2",
+            "Results": [
+                {
+                    "Histogram": [
+                        {"Display": "[0, 1]", "Outcome": [0, 1], "Count": 3},
+                        {"Display": "ExecutionFailure", "Outcome": outcome, "Count": 2},
+                    ]
+                }
+            ],
+        }
+        job = Job(
+            workspace=Mock(),
+            job_details=JobDetails(
+                id="fake-job-id",
+                name="test",
+                container_uri="fake-container-uri",
+                input_data_format="qir.v1",
+                provider_id="test",
+                target="test",
+                status="Succeeded",
+                output_data_format="microsoft.quantum-results.v2",
+                output_data_uri="fake-results-uri",
+            ),
+        )
+        monkeypatch.setattr(job, "download_data", lambda _uri: json.dumps(payload).encode("utf-8"))
+
+        counts, loss, failures = _process_raw_results(job.get_results_histogram())
+
+        assert counts == {"10": 3}
+        assert loss == {}
+        assert failures == {"ExecutionFailure": {"outcome": outcome, "count": 2}}
 
 
 @pytest.fixture
@@ -284,6 +357,73 @@ class TestAzureQuantumBackendSubmission:
         metadata = result.get_executor_metadata()
         assert metadata["job_id"] == fake_workspace.last.target.job.id
         assert metadata["saved_attachments"] == []
+        assert metadata["failed_shots"] == 0
+        assert metadata["failed_results"] == {}
+
+    def test_mixed_results_preserve_failures(self, fake_workspace, configured_executor, test_circuit_1, monkeypatch):
+        """Clean results survive failed shots, whose counts and details remain inspectable."""
+        raw_results = {
+            "valid": {"outcome": [0, 1], "count": 6},
+            "loss": {"outcome": [1, "-"], "count": 1},
+            "failed": {"outcome": {"Error": {"Name": "ExecutionFailure"}}, "count": 3},
+        }
+        monkeypatch.setattr(_FakeJob, "get_results_histogram", lambda _self: raw_results)
+        warnings: list[str] = []
+        monkeypatch.setattr(circuit_executor.Logger, "warn", warnings.append)
+
+        result = configured_executor.run(test_circuit_1, shots=10)
+
+        assert result.bitstring_counts == {"10": 6}
+        assert result.loss_bitstrings == {"L1": 1}
+        assert result.total_shots == 10
+        metadata = result.get_executor_metadata()
+        assert metadata["job_id"] == fake_workspace.last.target.job.id
+        assert metadata["results"] == raw_results
+        assert metadata["failed_shots"] == 3
+        assert metadata["failed_results"] == {"failed": raw_results["failed"]}
+        assert len(warnings) == 1
+        assert "3 failed shots" in warnings[0]
+        assert "ExecutionFailure" in warnings[0]
+
+    @pytest.mark.parametrize("remaining_outcome", [None, [1, "-"]])
+    def test_no_clean_results_raise_with_failure_details(
+        self, fake_workspace, configured_executor, test_circuit_1, monkeypatch, tmp_path, *, remaining_outcome
+    ):
+        """An unusable job stops estimation but retains job details and downloaded attachments."""
+        raw_results = {
+            "failed": {"outcome": {"Error": {"Name": "ExecutionFailure"}}, "count": 1},
+        }
+        if remaining_outcome is not None:
+            raw_results["loss"] = {"outcome": remaining_outcome, "count": 1}
+        monkeypatch.setattr(_FakeJob, "get_results_histogram", lambda _self: raw_results)
+        configured_executor.settings().set("output_dir", str(tmp_path))
+        configured_executor.settings().set("attachments", ["output"])
+
+        with pytest.raises(JobFailedWithResultsError, match="no valid measurement results") as error:
+            configured_executor.run(test_circuit_1, shots=len(raw_results))
+
+        details = error.value.get_failure_results()
+        assert details["job_id"] == fake_workspace.last.target.job.id
+        assert details["failed_shots"] == 1
+        assert details["failed_results"] == {"failed": raw_results["failed"]}
+        assert details["results"] == raw_results
+        assert details["saved_attachments"] == [str(tmp_path / "output")]
+        assert (tmp_path / "output").read_bytes() == b"contents of output"
+        assert "ExecutionFailure" in str(error.value)
+
+    @pytest.mark.parametrize("raw_results", [{}, {"loss": {"outcome": [1, "-"], "count": 2}}])
+    def test_empty_or_loss_only_results_raise(
+        self, fake_workspace, configured_executor, test_circuit_1, monkeypatch, raw_results
+    ):
+        """No clean counts must never be passed to an estimator as usable measurements."""
+        monkeypatch.setattr(_FakeJob, "get_results_histogram", lambda _self: raw_results)
+
+        with pytest.raises(JobFailedWithResultsError, match="no valid measurement results") as error:
+            configured_executor.run(test_circuit_1, shots=2)
+
+        details = error.value.get_failure_results()
+        assert details["job_id"] == fake_workspace.last.target.job.id
+        assert details["results"] == raw_results
 
     def test_attachments_saved(self, fake_workspace, test_circuit_1: Circuit, tmp_path):
         """Named attachments are written into output_dir."""

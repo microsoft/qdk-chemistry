@@ -93,6 +93,14 @@ def four_qubit_circuit_problem() -> CircuitBuilderProblem:
 class TestIterativeQpeCircuitBuilder:
     """Tests for the iterative phase estimation circuit builder."""
 
+    def test_mid_shots_setting(self) -> None:
+        """Internal repetitions have their own builder setting, independent of executor shots."""
+        assert QdkIterativeQpeCircuitBuilder().settings().get("mid_shots") == 3
+        builder = QdkIterativeQpeCircuitBuilder(mid_shots=5)
+        assert builder.settings().get("mid_shots") == 5
+        builder_keys = builder.settings().keys()
+        assert "shots_per_bit" not in builder_keys
+
     def test_generates_correct_number_of_circuits(
         self,
         two_qubit_circuit_problem: CircuitBuilderProblem,

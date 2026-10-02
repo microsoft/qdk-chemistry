@@ -40,7 +40,8 @@ class IterativePhaseEstimationSettings(PhaseEstimationSettings):
         """Initialize the settings for Iterative Phase Estimation.
 
         Args:
-            shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
+            shots_per_bit: Executions per phase bit, or whole-circuit executions when the builder
+                enables ``combine_iterations``.
 
         """
         super().__init__()
@@ -48,7 +49,7 @@ class IterativePhaseEstimationSettings(PhaseEstimationSettings):
             "shots_per_bit",
             "int",
             3,
-            "The number of shots to execute per measuring a bit in the iterative phase estimation.",
+            "Executions per phase bit, or whole-circuit executions when combine_iterations is enabled.",
         )
 
 
@@ -62,7 +63,9 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Initialize IterativePhaseEstimation with the given settings.
 
         Args:
-            shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
+            shots_per_bit: Executions per phase bit, or whole-circuit executions when the builder
+                enables ``combine_iterations``. The builder's ``mid_shots`` independently controls
+                internal repetitions per bit in combined mode.
 
         """
         Logger.trace_entering()
@@ -87,7 +90,14 @@ class IterativePhaseEstimation(PhaseEstimation):
         Returns:
             QpeResult: The result of the phase estimation.
 
+        Raises:
+            ValueError: If ``shots_per_bit`` or ``num_bits`` is not positive.
+
         """
+        shots_per_bit = self.settings().get("shots_per_bit")
+        if shots_per_bit <= 0:
+            raise ValueError(f"shots_per_bit must be a positive integer. Got {shots_per_bit}.")
+
         # Create nested algorithms from settings
         circuit_executor = self._create_nested("circuit_executor")
         circuit_builder = self._create_nested("qpe_circuit_builder")
@@ -135,9 +145,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_circuit = iteration_circuits[0]
             Logger.info(f"Iteration {iteration + 1} / {num_bits}: circuit generated.")
             # Run the iteration circuit on the simulator
-            executor_data = circuit_executor.run(
-                iteration_circuit, shots=self.settings().get("shots_per_bit"), noise=noise
-            )
+            executor_data = circuit_executor.run(iteration_circuit, shots=shots_per_bit, noise=noise)
             bitstring_result = executor_data.bitstring_counts
             Logger.info(f"Iteration {iteration + 1} / {num_bits}: Measurement results: {bitstring_result}")
             # Phase bit through majority vote
@@ -173,11 +181,11 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Run the full IQPE as a single circuit with in-circuit classical feedback.
 
         The builder produces one circuit that performs every round using mid-circuit
-        measurement and classical feed-forward, repeating each round ``shots_per_bit``
-        times and feeding the majority bit forward. That makes one execution equivalent
-        to a full pass of the per-bit loop, in both estimator and controlled-unitary
-        count, so the circuit is executed once and its single bitstring decoded as
-        ``int(bitstring_msb_first, 2) / 2**num_bits``.
+        measurement and classical feed-forward, repeating each round ``mid_shots``
+        times and feeding the majority bit forward. The estimator's ``shots_per_bit``
+        controls how many times the executor runs that whole circuit. The most frequent
+        voted bitstring is decoded as ``int(bitstring_msb_first, 2) / 2**num_bits``;
+        ties are resolved by choosing the lexicographically smallest bitstring.
 
         Args:
             circuit_builder: The iterative circuit builder configured with ``combine_iterations`` enabled.
@@ -195,20 +203,21 @@ class IterativePhaseEstimation(PhaseEstimation):
             RuntimeError: If the executor returns no measurement results.
 
         """
-        # The vote happens inside the circuit, so hand the builder the shot budget and run once.
-        circuit_builder.settings().update("shots_per_bit", self.settings().get("shots_per_bit"))
+        shots = self.settings().get("shots_per_bit")
+        mid_shots = circuit_builder.settings().get("mid_shots")
         full_circuit = circuit_builder._run_impl(  # noqa: SLF001
             state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
         )[0]
-        Logger.info("Running full IQPE as a single circuit with in-circuit classical feedback.")
-        executor_data = circuit_executor.run(full_circuit, shots=1, noise=noise)
+        Logger.info(
+            f"combine_iterations=True: shots_per_bit={shots} runs the whole circuit {shots} times; "
+            f"mid_shots={mid_shots} samples per phase bit in each execution."
+        )
+        executor_data = circuit_executor.run(full_circuit, shots=shots, noise=noise)
         counts = executor_data.bitstring_counts
         if not counts:
             raise RuntimeError("No measurement results returned from the circuit executor.")
 
-        # One execution yields one voted bitstring; take the most frequent so a backend that
-        # returns more than the requested shot still decodes. The executor returns each
-        # bitstring MSB-first (same convention as the standard QPE path).
+        # Each shot returns one voted bitstring, MSB-first, as in the standard QPE path.
         bitstring_msb_first = min(counts, key=lambda b: (-counts[b], b))
         Logger.info(f"Voted bitstring (MSB first): {bitstring_msb_first}")
         phase_fraction = int(bitstring_msb_first, 2) / (2**num_bits)

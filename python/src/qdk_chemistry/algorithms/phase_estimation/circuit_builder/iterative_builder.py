@@ -42,7 +42,7 @@ class QdkIterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "Build the full IQPE as one circuit with in-circuit classical feedback (needs an Adaptive target).",
         )
         self._set_default(
-            "shots_per_bit",
+            "mid_shots",
             "int",
             3,
             "Repetitions of each round that the combined circuit majority-votes to decide its bit."
@@ -66,7 +66,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         unitary_builder: AlgorithmRef | None = None,
         controlled_circuit_mapper: AlgorithmRef | None = None,
         combine_iterations: bool = False,
-        shots_per_bit: int = 3,
+        mid_shots: int = 3,
     ):
         """Initialize the IterativeQpeCircuitBuilder.
 
@@ -77,9 +77,9 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             combine_iterations: Build the full IQPE as one circuit with in-circuit classical feedback. Default to False.
-            shots_per_bit: Repetitions of each round that the combined circuit majority-votes to decide its bit.
-                Only used when ``combine_iterations`` is enabled; ``IterativePhaseEstimation`` overrides it with
-                its own ``shots_per_bit`` when it drives this builder. Default to 3.
+            mid_shots: Repetitions of each round that the combined circuit majority-votes to decide its bit.
+                Only used when ``combine_iterations`` is enabled. Independent of the estimator's
+                ``shots_per_bit``, which controls whole-circuit executions in combined mode. Default to 3.
 
         """
         Logger.trace_entering()
@@ -93,7 +93,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         if controlled_circuit_mapper is not None:
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
         self._settings.set("combine_iterations", combine_iterations)
-        self._settings.set("shots_per_bit", shots_per_bit)
+        self._settings.set("mid_shots", mid_shots)
 
     def _run_impl(
         self,
@@ -119,7 +119,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             ``combine_iterations`` is enabled).
 
         Raises:
-            ValueError: If ``num_iteration`` >= ``num_bits``, or if ``shots_per_bit`` is not positive.
+            ValueError: If ``num_iteration`` >= ``num_bits``, or if ``mid_shots`` is not positive in combined mode.
 
         """
         num_bits = self.settings().get("num_bits")
@@ -127,14 +127,14 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
         if self.settings().get("combine_iterations"):
-            shots_per_bit = self.settings().get("shots_per_bit")
-            if shots_per_bit <= 0:
-                raise ValueError(f"shots_per_bit must be a positive integer. Got {shots_per_bit}.")
+            mid_shots = self.settings().get("mid_shots")
+            if mid_shots <= 0:
+                raise ValueError(f"mid_shots must be a positive integer. Got {mid_shots}.")
             circuit = self._create_full_circuit(
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,
                 num_bits=num_bits,
-                shots_per_bit=shots_per_bit,
+                mid_shots=mid_shots,
             )
             Logger.info("Built single full IQPE circuit with in-circuit classical feedback.")
             return [circuit]
@@ -244,7 +244,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         qubit_hamiltonian: QubitOperator,
         *,
         num_bits: int,
-        shots_per_bit: int,
+        mid_shots: int,
     ) -> Circuit:
         """Construct a single circuit implementing the full IQPE with in-circuit feedback.
 
@@ -253,16 +253,15 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         measurement and classical feed-forward apply the phase correction on device, so
         the resulting circuit requires an Adaptive-profile target.
 
-        Each round is repeated ``shots_per_bit`` times inside the circuit and its bit is the
-        majority of those repetitions, mirroring the per-bit path's vote. One execution of
-        the result therefore costs the same controlled-unitary applications as a full
-        per-bit pass, and ``shots_per_bit`` keeps its meaning.
+        Each round is repeated ``mid_shots`` times inside the circuit and its bit is the
+        majority of those repetitions. This internal repetition count is independent of
+        how many times the executor runs the whole circuit.
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             num_bits: Total number of phase bits to measure.
-            shots_per_bit: Repetitions of each round that are majority-voted to decide its bit.
+            mid_shots: Repetitions of each round that are majority-voted to decide its bit.
 
         Returns:
             A quantum circuit implementing the full IQPE run.
@@ -301,7 +300,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         iterative_parameters = {
             "numBits": num_bits,
-            "shotsPerBit": shots_per_bit,
+            "midShots": mid_shots,
             "statePrep": state_preparation._qsharp_op,  # noqa: SLF001
             "controlledUnitary": [c._qsharp_op for c in ctrl_unitary_circuits],  # noqa: SLF001
             "phaseQubit": 0,

@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from azure.quantum import Workspace
+from azure.quantum.job import JobFailedWithResultsError
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
@@ -34,7 +35,9 @@ _WORKSPACE_SETTINGS = ("subscription_id", "resource_group", "workspace_name", "t
 _OUTCOME_BITS = {0: "0", 1: "1", "0": "0", "1": "1", "-": "L"}
 
 
-def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, int]]:
+def _process_raw_results(
+    raw_results: dict[str, dict[str, Any]],
+) -> tuple[dict[str, int], dict[str, int], dict[str, dict[str, Any]]]:
     """Convert Azure Quantum job histogram results to integer bitstring counts.
 
     Uses the ``microsoft.quantum-results.v2`` histogram format returned by
@@ -43,6 +46,9 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
     measurements, with values of ``0``, ``1``, or ``'-'`` (a lost qubit). Shots
     with at least one lost qubit are separated into a loss dictionary, with
     ``'-'`` rendered as ``'L'`` to match the loss-bitstring convention.
+    Error outcomes, unexpected values, and empty outcomes exclude the entire shot
+    from both dictionaries. Their original
+    histogram entries are retained separately, keyed by the SDK's display label.
 
     The ``outcome`` list is ordered first-recorded-result-first; it is reversed
     here so the emitted bitstrings follow the qubit-0-rightmost convention used
@@ -52,33 +58,35 @@ def _process_raw_results(raw_results: dict) -> tuple[dict[str, int], dict[str, i
         raw_results: Histogram results from ``job.get_results_histogram()``.
 
     Returns:
-        A ``(bitstring_counts, loss_bitstrings)`` tuple of label-to-count dicts; the latter is empty absent qubit loss.
-
-    Raises:
-        ValueError: If an outcome holds anything other than ``0``, ``1``, or ``'-'``, which
-            is how a failed or malformed shot arrives.
+        A ``(bitstring_counts, loss_bitstrings, failed_results)`` tuple. The first
+        two dictionaries contain bitstring counts; the third contains the original
+        outcome and count for each failed histogram entry.
 
     """
     counts: dict[str, int] = {}
     loss: dict[str, int] = {}
-    for entry in raw_results.values():
+    failures: dict[str, dict[str, Any]] = {}
+    for label, entry in raw_results.items():
         outcome = entry["outcome"]
         count = entry["count"]
         outcome_bits = outcome if isinstance(outcome, list | tuple) else (outcome,)
+        if not outcome_bits:
+            failures[label] = entry
+            continue
         chars = []
         for bit in reversed(outcome_bits):
             char = _OUTCOME_BITS.get(bit) if isinstance(bit, int | str) else None
             if char is None:
-                raise ValueError(
-                    f"Unexpected measurement outcome {bit!r} in Azure Quantum results; expected 0, 1, or '-'."
-                )
+                failures[label] = entry
+                break
             chars.append(char)
-        key = "".join(chars)
-        if "L" in key:
-            loss[key] = loss.get(key, 0) + count
         else:
-            counts[key] = counts.get(key, 0) + count
-    return counts, loss
+            key = "".join(chars)
+            if "L" in key:
+                loss[key] = loss.get(key, 0) + count
+            else:
+                counts[key] = counts.get(key, 0) + count
+    return counts, loss, failures
 
 
 class AzureQuantumBackendSettings(Settings):
@@ -173,12 +181,15 @@ class AzureQuantumBackend(CircuitExecutor):
             noise: Not used. Configure noise through the target's own ``input_params``.
 
         Returns:
-            CircuitExecutorData: Object containing the results of the circuit execution.
+            CircuitExecutorData: Clean bitstring counts, qubit-loss counts, and metadata
+                including ``failed_shots`` and the original ``failed_results`` entries.
 
         Raises:
             NotImplementedError: If a noise profile is supplied.
             ValueError: If the connection settings are incomplete, the target name does not
                 resolve to a single target, or ``input_params`` is not a JSON object.
+            JobFailedWithResultsError: If no clean measurement shots remain. The job metadata
+                and failure details are available through ``get_failure_results()``.
 
         """
         Logger.trace_entering()
@@ -234,16 +245,31 @@ class AzureQuantumBackend(CircuitExecutor):
 
         saved_attachments = self._save_attachments(job)
 
-        bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
+        bitstring_counts, loss_bitstrings, failed_results = _process_raw_results(raw_results)
+        failed_shots = sum(entry["count"] for entry in failed_results.values())
+        metadata = {
+            "results": raw_results,
+            "job_id": job.id,
+            "saved_attachments": saved_attachments,
+            "failed_shots": failed_shots,
+            "failed_results": failed_results,
+        }
+        if failed_results:
+            Logger.warn(
+                f"Azure Quantum job {job.id} returned {failed_shots} failed shots; "
+                f"excluding them from measurement counts. Failed results: {failed_results}"
+            )
+        if not sum(bitstring_counts.values()):
+            raise JobFailedWithResultsError(
+                f"Azure Quantum job {job.id} returned no valid measurement results "
+                f"({failed_shots} failed shots, {sum(loss_bitstrings.values())} loss shots).",
+                metadata,
+            )
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
-            executor_metadata={
-                "results": raw_results,
-                "job_id": job.id,
-                "saved_attachments": saved_attachments,
-            },
+            executor_metadata=metadata,
             loss_bitstrings=loss_bitstrings or None,
         )
 

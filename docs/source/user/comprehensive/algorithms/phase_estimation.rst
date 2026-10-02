@@ -167,9 +167,16 @@ where :math:`b_k` is the bit measured at iteration :math:`k`.
 Each bit is determined by a majority vote over multiple circuit executions (controlled by ``shots_per_bit``).
 
 When the circuit builder sets ``combine_iterations``, every round instead runs inside a single circuit that
-repeats the round ``shots_per_bit`` times, majority-votes the bit on the device, and feeds it forward. The
-estimator and the number of controlled-unitary applications match the per-bit path; only the number of
-submitted jobs differs, which is what makes the mode useful on hardware backends.
+repeats the round ``mid_shots`` times, majority-votes the bit on the device, and feeds it forward.
+The estimator's ``shots_per_bit`` independently controls how many times that whole circuit executes.
+Each execution returns one voted bitstring; the most frequent complete bitstring determines the phase,
+with ties resolved by choosing the lexicographically smallest bitstring.
+An informational log reports both counts before execution.
+
+For example, ``mid_shots=3`` and ``shots_per_bit=5`` execute the whole circuit five times,
+with three internal samples per phase bit in each execution. This is one executor submission
+with five shots, not five separate submissions. To retain the previous single-execution behavior,
+set the estimator's ``shots_per_bit=1``.
 
 .. rubric:: Settings
 
@@ -185,8 +192,8 @@ Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.iterative_
    * - ``shots_per_bit``
      - int
      - Number of circuit executions per bit, used for majority-vote determination. With
-       ``combine_iterations`` enabled the same vote happens inside the circuit instead.
-       Default is 3.
+       ``combine_iterations`` enabled, number of whole-circuit executions instead; internal
+       voting uses the builder's separate ``mid_shots`` setting. Must be positive. Default is 3.
 
 Nested algorithm configuration (via ``qpe_circuit_builder``):
 
@@ -196,7 +203,23 @@ See :doc:`qpe_circuit_builder` for configuring:
 - ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}` (Trotter)
 - ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
+- ``combine_iterations`` — Build one circuit containing every round (QDK builder only)
+- ``mid_shots`` — Internal samples per bit in each combined execution; default 3 (QDK builder only)
 
+.. code-block:: python
+
+   iqpe = create(
+       "phase_estimation",
+       "qdk_iterative",
+       shots_per_bit=5,
+       qpe_circuit_builder=AlgorithmRef(
+           "qpe_circuit_builder",
+           "qdk_iterative",
+           num_bits=4,
+           combine_iterations=True,
+           mid_shots=3,
+       ),
+   )
 
 .. _standard-qpe-algorithm:
 
