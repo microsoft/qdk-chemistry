@@ -274,7 +274,8 @@ inline int64_t block_two_pass_gs_qr(int64_t N, int64_t K_old,
     }
   }
 
-  // QR orthonormalization for the new block after two-pass GS.
+  // QR orthonormalization for the new block after two-pass GS
+  // Two passes can improve numerical stability with better orthogonality.
   try {
     lobpcgxx::cholqr(N, P, W, LDW, 2);
 
@@ -303,6 +304,7 @@ inline int64_t block_two_pass_gs_qr(int64_t N, int64_t K_old,
       auto* col = W + p * LDW;
 
       if (K_old > 0) {
+        // Two-pass GS to improve numerical stability with better orthogonality.
         for (int rep = 0; rep < 2; ++rep) {
           blas::gemm(blas::Layout::ColMajor, blas::Op::ConjTrans,
                      blas::Op::NoTrans, K_old, 1, N, 1., V_old, LDV_old, col,
@@ -379,7 +381,9 @@ auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
 
   max_m = std::min(max_m, N);
   block_size = std::min(block_size, max_m);
-  n_roots = std::min(n_roots, block_size);
+  if (n_roots > block_size)
+     throw std::runtime_error(
+         "Block Davidson: n_roots must not exceed the available block size");
 
   logger->info("[Block Davidson Eigensolver]:");
   logger->info("  {} = {:6}, {} = {:4}, {} = {:4}, {} = {:4}, {} = {:10.5e}",
@@ -387,7 +391,7 @@ auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
                "RES_TOL", tol);
 
   std::vector<double> V(N * max_m), AV(N * max_m), C(max_m * max_m), LAM(max_m),
-      X_ritz(N * n_roots), AX_ritz(N * n_roots), R(N * n_roots),
+      X_ritz(N * block_size), AX_ritz(N * block_size), R(N * block_size),
       W(N * block_size);
 
   std::copy_n(X, N * block_size, V.data());
@@ -411,21 +415,24 @@ auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
 
     lobpcgxx::rayleigh_ritz(N, m, V.data(), N, AV.data(), N, LAM.data(),
                             C.data(), m);
-
+    // Effective block size allowed by the active subspace dimension.
+    const int64_t eff_block_size = std::min<int64_t>(block_size, m);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, N,
-               n_roots, m, 1., V.data(), N, C.data(), m, 0., X_ritz.data(), N);
+               eff_block_size, m, 1., V.data(), N, C.data(), m, 0.,
+               X_ritz.data(), N);
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, N,
-               n_roots, m, 1., AV.data(), N, C.data(), m, 0., AX_ritz.data(),
-               N);
+               eff_block_size, m, 1., AV.data(), N, C.data(), m, 0.,
+               AX_ritz.data(), N);
 
-    std::copy_n(AX_ritz.data(), N * n_roots, R.data());
-    for (int64_t root = 0; root < n_roots; ++root) {
+    std::copy_n(AX_ritz.data(), N * eff_block_size, R.data());
+    for (int64_t root = 0; root < eff_block_size; ++root) {
       blas::axpy(N, -LAM[root], X_ritz.data() + root * N, 1,
                  R.data() + root * N, 1);
     }
 
+    const int64_t conv_count = std::min<int64_t>(n_roots, eff_block_size);
     double max_res_nrm = 0.0;
-    for (int64_t root = 0; root < n_roots; ++root) {
+    for (int64_t root = 0; root < conv_count; ++root) {
       auto res_nrm = blas::nrm2(N, R.data() + root * N, 1);
       max_res_nrm = std::max(max_res_nrm, res_nrm);
     }
@@ -441,8 +448,9 @@ auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
     }
 
     if (m + block_size > max_m) {
-      std::copy_n(X_ritz.data(), N * n_roots, V.data());
-      m = block_two_pass_gs_qr(N, 0, nullptr, N, n_roots, V.data(), N, 1e-12);
+      std::copy_n(X_ritz.data(), N * eff_block_size, V.data());
+      m = block_two_pass_gs_qr(N, 0, nullptr, N, eff_block_size, V.data(), N,
+                              1e-12);
       if (m < n_roots) {
         throw std::runtime_error(
             "Block Davidson: Restart block rank dropped below n_roots");
@@ -451,7 +459,7 @@ auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
       continue;
     }
 
-    for (int64_t root = 0; root < n_roots; ++root) {
+    for (int64_t root = 0; root < eff_block_size; ++root) {
       auto* wr = W.data() + root * N;
       auto* rr = R.data() + root * N;
       for (int64_t j = 0; j < N; ++j) {
@@ -463,11 +471,12 @@ auto block_davidson(int64_t N, int64_t max_m, int64_t block_size,
       }
     }
 
-    int64_t p =
-        block_two_pass_gs_qr(N, m, V.data(), N, n_roots, W.data(), N, 1e-12);
+    int64_t p = block_two_pass_gs_qr(N, m, V.data(), N, eff_block_size,
+                                    W.data(), N, 1e-12);
     if (p <= 0) {
-      std::copy_n(X_ritz.data(), N * n_roots, V.data());
-      m = block_two_pass_gs_qr(N, 0, nullptr, N, n_roots, V.data(), N, 1e-12);
+      std::copy_n(X_ritz.data(), N * eff_block_size, V.data());
+      m = block_two_pass_gs_qr(N, 0, nullptr, N, eff_block_size, V.data(), N,
+                              1e-12);
       if (m < n_roots) {
         throw std::runtime_error(
             "Block Davidson: Unable to generate independent correction block");
