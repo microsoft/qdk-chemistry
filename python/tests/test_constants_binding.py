@@ -189,7 +189,10 @@ class TestValueConsistency:
         if "2022" not in core_constants.get_current_codata_version():
             pytest.skip("Reference value is CODATA 2022.")
         bohr_magneton_mev_per_tesla = constants.BOHR_MAGNETON / constants.ELEMENTARY_CHARGE * 1.0e3
-        assert bohr_magneton_mev_per_tesla == pytest.approx(5.7883817982e-2, rel=1.0e-10)
+        # Half a unit in the last published digit of the CODATA value.
+        assert bohr_magneton_mev_per_tesla == pytest.approx(
+            5.7883817982e-2, abs=0.5 * float_comparison_absolute_tolerance
+        )
 
     def test_documentation_value_consistency(self):
         """Test that ConstantInfo values match actual constants."""
