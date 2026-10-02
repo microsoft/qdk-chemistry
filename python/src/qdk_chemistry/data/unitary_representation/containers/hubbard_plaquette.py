@@ -126,6 +126,10 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     def combine(self, other: UnitaryContainer) -> UnitaryContainer:
         """Return the evolution that applies this container and then ``other``.
 
+        Angles and scale are compared with :func:`numpy.isclose`, as
+        :class:`PauliProductFormulaContainer` compares scale, so the rounding left by splitting a
+        time interval into steps does not block the merge.
+
         Args:
             other: The container to append after this one.
 
@@ -142,8 +146,10 @@ class HubbardPlaquetteContainer(UnitaryContainer):
                 f"A plaquette evolution composes with another plaquette evolution, not with a {type(other).__name__}."
             )
 
-        body = ("width", "height", "interaction_angle", "hopping_angle", "constant_shift", "scale")
-        differing = [name for name in body if getattr(self, name) != getattr(other, name)]
+        exact = ("width", "height")
+        approximate = ("interaction_angle", "hopping_angle", "constant_shift", "scale")
+        differing = [name for name in exact if getattr(self, name) != getattr(other, name)]
+        differing += [name for name in approximate if not np.isclose(getattr(self, name), getattr(other, name))]
         if differing:
             raise ValueError(
                 "Only repetitions of one body compose into a single plaquette evolution, but the two "
