@@ -34,6 +34,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2DDirty;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
+    import QDKChemistry.Utils.SelectSwap.LookupSelect, QDKChemistry.Utils.SelectSwap.LookupSelectSwap, QDKChemistry.Utils.SelectSwap.LookupDirtySelectSwap;
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
@@ -320,7 +321,7 @@ namespace QDKChemistry.Utils.AliasSampling {
             [],
             numSwapBits,
             [],
-            false
+            LookupSelectSwap()
         );
     }
 
@@ -339,10 +340,17 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///   6. Conditional swap signOrig ↔ signAlt
     ///   7. Z(signOrig) for sign encoding
     ///
-    /// `dirty` is an optional lender for the QROAM swap block: when `useDirtyLookup` is set and
-    /// it holds enough qubits, the lookup borrows them instead of allocating clean scratch, so
-    /// it adds no width. The lender may be entangled with anything and comes back untouched.
-    /// Too short a lender falls back to the clean path rather than faulting.
+    /// `dirty` is an optional lender for the QROAM swap block. `lookupMethod` names the routing
+    /// strategy, from the same `LookupSelect` / `LookupSelectSwap` / `LookupDirtySelectSwap` set
+    /// every other loader in this library uses, so one caller-level choice governs them all:
+    ///
+    ///   * `LookupSelect` loads with a plain unary iteration and allocates nothing. It forces
+    ///     width 0 regardless of `numSwapBits`, since naming the plain load and then asking for
+    ///     a swap network is a contradiction and the method is the more specific request.
+    ///   * `LookupSelectSwap` allocates clean scratch.
+    ///   * `LookupDirtySelectSwap` borrows from `dirty`, which may be entangled with anything
+    ///     and comes back untouched. Too short a lender falls back to the clean path rather
+    ///     than faulting.
     operation ConditionalAliasSamplingPrepareWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
@@ -355,7 +363,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         freeRiderRegister : Qubit[],
         numSwapBits : Int,
         dirty : Qubit[],
-        useDirtyLookup : Bool
+        lookupMethod : Int
     ) : Unit is Adj {
         let nIndexBits = Length(indexRegister);
         let nCoeffs = Length(coefficients[0]);
@@ -379,8 +387,10 @@ namespace QDKChemistry.Utils.AliasSampling {
         // no width at all. It runs `Select` twice and the butterfly four times, so its Toffoli
         // optimum sits at a different width than the clean one -- picking with the clean model
         // would overshoot -- and it is additionally capped by what the caller actually lent.
-        let wantDirty = useDirtyLookup and Length(dirty) > 0;
-        let lambda = if numSwapBits == -1 {
+        let wantDirty = lookupMethod == LookupDirtySelectSwap() and Length(dirty) > 0;
+        let lambda = if lookupMethod == LookupSelect() {
+            0
+        } elif numSwapBits == -1 {
             if wantDirty {
                 ComputeOptimalDirtySwapBits2D(nCond, nInnerData, m, true, Length(dirty))
             } else {
@@ -563,7 +573,7 @@ namespace QDKChemistry.Utils.AliasSampling {
                 freeRiderReg,
                 0,
                 [],
-                false
+                LookupSelectSwap()
             );
         }
     }

@@ -49,6 +49,38 @@ namespace QDKChemistry.Utils.SelectSwap {
         Padded(-2^nRequired, [false, size = Length(data[0])], data)
     }
 
+    //  LOOKUP METHOD TAGS
+    //
+    //  The three ways any table in this library can be loaded. Shared by every loader --
+    //  the streamed rotation batches and the inner alias-sampling tables both select from
+    //  this one set -- so a caller names a routing strategy once and every lookup honours it.
+    //
+    //  Each tag is a strategy, not a guarantee. Every method falls back to `LookupSelect` when
+    //  its own cost model says no network beats the plain load at that shape, so naming a
+    //  method can never cost Toffolis relative to `LookupSelect`; it only grants permission to
+    //  spend qubits if doing so pays.
+
+    /// Plain unary-iteration `Select`: no scratch, no borrowing, `numData - 1` Toffolis.
+    ///
+    /// The widest-register, cheapest-space option, and the floor every other method falls back
+    /// to. Choose it when neither allocatable nor borrowable space exists.
+    function LookupSelect() : Int { 0 }
+
+    /// Clean select-swap (QROAM): allocates scratch to cut Toffolis.
+    ///
+    /// Trades `numBits * (2^k - 1)` fresh qubits for a shallower address iteration. The scratch
+    /// adds to peak width, so this pays when Toffolis bind and width does not.
+    function LookupSelectSwap() : Int { 1 }
+
+    /// Select-swap that borrows live caller qubits instead of allocating scratch.
+    ///
+    /// Costs no width at all, but runs `Select` twice and the butterfly four times, so it pays
+    /// roughly two to three times the Toffolis of the clean network at equal width. It only
+    /// undercuts a plain `Select` on tables large relative to the word -- roughly
+    /// `numData > 32 * numBits` -- and is additionally capped by how much the caller lent.
+    /// At shapes where neither holds it declines and falls back to `LookupSelect`.
+    function LookupDirtySelectSwap() : Int { 2 }
+
     /// Expands a lookup table to the full `2^nRequired` address space the way `Select` reads it.
     ///
     /// `Select` never reads a surplus address as zero; `UnaryIteration` routes anything at or

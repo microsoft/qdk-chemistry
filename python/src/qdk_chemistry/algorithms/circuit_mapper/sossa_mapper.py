@@ -21,8 +21,8 @@ __all__: list[str] = [
     "rotation_batch_size_for",
 ]
 
-#: Maps the ``rotation_lookup_method`` setting onto the Q# ``RotationLookup*`` constants.
-_ROTATION_LOOKUP_METHODS: dict[str, int] = {
+#: Maps the ``lookup_method`` setting onto the Q# ``Lookup*`` constants.
+_LOOKUP_METHODS: dict[str, int] = {
     "select": 0,
     "select_swap": 1,
     "dirty_select_swap": 2,
@@ -118,18 +118,22 @@ class SOSSAMapperSettings(Settings):
             (0, 4096),
         )
         self._set_default(
-            "rotation_lookup_method",
+            "lookup_method",
             "string",
-            "dirty_select_swap",
-            "Loader for streamed rotation batches. 'select' is a plain unary-iteration lookup: "
-            "no extra qubits, Toffoli cost one per table row. 'select_swap' is a clean QROAM "
-            "that can cut those Toffolis but allocates b_rot*lambda*(2^k-1) scratch qubits, "
-            "which partly offsets the register the streaming saved; it only pays at the "
-            "smallest batch sizes, because the scratch scales with the angle word and so with "
-            "the batch. 'dirty_select_swap' runs the same network on borrowed wavefunction "
-            "qubits, so it costs no width at all, but only undercuts 'select' on tables large "
-            "relative to the angle word and otherwise falls back to it. Has no effect unless "
-            "'rotation_batch_size' streams the angles.",
+            "select_swap",
+            "How every QROM table in the walk is routed. One choice governs both lookups -- the "
+            "streamed rotation batches and the inner alias-sampling tables -- because they draw "
+            "on the same budget and a caller who is short of qubits is short of them everywhere. "
+            "'select' is a plain unary-iteration lookup: no extra qubits, Toffoli cost one per "
+            "table row. 'select_swap' is a clean QROAM that cuts those Toffolis but allocates "
+            "scratch proportional to 2^k times the loaded word. 'dirty_select_swap' runs the "
+            "same network on borrowed qubits that are provably idle across the load, so it costs "
+            "no width at all, but it runs Select twice and the butterfly four times and so pays "
+            "roughly two to three times the Toffolis of the clean network at equal width. "
+            "Every method falls back to a plain lookup at shapes where its own cost model says "
+            "no network pays, so naming one can only ever spend qubits that buy something. "
+            "Borrowing in particular only undercuts a plain lookup on tables large relative to "
+            "the loaded word, roughly numData > 32 * numBits.",
             ["select", "select_swap", "dirty_select_swap"],
         )
         self._set_default(
@@ -156,21 +160,6 @@ class SOSSAMapperSettings(Settings):
             "increase in return, and re-derive 'rotation_batch_size' afterwards, since "
             "narrowing PREPARE can put SELECT back on the critical path.",
             (-1, 30),
-        )
-        self._set_default(
-            "inner_prepare_lookup_method",
-            "string",
-            "select_swap",
-            "Where the inner alias-sampling QROAM gets its swap block. 'select_swap' allocates "
-            "clean scratch; 'dirty_select_swap' borrows wavefunction qubits that are provably "
-            "idle for the whole of PREPARE, so the lookup costs no width at all. Borrowing is "
-            "capped by the size of the system register, so it reaches a narrower swap width "
-            "than the clean network would, and it pays roughly twice the Toffolis at equal "
-            "width. It is a qubit-for-Toffoli trade, worth taking only because this lookup "
-            "sets the peak width of the whole walk. Has no effect when "
-            "'inner_prepare_swap_bits' is 0, which loads with a plain Select and allocates no "
-            "swap block either way.",
-            ["select_swap", "dirty_select_swap"],
         )
 
 
@@ -260,7 +249,7 @@ class SOSSAMapper(CircuitMapper):
                 free_rider_data,
                 coeff_bits,
                 self._settings.get("inner_prepare_swap_bits"),
-                self._settings.get("inner_prepare_lookup_method") == "dirty_select_swap",
+                self._lookup_method(),
             )
         if algorithm == "direct":
             return (
@@ -268,6 +257,25 @@ class SOSSAMapper(CircuitMapper):
                 QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp(free_rider_data),
             )
         raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{algorithm}'.")
+
+    def _lookup_method(self) -> int:
+        r"""Resolve ``lookup_method`` to the Q# tag both loaders branch on.
+
+        One setting feeds the streamed rotation batches and the inner alias-sampling
+        tables alike, so a caller cannot accidentally route one table through borrowed
+        qubits and the other through allocated scratch.
+
+        Returns:
+            The Q# ``Lookup*`` constant for the configured method.
+
+        Raises:
+            ValueError: If the configured method is not one of the three known tags.
+
+        """
+        method = self._settings.get("lookup_method")
+        if method not in _LOOKUP_METHODS:
+            raise ValueError(f"Unsupported SOSSA lookup method '{method}'.")
+        return _LOOKUP_METHODS[method]
 
     def _build_select(self, container: SOSSABlockEncodingContainer) -> Any:
         r"""Build the SELECT step.
@@ -293,9 +301,7 @@ class SOSSAMapper(CircuitMapper):
         else:
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
-        lookup_method = self._settings.get("rotation_lookup_method")
-        if lookup_method not in _ROTATION_LOOKUP_METHODS:
-            raise ValueError(f"Unsupported SOSSA rotation lookup method '{lookup_method}'.")
+        lookup_method = self._lookup_method()
 
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
@@ -307,7 +313,7 @@ class SOSSAMapper(CircuitMapper):
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
             "rotationBatchSize": int(self._settings.get("rotation_batch_size")),
-            "rotationLookupMethod": _ROTATION_LOOKUP_METHODS[lookup_method],
+            "rotationLookupMethod": lookup_method,
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
