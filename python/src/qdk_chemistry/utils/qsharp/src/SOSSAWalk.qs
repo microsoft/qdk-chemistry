@@ -46,6 +46,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits, QDKChemistry.Utils.SelectSwap.DirtyQROAMBorrowedQubits, QDKChemistry.Utils.SelectSwap.SelectSwapAliased, QDKChemistry.Utils.SelectSwap.SelectSwapDirty;
+    import QDKChemistry.Utils.SelectSwap.LookupSelect, QDKChemistry.Utils.SelectSwap.LookupSelectSwap, QDKChemistry.Utils.SelectSwap.LookupDirtySelectSwap;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -69,8 +70,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         /// qubits instead of `(N - 1) * b_rot`.
         /// :cite:`Low2026` Appendix E 3.
         rotationBatchSize : Int,
-        /// Which loader a streamed rotation batch uses: `RotationLookupSelect()`,
-        /// `RotationLookupSelectSwap()`, or `RotationLookupDirtySelectSwap()`.
+        /// Which loader a streamed rotation batch uses: `LookupSelect()`,
+        /// `LookupSelectSwap()`, or `LookupDirtySelectSwap()`.
         /// Only consulted when the angles are actually streamed; a resident angle word is
         /// already wide enough that no swap network fits.
         rotationLookupMethod : Int,
@@ -83,27 +84,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         /// (x_o, b) coefficient into, or -1 when the inner PREPARE supplies no sign bit.
         signQubitIndex : Int,
     }
-
-    /// Plain unary-iteration `Select` for a streamed rotation batch.
-    ///
-    /// No scratch, Toffoli cost `numData - 1`. This is the widest-register, cheapest-space
-    /// option and the one to keep when the borrowable or allocatable space is not there.
-    function RotationLookupSelect() : Int { 0 }
-
-    /// Clean select-swap (QROAM) for a streamed rotation batch.
-    ///
-    /// Allocates `bRot * lambda * (2^k - 1)` scratch qubits and pays only the forward load,
-    /// since the batch is erased by measurement. At the Fe2S2 shapes this roughly halves the
-    /// lookup Toffolis for a few dozen qubits -- far less than the resident angle word it
-    /// replaces, so it is usually the best of the three when the space exists.
-    function RotationLookupSelectSwap() : Int { 1 }
-
-    /// Select-swap that borrows live wavefunction qubits instead of allocating scratch.
-    ///
-    /// Costs no extra width at all, but its cost model only undercuts a plain `Select` once
-    /// the table is large relative to the word, roughly `numData > 32 * numBits`, so at small
-    /// tables it correctly declines and falls back to `Select`.
-    function RotationLookupDirtySelectSwap() : Int { 2 }
 
     /// Sizes of the registers packed into the target register handed to a walk callable.
     ///
@@ -697,7 +677,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ) : Unit is Adj + Ctl {
         if numSwapBits == 0 {
             Controlled Select([isSF], (data, address, target));
-        } elif lookupMethod == RotationLookupSelectSwap() {
+        } elif lookupMethod == LookupSelectSwap() {
             Controlled SelectSwapAliased([isSF], (numSwapBits, data, address, target));
         } else {
             Controlled SelectSwapDirty([isSF], (numSwapBits, data, address, dirty, target));
@@ -771,7 +751,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     dqAddress,
                     isSF,
                     [],
-                    RotationLookupSelect(),
+                    LookupSelect(),
                     0,
                     0,
                     rotTarget
@@ -926,9 +906,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         numBits : Int,
         availableDirty : Int,
     ) : Int {
-        if lookupMethod == RotationLookupSelectSwap() {
+        if lookupMethod == LookupSelectSwap() {
             ComputeOptimalSwapBits(numData, numBits)
-        } elif lookupMethod == RotationLookupDirtySelectSwap() {
+        } elif lookupMethod == LookupDirtySelectSwap() {
             ComputeOptimalDirtySwapBits(numData, numBits, availableDirty)
         } else {
             0
@@ -997,7 +977,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         numSwapBits : Int,
-        useDirtyLookup : Bool,
+        lookupMethod : Int,
     ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj {
         let nCoeffs = Length(innerCoefficients[0]);
         // A single inner entry still gets a one-qubit b register, matching MakeInnerPrepareDirect
@@ -1033,7 +1013,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 freeRiderReg,
                 swapBits,
                 dirty,
-                useDirtyLookup
+                lookupMethod
             );
         }
     }
@@ -1112,7 +1092,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         numSwapBits : Int,
-        useDirtyLookup : Bool,
+        lookupMethod : Int,
     ) : (
         ((Qubit[], Qubit[], Qubit[]) => Unit is Adj),
         ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
@@ -1132,7 +1112,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 inlineData,
                 coefficientBitPrecision,
                 numSwapBits,
-                useDirtyLookup
+                lookupMethod
             ),
             MakeFreeRiderLoadOp(separateData)
         )
@@ -1346,7 +1326,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use dqAddress = Qubit[numDQAddressQubits];
         use target = Qubit[Length(sfData[0])];
         // Only a dirty load borrows; the clean paths allocate their own scratch internally.
-        let numDirty = if lookupMethod == RotationLookupDirtySelectSwap() {
+        let numDirty = if lookupMethod == LookupDirtySelectSwap() {
             MaxI(
                 if sfSwapBits == 0 { 0 } else { DirtyQROAMBorrowedQubits(sfSwapBits, Length(sfData[0])) },
                 if dqSwapBits == 0 { 0 } else { DirtyQROAMBorrowedQubits(dqSwapBits, Length(dqData[0])) }

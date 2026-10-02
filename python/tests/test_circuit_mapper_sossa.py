@@ -13,7 +13,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _ROTATION_LOOKUP_METHODS, rotation_batch_size_for
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS, rotation_batch_size_for
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -444,7 +444,7 @@ class TestSOSSAMapper:
                 dq_data,
                 sf_address_qubits,
                 dq_address_qubits,
-                _ROTATION_LOOKUP_METHODS[lookup_method],
+                _LOOKUP_METHODS[lookup_method],
                 sf_swap_bits,
                 dq_swap_bits,
             )
@@ -461,7 +461,7 @@ class TestSOSSAMapper:
 
         for _ in range(_ROUND_TRIP_TRIALS):
             assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
-                sf_data, dq_data, 2, 3, _ROTATION_LOOKUP_METHODS["dirty_select_swap"], 1, dq_swap_bits
+                sf_data, dq_data, 2, 3, _LOOKUP_METHODS["dirty_select_swap"], 1, dq_swap_bits
             )
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
@@ -602,7 +602,7 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
             "rotationBatchSize": rotation_batch_size,
-            "rotationLookupMethod": _ROTATION_LOOKUP_METHODS[lookup_method],
+            "rotationLookupMethod": _LOOKUP_METHODS[lookup_method],
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -641,7 +641,7 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
             "rotationBatchSize": 0,
-            "rotationLookupMethod": _ROTATION_LOOKUP_METHODS["select"],
+            "rotationLookupMethod": _LOOKUP_METHODS["select"],
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }

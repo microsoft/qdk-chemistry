@@ -875,25 +875,23 @@ class TestSOSSAResourceEstimation:
     def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):
         """Each loader has to be worth choosing somewhere, and none may be a silent regression.
 
-        At the Fe2S2 table shape the SF lookup is only 224 rows against a 15-bit angle word,
-        well under the ``numData > 32 * numBits`` point where a *borrowed* swap network starts
-        to pay, so ``dirty_select_swap`` is expected to decline it and leave the plain lookup
-        in place -- selecting it must therefore cost nothing at all here.
-        See ``TestDirtyQROAMCostModel`` for the regime where it does pay.
+        At the Fe2S2 table shapes a *borrowed* swap network does not pay. The SF rotation table
+        is only 224 rows against a 15-bit angle word, well under the ``numData > 32 * numBits``
+        point where borrowing starts to win, and the inner alias table cannot raise a lender
+        long enough for the width its own cost model wants. So ``dirty_select_swap`` is expected
+        to decline on both loaders and leave the plain lookup in place -- selecting it must
+        therefore cost nothing at all here. See ``TestDirtyQROAMCostModel`` for the regime where
+        it does pay.
 
         A *clean* swap network has no such threshold: it buys the same Toffoli reduction with
         allocated scratch instead of borrowed qubits, so ``select_swap`` should cut Toffolis
         here where ``dirty_select_swap`` cannot. That scratch is the price, and the point of
         offering all three is that the right trade depends on which budget is binding.
         """
-        plain_qubits, plain_toffolis = self._fe2s2_logical_counts(
-            rotation_batch_size=1, rotation_lookup_method="select"
-        )
-        clean_qubits, clean_toffolis = self._fe2s2_logical_counts(
-            rotation_batch_size=1, rotation_lookup_method="select_swap"
-        )
+        plain_qubits, plain_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1, lookup_method="select")
+        clean_qubits, clean_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1, lookup_method="select_swap")
         dirty_qubits, dirty_toffolis = self._fe2s2_logical_counts(
-            rotation_batch_size=1, rotation_lookup_method="dirty_select_swap"
+            rotation_batch_size=1, lookup_method="dirty_select_swap"
         )
 
         assert (dirty_qubits, dirty_toffolis) == (plain_qubits, plain_toffolis), (
@@ -906,6 +904,27 @@ class TestSOSSAResourceEstimation:
         )
         assert clean_qubits >= plain_qubits, (
             f"a clean swap network allocates scratch, so it cannot also be narrower: {plain_qubits} -> {clean_qubits}"
+        )
+
+    def test_one_lookup_method_setting_reaches_both_loaders(self):
+        """``lookup_method`` has to govern the inner PREPARE too, not just the rotation batches.
+
+        The two QROMs draw on one qubit budget, so routing them independently is a way to be
+        accidentally inconsistent -- borrowing for one table and allocating for the other -- and
+        there is no caller who wants that. One setting governs both.
+
+        Proving it needs a configuration where the rotation loader cannot be responsible for the
+        difference. With the angles resident there is no streamed batch to load, so the rotation
+        lookup is inert and *any* change in cost has to come from the inner alias table. Width is
+        the wrong thing to watch here: the resident angle word sets the peak, so the PREPARE
+        scratch hides underneath it and the qubit count does not move. Toffolis do.
+        """
+        _, plain_toffolis = self._fe2s2_logical_counts(lookup_method="select")
+        _, clean_toffolis = self._fe2s2_logical_counts(lookup_method="select_swap")
+
+        assert clean_toffolis < plain_toffolis, (
+            "with the angles resident only the inner PREPARE can be reading 'lookup_method', so "
+            f"a clean swap network has to show up as cheaper here: {plain_toffolis} -> {clean_toffolis}"
         )
 
     def test_narrowing_the_alias_lookup_only_pays_once_the_angles_are_streamed(self):
