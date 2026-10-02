@@ -12,6 +12,7 @@ import pytest
 import scipy
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
 from qdk_chemistry.data import FlatPartition, LayeredPartition, QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -1016,6 +1017,25 @@ class TestPartitionGrouping:
         minimized = len(step_terms(unequal(declared), True))
         assert minimized == min(len(step_terms(unequal(groups), False)) for groups in permutations(declared))
         assert minimized < len(step_terms(unequal(declared), False))
+
+    def test_automatic_steps_bound_the_minimized_order(self):
+        """Second-order automatic steps use the commutator bound of the reordered terms."""
+        labels = ["ZX", "XZ", "ZZ", "XY", "ZY"]
+        coefficients = np.array([1.44, 0.9, 0.44, 1.5, 1.15])
+        partition = FlatPartition(strategy="commuting", groups=[[0, 1], [2, 3], [4]])
+        hamiltonian = QubitOperator(labels, coefficients, term_partition=partition)
+        builder = Trotter(order=2, time=1.0, target_accuracy=1e-3, minimize_pauli_exponentials=True)
+        container = builder.run(hamiltonian).get_container()
+
+        # The largest group moves to the center, so the second group leads.
+        emitted = [2, 3, 4, 0, 1]
+        expected_terms = [Trotter._pauli_label_to_map(labels[i]) for i in emitted]
+        assert [term.pauli_term for term in container.step_terms[:5]] == expected_terms
+        steps = trotter_steps_commutator(
+            QubitOperator([labels[i] for i in emitted], coefficients[emitted]), 1.0, 1e-3, order=2
+        )
+        assert steps > trotter_steps_commutator(QubitOperator(labels, coefficients), 1.0, 1e-3, order=2)
+        assert container.step_reps == steps
 
     def test_flat_partition_groups_commuting_terms(self):
         """Test that a FlatPartition groups commuting terms into parallelizable layers."""

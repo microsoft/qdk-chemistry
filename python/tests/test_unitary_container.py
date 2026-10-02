@@ -316,8 +316,14 @@ class TestPauliProductFormulaContainer:
         assert fused.suffix_terms == tuple(middle + right)
         assert fused.combine(fused, atol=0.0).num_stored_terms <= 8
         if repetitions < 10**9:  # Only small repetition counts can be multiplied out.
+            fused_unitary = _formula_unitary(fused)
             np.testing.assert_allclose(
-                _formula_unitary(fused), _formula_unitary(formula), atol=float_comparison_absolute_tolerance
+                fused_unitary, _formula_unitary(formula), atol=float_comparison_absolute_tolerance
+            )
+            np.testing.assert_allclose(
+                _formula_unitary(fused.combine(fused, atol=0.0)),
+                fused_unitary @ fused_unitary,
+                atol=float_comparison_absolute_tolerance,
             )
 
     def test_combine_different_bodies_includes_endpoints(self) -> None:

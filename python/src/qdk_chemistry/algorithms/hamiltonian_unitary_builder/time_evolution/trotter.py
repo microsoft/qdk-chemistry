@@ -20,6 +20,8 @@ References:
 
 from __future__ import annotations
 
+import numpy as np
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
@@ -151,6 +153,7 @@ class Trotter(TimeEvolutionBuilder):
         This minimizes the Pauli exponentials for a fixed partition and step count,
         not angle-dependent synthesis cost or simulation error. It does not fuse
         repetition boundaries. First-order formulas retain their original ordering.
+        Automatic step counts bound the emitted group order.
 
         Args:
             order: Trotter decomposition order (1, 2, or any positive even integer). Defaults to 1.
@@ -271,10 +274,19 @@ class Trotter(TimeEvolutionBuilder):
         order = self._settings.get("order")
         weight_threshold = self._settings.get("weight_threshold")
 
+        # The second-order commutator bound depends on term order, so bound the emitted order.
+        maps, coefficients, groups = self._ordered_trotter_groups(qubit_hamiltonian, atol=weight_threshold)
+        emitted = [i for group in groups for layer in group for i in layer if i in maps]
+        if not emitted:
+            return manual
+        ordered_hamiltonian = QubitOperator.from_sparse_terms(
+            qubit_hamiltonian.num_qubits, [maps[i] for i in emitted], np.array([coefficients[i] for i in emitted])
+        )
+
         error_bound = self._settings.get("error_bound")
         if error_bound == "commutator":
             auto = trotter_steps_commutator(
-                hamiltonian=qubit_hamiltonian,
+                hamiltonian=ordered_hamiltonian,
                 time=time,
                 target_accuracy=target_accuracy,
                 order=order,
@@ -283,7 +295,7 @@ class Trotter(TimeEvolutionBuilder):
 
         else:
             auto = trotter_steps_naive(
-                hamiltonian=qubit_hamiltonian,
+                hamiltonian=ordered_hamiltonian,
                 time=time,
                 target_accuracy=target_accuracy,
                 order=order,
@@ -301,9 +313,31 @@ class Trotter(TimeEvolutionBuilder):
         """Retain declared group and disjoint-layer boundaries after ordering and coefficient filtering."""
         terms: list[ExponentiatedPauliTerm] = []
         offsets = [0]
-        partition = qubit_hamiltonian.term_partition
-        layer_offsets = [0] if isinstance(partition, LayeredPartition) else None
+        layer_offsets = [0] if isinstance(qubit_hamiltonian.term_partition, LayeredPartition) else None
 
+        maps, coefficients, groups = self._ordered_trotter_groups(qubit_hamiltonian, atol=atol)
+        if not maps:
+            Logger.warn("No coefficients above the tolerance; returning empty term list.")
+            return terms, (0,), None if layer_offsets is None else (0,)
+        if not groups:
+            Logger.warn("Term partition produced no groups; returning empty term list.")
+            return terms, (0,), None if layer_offsets is None else (0,)
+
+        for fraction, group_index in self._trotter_schedule(len(groups)):
+            stage_time = time * fraction
+            for layer in groups[group_index]:
+                terms.extend(ExponentiatedPauliTerm(maps[i], coefficients[i] * stage_time) for i in layer if i in maps)
+                if layer_offsets is not None and len(terms) != layer_offsets[-1]:
+                    layer_offsets.append(len(terms))
+            if len(terms) != offsets[-1]:
+                offsets.append(len(terms))
+
+        return terms, tuple(offsets), None if layer_offsets is None else tuple(layer_offsets)
+
+    def _ordered_trotter_groups(
+        self, qubit_hamiltonian: QubitOperator, *, atol: float
+    ) -> tuple[dict[int, dict[int, str]], list[float], list[list[tuple[int, ...]]]]:
+        """Return active term maps, real coefficients, and index groups in emitted order."""
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
@@ -317,16 +351,10 @@ class Trotter(TimeEvolutionBuilder):
             for index, coefficient in enumerate(coefficients)
             if abs(coefficient) > atol
         }
-        if not maps:
-            Logger.warn("No coefficients above the tolerance; returning empty term list.")
-            return terms, (0,), None if layer_offsets is None else (0,)
-
+        partition = qubit_hamiltonian.term_partition
         groups: list[list[tuple[int, ...]]] = (
             self._partition_indices(partition) if partition is not None else [[(i,)] for i in range(len(coefficients))]
         )
-        if not groups:
-            Logger.warn("Term partition produced no groups; returning empty term list.")
-            return terms, (0,), None if layer_offsets is None else (0,)
 
         order = self._settings.get("order")
         if order > 1 and self._settings.get("minimize_pauli_exponentials") and len(groups) > 1:
@@ -347,16 +375,7 @@ class Trotter(TimeEvolutionBuilder):
                     *(group for i, group in enumerate(groups) if i not in (outer, central)),
                     groups[central],
                 ]
-        for fraction, group_index in self._trotter_schedule(len(groups)):
-            stage_time = time * fraction
-            for layer in groups[group_index]:
-                terms.extend(ExponentiatedPauliTerm(maps[i], coefficients[i] * stage_time) for i in layer if i in maps)
-                if layer_offsets is not None and len(terms) != layer_offsets[-1]:
-                    layer_offsets.append(len(terms))
-            if len(terms) != offsets[-1]:
-                offsets.append(len(terms))
-
-        return terms, tuple(offsets), None if layer_offsets is None else tuple(layer_offsets)
+        return maps, coefficients, groups
 
     def _trotter_schedule(self, num_groups: int) -> list[tuple[float, int]]:
         """Return shared Strang/Suzuki time fractions and group indices for one step."""
