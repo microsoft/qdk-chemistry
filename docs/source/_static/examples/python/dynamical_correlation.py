@@ -63,6 +63,6 @@ print(f"MP2 Total Energy: {mp2_total_energy:.10f} Hartree")
 from qdk_chemistry.algorithms import registry
 
 print(registry.available("dynamical_correlation_calculator"))
-# ['pyscf_coupled_cluster', 'qdk_mp2_calculator']
+# ['exachem_ccsd', 'pyscf_coupled_cluster', 'qdk_mp2_calculator']
 # end-cell-list-implementations
 ################################################################################
