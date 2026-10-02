@@ -382,7 +382,7 @@ class TestAzureQuantumBackendSubmission:
         assert metadata["failed_results"] == {"failed": raw_results["failed"]}
         assert len(warnings) == 1
         assert "3 failed shots" in warnings[0]
-        assert "ExecutionFailure" in warnings[0]
+        assert "excluding them from measurement counts" in warnings[0]
 
     @pytest.mark.parametrize("remaining_outcome", [None, [1, "-"]])
     def test_no_clean_results_raise_with_failure_details(

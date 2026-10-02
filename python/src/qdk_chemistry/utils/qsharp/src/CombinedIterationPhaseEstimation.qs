@@ -8,6 +8,7 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
     import Std.Arrays.Subarray;
     import Std.Convert.IntAsDouble;
     import Std.Math.PI;
+    import QDKChemistry.Utils.IterativePhaseEstimation.GetIQPEAncillaIndices;
 
     /// Runs the full iterative Quantum Phase Estimation (IQPE) as a single circuit
     /// with in-circuit classical feedback.
@@ -27,9 +28,11 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
     /// - `controlledUnitary`: An array of controlled-U^(2^k) operations, one per round.
     ///    Each operation already encapsulates the correct power, so the unitary builder's
     ///    `power_strategy` is honoured exactly as in the per-round path.
-    /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
-    /// - `systems`: An array of indices representing the system qubits.
+    /// - `phaseQubit`: The phase qubit index, distinct from every system index.
+    /// - `systems`: Unique system indices, in the order expected by state preparation and the unitary.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
+    /// All indices must be within a register of `Length(systems) + 1 + numAncillaQubits` qubits.
+    /// Ancillas are the unused indices in ascending order, appended after the systems.
     /// # Returns
     /// An array of `numBits` majority-voted results. `results[0]` is measured with the
     /// highest power `2^(numBits - 1)`, matching the round ordering of the per-round builder.
@@ -45,14 +48,11 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
         if midShots < 1 {
             fail "midShots must be a positive integer.";
         }
+        let ancillaIndices = GetIQPEAncillaIndices(phaseQubit, systems, numAncillaQubits);
         use qs = Qubit[Length(systems) + 1 + numAncillaQubits];
         let phase = qs[phaseQubit];
         let system = Subarray(systems, qs);
-        let ancillas = if numAncillaQubits == 0 {
-            []
-        } else {
-            qs[1 + Length(systems)..Length(qs) - 1]
-        };
+        let ancillas = Subarray(ancillaIndices, qs);
         let allTargets = system + ancillas;
 
         mutable results = [Zero, size = numBits];

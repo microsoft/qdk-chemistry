@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 from qdk import TargetProfile
-from qdk.qsharp import Pauli
+from qdk.qsharp import Pauli, QSharpError, Result
 
 import qdk_chemistry.utils.qsharp as qsharp_package
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
@@ -210,3 +210,34 @@ class TestTargetProfiles:
 
         pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
         assert "define" in str(base_context.compile(pauli_exp, [[Pauli.X, Pauli.Z]], [0.5], 2, 0, [1, 2]))
+
+
+@pytest.mark.parametrize("combined", [False, True])
+@pytest.mark.parametrize(
+    ("phase", "systems", "ancillas", "error"),
+    [
+        (0, [1], 1, None),
+        (0, [2], 1, None),
+        (2, [0], 1, None),
+        (-1, [1], 1, "phaseQubit must be within"),
+        (3, [1], 1, "phaseQubit must be within"),
+        (0, [-1], 1, "System qubit indices must be within"),
+        (0, [3], 1, "System qubit indices must be within"),
+        (0, [1, 1], 1, "System qubit indices must be unique"),
+        (1, [1], 1, "System qubit indices must be distinct"),
+        (0, [1], -1, "numAncillaQubits must be non-negative"),
+    ],
+)
+def test_iqpe_qubit_layout(combined: bool, phase: int, systems: list[int], ancillas: int, error: str | None) -> None:
+    """Both entry points support alternate layouts and reject invalid indices."""
+    unitary = "(phase, targets) => { CNOT(targets[0], targets[1]); Controlled Z([phase], targets[1]); }"
+    if combined:
+        call = f"CombinedIterationPhaseEstimation.RunFullIQPE(1, 1, _ => (), [{unitary}]"
+    else:
+        call = f"IterativePhaseEstimation.MakeIQPECircuit(_ => (), {unitary}, 0.0"
+    expression = f"QDKChemistry.Utils.{call}, {phase}, {systems}, {ancillas})"
+    if error is not None:
+        with pytest.raises(QSharpError, match=error):
+            get_qsharp_context().eval(expression)
+    else:
+        assert get_qsharp_context().eval(expression) == [Result.Zero]
