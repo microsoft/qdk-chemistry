@@ -565,7 +565,7 @@ class TestModelHamiltonians:
         assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
 
     def test_kitaev_keeps_small_couplings_beside_large_ones(self) -> None:
-        """Residue cleanup keeps a gamma coupling far below a large Heisenberg coupling."""
+        """A large Heisenberg coupling does not suppress a much smaller gamma coupling."""
         graph = _kitaev_graph(LatticeGeometry.honeycomb(3, 3))
         terms = _get_terms_dict(
             create_kitaev_hamiltonian(graph, kx=0.0, ky=0.0, kz=0.0, j=1e20, gamma=1.0, include_term_groups=False)
@@ -698,7 +698,6 @@ class TestModelHamiltonians:
                     ],
                 ]
             )
-            exchange[np.abs(exchange) < 100 * np.finfo(float).eps * np.max(np.abs(exchange))] = 0.0
             for first_index, first in enumerate(components):
                 for second_index, second in enumerate(components):
                     coefficient = exchange[first_index, second_index] / 4.0
