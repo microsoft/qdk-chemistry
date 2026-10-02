@@ -244,9 +244,9 @@ class TestSparseIsometryBinaryEncoding:
         [
             (6, 6, 20, 42, True, True),
             (6, 6, 20, 42, True, False),
-            (6, 6, 20, 42, False, True),
+            pytest.param(6, 6, 20, 42, False, True, marks=pytest.mark.slow),
             (6, 6, 30, 7, True, True),
-            (6, 6, 30, 7, False, True),
+            pytest.param(6, 6, 30, 7, False, True, marks=pytest.mark.slow),
         ],
         ids=[
             "6e6o_20det_binenc_negctrl",
