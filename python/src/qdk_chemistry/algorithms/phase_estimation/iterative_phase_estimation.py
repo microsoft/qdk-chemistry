@@ -127,6 +127,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 qubit_hamiltonian=qubit_hamiltonian,
                 container=container,
                 num_bits=num_bits,
+                shots_per_bit=shots_per_bit,
                 noise=noise,
             )
 
@@ -176,6 +177,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         qubit_hamiltonian: QubitOperator,
         container,
         num_bits: int,
+        shots_per_bit: int,
         noise: QuantumErrorProfile | None,
     ) -> QpeResult:
         """Run the full IQPE as a single circuit with in-circuit classical feedback.
@@ -194,6 +196,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             container: The unitary container providing ``eigenvalue_from_phase``.
             num_bits: The number of phase bits to estimate.
+            shots_per_bit: The validated number of executions of the whole circuit.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -203,16 +206,13 @@ class IterativePhaseEstimation(PhaseEstimation):
             RuntimeError: If the executor returns no measurement results.
 
         """
-        shots = self.settings().get("shots_per_bit")
         mid_shots = circuit_builder.settings().get("mid_shots")
-        full_circuit = circuit_builder._run_impl(  # noqa: SLF001
-            state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
-        )[0]
+        full_circuit = circuit_builder.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)[0]
         Logger.info(
-            f"combine_iterations=True: shots_per_bit={shots} runs the whole circuit {shots} times; "
+            f"combine_iterations=True: shots_per_bit={shots_per_bit} runs the whole circuit {shots_per_bit} times; "
             f"mid_shots={mid_shots} samples per phase bit in each execution."
         )
-        executor_data = circuit_executor.run(full_circuit, shots=shots, noise=noise)
+        executor_data = circuit_executor.run(full_circuit, shots=shots_per_bit, noise=noise)
         counts = executor_data.bitstring_counts
         if not counts:
             raise RuntimeError("No measurement results returned from the circuit executor.")

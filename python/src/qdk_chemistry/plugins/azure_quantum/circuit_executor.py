@@ -257,7 +257,7 @@ class AzureQuantumBackend(CircuitExecutor):
         if failed_results:
             Logger.warn(
                 f"Azure Quantum job {job.id} returned {failed_shots} failed shots; "
-                f"excluding them from measurement counts. Failed results: {failed_results}"
+                f"excluding them from measurement counts."
             )
         if not sum(bitstring_counts.values()):
             raise JobFailedWithResultsError(

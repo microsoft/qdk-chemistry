@@ -16,8 +16,7 @@ from qdk_chemistry.data import Circuit, QuantumErrorProfile, SettingTypeMismatch
 
 pytest.importorskip("azure.quantum", reason="azure-quantum is not installed")
 
-from azure.quantum._client.models import JobDetails
-from azure.quantum.job import Job, JobFailedWithResultsError
+from azure.quantum.job import Job, JobDetails, JobFailedWithResultsError
 
 from qdk_chemistry.plugins.azure_quantum import circuit_executor
 from qdk_chemistry.plugins.azure_quantum.circuit_executor import (

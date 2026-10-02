@@ -841,6 +841,12 @@ def test_iqpe_uses_independent_shot_counts(
     )
     with (
         patch.object(
+            QdkIterativeQpeCircuitBuilder, "run", autospec=True, side_effect=QdkIterativeQpeCircuitBuilder.run
+        ) as build,
+        patch.object(
+            IterativePhaseEstimation, "settings", autospec=True, side_effect=IterativePhaseEstimation.settings
+        ) as settings,
+        patch.object(
             QdkFullStateSimulator, "_run_impl", autospec=True, side_effect=QdkFullStateSimulator._run_impl
         ) as execute,
         patch.object(Logger, "info") as log,
@@ -849,9 +855,15 @@ def test_iqpe_uses_independent_shot_counts(
 
     assert result.bitstring_msb_first == problem.expected_bitstring
     assert result.raw_energy == pytest.approx(problem.expected_energy, abs=qpe_energy_tolerance)
+    settings.assert_called_once()
     assert execute.call_count == (1 if combine_iterations else problem.num_bits)
     assert all(call.kwargs["shots"] == shots_per_bit for call in execute.call_args_list)
     if combine_iterations:
+        build.assert_called_once()
+        assert build.call_args.kwargs == {
+            "state_preparation": problem.state_prep,
+            "qubit_hamiltonian": problem.hamiltonian,
+        }
         circuit = execute.call_args.args[1]
         qir = str(circuit.get_qir())
         assert qir.count("call void @__quantum__qis__mresetz__body") == problem.num_bits * (mid_shots + 1)
