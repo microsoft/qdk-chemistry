@@ -104,17 +104,14 @@ Constructs circuits for Kitaev's iterative phase estimation algorithm, which ext
      - Specific iteration to build (0-based). If negative, builds all iterations. Default: ``-1``.
    * - ``combine_iterations``
      - bool
-     - QDK only. Build every round into one circuit that majority-votes each bit and carries it forward with
-       mid-circuit measurement and classical feed-forward, instead of one circuit per bit. Requires an
-       Adaptive-profile target. Default: ``False``.
+     - Build every round into one circuit that majority-votes each bit and carries it forward with
+       mid-circuit measurement and classical feed-forward. Requires an Adaptive-profile target.
+       Default: ``False``. QDK iterative builder only.
    * - ``mid_shots``
      - int
-     - QDK only. Positive number of internal repetitions per phase bit, majority-voted inside each
+     - Positive number of internal repetitions per phase bit, majority-voted inside each
        combined circuit execution. Independent of the estimator's ``shots_per_bit``.
-       Only used when ``combine_iterations`` is enabled. Default: ``3``.
-
-The builder setting previously named ``shots_per_bit`` is now ``mid_shots``.
-The estimator still uses ``shots_per_bit``; in combined mode it controls the number of whole-circuit executions.
+       Only used when ``combine_iterations`` is enabled. Default: ``3``. QDK iterative builder only.
 
 **Usage example:**
 
