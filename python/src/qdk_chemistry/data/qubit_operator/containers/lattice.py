@@ -108,7 +108,7 @@ class LatticeContainer(QubitOperatorContainer):
             return {}
         if not isinstance(couplings, Mapping):
             raise TypeError(f"couplings must map names to numbers, got a {type(couplings).__name__}.")
-        validated = {}
+        validated: dict[str, float] = {}
         for name, value in couplings.items():
             if not isinstance(name, str):
                 raise TypeError(f"Coupling names must be strings, got {name!r}.")
