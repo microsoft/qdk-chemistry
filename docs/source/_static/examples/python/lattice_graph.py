@@ -1,15 +1,91 @@
-"""LatticeGraph creation and manipulation example."""
+"""Lattice geometry, explicit connectivity, and edge-coloring examples."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections import Counter
 from pathlib import Path
 
 import numpy as np
+from qdk_chemistry.data import (
+    BondFlavorDefinition,
+    EdgeLabel,
+    LatticeGeometry,
+    LatticeGraph,
+)
 
-from qdk_chemistry.data import LatticeGraph
+################################################################################
+# start-cell-create-geometry
+geometry = LatticeGeometry.honeycomb_plaquettes(1, 1)
+print(f"Hexagon geometry: {geometry.num_sites} sites")
+print(f"Positions:\n{geometry.positions}")
+# end-cell-create-geometry
+################################################################################
+
+################################################################################
+# start-cell-geometry-shells
+hexagon = LatticeGraph.from_geometry(geometry, shells=[1, 2, 3])
+shell_sizes = Counter(label.shell for label in hexagon.edge_labels.values())
+print(dict(sorted(shell_sizes.items())))  # {1: 6, 2: 6, 3: 3}
+# end-cell-geometry-shells
+################################################################################
+
+################################################################################
+# start-cell-periodic-geometry
+ring_geometry = LatticeGeometry.chain(6, periodic=True)
+ring_graph = LatticeGraph.from_geometry(ring_geometry, shells=[1, 2])
+print(
+    f"Periodic ring: {ring_graph.num_edges} edges"
+)  # 6 first- and 6 second-neighbor bonds
+try:
+    LatticeGraph.from_geometry(LatticeGeometry.chain(2, periodic=True))
+except ValueError as error:
+    print(error)  # Two periodic images join sites 0 and 1.
+# end-cell-periodic-geometry
+################################################################################
+
+################################################################################
+# start-cell-from-geometry
+square_geometry = LatticeGeometry.square(3, 3)
+graph = LatticeGraph.from_geometry(square_geometry, shells=[1, 2])
+print(
+    f"Labelled shells: {sorted({label.shell for label in graph.edge_labels.values()})}"
+)
+print(f"Interaction edges: {graph.num_edges}")
+# end-cell-from-geometry
+################################################################################
+
+################################################################################
+# start-cell-bond-flavors
+flavored_graph = LatticeGraph.from_geometry(
+    square_geometry,
+    shells=[1, 2],
+    bond_flavors=[
+        BondFlavorDefinition(1, np.array([1.0, 0.0]), 10),
+        BondFlavorDefinition(1, np.array([0.0, 1.0]), 20),
+        BondFlavorDefinition(2, np.array([1.0, 1.0]), 30),
+        BondFlavorDefinition(2, np.array([1.0, -1.0]), 40),
+    ],
+)
+(site_i, site_j), label = next(iter(flavored_graph.edge_labels.items()))
+print(site_i, site_j, label.shell, label.flavor, flavored_graph.weight(site_i, site_j))
+# end-cell-bond-flavors
+################################################################################
+
+################################################################################
+# start-cell-coloring
+# Here XX acts on shell 1 and ZZ on shell 2, with nonzero couplings throughout.
+xx_pairs = [pair for pair, label in graph.edge_labels.items() if label.shell == 1]
+zz_pairs = [pair for pair, label in graph.edge_labels.items() if label.shell == 2]
+# Restrict the constructor's coloring; neither family is recolored.
+coloring = graph.edge_coloring
+assert coloring is not None
+xx_coloring = {pair: coloring[pair] for pair in xx_pairs}
+zz_coloring = {pair: coloring[pair] for pair in zz_pairs}
+# end-cell-coloring
+################################################################################
 
 ################################################################################
 # start-cell-create-chain
@@ -91,6 +167,23 @@ print(f"Bidirectional: is_symmetric = {bidirectional.is_symmetric}")
 ################################################################################
 
 ################################################################################
+# start-cell-custom-labels
+# A four-site ring with two bond flavors and one second-shell diagonal
+custom_labels = {
+    (0, 1): EdgeLabel(1, flavor=0),
+    (1, 2): EdgeLabel(1, flavor=1),
+    (2, 3): EdgeLabel(1, flavor=0),
+    (0, 3): EdgeLabel(1, flavor=1),
+    (0, 2): EdgeLabel(2),
+}
+labelled = LatticeGraph.make_bidirectional(
+    LatticeGraph({pair: 1.0 for pair in custom_labels}, edge_labels=custom_labels)
+)
+print(f"Labelled custom graph: {labelled.num_edges} edges")
+# end-cell-custom-labels
+################################################################################
+
+################################################################################
 # start-cell-properties
 # Query lattice properties
 lattice = LatticeGraph.chain(4)
@@ -114,18 +207,18 @@ print(f"Adjacency matrix:\n{adj_matrix}")
 
 ################################################################################
 # start-cell-serialization
-lattice = LatticeGraph.chain(4)
+lattice = flavored_graph
 
 # Save to JSON
-lattice.to_json_file(Path("chain.lattice_graph.json"))
+lattice.to_json_file(Path("square.lattice_graph.json"))
 
 # Load from JSON
-loaded = LatticeGraph.from_json_file(Path("chain.lattice_graph.json"))
+loaded = LatticeGraph.from_json_file(Path("square.lattice_graph.json"))
 print(f"Loaded lattice: {loaded.num_sites} sites, {loaded.num_edges} edges")
 
 # Save to HDF5
-lattice.to_hdf5_file(Path("chain.lattice_graph.hdf5"))
+lattice.to_hdf5_file(Path("square.lattice_graph.hdf5"))
 # end-cell-serialization
-Path("chain.lattice_graph.json").unlink()
-Path("chain.lattice_graph.hdf5").unlink()
+Path("square.lattice_graph.json").unlink()
+Path("square.lattice_graph.hdf5").unlink()
 ################################################################################

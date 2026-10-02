@@ -13,6 +13,7 @@
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/lattice_geometry.hpp>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -26,6 +27,24 @@ namespace qdk::chemistry::data {
  * Two edges sharing the same color have disjoint vertex sets.
  */
 using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
+
+/** @brief Geometric shell and optional semantic flavor of one edge. */
+struct EdgeLabel {
+  /// One-based neighbor shell, at most 2^53 so that HDF5 stores it exactly.
+  std::uint64_t shell;
+  std::optional<BondFlavorId> flavor;
+  bool operator==(const EdgeLabel&) const = default;
+};
+
+/** @brief Edge labels keyed by ordered (i, j) with i < j. */
+using EdgeLabels = std::map<std::pair<std::uint64_t, std::uint64_t>, EdgeLabel>;
+
+/** @brief Optional semantic label for one shell and geometric bond axis. */
+struct BondFlavorDefinition {
+  std::uint64_t shell;
+  Eigen::RowVectorXd axis;
+  BondFlavorId flavor;
+};
 
 // ---- Free coloring functions ------------------------------------------------
 // These compute edge colorings for known lattice topologies.  They are
@@ -100,6 +119,8 @@ EdgeColoring trivial_edge_coloring(const Eigen::SparseMatrix<double>& adj);
  * Stores the lattice topology as a sparse adjacency matrix and provides
  * static factory methods for common lattice geometries. Used by model
  * Hamiltonian builders to define site connectivity and hopping integrals.
+ * Graphs built from a LatticeGeometry, or constructed with edge labels, also
+ * label each edge with its neighbor shell and optional bond flavor.
  */
 class LatticeGraph : public DataClass {
  public:
@@ -113,30 +134,70 @@ class LatticeGraph : public DataClass {
    * @param edge_weights Map of (source, target) -> weight.
    * @param num_sites   Total number of sites. If 0, inferred from the
    *                    largest index in edge_weights.
+   * @param edge_labels Shell and optional flavor of every stored pair, keyed
+   *                    by (i, j) with i < j whichever direction stores it, or
+   *                    empty for an unlabelled graph.
+   * @throws std::invalid_argument If nonempty edge_labels do not label exactly
+   *         the stored pairs with shells from 1 to 2^53.
    */
   LatticeGraph(const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
                    edge_weights,
-               std::uint64_t num_sites = 0);
+               std::uint64_t num_sites = 0, EdgeLabels edge_labels = {});
 
   /**
    * @brief Create a lattice graph from a dense adjacency matrix.
    *
    * @param adjacency_matrix Square dense matrix of edge weights.
+   * @param edge_labels Shell and optional flavor of every nonzero pair, keyed
+   *                    by (i, j) with i < j whichever direction stores it, or
+   *                    empty for an unlabelled graph.
    * @return LatticeGraph with the given adjacency.
-   * @throws std::invalid_argument If the matrix is not square.
+   * @throws std::invalid_argument If the matrix is not square or the labels
+   *         are invalid.
    */
-  static LatticeGraph from_dense_matrix(
-      const Eigen::MatrixXd& adjacency_matrix);
+  static LatticeGraph from_dense_matrix(const Eigen::MatrixXd& adjacency_matrix,
+                                        EdgeLabels edge_labels = {});
 
   /**
    * @brief Create a lattice graph from a sparse adjacency matrix.
    *
    * @param sparse Sparse square matrix of edge weights.
+   * @param edge_labels Shell and optional flavor of every stored pair, keyed
+   *                    by (i, j) with i < j whichever direction stores it, or
+   *                    empty for an unlabelled graph.
    * @return LatticeGraph with the given adjacency.
-   * @throws std::invalid_argument If the matrix is not square.
+   * @throws std::invalid_argument If the matrix is not square or the labels
+   *         are invalid.
    */
   static LatticeGraph from_sparse_matrix(
-      const Eigen::SparseMatrix<double>& sparse);
+      const Eigen::SparseMatrix<double>& sparse, EdgeLabels edge_labels = {});
+
+  /**
+   * @brief Materialize the requested geometric shells as labelled edges.
+   *
+   * Shells rank the distinct distances present on this geometry, including
+   * periodic images, so a thin patch can lack a bulk-lattice shell and number
+   * the longer distances differently. Each physical connection becomes one
+   * edge of weight `weight`. Edges are colored greedily with seed
+   * `coloring_seed` and 32 trials.
+   *
+   * @param geometry Source geometry; it is not retained.
+   * @param shells Positive shell indices; duplicates are ignored.
+   * @param definitions Optional shell-axis flavor assignments.
+   * @param weight Finite weight of every edge.
+   * @param tolerance Positive distance and axis tolerance, less than 1, the
+   *                  lattice unit length.
+   * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
+   * @return Graph whose edges carry their shell and flavor.
+   * @throws std::invalid_argument If a site neighbors its own periodic image,
+   *         several periodic images join one site pair, or a bond axis lies
+   *         within the tolerance of several flavor axes of its shell.
+   */
+  static LatticeGraph from_geometry(
+      const LatticeGeometry& geometry,
+      const std::vector<std::uint64_t>& shells = {1},
+      const std::vector<BondFlavorDefinition>& definitions = {},
+      double weight = 1.0, double tolerance = 1.0e-9, int coloring_seed = 0);
 
   /**
    * @brief Return a new lattice graph with reverse edges added.
@@ -208,6 +269,9 @@ class LatticeGraph : public DataClass {
    * undirected edge is counted once.
    */
   std::uint64_t num_edges() const;
+
+  /** @brief Shell and flavor of each edge; empty for unlabelled graphs. */
+  const EdgeLabels& edge_labels() const;
 
   /**
    * @brief Create a one-dimensional chain lattice.
@@ -337,7 +401,7 @@ class LatticeGraph : public DataClass {
    *
    * With periodic boundary conditions (using the 3x4 example above):
    *   - periodic_x wraps right to left: 5 -- 0, 11 -- 6, 17 -- 12, 23 -- 18
-   *   - periodic_y wraps top to bottom: 19 -- 0, 15 -- 2, 17 -- 4
+   *   - periodic_y wraps top to bottom: 19 -- 0, 21 -- 2, 23 -- 4
    *
    * @param nx         Number of unit cells along the x-axis.
    * @param ny         Number of unit cells along the y-axis.
@@ -450,7 +514,8 @@ class LatticeGraph : public DataClass {
   /**
    * @brief Convert lattice graph to JSON representation.
    *
-   * Stores the sparse adjacency matrix (row-major) and the symmetry flag.
+   * Stores the sparse adjacency matrix (row-major) and the symmetry flag,
+   * plus the edge coloring and edge labels when present.
    *
    * @return JSON object containing the serialised data.
    */
@@ -479,7 +544,8 @@ class LatticeGraph : public DataClass {
 
   /**
    * @brief Load a lattice graph from a JSON object.
-   * @param j JSON object (must contain "adjacency_matrix" and "is_symmetric").
+   * @param j JSON object with num_sites, adjacency_sparse, and optional edge
+   *          metadata.
    * @return New LatticeGraph instance.
    */
   static LatticeGraph from_json(const nlohmann::json& j);
@@ -506,12 +572,16 @@ class LatticeGraph : public DataClass {
    * permutation.
    * @return A new LatticeGraph with the permuted adjacency matrix and edge
    * coloring.
+   * @throws std::invalid_argument If path omits or repeats a lattice site.
    */
   static LatticeGraph permute(const LatticeGraph& graph,
                               const std::vector<std::uint64_t>& path);
 
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
+  /// Serialization version
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 
   /**
    * @brief Private constructor from a sparse adjacency matrix.
@@ -521,9 +591,14 @@ class LatticeGraph : public DataClass {
    *
    * @param adjacency Sparse square adjacency matrix (moved in).
    * @param coloring  Optional edge coloring (moved in).
+   * @param edge_labels Optional edge labels (moved in).
    */
   explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
-                        std::optional<EdgeColoring> coloring = std::nullopt);
+                        std::optional<EdgeColoring> coloring = std::nullopt,
+                        EdgeLabels edge_labels = {});
+
+  void _validate_coloring() const;
+  void _validate_edge_labels() const;
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
@@ -539,6 +614,7 @@ class LatticeGraph : public DataClass {
   bool _is_symmetric;
   /// Edge coloring, populated at construction for recognised topologies.
   std::optional<EdgeColoring> _edge_coloring;
+  EdgeLabels _edge_labels;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,
