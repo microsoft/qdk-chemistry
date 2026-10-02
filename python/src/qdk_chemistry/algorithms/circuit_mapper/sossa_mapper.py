@@ -123,12 +123,13 @@ class SOSSAMapperSettings(Settings):
             "dirty_select_swap",
             "Loader for streamed rotation batches. 'select' is a plain unary-iteration lookup: "
             "no extra qubits, Toffoli cost one per table row. 'select_swap' is a clean QROAM "
-            "that roughly halves those Toffolis but allocates b_rot*lambda*(2^k-1) scratch "
-            "qubits, which partly offsets the register the streaming saved. 'dirty_select_swap' "
-            "runs the same network on borrowed wavefunction qubits, so it costs no width at all, "
-            "but only undercuts 'select' on tables large relative to the angle word and "
-            "otherwise falls back to it. Has no effect unless 'rotation_batch_size' streams the "
-            "angles.",
+            "that can cut those Toffolis but allocates b_rot*lambda*(2^k-1) scratch qubits, "
+            "which partly offsets the register the streaming saved; it only pays at the "
+            "smallest batch sizes, because the scratch scales with the angle word and so with "
+            "the batch. 'dirty_select_swap' runs the same network on borrowed wavefunction "
+            "qubits, so it costs no width at all, but only undercuts 'select' on tables large "
+            "relative to the angle word and otherwise falls back to it. Has no effect unless "
+            "'rotation_batch_size' streams the angles.",
             ["select", "select_swap", "dirty_select_swap"],
         )
         self._set_default(
@@ -147,13 +148,29 @@ class SOSSAMapperSettings(Settings):
             "k, clamped to the table's address width. The swap network allocates scratch "
             "proportional to 2^k times the loaded word, and that word carries "
             "'coefficient_bit_precision', so k multiplies the cost of every coefficient bit. "
-            "The default selector minimises Toffolis with no width term at all, so it can pick "
-            "a k whose scratch sets the peak qubit count of the whole walk. Lowering k by one "
-            "is exact -- it changes only how identical data is routed, never the state "
-            "prepared -- which makes it the one width knob here that costs no accuracy. Expect "
-            "a modest Toffoli increase in return, and re-derive 'rotation_batch_size' "
-            "afterwards, since narrowing PREPARE can put SELECT back on the critical path.",
+            "The default selector takes the narrowest width within a fifth of the Toffoli "
+            "optimum, which declines the last widening or two that the Toffoli minimum would "
+            "take; set k explicitly to get that minimum back. Lowering k by one is exact -- it "
+            "changes only how identical data is routed, never the state prepared -- which "
+            "makes it the one width knob here that costs no accuracy. Expect a modest Toffoli "
+            "increase in return, and re-derive 'rotation_batch_size' afterwards, since "
+            "narrowing PREPARE can put SELECT back on the critical path.",
             (-1, 30),
+        )
+        self._set_default(
+            "inner_prepare_lookup_method",
+            "string",
+            "select_swap",
+            "Where the inner alias-sampling QROAM gets its swap block. 'select_swap' allocates "
+            "clean scratch; 'dirty_select_swap' borrows wavefunction qubits that are provably "
+            "idle for the whole of PREPARE, so the lookup costs no width at all. Borrowing is "
+            "capped by the size of the system register, so it reaches a narrower swap width "
+            "than the clean network would, and it pays roughly twice the Toffolis at equal "
+            "width. It is a qubit-for-Toffoli trade, worth taking only because this lookup "
+            "sets the peak width of the whole walk. Has no effect when "
+            "'inner_prepare_swap_bits' is 0, which loads with a plain Select and allocates no "
+            "swap block either way.",
+            ["select_swap", "dirty_select_swap"],
         )
 
 
@@ -243,6 +260,7 @@ class SOSSAMapper(CircuitMapper):
                 free_rider_data,
                 coeff_bits,
                 self._settings.get("inner_prepare_swap_bits"),
+                self._settings.get("inner_prepare_lookup_method") == "dirty_select_swap",
             )
         if algorithm == "direct":
             return (

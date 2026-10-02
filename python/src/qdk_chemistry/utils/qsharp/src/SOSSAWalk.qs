@@ -461,7 +461,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     operation SOSSABlockEncoding(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numReflectInner : Int,
         numOuterIndexQubits : Int,
@@ -490,7 +490,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             } apply {
                 within {
                     within {
-                        innerPrepareOp(outerIndexReg, innerReg);
+                        // `systemReg` is lent to the inner PREPARE's QROAM: SELECT is the only
+                        // thing that touches the wavefunction, and it runs in the `apply` below,
+                        // so these qubits are provably idle for the whole of PREPARE. A dirty
+                        // load hands them back untouched, so the `within` uncompute still sees
+                        // exactly the state it would have seen from a clean load.
+                        innerPrepareOp(outerIndexReg, innerReg, systemReg);
                         H(spinReg[1]);
                     } apply {
                         selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
@@ -511,7 +516,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     operation SOSSABlockEncodingOnRegister(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
         allQubits : Qubit[],
@@ -992,7 +997,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         numSwapBits : Int,
-    ) : (Qubit[], Qubit[]) => Unit is Adj {
+        useDirtyLookup : Bool,
+    ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj {
         let nCoeffs = Length(innerCoefficients[0]);
         // A single inner entry still gets a one-qubit b register, matching MakeInnerPrepareDirect
         // and the Python layout. Letting this fall to zero would leave the alias PREPARE treating
@@ -1005,7 +1011,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // asserts as much. Clamp rather than fault, so an over-large request degrades to the
         // widest usable network instead of crashing inside Q#.
         let swapBits = if numSwapBits > 0 { MinI(numSwapBits, nIndexBits) } else { numSwapBits };
-        (outerReg, innerReg) => {
+        (outerReg, innerReg, dirty) => {
             let indexReg = innerReg[0..nIndexBits - 1];
             let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
             let flagQubit = innerReg[nIndexBits + mu];
@@ -1024,7 +1030,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 uniformReg,
                 flagQubit,
                 qromOut,
-                freeRiderReg, swapBits
+                freeRiderReg,
+                swapBits,
+                dirty,
+                useDirtyLookup
             );
         }
     }
@@ -1103,8 +1112,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         numSwapBits : Int,
+        useDirtyLookup : Bool,
     ) : (
-        ((Qubit[], Qubit[]) => Unit is Adj),
+        ((Qubit[], Qubit[], Qubit[]) => Unit is Adj),
         ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
     ) {
         let loadSeparately = ShouldLoadFreeRiderSeparately(
@@ -1121,7 +1131,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 innerCoefficients,
                 inlineData,
                 coefficientBitPrecision,
-                numSwapBits
+                numSwapBits,
+                useDirtyLookup
             ),
             MakeFreeRiderLoadOp(separateData)
         )
@@ -1135,11 +1146,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     function MakeInnerPrepareDirect(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][]
-    ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+    ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
         let nCoeffs = Length(innerCoefficients[0]);
         let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
         let signData = BuildInnerSignTable(innerCoefficients, nIndexBits);
-        (outerReg, innerReg) => {
+        // Direct preparation has no lookup table, so there is nothing to borrow for; the
+        // lender is accepted and ignored purely to keep one inner-PREPARE signature.
+        (outerReg, innerReg, _) => {
             let bReg = innerReg[0..nIndexBits - 1];
 
             let xo = Length(innerCoefficients);
@@ -1182,7 +1195,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     function MakeSOSSABlockEncodingOp(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
     ) : (Qubit[] => Unit is Adj) {
@@ -1194,7 +1207,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     operation MakeSOSSABlockEncodingCircuit(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
         selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
         layout : SOSSAWalkLayout,
     ) : Unit {
@@ -1214,15 +1227,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Adapter: outer PREPARE then inner PREPARE, over one flat register.
+    ///
+    /// Lends the inner PREPARE nothing, so this exercises the clean lookup. The fidelity it
+    /// checks is the state on `qs`, which a borrowed load leaves alone by construction.
     function MakeOuterInnerPrepOp(
         outerOp : (Qubit[]) => Unit is Adj + Ctl,
-        innerOp : (Qubit[], Qubit[]) => Unit is Adj,
+        innerOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
         nOuter : Int,
     ) : Qubit[] => Unit {
         (qs) => {
             let outerReg = qs[0..nOuter - 1];
             outerOp(outerReg);
-            innerOp(outerReg, qs[nOuter...]);
+            innerOp(outerReg, qs[nOuter...], []);
         }
     }
 

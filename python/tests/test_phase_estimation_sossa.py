@@ -740,13 +740,18 @@ class TestSOSSAResourceEstimation:
     # Derived rather than swept: width falls linearly as angles leave the register, so
     # W(lambda) = max(W_floor, W_resident - (A - lambda) * b_rot) over A = N - 1 = 19 angles,
     # and the two branches meet at A - ceil((W_resident - W_floor) / b_rot), here
-    # 19 - ceil((486 - 427) / 15) = 15. Two estimates fix it, not a sweep.
+    # 19 - ceil((486 - 379) / 15) = 11. Two estimates fix it, not a sweep.
+    #
+    # The floor is 379 rather than 427 because ``ComputeOptimalLambda2D`` declines the widest
+    # swap network; narrowing PREPARE lowers the floor, which moves this knee *down* by
+    # putting SELECT back on the critical path sooner. That coupling is the reason the
+    # ``inner_prepare_swap_bits`` docs say to re-derive the batch size afterwards.
     #
     # Note this is where the floor *ends*, not the batch to recommend. Being the largest
     # lambda that still reaches the floor makes it the one with no headroom left, and
     # lambda = 10 buys the identical circuit; see
     # ``test_only_the_smallest_batch_of_each_step_is_worth_choosing``.
-    _FE2S2_BATCH_KNEE = 15
+    _FE2S2_BATCH_KNEE = 11
 
     @staticmethod
     def _fe2s2_logical_counts(**select_settings):
@@ -851,7 +856,7 @@ class TestSOSSAResourceEstimation:
         That is why "take the widest batch that fits your budget" is the wrong rule and
         ``rotation_batch_size_for`` exists: given room for 440 qubits that rule hands back
         ``lambda = 16``, which is strictly worse than the ``lambda = 10`` derived here --
-        13 qubits more for an identical circuit.
+        61 qubits more for an identical circuit.
         """
         smallest = rotation_batch_size_for(20, num_batches=2)
         assert smallest == 10, f"two passes over 19 angles needs batches of 10, got {smallest}"
@@ -943,14 +948,21 @@ class TestSOSSAResourceEstimation:
         so halving the scratch costs one extra select layer rather than a second pass over
         the data.
 
-        What is pinned is that ordering -- the second step must recover at least as much
+        Both widths are pinned explicitly so this measures the mechanism rather than the
+        default. ``k = 3`` is the Toffoli optimum -- what a width-blind rule picks -- and is
+        the honest baseline for "what does re-routing buy", since the shipped default has
+        already taken part of that saving for itself.
+
+        What is pinned is the ordering -- the second step must recover at least as much
         width as the first, at a far smaller fraction of the Toffoli count. Magnitudes stay
         free to move with the cost model.
         """
         batch = rotation_batch_size_for(20, num_batches=2)
 
-        resident_qubits, resident_toffolis = self._fe2s2_logical_counts()
-        streamed_qubits, streamed_toffolis = self._fe2s2_logical_counts(rotation_batch_size=batch)
+        resident_qubits, resident_toffolis = self._fe2s2_logical_counts(inner_prepare_swap_bits=3)
+        streamed_qubits, streamed_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=3
+        )
         narrowed_qubits, narrowed_toffolis = self._fe2s2_logical_counts(
             rotation_batch_size=batch, inner_prepare_swap_bits=2
         )
@@ -969,35 +981,48 @@ class TestSOSSAResourceEstimation:
             f"{narrowing_overhead:.1%} vs {streaming_overhead:.1%}"
         )
 
-    def test_the_default_alias_swap_width_minimises_toffolis_and_ignores_width(self):
-        """Document the default's blind spot, which is the whole reason the knob exists.
+    def test_the_default_alias_swap_width_declines_the_toffoli_optimum_to_save_scratch(self):
+        """The default takes the narrowest width that is nearly Toffoli-optimal, not the best.
 
-        ``ComputeOptimalLambda2D`` scores candidate swap widths by Toffoli count alone; the
-        scratch a wider network allocates never enters its objective. At this shape it lands
-        on ``k = 3``, which is genuinely the cheapest in Toffolis -- so the default is not
-        wrong, just answering a different question than a qubit-limited caller is asking.
+        ``ComputeOptimalLambda2D`` scores widths by Toffoli count but then takes the
+        *narrowest* one within a fifth of the minimum, because each extra swap bit doubles a
+        scratch block that sets the peak width of the whole walk. At this shape that declines
+        ``k = 3`` -- genuinely the Toffoli minimum -- in favour of ``k = 2``.
 
-        Pinning ``auto == 3`` here is what makes the knob's value legible: ``k = 2`` is not
-        beating a bad choice, it is declining the Toffoli-optimal one in exchange for width.
+        Pinning the comparison rather than the chosen width is what keeps this honest: the
+        declined width has to be really cheaper in Toffolis, or the default is not trading
+        anything. The premium it pays must also stay small next to the width it buys,
+        otherwise the tolerance is set wrong.
         """
         batch = rotation_batch_size_for(20, num_batches=2)
 
-        auto = self._fe2s2_logical_counts(rotation_batch_size=batch)
-        explicit = self._fe2s2_logical_counts(rotation_batch_size=batch, inner_prepare_swap_bits=3)
-
-        assert explicit == auto, f"the default selector should be choosing k=3 at this shape: {auto} vs {explicit}"
-
-        narrow_qubits, narrow_toffolis = self._fe2s2_logical_counts(
-            rotation_batch_size=batch, inner_prepare_swap_bits=2
+        auto_qubits, auto_toffolis = self._fe2s2_logical_counts(rotation_batch_size=batch)
+        optimum_qubits, optimum_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=3
         )
-        auto_qubits, auto_toffolis = auto
 
-        assert narrow_qubits < auto_qubits, (
-            f"one swap bit less has to free the scratch it was allocating: {auto_qubits} -> {narrow_qubits}"
+        assert auto_qubits < optimum_qubits, (
+            f"the default should be declining the widest network: {optimum_qubits} -> {auto_qubits}"
         )
-        assert narrow_toffolis > auto_toffolis, (
-            f"and it cannot also be cheaper, or the default would not have skipped it: "
-            f"{auto_toffolis} -> {narrow_toffolis}"
+        assert auto_toffolis > optimum_toffolis, (
+            f"and it cannot also be cheaper, or nothing is being traded: {optimum_toffolis} -> {auto_toffolis}"
+        )
+
+        width_saved = (optimum_qubits - auto_qubits) / optimum_qubits
+        toffoli_premium = (auto_toffolis - optimum_toffolis) / optimum_toffolis
+        assert toffoli_premium < width_saved, (
+            f"the default's Toffoli premium has to be small next to the width it buys, or the "
+            f"tolerance is mis-set: {toffoli_premium:.1%} Toffolis for {width_saved:.1%} width"
+        )
+
+        narrower_qubits, narrower_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=1
+        )
+        assert narrower_toffolis > auto_toffolis, (
+            f"one bit narrower than the default must cost Toffolis: {auto_toffolis} -> {narrower_toffolis}"
+        )
+        assert narrower_qubits < auto_qubits, (
+            f"and it has to be freeing scratch to be worth considering: {auto_qubits} -> {narrower_qubits}"
         )
 
     def test_only_the_smallest_swap_width_of_each_step_is_worth_choosing(self):
