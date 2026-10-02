@@ -11,6 +11,7 @@ Version 2.2.1
 - Fixed local Copilot plugin installation and MCP Apps
 - Hardened the Windows wheel runtime prerequisite: import now raises a clear error when the Visual C++ v14 Redistributable is missing, and installation instructions document the requirement
 - Updated the molecular QPE tutorial to the current ``sparse_isometry`` API and added coverage testing it against the published 2.2 wheels
+- Fixed restricted open-shell (ROHF) SCF crashing when linear-dependency removal leaves fewer molecular orbitals than atomic orbitals (#543)
 
 Version 2.2.0
 =============
