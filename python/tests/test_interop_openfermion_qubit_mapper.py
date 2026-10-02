@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 import importlib.util
-from typing import TYPE_CHECKING
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -32,9 +32,11 @@ if OPENFERMION_AVAILABLE:
         Hamiltonian,
         MajoranaMapping,
         Orbitals,
+        QubitOperator,
         Symmetries,
     )
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
+    from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
         hamiltonian_to_interaction_operator,
@@ -46,9 +48,6 @@ if OPENFERMION_AVAILABLE:
         "jordan-wigner": MajoranaMapping.jordan_wigner,
         "bravyi-kitaev": MajoranaMapping.bravyi_kitaev,
     }
-
-if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitOperator
 
 pytestmark = pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
 
@@ -319,6 +318,16 @@ def test_qubit_operator_round_trip():
         of.linalg.get_sparse_operator(original, n_qubits=n_qubits).toarray(),
         atol=float_comparison_absolute_tolerance,
     )
+
+
+def test_sparse_qubit_operator_converts_without_labels(monkeypatch):
+    """Sparse storage converts from its factors without building full-register labels."""
+    qh = QubitOperator.from_sparse_terms(100_000, [{0: "X", 99_999: "Y"}, {}], np.array([0.5, -1.25]))
+    monkeypatch.setattr(SparsePauliTerms, "__getitem__", Mock(side_effect=AssertionError("Dense labels")))
+
+    qop = qubit_hamiltonian_to_qubit_operator(qh)
+
+    assert qop == of.QubitOperator("X0 Y99999", 0.5) + of.QubitOperator((), -1.25)
 
 
 def test_qubit_operator_to_qubit_hamiltonian_empty():

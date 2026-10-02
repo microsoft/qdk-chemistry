@@ -28,14 +28,22 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenh
     zassenhaus_steps_naive,
 )
 from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
-from qdk_chemistry.data import FactorizedHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitOperator
+from qdk_chemistry.data import (
+    FactorizedHamiltonianContainer,
+    Hamiltonian,
+    MajoranaMapping,
+    QubitOperator,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
     RotatedPaulis,
     SumOfSquaresContainer,
     SumOfSquaresMetadata,
 )
+from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
 
 from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
@@ -525,3 +533,203 @@ class TestPauliOnlyAlgorithmsRejectSumOfSquares:
 
         with pytest.raises(error, match=match):
             invoke(operator)
+
+
+def _sparse_and_dense_operators(dtype: type = np.float64) -> tuple[QubitOperator, QubitOperator]:
+    """Build one vacuum-preserving Hermitian operator with sparse and with dense storage."""
+    coefficients = np.array([0.5, 0.5, 0.25, -0.25, 0.1], dtype=dtype)
+    sparse = QubitOperator.from_sparse_terms(
+        2, [{0: "X", 1: "X"}, {0: "Y", 1: "Y"}, {1: "Z"}, {0: "Z"}, {}], coefficients
+    )
+    return sparse, QubitOperator(list(sparse.pauli_strings), coefficients)
+
+
+class TestSparsePauliDecompositionContainer:
+    def test_is_a_pauli_decomposition_with_its_own_type(self) -> None:
+        """Sparse storage is a Pauli decomposition subtype with a distinct wire type."""
+        sparse, dense = _sparse_and_dense_operators()
+
+        assert isinstance(sparse.get_container(), SparsePauliDecompositionContainer)
+        assert isinstance(sparse.get_container(), PauliDecompositionContainer)
+        assert (dense.get_container_type(), sparse.get_container_type()) == (
+            "pauli_decomposition",
+            "sparse_pauli_decomposition",
+        )
+        assert sparse.equiv(dense)
+        assert dense.equiv(sparse)
+
+    @pytest.mark.parametrize("dtype", [np.float64, np.complex128, np.float32])
+    @pytest.mark.parametrize("left_sparse", [False, True])
+    @pytest.mark.parametrize("right_sparse", [False, True])
+    def test_arithmetic_and_equivalence_across_storages(self, left_sparse, right_sparse, dtype) -> None:
+        """Sums, scalar products and equivalence agree for every storage pairing and coefficient dtype."""
+        sparse, dense = _sparse_and_dense_operators(dtype)
+        left = sparse if left_sparse else dense
+        right = sparse if right_sparse else dense
+        doubled = QubitOperator(list(dense.pauli_strings), 2 * dense.coefficients)
+
+        total = left + right
+        assert total.get_container_type() == left.get_container_type()
+        assert total.equiv(doubled)
+        assert doubled.equiv(total)
+        assert (2.0 * left).equiv(doubled)
+        assert (left * 2.0).equiv(doubled)
+        assert left.equiv(right)
+        assert right.equiv(left)
+        assert not left.equiv(doubled)
+
+    @pytest.mark.parametrize(
+        ("coefficients", "total"),
+        [
+            (np.array([1.0, 1e-8], dtype=np.float32), 1.0),
+            (np.array([100, 100], dtype=np.int8), 200),
+            (np.array([200, 100], dtype=np.uint8), 300),
+        ],
+        ids=["float32", "int8", "uint8"],
+    )
+    def test_equivalence_sums_like_dense_storage(self, coefficients, total) -> None:
+        """Both storages sum floats in their stored precision and integers exactly, without overflow."""
+        reference = QubitOperator(["ZZ"], np.array([total]))
+        dense = QubitOperator(["ZZ", "ZZ"], coefficients)
+        sparse = QubitOperator.from_sparse_terms(2, [{0: "Z", 1: "Z"}] * 2, coefficients)
+
+        assert dense.equiv(reference)
+        assert sparse.equiv(reference)
+        assert reference.equiv(dense)
+        assert reference.equiv(sparse)
+
+    def test_json_layout(self) -> None:
+        """JSON keeps the width and each term's factors, and dispatches back to sparse storage."""
+        sparse, _ = _sparse_and_dense_operators()
+
+        json_data = sparse.to_json()
+        assert json_data["container_type"] == "sparse_pauli_decomposition"
+        assert json_data["version"] == "0.1.0"
+        assert json_data["num_qubits"] == 2
+        assert json_data["pauli_terms"][0] == [[0, "X"], [1, "X"]]
+        assert json_data["pauli_terms"][-1] == []
+        assert "pauli_strings" not in json_data
+
+        restored = QubitOperator.from_json(json_data)
+        assert isinstance(restored.get_container(), SparsePauliDecompositionContainer)
+        assert restored.content_hash() == sparse.content_hash()
+
+    def test_hdf5_stores_numeric_arrays(self, tmp_path) -> None:
+        """HDF5 keeps factors as compressed-row integer arrays rather than strings."""
+        sparse, _ = _sparse_and_dense_operators()
+        path = tmp_path / "sparse.h5"
+
+        with h5py.File(path, "w") as handle:
+            sparse.to_hdf5(handle.create_group("operator"))
+
+        with h5py.File(path, "r") as handle:
+            group = handle["operator"]
+            assert group.attrs["container_type"] == "sparse_pauli_decomposition"
+            assert group.attrs["num_qubits"] == 2
+            np.testing.assert_array_equal(group["term_offsets"], [0, 2, 4, 5, 6, 6])
+            np.testing.assert_array_equal(group["qubit_indices"], [0, 1, 0, 1, 1, 0])
+            np.testing.assert_array_equal(group["pauli_codes"], [1, 1, 2, 2, 3, 3])
+            assert "pauli_strings" not in group
+            restored = QubitOperator.from_hdf5(group)
+
+        assert isinstance(restored.get_container(), SparsePauliDecompositionContainer)
+        assert restored.content_hash() == sparse.content_hash()
+
+    @pytest.mark.parametrize(
+        ("name", "values"),
+        [
+            ("term_offsets", [1, 2, 4, 5, 6, 6]),
+            ("term_offsets", [0, 4, 2, 5, 6, 6]),
+            ("qubit_indices", [0.0, 1.0, 0.0, 1.0, 1.0, 0.0]),
+            ("pauli_codes", [1, 1, 2, 2, 3, 4]),
+            ("pauli_codes", [1, 1, 2, 2, 3]),
+        ],
+        ids=["offset_start", "decreasing_offsets", "float_qubits", "code_range", "code_count"],
+    )
+    def test_hdf5_rejects_malformed_arrays(self, tmp_path, name, values) -> None:
+        """Malformed factor arrays fail before any term is built."""
+        sparse, _ = _sparse_and_dense_operators()
+
+        with h5py.File(tmp_path / "malformed.h5", "w") as handle:
+            group = handle.create_group("operator")
+            sparse.to_hdf5(group)
+            del group[name]
+            group.create_dataset(name, data=np.array(values))
+            with pytest.raises(ValueError, match="Invalid sparse Pauli term arrays"):
+                QubitOperator.from_hdf5(group)
+
+    def test_hdf5_rejects_fractional_width(self, tmp_path) -> None:
+        """A non-integer register width fails instead of being truncated."""
+        sparse, _ = _sparse_and_dense_operators()
+
+        with h5py.File(tmp_path / "width.h5", "w") as handle:
+            group = handle.create_group("operator")
+            sparse.to_hdf5(group)
+            group.attrs["num_qubits"] = 2.5
+            with pytest.raises(ValueError, match="num_qubits"):
+                QubitOperator.from_hdf5(group)
+
+
+class TestPauliOnlyAlgorithmsAcceptSparseStorage:
+    """Algorithms written against Pauli terms treat sparse storage as a Pauli decomposition."""
+
+    @pytest.mark.parametrize(
+        "invoke",
+        [
+            partial(_run_builder, builder_type=LCUBuilder),
+            partial(_run_builder, builder_type=Trotter, time=1.0),
+            partial(_run_builder, builder_type=Zassenhaus, time=1.0),
+            partial(_run_builder, builder_type=QDrift, time=1.0, seed=7),
+            partial(_run_builder, builder_type=PartiallyRandomized, time=1.0, seed=7),
+            partial(_run_term_grouper, strategy="commuting"),
+            partial(_run_term_grouper, strategy="qubit_wise_commuting"),
+            partial(_run_term_grouper, strategy="identity"),
+            partial(_run_term_grouper, strategy="vacuum_annihilating"),
+            pytest.param(
+                partial(_run_term_grouper, strategy="nx_commuting"),
+                marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed"),
+            ),
+            pytest.param(
+                partial(_run_term_grouper, strategy="nx_qubit_wise_commuting"),
+                marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed"),
+            ),
+            commutator_bound_first_order,
+            partial(qdrift_samples_campbell, time=1.0, target_accuracy=1e-3),
+            partial(trotter_steps_naive, time=1.0, target_accuracy=1e-3),
+            partial(zassenhaus_steps_naive, time=1.0, target_accuracy=1e-3),
+            partial(zassenhaus_omitted_commutator_norm, order=1, weight_threshold=1e-12),
+            methodcaller("to_matrix"),
+        ],
+        ids=[
+            "lcu",
+            "trotter",
+            "zassenhaus",
+            "qdrift_seeded",
+            "partially_randomized_seeded",
+            "term_grouper_commuting",
+            "term_grouper_qubit_wise_commuting",
+            "term_grouper_identity",
+            "term_grouper_vacuum_annihilating",
+            "term_grouper_nx_commuting",
+            "term_grouper_nx_qubit_wise_commuting",
+            "commutator_bound",
+            "qdrift_samples",
+            "trotter_steps",
+            "zassenhaus_steps",
+            "zassenhaus_omitted_commutator_norm",
+            "to_matrix",
+        ],
+    )
+    def test_sparse_input_matches_dense(self, invoke) -> None:
+        """Deterministic results match dense storage, and grouped operators stay sparse."""
+        sparse, dense = _sparse_and_dense_operators()
+
+        sparse_result, dense_result = invoke(sparse), invoke(dense)
+
+        if isinstance(dense_result, QubitOperator):
+            assert isinstance(sparse_result.get_container(), SparsePauliDecompositionContainer)
+            assert sparse_result.term_partition == dense_result.term_partition
+        elif isinstance(dense_result, UnitaryRepresentation):
+            assert sparse_result.get_container().to_json() == dense_result.get_container().to_json()
+        else:
+            np.testing.assert_array_equal(sparse_result, dense_result)

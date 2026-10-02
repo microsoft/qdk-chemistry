@@ -64,6 +64,12 @@ def _hash_tapering(h, tapering: TaperingSpecification) -> None:
     _hash_arg(h, tapering.to_json())
 
 
+def _summands(coefficients: np.ndarray) -> list[Any] | np.ndarray:
+    """Return coefficients for summation: exact Python ints for integer dtypes, else the stored floating values."""
+    values = np.asarray(coefficients)
+    return values.tolist() if values.dtype.kind in "biu" else values
+
+
 class PauliDecompositionContainer(QubitOperatorContainer):
     """Container representing an operator as a weighted sum of Pauli strings.
 
@@ -220,9 +226,10 @@ class PauliDecompositionContainer(QubitOperatorContainer):
     def equiv(self, other: PauliDecompositionContainer, atol: float = 1e-12) -> bool:
         """Check mathematical equivalence with another QubitOperator.
 
-        Two operators are equivalent if they contain the same Pauli
-        terms with the same coefficients (within tolerance), regardless of
-        term ordering.  Duplicate Pauli strings are summed before comparison.
+        Two operators are equivalent if they act on the same number of qubits
+        and contain the same Pauli terms with the same coefficients (within
+        tolerance), regardless of term ordering.  Duplicate Pauli strings are
+        summed before comparison.
 
         Args:
             other: The QubitOperator to compare against.
@@ -238,12 +245,12 @@ class PauliDecompositionContainer(QubitOperatorContainer):
             True
 
         """
-        if not isinstance(other, PauliDecompositionContainer):
+        if not isinstance(other, PauliDecompositionContainer) or self.num_qubits != other.num_qubits:
             return False
 
         def _sum_terms(qh: PauliDecompositionContainer) -> dict[str, complex]:
             d: dict[str, complex] = {}
-            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
+            for ps, c in zip(qh.pauli_strings, _summands(qh.coefficients), strict=True):
                 d[ps] = d.get(ps, 0) + c
             return d
 
