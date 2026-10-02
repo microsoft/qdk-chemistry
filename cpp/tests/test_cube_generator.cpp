@@ -185,8 +185,7 @@ TEST(CubeGeneratorTest, EvaluatesHydrogenOrbitalFromNamedBasis) {
 
   const auto shells = basis->get_shells_for_atom(0);
   ASSERT_FALSE(shells.empty());
-  ASSERT_TRUE(shells.front().has_radial_powers());
-  EXPECT_TRUE((shells.front().rpowers.array() == 0).all());
+  EXPECT_FALSE(shells.front().has_radial_powers());
 
   CubeGenerator generator(basis);
   Eigen::VectorXd coefficients(1);
@@ -273,7 +272,17 @@ TEST(CubeGeneratorTest, AcceptsExplicitZeroRadialPowers) {
                       std::vector<double>{1.0}, std::vector<int>{0});
   auto basis = std::make_shared<BasisSet>("zero-radial", shells, structure);
 
-  EXPECT_NO_THROW({ CubeGenerator generator(basis); });
+  CubeGenerator generator(basis);
+  CubeGenerator ordinary_generator(make_hydrogen_basis());
+  const Eigen::VectorXd coefficients = Eigen::VectorXd::Ones(1);
+  const auto grid = single_point_grid();
+  const auto orbital = generator.orbital(coefficients, "", grid);
+  const auto ordinary_orbital =
+      ordinary_generator.orbital(coefficients, "", grid);
+
+  ASSERT_EQ(orbital.size(), 1);
+  ASSERT_EQ(ordinary_orbital.size(), 1);
+  EXPECT_NEAR(orbital[0], ordinary_orbital[0], 1e-12);
 }
 
 TEST(CubeGeneratorTest, IndexesAtomicOrbitalsInAtomMajorOrder) {

@@ -13,6 +13,7 @@ from qdk_chemistry.algorithms import (
     ActiveSpaceSelector,
     DynamicalCorrelationCalculator,
     EffectiveHamiltonianConstructor,
+    HamiltonianBasisTransformer,
     HamiltonianConstructor,
     MultiConfigurationCalculator,
     MultiConfigurationScf,
@@ -176,6 +177,23 @@ class MockHamiltonianConstructor(HamiltonianConstructor):
     def name(self) -> str:
         """Return the algorithm name."""
         return "mock_hamiltonian_constructor"
+
+
+class MockHamiltonianBasisTransformer(HamiltonianBasisTransformer):
+    def __init__(self):
+        super().__init__()
+        self._settings = Settings()
+        self._settings._set_default("test_parameter", "string", "default")
+        self.calls = 0
+        self.last_target = None
+
+    def _run_impl(self, hamiltonian, target_orbitals):
+        self.calls += 1
+        self.last_target = target_orbitals
+        return hamiltonian
+
+    def name(self) -> str:
+        return "mock_hamiltonian_basis_transformer"
 
 
 class MockScfSolver(ScfSolver):
@@ -509,6 +527,42 @@ class TestAlgorithmClasses:
         assert isinstance(result, Hamiltonian)
         # For legacy constructor, check that it has one-body integrals set
         assert result.has_one_body_integrals()
+
+    def test_hamiltonian_basis_transformer_inheritance(self):
+        """Test Python override dispatch and settings replacement."""
+        transformer = MockHamiltonianBasisTransformer()
+        assert isinstance(transformer, HamiltonianBasisTransformer)
+        assert transformer.type_name() == "hamiltonian_basis_transformer"
+        assert transformer.settings()["test_parameter"] == "default"
+
+        transformer.settings()["test_parameter"] = "updated"
+        source = create_test_hamiltonian(2)
+        target_orbitals = source.get_orbitals()
+        result = transformer.run(source, target_orbitals)
+
+        assert result is source
+        assert transformer.calls == 1
+        assert transformer.last_target is target_orbitals
+        assert transformer.settings()["test_parameter"] == "updated"
+
+    def test_hamiltonian_basis_transformer_registration(self):
+        """Test that a Python transformer implementation survives factory use."""
+
+        def create_mock_transformer():
+            return MockHamiltonianBasisTransformer()
+
+        algorithms.register(create_mock_transformer)
+        transformer = algorithms.create(
+            "hamiltonian_basis_transformer",
+            "mock_hamiltonian_basis_transformer",
+        )
+        source = create_test_hamiltonian(2)
+
+        result = transformer.run(source, source.get_orbitals())
+
+        assert isinstance(transformer, MockHamiltonianBasisTransformer)
+        assert result is source
+        assert transformer.calls == 1
 
     def test_scf_solver_inheritance(self):
         """Test that ScfSolver can be inherited from Python."""
