@@ -564,6 +564,15 @@ class TestModelHamiltonians:
                     expected["".join(pauli)] = matrix[first, second]
         assert terms == pytest.approx(expected, abs=float_comparison_absolute_tolerance)
 
+    def test_kitaev_keeps_small_couplings_beside_large_ones(self) -> None:
+        """Residue cleanup keeps a gamma coupling far below a large Heisenberg coupling."""
+        graph = _kitaev_graph(LatticeGeometry.honeycomb(3, 3))
+        terms = _get_terms_dict(
+            create_kitaev_hamiltonian(graph, kx=0.0, ky=0.0, kz=0.0, j=1e20, gamma=1.0, include_term_groups=False)
+        )
+        num_bonds = sum(label.shell == 1 for label in graph.edge_labels.values())
+        assert sum(value == 0.25 for value in terms.values()) == 2 * num_bonds
+
     def test_kitaev_crystallographic_magnetic_field(self):
         graph = _kitaev_graph(LatticeGeometry.honeycomb(2, 2))
         field_abc = np.array([2.0, -3.0, 5.0])
