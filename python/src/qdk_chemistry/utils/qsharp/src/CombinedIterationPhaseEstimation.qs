@@ -12,9 +12,7 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
     /// Runs the full iterative Quantum Phase Estimation (IQPE) as a single circuit
     /// with in-circuit classical feedback.
     ///
-    /// Unlike `RunIQPE`, which measures a single phase bit per circuit execution and
-    /// relies on the host to accumulate the phase correction between rounds, this
-    /// operation performs every round in one circuit. It uses mid-circuit measurement
+    /// This operation performs every round of IQPE in one circuit. It uses mid-circuit measurement
     /// and classical feed-forward to compute and apply the phase correction on device.
     /// It therefore requires a target that supports the Adaptive profile (mid-circuit
     /// measurement and classical control) and is not compatible with Base-profile-only

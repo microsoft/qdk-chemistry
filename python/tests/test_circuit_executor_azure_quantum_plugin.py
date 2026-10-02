@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from qdk_chemistry.data import Circuit, QuantumErrorProfile
+from qdk_chemistry.data import Circuit, QuantumErrorProfile, SettingTypeMismatch
 
 pytest.importorskip("azure.quantum", reason="azure-quantum is not installed")
 
@@ -92,16 +92,26 @@ class TestAzureQuantumBackendCircuitExecutor:
         assert executor.settings().get("location") == "location"
         assert executor.settings().get("auth_mode") == "default"
 
-    def test_input_params_accepts_dict_or_json_string(self):
-        """A dict is encoded once and a pre-encoded string is stored as-is."""
+    def test_input_params_accepts_json_string(self):
+        """A JSON object string is stored as-is without double encoding."""
         payload = {"someOption": False, "seed": 7}
         encoded = json.dumps(payload)
 
-        from_dict = AzureQuantumBackend(input_params=payload).settings().get("input_params")
         from_string = AzureQuantumBackend(input_params=encoded).settings().get("input_params")
 
-        assert json.loads(from_dict) == payload
+        assert from_string == encoded
         assert json.loads(from_string) == payload
+
+    def test_input_params_rejects_dict(self):
+        """The constructor and settings both require a JSON string, not a dict."""
+        payload = {"someOption": False, "seed": 7}
+
+        with pytest.raises(SettingTypeMismatch, match="Type mismatch for setting 'input_params'"):
+            AzureQuantumBackend(input_params=payload)
+
+        executor = AzureQuantumBackend()
+        with pytest.raises(SettingTypeMismatch, match="Type mismatch for setting 'input_params'"):
+            executor.settings().set("input_params", payload)
 
     def test_settings_reach_the_workspace(self, fake_workspace, test_circuit_1: Circuit):
         """Configured values are used to build the workspace and target."""

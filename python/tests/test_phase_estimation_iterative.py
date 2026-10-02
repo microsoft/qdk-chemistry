@@ -722,6 +722,48 @@ def test_combined_iqpe_matches_per_bit_on_ising_chain(power_strategy: str) -> No
     assert list(combined.bits_msb_first) == list(per_bit.bits_msb_first)
 
 
+@pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+def test_combined_iqpe_matches_per_bit_on_four_qubit_hamiltonian(
+    four_qubit_phase_problem: PhaseEstimationProblem, power_strategy: str
+) -> None:
+    """Compare both IQPE modes on an entangled four-qubit, six-bit benchmark.
+
+    For ``H = 0.25 XXXX + 4.5 ZZZZ``, the state ``(|1000> - |0111>)/sqrt(2)``
+    has energy ``-4.75`` and phase ``19/64`` at ``t = pi/8`` (bits ``010011``).
+    Unlike the two-bit Ising case, this exercises non-Clifford rotations and
+    feedback across six rounds. Commuting terms and an exactly representable
+    phase keep the expected result deterministic for both power strategies.
+    """
+    problem = four_qubit_phase_problem
+    unitary_builder = AlgorithmRef(
+        "hamiltonian_unitary_builder",
+        "trotter",
+        time=problem.evolution_time,
+        power_strategy=power_strategy,
+    )
+    for combine_iterations in (False, True):
+        iqpe = create(
+            "phase_estimation",
+            "qdk_iterative",
+            shots_per_bit=problem.shots_iterative,
+            qpe_circuit_builder=AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_iterative",
+                num_bits=problem.num_bits,
+                unitary_builder=unitary_builder,
+                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+                combine_iterations=combine_iterations,
+            ),
+            circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+        )
+        result = iqpe.run(state_preparation=problem.state_prep, qubit_hamiltonian=problem.hamiltonian)
+
+        assert result.raw_energy == pytest.approx(problem.expected_energy, abs=qpe_energy_tolerance)
+        assert result.phase_fraction == pytest.approx(problem.expected_phase, abs=qpe_phase_fraction_tolerance)
+        assert list(result.bits_msb_first) == problem.expected_bits
+        assert result.bitstring_msb_first == problem.expected_bitstring
+
+
 def _combined_builder(
     problem: PhaseEstimationProblem, *, num_bits: int, shots_per_bit: int
 ) -> QdkIterativeQpeCircuitBuilder:
