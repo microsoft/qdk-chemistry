@@ -545,8 +545,13 @@ qcs::Relativity parse_relativity(const std::string& label) {
       return entry.relativity;
     }
   }
+  std::string supported;
+  for (const auto& entry : kRelativityLabels) {
+    supported +=
+        (supported.empty() ? "'" : ", '") + std::string(entry.label) + "'";
+  }
   throw std::invalid_argument("Unsupported relativistic treatment '" + label +
-                              "'");
+                              "'. Supported: " + supported);
 }
 
 }  // namespace qdk::chemistry::utils::microsoft
