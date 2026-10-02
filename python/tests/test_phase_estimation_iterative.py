@@ -720,3 +720,54 @@ def test_combined_iqpe_matches_per_bit_on_ising_chain(power_strategy: str) -> No
     assert combined.raw_energy == pytest.approx(per_bit.raw_energy, abs=qpe_energy_tolerance)
     assert combined.phase_fraction == pytest.approx(0.25, abs=qpe_phase_fraction_tolerance)
     assert list(combined.bits_msb_first) == list(per_bit.bits_msb_first)
+
+
+def _combined_builder(
+    problem: PhaseEstimationProblem, *, num_bits: int, shots_per_bit: int
+) -> QdkIterativeQpeCircuitBuilder:
+    """Build a combined-mode IQPE circuit builder for ``problem``."""
+    return QdkIterativeQpeCircuitBuilder(
+        num_bits=num_bits,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        combine_iterations=True,
+        shots_per_bit=shots_per_bit,
+    )
+
+
+@pytest.mark.parametrize("shots_per_bit", [0, -1])
+def test_combined_iqpe_rejects_non_positive_shots_per_bit(
+    two_qubit_phase_problem: PhaseEstimationProblem, shots_per_bit: int
+) -> None:
+    """Combined IQPE rejects a non-positive ``shots_per_bit`` instead of emitting an empty vote."""
+    builder = _combined_builder(two_qubit_phase_problem, num_bits=2, shots_per_bit=shots_per_bit)
+
+    with pytest.raises(ValueError, match="shots_per_bit must be a positive integer"):
+        builder.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )
+
+
+@pytest.mark.parametrize("shots_per_bit", [1, 3])
+def test_combined_iqpe_repeats_and_votes_inside_the_circuit(
+    two_qubit_phase_problem: PhaseEstimationProblem, shots_per_bit: int
+) -> None:
+    """Each round is repeated ``shots_per_bit`` times inside the circuit, then voted.
+
+    The majority vote lives in the circuit rather than in the host, so a single
+    execution already costs a full per-bit pass. A round therefore measures the phase
+    qubit ``shots_per_bit`` times for the Hadamard tests plus once to read the voted
+    bit back out, which pins both the repetition and the vote readout.
+    """
+    num_bits = 2
+    builder = _combined_builder(two_qubit_phase_problem, num_bits=num_bits, shots_per_bit=shots_per_bit)
+
+    circuits = builder.run(
+        state_preparation=two_qubit_phase_problem.state_prep,
+        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+    )
+
+    assert len(circuits) == 1
+    qir = str(circuits[0].get_qir())
+    assert qir.count("call void @__quantum__qis__mresetz__body") == num_bits * (shots_per_bit + 1)

@@ -173,9 +173,11 @@ class IterativePhaseEstimation(PhaseEstimation):
         """Run the full IQPE as a single circuit with in-circuit classical feedback.
 
         The builder produces one circuit that performs every round using mid-circuit
-        measurement and classical feed-forward. The executor returns each shot's full
-        measured bitstring MSB-first (same convention as the standard QPE path); the most
-        frequent bitstring is decoded as ``int(bitstring_msb_first, 2) / 2**num_bits``.
+        measurement and classical feed-forward, repeating each round ``shots_per_bit``
+        times and feeding the majority bit forward. That makes one execution equivalent
+        to a full pass of the per-bit loop, in both estimator and controlled-unitary
+        count, so the circuit is executed once and its single bitstring decoded as
+        ``int(bitstring_msb_first, 2) / 2**num_bits``.
 
         Args:
             circuit_builder: The iterative circuit builder configured with ``combine_iterations`` enabled.
@@ -193,19 +195,22 @@ class IterativePhaseEstimation(PhaseEstimation):
             RuntimeError: If the executor returns no measurement results.
 
         """
+        # The vote happens inside the circuit, so hand the builder the shot budget and run once.
+        circuit_builder.settings().update("shots_per_bit", self.settings().get("shots_per_bit"))
         full_circuit = circuit_builder._run_impl(  # noqa: SLF001
             state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
         )[0]
         Logger.info("Running full IQPE as a single circuit with in-circuit classical feedback.")
-        executor_data = circuit_executor.run(full_circuit, shots=self.settings().get("shots_per_bit"), noise=noise)
+        executor_data = circuit_executor.run(full_circuit, shots=1, noise=noise)
         counts = executor_data.bitstring_counts
         if not counts:
             raise RuntimeError("No measurement results returned from the circuit executor.")
 
-        # Most frequent bitstring across shots, decoded like standard QPE. The executor
-        # returns each bitstring MSB-first (same convention as the standard QPE path).
+        # One execution yields one voted bitstring; take the most frequent so a backend that
+        # returns more than the requested shot still decodes. The executor returns each
+        # bitstring MSB-first (same convention as the standard QPE path).
         bitstring_msb_first = min(counts, key=lambda b: (-counts[b], b))
-        Logger.info(f"Dominant measured bitstring (MSB first): {bitstring_msb_first}")
+        Logger.info(f"Voted bitstring (MSB first): {bitstring_msb_first}")
         phase_fraction = int(bitstring_msb_first, 2) / (2**num_bits)
 
         return QpeResult.from_phase_fraction(
