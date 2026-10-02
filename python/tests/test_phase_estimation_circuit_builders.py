@@ -93,6 +93,14 @@ def four_qubit_circuit_problem() -> CircuitBuilderProblem:
 class TestIterativeQpeCircuitBuilder:
     """Tests for the iterative phase estimation circuit builder."""
 
+    def test_mid_shots_setting(self) -> None:
+        """Internal repetitions have their own builder setting, independent of executor shots."""
+        assert QdkIterativeQpeCircuitBuilder().settings().get("mid_shots") == 3
+        builder = QdkIterativeQpeCircuitBuilder(mid_shots=5)
+        assert builder.settings().get("mid_shots") == 5
+        builder_keys = builder.settings().keys()
+        assert "shots_per_bit" not in builder_keys
+
     def test_generates_correct_number_of_circuits(
         self,
         two_qubit_circuit_problem: CircuitBuilderProblem,
@@ -148,6 +156,57 @@ class TestIterativeQpeCircuitBuilder:
             assert len(qsc_json["qubits"]) == two_qubit_circuit_problem.num_qubits
             # Ancilla qubit (q_0) has a measurement result
             assert qsc_json["qubits"][0]["numResults"] == 1
+
+    def test_combined_iterations_returns_single_circuit(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """combine_iterations collapses the per-bit circuits into one adaptive circuit."""
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        builder.settings().set("combine_iterations", True)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert len(circuits) == 1
+        assert circuits[0]._qsharp_factory.program is QSHARP_UTILS.CombinedIterationPhaseEstimation.RunFullIQPE
+
+    def test_combined_iterations_builds_one_controlled_unitary_per_round(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem
+    ) -> None:
+        """Combined mode requests the same powers as the per-bit path, so power_strategy applies."""
+        recorded_powers: list[int] = []
+
+        class _PowerRecordingBuilder(QdkIterativeQpeCircuitBuilder):
+            """Records the controlled power requested for each round."""
+
+            def _create_controlled_circuit(self, qubit_hamiltonian, power):
+                recorded_powers.append(power)
+                return super()._create_controlled_circuit(qubit_hamiltonian, power)
+
+        builder = _PowerRecordingBuilder(
+            num_bits=two_qubit_circuit_problem.num_bits,
+            unitary_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time
+            ),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set("combine_iterations", True)
+
+        builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        num_bits = two_qubit_circuit_problem.num_bits
+        assert recorded_powers == [2 ** (num_bits - k - 1) for k in range(num_bits)]
 
     def test_run_returns_circuits_four_qubit(self, four_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate circuit builder with a four-qubit Hamiltonian produces more circuits."""
