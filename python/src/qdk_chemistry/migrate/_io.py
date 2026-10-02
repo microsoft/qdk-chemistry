@@ -24,7 +24,7 @@ import numpy as np
 _JSON_SUFFIXES = {".json"}
 _HDF5_SUFFIXES = {".h5", ".hdf5", ".he5"}
 
-_TYPE_TOKENS = ("basis_set", "orbitals", "hamiltonian", "wavefunction", "ansatz", "qpe_result")
+_TYPE_TOKENS = ("basis_set", "orbitals", "hamiltonian", "wavefunction", "ansatz", "qpe_result", "lattice_graph")
 
 
 def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:

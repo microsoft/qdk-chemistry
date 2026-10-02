@@ -15,7 +15,8 @@ Python::
     migrate.convert_file("old.hamiltonian.json", "new.hamiltonian.h5")
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``basis_set`` / ``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
+(``basis_set`` / ``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result`` /
+``lattice_graph``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 Input and output formats may differ.
 
@@ -24,7 +25,7 @@ on a library release: every migratable type exposes a ``STEPS`` table mapping a
 source version to a ``(next_version, transform)`` pair, and the chain is followed
 until it reaches the version the installed library accepts. To support a future
 serialization-version bump for a data class, register the next step in that type's
-``STEPS`` table (``_basis_set``/``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``);
+``STEPS`` table (``_basis_set``/``_orbitals``/``_hamiltonian``/``_wavefunction``/``_qpe_result``/``_lattice_graph``);
 the migrated document is validated against the live deserializer, so a missing step
 fails loudly.
 
@@ -49,9 +50,9 @@ from pathlib import Path
 
 import h5py
 
-from qdk_chemistry.data import Ansatz, BasisSet, Hamiltonian, Orbitals, QpeResult, Wavefunction
+from qdk_chemistry.data import Ansatz, BasisSet, Hamiltonian, LatticeGraph, Orbitals, QpeResult, Wavefunction
 
-from . import _ansatz, _basis_set, _hamiltonian, _io, _orbitals, _qpe_result, _wavefunction
+from . import _ansatz, _basis_set, _hamiltonian, _io, _lattice_graph, _orbitals, _qpe_result, _wavefunction
 
 __all__ = ["MigrationError", "convert_file"]
 
@@ -82,6 +83,7 @@ _MODULES = {
     "wavefunction": _wavefunction,
     "ansatz": _ansatz,
     "qpe_result": _qpe_result,
+    "lattice_graph": _lattice_graph,
 }
 
 _CLASSES = {
@@ -91,6 +93,7 @@ _CLASSES = {
     "wavefunction": Wavefunction,
     "ansatz": Ansatz,
     "qpe_result": QpeResult,
+    "lattice_graph": LatticeGraph,
 }
 
 

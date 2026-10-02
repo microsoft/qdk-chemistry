@@ -25,6 +25,7 @@ from qdk_chemistry.data import (
     BasisSet,
     Configuration,
     Hamiltonian,
+    LatticeGraph,
     Orbitals,
     QpeResult,
     Structure,
@@ -193,6 +194,45 @@ def test_qpe_result(tmp_path, source_format, output_format):
 
     with pytest.raises(migrate.MigrationError, match="No migration step"):
         migrate.convert_file(dst, tmp_path / f"qpe_again.qpe_result.{output_suffix}")
+
+
+# --------------------------------------------------------------------------- #
+# Lattice graph
+# --------------------------------------------------------------------------- #
+def _write_old_lattice_graph(path, source_format):
+    """Write a weighted three-site path in the unversioned LatticeGraph layout."""
+    adjacency = [[0, 1, 1.5], [1, 0, 1.5], [1, 2, -0.5], [2, 1, -0.5]]
+    coloring = [[0, 1, 0], [1, 2, 1]]
+    if source_format == "json":
+        doc = {"num_sites": 3, "is_symmetric": True, "adjacency_sparse": adjacency, "edge_coloring": coloring}
+        path.write_text(json.dumps(doc))
+    else:
+        with h5py.File(path, "w") as handle:
+            handle.attrs["num_sites"] = np.uint64(3)
+            handle.attrs["is_symmetric"] = True
+            handle.create_dataset("adjacency_sparse", data=np.array(adjacency, dtype=np.float64))
+            handle.create_dataset("edge_coloring", data=np.array(coloring, dtype=np.float64))
+
+
+@pytest.mark.parametrize(
+    ("source_format", "output_format"),
+    [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
+)
+def test_lattice_graph(tmp_path, source_format, output_format):
+    src = tmp_path / f"old.lattice_graph.{'json' if source_format == 'json' else 'h5'}"
+    dst = tmp_path / f"new.lattice_graph.{'json' if output_format == 'json' else 'h5'}"
+    _write_old_lattice_graph(src, source_format)
+    with pytest.raises(RuntimeError, match=r"qdk_chemistry\.migrate"):
+        LatticeGraph.from_file(src, source_format)
+
+    migrate.convert_file(src, dst)
+    graph = LatticeGraph.from_file(dst, output_format)
+    np.testing.assert_array_equal(graph.adjacency_matrix(), [[0.0, 1.5, 0.0], [1.5, 0.0, -0.5], [0.0, -0.5, 0.0]])
+    assert graph.edge_coloring == {(0, 1): 0, (1, 2): 1}
+    assert graph.edge_labels == {}
+
+    with pytest.raises(migrate.MigrationError, match="No migration step"):
+        migrate.convert_file(dst, tmp_path / f"again.lattice_graph.{'json' if output_format == 'json' else 'h5'}")
 
 
 # --------------------------------------------------------------------------- #

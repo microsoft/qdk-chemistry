@@ -4,8 +4,9 @@ Migrating data files between serialization versions
 Each QDK/Chemistry data class versions its on-disk serialization schema
 independently. Deserializers for :class:`~qdk_chemistry.data.Orbitals`,
 :class:`~qdk_chemistry.data.Hamiltonian`,
-:class:`~qdk_chemistry.data.Wavefunction`, and
-:class:`~qdk_chemistry.data.QpeResult` accept **only** the serialization version
+:class:`~qdk_chemistry.data.Wavefunction`,
+:class:`~qdk_chemistry.data.QpeResult`, and
+:class:`~qdk_chemistry.data.LatticeGraph` accept **only** the serialization version
 the installed library was built against. Loading a file written against an older
 version of that class's schema raises an error that points back here.
 
@@ -25,7 +26,8 @@ single file:
    python -m qdk_chemistry.migrate old.hamiltonian.h5 new.hamiltonian.h5
 
 The data type is taken from the ``name.type.ext`` filename convention
-(``basis_set`` / ``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result``) and the
+(``basis_set`` / ``orbitals`` / ``hamiltonian`` / ``wavefunction`` / ``ansatz`` / ``qpe_result`` /
+``lattice_graph``) and the
 serialization format from the file extension (``.json`` or ``.h5`` / ``.hdf5``).
 The input and output formats may differ, so the same command also converts between
 JSON and HDF5:
@@ -78,6 +80,9 @@ registered make the following changes:
   Wavefunction are each migrated through their own serialization-version chains.
 - :class:`~qdk_chemistry.data.QpeResult` — the result fields are preserved while
   the obsolete evolution-time field is removed.
+- :class:`~qdk_chemistry.data.LatticeGraph` — files written before lattice graphs
+  were versioned gain a serialization version; the adjacency and any stored edge
+  coloring are unchanged.
 
 Data classes whose serialization schema has not changed (for example
 :class:`~qdk_chemistry.data.Structure` and the remaining qubit-level classes)
