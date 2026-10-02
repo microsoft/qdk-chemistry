@@ -253,8 +253,10 @@ class Trotter(TimeEvolutionBuilder):
             container = container.fuse_boundaries(atol=0.0)
         return UnitaryRepresentation(container=container)
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
-        """Determine the number of Trotter divisions to use.
+    def _resolve_num_divisions(
+        self, num_qubits: int, terms: list[dict[int, str]], coefficients: list[float], time: float
+    ) -> int:
+        """Determine the number of Trotter divisions for terms in emitted order.
 
         When both *num_divisions* and *target_accuracy* are provided, the
         larger value wins.  When neither is provided, the default is 1.
@@ -264,16 +266,17 @@ class Trotter(TimeEvolutionBuilder):
         manual = num_divisions if num_divisions > 0 else 1
 
         target_accuracy = self._settings.get("target_accuracy")
-        if target_accuracy <= 0.0:
+        if target_accuracy <= 0.0 or not terms:
             return manual
 
+        hamiltonian = QubitOperator.from_sparse_terms(num_qubits, terms, np.array(coefficients))
         order = self._settings.get("order")
         weight_threshold = self._settings.get("weight_threshold")
 
         error_bound = self._settings.get("error_bound")
         if error_bound == "commutator":
             auto = trotter_steps_commutator(
-                hamiltonian=qubit_hamiltonian,
+                hamiltonian=hamiltonian,
                 time=time,
                 target_accuracy=target_accuracy,
                 order=order,
@@ -282,7 +285,7 @@ class Trotter(TimeEvolutionBuilder):
 
         else:
             auto = trotter_steps_naive(
-                hamiltonian=qubit_hamiltonian,
+                hamiltonian=hamiltonian,
                 time=time,
                 target_accuracy=target_accuracy,
                 order=order,
@@ -348,12 +351,7 @@ class Trotter(TimeEvolutionBuilder):
         # The second-order commutator bound depends on term order, so bound the emitted order.
         emitted = [i for group in groups for layer in group for i in layer if i in maps]
         num_divisions = self._resolve_num_divisions(
-            QubitOperator.from_sparse_terms(
-                qubit_hamiltonian.num_qubits, [maps[i] for i in emitted], np.array([coefficients[i] for i in emitted])
-            )
-            if emitted and self._settings.get("target_accuracy") > 0.0
-            else qubit_hamiltonian,
-            time,
+            qubit_hamiltonian.num_qubits, [maps[i] for i in emitted], [coefficients[i] for i in emitted], time
         )
         delta = time / num_divisions
         for fraction, group_index in self._trotter_schedule(len(groups)):
