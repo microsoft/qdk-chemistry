@@ -33,7 +33,7 @@ The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.b
 
 TimeDependentQubitHamiltonian
    A :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` specifying the time-evolution schedule.
-   For static Hamiltonians, use :class:`~qdk_chemistry.data.DrivenQubitHamiltonian` with a constant drive ``lambda t: 1.0``.
+   For static Hamiltonians, use ``DrivenQubitHamiltonian(h0)`` without a drive; the propagator then returns ``h0`` unchanged, including its term partition.
 
 State preparation circuit
    A :class:`~qdk_chemistry.data.circuit.Circuit` that prepares the initial state.
