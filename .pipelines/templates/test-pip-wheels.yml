@@ -4,7 +4,7 @@ parameters:
   default: $(Agent.BuildDirectory)
 - name: dockerImage
   type: string
-  default: ubuntu:22.04
+  default: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
 - name: imageTag
   type: string
   default: linux/amd64
@@ -17,6 +17,9 @@ parameters:
 - name: runSlowTests
   type: boolean
   default: true
+- name: exachemRequired
+  type: boolean
+  default: false
 - name: condition
   type: string
   default: succeeded()
@@ -31,6 +34,7 @@ steps:
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
         -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
+        -e EXACHEM_REQUIRED=${{ parameters.exachemRequired }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \

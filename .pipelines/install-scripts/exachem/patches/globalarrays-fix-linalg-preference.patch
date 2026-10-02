@@ -1,0 +1,68 @@
+# globalarrays-fix-linalg-preference.patch
+# ----------------------------------------------------------------------------------------------------------------------
+# Applied to GlobalArrays before we build+install it ourselves for TAMM/ExaChem to reuse (see install-exachem.sh).
+# Fixes GA's own build resolving LAPACK to its bundled ReferenceLAPACK instead of libFLAME when
+# LINALG_VENDOR=BLIS, which causes "multiple definition of `dsytrd_'" once both end up statically linked.
+#
+# 1. cmake/ga-linalg.cmake overwrites LAPACK_PREFERENCE_LIST twice, clobbering any caller-supplied value. Guard
+#    both overwrites so a caller-supplied preference (e.g. "FLAME;ReferenceLAPACK") survives.
+#
+# 2 & 3. LinAlgModulesMacros.cmake's install_linalg_modules() doesn't install FindFLAME.cmake alongside GA's
+#    exported config, so downstream consumers can't re-resolve libFLAME. Fix 2 adds it to the installed list;
+#    fix 3 also installs it explicitly in CMakeLists.txt, mirroring GA's own workaround for two other finder
+#    modules under the same "not reliably installed via ExternalProject" comment.
+#
+# Verified against GlobalArrays/ga commit 635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4.
+# ----------------------------------------------------------------------------------------------------------------------
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 02ef6212..bedcdc49 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -545,6 +545,7 @@ if(ENABLE_BLAS)
+   install(FILES
+     ${CMAKE_CURRENT_LIST_DIR}/cmake/linalg-modules/FindILP64.cmake
+     ${CMAKE_CURRENT_LIST_DIR}/cmake/linalg-modules/FindStandardFortran.cmake
++    ${CMAKE_CURRENT_LIST_DIR}/cmake/linalg-modules/FindFLAME.cmake
+     DESTINATION ${INSTALL_CONFIGDIR}/linalg-cmake-modules
+   )
+ endif()
+diff --git a/cmake/ga-linalg.cmake b/cmake/ga-linalg.cmake
+index 21974f19..88d34d6f 100644
+--- a/cmake/ga-linalg.cmake
++++ b/cmake/ga-linalg.cmake
+@@ -83,7 +83,12 @@ endif()
+ set(GA_BLAS_ILP64 OFF)
+ if (ENABLE_BLAS)
+     set(BLAS_PREFERENCE_LIST      ${LINALG_VENDOR})
+-    set(LAPACK_PREFERENCE_LIST    ${LINALG_VENDOR})
++    set(_qdk_caller_lapack_preference_list "${LAPACK_PREFERENCE_LIST}")
++    if(_qdk_caller_lapack_preference_list)
++      set(LAPACK_PREFERENCE_LIST "${_qdk_caller_lapack_preference_list}")
++    else()
++      set(LAPACK_PREFERENCE_LIST ${LINALG_VENDOR})
++    endif()
+     set(ScaLAPACK_PREFERENCE_LIST ${LINALG_VENDOR})
+ 
+     set(LINALG_PREFER_STATIC ON)
+@@ -122,7 +127,9 @@ if (ENABLE_BLAS)
+     if(_blis_essl_set OR ${LINALG_VENDOR} MATCHES "OpenBLAS")
+       set(use_openmp OFF)
+       # if(_blis_essl_set) #Assume openblas does not have lapack
++      if(NOT _qdk_caller_lapack_preference_list)
+         set(LAPACK_PREFERENCE_LIST ReferenceLAPACK)
++      endif()
+       # endif()
+       if(ENABLE_SCALAPACK)
+         set(ScaLAPACK_PREFERENCE_LIST ReferenceScaLAPACK)
+diff --git a/cmake/linalg-modules/LinAlgModulesMacros.cmake b/cmake/linalg-modules/LinAlgModulesMacros.cmake
+index 6e064f9b..740141a9 100644
+--- a/cmake/linalg-modules/LinAlgModulesMacros.cmake
++++ b/cmake/linalg-modules/LinAlgModulesMacros.cmake
+@@ -25,6 +25,7 @@ function( install_linalg_modules _dest_dir )
+ set( LINALG_FIND_MODULES
+      FindBLAS.cmake
+      FindBLIS.cmake
++     FindFLAME.cmake
+      FindIBMESSL.cmake
+      FindIntelMKL.cmake
+      FindLAPACK.cmake
