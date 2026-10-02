@@ -8,6 +8,9 @@
 from __future__ import annotations
 
 import json
+import math
+from collections.abc import Mapping
+from numbers import Real
 from typing import TYPE_CHECKING, Any, NoReturn
 
 from qdk_chemistry.data._hashing import _hash_arg, _hash_str
@@ -22,11 +25,14 @@ __all__ = ["LatticeContainer"]
 
 
 class LatticeContainer(QubitOperatorContainer):
-    """A qubit operator defined by the lattice geometry it lives on.
+    """A qubit operator defined by the lattice geometry it lives on and its model couplings.
 
-    The container carries the geometry only. Model parameters such as the hopping
-    amplitude belong to the algorithm consuming it, so the geometry assigns no edge
-    weights. Each site carries two spin orbitals, so the register is twice the site count.
+    The couplings are named model coefficients, such as ``{"hopping": t, "interaction": U}``
+    for the Fermi-Hubbard model. The container attaches no meaning to the names: each consuming
+    algorithm documents the names it reads and rejects any it does not, so the same container
+    serves other lattice models under their own names. The couplings are serialized and hashed
+    with the geometry, so two operators that differ only in a coupling are distinct. Each site
+    carries two spin orbitals, so the register is twice the site count.
 
     The geometry is a :class:`~qdk_chemistry.data.LatticeGeometry`, whose factories
     document what their ``nx`` and ``ny`` count: sites for
@@ -39,12 +45,15 @@ class LatticeContainer(QubitOperatorContainer):
 
     Args:
         geometry: Site positions and periodic supercell vectors of the lattice.
+        couplings: Model coefficients keyed by name. Defaults to none.
         encoding: Rejected; the container stores geometry and fixes no encoding.
         fermion_mode_order: Rejected; the container stores geometry and fixes no ordering.
 
     Raises:
-        TypeError: If *geometry* is not a :class:`~qdk_chemistry.data.LatticeGeometry`.
-        ValueError: If *encoding* or *fermion_mode_order* is supplied.
+        TypeError: If *geometry* is not a :class:`~qdk_chemistry.data.LatticeGeometry`, or a
+            coupling name is not a string or its value is not a real number.
+        ValueError: If *encoding* or *fermion_mode_order* is supplied, a coupling name is empty,
+            or a coupling value is not finite.
 
     """
 
@@ -65,10 +74,11 @@ class LatticeContainer(QubitOperatorContainer):
         self,
         geometry: LatticeGeometry,
         *,
+        couplings: Mapping[str, float] | None = None,
         encoding: str | None = None,
         fermion_mode_order: object | None = None,
     ) -> None:
-        """Initialize the container from a lattice geometry."""
+        """Initialize the container from a lattice geometry and its model couplings."""
         if encoding is not None:
             raise ValueError(
                 "LatticeContainer stores lattice geometry and fixes no fermion-to-qubit encoding, "
@@ -88,7 +98,34 @@ class LatticeContainer(QubitOperatorContainer):
                 "factory such as LatticeGeometry.square(nx, ny)."
             )
         self.geometry = geometry
+        self._couplings = self._validated_couplings(couplings)
         super().__init__(None, None)
+
+    @staticmethod
+    def _validated_couplings(couplings: Mapping[str, float] | None) -> dict[str, float]:
+        """Return the couplings as a name-sorted dictionary of finite floats."""
+        if couplings is None:
+            return {}
+        if not isinstance(couplings, Mapping):
+            raise TypeError(f"couplings must map names to numbers, got a {type(couplings).__name__}.")
+        validated = {}
+        for name, value in couplings.items():
+            if not isinstance(name, str):
+                raise TypeError(f"Coupling names must be strings, got {name!r}.")
+            if not name:
+                raise ValueError("Coupling names must not be empty.")
+            # bool is a Real subclass, but True as a coupling is always a mistake.
+            if isinstance(value, bool) or not isinstance(value, Real):
+                raise TypeError(f"Coupling {name!r} must be a real number, got a {type(value).__name__}.")
+            if not math.isfinite(value):
+                raise ValueError(f"Coupling {name!r} must be finite, got {value}.")
+            validated[name] = float(value)
+        return dict(sorted(validated.items()))
+
+    @property
+    def couplings(self) -> dict[str, float]:
+        """Return a copy of the model couplings, keyed by name."""
+        return dict(self._couplings)
 
     @property
     def type(self) -> str:
@@ -112,7 +149,8 @@ class LatticeContainer(QubitOperatorContainer):
         """
         raise NotImplementedError(
             "Matrix conversion is not implemented for the 'lattice' representation, which carries "
-            "no model parameters; build the operator as a Pauli decomposition first."
+            "geometry and named couplings rather than Pauli terms; build the operator as a Pauli "
+            "decomposition first."
         )
 
     def _hash_update(self, h) -> None:
@@ -126,6 +164,7 @@ class LatticeContainer(QubitOperatorContainer):
             {
                 "container_type": self.type,
                 "geometry": json.loads(self.geometry.to_json()),
+                "couplings": dict(self._couplings),
             }
         )
 
@@ -153,7 +192,10 @@ class LatticeContainer(QubitOperatorContainer):
         from qdk_chemistry.data import LatticeGeometry  # noqa: PLC0415  (avoids an import cycle)
 
         cls._validate_json_version(cls._serialization_version, json_data)
-        return cls(LatticeGeometry.from_json(json.dumps(json_data["geometry"])))
+        return cls(
+            LatticeGeometry.from_json(json.dumps(json_data["geometry"])),
+            couplings=json_data.get("couplings"),
+        )
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> LatticeContainer:
@@ -173,7 +215,8 @@ class LatticeContainer(QubitOperatorContainer):
         """Return a human-readable summary of the container."""
         periods = self.geometry.periods
         directions = 0 if periods is None else int(periods.shape[0])
+        couplings = ", ".join(f"{name}={value:g}" for name, value in self._couplings.items()) or "none"
         return (
             f"Lattice qubit operator ({self.geometry.num_sites} sites, "
-            f"{directions} periodic direction(s), {self.num_qubits} qubits)"
+            f"{directions} periodic direction(s), {self.num_qubits} qubits, couplings: {couplings})"
         )

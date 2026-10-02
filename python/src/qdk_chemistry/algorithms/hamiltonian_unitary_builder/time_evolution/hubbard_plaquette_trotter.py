@@ -35,6 +35,9 @@ _GEOMETRY_TOLERANCE = 1e-9
 #: Decimal places the site coordinates are rounded to before they are counted.
 _GEOMETRY_DECIMALS = 9
 
+#: The :class:`LatticeContainer` couplings this builder reads, and the only ones it accepts.
+_COUPLING_NAMES = frozenset({"hopping", "interaction"})
+
 
 class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
     """Settings for the plaquette Trotter builder."""
@@ -55,8 +58,6 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             0,
             "Explicit number of plaquette Trotter steps (0 means automatic).",
         )
-        self._set_default("t", "float", 1.0, "Uniform hopping amplitude of the Fermi-Hubbard model.")
-        self._set_default("u", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
         self._set_default(
             "num_electrons",
             "int",
@@ -70,7 +71,9 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
     The builder takes a :class:`~qdk_chemistry.data.QubitOperator` wrapping a
     :class:`~qdk_chemistry.data.qubit_operator.containers.lattice.LatticeContainer`, which
-    carries the lattice geometry. The model parameters ``t`` and ``u`` are settings.
+    carries the lattice geometry and the model couplings. It reads exactly two couplings,
+    ``"hopping"`` (the uniform hopping amplitude :math:`t`) and ``"interaction"`` (the uniform
+    on-site interaction :math:`U`), and rejects a container missing either or carrying any other.
 
     The interaction is taken in Campbell's particle-hole symmetric form
     :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is
@@ -90,8 +93,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         self,
         order: int = 2,
         *,
-        t: float = 1.0,
-        u: float = 0.0,
         num_electrons: int | None = None,
         time: float = 0.0,
         target_accuracy: float = 0.0,
@@ -103,8 +104,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         Args:
             order: Trotter decomposition order. Only 2 is supported.
-            t: Uniform hopping amplitude of the Fermi-Hubbard model.
-            u: Uniform on-site interaction of the Fermi-Hubbard model.
             num_electrons: Electron count for the classical shift to the conventional model; ``None`` skips it.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto Trotter step computation. Use 0.0 to disable.
@@ -127,8 +126,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         settings.set("order", order)
         settings.set("target_accuracy", target_accuracy)
         settings.set("num_divisions", num_divisions)
-        settings.set("t", t)
-        settings.set("u", u)
         if num_electrons is not None:
             settings.set("num_electrons", int(num_electrons))
         self._settings = settings
@@ -190,6 +187,32 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         Logger.debug(f"HubbardPlaquetteTrotter: periodic {width}x{height} square lattice, {len(bonds)} bonds per spin.")
         return width, height, sections
+
+    @staticmethod
+    def _model_couplings(container: LatticeContainer) -> tuple[float, float]:
+        """Return the hopping amplitude and on-site interaction the container carries.
+
+        Args:
+            container: The lattice container to read.
+
+        Returns:
+            A tuple of the ``"hopping"`` and ``"interaction"`` couplings.
+
+        Raises:
+            ValueError: If either coupling is missing, or the container carries any other, which
+                this builder would otherwise silently drop from the evolution.
+
+        """
+        couplings = container.couplings
+        missing = sorted(_COUPLING_NAMES - couplings.keys())
+        unexpected = sorted(couplings.keys() - _COUPLING_NAMES)
+        if missing or unexpected:
+            raise ValueError(
+                "HubbardPlaquetteTrotter evolves the uniform Fermi-Hubbard model and needs exactly the "
+                f"couplings {sorted(_COUPLING_NAMES)}; the lattice container is missing {missing} and "
+                f"carries unsupported {unexpected}."
+            )
+        return couplings["hopping"], couplings["interaction"]
 
     @staticmethod
     def _square_grid_shape(geometry: LatticeGeometry) -> tuple[int, int]:
@@ -407,7 +430,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             UnitaryRepresentation: The segmented plaquette product formula.
 
         Raises:
-            ValueError: If the order is not 2, or the geometry is not a periodic square lattice.
+            ValueError: If the order is not 2, the geometry is not a periodic square lattice, or the
+                container's couplings are not exactly ``"hopping"`` and ``"interaction"``.
 
         """
         order = self._settings.get("order")
@@ -418,8 +442,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         width, height, _sections = self._lattice_geometry(qubit_hamiltonian)
 
         # 2. Model parameters
-        hopping = float(self._settings.get("t")) * self._bond_multiplicity(width, height)
-        interaction = float(self._settings.get("u"))
+        hopping_amplitude, interaction = self._model_couplings(qubit_hamiltonian.get_container())
+        hopping = hopping_amplitude * self._bond_multiplicity(width, height)
         pair_angle = 0.25 * interaction
         num_electrons = int(self._settings.get("num_electrons"))
         num_sites = width * height
@@ -427,7 +451,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         # 3. Step count
         time, power_repetitions = self._resolve_power()
-        num_divisions = self._step_count(hopping, width, height, time)
+        num_divisions = self._step_count(hopping, interaction, width, height, time)
         delta_time = time / num_divisions
 
         return UnitaryRepresentation(
@@ -484,12 +508,17 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         supercell. A Fourier transform over those cells splits it into the four-by-four
         Hermitian blocks assembled below. The trace norm is therefore the sum of the
         magnitudes of their eigenvalues.
+
+        Each block entry couples a site to its partner one bond away, in the same cell, and to
+        its partner three bonds away, two cells over. The second coupling therefore carries the
+        phase of a two-cell translation, ``exp(2ik)``. With two cells along a side the two
+        partners coincide and cancel, which is why the commutator vanishes on a 4x4 lattice.
         """
         cells_x, cells_y = width // 2, height // 2
         momenta_x = 2.0 * math.pi * np.arange(cells_x) / cells_x
         momenta_y = 2.0 * math.pi * np.arange(cells_y) / cells_y
-        phase_x = np.exp(1j * momenta_x)[:, None]
-        phase_y = np.exp(1j * momenta_y)[None, :]
+        phase_x = np.exp(2j * momenta_x)[:, None]
+        phase_y = np.exp(2j * momenta_y)[None, :]
 
         fourier = np.zeros((cells_x, cells_y, 4, 4), dtype=complex)
         fourier[:, :, 0, 1] = -2.0 + 2.0 / phase_x
@@ -505,6 +534,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     def _step_count(
         self,
         hopping: float,
+        interaction: float,
         width: int,
         height: int,
         time: float,
@@ -536,6 +566,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         Args:
             hopping: Uniform hopping amplitude.
+            interaction: Uniform on-site interaction.
             width: Number of lattice columns.
             height: Number of lattice rows.
             time: Duration of the evolution.
@@ -553,7 +584,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         num_sites = width * height
         hopping = abs(hopping)
-        interaction = abs(self._settings.get("u"))
+        interaction = abs(interaction)
 
         hopping_norm = self._hopping_trace_norm(width, height) * hopping
         commutator_norm = self._commutator_trace_norm(width, height) * hopping**3

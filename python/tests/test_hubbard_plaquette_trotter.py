@@ -31,15 +31,16 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
-def _lattice_operator(width: int, height: int) -> QubitOperator:
-    """Return a periodic square lattice as a lattice-backed qubit operator."""
+def _lattice_operator(width: int, height: int, *, t: float, u: float) -> QubitOperator:
+    """Return a periodic square Fermi-Hubbard lattice as a lattice-backed qubit operator."""
     geometry = LatticeGeometry.square(width, height, periodic_x=True, periodic_y=True)
-    return QubitOperator(container=LatticeContainer(geometry))
+    return QubitOperator(container=LatticeContainer(geometry, couplings={"hopping": t, "interaction": u}))
 
 
 #: Angle unit the layer angles below are built from. Nothing rounds any more, so the value is
@@ -94,8 +95,8 @@ def _evolution_circuit(
     num_divisions: int = 1,
 ):
     """Return the uncontrolled plaquette evolution as a Q# callable."""
-    builder = HubbardPlaquetteTrotter(order=2, time=time, t=t, u=u, num_divisions=num_divisions, target_accuracy=0.0)
-    container = builder.run(_lattice_operator(width, height)).get_container()
+    builder = HubbardPlaquetteTrotter(order=2, time=time, num_divisions=num_divisions, target_accuracy=0.0)
+    container = builder.run(_lattice_operator(width, height, t=t, u=u)).get_container()
     return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(_plaquette_parameters(container))
 
 
@@ -185,8 +186,8 @@ class TestHubbardPlaquetteContainer:
 
     def test_builder_emits_a_plaquette_container(self):
         """The builder's representation is the plaquette container."""
-        unitary = HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, num_divisions=3, target_accuracy=0.0).run(
-            _lattice_operator(2, 2)
+        unitary = HubbardPlaquetteTrotter(order=2, time=0.1, num_divisions=3, target_accuracy=0.0).run(
+            _lattice_operator(2, 2, t=1.0, u=4.0)
         )
         container = unitary.get_container()
 
@@ -198,8 +199,8 @@ class TestHubbardPlaquetteContainer:
     def test_representation_size_is_independent_of_the_lattice(self):
         """The payload is a fixed set of scalars, so it does not grow with the lattice."""
         payloads = [
-            HubbardPlaquetteTrotter(order=2, time=0.1, t=1.0, u=4.0, num_divisions=1)
-            .run(_lattice_operator(side, side))
+            HubbardPlaquetteTrotter(order=2, time=0.1, num_divisions=1)
+            .run(_lattice_operator(side, side, t=1.0, u=4.0))
             .get_container()
             .to_json()
             for side in (2, 4, 6)
@@ -213,8 +214,8 @@ class TestHubbardPlaquetteContainer:
     def test_container_round_trips_through_json(self):
         """Serialization preserves every field the Q# lowering reads."""
         container = (
-            HubbardPlaquetteTrotter(order=2, time=0.3, t=1.0, u=8.0, num_divisions=2)
-            .run(_lattice_operator(4, 4))
+            HubbardPlaquetteTrotter(order=2, time=0.3, num_divisions=2)
+            .run(_lattice_operator(4, 4, t=1.0, u=8.0))
             .get_container()
         )
 
@@ -231,7 +232,7 @@ class TestHubbardPlaquetteContainer:
         open_lattice = QubitOperator(
             container=LatticeContainer(LatticeGeometry.square(4, 4, periodic_x=False, periodic_y=False))
         )
-        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, num_divisions=1)
 
         with pytest.raises(ValueError, match="periodic in both directions"):
             builder.run(open_lattice)
@@ -243,7 +244,7 @@ class TestHubbardPlaquetteContainer:
     def test_rejects_a_geometry_that_is_not_a_square_grid(self, factory, nx, ny):
         """Only the square lattice carries the unit-spaced grid the plaquette tiling assumes."""
         geometry = getattr(LatticeGeometry, factory)(nx, ny, periodic_x=True, periodic_y=True)
-        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, num_divisions=1)
 
         with pytest.raises(ValueError, match="unit-spaced square lattice"):
             builder.run(QubitOperator(container=LatticeContainer(geometry)))
@@ -260,10 +261,76 @@ class TestHubbardPlaquetteContainer:
             create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=4.0),
             mapping=MajoranaMapping.jordan_wigner(8),
         )
-        builder = HubbardPlaquetteTrotter(order=2, time=0.05, t=1.0, u=4.0, num_divisions=1)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, num_divisions=1)
 
         with pytest.raises(TypeError, match="LatticeContainer"):
             builder.run(mapped)
+
+    @pytest.mark.parametrize(
+        ("couplings", "message"),
+        [
+            ({"hopping": 1.0}, r"missing \['interaction'\]"),
+            ({"interaction": 4.0}, r"missing \['hopping'\]"),
+            ({}, r"missing \['hopping', 'interaction'\]"),
+            ({"hopping": 1.0, "interaction": 4.0, "onsite": 0.5}, r"unsupported \['onsite'\]"),
+        ],
+    )
+    def test_requires_exactly_the_hubbard_couplings(self, couplings, message):
+        """A missing coupling has no safe default, and an extra one would silently drop from the evolution."""
+        geometry = LatticeGeometry.square(4, 4, periodic_x=True, periodic_y=True)
+        operator = QubitOperator(container=LatticeContainer(geometry, couplings=couplings))
+        builder = HubbardPlaquetteTrotter(order=2, time=0.05, num_divisions=1)
+
+        with pytest.raises(ValueError, match=message):
+            builder.run(operator)
+
+    def test_the_couplings_decide_the_evolution(self):
+        """Same geometry, different interaction: distinct operators, distinct circuits."""
+        weak = _lattice_operator(4, 4, t=1.0, u=0.0)
+        strong = _lattice_operator(4, 4, t=1.0, u=8.0)
+        builder = HubbardPlaquetteTrotter(order=2, time=0.1, num_divisions=1)
+
+        assert weak.get_container().content_hash() != strong.get_container().content_hash()
+        assert builder.run(weak).get_container().interaction_angle == 0.0
+        assert builder.run(strong).get_container().interaction_angle == pytest.approx(0.25 * 8.0 * 0.1)
+
+    @staticmethod
+    def _step(time: float, width: int = 4, height: int = 4) -> HubbardPlaquetteContainer:
+        builder = HubbardPlaquetteTrotter(order=2, time=time, num_divisions=2)
+        return builder.run(_lattice_operator(width, height, t=1.0, u=8.0)).get_container()
+
+    def test_repetitions_of_one_body_combine_into_one(self):
+        """Appending a body to itself adds the repetitions and keeps everything else."""
+        step = self._step(0.1)
+
+        combined = step.combine(step)
+
+        assert isinstance(combined, HubbardPlaquetteContainer)
+        assert combined.step_reps == 2 * step.step_reps
+        fields = ("width", "height", "interaction_angle", "hopping_angle", "constant_shift", "scale")
+        assert [getattr(combined, name) for name in fields] == [getattr(step, name) for name in fields]
+
+    def test_the_rounding_of_a_split_interval_still_combines(self):
+        """Euler splits 0.3 into steps of 0.1 and a residual of 0.3 - 0.2, which is 0.1 to within one ulp."""
+        residual = 0.3 - 2 * 0.1
+        assert residual != 0.1
+
+        combined = self._step(0.1).combine(self._step(residual))
+
+        assert combined.step_reps == 4
+
+    def test_different_bodies_do_not_combine(self):
+        """A rescaled power has different angles, so no single body can represent both."""
+        with pytest.raises(ValueError, match="hopping_angle"):
+            self._step(0.1).combine(self._step(0.2))
+
+    def test_different_lattices_do_not_combine(self):
+        with pytest.raises(ValueError, match="height"):
+            self._step(0.1).combine(self._step(0.1, height=6))
+
+    def test_only_plaquette_evolutions_combine(self):
+        with pytest.raises(TypeError, match="plaquette"):
+            self._step(0.1).combine(PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=32))
 
 
 class TestPlaquetteTiling:
@@ -773,8 +840,6 @@ class TestPlaquettePhaseEstimation:
                     "hubbard_plaquette",
                     order=2,
                     time=time,
-                    t=t,
-                    u=u,
                     num_divisions=num_divisions,
                     target_accuracy=0.0,
                 ),
@@ -782,7 +847,7 @@ class TestPlaquettePhaseEstimation:
         )
         iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42))
 
-        result = iqpe.run(state_preparation=preparation, qubit_hamiltonian=_lattice_operator(2, 2))
+        result = iqpe.run(state_preparation=preparation, qubit_hamiltonian=_lattice_operator(2, 2, t=t, u=u))
 
         assert tuple(result.bits_msb_first or ()) == (0, 0, 0, 1), "phase 1/16 is exactly 0001"
         assert result.raw_energy == pytest.approx(expected_energy, rel=1e-6)
@@ -912,46 +977,9 @@ class TestPlaquetteUnderPhaseEstimation:
             create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0], max_hwp_batch_size=-2)
 
 
-def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> float:
-    """Recompute Campbell's W_PLAQ independently of the builder.
-
-    Follows Eq. (10) of Campbell arXiv:2012.09238v4 for W_SO2, Eq. (D10) for the
-    plaquette-splitting term, and Eq. (D6) for their sum.
-    """
+def _tiling_matrices(width: int, height: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return the pink and gold single-particle hopping matrices at unit amplitude."""
     num_sites = width * height
-
-    if width < 4 or height < 4:
-        sections = HubbardPlaquetteTrotter._plaquette_sections(width, height)
-        commutator_matrices = []
-        for cycles in sections:
-            matrix = np.zeros((num_sites, num_sites))
-            for cycle in cycles:
-                for index in range(4):
-                    site_a, site_b = cycle[index], cycle[(index + 1) % 4]
-                    matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
-            commutator_matrices.append(matrix)
-        matrix_p, matrix_g = commutator_matrices
-        inner = matrix_p @ matrix_g - matrix_g @ matrix_p
-        outer = inner @ matrix_g - matrix_g @ inner
-        commutator_norm = float(np.linalg.svd(outer, compute_uv=False).sum()) * t**3
-    else:
-        cells_x, cells_y = width // 2, height // 2
-        momenta_x = 2.0 * math.pi * np.arange(cells_x) / cells_x
-        momenta_y = 2.0 * math.pi * np.arange(cells_y) / cells_y
-        phase_x = np.exp(1j * momenta_x)[:, None]
-        phase_y = np.exp(1j * momenta_y)[None, :]
-
-        fourier = np.zeros((cells_x, cells_y, 4, 4), dtype=complex)
-        fourier[:, :, 0, 1] = -2.0 + 2.0 / phase_x
-        fourier[:, :, 1, 0] = -2.0 + 2.0 * phase_x
-        fourier[:, :, 0, 2] = -2.0 + 2.0 / phase_y
-        fourier[:, :, 2, 0] = -2.0 + 2.0 * phase_y
-        fourier[:, :, 1, 3] = -2.0 + 2.0 / phase_y
-        fourier[:, :, 3, 1] = -2.0 + 2.0 * phase_y
-        fourier[:, :, 2, 3] = -2.0 + 2.0 / phase_x
-        fourier[:, :, 3, 2] = -2.0 + 2.0 * phase_x
-        commutator_norm = float(np.abs(np.linalg.eigvalsh(fourier)).sum()) * t**3
-
     matrices = []
     for cycles in HubbardPlaquetteTrotter._plaquette_sections(width, height):
         matrix = np.zeros((num_sites, num_sites))
@@ -961,8 +989,33 @@ def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> fl
                 matrix[site_a, site_b] = matrix[site_b, site_a] = -1.0
         matrices.append(matrix)
     matrix_p, matrix_g = matrices
+    return matrix_p, matrix_g
 
-    hopping_norm = float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum()) * t
+
+def _dense_commutator_trace_norm(width: int, height: int) -> float:
+    """Return ``||[[R_p, R_g], R_g]||_1`` by a singular value decomposition of the dense matrix."""
+    matrix_p, matrix_g = _tiling_matrices(width, height)
+    inner = matrix_p @ matrix_g - matrix_g @ matrix_p
+    outer = inner @ matrix_g - matrix_g @ inner
+    return float(np.linalg.svd(outer, compute_uv=False).sum())
+
+
+def _dense_hopping_trace_norm(width: int, height: int) -> float:
+    """Return ``||R_p + R_g||_1`` by a singular value decomposition of the dense matrix."""
+    matrix_p, matrix_g = _tiling_matrices(width, height)
+    return float(np.linalg.svd(matrix_p + matrix_g, compute_uv=False).sum())
+
+
+def _reference_w_plaquette(width: int, height: int, *, t: float, u: float) -> float:
+    """Recompute Campbell's W_PLAQ independently of the builder.
+
+    Follows Eq. (10) of Campbell arXiv:2012.09238v4 for W_SO2, Eq. (D10) for the
+    plaquette-splitting term, and Eq. (D6) for their sum. Both norms come from dense
+    singular value decompositions rather than the builder's closed forms.
+    """
+    num_sites = width * height
+    commutator_norm = _dense_commutator_trace_norm(width, height) * t**3
+    hopping_norm = _dense_hopping_trace_norm(width, height) * t
 
     w_so2 = u * t**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + u**2 / 24.0 * hopping_norm
     return w_so2 + 3.0 / 24.0 * commutator_norm
@@ -973,18 +1026,16 @@ def _auto_step_count(width: int, height: int, *, t: float, u: float, time: float
     builder = HubbardPlaquetteTrotter(
         order=2,
         time=time,
-        t=t,
-        u=u,
         num_divisions=1,
         target_accuracy=target_accuracy,
     )
-    return builder._step_count(t, width, height, time)
+    return builder._step_count(t, u, width, height, time)
 
 
 class TestAutomaticStepCount:
     """The ``target_accuracy`` path, which sizes the step count from the error bound."""
 
-    @pytest.mark.parametrize(("width", "height"), [(2, 2), (4, 4), (6, 6)])
+    @pytest.mark.parametrize(("width", "height"), [(2, 2), (4, 4), (6, 6), (8, 8)])
     @pytest.mark.parametrize("phase", [1e-6, 0.25, 1.0, math.pi / 2])
     def test_matches_the_exact_rule_of_apel_algorithm_1(self, width, height, phase):
         """Reproduce r = ceil(sqrt(W_PLAQ tau^3 / (2 sin(eps tau / 2)))) against an independent W."""
@@ -997,6 +1048,19 @@ class TestAutomaticStepCount:
         expected = math.ceil(math.sqrt(w_plaquette * time**3 / (2.0 * math.sin(phase / 2.0))))
         assert count == expected
 
+    @pytest.mark.parametrize(
+        ("width", "height"),
+        [(2, 2), (4, 4), (6, 6), (8, 8), (10, 10), (12, 12), (4, 6), (4, 8), (6, 8), (8, 12)],
+    )
+    def test_the_closed_form_norms_match_a_dense_decomposition(self, width, height):
+        """Even cell counts are where a wrong Bloch phase shows, so they are covered on both axes."""
+        assert HubbardPlaquetteTrotter._commutator_trace_norm(width, height) == pytest.approx(
+            _dense_commutator_trace_norm(width, height), abs=1e-9
+        )
+        assert HubbardPlaquetteTrotter._hopping_trace_norm(width, height) == pytest.approx(
+            _dense_hopping_trace_norm(width, height), abs=1e-9
+        )
+
     def test_saturates_once_the_accuracy_target_exceeds_a_half_turn(self):
         """||Delta U|| <= 2 caps the arcsine, so the count stops falling at eps tau = pi."""
         t, u, time = 1.0, 8.0, 3.0
@@ -1007,8 +1071,8 @@ class TestAutomaticStepCount:
         assert beyond_pi == at_pi
 
     def test_a_disabled_target_leaves_the_manual_count_alone(self):
-        builder = HubbardPlaquetteTrotter(order=2, time=3.0, t=1.0, u=8.0, num_divisions=7, target_accuracy=0.0)
-        assert builder._step_count(1.0, 4, 4, 3.0) == 7
+        builder = HubbardPlaquetteTrotter(order=2, time=3.0, num_divisions=7, target_accuracy=0.0)
+        assert builder._step_count(1.0, 8.0, 4, 4, 3.0) == 7
 
     def test_the_hamiltonian_conserves_particle_number(self):
         """Justifies recovering the conventional energy by a classical shift."""
@@ -1033,10 +1097,10 @@ class TestAutomaticStepCount:
         """``num_electrons`` adds the ``U*eta/2 - U*M/4`` offset during phase conversion."""
         width = height = 2
         u, time, divisions = 4.0, 0.3, 2
-        operator = _lattice_operator(width, height)
+        operator = _lattice_operator(width, height, t=1.0, u=u)
 
         unshifted = (
-            HubbardPlaquetteTrotter(order=2, time=time, t=1.0, u=u, num_divisions=divisions, target_accuracy=0.0)
+            HubbardPlaquetteTrotter(order=2, time=time, num_divisions=divisions, target_accuracy=0.0)
             .run(operator)
             .get_container()
         )
@@ -1044,8 +1108,6 @@ class TestAutomaticStepCount:
             HubbardPlaquetteTrotter(
                 order=2,
                 time=time,
-                t=1.0,
-                u=u,
                 num_electrons=num_electrons,
                 num_divisions=divisions,
                 target_accuracy=0.0,
@@ -1172,13 +1234,13 @@ _HUBBARD_L4_FULL_CIRCUIT = {
     "qpe_bits": 10,
     "base_time": 0.056341508088837824,
     "logical_qubits": 73,
-    "rotations": 736812,
-    "rotation_depth": 557185,
-    "t_gates": 766491,
-    "ccz_count": 718100,
+    "rotations": 729063,
+    "rotation_depth": 551326,
+    "t_gates": 758427,
+    "ccz_count": 710540,
     "ccix_count": 0,
-    "toffolis": 718100,
-    "measurements": 718110,
+    "toffolis": 710540,
+    "measurements": 710550,
 }
 
 
@@ -1195,7 +1257,7 @@ def _benchmark_schedule(size: int) -> tuple[float, float, float, float]:
 
 def _benchmark_logical_counts(size: int, max_batch_size: int = -1) -> dict:
     """Build the benchmark's phase-estimation circuit for one lattice and trace its gate counts."""
-    operator = _lattice_operator(size, size)
+    operator = _lattice_operator(size, size, t=_BENCHMARK_HOPPING_T, u=_BENCHMARK_U_OVER_T * _BENCHMARK_HOPPING_T)
     energy_budget, qpe_budget, trotter_budget, base_time = _benchmark_schedule(size)
 
     unitary_builder = AlgorithmRef(
@@ -1203,8 +1265,6 @@ def _benchmark_logical_counts(size: int, max_batch_size: int = -1) -> dict:
         "hubbard_plaquette",
         order=_BENCHMARK_TROTTER_ORDER,
         time=base_time,
-        t=_BENCHMARK_HOPPING_T,
-        u=_BENCHMARK_U_OVER_T * _BENCHMARK_HOPPING_T,
         # Bit k evolves for base_time * 2^k rather than repeating the block 2^k times.
         power_strategy="rescale",
         target_accuracy=trotter_budget,
