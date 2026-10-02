@@ -12,6 +12,13 @@ The electronic Hamiltonian describes the energy of a system of electrons in the 
 It consists of kinetic energy terms, electron-nucleus attraction terms, and electron-electron repulsion terms.
 The ``HamiltonianConstructor`` algorithm computes the matrix elements of this operator in a given orbital basis, which can be the full orbital space or an active subspace.
 
+Conversion with :func:`~qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf` respects the
+:class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals and scalar core energy,
+rather than using only its :class:`~qdk_chemistry.data.Orbitals`.
+For molecular references, the conversion retains the AO basis and evaluates ordinary Coulomb two-electron integrals from that basis.
+For restricted closed-shell model references, it uses the stored two-electron integrals as well.
+This contract applies to both nonrelativistic and relativistically corrected one-electron operators; active-space effective Hamiltonians are not supported by this conversion.
+
 Using the HamiltonianConstructor
 ---------------------------------
 
@@ -125,6 +132,41 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_use_atomics``
      - bool
      - Use atomic accumulation into one shared buffer instead of per-thread private buffers during the :term:`AO` to active :term:`MO` ERI transformation. Reduces peak memory usage for large systems but may be slower. Only affects ``eri_method="direct"``. Default: false
+   * - ``relativity``
+     - string
+     - Relativistic treatment ("", "sf-x2c", or "sf-x2c-contracted"). Default: "" (nonrelativistic)
+
+Relativistic treatment
+~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Setting: ``relativity="sf-x2c"`` or ``relativity="sf-x2c-contracted"``
+
+.. note::
+
+   Spin-free X2C is not currently available during the :term:`SCF` calculation itself. It is applied only when constructing a :class:`~qdk_chemistry.data.Hamiltonian` from existing :class:`~qdk_chemistry.data.Orbitals`.
+
+The ``relativity`` setting selects the relativistic treatment of the Hamiltonian, with the empty string (``""``) retaining the nonrelativistic default.
+The ``"sf-x2c"`` and ``"sf-x2c-contracted"`` options apply spin-free exact-two-component (X2C) scalar-relativistic corrections using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
+The spin-free X2C treatment constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
+
+Both options use the one-electron (X2C-1e) approximation: only the one-electron Hamiltonian is modified, the two-electron integrals are unchanged, and spin-orbit coupling is not included.
+ECPs and Cartesian atomic orbitals are not supported.
+With ``relativity="sf-x2c"``, contracted basis functions are decontracted for the X2C transformation and the resulting one-electron Hamiltonian is then exactly recontracted.
+Use ``relativity="sf-x2c-contracted"`` to perform the X2C transformation directly in the supplied contracted basis.
+
+.. tab:: Python API
+
+    .. literalinclude:: ../../../_static/examples/python/hamiltonian_constructor.py
+         :language: python
+         :start-after: # start-cell-x2c
+         :end-before: # end-cell-x2c
+
+.. tab:: C++ API
+
+    .. literalinclude:: ../../../_static/examples/cpp/hamiltonian_constructor.cpp
+         :language: cpp
+         :start-after: // start-cell-x2c
+         :end-before: // end-cell-x2c
 
 QDK Cholesky
 ~~~~~~~~~~~~
@@ -156,6 +198,9 @@ Four-center integrals are lazily computed from the three-center integrals on dem
    * - ``store_ao_cholesky_vectors``
      - bool
      - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
+   * - ``relativity``
+     - string
+     - Relativistic treatment (``""``, ``"sf-x2c"``, or ``"sf-x2c-contracted"``). Default: ``""`` (nonrelativistic)
 
 Related classes
 ---------------
