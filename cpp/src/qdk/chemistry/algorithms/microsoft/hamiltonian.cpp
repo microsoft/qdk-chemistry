@@ -74,7 +74,8 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
 std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
     std::shared_ptr<data::Orbitals> orbitals,
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const Eigen::MatrixXd& H_full, const std::string& eri_method) {
+    const Eigen::MatrixXd& H_full, const std::string& eri_method,
+    bool eri_use_atomics) {
   QDK_LOG_TRACE_ENTERING();
 
   auto basis_set = orbitals->get_basis_set();
@@ -155,7 +156,6 @@ std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
 
   // Use atomic accumulation (one shared buffer) instead of per-thread
   // private buffers in the ERI backend.
-  bool eri_use_atomics = _settings->get<bool>("eri_use_atomics");
   scf_config->eri.use_atomics = eri_use_atomics;
   scf_config->k_eri.use_atomics = eri_use_atomics;
 
@@ -467,6 +467,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   return detail::construct_canonical_hamiltonian(
       std::move(orbitals), internal_basis_set, one_body_ao,
-      _settings->get<std::string>("eri_method"));
+      _settings->get<std::string>("eri_method"),
+      _settings->get<bool>("eri_use_atomics"));
 }
 }  // namespace qdk::chemistry::algorithms::microsoft

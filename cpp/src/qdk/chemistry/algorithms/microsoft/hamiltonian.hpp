@@ -46,7 +46,8 @@ build_one_body_ao(const data::BasisSet& basis_set,
 std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
     std::shared_ptr<data::Orbitals> orbitals,
     const std::shared_ptr<qdk::chemistry::scf::BasisSet>& internal_basis_set,
-    const Eigen::MatrixXd& one_body_ao, const std::string& eri_method);
+    const Eigen::MatrixXd& one_body_ao, const std::string& eri_method,
+    bool eri_use_atomics);
 
 }  // namespace detail
 
