@@ -845,11 +845,12 @@ class TestSOSSAResourceEstimation:
     def test_the_tightest_batch_is_dominated_by_larger_ones_at_the_same_width(self):
         """Over-shrinking the batch buys nothing, which is half of the usage guidance.
 
-        The Toffoli penalty tracks the *number* of batches, ``ceil((N - 1) / lambda)``, not
-        ``lambda`` itself, while the qubit saving stops once some other stage sets the peak
-        width. At Fe2S2 that makes every ``lambda`` from 1 up to the knee land on the same
-        qubit count, so the smallest one is strictly worse than larger ones that reach the
-        same floor -- same width, several times the Toffolis.
+        The Toffoli penalty is driven by the *number* of batches, ``ceil((N - 1) / lambda)``
+        -- ``lambda = 1`` sweeps the rotation table nineteen times -- while the qubit saving
+        stops once some other stage sets the peak width. At Fe2S2 that makes every
+        ``lambda`` from 1 up to the knee land on the same qubit count, so the smallest one
+        is strictly worse than larger ones that reach the same floor -- same width, several
+        times the Toffolis.
 
         The other half is that growing ``lambda`` past the point where the batch count drops
         is equally pointless, so the rule is neither "smallest" nor "widest": pick the batch
@@ -870,17 +871,22 @@ class TestSOSSAResourceEstimation:
     def test_only_the_smallest_batch_of_each_step_is_worth_choosing(self):
         """The usage guidance: choose the batch *count*, then derive lambda from it.
 
-        Streaming reloads once per batch, so the Toffoli cost is a function of
-        ``ceil((N - 1) / lambda)`` and not of ``lambda``, which makes it a step function --
-        every ``lambda`` from 10 to 15 splits the 19 angles into two passes and costs
-        exactly the same. The rotation register, though, keeps growing at ``b_rot`` qubits
-        per angle right across that step. So every ``lambda`` above the smallest in its step
-        pays width for nothing.
+        Streaming reloads once per batch, so the batch count ``ceil((N - 1) / lambda)`` sets
+        how many times the rotation table is swept, while the rotation register keeps
+        growing at ``b_rot`` qubits per angle right across a step. Every ``lambda`` from 10
+        to 18 splits the 19 angles into two passes, and ``lambda = 10`` is the narrowest of
+        them.
 
         That is why "take the widest batch that fits your budget" is the wrong rule and
         ``rotation_batch_size_for`` exists: given room for 440 qubits that rule hands back
-        ``lambda = 16``, which is strictly worse than the ``lambda = 10`` derived here --
-        61 qubits more for an identical circuit.
+        ``lambda = 16``, which is worse than the ``lambda = 10`` derived here on *both*
+        axes -- 61 qubits wider and some 3.6% more Toffolis.
+
+        The Toffoli cost is deliberately *not* asserted to be flat across the step. Under
+        the shared ``select_swap`` lookup the per-batch table grows with ``lambda`` and the
+        swap network re-optimises its width against it, so the cost sawtooths instead of
+        holding constant. See
+        ``test_a_wider_batch_in_the_same_step_can_undercut_a_narrower_one``.
         """
         smallest = rotation_batch_size_for(20, num_batches=2)
         assert smallest == 10, f"two passes over 19 angles needs batches of 10, got {smallest}"
@@ -888,12 +894,38 @@ class TestSOSSAResourceEstimation:
         smallest_qubits, smallest_toffolis = self._fe2s2_logical_counts(rotation_batch_size=smallest)
         wider_qubits, wider_toffolis = self._fe2s2_logical_counts(rotation_batch_size=16)
 
-        assert wider_toffolis == smallest_toffolis, (
-            f"lambda=16 still makes two passes, so it cannot undercut lambda={smallest}: "
-            f"{wider_toffolis} vs {smallest_toffolis}"
-        )
         assert wider_qubits > smallest_qubits, (
             f"the six extra angles lambda=16 keeps resident have to cost width: {wider_qubits} vs {smallest_qubits}"
+        )
+        assert wider_toffolis > smallest_toffolis, (
+            f"lambda=16 makes the same two passes but re-optimises its swap width against a "
+            f"larger table, so it does not undercut lambda={smallest}: {wider_toffolis} vs {smallest_toffolis}"
+        )
+
+    def test_a_wider_batch_in_the_same_step_can_undercut_a_narrower_one(self):
+        """Within one batch-count step the Toffoli cost sawtooths; it is not a flat line.
+
+        This is the one place the "derive lambda from the batch count" rule is lossy, so it
+        is worth pinning rather than leaving as folklore. ``lambda = 18`` makes the same two
+        passes as ``lambda = 10`` yet costs *fewer* Toffolis, because the shared
+        ``select_swap`` lookup amortises one larger per-batch table better than it does two
+        smaller ones. It pays for that in width, on the axis this whole code path exists to
+        minimise.
+
+        So the rule still picks ``lambda = 10``, but the honest statement is that it trades
+        Toffolis for qubits there rather than getting the width for free. A caller who is
+        Toffoli-bound rather than width-bound should read the step rather than trust the
+        rule.
+        """
+        narrow_qubits, narrow_toffolis = self._fe2s2_logical_counts(rotation_batch_size=10)
+        wide_qubits, wide_toffolis = self._fe2s2_logical_counts(rotation_batch_size=18)
+
+        assert wide_toffolis < narrow_toffolis, (
+            f"lambda=18 should amortise its single larger table better than lambda=10: "
+            f"{wide_toffolis} vs {narrow_toffolis}"
+        )
+        assert wide_qubits > narrow_qubits, (
+            f"lambda=18 holds eight more angles resident, which must cost width: {wide_qubits} vs {narrow_qubits}"
         )
 
     def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):
