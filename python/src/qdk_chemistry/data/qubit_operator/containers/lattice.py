@@ -139,7 +139,7 @@ class LatticeContainer(QubitOperatorContainer):
     def from_json(cls, json_data: dict[str, Any]) -> LatticeContainer:
         """Create a lattice container from JSON.
 
-        The geometry is rebuilt through :meth:`LatticeGeometry.from_json`, which
+        The geometry is rebuilt through :meth:`~qdk_chemistry.data.LatticeGeometry.from_json`, which
         validates the stored layout, so a document whose site positions and lattice
         dimensions disagree is rejected here rather than in the consuming algorithm.
 
