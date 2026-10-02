@@ -134,25 +134,53 @@ namespace QDKChemistry.Utils.SelectSwap {
         table
     }
 
+    /// Smallest relative Toffoli gain that justifies one more swap bit.
+    ///
+    /// Each extra bit doubles the scratch block, and for any caller not already wider
+    /// elsewhere that block sets the peak width of the whole algorithm. Scoring widths by
+    /// Toffoli count alone never sees that, so it keeps widening while the gains flatten.
+    ///
+    /// Measured at the Fe2S2-20 inner PREPARE: the last bit a Toffoli-only rule takes buys
+    /// 1.8M Toffolis out of 260M (0.7% of the run) for 92 logical qubits out of 427 (22% of
+    /// the register). Requiring each widening to earn a fifth of the cost declines that step
+    /// and keeps every step that genuinely pays, which at that shape lands on `k = 2`.
+    ///
+    /// Callers that want the Toffoli optimum regardless of width still have it: set the swap
+    /// width explicitly rather than leaving it to this rule.
+    internal function SwapWideningTolerance() : Double {
+        0.2
+    }
+
+    /// Narrowest swap width whose Toffoli cost is within `SwapWideningTolerance()` of the best.
+    ///
+    /// Returns the *narrowest* qualifying width rather than the cheapest, so a width is taken
+    /// only when the extra scratch is paying for itself. Widths are scanned in order, so the
+    /// first qualifier is the narrowest by construction.
     function ComputeOptimalLambda2D(
         numOuterData : Int,
         numInnerData : Int,
         numBits : Int,
         outerAddressAlwaysValid : Bool,
     ) : Int {
-        mutable best = 2^32;
-        mutable bestLambda = 0;
-
         let addressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
-        for lambda in 0..addressBits - 1 {
+
+        mutable best = SelectSwapCost2D(0, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
+        for lambda in 1..addressBits - 1 {
             let cost = SelectSwapCost2D(lambda, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
             if cost < best {
-                set bestLambda = lambda;
                 set best = cost;
             }
         }
 
-        return bestLambda;
+        let threshold = IntAsDouble(best) * (1.0 + SwapWideningTolerance());
+        for lambda in 0..addressBits - 1 {
+            let cost = SelectSwapCost2D(lambda, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
+            if IntAsDouble(cost) <= threshold {
+                return lambda;
+            }
+        }
+
+        return 0;
     }
 
     internal function ComputeOptimalLambda1D(numData : Int, numBits : Int) : Int {
@@ -186,6 +214,14 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
     }
 
+    /// Toffoli cost of erasing an `addressBits`-wide load by measurement and phase fixup.
+    ///
+    /// The `O(sqrt(N))` unlookup: measure the loaded word out in the X basis and repair the
+    /// phase it leaves on the address with a lookup over a table of parities.
+    internal function MeasurementUnlookupCost(addressBits : Int) : Int {
+        2^((addressBits + 1) / 2) + 2^(addressBits / 2) - (addressBits + 2)
+    }
+
     /// Toffoli cost of one `SelectSwap2D` *and its uncompute*, for a given swap width.
     internal function SelectSwapCost2D(
         lambda : Int,
@@ -201,12 +237,75 @@ namespace QDKChemistry.Utils.SelectSwap {
         let numEntries = outerBlocks * 2^(innerAddressBits - lambda);
         let selectCost = numEntries - 2;
 
-        let eraseBits = outerAddressBits + innerAddressBits;
-        let eraseCost = 2^((eraseBits + 1) / 2) + 2^(eraseBits / 2) - (eraseBits + 2);
+        let eraseCost = MeasurementUnlookupCost(outerAddressBits + innerAddressBits);
         let swapCost = (2^lambda - 1) * numBits;
         let numErasures = if lambda == 0 { 1 } else { 2 };
 
         return selectCost + swapCost + numErasures * eraseCost;
+    }
+
+    /// Toffoli cost of one `SelectSwap2DDirty` and its uncompute, for a given swap width.
+    ///
+    /// Two differences from `SelectSwapCost2D`, both from borrowing rather than allocating.
+    /// The forward pass runs `Select` twice and the butterfly four times instead of once each,
+    /// which is the price of restoring the lender by XOR involution rather than by measuring
+    /// it -- `2*ceil(d/K) + 4*b*(K-1)` in Berry et al. (arXiv:1902.02134, Appendix A,
+    /// Theorem 1). Against that, only the target is ever erased: there is no clean scratch to
+    /// unlook, so a wide load pays one measurement erasure where the clean path pays two.
+    internal function DirtyQROAMCost2D(
+        lambda : Int,
+        numOuterData : Int,
+        numInnerData : Int,
+        numBits : Int,
+        outerAddressAlwaysValid : Bool,
+    ) : Int {
+        let outerAddressBits = Ceiling(Lg(IntAsDouble(numOuterData)));
+        let innerAddressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
+        let outerBlocks = if outerAddressAlwaysValid { numOuterData } else { 2^outerAddressBits };
+        let eraseCost = MeasurementUnlookupCost(outerAddressBits + innerAddressBits);
+
+        if lambda == 0 {
+            // Width 0 is a single plain `Select`, not the `K = 1` limit of the swap formula:
+            // that limit charges two passes for a load that only makes one.
+            outerBlocks * 2^innerAddressBits - 2 + eraseCost
+        } else {
+            let numEntries = outerBlocks * 2^(innerAddressBits - lambda);
+            let selectCost = 2 * (numEntries - 1);
+            let swapCost = 4 * numBits * (2^lambda - 1);
+            selectCost + swapCost + eraseCost
+        }
+    }
+
+    /// Best dirty swap width for the 2D lookup, given how many qubits the caller can lend.
+    ///
+    /// Returns 0 when no wider network fits in `availableDirty` or when none beats the plain
+    /// load, in which case the caller should stay on `Select` and borrow nothing.
+    function ComputeOptimalDirtySwapBits2D(
+        numOuterData : Int,
+        numInnerData : Int,
+        numBits : Int,
+        outerAddressAlwaysValid : Bool,
+        availableDirty : Int,
+    ) : Int {
+        let innerAddressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
+        mutable best = DirtyQROAMCost2D(0, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
+        mutable bestLambda = 0;
+        for lambda in 1..innerAddressBits {
+            if DirtyQROAMBorrowedQubits(lambda, numBits) <= availableDirty {
+                let cost = DirtyQROAMCost2D(
+                    lambda,
+                    numOuterData,
+                    numInnerData,
+                    numBits,
+                    outerAddressAlwaysValid
+                );
+                if cost < best {
+                    set best = cost;
+                    set bestLambda = lambda;
+                }
+            }
+        }
+        bestLambda
     }
 
     internal function DimensionsForSelect(data : Bool[][], address : Qubit[]) : Int {
@@ -356,6 +455,85 @@ namespace QDKChemistry.Utils.SelectSwap {
                     outerAddressAlwaysValid,
                     swapTarget
                 );
+            }
+        }
+        adjoint (...) {
+            EraseSwappedLoad(data, outerAddress, innerAddress, 0, outerAddressAlwaysValid, target);
+        }
+    }
+
+    /// `SelectSwap2D` that borrows the swap block instead of allocating it.
+    ///
+    /// Same contract as `SelectSwap2D` — XORs `data[outer][inner]` into `target`, and its
+    /// adjoint is the same measurement-based erasure — but the `m * 2^numSwapBits` swap block
+    /// is lent by the caller, so the load costs no width at all. `dirty` may be entangled with
+    /// anything and is handed back exactly as it arrived; nothing there is measured or reset.
+    ///
+    /// The forward pass goes through `SwappedLoadShape`, so the flattened table, the select
+    /// address and the butterfly address are the ones the clean path builds. That is what keeps
+    /// the shared erasure valid: the adjoint reads the combined `(outer, inner)` address and is
+    /// indifferent to how the forward pass was routed, but only if both agree on which row the
+    /// address names.
+    ///
+    /// Cancellation, with the borrowed block as chunks `psi_0..psi_{K-1}` and `s` the swap
+    /// address, exactly as in `SelectSwapDirty`:
+    ///
+    ///   1. butterfly, `target ^= psi_s`, unbutterfly
+    ///   2. `Select` — chunk `p` becomes `psi_p ^ data[select + p*2^k]`
+    ///   3. butterfly, `target ^= psi_s ^ data[...]`, unbutterfly — the two `psi_s` cancel
+    ///   4. `Select` again — XOR is an involution, so the lender is restored
+    ///
+    /// Step 4 re-runs `Select` forward rather than taking its adjoint: the library adjoint is a
+    /// measurement-based unlookup, which would destroy the lender's state.
+    operation SelectSwap2DDirty(
+        data : Bool[][][],
+        outerAddress : Qubit[],
+        innerAddress : Qubit[],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+        dirty : Qubit[],
+        target : Qubit[],
+    ) : Unit is Adj {
+        body (...) {
+            Fact(not IsEmpty(data), "data cannot be empty");
+            let m = Length(data[0][0]);
+            Fact(
+                Length(target) == m,
+                $"target holds one {m}-bit word, got {Length(target)} qubits"
+            );
+            let (flatData, selectAddress, swapAddress) = SwappedLoadShape(
+                data,
+                outerAddress,
+                innerAddress,
+                numSwapBits,
+                outerAddressAlwaysValid
+            );
+            if numSwapBits == 0 {
+                Select(flatData, selectAddress, target);
+            } else {
+                let needed = DirtyQROAMBorrowedQubits(numSwapBits, m);
+                Fact(
+                    Length(dirty) >= needed,
+                    $"dirty register needs {needed} qubits, got {Length(dirty)}"
+                );
+                let borrowed = dirty[...needed - 1];
+                let chunks = Chunks(m, borrowed);
+
+                within {
+                    SwapDataOutputs(swapAddress, chunks);
+                } apply {
+                    ApplyToEachCA(CNOT, Zipped(chunks[0], target));
+                }
+
+                Select(flatData, selectAddress, borrowed);
+
+                within {
+                    SwapDataOutputs(swapAddress, chunks);
+                } apply {
+                    ApplyToEachCA(CNOT, Zipped(chunks[0], target));
+                }
+
+                Select(flatData, selectAddress, borrowed);
             }
         }
         adjoint (...) {
@@ -690,6 +868,134 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
         if applyAdjoint {
             Adjoint SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+        }
+    }
+
+    /// `SelectSwap2DDirty` loads exactly what `SelectSwap2D` loads, and returns the lender.
+    ///
+    /// The two loads are run back to back into the same `copy` register, so `copy` cancels to
+    /// zero precisely when they agree. Comparing against the clean path rather than against
+    /// `data[i][j]` is what lets the sweep cover the *whole* address space: surplus outer
+    /// addresses are aliased onto real rows by `Select`, and the point at issue is that the
+    /// borrowed path aliases them the same way, not what the alias happens to be.
+    ///
+    /// The borrowed register is seeded into a non-trivial product state, so a construction that
+    /// silently assumed `|0>` scratch shows up as either a wrong word or a disturbed lender.
+    internal operation TestSelectSwap2DDirtyMatchesClean(
+        data : Bool[][][],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+        dirtySeed : Int,
+    ) : Bool {
+        let m = Length(data[0][0]);
+        let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
+        let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
+        let numDirty = DirtyQROAMBorrowedQubits(numSwapBits, m);
+
+        use outerAddr = Qubit[nOuterAddr];
+        use innerAddr = Qubit[nInnerAddr];
+        use dirty = Qubit[MaxI(1, numDirty)];
+        use target = Qubit[m];
+        use copy = Qubit[m];
+
+        mutable allCorrect = true;
+
+        for i in 0..2^nOuterAddr - 1 {
+            for j in 0..2^nInnerAddr - 1 {
+                ApplyXorInPlace(i, outerAddr);
+                ApplyXorInPlace(j, innerAddr);
+                if numDirty > 0 {
+                    ApplyXorInPlace(dirtySeed % 2^numDirty, dirty[...numDirty - 1]);
+                }
+
+                // Each `within` uncompute is the measurement erasure, which leaves a phase on
+                // the address but returns `target` to |0>. The address is a basis state here,
+                // so that phase is global and cannot affect the comparison.
+                within {
+                    SelectSwap2DDirty(
+                        data,
+                        outerAddr,
+                        innerAddr,
+                        numSwapBits,
+                        outerAddressAlwaysValid,
+                        dirty,
+                        target
+                    );
+                } apply {
+                    ApplyToEachCA(CNOT, Zipped(target, copy));
+                }
+                within {
+                    SelectSwap2D(data, outerAddr, innerAddr, 0, outerAddressAlwaysValid, target);
+                } apply {
+                    ApplyToEachCA(CNOT, Zipped(target, copy));
+                }
+
+                let residue = MResetEachZ(copy);
+                if not All(r -> r == Zero, residue) {
+                    Message($"FAIL word: outer={i}, inner={j}, differs from clean in {residue}");
+                    set allCorrect = false;
+                }
+
+                // The lender must come back exactly as it went in.
+                if numDirty > 0 {
+                    ApplyXorInPlace(dirtySeed % 2^numDirty, dirty[...numDirty - 1]);
+                    let dirtyResidue = MResetEachZ(dirty);
+                    if not All(r -> r == Zero, dirtyResidue) {
+                        Message($"FAIL dirty disturbed: outer={i}, inner={j}, residue={dirtyResidue}");
+                        set allCorrect = false;
+                    }
+                }
+
+                ApplyXorInPlace(i, outerAddr);
+                ApplyXorInPlace(j, innerAddr);
+            }
+        }
+
+        allCorrect
+    }
+
+    /// Traces `SelectSwap2DDirty` for a costing regression.
+    ///
+    /// The lender is allocated here because a standalone probe has nothing to borrow from, so
+    /// this measures Toffolis rather than width; the width saving only exists where the lender
+    /// is a register the caller already owns.
+    internal operation TestSelectSwap2DDirtyResourceProbe(
+        data : Bool[][][],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+        applyForward : Bool,
+        applyAdjoint : Bool
+    ) : Unit {
+        let m = Length(data[0][0]);
+        let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
+        let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
+
+        use outerAddr = Qubit[nOuterAddr];
+        use innerAddr = Qubit[nInnerAddr];
+        use target = Qubit[m];
+        use dirty = Qubit[MaxI(1, DirtyQROAMBorrowedQubits(numSwapBits, m))];
+
+        if applyForward {
+            SelectSwap2DDirty(
+                data,
+                outerAddr,
+                innerAddr,
+                numSwapBits,
+                outerAddressAlwaysValid,
+                dirty,
+                target
+            );
+        }
+        if applyAdjoint {
+            Adjoint SelectSwap2DDirty(
+                data,
+                outerAddr,
+                innerAddr,
+                numSwapBits,
+                outerAddressAlwaysValid,
+                dirty,
+                target
+            );
         }
     }
 
