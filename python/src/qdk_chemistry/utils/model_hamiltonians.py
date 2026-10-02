@@ -484,11 +484,7 @@ def create_kitaev_hamiltonian(
         for other_index in other_indices:
             exchange[flavor_index, other_index] = gamma_prime_value
             exchange[other_index, flavor_index] = gamma_prime_value
-        transformed = transform @ exchange @ transform.T / 4.0
-        # Zero only rotation residues, bounded per entry by the magnitudes entering its products.
-        rounding = 8 * np.finfo(float).eps * (np.abs(transform) @ np.abs(exchange) @ np.abs(transform).T) / 4.0
-        transformed[np.abs(transformed) <= rounding] = 0.0
-        exchange_by_pair[pair] = transformed
+        exchange_by_pair[pair] = transform @ exchange @ transform.T / 4.0
 
     pauli_components = ("X", "Y", "Z")
     couplings: list[tuple[str, dict[tuple[int, int], float]]] = []
