@@ -806,6 +806,23 @@ class TestSOSSAResourceEstimation:
         assert toffoli_count == pytest.approx(42_558_509, rel=0.01)
         assert num_qubits == 486
 
+    def test_fe2s2_streamed_logical_resource_estimate(self):
+        """Pin the streamed Fe2S2 cost, which is the configuration the example runs.
+
+        The test above pins the *resident* circuit at 486 qubits, but the example streams
+        its angles at the knee, and the streamed width is the number this work exists to
+        move. Nothing else pinned its magnitude: every other knee test asserts a direction
+        or an ordering, deliberately, so that the lookup cost model stays free to change.
+        The gap that left is a regression which preserves all of those orderings while
+        quietly giving back the width -- each test still passes, and the headline number
+        moves. This is the guard for that, and it is kept separate so the relational tests
+        can stay magnitude-free.
+        """
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
+
+        assert num_qubits == 379
+        assert toffoli_count == pytest.approx(60_535_087, rel=0.01)
+
     def test_streaming_the_rotation_angles_trades_toffolis_for_qubits(self):
         """Streaming is a Pareto move, not a free win, and the default must stay put.
 
