@@ -127,7 +127,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         """Return the evolution that applies this container and then ``other``.
 
         Angles and scale are compared with :func:`numpy.isclose`, as
-        :class:`PauliProductFormulaContainer` compares scale, so the rounding left by splitting a
+        :class:`~qdk_chemistry.data.PauliProductFormulaContainer` compares scale, so the rounding left by splitting a
         time interval into steps does not block the merge.
 
         Args:
