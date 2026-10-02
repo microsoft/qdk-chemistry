@@ -169,7 +169,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
+        ctrl_unitary_ops, prepare_shared_op, num_shared_ancillas = self._shared_register(controlled_unitary_circuits)
         self._validate_state_prep_width(state_preparation, num_system_qubits)
         phase_qubit_prep_op = self._phase_state_op(num_bits)
         ancillas = list(range(num_bits))
@@ -182,6 +182,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             systems,
             phase_qubit_prep_op,
             num_ancilla_qubits,
+            prepare_shared_op,
+            num_shared_ancillas,
         )
         standard_parameters = {
             "statePrep": state_prep_op,
@@ -191,6 +193,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "systems": systems,
             "phaseQubitPrep": phase_qubit_prep_op,
             "numAncillaQubits": num_ancilla_qubits,
+            "prepareSharedOp": prepare_shared_op,
+            "numSharedAncillas": num_shared_ancillas,
             "measurePhase": bool(self._settings.get("measure_phase")),
             "computeCapacity": int(self._settings.get("compute_capacity")),
         }

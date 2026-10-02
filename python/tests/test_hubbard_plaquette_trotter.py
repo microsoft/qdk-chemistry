@@ -43,9 +43,17 @@ def _lattice_operator(width: int, height: int, *, t: float, u: float) -> QubitOp
     return QubitOperator(container=LatticeContainer(geometry, couplings={"hopping": t, "interaction": u}))
 
 
-#: Angle unit the layer angles below are built from. Nothing rounds any more, so the value is
-#: only a convenient scale that keeps the catalyst eigenphase an exact multiple of pi.
-_ANGLE_QUANTUM = 2.0 * math.pi / 64
+#: Width of the phase gradient register the tests apply the Hamming-weight rotations through.
+#: A b-qubit gradient rounds every rotation to the nearest multiple of 2*pi/2**b, so the tests
+#: below keep every layer angle an exact multiple of that quantum. The construction is then exact
+#: and the assertions can stay at 1e-10, while the register stays small enough to simulate: the
+#: gradient is a uniform superposition, so it multiplies the simulated state's support by 2**b.
+_GRADIENT_BITS = 6
+_ANGLE_QUANTUM = 2.0 * math.pi / 2**_GRADIENT_BITS
+
+#: Run a Hamming-weight test both ways the place values can be rotated: through a phase gradient
+#: of ``_GRADIENT_BITS`` qubits, and, with an empty gradient, as the original ladder of ``Rz``.
+_GRADIENT_OR_LADDER = pytest.mark.parametrize("bits", [_GRADIENT_BITS, 0], ids=["phase_gradient", "rz_ladder"])
 
 
 def _reference_hamiltonian(width: int, height: int, *, t: float, u: float) -> np.ndarray:
@@ -82,6 +90,8 @@ def _plaquette_parameters(container, max_batch_size: int = -1):
         hoppingAngle=container.hopping_angle,
         repetitions=container.step_reps,
         maxBatchSize=max_batch_size,
+        usePhaseGradient=True,
+        rotationBitPrecision=_GRADIENT_BITS,
     )
 
 
@@ -98,60 +108,6 @@ def _evolution_circuit(
     builder = HubbardPlaquetteTrotter(order=2, time=time, num_divisions=num_divisions, target_accuracy=0.0)
     container = builder.run(_lattice_operator(width, height, t=t, u=u)).get_container()
     return QSHARP_UTILS.HubbardPlaquette.MakeRepPlaquetteExpOp(_plaquette_parameters(container))
-
-
-def _plaquette_operation_from_angles(
-    width: int,
-    height: int,
-    *,
-    interaction_angle: float,
-    hopping_angle: float,
-    repetitions: int,
-    controlled: bool = False,
-    forced_legacy: bool = False,
-):
-    """Return a direct Q# callable for a plaquette evolution with exact test angles."""
-    operation = "RepPlaquetteExpWithForcedLegacyCostsForTest" if forced_legacy else "RepPlaquetteExp"
-    params = (
-        f"{_PLAQUETTE}.HubbardPlaquetteParams("
-        f"{width}, {height}, {interaction_angle:.17g}, {hopping_angle:.17g}, {repetitions}, -1)"
-    )
-    if controlled:
-        return get_qsharp_context().eval(
-            f"qs => {{ Controlled {_PLAQUETTE}.{operation}([qs[0]], ({params}, qs[1...])); }}"
-        )
-    return get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.{operation}({params}, qs); }}")
-
-
-def _basis_state(num_qubits: int, occupied_modes: tuple[int, ...], *, control: bool | None = None) -> np.ndarray:
-    """Return a computational basis state, optionally with a leading control qubit."""
-    total_qubits = num_qubits + (control is not None)
-    index = 0
-    if control:
-        index |= 1 << (total_qubits - 1)
-    offset = 1 if control is not None else 0
-    for mode in occupied_modes:
-        index |= 1 << (total_qubits - 1 - offset - mode)
-    state = np.zeros(2**total_qubits)
-    state[index] = 1.0
-    return state
-
-
-def _legacy_particle_number_phase(index: int, *, u: float, sites: int, time: float) -> complex:
-    """Return the conventional-vs-symmetric phase for one system-register basis index."""
-    electrons = index.bit_count()
-    return np.exp(-1j * (0.5 * u * electrons - 0.25 * u * sites) * time)
-
-
-def _apply_legacy_particle_number_phase(state: np.ndarray, *, u: float, sites: int, time: float) -> np.ndarray:
-    """Apply the conventional-vs-symmetric particle-number phase to a system-register state."""
-    return np.asarray(
-        [
-            amplitude * _legacy_particle_number_phase(index, u=u, sites=sites, time=time)
-            for index, amplitude in enumerate(state)
-        ],
-        dtype=complex,
-    )
 
 
 def _applied_state(operation, state: np.ndarray) -> np.ndarray:
@@ -492,6 +448,88 @@ def _register_index(values: list[int], widths: list[int]) -> int:
     return index
 
 
+def _binary_gradient_words(phi: float, n: int, bits: int) -> list[int]:
+    """Return the ``bits``-bit word of each place value, computed independently of Q#."""
+    modulus = 1 << bits
+    return [round(phi * 2**j * modulus / (4.0 * math.pi)) % modulus for j in range(n)]
+
+
+class TestBinaryGradientWords:
+    """The classical words Hamming-weight phasing loads, one per place value of the weight."""
+
+    @pytest.mark.parametrize("phi", [0.37, -2.9, 0.75 * math.pi, 9.5])
+    @pytest.mark.parametrize(("n", "bits"), [(1, 4), (3, 5), (4, 8)])
+    def test_words_are_the_nearest_representable_rotation(self, phi, n, bits):
+        """Word j rounds Rz(phi 2^j) onto the 4 pi / 2^bits lattice the gradient resolves."""
+        actual = [int(word) for word in QSHARP_UTILS.HubbardPlaquette.BinaryGradientWords(phi, n, bits)]
+        assert actual == _binary_gradient_words(phi, n, bits)
+        assert all(0 <= word < 2**bits for word in actual), "a word must fit the gradient register"
+
+    def test_a_lattice_angle_is_represented_exactly(self):
+        """Angles that are multiples of 4 pi / 2^bits round to themselves, so the phasing is exact."""
+        bits, k = 5, 3
+        phi = 4.0 * math.pi * k / 2**bits
+        actual = [int(word) for word in QSHARP_UTILS.HubbardPlaquette.BinaryGradientWords(phi, 4, bits)]
+        assert actual == [(k * 2**j) % 2**bits for j in range(4)]
+
+
+class TestPhaseByBinaryGradient:
+    """Hamming-weight phasing applies e^{i phi w} and returns the gradient register prepared."""
+
+    #: A phase on the 4 pi / 2^bits lattice, so every word is exact and the assertions can be tight.
+    BITS = 4
+    PHI = 4.0 * math.pi * 3 / 2**4
+
+    @classmethod
+    def _operation(cls, n: int, controlled: bool) -> str:
+        """Return Q# applying the phasing, with the constant offset, on a gradient prepared around it."""
+        words = _binary_gradient_words(cls.PHI, n, cls.BITS)
+        offset = -sum(4.0 * math.pi * word / 2**cls.BITS for word in words)
+        lead = 1 if controlled else 0
+        weight = f"qs[{lead}..{lead + n - 1}]"
+        gradient = f"qs[{lead + n}...]"
+        body = (
+            f"{_PLAQUETTE}.PhaseByBinaryGradient({words}, {weight}, {gradient}); R(PauliI, {offset}, {weight}[0]);"
+            if not controlled
+            else (
+                f"Controlled {_PLAQUETTE}.PhaseByBinaryGradient([qs[0]], ({words}, {weight}, {gradient})); "
+                f"Controlled R([qs[0]], (PauliI, {offset}, {weight}[0]));"
+            )
+        )
+        return f"qs => {{ within {{ {_PLAQUETTE}.PreparePlaquetteGradient({gradient}); }} apply {{ {body} }} }}"
+
+    @pytest.mark.parametrize("n", [1, 3])
+    def test_phases_every_weight_and_restores_the_gradient(self, n):
+        """Every weight picks up e^{i phi w}; the gradient ends in |0> after unpreparation."""
+        widths = [n, self.BITS]
+        amplitudes = np.zeros(2 ** sum(widths))
+        for weight in range(2**n):
+            amplitudes[_register_index([weight, 0], widths)] = 2 ** (-n / 2)
+        actual = _applied_state(self._operation(n, controlled=False), amplitudes)
+
+        expected = np.zeros_like(actual)
+        for weight in range(2**n):
+            expected[_register_index([weight, 0], widths)] = 2 ** (-n / 2) * np.exp(1j * self.PHI * weight)
+        assert np.allclose(actual, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("n", [2, 3])
+    def test_controlled_phasing_acts_only_when_the_control_is_set(self, n):
+        """Loading the word under control leaves the addition, and the gradient, uncontrolled."""
+        widths = [1, n, self.BITS]
+        amplitudes = np.zeros(2 ** sum(widths))
+        for control in (0, 1):
+            for weight in range(2**n):
+                amplitudes[_register_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2)
+        actual = _applied_state(self._operation(n, controlled=True), amplitudes)
+
+        expected = np.zeros_like(actual)
+        for control in (0, 1):
+            for weight in range(2**n):
+                phase = np.exp(1j * self.PHI * weight) if control else 1.0
+                expected[_register_index([control, weight, 0], widths)] = 2 ** (-(n + 1) / 2) * phase
+        assert np.allclose(actual, expected, atol=1e-10)
+
+
 def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
     """Return exp(i angle XX) exp(i angle YY) on every pair (2k, 2k + 1), which all commute."""
     num_qubits = 2 * num_pairs
@@ -501,73 +539,57 @@ def _hopping_tower(angle: float, num_pairs: int) -> np.ndarray:
     return scipy.linalg.expm(1j * angle * generator)
 
 
-def _apply_hopping_tower(angle: float, num_pairs: int, state: np.ndarray) -> np.ndarray:
-    """Apply the same adjacent-pair hopping tower without materializing a 2**n by 2**n matrix."""
-    pauli_pair = np.kron(_PAULI_X, _PAULI_X) + np.kron(_PAULI_Y, _PAULI_Y)
-    pair_gate = scipy.linalg.expm(1j * angle * pauli_pair)
-    num_qubits = 2 * num_pairs
-    evolved = state.astype(complex)
-    for pair in range(num_pairs):
-        q0, q1 = 2 * pair, 2 * pair + 1
-        axes = [q0, q1] + [axis for axis in range(num_qubits) if axis not in (q0, q1)]
-        inverse = np.argsort(axes)
-        moved = np.transpose(evolved.reshape([2] * num_qubits), axes).reshape(4, -1)
-        evolved = np.transpose((pair_gate @ moved).reshape([2, 2] + [2] * (num_qubits - 2)), inverse).reshape(-1)
-    return evolved
+def _hopping_phases(angle: float, num_pairs: int, control: str | None = None, bits: int = _GRADIENT_BITS) -> str:
+    """Return Q# applying ``HoppingPhases`` on a gradient prepared around it, optionally controlled.
 
-
-def _hopping_phases(angle: float, control: str | None = None, *, forced_legacy: bool = False) -> str:
-    """Return Q# applying ``HoppingPhases``, optionally controlled."""
+    Only the tower is controlled, as in the evolution: the gradient is prepared either way. A
+    ``bits`` of zero leaves the gradient empty, which selects the ``Rz`` ladder.
+    """
     register = "qs" if control is None else "qs[1...]"
-    arguments = f"({angle}, Std.Arrays.Chunks(2, {register}), -1)"
-    operation = "HoppingPhasesWithForcedLegacyCostsForTest" if forced_legacy else "HoppingPhases"
+    arguments = f"({angle}, Std.Arrays.Chunks(2, {register}), -1, gradient)"
     tower = (
-        f"{_PLAQUETTE}.{operation}{arguments}"
+        f"{_PLAQUETTE}.HoppingPhases{arguments}"
         if control is None
-        else f"Controlled {_PLAQUETTE}.{operation}([{control}], {arguments})"
+        else f"Controlled {_PLAQUETTE}.HoppingPhases([{control}], {arguments})"
     )
-    return f"qs => {{ {tower}; }}"
+    return (
+        f"qs => {{ use gradient = Qubit[{_PLAQUETTE}.TowerGradientSize({2 * num_pairs}, -1, {bits})]; "
+        f"within {{ {_PLAQUETTE}.PreparePlaquetteGradient(gradient); }} apply {{ {tower}; }} }}"
+    )
 
 
 class TestHoppingPhases:
     """Every XX and YY term of a hopping tiling is phased as one equal-angle tower."""
 
+    @_GRADIENT_OR_LADDER
     @pytest.mark.parametrize("num_pairs", [2, 4, 5])
-    def test_tower_matches_the_separate_rotations(self, num_pairs):
+    def test_tower_matches_the_separate_rotations(self, num_pairs, bits):
         """Below the break-even the terms are applied directly; from 8 rotations on, through HWP."""
         angle = 4 * _ANGLE_QUANTUM
-        operation = _hopping_phases(angle)
+        operation = _hopping_phases(angle, num_pairs, bits=bits)
 
         state = _random_state(2 * num_pairs, seed=num_pairs)
         expected = _hopping_tower(angle, num_pairs) @ state
         assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
 
-    def test_controlled_tower_acts_only_when_the_control_is_set(self):
+    @_GRADIENT_OR_LADDER
+    def test_controlled_tower_acts_only_when_the_control_is_set(self, bits):
         """Under control a stray global phase of the tower would become a relative phase."""
         angle, num_pairs = 4 * _ANGLE_QUANTUM, 4
-        operation = _hopping_phases(angle, control="qs[0]")
+        operation = _hopping_phases(angle, num_pairs, control="qs[0]", bits=bits)
 
         state = _random_state(2 * num_pairs + 1, seed=21)
         half = len(state) // 2
         expected = np.concatenate([state[:half], _hopping_tower(angle, num_pairs) @ state[half:]])
         assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
 
-    def test_forced_legacy_tower_matches_the_same_hopping_evolution(self):
-        """The resource-estimation legacy XX/YY split is unitary-equivalent above the HWP break-even."""
-        angle, num_pairs = 3 * _ANGLE_QUANTUM, 8
-        operation = _hopping_phases(angle, forced_legacy=True)
-
-        state = _random_state(2 * num_pairs, seed=91)
-        expected = _apply_hopping_tower(angle, num_pairs, state)
-
-        assert np.allclose(_applied_state(operation, state), expected, atol=1e-10)
-
 
 class TestInteractionLayer:
-    """The on-site tower phases every site pair through a Hamming-weight register."""
+    """The on-site tower phases every site pair through a Hamming-weight register and the gradient."""
 
+    @_GRADIENT_OR_LADDER
     @pytest.mark.parametrize("multiple", [4, -13])
-    def test_matches_the_separate_pair_rotations(self, multiple):
+    def test_matches_the_separate_pair_rotations(self, multiple, bits):
         """At eight sites the tower takes the HWP path; each basis state gets exp(-i angle sum Z Z)."""
         angle = multiple * _ANGLE_QUANTUM
         sites, num_qubits = 8, 16
@@ -582,20 +604,29 @@ class TestInteractionLayer:
             spins = [1 - 2 * ((index >> (num_qubits - 1 - qubit)) & 1) for qubit in range(num_qubits)]
             expected[index] *= np.exp(-1j * angle * sum(spins[s] * spins[s + sites] for s in range(sites)))
 
-        operation = f"qs => {{ {_PLAQUETTE}.InteractionLayer({angle}, {sites}, qs, -1); }}"
+        operation = (
+            f"qs => {{ use gradient = Qubit[{_PLAQUETTE}.TowerGradientSize({sites}, -1, {bits})]; "
+            f"within {{ {_PLAQUETTE}.PreparePlaquetteGradient(gradient); }} "
+            f"apply {{ {_PLAQUETTE}.InteractionLayer({angle}, {sites}, qs, -1, gradient); }} }}"
+        )
         assert np.allclose(_applied_state(operation, amplitudes), expected, atol=1e-10)
 
 
-def _single_z_tower(angle: float, count: int, cap: int, controlled: bool = False) -> str:
-    """Return Q# phasing ``count`` single-qubit Z terms as one capped Hamming-weight tower."""
+def _single_z_tower(angle: float, count: int, cap: int, controlled: bool = False, bits: int = _GRADIENT_BITS) -> str:
+    """Return Q# phasing ``count`` single-qubit Z terms as one capped tower, on a gradient prepared around it."""
     lead = 1 if controlled else 0
-    arguments = f"({angle}, [[PauliZ], size = {count}], Std.Arrays.Chunks(1, qs[{lead}..{lead + count - 1}]), {cap})"
+    arguments = (
+        f"({angle}, [[PauliZ], size = {count}], Std.Arrays.Chunks(1, qs[{lead}..{lead + count - 1}]), {cap}, gradient)"
+    )
     call = (
         f"Controlled {_PLAQUETTE}.HammingWeightPhase([qs[0]], {arguments})"
         if controlled
         else f"{_PLAQUETTE}.HammingWeightPhase{arguments}"
     )
-    return f"qs => {{ {call}; }}"
+    return (
+        f"qs => {{ use gradient = Qubit[{_PLAQUETTE}.TowerGradientSize({count}, {cap}, {bits})]; "
+        f"within {{ {_PLAQUETTE}.PreparePlaquetteGradient(gradient); }} apply {{ {call}; }} }}"
+    )
 
 
 def _single_z_phases(angle: float, count: int, num_qubits: int, lead: int, basis_states) -> np.ndarray:
@@ -624,6 +655,7 @@ class TestHammingWeightBatchCap:
     error in that constant shows up as a wrong phase here rather than as a wrong gate count.
     """
 
+    @_GRADIENT_OR_LADDER
     @pytest.mark.parametrize(
         ("count", "cap", "batches"),
         [
@@ -633,16 +665,17 @@ class TestHammingWeightBatchCap:
             (10, 5, "two batches, both below the break-even"),
         ],
     )
-    def test_the_split_preserves_the_tower(self, count, cap, batches):
+    def test_the_split_preserves_the_tower(self, count, cap, batches, bits):
         """Whatever the split, the tower is still exp(-i angle sum_j Z_j)."""
         angle = 3 * _ANGLE_QUANTUM
         amplitudes, basis_states = _sparse_state(count, seed=count + cap)
         expected = amplitudes.astype(complex) * _single_z_phases(angle, count, count, 0, basis_states)
 
-        actual = _applied_state(_single_z_tower(angle, count, cap), amplitudes)
+        actual = _applied_state(_single_z_tower(angle, count, cap, bits=bits), amplitudes)
         assert np.allclose(actual, expected, atol=1e-10), f"capped tower differs for {batches}"
 
-    def test_a_capped_tower_is_controlled_as_a_whole(self):
+    @_GRADIENT_OR_LADDER
+    def test_a_capped_tower_is_controlled_as_a_whole(self, bits):
         """Each batch's identity phase is not global under control, so a stray one is visible here."""
         angle, count, cap = 3 * _ANGLE_QUANTUM, 12, 8
         num_qubits = count + 1
@@ -654,7 +687,16 @@ class TestHammingWeightBatchCap:
         expected = amplitudes.astype(complex)
         expected[half:] *= phases[half:]
 
-        actual = _applied_state(_single_z_tower(angle, count, cap, controlled=True), amplitudes)
+        actual = _applied_state(_single_z_tower(angle, count, cap, controlled=True, bits=bits), amplitudes)
+        assert np.allclose(actual, expected, atol=1e-10)
+
+    def test_the_rz_ladder_is_exact_off_the_gradient_lattice(self):
+        """Without a gradient nothing is rounded, so an angle no gradient could hold is still exact."""
+        angle, count = 0.1234567, 12
+        amplitudes, basis_states = _sparse_state(count, seed=91)
+        expected = amplitudes.astype(complex) * _single_z_phases(angle, count, count, 0, basis_states)
+
+        actual = _applied_state(_single_z_tower(angle, count, -1, bits=0), amplitudes)
         assert np.allclose(actual, expected, atol=1e-10)
 
     @pytest.mark.parametrize(
@@ -664,6 +706,15 @@ class TestHammingWeightBatchCap:
     def test_the_batch_size_is_the_cap_until_the_tower_is_shorter(self, count, cap, expected):
         """A cap at or above the tower length leaves it whole; -1 never splits."""
         assert QSHARP_UTILS.HubbardPlaquette.HammingWeightBatchSize(count, cap) == expected
+
+    @pytest.mark.parametrize(
+        ("count", "cap", "phased"),
+        [(16, -1, True), (16, 8, True), (16, 7, False), (12, 8, True), (5, -1, False), (0, -1, False)],
+    )
+    def test_the_gradient_follows_the_batch_rather_than_the_tower(self, count, cap, phased):
+        """A cap that leaves every batch below the break-even must not allocate a gradient it never uses."""
+        size = QSHARP_UTILS.HubbardPlaquette.TowerGradientSize(count, cap, _GRADIENT_BITS)
+        assert size == (_GRADIENT_BITS if phased else 0)
 
 
 class TestPlaquetteEvolutionOnAState:
@@ -698,7 +749,11 @@ class TestPlaquetteEvolutionOnAState:
         cycles = [[5, 6, 2, 1], [7, 4, 0, 3]]
         kappa = 2.0 * duration
         literal = "[" + ", ".join("[" + ", ".join(map(str, cycle)) + "]" for cycle in cycles) + "]"
-        operation = get_qsharp_context().eval(f"qs => {{ {_PLAQUETTE}.HoppingLayer({kappa}, {literal}, qs, -1); }}")
+        operation = get_qsharp_context().eval(
+            f"qs => {{ use gradient = Qubit[{_PLAQUETTE}.TowerGradientSize({2 * len(cycles)}, -1, {_GRADIENT_BITS})]; "
+            f"within {{ {_PLAQUETTE}.PreparePlaquetteGradient(gradient); }} "
+            f"apply {{ {_PLAQUETTE}.HoppingLayer({kappa}, {literal}, qs, -1, gradient); }} }}"
+        )
 
         annihilate = np.array([[0, 1], [0, 0]], dtype=complex)
         identity = np.eye(2)
@@ -725,70 +780,6 @@ class TestPlaquetteEvolutionOnAState:
         )
 
         assert _infidelity(actual, expected) < 1e-9
-
-
-class TestForcedLegacyPlaquetteCosts:
-    """The resource-estimation-only legacy branches cost the conventional-model unitary."""
-
-    @staticmethod
-    def _operations(controlled: bool):
-        width = height = 2
-        time, t, u, repetitions = 0.05, 1.0, 4.0, 1
-        delta = time / repetitions
-        interaction_angle = 0.25 * u * delta
-        hopping_angle = 2.0 * t * delta
-        normal = _plaquette_operation_from_angles(
-            width,
-            height,
-            interaction_angle=interaction_angle,
-            hopping_angle=hopping_angle,
-            repetitions=repetitions,
-            controlled=controlled,
-        )
-        forced = _plaquette_operation_from_angles(
-            width,
-            height,
-            interaction_angle=interaction_angle,
-            hopping_angle=hopping_angle,
-            repetitions=repetitions,
-            controlled=controlled,
-            forced_legacy=True,
-        )
-        return normal, forced, time, u, width * height
-
-    def test_forced_legacy_plaquette_matches_normal_in_fixed_particle_number_sectors(self):
-        """The legacy path differs only by a global phase on definite-N basis states."""
-        occupations = [(), (0,), (0, 4), (0, 1, 2, 3), tuple(range(8))]
-        num_qubits = 8
-
-        for controlled in (False, True):
-            normal, forced, *_ = self._operations(controlled)
-            for occupied in occupations:
-                state = _basis_state(num_qubits, occupied, control=True if controlled else None)
-                assert _infidelity(_applied_state(forced, state), _applied_state(normal, state)) < 1e-12
-
-    @pytest.mark.parametrize("controlled", [False, True])
-    def test_forced_legacy_plaquette_difference_is_the_particle_number_phase(self, controlled):
-        """On a particle-number superposition, the legacy path differs by the known N-sector phase."""
-        normal, forced, time, u, sites = self._operations(controlled)
-        num_qubits = 2 * sites
-        state = _random_state(num_qubits + int(controlled), seed=102 + int(controlled))
-        normal_state = _applied_state(normal, state)
-        forced_state = _applied_state(forced, state)
-
-        if controlled:
-            half = len(state) // 2
-            corrected = np.concatenate(
-                [
-                    normal_state[:half],
-                    _apply_legacy_particle_number_phase(normal_state[half:], u=u, sites=sites, time=time),
-                ]
-            )
-        else:
-            corrected = _apply_legacy_particle_number_phase(normal_state, u=u, sites=sites, time=time)
-
-        assert _infidelity(forced_state, normal_state) > 1e-4
-        assert _infidelity(forced_state, corrected) < 1e-12
 
 
 class TestPlaquettePhaseEstimation:
@@ -858,7 +849,13 @@ _CATALYST_SITES = _CATALYST_WIDTH * _CATALYST_HEIGHT
 
 
 def _plaquette_controlled(
-    interaction_angle: float, hopping_angle: float, step_reps: int, width: int = 4, height: int = 2
+    interaction_angle: float,
+    hopping_angle: float,
+    step_reps: int,
+    width: int = 4,
+    height: int = 2,
+    *,
+    use_phase_gradient: bool = True,
 ) -> Circuit:
     """Return the controlled plaquette circuit the mapper emits for these exact angles."""
     container = HubbardPlaquetteContainer(
@@ -872,6 +869,8 @@ def _plaquette_controlled(
         "controlled_circuit_mapper",
         "hubbard_plaquette",
         control_indices=[0],
+        use_phase_gradient=use_phase_gradient,
+        rotation_bit_precision=_GRADIENT_BITS,
     ).run(UnitaryRepresentation(container=container))
 
 
@@ -908,61 +907,104 @@ def _standard_phase(results: list) -> float:
     return int(bits, 2) / 2 ** len(bits)
 
 
-# Angles whose eigenphase is exactly pi / 2, so every measured bit is deterministic.
+# Angles whose eigenphase is exactly pi / 2, so every measured bit is deterministic. The hopping
+# angle is a multiple of 16 quanta, so every angle the layers derive from it -- halved for the
+# boundary, halved again inside the tiling, doubled for the squared query -- stays on the gradient
+# lattice and the Hamming-weight rotations are exact.
 _HOPPING = 20 * _ANGLE_QUANTUM
 _INTERACTION = (2.0 * _HOPPING - np.pi / 2) / (_CATALYST_SITES - 2)
 
 
-class TestPlaquetteUnderPhaseEstimation:
-    """The controlled plaquette evolution kicks its eigenphase back onto the phase register."""
+class TestSharedPlaquetteCatalysts:
+    """Phase estimation prepares the plaquette phase gradient once and shares it across queries."""
+
+    def test_mapper_declares_its_phase_gradient(self):
+        """Every tower phases through one binary gradient, whose state carries no angle."""
+        circuit = _plaquette_controlled(0.3, 0.2, 1)
+        assert circuit.metadata.num_phase_gradient_ancillas == _GRADIENT_BITS
+        assert circuit.num_qubits == 2 * _CATALYST_SITES + _GRADIENT_BITS
+
+    def test_a_lattice_below_the_break_even_declares_none(self):
+        """The 2x2 towers rotate term by term, so there is nothing to share."""
+        assert _plaquette_controlled(0.3, 0.2, 1, width=2, height=2).metadata.num_phase_gradient_ancillas == 0
+
+    def test_the_rotation_ladder_declares_none(self):
+        """Without the phase gradient every place value is synthesized, so there is nothing to share."""
+        circuit = _plaquette_controlled(0.3, 0.2, 1, use_phase_gradient=False)
+        assert circuit.metadata.num_phase_gradient_ancillas == 0
 
     @pytest.mark.slow
+    @pytest.mark.parametrize("use_phase_gradient", [True, False], ids=["phase_gradient", "rz_ladder"])
     @pytest.mark.parametrize(("feedback", "expected"), [(0.0, 0), (np.pi, 1)])
-    def test_iterative_estimation_kicks_back_the_exact_phase(self, feedback, expected):
+    def test_iterative_estimation_kicks_back_the_exact_phase(self, feedback, expected, use_phase_gradient):
         """The phase qubit reads a fixed bit once the feedback cancels, or completes, the eigenphase."""
         builder = create("qpe_circuit_builder", "qdk_iterative", num_bits=1)
-        controlled = _plaquette_controlled(_INTERACTION, _HOPPING, 1)
+        controlled = _plaquette_controlled(_INTERACTION, _HOPPING, 1, use_phase_gradient=use_phase_gradient)
         phase = _eigenphase(_INTERACTION, _HOPPING, 1)
         circuit = builder._create_circuit_from_qsharp_op(
             _one_electron_preparation(), controlled, feedback - phase, 2 * _CATALYST_SITES
         )
+        shared = _GRADIENT_BITS if use_phase_gradient else 0
+        assert circuit._qsharp_factory.parameter["numSharedAncillas"] == shared
 
         outcomes = {int(shot[0] == Result.One) for shot in _run(circuit, shots=4)}
         assert outcomes == {expected}
 
     @pytest.mark.slow
-    def test_standard_estimation_reads_the_phase_across_powers(self):
-        """Each query applies its own power of the evolution.
+    def test_standard_estimation_shares_one_register_across_powers(self):
+        """Repetitions change the power but not the gradient, so every query reuses the same register.
 
         The eigenphase is pi / 2, so two phase bits read exactly one quarter.
         """
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         powers = [_plaquette_controlled(_INTERACTION, _HOPPING, reps) for reps in (2, 1)]
         circuit = builder._create_circuit_from_qsharp_op(_one_electron_preparation(), powers, 2, 2 * _CATALYST_SITES)
+        parameters = circuit._qsharp_factory.parameter
+        assert parameters["numSharedAncillas"] == _GRADIENT_BITS
+        assert parameters["prepareSharedOp"] is not QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
         assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
 
     @pytest.mark.slow
-    def test_rescaled_powers_read_the_same_phase(self):
-        """Doubling the layer angles is the squared query, so the reading is unchanged."""
+    def test_rescaled_powers_share_the_whole_register(self):
+        """A binary gradient does not depend on the layer angles, so rescaled powers share all of it."""
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         powers = [
             _plaquette_controlled(2 * _INTERACTION, 2 * _HOPPING, 1),
             _plaquette_controlled(_INTERACTION, _HOPPING, 1),
         ]
         circuit = builder._create_circuit_from_qsharp_op(_one_electron_preparation(), powers, 2, 2 * _CATALYST_SITES)
+        parameters = circuit._qsharp_factory.parameter
+        assert parameters["numSharedAncillas"] == _GRADIENT_BITS
+        assert parameters["prepareSharedOp"] is not QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
         assert {_standard_phase(shot) for shot in _run(circuit, shots=2)} == {0.25}
 
-    def test_the_mapper_declares_no_shared_register(self):
-        """Nothing in the plaquette path asks phase estimation for ancillas any more."""
-        circuit = _plaquette_controlled(0.3, 0.2, 1)
-        assert circuit.metadata.num_phase_gradient_ancillas == 0
+    def test_mismatched_gradient_requests_are_rejected(self):
+        """One register cannot serve two widths, and silently dropping one would emit a broken circuit."""
+        builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
+        circuits = [_plaquette_controlled(0.3, 0.2, 1), _plaquette_controlled(0.3, 0.2, 1, width=2, height=2)]
+        with pytest.raises(ValueError, match="same phase gradient register"):
+            builder._shared_register(circuits)
+
+    def test_a_lattice_below_the_break_even_shares_nothing(self):
+        """Nothing is prepared when no controlled unitary asks for a gradient."""
+        builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
+        circuits = [_plaquette_controlled(0.3, 0.2, 1, width=2, height=2)] * 2
+        ops, prepare, num_shared = builder._shared_register(circuits)
+        assert len(ops) == 2
+        assert num_shared == 0
+        assert prepare is QSHARP_UTILS.PrepSelPrep.NoOpPrepare
 
     def test_the_mapper_defaults_to_an_uncapped_batch(self):
         """The cap is opt-in, so the default must leave the tower whole."""
         mapper = create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0])
         assert int(mapper.settings().get("max_hwp_batch_size")) == -1
+
+    def test_the_mapper_defaults_to_the_phase_gradient(self):
+        """The rotation ladder is opt-in, so the default must phase through the gradient."""
+        mapper = create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0])
+        assert mapper.settings().get("use_phase_gradient") is True
 
     def test_the_mapper_rejects_a_zero_cap(self):
         """Zero terms per batch would phase nothing, and zero is inside the setting's range."""
@@ -1185,17 +1227,17 @@ _BENCHMARK_TROTTER_ORDER = 2
 
 
 #: Rotation synthesis rounds transcendental angles, so these two counts drift by a few
-#: units out of millions across platforms (Linux matches exactly, macOS is +1, Windows
-#: ARM64 is +5). They are pinned to a relative tolerance; every other column stays exact.
+#: units across platforms (the pins are Linux; other platforms have been seen up to +5, on
+#: Windows ARM64). The phase gradient leaves only tens of thousands of rotations at L=4, where
+#: a relative tolerance alone would not absorb that drift, so they are pinned to the larger of
+#: a relative and an absolute tolerance; every other column stays exact.
 _PLATFORM_SENSITIVE_COLUMNS = frozenset({"rotations", "rotation_depth"})
 _PLATFORM_RELATIVE_TOLERANCE = 1e-4
+_PLATFORM_ABSOLUTE_TOLERANCE = 16
 
 
 #: L=2 has four sites, which is below the Hamming-weight-phasing break-even of eight terms, so
 #: every tower rotates term by term: no adder tree, and therefore no Toffolis at all.
-#:
-#: TEMPORARY (legacy parity): resource estimates include the legacy circuit's extra work, whose
-#: single-mode tower over eight modes did reach the break-even, so these are the legacy counts.
 _HUBBARD_L2_FULL_CIRCUIT = {
     "L": 2,
     "sites": 4,
@@ -1206,23 +1248,22 @@ _HUBBARD_L2_FULL_CIRCUIT = {
     "trotter_budget": 0.0068000000000000005,
     "qpe_bits": 10,
     "base_time": 0.2253660323553513,
-    "logical_qubits": 25,
-    "rotations": 2224986,
-    "rotation_depth": 1483458,
+    "logical_qubits": 18,
+    "rotations": 1047435,
+    "rotation_depth": 698444,
     "t_gates": 697995,
-    "ccz_count": 610582,
+    "ccz_count": 0,
     "ccix_count": 0,
-    "toffolis": 610582,
-    "measurements": 610592,
+    "toffolis": 0,
+    "measurements": 10,
 }
 
 
 #: L=4 has sixteen sites, so every tower is above the break-even and takes the
 #: Hamming-weight-phasing path: an adder tree compresses sixteen same-angle rotations into a
-#: five-bit weight, and each place value takes one synthesized ``Rz``. This is the case that
+#: five-bit weight, and each place value is rotated through the shared ten-qubit binary phase
+#: gradient, which turns the place-value rotations into Toffolis. This is the case that
 #: exercises the construction, which is why it is pinned.
-#:
-#: TEMPORARY (legacy parity): these are the legacy circuit's counts, which the estimates reproduce exactly.
 _HUBBARD_L4_FULL_CIRCUIT = {
     "L": 4,
     "sites": 16,
@@ -1233,14 +1274,30 @@ _HUBBARD_L4_FULL_CIRCUIT = {
     "trotter_budget": 0.027200000000000002,
     "qpe_bits": 10,
     "base_time": 0.056341508088837824,
-    "logical_qubits": 73,
-    "rotations": 729063,
-    "rotation_depth": 551326,
-    "t_gates": 758427,
-    "ccz_count": 710540,
+    "logical_qubits": 87,
+    "rotations": 24549,
+    "rotation_depth": 24257,
+    "t_gates": 758481,
+    "ccz_count": 1421400,
     "ccix_count": 0,
-    "toffolis": 710540,
-    "measurements": 710550,
+    "toffolis": 1421400,
+    "measurements": 1421410,
+}
+
+
+#: The same L=4 circuit with ``use_phase_gradient=False``: each place value of the Hamming
+#: weight is synthesized as its own ``Rz``, the original rotation ladder. Without the gradient
+#: register and the additions into it, it holds thirty fewer qubits and a quarter of the
+#: Toffolis, and pays for that in rotations.
+_HUBBARD_L4_ROTATION_LADDER = {
+    **_HUBBARD_L4_FULL_CIRCUIT,
+    "logical_qubits": 57,
+    "rotations": 261233,
+    "rotation_depth": 190086,
+    "t_gates": 758427,
+    "ccz_count": 355350,
+    "toffolis": 355350,
+    "measurements": 355360,
 }
 
 
@@ -1255,7 +1312,7 @@ def _benchmark_schedule(size: int) -> tuple[float, float, float, float]:
     return energy_budget, qpe_budget, trotter_budget, base_time
 
 
-def _benchmark_logical_counts(size: int, max_batch_size: int = -1) -> dict:
+def _benchmark_logical_counts(size: int, max_batch_size: int = -1, *, use_phase_gradient: bool = True) -> dict:
     """Build the benchmark's phase-estimation circuit for one lattice and trace its gate counts."""
     operator = _lattice_operator(size, size, t=_BENCHMARK_HOPPING_T, u=_BENCHMARK_U_OVER_T * _BENCHMARK_HOPPING_T)
     energy_budget, qpe_budget, trotter_budget, base_time = _benchmark_schedule(size)
@@ -1275,7 +1332,10 @@ def _benchmark_logical_counts(size: int, max_batch_size: int = -1) -> dict:
         num_bits=_BENCHMARK_QPE_BITS,
         unitary_builder=unitary_builder,
         controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper", "hubbard_plaquette", max_hwp_batch_size=max_batch_size
+            "controlled_circuit_mapper",
+            "hubbard_plaquette",
+            max_hwp_batch_size=max_batch_size,
+            use_phase_gradient=use_phase_gradient,
         ),
     )
     circuit_builder.settings().set("phase_state", "sine")
@@ -1314,8 +1374,8 @@ def _compare_counts(actual: dict, expected: dict) -> list[str]:
     for column, want in expected.items():
         got = actual[column]
         if column in _PLATFORM_SENSITIVE_COLUMNS:
-            matches = got == pytest.approx(want, rel=_PLATFORM_RELATIVE_TOLERANCE)
-            tolerance = f" (rel={_PLATFORM_RELATIVE_TOLERANCE})"
+            matches = got == pytest.approx(want, rel=_PLATFORM_RELATIVE_TOLERANCE, abs=_PLATFORM_ABSOLUTE_TOLERANCE)
+            tolerance = f" (rel={_PLATFORM_RELATIVE_TOLERANCE}, abs={_PLATFORM_ABSOLUTE_TOLERANCE})"
         else:
             matches = got == pytest.approx(want) if isinstance(want, float) else got == want
             tolerance = ""
@@ -1337,9 +1397,8 @@ class TestBenchmarkLogicalResources:
         mismatches = _compare_counts(actual, _HUBBARD_L2_FULL_CIRCUIT)
         assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
 
-        # TEMPORARY (legacy parity): the legacy single-mode tower brings its adder tree back;
-        # restore the zero-Toffoli check with the revert.
-        assert actual["toffolis"] == _HUBBARD_L2_FULL_CIRCUIT["toffolis"]
+        # Below the break-even zero Toffolis is the correct answer, not a collapsed circuit.
+        assert actual["toffolis"] == 0, "the 2x2 lattice is below the break-even and phases term by term"
 
     def test_lattice_above_the_break_even(self):
         """L=4 is the case that exercises the adder tree and the Hamming-weight rotation ladder."""
@@ -1354,14 +1413,26 @@ class TestBenchmarkLogicalResources:
 
     def test_a_cap_at_least_the_tower_length_changes_nothing(self):
         """The 4x4 towers are sixteen terms long, so a cap of sixteen cannot split any of them."""
-        # TEMPORARY (legacy parity): the legacy single-mode tower spans all 32 modes, so the cap that
-        # splits nothing is 32 until the revert; restore max_batch_size=16 with it.
-        assert _benchmark_logical_counts(4, max_batch_size=32) == _benchmark_logical_counts(4)
+        assert _benchmark_logical_counts(4, max_batch_size=16) == _benchmark_logical_counts(4)
 
-    def test_capping_trades_qubits_for_rotations(self):
-        """Halving the batch releases the adder-tree scratch sooner and pays for it in rotations."""
+    def test_capping_trades_qubits_for_toffolis(self):
+        """Halving the batch releases the adder-tree scratch sooner and pays for it in Toffolis."""
         uncapped = _benchmark_logical_counts(4)
         capped = _benchmark_logical_counts(4, max_batch_size=8)
+
+        assert capped["logical_qubits"] < uncapped["logical_qubits"], "a shorter batch must hold fewer ancillas"
+        assert capped["toffolis"] > uncapped["toffolis"], "each batch pays its own place-value gradient additions"
+
+    def test_the_rotation_ladder_is_still_available(self):
+        """Turning the phase gradient off restores the original ladder of synthesized rotations."""
+        actual = _benchmark_logical_counts(4, use_phase_gradient=False)
+        mismatches = _compare_counts(actual, _HUBBARD_L4_ROTATION_LADDER)
+        assert not mismatches, "Mismatches found:\n" + "\n".join(mismatches)
+
+    def test_capping_the_ladder_trades_qubits_for_rotations(self):
+        """Without the gradient the per-batch price is paid in synthesized place-value rotations."""
+        uncapped = _benchmark_logical_counts(4, use_phase_gradient=False)
+        capped = _benchmark_logical_counts(4, max_batch_size=8, use_phase_gradient=False)
 
         assert capped["logical_qubits"] < uncapped["logical_qubits"], "a shorter batch must hold fewer ancillas"
         assert capped["rotations"] > uncapped["rotations"], "each batch pays its own place-value rotations"
