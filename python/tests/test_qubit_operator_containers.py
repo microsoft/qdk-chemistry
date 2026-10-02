@@ -7,6 +7,7 @@
 
 from functools import partial
 from operator import methodcaller
+from typing import ClassVar
 
 import h5py
 import numpy as np
@@ -31,11 +32,13 @@ from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQub
 from qdk_chemistry.data import (
     FactorizedHamiltonianContainer,
     Hamiltonian,
+    LatticeGeometry,
     MajoranaMapping,
     QubitOperator,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
+from qdk_chemistry.data.qubit_operator.containers.lattice import LatticeContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
@@ -358,6 +361,113 @@ def _one_body_block(h1: np.ndarray):
         Hamiltonian(_factorized_with_one_body(h1)), MajoranaMapping.jordan_wigner(2 * n)
     )
     return operator.get_container()
+
+
+class TestLatticeContainer:
+    """Serialization of the lattice container the plaquette builders consume."""
+
+    _COUPLINGS: ClassVar[dict[str, float]] = {"interaction": 8.0, "hopping": 1.0}
+
+    def test_json_roundtrip(self) -> None:
+        """The geometry and couplings survive a JSON round-trip."""
+        geometry = LatticeGeometry.square(4, 3, periodic_x=True, periodic_y=True)
+        container = LatticeContainer(geometry, couplings=self._COUPLINGS)
+
+        json_data = QubitOperator(container=container).to_json()
+        assert json_data["container_type"] == "lattice"
+        restored = QubitOperator.from_json(json_data).get_container()
+
+        assert isinstance(restored, LatticeContainer)
+        assert restored.geometry.num_sites == 12
+        assert restored.num_qubits == 24
+        assert restored.couplings == self._COUPLINGS
+        np.testing.assert_allclose(restored.geometry.positions, geometry.positions)
+        np.testing.assert_allclose(restored.geometry.periods, geometry.periods)
+
+    def test_hdf5_roundtrip(self, tmp_path) -> None:
+        """The container reloads from HDF5 through the qubit operator's container dispatch."""
+        geometry = LatticeGeometry.square(4, 3, periodic_x=True, periodic_y=True)
+        container = LatticeContainer(geometry, couplings=self._COUPLINGS)
+        path = tmp_path / "lattice.h5"
+
+        with h5py.File(path, "w") as handle:
+            QubitOperator(container=container).to_hdf5(handle.create_group("operator"))
+
+        with h5py.File(path, "r") as handle:
+            assert handle["operator"].attrs["container_type"] == "lattice"
+            operator = QubitOperator.from_hdf5(handle["operator"])
+
+        restored = operator.get_container()
+        assert isinstance(restored, LatticeContainer)
+        assert restored.couplings == self._COUPLINGS
+        np.testing.assert_allclose(restored.geometry.positions, geometry.positions)
+        np.testing.assert_allclose(restored.geometry.periods, geometry.periods)
+        assert operator.content_hash() == QubitOperator(container=container).content_hash()
+
+    def test_couplings_are_part_of_the_identity(self) -> None:
+        """Two operators on one geometry that differ only in a coupling must not hash alike."""
+        geometry = LatticeGeometry.square(4, 4, periodic_x=True, periodic_y=True)
+
+        def operator_hash(couplings):
+            return QubitOperator(container=LatticeContainer(geometry, couplings=couplings)).content_hash()
+
+        assert operator_hash({"hopping": 1.0, "interaction": 0.0}) != operator_hash(
+            {"hopping": 1.0, "interaction": 8.0}
+        )
+        # Names, not insertion order, identify a coupling.
+        assert operator_hash({"hopping": 1.0, "interaction": 8.0}) == operator_hash(
+            {"interaction": 8.0, "hopping": 1.0}
+        )
+
+    def test_couplings_are_a_copy(self) -> None:
+        """Mutating the returned mapping cannot change the container behind its hash."""
+        container = LatticeContainer(LatticeGeometry.square(2, 2), couplings={"hopping": 1.0})
+        container.couplings["hopping"] = 5.0
+
+        assert container.couplings == {"hopping": 1.0}
+
+    @pytest.mark.parametrize(
+        ("couplings", "error", "message"),
+        [
+            ({1: 1.0}, TypeError, "names must be strings"),
+            ({"": 1.0}, ValueError, "must not be empty"),
+            ({"hopping": "1.0"}, TypeError, "real number"),
+            ({"hopping": True}, TypeError, "real number"),
+            ({"hopping": float("nan")}, ValueError, "finite"),
+            ([("hopping", 1.0)], TypeError, "map names to numbers"),
+        ],
+    )
+    def test_rejects_malformed_couplings(self, couplings, error, message) -> None:
+        with pytest.raises(error, match=message):
+            LatticeContainer(LatticeGeometry.square(2, 2), couplings=couplings)
+
+    @pytest.mark.parametrize(
+        ("factory", "nx", "ny", "expected_sites"),
+        [("square", 3, 2, 6), ("honeycomb", 3, 2, 12), ("kagome", 3, 2, 18)],
+    )
+    def test_factory_site_counts_survive_the_round_trip(self, factory, nx, ny, expected_sites) -> None:
+        """Each factory documents what nx and ny count, and the stored geometry keeps it.
+
+        ``square`` counts sites while ``honeycomb`` and ``kagome`` count unit cells of two
+        and three sites, so the site count is the observable that distinguishes them.
+        """
+        geometry = getattr(LatticeGeometry, factory)(nx, ny)
+        container = LatticeContainer(geometry)
+        assert container.geometry.num_sites == expected_sites
+
+        restored = QubitOperator.from_json(QubitOperator(container=container).to_json()).get_container()
+        assert restored.geometry.num_sites == expected_sites
+        np.testing.assert_allclose(restored.geometry.positions, geometry.positions)
+
+    def test_rejects_a_geometry_whose_stored_layout_is_inconsistent(self) -> None:
+        """Loading validates the layout, so a hand-edited document fails instead of loading."""
+        container = LatticeContainer(LatticeGeometry.square(4, 3, periodic_x=True, periodic_y=True))
+        json_data = QubitOperator(container=container).to_json()
+        # Claim a lattice shape that no longer accounts for every stored site.
+        json_data["geometry"]["integer_embedding"]["nx"] = 5
+
+        with pytest.raises(ValueError, match="[Ii]nvalid lattice integer embedding"):
+            QubitOperator.from_json(json_data)
 
 
 class TestSumOfSquaresQubitMapper:

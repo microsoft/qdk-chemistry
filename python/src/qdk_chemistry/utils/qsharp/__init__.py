@@ -37,6 +37,7 @@ _BASE_PROFILE_FILES = (
     "ControlledPauliExp.qs",
     "ControlledSwapPauliExp.qs",
     "HadamardTest.qs",
+    "HubbardPlaquette.qs",
     "PauliExp.qs",
     "MeasurementBasis.qs",
     "Select.qs",
