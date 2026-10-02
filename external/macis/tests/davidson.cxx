@@ -9,6 +9,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <numeric>
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/solvers/davidson.hpp>
@@ -71,6 +72,79 @@ TEST_CASE("Davidson") {
         blas::dot(X.size(), X.data(), 1, AX.data(), 1),
         Catch::Matchers::WithinAbs(E0, testing::numerical_zero_tolerance));
   }
+
+  SECTION("Block two-pass GS/QR") {
+    std::vector<double> W = {1.0, 0.0, 0.0,
+                            1.0, 0.0, 0.0,
+                            0.0, 1.0, 0.0};
+    auto keep = macis::block_two_pass_gs_qr(3, 0, nullptr, 3, 3, W.data(), 3);
+
+    REQUIRE(keep == 2);
+    for (int64_t col = 0; col < keep; ++col) {
+      const auto* v = W.data() + col * 3;
+      REQUIRE_THAT(blas::nrm2(3, v, 1),
+                   Catch::Matchers::WithinAbs(1.0,
+                                             testing::numerical_zero_tolerance));
+      for (int64_t other = col + 1; other < keep; ++other) {
+        const auto* w = W.data() + other * 3;
+        REQUIRE_THAT(blas::dot(3, v, 1, w, 1),
+                     Catch::Matchers::WithinAbs(
+                         0.0, testing::numerical_zero_tolerance));
+      }
+    }
+  }
+
+  SECTION("Block Davidson on a diagonal matrix") {
+    constexpr int64_t N = 12;
+    constexpr int64_t block_size = 4;
+    constexpr int64_t n_roots = 4;
+
+    std::vector<double> diag(N);
+    std::iota(diag.begin(), diag.end(), 1.0);
+
+    struct DiagOp {
+      const std::vector<double>* d;
+      void operator_action(size_t m, double alpha, const double* V, size_t LDV,
+                           double beta, double* AV, size_t LDAV) const {
+        for (size_t j = 0; j < m; ++j) {
+          const auto* vj = V + j * LDV;
+          auto* avj = AV + j * LDAV;
+          for (size_t i = 0; i < d->size(); ++i) {
+            avj[i] = alpha * (*d)[i] * vj[i] + beta * avj[i];
+          }
+        }
+      }
+    } op{&diag};
+
+    std::vector<double> X(N * block_size, 0.0);
+    for (int64_t col = 0; col < n_roots; ++col) {
+      X[col * N + col] = 1.0;
+    }
+
+    auto [niter, evals] =
+        macis::block_davidson(N, 20, block_size, n_roots, op, diag.data(),
+                             1e-10, X.data());
+
+    REQUIRE(evals.size() == n_roots);
+    for (int64_t root = 0; root < n_roots; ++root) {
+      REQUIRE_THAT(evals[root], Catch::Matchers::WithinAbs(
+                                   static_cast<double>(root + 1), 1e-10));
+    }
+
+    for (int64_t col = 0; col < n_roots; ++col) {
+      const auto* xcol = X.data() + col * N;
+      REQUIRE_THAT(blas::nrm2(N, xcol, 1),
+                   Catch::Matchers::WithinAbs(1.0,
+                                             testing::numerical_zero_tolerance));
+      for (int64_t other = col + 1; other < n_roots; ++other) {
+        const auto* xother = X.data() + other * N;
+        REQUIRE_THAT(blas::dot(N, xcol, 1, xother, 1),
+                     Catch::Matchers::WithinAbs(
+                         0.0, testing::numerical_zero_tolerance));
+      }
+    }
+  }
+
   spdlog::drop_all();
 }
 
