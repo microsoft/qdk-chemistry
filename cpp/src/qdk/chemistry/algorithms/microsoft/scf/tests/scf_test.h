@@ -230,10 +230,10 @@ class SCFTest
     // each thread, so its entry points pin BLAS to one thread and must restore
     // the previous count on exit. 0 means this build bound no thread-control
     // API, where the guard is intentionally a no-op and nothing is restored.
-    const int blas_threads_before = util::get_blas_num_threads();
+    const int blas_threads_before = util::blas_get_num_threads();
     const auto& ctx = scf->run();
     if (blas_threads_before > 0)
-      EXPECT_EQ(util::get_blas_num_threads(), blas_threads_before);
+      EXPECT_EQ(util::blas_get_num_threads(), blas_threads_before);
     auto res = ctx.result;
 
     // Print JSON line for reference data
