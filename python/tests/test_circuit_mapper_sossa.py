@@ -6,12 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from typing import Any
 
 import numpy as np
 import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS, rotation_batch_size_for
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -29,6 +31,10 @@ from .test_phase_estimation_sossa import (
     _python_to_qsharp_permutation,
     _python_to_qsharp_sign,
 )
+
+# The branched angle-word erasure measures, so a mismatched row only shows up for the
+# outcomes whose parity it changes; repeat to keep the check from passing by luck.
+_ROUND_TRIP_TRIALS = 8
 
 
 def _build_sossa_unitary(
@@ -389,39 +395,73 @@ class TestSOSSAMapper:
             coefficients,
             free_rider_data,
             1,
+            -1,
         )
 
         assert load_separately is False
 
     @pytest.mark.parametrize(
-        ("sf_rows", "sf_address_qubits", "dq_rows", "dq_address_qubits"),
+        "table_shape",
         [
             (4, 2, 4, 2),
             (3, 2, 3, 2),
             (5, 3, 3, 2),
             (2, 1, 7, 3),
         ],
+        ids=["sf4dq4", "sf3dq3", "sf5dq3", "sf2dq7"],
     )
+    @pytest.mark.parametrize("swap_bits", [(0, 0), (1, 0), (0, 1), (1, 1)])
+    @pytest.mark.parametrize("lookup_method", ["select_swap", "dirty_select_swap"])
     def test_branched_angle_word_erasure_restores_the_address_register(
         self,
-        sf_rows: int,
-        sf_address_qubits: int,
-        dq_rows: int,
-        dq_address_qubits: int,
+        table_shape: tuple[int, int, int, int],
+        lookup_method: str,
+        swap_bits: tuple[int, int],
     ) -> None:
-        """The measurement-based erasure must phase exactly what the forward load wrote."""
+        """The measurement-based erasure must phase exactly what the forward load wrote.
+
+        Swept over both swap-network loaders and their widths: a select-swap has to leave the
+        angle word in the state the plain lookup would, or the shared erasure stops matching.
+        The row counts that are not powers of two are the ones that bite -- ``Select`` aliases
+        the surplus addresses onto real rows, so a loader that zero-filled them instead would
+        load a different word than the fixup table phases. The borrowed register is conjugated
+        along with the addresses, so a dirty network also has to come back unentangled.
+
+        One swap bit is the widest setting every shape here can take -- the narrowest table
+        has two rows, so a single address bit -- and it keeps the borrowed block out of the
+        simulated statevector. ``test_a_wider_borrowed_network_survives_the_erasure`` covers
+        a deeper network on a shape that can afford one.
+        """
         width = 3
+        sf_rows, sf_address_qubits, dq_rows, dq_address_qubits = table_shape
         sf_data = [[(i + j) % 3 == 0 for j in range(width)] for i in range(sf_rows)]
         dq_data = [[bool((i >> j) & 1) for j in range(width - 1)] for i in range(dq_rows)]
+        sf_swap_bits, dq_swap_bits = swap_bits
 
-        # The erasure measures, so a mismatched row only shows up for the outcomes whose
-        # parity it changes; repeat to keep the check from passing by luck.
-        for _ in range(8):
-            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+        for _ in range(_ROUND_TRIP_TRIALS):
+            assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
                 sf_data,
                 dq_data,
                 sf_address_qubits,
                 dq_address_qubits,
+                _LOOKUP_METHODS[lookup_method],
+                sf_swap_bits,
+                dq_swap_bits,
+            )
+
+    @pytest.mark.parametrize("dq_swap_bits", [2, 3])
+    def test_a_wider_borrowed_network_survives_the_erasure(self, dq_swap_bits: int) -> None:
+        """A multi-level butterfly still hands back the same angle word the erasure expects.
+
+        Kept to the single-bit DQ word so that ``numBits * 2**numSwapBits`` borrowed qubits
+        stay cheap to simulate as the network gets deeper.
+        """
+        sf_data = [[(i + j) % 3 == 0 for j in range(1)] for i in range(4)]
+        dq_data = [[bool((i >> j) & 1) for j in range(1)] for i in range(8)]
+
+        for _ in range(_ROUND_TRIP_TRIALS):
+            assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+                sf_data, dq_data, 2, 3, _LOOKUP_METHODS["dirty_select_swap"], 1, dq_swap_bits
             )
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
@@ -537,9 +577,12 @@ class TestSelectFullFidelity:
     def _select_data(
         N: int,  # noqa: N803
         rotation_bit_precision: int,
+        *,
         num_ranks: int = 1,
         num_bases: int = 1,
         num_copies: int = 1,
+        rotation_batch_size: int = 0,
+        lookup_method: str = "select",
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -558,6 +601,8 @@ class TestSelectFullFidelity:
             # Indexed b * R + r, matching both BuildSFBulkRotationData and the direct path.
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
+            "rotationBatchSize": rotation_batch_size,
+            "rotationLookupMethod": _LOOKUP_METHODS[lookup_method],
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -595,6 +640,8 @@ class TestSelectFullFidelity:
             "OneBodyRotationAngles": [_vector_to_givens_angles(u)] + [_vector_to_givens_angles(other)] * (N - 1),
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
+            "rotationBatchSize": 0,
+            "rotationLookupMethod": _LOOKUP_METHODS["select"],
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
@@ -661,6 +708,78 @@ class TestSelectFullFidelity:
             f"phase-gradient and direct SELECT backends disagree: fidelity={fidelity}"
         )
 
+    @pytest.mark.parametrize(
+        ("dims", "bit_precision"),
+        [
+            ((3, 1, 1, 1), 4),
+            ((4, 1, 2, 1), 4),
+        ],
+        ids=["N3R1B1", "N4R1B2"],
+    )
+    @pytest.mark.parametrize("lookup_method", ["select", "select_swap", "dirty_select_swap"])
+    def test_streamed_rotation_angles_match_the_resident_register(
+        self,
+        dims: tuple[int, int, int, int],
+        bit_precision: int,
+        lookup_method: str,
+    ):
+        """Streaming the Givens angles must not change what SELECT does, only what it costs.
+
+        Run for all three loaders, since each is a different forward path sharing one
+        measurement-based erasure: whichever one loads the angle word, the resulting state has
+        to be the resident register's.
+
+        Covers both branches of the angle lookup -- ``xo = 0`` takes the one-body DQ table and
+        ``xo = N`` takes the two-body SF table -- at both ``b`` values that matter, since
+        ``b = numBases`` is the one that sets the ``bEqB`` flag. That flag rides the resident
+        table for free but is computed arithmetically on the streamed path, so it needs a
+        branch of its own here.
+
+        Every streaming batch size is compared against the resident reference. The angle
+        chain is order sensitive, so a batch loop that walked the windows the wrong way would
+        show up immediately.
+        """
+        num_orbitals, num_ranks, num_bases, num_copies = dims
+        # Annotated rather than inferred: mypy widens the literal dict to dict[str, int] and
+        # then checks it against every remaining keyword of _select_data, including the str
+        # lookup_method, which the ints cannot satisfy.
+        kwargs: dict[str, Any] = {
+            "rotation_bit_precision": bit_precision,
+            "num_ranks": num_ranks,
+            "num_bases": num_bases,
+            "num_copies": num_copies,
+        }
+        num_rot_angles = num_orbitals - 1
+
+        for xo_value in (0, num_orbitals):
+            for b_value in (0, num_bases):
+                reference = self._run_select(
+                    self._select_data(num_orbitals, **kwargs),
+                    xo_value=xo_value,
+                    b_value=b_value,
+                    use_phase_gradient=True,
+                )
+                for batch in range(1, num_rot_angles):
+                    streamed = self._run_select(
+                        self._select_data(
+                            num_orbitals,
+                            rotation_batch_size=batch,
+                            lookup_method=lookup_method,
+                            **kwargs,
+                        ),
+                        xo_value=xo_value,
+                        b_value=b_value,
+                        use_phase_gradient=True,
+                    )
+                    # The angle word is erased by measurement and the per-branch fixup restores
+                    # the state only up to an outcome-dependent global phase, so overlap
+                    # magnitude is the comparison that means anything here.
+                    fidelity = abs(np.vdot(reference, streamed))
+                    assert fidelity == pytest.approx(1.0, abs=1e-9), (
+                        f"lambda={batch} lookup={lookup_method} xo={xo_value} b={b_value} "
+                        f"disagrees with the resident register: fidelity={fidelity}"
+                    )
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Walk operator logical resource count tests
@@ -715,3 +834,83 @@ class TestSOSSAWalkLogicalCounts:
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
+
+
+class TestRotationBatchSizeFor:
+    """The arithmetic behind the ``rotation_batch_size`` guidance."""
+
+    @pytest.mark.parametrize(
+        ("num_batches", "expected"),
+        [(1, 19), (2, 10), (3, 7), (4, 5), (5, 4), (7, 3), (10, 2), (19, 1)],
+    )
+    def test_it_returns_the_smallest_batch_making_that_many_passes(self, num_batches, expected):
+        """Each answer must make exactly the requested number of passes, and one less must not.
+
+        The helper only earns its place if it lands on the *first* lambda of each step, so
+        both halves are checked: the value makes ``num_batches`` passes, and shrinking it by
+        one spills into another pass. The N = 20 shape is the one the resource-estimation
+        pins use.
+        """
+        num_angles = 19
+        batch = rotation_batch_size_for(20, num_batches)
+
+        assert batch == expected
+        assert math.ceil(num_angles / batch) == num_batches
+        assert batch == 1 or math.ceil(num_angles / (batch - 1)) > num_batches, (
+            f"lambda={batch} is not the smallest making {num_batches} passes"
+        )
+
+    def test_one_batch_keeps_every_angle_resident(self):
+        """One pass has to mean the whole table, which is the setting's resident behaviour."""
+        for num_orbitals in (2, 8, 20, 57):
+            assert rotation_batch_size_for(num_orbitals, 1) == num_orbitals - 1
+
+    @pytest.mark.parametrize(
+        ("num_orbitals", "num_batches", "match"),
+        [
+            (1, 1, "num_orbitals must be at least 2"),
+            (0, 1, "num_orbitals must be at least 2"),
+            (20, 0, "num_batches must be between 1 and 19"),
+            (20, 20, "num_batches must be between 1 and 19"),
+            (20, -1, "num_batches must be between 1 and 19"),
+            (2, 2, "num_batches must be between 1 and 1"),
+        ],
+    )
+    def test_it_rejects_shapes_that_cannot_be_batched(self, num_orbitals, num_batches, match):
+        """Out-of-range passes are a caller bug, not something to silently round into range.
+
+        The message is matched as well as the type, because the two bounds fail for
+        different reasons and silently swapping which one fired would hide a sign or
+        off-by-one error in the other.
+        """
+        with pytest.raises(ValueError, match=match):
+            rotation_batch_size_for(num_orbitals, num_batches)
+
+
+class TestInnerPrepareSwapBitsSetting:
+    """The ``inner_prepare_swap_bits`` setting's contract, without paying for an estimate."""
+
+    def test_it_defaults_to_letting_the_library_choose(self):
+        """The knob must be opt-in: shipping it may not move anyone's existing numbers.
+
+        ``-1`` is the sentinel the Q# side already understood before this setting existed,
+        so the default routes to exactly the same selector that was hard-coded there.
+        """
+        assert SOSSAMapper().settings().get("inner_prepare_swap_bits") == -1
+
+    @pytest.mark.parametrize("swap_bits", [-1, 0, 1, 2, 3, 30])
+    def test_it_accepts_the_sentinel_and_real_widths(self, swap_bits):
+        """``-1`` auto, ``0`` plain select, and positive widths are all meaningful."""
+        ref = AlgorithmRef("circuit_mapper", "sossa", inner_prepare_swap_bits=swap_bits)
+
+        assert ref.settings.get("inner_prepare_swap_bits") == swap_bits
+
+    @pytest.mark.parametrize("swap_bits", [-2, 31])
+    def test_it_rejects_widths_outside_the_declared_range(self, swap_bits):
+        """Below the sentinel is meaningless and far above it is certainly a mistake.
+
+        The Q# side clamps an over-wide request to the table instead of faulting, so this
+        bound is about catching nonsense early rather than about safety.
+        """
+        with pytest.raises(ValueError, match="out of allowed range"):
+            AlgorithmRef("circuit_mapper", "sossa", inner_prepare_swap_bits=swap_bits)

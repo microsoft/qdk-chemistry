@@ -176,3 +176,196 @@ class TestSelectSwap2DErasesByMeasurement:
 
             assert round_trip - forward == expected
             assert expected < forward
+
+
+_DIRTY_TRIALS = 6
+
+
+def _select_swap_ns(ctx=None):
+    return (ctx or get_qsharp_context()).code.QDKChemistry.Utils.SelectSwap
+
+
+def _make_table(num_rows: int, width: int) -> list[list[bool]]:
+    return [[(r * 37 + b * 11 + r * b) % 3 == 0 for b in range(width)] for r in range(num_rows)]
+
+
+class TestDirtyQROAMLoadsCorrectValues:
+    """Borrowing live qubits must load the same word a clean lookup would.
+
+    The borrowed register is mid-computation and entangled with the rest of the machine, so
+    the network has to put it back bit-for-bit. Sweeping the whole address space matters
+    because surplus addresses -- those past the end of a non-power-of-two table -- are
+    aliased onto real rows by ``Std.TableLookup.Select`` rather than reading as zero, and the
+    swap path has to alias them the same way.
+
+    Shapes are kept narrow on purpose: a swap width of ``k`` borrows ``width * 2**k`` qubits,
+    which lands in the simulated statevector, so a wide word at a wide swap is unsimulable.
+    """
+
+    @pytest.mark.parametrize("dirty_seed", [0, 1, 5])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
+    @pytest.mark.parametrize(("num_rows", "width"), [(8, 1), (16, 1)])
+    def test_loads_every_address(self, num_rows, width, num_swap_bits, dirty_seed):
+        assert _select_swap_ns().TestSelectSwapDirtyCorrectness(_make_table(num_rows, width), num_swap_bits, dirty_seed)
+
+    @pytest.mark.parametrize("dirty_seed", [0, 3])
+    @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
+    @pytest.mark.parametrize(("num_rows", "width"), [(5, 2), (6, 2), (7, 1), (11, 2)])
+    def test_loads_every_address_when_length_is_not_a_power_of_two(self, num_rows, width, num_swap_bits, dirty_seed):
+        """Surplus addresses have to alias exactly as the plain lookup aliases them."""
+        assert _select_swap_ns().TestSelectSwapDirtyCorrectness(_make_table(num_rows, width), num_swap_bits, dirty_seed)
+
+
+class TestDirtyQROAMReturnsTheBorrowedQubits:
+    """The lender comes back unentangled, or the borrowing silently corrupts the caller."""
+
+    @pytest.mark.parametrize(
+        ("num_rows", "width", "num_swap_bits"),
+        [(8, 1, 1), (8, 1, 2), (8, 1, 3), (6, 2, 1), (6, 2, 2), (5, 1, 2)],
+    )
+    def test_borrowed_register_is_restored_exactly(self, num_rows, width, num_swap_bits):
+        """A phase oracle sees any residue the load leaves behind on the lender.
+
+        Restoring the borrowed qubits' *values* is not enough: if the load leaves them
+        correlated with the address, conjugating a phase kick will not close. Comparing
+        against the width-0 path rather than a bare ``Select`` keeps the measurement on this
+        network, since the library's measurement-based ``Adjoint Select`` is itself not
+        self-cancelling on non-power-of-two tables.
+
+        The load erases by measurement, so a single passing trial proves nothing.
+        """
+        data = _make_table(num_rows, width)
+        failures = sum(
+            1
+            for _ in range(_DIRTY_TRIALS)
+            if not _select_swap_ns().TestSelectSwapDirtyPhaseAgreement(data, num_swap_bits)
+        )
+        assert failures == 0, (
+            f"the borrowed register was not restored in {failures}/{_DIRTY_TRIALS} trials at "
+            f"num_swap_bits={num_swap_bits}: the lender is left entangled with the address."
+        )
+
+
+class TestDirtyQROAMCostModel:
+    """The width is chosen by cost, so the cost model is what decides if borrowing happens."""
+
+    def test_width_zero_costs_the_plain_lookup(self):
+        """Zero swap bits has to mean *no swap network*, not a one-block swap network.
+
+        Modelling it as the ``K = 1`` limit of the two-pass formula would report roughly
+        twice the true cost and make every swap width look like an improvement over a
+        baseline that was never real.
+        """
+        cost = _select_swap_ns().DirtyQROAMCost
+        for num_data in (8, 15, 224, 864):
+            assert cost(0, num_data, 10) == num_data - 1
+
+    @pytest.mark.parametrize(("num_data", "num_bits"), [(20, 15), (224, 15), (64, 10)])
+    def test_short_tables_decline_to_borrow(self, num_data, num_bits):
+        """Below roughly ``numData > 32 * numBits`` a swap network cannot win, so it is refused.
+
+        The two-pass structure costs ``2*ceil(d/K) + 4*b*(K-1)``, whose optimum ``4*sqrt(2*b*d)``
+        only undercuts the plain ``d - 1`` once the table is tall relative to the word. Fe2S2's
+        224-row, 15-bit angle table sits well under that line.
+        """
+        assert _select_swap_ns().ComputeOptimalDirtySwapBits(num_data, num_bits, 4096) == 0
+
+    @pytest.mark.parametrize(("num_data", "num_bits"), [(864, 10), (2048, 8)])
+    def test_tall_tables_borrow_and_come_out_ahead(self, num_data, num_bits):
+        """Where the crossover is cleared the chosen width must actually beat the plain lookup."""
+        select_swap = _select_swap_ns()
+        width = select_swap.ComputeOptimalDirtySwapBits(num_data, num_bits, 4096)
+
+        assert width > 0
+        assert select_swap.DirtyQROAMCost(width, num_data, num_bits) < num_data - 1
+
+    def test_a_tight_dirty_budget_forces_the_plain_lookup(self):
+        """Borrowing is only legal for qubits that exist; a short budget must fall back, not overdraw."""
+        select_swap = _select_swap_ns()
+        unconstrained = select_swap.ComputeOptimalDirtySwapBits(864, 10, 4096)
+        assert unconstrained > 0
+        assert select_swap.DirtyQROAMBorrowedQubits(unconstrained, 10) > 10
+
+        assert select_swap.ComputeOptimalDirtySwapBits(864, 10, 10) == 0
+
+    def test_the_chosen_width_fits_the_budget_it_was_given(self):
+        select_swap = _select_swap_ns()
+        for available in (0, 10, 40, 80, 160, 640):
+            width = select_swap.ComputeOptimalDirtySwapBits(864, 10, available)
+            assert select_swap.DirtyQROAMBorrowedQubits(width, 10) <= available or width == 0
+
+
+class TestCleanSelectSwapForwardCostModel:
+    """The clean network is chosen for a load that is erased by measurement, not by its adjoint."""
+
+    def test_width_zero_costs_the_plain_lookup(self):
+        """Zero swap bits means no network at all, so the baseline is the plain unary iteration."""
+        cost = _select_swap_ns().SelectSwapForwardCost
+        for num_data in (8, 15, 224, 864):
+            assert cost(0, num_data, 10) == num_data - 1
+
+    def test_the_forward_cost_is_cheaper_than_the_compute_uncompute_model(self):
+        """Pricing only the forward pass is the whole reason this model exists.
+
+        ``SelectSwapCost1D`` includes the swap network's own uncompute, which is right when the
+        adjoint erases the load. A streamed rotation batch is erased by a shared measurement
+        instead, so charging for that uncompute would pick a width tuned to a cost we never pay.
+        """
+        select_swap = _select_swap_ns()
+        for width in (1, 2, 3):
+            assert select_swap.SelectSwapForwardCost(width, 224, 15) < select_swap.SelectSwapCost1D(width, 224, 15)
+
+    @pytest.mark.parametrize(("num_data", "num_bits"), [(224, 15), (64, 10), (864, 10), (32, 4)])
+    def test_the_chosen_width_beats_the_plain_lookup(self, num_data, num_bits):
+        """A clean network has no borrowing threshold: allocated scratch always buys Toffolis."""
+        select_swap = _select_swap_ns()
+        width = select_swap.ComputeOptimalSwapBits(num_data, num_bits)
+
+        assert width > 0
+        assert select_swap.SelectSwapForwardCost(width, num_data, num_bits) < num_data - 1
+
+    @pytest.mark.parametrize(("num_data", "num_bits"), [(224, 15), (64, 10), (864, 10)])
+    def test_the_chosen_width_is_the_optimum_over_every_width(self, num_data, num_bits):
+        """The scan must be a true argmin, not merely an improvement over the baseline."""
+        select_swap = _select_swap_ns()
+        address_bits = math.ceil(math.log2(num_data))
+        chosen = select_swap.ComputeOptimalSwapBits(num_data, num_bits)
+        best = min(select_swap.SelectSwapForwardCost(k, num_data, num_bits) for k in range(address_bits + 1))
+
+        assert select_swap.SelectSwapForwardCost(chosen, num_data, num_bits) == best
+
+    def test_a_wide_word_against_a_short_table_declines_the_network(self):
+        """Scratch costs ``numBits * (2^k - 1)``, so a wide word can make every width a loss."""
+        select_swap = _select_swap_ns()
+
+        assert select_swap.ComputeOptimalSwapBits(4, 64) == 0
+
+    def test_the_scratch_cost_is_reported_for_the_width_that_was_chosen(self):
+        """The Toffoli saving is only half the trade; callers need the width it is bought with."""
+        select_swap = _select_swap_ns()
+        width = select_swap.ComputeOptimalSwapBits(224, 15)
+
+        assert select_swap.SelectSwapScratchQubits(0, 15) == 0
+        assert select_swap.SelectSwapScratchQubits(width, 15) == 15 * (2**width - 1)
+
+
+class TestSelectSwapAliasedMatchesPlainSelect:
+    """A loader sharing ``Select``'s measurement-based erasure must share its address routing.
+
+    ``SelectSwap`` zero-fills the addresses past the end of the table, which is correct when its
+    own adjoint erases the load. ``Select`` instead aliases them onto real rows, and the phase
+    fixup that erases a streamed rotation batch is written against that aliasing. A zero-filled
+    forward load would therefore be phased against a word it never wrote.
+
+    Checked by value rather than by phase: ``Select`` erases a ragged table by measurement, so
+    the phase-oracle harness used elsewhere in this file disagrees with ``Select`` even when
+    ``Select`` is compared against itself. The forward load is what the streamed rotation path
+    takes from ``Select``, and the forward load is what these compare.
+    """
+
+    @pytest.mark.parametrize("num_swap_bits", [-1, 0, 1, 2])
+    @pytest.mark.parametrize("data", [_DATA_1D, _DATA_1D_RAGGED], ids=["power_of_two", "ragged"])
+    def test_aliased_load_matches_plain_select(self, num_swap_bits, data):
+        assert get_qsharp_context().code.QDKChemistry.Utils.SelectSwap.TestSelectSwapAliasedMatchesSelect1D(
+            data, num_swap_bits
+        )

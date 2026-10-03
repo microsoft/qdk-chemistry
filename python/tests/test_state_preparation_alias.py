@@ -93,17 +93,17 @@ class TestAliasSamplingStatePreparation:
             for outer in range(90)
         ]
         num_swap_bits = select_swap.ComputeOptimalLambda2D(90, 16, 21, True)
-        assert num_swap_bits == 3, f"expected three swap bits, got {num_swap_bits}"
+        assert num_swap_bits == 2, f"expected two swap bits, got {num_swap_bits}"
         expected_lookup_counts = {
             "forward": (
                 (True, False),
                 {
-                    "numQubits": 283,
-                    "cczCount": 408,
+                    "numQubits": 199,
+                    "cczCount": 504,
                     "ccixCount": 0,
                     "tCount": 0,
                     "rotationCount": 0,
-                    "measurementCount": 429,
+                    "measurementCount": 525,
                 },
             ),
             "adjoint": (
@@ -120,12 +120,12 @@ class TestAliasSamplingStatePreparation:
             "round_trip": (
                 (True, True),
                 {
-                    "numQubits": 283,
-                    "cczCount": 491,
+                    "numQubits": 199,
+                    "cczCount": 587,
                     "ccixCount": 0,
                     "tCount": 0,
                     "rotationCount": 0,
-                    "measurementCount": 533,
+                    "measurementCount": 629,
                 },
             ),
         }
@@ -135,6 +135,40 @@ class TestAliasSamplingStatePreparation:
             )
             actual = {name: counts[name] for name in expected}
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
+
+    def test_the_swap_width_rule_declines_a_widening_that_does_not_pay(self):
+        """``ComputeOptimalLambda2D`` takes the narrowest width that is nearly Toffoli-optimal.
+
+        At this shape ``k = 3`` is the Toffoli minimum, but it doubles the scratch block to
+        get there. Pinning both widths side by side is what makes the rule's judgement
+        legible: the width it declines is genuinely cheaper in Toffolis, and the rule is
+        choosing to pay that rather than the scratch.
+        """
+        context = create_qsharp_context()
+        select_swap = context.code.QDKChemistry.Utils.SelectSwap
+        lookup_data = [
+            [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
+            for outer in range(90)
+        ]
+
+        chosen, declined = 2, 3
+        assert select_swap.ComputeOptimalLambda2D(90, 16, 21, True) == chosen
+        assert select_swap.SelectSwapCost2D(declined, 90, 16, 21, True) < select_swap.SelectSwapCost2D(
+            chosen, 90, 16, 21, True
+        ), "the declined width has to be the Toffoli-cheaper one, or there is nothing being traded"
+
+        counts = {
+            width: context.logical_counts(
+                select_swap.TestSelectSwap2DResourceProbe, lookup_data, width, True, True, True
+            )
+            for width in (chosen, declined)
+        }
+        assert counts[chosen]["numQubits"] < counts[declined]["numQubits"], (
+            f"the narrower network must free scratch: {counts[chosen]['numQubits']} vs {counts[declined]['numQubits']}"
+        )
+        assert counts[chosen]["cczCount"] > counts[declined]["cczCount"], (
+            f"and must cost Toffolis for it: {counts[chosen]['cczCount']} vs {counts[declined]['cczCount']}"
+        )
 
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign."""

@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import rotation_batch_size_for
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
 from qdk_chemistry.data import (
@@ -305,8 +306,14 @@ def _sossa_circuit_mapper_ref(
     select_algorithm: str = "direct",
     coefficient_bit_precision: int = 10,
     rotation_bit_precision: int = 10,
+    **settings,
 ) -> AlgorithmRef:
-    """Return an AlgorithmRef for the SOSSA circuit mapper."""
+    """Return an AlgorithmRef for the SOSSA circuit mapper.
+
+    Extra keyword arguments are passed through to the mapper's settings, so a caller can
+    vary one knob -- ``rotation_batch_size``, say -- without this helper having to know
+    about it.
+    """
     return AlgorithmRef(
         "circuit_mapper",
         "sossa",
@@ -315,6 +322,7 @@ def _sossa_circuit_mapper_ref(
         select_algorithm=select_algorithm,
         coefficient_bit_precision=coefficient_bit_precision,
         rotation_bit_precision=rotation_bit_precision,
+        **settings,
     )
 
 
@@ -728,8 +736,26 @@ class TestSOSSAQPEScope:
 class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
-    def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
+    # Largest rotation batch that still reaches the floor the peak width can be pushed to.
+    # Derived rather than swept: width falls linearly as angles leave the register, so
+    # W(lambda) = max(W_floor, W_resident - (A - lambda) * b_rot) over A = N - 1 = 19 angles,
+    # and the two branches meet at A - ceil((W_resident - W_floor) / b_rot), here
+    # 19 - ceil((486 - 379) / 15) = 11. Two estimates fix it, not a sweep.
+    #
+    # The floor is 379 rather than 427 because ``ComputeOptimalLambda2D`` declines the widest
+    # swap network; narrowing PREPARE lowers the floor, which moves this knee *down* by
+    # putting SELECT back on the critical path sooner. That coupling is the reason the
+    # ``inner_prepare_swap_bits`` docs say to re-derive the batch size afterwards.
+    #
+    # Note this is where the floor *ends*, not the batch to recommend. Being the largest
+    # lambda that still reaches the floor makes it the one with no headroom left, and
+    # lambda = 10 buys the identical circuit; see
+    # ``test_only_the_smallest_batch_of_each_step_is_worth_choosing``.
+    _FE2S2_BATCH_KNEE = 11
+
+    @staticmethod
+    def _fe2s2_logical_counts(**select_settings):
+        """Estimate the Fe2S2-20 circuit, varying only the SELECT rotation settings.
 
         Uses a random factorized Hamiltonian rather than the H2 data because the point is
         to exercise the register widths at ``(N, R, B, C) = (20, 14, 15, 5)``, not to
@@ -757,14 +783,358 @@ class TestSOSSAResourceEstimation:
                 select_algorithm="qrom_phase_gradient",
                 coefficient_bit_precision=11,
                 rotation_bit_precision=15,
+                **select_settings,
             ),
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
         )
         circuit = builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
 
-        logical_counts = circuit.estimate().logical_counts
+        counts = circuit.estimate().logical_counts
+        return counts["numQubits"], counts["cczCount"] + counts["ccixCount"]
 
-        toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
+    def test_fe2s2_logical_resource_estimate(self):
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs."""
+        num_qubits, toffoli_count = self._fe2s2_logical_counts()
 
         assert toffoli_count == pytest.approx(42_558_509, rel=0.01)
-        assert logical_counts["numQubits"] == 486
+        assert num_qubits == 486
+
+    def test_fe2s2_streamed_logical_resource_estimate(self):
+        """Pin the streamed Fe2S2 cost, which is the configuration the example runs.
+
+        The test above pins the *resident* circuit at 486 qubits, but the example streams
+        its angles at the knee, and the streamed width is the number this work exists to
+        move. Nothing else pinned its magnitude: every other knee test asserts a direction
+        or an ordering, deliberately, so that the lookup cost model stays free to change.
+        The gap that left is a regression which preserves all of those orderings while
+        quietly giving back the width -- each test still passes, and the headline number
+        moves. This is the guard for that, and it is kept separate so the relational tests
+        can stay magnitude-free.
+        """
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
+
+        assert num_qubits == 379
+        assert toffoli_count == pytest.approx(60_535_087, rel=0.01)
+
+    def test_streaming_the_rotation_angles_trades_toffolis_for_qubits(self):
+        """Streaming is a Pareto move, not a free win, and the default must stay put.
+
+        Inside SELECT the resident angle register is the dominant cost -- all ``N - 1``
+        words at once, 285 of its qubits at ``b_rot = 15``. Across the whole walk it is not
+        the only wide stage, so streaming lowers the peak until a different stage becomes
+        the bottleneck and then stops helping. What is pinned here is the direction of both
+        axes, not the magnitude of either, so the lookup cost model stays free to change.
+        """
+        resident_qubits, resident_toffolis = self._fe2s2_logical_counts()
+        streamed_qubits, streamed_toffolis = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
+
+        assert streamed_qubits < resident_qubits, (
+            f"streaming should lower the peak width: {resident_qubits} -> {streamed_qubits}"
+        )
+        assert streamed_toffolis > resident_toffolis, (
+            "streaming reloads each batch to uncompute, so it cannot be free in Toffolis"
+        )
+
+    def test_the_tightest_batch_is_dominated_by_larger_ones_at_the_same_width(self):
+        """Over-shrinking the batch buys nothing, which is half of the usage guidance.
+
+        The Toffoli penalty is driven by the *number* of batches, ``ceil((N - 1) / lambda)``
+        -- ``lambda = 1`` sweeps the rotation table nineteen times -- while the qubit saving
+        stops once some other stage sets the peak width. At Fe2S2 that makes every
+        ``lambda`` from 1 up to the knee land on the same qubit count, so the smallest one
+        is strictly worse than larger ones that reach the same floor -- same width, several
+        times the Toffolis.
+
+        The other half is that growing ``lambda`` past the point where the batch count drops
+        is equally pointless, so the rule is neither "smallest" nor "widest": pick the batch
+        count and derive ``lambda``. See
+        ``test_only_the_smallest_batch_of_each_step_is_worth_choosing``.
+        """
+        tight_qubits, tight_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1)
+        knee_qubits, knee_toffolis = self._fe2s2_logical_counts(rotation_batch_size=self._FE2S2_BATCH_KNEE)
+
+        assert knee_qubits == tight_qubits, (
+            f"lambda=1 bought extra width over lambda={self._FE2S2_BATCH_KNEE}: {tight_qubits} vs {knee_qubits}"
+        )
+        assert knee_toffolis < tight_toffolis, (
+            f"lambda=1 should cost strictly more than lambda={self._FE2S2_BATCH_KNEE} for the "
+            f"same width: {tight_toffolis} vs {knee_toffolis}"
+        )
+
+    def test_only_the_smallest_batch_of_each_step_is_worth_choosing(self):
+        """The usage guidance: choose the batch *count*, then derive lambda from it.
+
+        Streaming reloads once per batch, so the batch count ``ceil((N - 1) / lambda)`` sets
+        how many times the rotation table is swept, while the rotation register keeps
+        growing at ``b_rot`` qubits per angle right across a step. Every ``lambda`` from 10
+        to 18 splits the 19 angles into two passes, and ``lambda = 10`` is the narrowest of
+        them.
+
+        That is why "take the widest batch that fits your budget" is the wrong rule and
+        ``rotation_batch_size_for`` exists: given room for 440 qubits that rule hands back
+        ``lambda = 16``, which is worse than the ``lambda = 10`` derived here on *both*
+        axes -- 61 qubits wider and some 3.6% more Toffolis.
+
+        The Toffoli cost is deliberately *not* asserted to be flat across the step. Under
+        the shared ``select_swap`` lookup the per-batch table grows with ``lambda`` and the
+        swap network re-optimises its width against it, so the cost sawtooths instead of
+        holding constant. See
+        ``test_a_wider_batch_in_the_same_step_can_undercut_a_narrower_one``.
+        """
+        smallest = rotation_batch_size_for(20, num_batches=2)
+        assert smallest == 10, f"two passes over 19 angles needs batches of 10, got {smallest}"
+
+        smallest_qubits, smallest_toffolis = self._fe2s2_logical_counts(rotation_batch_size=smallest)
+        wider_qubits, wider_toffolis = self._fe2s2_logical_counts(rotation_batch_size=16)
+
+        assert wider_qubits > smallest_qubits, (
+            f"the six extra angles lambda=16 keeps resident have to cost width: {wider_qubits} vs {smallest_qubits}"
+        )
+        assert wider_toffolis > smallest_toffolis, (
+            f"lambda=16 makes the same two passes but re-optimises its swap width against a "
+            f"larger table, so it does not undercut lambda={smallest}: {wider_toffolis} vs {smallest_toffolis}"
+        )
+
+    def test_a_wider_batch_in_the_same_step_can_undercut_a_narrower_one(self):
+        """Within one batch-count step the Toffoli cost sawtooths; it is not a flat line.
+
+        This is the one place the "derive lambda from the batch count" rule is lossy, so it
+        is worth pinning rather than leaving as folklore. ``lambda = 18`` makes the same two
+        passes as ``lambda = 10`` yet costs *fewer* Toffolis, because the shared
+        ``select_swap`` lookup amortises one larger per-batch table better than it does two
+        smaller ones. It pays for that in width, on the axis this whole code path exists to
+        minimise.
+
+        So the rule still picks ``lambda = 10``, but the honest statement is that it trades
+        Toffolis for qubits there rather than getting the width for free. A caller who is
+        Toffoli-bound rather than width-bound should read the step rather than trust the
+        rule.
+        """
+        narrow_qubits, narrow_toffolis = self._fe2s2_logical_counts(rotation_batch_size=10)
+        wide_qubits, wide_toffolis = self._fe2s2_logical_counts(rotation_batch_size=18)
+
+        assert wide_toffolis < narrow_toffolis, (
+            f"lambda=18 should amortise its single larger table better than lambda=10: "
+            f"{wide_toffolis} vs {narrow_toffolis}"
+        )
+        assert wide_qubits > narrow_qubits, (
+            f"lambda=18 holds eight more angles resident, which must cost width: {wide_qubits} vs {narrow_qubits}"
+        )
+
+    def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):
+        """Each loader has to be worth choosing somewhere, and none may be a silent regression.
+
+        At the Fe2S2 table shapes a *borrowed* swap network does not pay. The SF rotation table
+        is only 224 rows against a 15-bit angle word, well under the ``numData > 32 * numBits``
+        point where borrowing starts to win, and the inner alias table cannot raise a lender
+        long enough for the width its own cost model wants. So ``dirty_select_swap`` is expected
+        to decline on both loaders and leave the plain lookup in place -- selecting it must
+        therefore cost nothing at all here. See ``TestDirtyQROAMCostModel`` for the regime where
+        it does pay.
+
+        A *clean* swap network has no such threshold: it buys the same Toffoli reduction with
+        allocated scratch instead of borrowed qubits, so ``select_swap`` should cut Toffolis
+        here where ``dirty_select_swap`` cannot. That scratch is the price, and the point of
+        offering all three is that the right trade depends on which budget is binding.
+        """
+        plain_qubits, plain_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1, lookup_method="select")
+        clean_qubits, clean_toffolis = self._fe2s2_logical_counts(rotation_batch_size=1, lookup_method="select_swap")
+        dirty_qubits, dirty_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=1, lookup_method="dirty_select_swap"
+        )
+
+        assert (dirty_qubits, dirty_toffolis) == (plain_qubits, plain_toffolis), (
+            "the dirty cost model should have declined at this shape and left the plain lookup "
+            f"in place, but it changed the cost: {(plain_qubits, plain_toffolis)} -> "
+            f"{(dirty_qubits, dirty_toffolis)}"
+        )
+        assert clean_toffolis < plain_toffolis, (
+            f"a clean swap network should undercut the plain lookup: {plain_toffolis} -> {clean_toffolis}"
+        )
+        assert clean_qubits >= plain_qubits, (
+            f"a clean swap network allocates scratch, so it cannot also be narrower: {plain_qubits} -> {clean_qubits}"
+        )
+
+    def test_one_lookup_method_setting_reaches_both_loaders(self):
+        """``lookup_method`` has to govern the inner PREPARE too, not just the rotation batches.
+
+        The two QROMs draw on one qubit budget, so routing them independently is a way to be
+        accidentally inconsistent -- borrowing for one table and allocating for the other -- and
+        there is no caller who wants that. One setting governs both.
+
+        Proving it needs a configuration where the rotation loader cannot be responsible for the
+        difference. With the angles resident there is no streamed batch to load, so the rotation
+        lookup is inert and *any* change in cost has to come from the inner alias table. Width is
+        the wrong thing to watch here: the resident angle word sets the peak, so the PREPARE
+        scratch hides underneath it and the qubit count does not move. Toffolis do.
+        """
+        _, plain_toffolis = self._fe2s2_logical_counts(lookup_method="select")
+        _, clean_toffolis = self._fe2s2_logical_counts(lookup_method="select_swap")
+
+        assert clean_toffolis < plain_toffolis, (
+            "with the angles resident only the inner PREPARE can be reading 'lookup_method', so "
+            f"a clean swap network has to show up as cheaper here: {plain_toffolis} -> {clean_toffolis}"
+        )
+
+    def test_narrowing_the_alias_lookup_only_pays_once_the_angles_are_streamed(self):
+        """The two optimisations are sequential, not additive, because the peak stage moves.
+
+        Peak width is a maximum over stages, so narrowing anything but the current widest
+        stage is invisible. While the angle word is resident it is the widest thing in the
+        walk, and the inner PREPARE lookup -- however it is routed -- sits underneath it.
+        Only after streaming removes the angle register does the alias QROAM's swap scratch
+        become the stage that sets the peak, and only then does ``inner_prepare_swap_bits``
+        move the number at all.
+
+        This is the reason to reach for it second rather than instead: on its own it is pure
+        Toffoli overhead.
+        """
+        batch = rotation_batch_size_for(20, num_batches=2)
+
+        resident_auto_qubits, _ = self._fe2s2_logical_counts()
+        resident_narrow_qubits, _ = self._fe2s2_logical_counts(inner_prepare_swap_bits=2)
+
+        assert resident_narrow_qubits == resident_auto_qubits, (
+            "with the angle word resident the alias lookup is not the peak stage, so narrowing "
+            f"it cannot help: {resident_auto_qubits} -> {resident_narrow_qubits}"
+        )
+
+        streamed_auto_qubits, _ = self._fe2s2_logical_counts(rotation_batch_size=batch)
+        streamed_narrow_qubits, _ = self._fe2s2_logical_counts(rotation_batch_size=batch, inner_prepare_swap_bits=2)
+
+        assert streamed_narrow_qubits < streamed_auto_qubits, (
+            "once the angles are streamed the alias lookup sets the peak, so narrowing it must "
+            f"show up: {streamed_auto_qubits} -> {streamed_narrow_qubits}"
+        )
+
+    def test_narrowing_the_alias_lookup_buys_width_far_more_cheaply_than_streaming(self):
+        """Having streamed the angles, the next qubit is much cheaper than the last one was.
+
+        Streaming pays for width by reloading each batch to uncompute it, so its Toffoli
+        bill is steep. Re-routing a QROAM is different in kind: the swap width ``k`` only
+        decides how the *same* table is split between address iteration and a swap network,
+        so halving the scratch costs one extra select layer rather than a second pass over
+        the data.
+
+        Both widths are pinned explicitly so this measures the mechanism rather than the
+        default. ``k = 3`` is the Toffoli optimum -- what a width-blind rule picks -- and is
+        the honest baseline for "what does re-routing buy", since the shipped default has
+        already taken part of that saving for itself.
+
+        What is pinned is the ordering -- the second step must recover at least as much
+        width as the first, at a far smaller fraction of the Toffoli count. Magnitudes stay
+        free to move with the cost model.
+        """
+        batch = rotation_batch_size_for(20, num_batches=2)
+
+        resident_qubits, resident_toffolis = self._fe2s2_logical_counts(inner_prepare_swap_bits=3)
+        streamed_qubits, streamed_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=3
+        )
+        narrowed_qubits, narrowed_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=2
+        )
+
+        streaming_saved = resident_qubits - streamed_qubits
+        narrowing_saved = streamed_qubits - narrowed_qubits
+        assert narrowing_saved >= streaming_saved, (
+            f"narrowing the lookup should recover at least what streaming did: "
+            f"{narrowing_saved} vs {streaming_saved} qubits"
+        )
+
+        streaming_overhead = (streamed_toffolis - resident_toffolis) / resident_toffolis
+        narrowing_overhead = (narrowed_toffolis - streamed_toffolis) / streamed_toffolis
+        assert narrowing_overhead < streaming_overhead, (
+            f"re-routing a lookup should be cheaper than a second pass over the angles: "
+            f"{narrowing_overhead:.1%} vs {streaming_overhead:.1%}"
+        )
+
+    def test_the_default_alias_swap_width_declines_the_toffoli_optimum_to_save_scratch(self):
+        """The default takes the narrowest width that is nearly Toffoli-optimal, not the best.
+
+        ``ComputeOptimalLambda2D`` scores widths by Toffoli count but then takes the
+        *narrowest* one within a fifth of the minimum, because each extra swap bit doubles a
+        scratch block that sets the peak width of the whole walk. At this shape that declines
+        ``k = 3`` -- genuinely the Toffoli minimum -- in favour of ``k = 2``.
+
+        Pinning the comparison rather than the chosen width is what keeps this honest: the
+        declined width has to be really cheaper in Toffolis, or the default is not trading
+        anything. The premium it pays must also stay small next to the width it buys,
+        otherwise the tolerance is set wrong.
+        """
+        batch = rotation_batch_size_for(20, num_batches=2)
+
+        auto_qubits, auto_toffolis = self._fe2s2_logical_counts(rotation_batch_size=batch)
+        optimum_qubits, optimum_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=3
+        )
+
+        assert auto_qubits < optimum_qubits, (
+            f"the default should be declining the widest network: {optimum_qubits} -> {auto_qubits}"
+        )
+        assert auto_toffolis > optimum_toffolis, (
+            f"and it cannot also be cheaper, or nothing is being traded: {optimum_toffolis} -> {auto_toffolis}"
+        )
+
+        width_saved = (optimum_qubits - auto_qubits) / optimum_qubits
+        toffoli_premium = (auto_toffolis - optimum_toffolis) / optimum_toffolis
+        assert toffoli_premium < width_saved, (
+            f"the default's Toffoli premium has to be small next to the width it buys, or the "
+            f"tolerance is mis-set: {toffoli_premium:.1%} Toffolis for {width_saved:.1%} width"
+        )
+
+        narrower_qubits, narrower_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=1
+        )
+        assert narrower_toffolis > auto_toffolis, (
+            f"one bit narrower than the default must cost Toffolis: {auto_toffolis} -> {narrower_toffolis}"
+        )
+        assert narrower_qubits < auto_qubits, (
+            f"and it has to be freeing scratch to be worth considering: {auto_qubits} -> {narrower_qubits}"
+        )
+
+    def test_only_the_smallest_swap_width_of_each_step_is_worth_choosing(self):
+        """The same step-function trap as the rotation batch, in the other knob.
+
+        Scratch grows as ``2^k`` times the loaded word, but the peak is a maximum over
+        stages, so once the swap network drops below whatever stage is next-widest, further
+        shrinking is invisible while the Toffoli cost keeps climbing. ``k = 1`` lands on the
+        same peak as ``k = 2`` here and pays for the privilege, exactly as ``lambda = 1``
+        does against the derived batch size.
+
+        So the rule is the same shape in both knobs: take the *largest* setting that still
+        reaches the floor, never the smallest that fits.
+        """
+        batch = rotation_batch_size_for(20, num_batches=2)
+
+        tight_qubits, tight_toffolis = self._fe2s2_logical_counts(rotation_batch_size=batch, inner_prepare_swap_bits=1)
+        floor_qubits, floor_toffolis = self._fe2s2_logical_counts(rotation_batch_size=batch, inner_prepare_swap_bits=2)
+
+        assert tight_qubits == floor_qubits, (
+            f"k=1 bought no width over k=2, so it is dominated: {tight_qubits} vs {floor_qubits}"
+        )
+        assert tight_toffolis > floor_toffolis, (
+            f"k=1 splits the table into more select layers, so it must cost more: {tight_toffolis} vs {floor_toffolis}"
+        )
+
+    def test_an_over_wide_swap_request_is_clamped_rather_than_faulted(self):
+        """A setting inside its declared range must never fault inside Q#.
+
+        ``SwappedLoadShape`` asserts ``numSwapBits <= nRequired``, and the table's address
+        width is far below the setting's upper bound, so the request is clamped to the
+        widest network the table can support. It is then free to be a bad choice -- a wider
+        network than the default picked can only add scratch -- but it has to produce an
+        estimate rather than an assertion failure.
+        """
+        batch = rotation_batch_size_for(20, num_batches=2)
+
+        clamped_qubits, clamped_toffolis = self._fe2s2_logical_counts(
+            rotation_batch_size=batch, inner_prepare_swap_bits=30
+        )
+        floor_qubits, _ = self._fe2s2_logical_counts(rotation_batch_size=batch, inner_prepare_swap_bits=2)
+
+        assert clamped_qubits > 0, "an over-wide request should still produce an estimate"
+        assert clamped_toffolis > 0, "an over-wide request should still produce an estimate"
+        assert clamped_qubits > floor_qubits, (
+            f"the widest network the table allows should be wider than the floor: {clamped_qubits} vs {floor_qubits}"
+        )
