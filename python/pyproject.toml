@@ -122,7 +122,7 @@ qiskit-extras = [
   "requests>=2.33.0"
 ]
 qre = [
-  "qdk[qre,jupyter]>=1.31.0"
+  "qdk[qre,jupyter]>=1.32.3"
 ]
 test = [
   "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",

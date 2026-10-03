@@ -83,6 +83,14 @@ class QdkUnaryQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "For memory compute layout, maximum number of compute qubits. "
             "Set to -1 to keep all logical qubits in compute.",
         )
+        self._set_default(
+            "num_warmup_queries",
+            "int",
+            1,
+            "Number of leading walk queries counted exactly under resource estimation before one "
+            "query is repeated for the rest. Warm-up queries let memory-compute placement reach "
+            "its steady state; they do not change the circuit or logical counts without placement.",
+        )
         self.set("unitary_builder", AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True))
 
 
@@ -111,6 +119,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_builder: AlgorithmRef | None = None,
         circuit_mapper: AlgorithmRef | None = None,
         compute_capacity: int = -1,
+        num_warmup_queries: int = 1,
     ) -> None:
         """Initialize the unary-iteration QPE circuit builder.
 
@@ -119,6 +128,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             unitary_builder: Optional algorithm reference for the unitary builder.
             circuit_mapper: Optional algorithm reference for the block-encoding circuit mapper.
             compute_capacity: Number of compute qubits in memory compute layout; -1 disables placement.
+            num_warmup_queries: Leading walk queries counted exactly under resource estimation.
 
         """
         Logger.trace_entering()
@@ -126,6 +136,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         self._settings = QdkUnaryQpeCircuitBuilderSettings()
         self._settings.set("num_queries", num_queries)
         self._settings.set("compute_capacity", compute_capacity)
+        self._settings.set("num_warmup_queries", num_warmup_queries)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
         if circuit_mapper is not None:
@@ -204,6 +215,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"compute_capacity must be -1 or a positive integer. Got {compute_capacity}.")
         if compute_capacity > 0:
             Logger.warn("Memory-compute placement counts might be inaccurate.")
+        num_warmup_queries = int(self._settings.get("num_warmup_queries"))
+        if num_warmup_queries < 0:
+            raise ValueError(f"num_warmup_queries must be non-negative. Got {num_warmup_queries}.")
         configured_num_bits = self._settings.get("num_bits")
         if configured_num_bits > 0 and configured_num_bits != num_phase_qubits:
             Logger.warn(
@@ -260,6 +274,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "statePrepUsesShared": bool(state_prep_shared),
             "blockEncodingUsesShared": bool(block_encoding_shared),
             "computeCapacity": compute_capacity,
+            "numWarmupQueries": num_warmup_queries,
         }
         circuit = Circuit(
             qsharp_factory=QsharpFactoryData(

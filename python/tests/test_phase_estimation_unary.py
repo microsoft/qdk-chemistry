@@ -117,14 +117,15 @@ class TestUnaryIterationQsharp:
 class TestBlockEncodingAgnosticSchedule:
     """The signed-power schedule must work for any self-inverse block encoding."""
 
+    @pytest.mark.parametrize("num_warmup_queries", [0, 1, 3])
     @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7])
-    def test_resource_optimization_preserves_logical_counts(self, num_queries):
+    def test_resource_optimization_preserves_logical_counts(self, num_queries, num_warmup_queries):
         """Repeating one representative slot must match the literal schedule's costs."""
         operation = QSHARP_UTILS.UnaryPhaseEstimation.TestSignedPowerScheduleResources
         context = get_qsharp_context()
 
-        optimized = context.logical_counts(operation, num_queries, True)
-        direct = context.logical_counts(operation, num_queries, False)
+        optimized = context.logical_counts(operation, num_queries, num_warmup_queries, True)
+        direct = context.logical_counts(operation, num_queries, num_warmup_queries, False)
 
         assert optimized == direct
 
@@ -548,6 +549,57 @@ def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
     assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
 
 
+@pytest.mark.parametrize("num_warmup_queries", [0, 1, 3])
+def test_the_builder_passes_num_warmup_queries_to_qsharp(num_warmup_queries):
+    """The Python setting must reach the Q# factory unchanged."""
+    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=num_warmup_queries))[0]
+
+    assert circuit._qsharp_factory.parameter["numWarmupQueries"] == num_warmup_queries
+
+
+def test_the_builder_rejects_negative_num_warmup_queries():
+    """A negative warm-up count has no meaning and must fail before reaching Q#."""
+    with pytest.raises(ValueError, match="num_warmup_queries must be non-negative"):
+        _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=-1))
+
+
+@pytest.mark.parametrize("num_warmup_queries", [1, 3])
+def test_warmup_queries_do_not_change_counts_without_memory_placement(num_warmup_queries):
+    """Without memory placement every query costs the same, so warm-up is resource neutral."""
+    baseline = _logical_counts(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=0))
+    warmed = _logical_counts(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=num_warmup_queries))
+
+    assert warmed == baseline
+
+
+@pytest.mark.parametrize("compute_capacity", [4, 6])
+def test_one_warmup_query_matches_the_unrolled_memory_traffic(compute_capacity):
+    """Repeating the cold first query multiplies its memory faults; one warm-up query avoids that.
+
+    Warming up every query unrolls the schedule, which is the exact count to compare against.
+    """
+    num_queries = 100
+
+    def memory_traffic(num_warmup_queries: int) -> tuple[int, int]:
+        counts = _logical_counts(
+            QdkUnaryQpeCircuitBuilder(
+                num_queries=num_queries, compute_capacity=compute_capacity, num_warmup_queries=num_warmup_queries
+            )
+        )
+        return counts["readFromMemoryCount"], counts["writeToMemoryCount"]
+
+    unrolled = memory_traffic(num_queries)
+
+    assert memory_traffic(1) == unrolled
+    assert memory_traffic(0)[0] > unrolled[0]
+
+
+def _logical_counts(builder: QdkUnaryQpeCircuitBuilder) -> dict:
+    """Logical counts of the circuit ``builder`` produces for ``H = (X + Z)/2``."""
+    factory = _run_builder(builder)[0]._qsharp_factory
+    return get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
+
+
 @pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre not available")
 def test_a_positive_compute_capacity_moves_qubits_into_memory():
     """A honoured ``computeCapacity`` splits the estimate into a compute and a memory area.
@@ -577,7 +629,9 @@ def test_a_positive_compute_capacity_moves_qubits_into_memory():
 
     def split(compute_capacity: int) -> tuple[int, int]:
         circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
-        result = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, max_error=0.1)
+        # The trace backend ignores ``EnableMemoryComputeArchitecture``, so the split needs the counts backend.
+        application = circuit.get_qre_application(use_trace_backend=False)
+        result = estimate(application, architecture, isa_query, trace_query, max_error=0.1)
         entries = list(result)
         assert entries, f"capacity {compute_capacity} admitted no feasible estimate"
         best = min(entries, key=lambda entry: entry.qubits)
