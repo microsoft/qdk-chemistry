@@ -4,10 +4,8 @@
 
 namespace QDKChemistry.Utils.CircuitComposition {
 
+    import QDKChemistry.Utils.Loop.LoopCA;
     import Std.Arrays.Subarray;
-    import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EndEstimateCaching;
-    import Std.ResourceEstimation.SingleVariant;
 
     /// Returns the controlled version of `op`, taking the control register as its first argument.
     function MakeControlledOp<'T>(op : 'T => Unit is Adj + Ctl) : ((Qubit[], 'T) => Unit is Adj + Ctl) {
@@ -15,29 +13,27 @@ namespace QDKChemistry.Utils.CircuitComposition {
     }
 
     /// Applies `op` to `target` `power` times.
+    ///
+    /// Under resource estimation the first `numWarmupIterations` applications are counted
+    /// exactly and the next one is repeated for the rest; see `QDKChemistry.Utils.Loop.LoopCA`.
     operation ApplyRepeated<'T>(
-        cacheName : String,
         op : 'T => Unit is Adj + Ctl,
         power : Int,
+        numWarmupIterations : Int,
         target : 'T
     ) : Unit is Adj + Ctl {
-        for _ in 1..power {
-            if BeginEstimateCaching(cacheName, SingleVariant()) {
-                op(target);
-                EndEstimateCaching();
-            }
-        }
+        LoopCA(power, numWarmupIterations, _ => op(target));
     }
 
     /// Returns an operation applying `op` `power` times.
     /// Parameters:
-    /// - `cacheName`: A string used for caching the resource estimation
+    /// - `numWarmupIterations`: Leading applications counted exactly under resource estimation
     function MakeRepeatedOp<'T>(
-        cacheName : String,
         op : 'T => Unit is Adj + Ctl,
-        power : Int
+        power : Int,
+        numWarmupIterations : Int
     ) : ('T => Unit is Adj + Ctl) {
-        ApplyRepeated(cacheName, op, power, _)
+        ApplyRepeated(op, power, numWarmupIterations, _)
     }
 
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.

@@ -171,7 +171,10 @@ choices when the requested hardware model or scientific comparison differs.
 Conceptually, generated code can:
 
 1. Load or construct a QDK Chemistry `Circuit`, then call
-   `get_qre_application()`.
+   `get_qre_application()`. It traces Q# circuits with the QRE trace backend by
+   default; pass `use_trace_backend=False` to derive the trace from logical
+   counts instead, which memory-compute placement requires and which also works
+   around trace-backend failures in the installed QDK.
 2. Select or construct an architecture containing physical-operation times and
    error rates.
 3. Build a trace query from the application and compatible transforms. This may
