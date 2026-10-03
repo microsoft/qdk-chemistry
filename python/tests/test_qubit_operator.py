@@ -8,17 +8,26 @@
 import json
 import random as stdlib_random
 import re
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
 import scipy.sparse
 
 from qdk_chemistry.algorithms import registry
+from qdk_chemistry.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_operator import QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import (
+    SparsePauliDecompositionContainer,
+    SparsePauliTerms,
+)
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition
+from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+_requires_networkx = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed")
 
 
 def _pauli_matrix(label):
@@ -36,6 +45,22 @@ def _pauli_matrix(label):
         else:
             raise ValueError(f"Invalid Pauli character '{i}'")
     return mat
+
+
+def _sparse_copy(operator: QubitOperator) -> QubitOperator:
+    """Copy an operator into sparse storage while retaining its metadata."""
+    return QubitOperator.from_sparse_terms(
+        operator.num_qubits,
+        (
+            {len(label) - 1 - index: axis for index, axis in enumerate(label) if axis != "I"}
+            for label in operator.pauli_strings
+        ),
+        operator.coefficients,
+        encoding=operator.encoding,
+        fermion_mode_order=operator.fermion_mode_order,
+        term_partition=operator.term_partition,
+        tapering=operator.tapering,
+    )
 
 
 class TestQubitHamiltonian:
@@ -67,6 +92,27 @@ class TestQubitHamiltonian:
             QubitOperator(pauli_strings=["X", ""], coefficients=np.array([1.0, 0.5]))
         with pytest.raises(ValueError, match="empty"):
             QubitOperator(pauli_strings=[], coefficients=[])
+
+    def test_sparse_terms_match_dense_operator(self):
+        dense = QubitOperator(["IX", "YY", "ZI"], np.array([1.0, -0.5, 0.75]))
+        sparse = QubitOperator.from_sparse_terms(
+            2,
+            [((0, "X"),), ((0, "Y"), (1, "Y")), ((1, "Z"),)],
+            np.array([1.0, -0.5, 0.75]),
+        )
+
+        assert sparse.pauli_strings == dense.pauli_strings
+        assert sparse.num_qubits == 2
+        assert len(sparse.coefficients) == 3
+        assert sparse.equiv(dense)
+        np.testing.assert_array_equal(sparse.to_matrix(), dense.to_matrix())
+        assert (2.0 * sparse).pauli_strings == dense.pauli_strings
+
+    def test_sparse_terms_validate_factors(self):
+        with pytest.raises(ValueError, match="in-range integer indices"):
+            QubitOperator.from_sparse_terms(2, [((2, "X"),)], np.array([1.0]))
+        with pytest.raises(ValueError, match="X/Y/Z axes"):
+            QubitOperator.from_sparse_terms(2, [((0, "A"),)], np.array([1.0]))
 
     def test_content_hash_includes_fermion_mode_order(self):
         """Content hash changes when fermion_mode_order changes."""
@@ -445,6 +491,49 @@ class TestQubitHamiltonianSerialization:
         assert reconstructed.pauli_strings == original.pauli_strings
         np.testing.assert_array_almost_equal(reconstructed.coefficients, original.coefficients)
 
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_sparse_roundtrip(self, tmp_path, file_format):
+        """Sparse words, including identity, round-trip through their own container type."""
+        original = QubitOperator.from_sparse_terms(
+            4,
+            [((0, "X"), (3, "Z")), ((1, "Y"),), ()],
+            np.array([1.0, -0.5j, 0.25]),
+        )
+        filename = tmp_path / f"test.qubit_hamiltonian.{file_format}"
+        original.to_file(str(filename), file_format)
+        reconstructed = QubitOperator.from_file(str(filename), file_format)
+
+        assert original.to_json()["version"] == "0.1.0"
+        assert original.to_json()["container_type"] == "sparse_pauli_decomposition"
+        assert "pauli_terms" in original.to_json()
+        assert not {"term_offsets", "qubit_indices", "pauli_codes", "pauli_strings"} & original.to_json().keys()
+        assert isinstance(reconstructed.get_container(), SparsePauliDecompositionContainer)
+        assert reconstructed.content_hash(0) == original.content_hash(0)
+        assert reconstructed.pauli_strings == original.pauli_strings
+        np.testing.assert_array_equal(reconstructed.coefficients, original.coefficients)
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    @pytest.mark.parametrize("identity_only", [False, True])
+    def test_sparse_roundtrip_preserves_metadata(self, tmp_path, file_format, identity_only):
+        """Sparse words round-trip with width, coefficients, partition, tapering and encoding metadata."""
+        partition = LayeredPartition(strategy="declared", groups=(((2, 0),), ((1,),)))
+        tapering = TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1))
+        expected = QubitOperator.from_sparse_terms(
+            4,
+            [{}, {}, {}] if identity_only else [{0: "X", 3: "Z"}, {}, {1: "Y"}],
+            np.array([1.0, -0.5j, 0.25]),
+            encoding="jordan-wigner",
+            fermion_mode_order="blocked",
+            term_partition=partition,
+            tapering=tapering,
+        )
+        filename = tmp_path / f"canonical.qubit_hamiltonian.{file_format}"
+        expected.to_file(filename, file_format)
+        restored = QubitOperator.from_file(filename, file_format)
+        assert isinstance(restored.pauli_strings, SparsePauliTerms)
+        assert restored.to_json() == expected.to_json()
+        assert restored.content_hash(0) == expected.content_hash(0)
+
     def test_json_file_roundtrip_complex_coefficients(self, tmp_path):
         """Test JSON file roundtrip with complex coefficients."""
         pauli_strings = ["IX", "YY", "ZZ", "XY"]
@@ -628,26 +717,39 @@ class TestQubitHamiltonianArithmetic:
         assert result.pauli_strings == ["XI", "IZ"]
         np.testing.assert_allclose(result.coefficients, [1.0, 2.0])
 
-    def test_add_merges_flat_partitions(self):
+    @pytest.mark.parametrize("sparse", [False, True])
+    def test_add_merges_flat_partitions(self, sparse):
         """__add__ should merge FlatPartitions with offset."""
         h1 = QubitOperator(
             ["XI", "IZ"], np.array([1.0, 1.0]), term_partition=FlatPartition(strategy="s", groups=((0, 1),))
         )
         h2 = QubitOperator(["XX"], np.array([0.5]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        if sparse:
+            h1 = _sparse_copy(h1)
         result = h1 + h2
         assert result.term_partition is not None
         assert isinstance(result.term_partition, FlatPartition)
         assert result.term_partition.groups == ((0, 1), (2,))
+        assert isinstance(result.get_container(), SparsePauliDecompositionContainer) == sparse
+        assert result.pauli_strings == ["XI", "IZ", "XX"]
+        np.testing.assert_array_equal(result.coefficients, [1.0, 1.0, 0.5])
 
-    def test_add_merges_layered_partitions(self):
+    @pytest.mark.parametrize("sparse", [False, True])
+    def test_add_merges_layered_partitions(self, sparse):
         """__add__ should merge LayeredPartitions with offset."""
         h1 = QubitOperator(
             ["XI", "IZ"], np.array([1.0, 1.0]), term_partition=LayeredPartition(strategy="s", groups=(((0,), (1,)),))
         )
         h2 = QubitOperator(["XX"], np.array([0.5]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
+        if sparse:
+            h2 = _sparse_copy(h2)
         result = h1 + h2
         assert isinstance(result.term_partition, LayeredPartition)
         assert result.term_partition.groups == (((0,), (1,)), ((2,),))
+        # The dense left operand decides the storage of the sum.
+        assert result.get_container_type() == "pauli_decomposition"
+        assert result.pauli_strings == ["XI", "IZ", "XX"]
+        np.testing.assert_array_equal(result.coefficients, [1.0, 1.0, 0.5])
 
     def test_add_mismatched_partition_types_raises(self):
         """__add__ with FlatPartition + LayeredPartition should raise TypeError."""
@@ -716,15 +818,16 @@ class TestTaperingPropagation:
             eigenvalues=(1, -1),
         )
 
-    @pytest.fixture
-    def tapered_h(self, tapering):
+    @pytest.fixture(params=[False, True], ids=["dense", "sparse"])
+    def tapered_h(self, tapering, request):
         """Create a QubitOperator with tapering metadata."""
-        return QubitOperator(
+        operator = QubitOperator(
             ["XI", "IZ"],
             np.array([1.0, 0.5]),
             encoding="symmetry-conserving-bravyi-kitaev",
             tapering=tapering,
         )
+        return _sparse_copy(operator) if request.param else operator
 
     def test_add_preserves_tapering(self, tapered_h, tapering):
         """H1 + H2 with matching tapering should preserve it."""
@@ -771,3 +874,113 @@ class TestTaperingPropagation:
         )
         result = h.to_interleaved(n_spatial=2)
         assert result.tapering == tapering
+
+
+class TestSparseQubitOperator:
+    """Sparse words preserve Pauli algebra without allocating dense labels."""
+
+    def test_sparse_words_and_coefficients_are_isolated(self):
+        """Own mutable inputs while sharing immutable factors during scalar multiplication."""
+        coefficients = np.array([-1.25, 0.5])
+        words = [{0: "Y"}, {}]
+        sparse = QubitOperator.from_sparse_terms(3, words, coefficients)
+        scaled = 2 * sparse
+        before = sparse.content_hash()
+        coefficients[:] = 0
+        words[0][0] = "Z"
+        with pytest.raises(AttributeError):
+            sparse.pauli_strings.words = ()
+        assert not np.shares_memory(scaled.coefficients, sparse.coefficients)
+        assert not scaled.coefficients.flags.writeable
+        with pytest.raises(ValueError, match="read-only"):
+            sparse.coefficients[0] = 0
+        assert sparse.content_hash() == before
+        terms = list(sparse.iter_sparse_terms())
+        assert terms == [(((0, "Y"),), -1.25), ((), 0.5)]
+        assert all(type(coefficient) is type(sparse.coefficients.item(0)) for _, coefficient in terms)
+
+    def test_sparse_labels_do_not_equal_a_string(self):
+        """The label view compares as a sequence of labels, never as one scalar string."""
+        labels = QubitOperator.from_sparse_terms(1, [{0: "X"}], np.array([1.0])).pauli_strings
+        assert labels == ["X"]
+        assert labels != "X"
+
+    def test_equiv_sums_duplicates_per_operand(self):
+        """Duplicate terms are summed within each operand, so a large coefficient cannot absorb a small one."""
+        sparse = QubitOperator.from_sparse_terms(1, [{0: "X"}, {0: "X"}], np.array([1e16, 1.0]))
+        assert sparse.equiv(sparse)
+
+    @pytest.mark.parametrize("coefficient", [0.0, 1e-14])
+    def test_equiv_requires_equal_width_in_both_orders(self, coefficient):
+        """Operators of different widths are never equivalent, whichever storage is compared first."""
+        dense = QubitOperator(pauli_strings=["XI"], coefficients=np.array([coefficient]))
+        wider = QubitOperator.from_sparse_terms(3, [{1: "X"}], np.array([coefficient]))
+        same_width = QubitOperator.from_sparse_terms(2, [{1: "X"}], np.array([coefficient]))
+        assert not dense.equiv(wider)
+        assert not wider.equiv(dense)
+        assert dense.equiv(same_width)
+        assert same_width.equiv(dense)
+
+    @pytest.mark.parametrize("term", [[(True, "X")], [(0.5, "X")], [(2**32, "X")], [(0, "I")], [(0, "X"), (0, "Y")]])
+    def test_sparse_factors_reject_invalid_values(self, term):
+        """Reject invalid indices, axes and duplicate qubits."""
+        with pytest.raises(ValueError, match="[Ss]parse Pauli"):
+            QubitOperator.from_sparse_terms(2, [term], np.array([1.0]))
+
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_large_sparse_operations_never_access_full_labels(self, file_format, monkeypatch, tmp_path):
+        """Arithmetic, reordering and persistence scale with support, not register width."""
+        coefficients = np.array([1.25, -2j, 0.5])
+        sparse = QubitOperator.from_sparse_terms(
+            100_000,
+            [{0: "X", 99_999: "Y"}, {65_536: "Z"}, {}],
+            coefficients,
+            term_partition=LayeredPartition(strategy="s", groups=(((2, 0),), ((1,),))),
+        )
+        monkeypatch.setattr(SparsePauliTerms, "__getitem__", Mock(side_effect=AssertionError("Dense labels")))
+        assert (0.0 * sparse).get_real_coefficients() == []
+        assert (sparse + (-0.5 * sparse)).equiv(0.5 * sparse)
+        assert (2j * sparse).equiv(sparse * 2j)
+        expected = QubitOperator.from_sparse_terms(100_000, [{0: "X", 99_999: "Y"}, {31_073: "Z"}, {}], coefficients)
+        interleaved = sparse.to_interleaved(50_000)
+        assert interleaved.equiv(expected)
+        assert interleaved.fermion_mode_order is FermionModeOrder.INTERLEAVED
+        assert interleaved.term_partition is None
+        filename = tmp_path / f"large.qubit_hamiltonian.{file_format}"
+        sparse.to_file(filename, file_format)
+        restored = QubitOperator.from_file(filename, file_format)
+        assert restored.to_json() == sparse.to_json()
+        assert restored.content_hash(0) == sparse.content_hash(0)
+        wider = QubitOperator.from_sparse_terms(100_001, sparse.pauli_strings.words, coefficients)
+        assert not sparse.equiv(wider)
+        assert sparse.content_hash() != wider.content_hash()
+
+    def test_json_rejects_broadcasting_coefficient_components(self):
+        """Do not silently broadcast a short imaginary component across sparse coefficients."""
+        payload = QubitOperator.from_sparse_terms(2, [{0: "X"}, {}], np.array([1.0, 0.5])).to_json()
+        payload["coefficients"]["imag"] = [0.0]
+        with pytest.raises(ValueError, match="matching shapes"):
+            QubitOperator.from_json(payload)
+
+    @pytest.mark.parametrize(
+        "strategy",
+        [
+            "commuting",
+            "qubit_wise_commuting",
+            "identity",
+            "vacuum_annihilating",
+            pytest.param("nx_commuting", marks=_requires_networkx),
+            pytest.param("nx_qubit_wise_commuting", marks=_requires_networkx),
+        ],
+    )
+    def test_term_groupers_keep_sparse_storage_without_labels(self, strategy, monkeypatch):
+        """Groupers compare sparse words and return operators sharing the input's terms."""
+        sparse = QubitOperator.from_sparse_terms(
+            100_000, [{0: "X", 99_999: "X"}, {0: "Y", 99_999: "Y"}, {65_536: "Z"}], np.array([0.5, 0.5, 1.0])
+        )
+        monkeypatch.setattr(SparsePauliTerms, "__getitem__", Mock(side_effect=AssertionError("Dense labels")))
+
+        grouped = registry.create("term_grouper", strategy).run(sparse)
+
+        assert grouped.pauli_strings is sparse.pauli_strings
+        assert sorted(index for group in grouped.term_partition.groups for index in group) == [0, 1, 2]

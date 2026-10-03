@@ -25,6 +25,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+
 if TYPE_CHECKING:
     from qdk_chemistry.data import QubitOperator
 
@@ -65,14 +67,15 @@ def qdrift_samples_campbell(
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
 
     container_type = hamiltonian.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"qDRIFT sample estimation requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."
         )
 
-    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
-    lambda_norm = sum(abs(coeff) for _, coeff in real_terms)
+    # Only magnitudes enter the bound, so skip building Pauli labels.
+    real_parts = (complex(coeff).real for coeff in hamiltonian.coefficients)
+    lambda_norm = sum(abs(real) for real in real_parts if abs(real) > weight_threshold)
 
     if lambda_norm == 0.0 or time == 0.0:
         return 1

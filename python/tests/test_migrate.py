@@ -25,9 +25,12 @@ from qdk_chemistry.data import (
     BasisSet,
     Configuration,
     Hamiltonian,
+    LatticeGraph,
     Orbitals,
+    PauliProductFormulaContainer,
     QpeResult,
     Structure,
+    UnitaryRepresentation,
     Wavefunction,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
@@ -193,6 +196,103 @@ def test_qpe_result(tmp_path, source_format, output_format):
 
     with pytest.raises(migrate.MigrationError, match="No migration step"):
         migrate.convert_file(dst, tmp_path / f"qpe_again.qpe_result.{output_suffix}")
+
+
+# --------------------------------------------------------------------------- #
+# Lattice graph
+# --------------------------------------------------------------------------- #
+def _write_old_lattice_graph(path, source_format):
+    """Write a weighted three-site path in the unversioned LatticeGraph layout."""
+    adjacency = [[0, 1, 1.5], [1, 0, 1.5], [1, 2, -0.5], [2, 1, -0.5]]
+    coloring = [[0, 1, 0], [1, 2, 1]]
+    if source_format == "json":
+        doc = {"num_sites": 3, "is_symmetric": True, "adjacency_sparse": adjacency, "edge_coloring": coloring}
+        path.write_text(json.dumps(doc))
+    else:
+        with h5py.File(path, "w") as handle:
+            handle.attrs["num_sites"] = np.uint64(3)
+            handle.attrs["is_symmetric"] = True
+            handle.create_dataset("adjacency_sparse", data=np.array(adjacency, dtype=np.float64))
+            handle.create_dataset("edge_coloring", data=np.array(coloring, dtype=np.float64))
+
+
+@pytest.mark.parametrize(
+    ("source_format", "output_format"),
+    [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
+)
+def test_lattice_graph(tmp_path, source_format, output_format):
+    src = tmp_path / f"old.lattice_graph.{'json' if source_format == 'json' else 'h5'}"
+    dst = tmp_path / f"new.lattice_graph.{'json' if output_format == 'json' else 'h5'}"
+    _write_old_lattice_graph(src, source_format)
+    with pytest.raises(RuntimeError, match=r"qdk_chemistry\.migrate"):
+        LatticeGraph.from_file(src, source_format)
+
+    migrate.convert_file(src, dst)
+    graph = LatticeGraph.from_file(dst, output_format)
+    np.testing.assert_array_equal(graph.adjacency_matrix(), [[0.0, 1.5, 0.0], [1.5, 0.0, -0.5], [0.0, -0.5, 0.0]])
+    assert graph.edge_coloring == {(0, 1): 0, (1, 2): 1}
+    assert graph.edge_labels == {}
+
+    with pytest.raises(migrate.MigrationError, match="No migration step"):
+        migrate.convert_file(dst, tmp_path / f"again.lattice_graph.{'json' if output_format == 'json' else 'h5'}")
+
+
+# --------------------------------------------------------------------------- #
+# Pauli product formula
+# --------------------------------------------------------------------------- #
+def _write_old_product_formula(path, source_format):
+    """Write twelve terms in the 0.2.0 layout, so HDF5 term indices reach two digits."""
+    step_terms = [{"pauli_term": {str(i % 3): "XYZ"[i % 3]}, "angle": 0.1 * (i + 1)} for i in range(12)]
+    header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": 3, "num_qubits": 3}
+    if source_format == "json":
+        path.write_text(json.dumps({**header, "step_terms": step_terms, "scale": 1.7}))
+    else:
+        with h5py.File(path, "w") as handle:
+            handle.attrs.update({**header, "scale": 1.7})
+            terms = handle.create_group("step_terms")
+            for i, term in enumerate(step_terms):
+                term_group = terms.create_group(f"term_{i}")
+                term_group.attrs["angle"] = term["angle"]
+                term_group.create_group("pauli_term").attrs.update(term["pauli_term"])
+    return step_terms
+
+
+@pytest.mark.parametrize("type_token", ["unitary_representation", "pauli_product_formula_container"])
+@pytest.mark.parametrize(
+    ("source_format", "output_format"),
+    [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
+)
+def test_pauli_product_formula(tmp_path, type_token, source_format, output_format):
+    src = tmp_path / f"old.{type_token}.{'json' if source_format == 'json' else 'h5'}"
+    dst = tmp_path / f"new.{type_token}.{'json' if output_format == 'json' else 'h5'}"
+    step_terms = _write_old_product_formula(src, source_format)
+    data_class = UnitaryRepresentation if type_token == "unitary_representation" else PauliProductFormulaContainer
+    with pytest.raises(RuntimeError, match=r"qdk_chemistry\.migrate"):
+        data_class.from_file(src, source_format)
+
+    migrate.convert_file(src, dst)
+    restored = data_class.from_file(dst, output_format)
+    formula = restored.get_container() if type_token == "unitary_representation" else restored
+    assert formula.to_json() == {
+        "version": "0.3.0",
+        "container_type": "pauli_product_formula",
+        "step_terms": step_terms,
+        "step_reps": 3,
+        "num_qubits": 3,
+        "scale": 1.7,
+        "prefix_terms": [],
+        "suffix_terms": [],
+    }
+
+    with pytest.raises(migrate.MigrationError, match="No migration step"):
+        migrate.convert_file(dst, tmp_path / f"again.{type_token}.{'json' if output_format == 'json' else 'h5'}")
+
+
+def test_other_unitary_containers_need_no_migration(tmp_path):
+    src = tmp_path / "old.unitary_representation.json"
+    src.write_text(json.dumps({"version": "0.2.0", "container_type": "lcu"}))
+    with pytest.raises(migrate.MigrationError, match="load without conversion"):
+        migrate.convert_file(src, tmp_path / "new.unitary_representation.json")
 
 
 # --------------------------------------------------------------------------- #

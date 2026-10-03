@@ -2,13 +2,69 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-// LatticeGraph usage examples.
+// Lattice geometry, explicit connectivity, and edge-coloring examples.
 // --------------------------------------------------------------------------------------------
-// start-cell-create-chain
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::data;
 
 int main() {
+  // start-cell-create-geometry
+  auto geometry = LatticeGeometry::honeycomb_plaquettes(1, 1);
+  const auto& positions = geometry.positions();
+  // end-cell-create-geometry
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-geometry-shells
+  auto hexagon = LatticeGraph::from_geometry(geometry, {1, 2, 3});
+  // Shells 1, 2, and 3 contain 6, 6, and 3 labelled edges, respectively.
+  // end-cell-geometry-shells
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-periodic-geometry
+  auto ring_geometry = LatticeGeometry::chain(6, /*periodic=*/true);
+  auto ring_graph = LatticeGraph::from_geometry(ring_geometry, {1, 2});
+  // Six first- and six second-neighbor bonds. A periodic two-site chain joins
+  // its sites through two images, so from_geometry rejects it.
+  // end-cell-periodic-geometry
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-from-geometry
+  auto square_geometry = LatticeGeometry::square(3, 3);
+  auto graph = LatticeGraph::from_geometry(square_geometry, {1, 2});
+  auto interaction_edges = graph.num_edges();
+  // end-cell-from-geometry
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-bond-flavors
+  auto flavored_graph =
+      LatticeGraph::from_geometry(square_geometry, {1, 2},
+                                  {
+                                      {1, Eigen::RowVector2d(1.0, 0.0), 10},
+                                      {1, Eigen::RowVector2d(0.0, 1.0), 20},
+                                      {2, Eigen::RowVector2d(1.0, 1.0), 30},
+                                      {2, Eigen::RowVector2d(1.0, -1.0), 40},
+                                  });
+  const auto& [edge, edge_label] = *flavored_graph.edge_labels().begin();
+  auto flavor = edge_label.flavor;  // Optional integer ID, not an edge color.
+  // end-cell-bond-flavors
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-coloring
+  // Here XX acts on shell 1 and ZZ on shell 2, with nonzero couplings
+  // throughout.
+  const auto& coloring = graph.edge_coloring().value();
+  EdgeColoring xx_coloring, zz_coloring;
+  for (const auto& [pair, label] : graph.edge_labels()) {
+    if (label.shell == 1) {
+      xx_coloring.emplace(pair, coloring.at(pair));
+    } else if (label.shell == 2) {
+      zz_coloring.emplace(pair, coloring.at(pair));
+    }
+  }
+  // end-cell-coloring
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-create-chain
   // Create a 6-site open chain
   auto chain = LatticeGraph::chain(6);
 
@@ -75,6 +131,20 @@ int main() {
   // end-cell-from-matrix
 
   // --------------------------------------------------------------------------------------------
+  // start-cell-custom-labels
+  // A four-site ring with two bond flavors and one second-shell diagonal
+  EdgeLabels custom_labels = {{{0, 1}, {1, 0}},
+                              {{1, 2}, {1, 1}},
+                              {{2, 3}, {1, 0}},
+                              {{0, 3}, {1, 1}},
+                              {{0, 2}, {2, std::nullopt}}};
+  std::map<std::pair<std::uint64_t, std::uint64_t>, double> custom_weights;
+  for (const auto& [pair, label] : custom_labels) custom_weights[pair] = 1.0;
+  auto labelled = LatticeGraph::make_bidirectional(
+      LatticeGraph(custom_weights, /*num_sites=*/0, custom_labels));
+  // end-cell-custom-labels
+
+  // --------------------------------------------------------------------------------------------
   // start-cell-properties
   // Query lattice properties
   auto lattice = LatticeGraph::chain(4);
@@ -96,16 +166,16 @@ int main() {
 
   // --------------------------------------------------------------------------------------------
   // start-cell-serialization
-  auto lg = LatticeGraph::chain(4);
+  auto lg = flavored_graph;
 
   // Save to JSON
-  lg.to_json_file("chain.lattice_graph.json");
+  lg.to_json_file("square.lattice_graph.json");
 
   // Load from JSON
-  auto loaded = LatticeGraph::from_json_file("chain.lattice_graph.json");
+  auto loaded = LatticeGraph::from_json_file("square.lattice_graph.json");
 
   // Save to HDF5
-  lg.to_hdf5_file("chain.lattice_graph.hdf5");
+  lg.to_hdf5_file("square.lattice_graph.hdf5");
   // end-cell-serialization
 
   return 0;
