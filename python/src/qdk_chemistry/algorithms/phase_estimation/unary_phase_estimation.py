@@ -90,6 +90,7 @@ def _post_process_phase_estimation(
         resolved_energy=raw_energy,
         bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
         bitstring_msb_first=bitstring_msb_first,
+        bitstring_counts=counts,
     )
 
 

@@ -272,6 +272,8 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
     result = _run_standard(two_qubit_phase_problem, builder_name)
 
     assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
+    assert result.bitstring_counts is not None
+    assert sum(result.bitstring_counts.values()) == two_qubit_phase_problem.shots
     assert np.isclose(
         result.phase_fraction,
         two_qubit_phase_problem.expected_phase,

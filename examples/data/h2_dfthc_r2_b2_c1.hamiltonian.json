@@ -2,7 +2,7 @@
     "version": "0.1.0",
     "container": {
         "version": "0.2.0",
-        "container_type": "factorized",
+        "container_type": "dfthc",
         "num_ranks": 2,
         "num_bases": 2,
         "num_copies": 1,
