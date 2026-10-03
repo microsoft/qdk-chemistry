@@ -5,4 +5,5 @@ target_sources(chemistry PRIVATE
     orbital_rotation.cpp
     golden_section.cpp
     logger.cpp
+    unitary_synthesis.cpp
 )

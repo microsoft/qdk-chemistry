@@ -72,6 +72,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
 - `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
+- `benchmark/mps_sequential_estimates.py`: Logical resource estimates for dense sequential MPS state preparation on square lattices versus bond dimension (saved results and plot in [`benchmark/`](benchmark/)).
 
 ## Companion datasets and assets
 
