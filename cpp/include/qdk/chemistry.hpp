@@ -17,6 +17,7 @@
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/algorithms/symmetry_shift.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
