@@ -5,88 +5,81 @@
 namespace QDKChemistry.Utils.PauliExp {
 
     import Std.Arrays.Subarray;
+    import Std.Math.Max;
+    import Std.ResourceEstimation.IsResourceEstimating;
+    import Std.ResourceEstimation.RepeatEstimates;
 
-    /// Performs Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `systems`: An array of qubits representing the system on which the operation acts.
-    /// # Returns
-    /// - `Unit`: The operation prepares the time evolution on the allocated qubits.
-    operation PauliExp(
-        pauliExponents : Pauli[][],
-        pauliCoefficients : Double[],
-        systems : Qubit[]
-    ) : Unit {
-        for idx in 0..Length(pauliExponents) - 1 {
-            let paulis = pauliExponents[idx];
-            let coeff = pauliCoefficients[idx];
-            Exp(paulis, -coeff, systems);
-        }
-    }
-
-
-    /// Performs repeated Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `pauliExponents`: An array of arrays of Pauli operators representing the Pauli terms.
-    /// - `pauliCoefficients`: An array of doubles representing the coefficients for each Pauli term.
-    /// - `repetitions`: The number of times to repeat the evolution.
+    /// Non-identity qubit positions and axes for each term; an empty row is identity.
     struct RepPauliExpParams {
-        pauliExponents : Pauli[][],
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
         pauliCoefficients : Double[],
         repetitions : Int,
+        // Counts of one-time terms before and after the repeated body.
+        numPrefixTerms : Int,
+        numSuffixTerms : Int,
     }
 
-    /// Performs repeated Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepPauliExpParams` struct containing the parameters for the operation.
-    /// - `systems`: An array of qubits representing the system on which the operation acts.
-    /// # Returns
-    /// - `Unit`: The operation prepares the repeated time evolution on the allocated qubits.
-    operation RepPauliExp(
-        params : RepPauliExpParams,
-        systems : Qubit[],
-    ) : Unit {
-        for i in 1..params.repetitions {
-            PauliExp(params.pauliExponents, params.pauliCoefficients, systems);
+    /// Applies one step, accessing only each term's non-identity support.
+    operation PauliExp(
+        pauliIndices : Int[][],
+        pauliOps : Pauli[][],
+        pauliCoefficients : Double[],
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        if Length(pauliIndices) != Length(pauliCoefficients) or Length(pauliOps) != Length(pauliCoefficients) {
+            fail "PauliExp: inconsistent array lengths.";
+        }
+        for term in 0..Length(pauliCoefficients) - 1 {
+            // Exp uses the opposite sign; empty support retains the phase needed by controlled evolution.
+            Exp(pauliOps[term], -pauliCoefficients[term], Subarray(pauliIndices[term], systems));
         }
     }
 
-    /// A helper operation to create a circuit for repeated Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepPauliExpParams` struct containing the parameters for the operation.
-    /// - `system`: An array of integers representing the indices of the system qubits.
-    /// # Returns
-    /// - `Unit`: The operation prepares the repeated time evolution on the allocated qubits.
-    operation MakeRepPauliExpCircuit(
-        params : RepPauliExpParams,
-        system : Int[],
-    ) : Unit {
-        // If no system indices are provided, there is nothing to do.
+    /// Repeats a step symbolically during resource estimation, and explicitly during simulation.
+    operation RepPauliExp(params : RepPauliExpParams, systems : Qubit[]) : Unit is Adj + Ctl {
+        let suffixStart = Length(params.pauliCoefficients) - params.numSuffixTerms;
+        let prefix = 0..params.numPrefixTerms - 1;
+        let step = params.numPrefixTerms..suffixStart - 1;
+        let suffix = suffixStart..Length(params.pauliCoefficients) - 1;
+        PauliExp(params.pauliIndices[prefix], params.pauliOps[prefix], params.pauliCoefficients[prefix], systems);
+        if IsResourceEstimating() {
+            within {
+                RepeatEstimates(params.repetitions);
+            } apply {
+                PauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems);
+            }
+        } else {
+            for _ in 1..params.repetitions {
+                PauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems);
+            }
+        }
+        PauliExp(params.pauliIndices[suffix], params.pauliOps[suffix], params.pauliCoefficients[suffix], systems);
+    }
+
+    /// Creates a circuit for repeated sparse Pauli evolution.
+    operation MakeRepPauliExpCircuit(params : RepPauliExpParams, system : Int[]) : Unit {
         if Length(system) == 0 {
             return ();
         }
-
-        // Determine the maximum index in the system array to size the qubit register safely.
-        mutable maxIndex = system[0];
-        for idx in 1..Length(system) - 1 {
-            let current = system[idx];
-            if current > maxIndex {
-                set maxIndex = current;
-            }
-        }
-
-        // Allocate enough qubits so that all indices in `system` are valid.
-        use qs = Qubit[maxIndex + 1];
+        use qs = Qubit[Max(system) + 1];
         RepPauliExp(params, Subarray(system, qs));
     }
 
-    /// A helper function to create a callable for repeated Time Evolution for a set of Pauli exponentials.
-    /// # Parameters
-    /// - `params`: A `RepPauliExpParams` struct containing the parameters for the operation.
-    /// # Returns
-    /// - `Qubit[] => Unit`: A callable that takes an array of system qubits, and prepares the repeated time evolution on the allocated qubits.
+    /// Uncontrolled entry point for `RepPauliExp`.
+    ///
+    /// Declared without functors on purpose. Callables built by partially applying an
+    /// `Adj + Ctl` operation cannot be resolved by the Q# defunctionalizer once they are
+    /// stored in a plain `Qubit[] => Unit` slot (such as the arguments of
+    /// `CircuitComposition.ApplySequential` or `MeasurementBasis.MakeMeasurementCircuit`),
+    /// which makes lowering those compositions to QIR fail. Forwarding through a plain
+    /// operation keeps the composed circuits statically resolvable.
+    operation ApplyRepPauliExp(params : RepPauliExpParams, systems : Qubit[]) : Unit {
+        RepPauliExp(params, systems);
+    }
+
+    /// Returns a composable callable for repeated sparse evolution.
     function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit {
-        RepPauliExp(params, _)
+        ApplyRepPauliExp(params, _)
     }
 }
