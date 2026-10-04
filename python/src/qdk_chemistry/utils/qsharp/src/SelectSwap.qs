@@ -66,8 +66,9 @@ namespace QDKChemistry.Utils.SelectSwap {
     //  put the address into a product basis, Mobius-transform the data, and emit one CCNOT per
     //  set bit of the transformed mask *per output bit*, so the Toffoli cost scales with the word
     //  width where a `Select` address iteration does not. That is least attractive at exactly our
-    //  shapes: the Fe2S2 inner PREPARE is 90 rows of 21 bits, narrow and deep. The argument is
-    //  structural rather than benchmarked, so measure before concluding the gap is real.
+    //  shapes, which are narrow and deep -- order a hundred rows of a few tens of bits. The
+    //  argument is structural rather than benchmarked, so measure before concluding the gap is
+    //  real.
 
     /// Plain unary-iteration `Select`: no scratch, no borrowing, `numData - 1` Toffolis.
     ///
@@ -181,9 +182,9 @@ namespace QDKChemistry.Utils.SelectSwap {
     /// elsewhere that block sets the peak width of the whole algorithm. Scoring widths by
     /// Toffoli count alone never sees that, so it keeps widening while the gains flatten.
     ///
-    /// Measured at the Fe2S2-20 inner PREPARE shape (`d = 90`, `m = 16`, `b = 21`): `k = 3`
-    /// is the Toffoli minimum at 491, and this rule instead takes `k = 2` at 587 -- 19.6%
-    /// more Toffolis for 84 of 283 scratch qubits (30%) less width.
+    /// Measured at the inner-PREPARE shape this rule's test exercises (`d = 90`, `m = 16`,
+    /// `b = 21`): `k = 3` is the Toffoli minimum at 491, and this rule instead takes `k = 2`
+    /// at 587 -- 19.6% more Toffolis for 84 of 283 scratch qubits (30%) less width.
     ///
     /// That decision is narrow: 587 clears the `491 * 1.2 = 589.2` threshold by 2.2 Toffolis,
     /// so a tolerance under roughly 0.195 would take `k = 3` and widen the algorithm instead.
