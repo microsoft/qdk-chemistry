@@ -170,6 +170,28 @@ class TestAliasSamplingStatePreparation:
             f"and must cost Toffolis for it: {counts[chosen]['cczCount']} vs {counts[declined]['cczCount']}"
         )
 
+        # The premium the rule pays has to stay small next to the width it buys, or the
+        # tolerance is mis-set. This guards the tolerance itself rather than the width it
+        # happens to pick, and is the one place that ratio is checked now that the setting
+        # caps rather than overrides and so cannot reach the declined width end to end.
+        width_saved = (counts[declined]["numQubits"] - counts[chosen]["numQubits"]) / counts[declined]["numQubits"]
+        toffoli_premium = (counts[chosen]["cczCount"] - counts[declined]["cczCount"]) / counts[declined]["cczCount"]
+        assert toffoli_premium < width_saved, (
+            f"the rule's Toffoli premium has to be small next to the width it buys, or the "
+            f"tolerance is mis-set: {toffoli_premium:.1%} Toffolis for {width_saved:.1%} width"
+        )
+
+        # And the margin is thin: the premium is ~19.6% against a 20% tolerance, so `k = 2`
+        # qualifies by about two Toffolis in 589. The width this shape lands on is therefore a
+        # property of the tolerance constant, not a comfortable feature of the shape. Pin the
+        # thinness so that lowering the tolerance fails here, naming the reason, rather than
+        # surfacing downstream as an unexplained widening of the whole algorithm.
+        assert 0.19 < toffoli_premium < 0.20, (
+            f"the declined width is a near-miss at this shape ({toffoli_premium:.2%} premium "
+            f"against a 20% tolerance); if this moved, the tolerance or the cost model changed "
+            f"and the resident width almost certainly moved with it"
+        )
+
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign."""
         prep = AliasSamplingStatePreparation(bits_precision=4)

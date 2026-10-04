@@ -59,6 +59,15 @@ namespace QDKChemistry.Utils.SelectSwap {
     //  its own cost model says no network beats the plain load at that shape, so naming a
     //  method can never cost Toffolis relative to `LookupSelect`; it only grants permission to
     //  spend qubits if doing so pays.
+    //
+    //  Three, where the reference library (microsoft/qdk `library/table_lookup`) has four: it
+    //  also loads via power products -- `LookupViaPP` and `LookupViaSplitPP`, after Gidney
+    //  (arXiv:2505.15917, section A.4) -- which we deliberately do not implement. Power products
+    //  put the address into a product basis, Mobius-transform the data, and emit one CCNOT per
+    //  set bit of the transformed mask *per output bit*, so the Toffoli cost scales with the word
+    //  width where a `Select` address iteration does not. That is least attractive at exactly our
+    //  shapes: the Fe2S2 inner PREPARE is 90 rows of 21 bits, narrow and deep. The argument is
+    //  structural rather than benchmarked, so measure before concluding the gap is real.
 
     /// Plain unary-iteration `Select`: no scratch, no borrowing, `numData - 1` Toffolis.
     ///
@@ -166,24 +175,25 @@ namespace QDKChemistry.Utils.SelectSwap {
         table
     }
 
-    /// Smallest relative Toffoli gain that justifies one more swap bit.
+    /// Largest relative Toffoli premium worth paying for a narrower swap network.
     ///
-    /// Each extra bit doubles the scratch block, and for any caller not already wider
+    /// Each extra swap bit doubles the scratch block, and for a caller not already wider
     /// elsewhere that block sets the peak width of the whole algorithm. Scoring widths by
     /// Toffoli count alone never sees that, so it keeps widening while the gains flatten.
     ///
-    /// Measured at the Fe2S2-20 inner PREPARE: the last bit a Toffoli-only rule takes buys
-    /// 1.8M Toffolis out of 260M (0.7% of the run) for 92 logical qubits out of 427 (22% of
-    /// the register). Requiring each widening to earn a fifth of the cost declines that step
-    /// and keeps every step that genuinely pays, which at that shape lands on `k = 2`.
+    /// Measured at the Fe2S2-20 inner PREPARE shape (`d = 90`, `m = 16`, `b = 21`): `k = 3`
+    /// is the Toffoli minimum at 491, and this rule instead takes `k = 2` at 587 -- 19.6%
+    /// more Toffolis for 84 of 283 scratch qubits (30%) less width.
     ///
-    /// Callers that want the Toffoli optimum regardless of width still have it: set the swap
-    /// width explicitly rather than leaving it to this rule.
-    internal function SwapWideningTolerance() : Double {
+    /// That decision is narrow: 587 clears the `491 * 1.2 = 589.2` threshold by 2.2 Toffolis,
+    /// so a tolerance under roughly 0.195 would take `k = 3` and widen the algorithm instead.
+    /// The margin lives in this constant rather than in the shape, so treat it as load-bearing
+    /// rather than as a round number.
+    internal function MaxToffoliPremiumForNarrowing() : Double {
         0.2
     }
 
-    /// Narrowest swap width whose Toffoli cost is within `SwapWideningTolerance()` of the best.
+    /// Narrowest swap width within `MaxToffoliPremiumForNarrowing()` of the cheapest.
     ///
     /// Returns the *narrowest* qualifying width rather than the cheapest, so a width is taken
     /// only when the extra scratch is paying for itself. Widths are scanned in order, so the
@@ -204,7 +214,7 @@ namespace QDKChemistry.Utils.SelectSwap {
             }
         }
 
-        let threshold = IntAsDouble(best) * (1.0 + SwapWideningTolerance());
+        let threshold = IntAsDouble(best) * (1.0 + MaxToffoliPremiumForNarrowing());
         for lambda in 0..addressBits - 1 {
             let cost = SelectSwapCost2D(lambda, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
             if IntAsDouble(cost) <= threshold {
@@ -1049,8 +1059,19 @@ namespace QDKChemistry.Utils.SelectSwap {
     ///
     /// At width 0 the load is a single plain `Select`, whose unary iteration over `numData`
     /// rows costs `numData - 1`. Widths above that are two `Select` passes over `2^(n-k)`
-    /// aliased rows plus four butterflies of `numBits * (2^k - 1)` controlled swaps, matching
-    /// `2*ceil(d/K) + 4*b*(K-1)` in Berry et al. (arXiv:1902.02134, Appendix A, Theorem 1).
+    /// aliased rows plus four butterflies of `numBits * (2^k - 1)` controlled swaps, which is
+    /// the structure of `2*ceil(d/K) + 4*b*(K-1)` in :cite:`Berry2019` (Appendix A, Theorem 1).
+    ///
+    /// The butterfly term is theirs exactly. The `Select` term is deliberately not: it is
+    /// `2*(2^(n-k) - 1)` rather than `2*ceil(d/K)`, which differs in two ways that pull in
+    /// opposite directions. The `-1` per pass is the exact unary-iteration cost rather than
+    /// their bound, so a power-of-two table costs 2 Toffolis less here than their formula
+    /// quotes. Against that, the table is padded to `2^ceil(lg d)` rows, so a table far from a
+    /// power of two is charged for the padding: at the Fe2S2 inner shape (`d = 90`, `K = 4`)
+    /// this is 62 against their 46. The padded form is what the implementation below actually
+    /// addresses, so costing the unpadded table would under-report a circuit nobody builds --
+    /// but it does mean this model is conservative about dirty loads at awkward table sizes,
+    /// which is the direction that makes borrowing look worse than it is.
     ///
     /// The width-0 case has to be the plain cost and not the `K = 1` limit of the swap formula:
     /// that limit charges two passes for a load that only makes one, and the doubled baseline
