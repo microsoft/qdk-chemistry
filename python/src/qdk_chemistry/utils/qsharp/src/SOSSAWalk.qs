@@ -45,7 +45,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
-    import QDKChemistry.Utils.SelectSwap.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits, QDKChemistry.Utils.SelectSwap.DirtyQROAMBorrowedQubits, QDKChemistry.Utils.SelectSwap.SelectSwapAliased, QDKChemistry.Utils.SelectSwap.SelectSwapDirty;
+    import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits, QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMBorrowedQubits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirty;
     import QDKChemistry.Utils.SelectSwap.LookupSelect, QDKChemistry.Utils.SelectSwap.LookupSelectSwap, QDKChemistry.Utils.SelectSwap.LookupDirtySelectSwap;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 

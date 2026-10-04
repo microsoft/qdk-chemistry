@@ -182,10 +182,25 @@ _DIRTY_TRIALS = 6
 
 
 def _select_swap_ns(ctx=None):
+    """The clean-strategy namespace: loaders that allocate their own swap scratch."""
     return (ctx or get_qsharp_context()).code.QDKChemistry.Utils.SelectSwap
 
 
+def _select_swap_dirty_ns(ctx=None):
+    """The dirty-strategy namespace: loaders that borrow live caller qubits instead.
+
+    Split from ``_select_swap_ns`` because the two strategies now live in separate Q# files,
+    so a test that reaches for a dirty symbol through the clean namespace fails to resolve
+    rather than silently exercising the wrong loader.
+    """
+    return (ctx or get_qsharp_context()).code.QDKChemistry.Utils.SelectSwapDirty
+
+
 def _make_table(num_rows: int, width: int) -> list[list[bool]]:
+    """Builds a deterministic bit table whose rows differ, so a misrouted address is visible.
+
+    A constant or repeating pattern would let a lookup that returns the wrong row still pass.
+    """
     return [[(r * 37 + b * 11 + r * b) % 3 == 0 for b in range(width)] for r in range(num_rows)]
 
 
@@ -206,14 +221,23 @@ class TestDirtyQROAMLoadsCorrectValues:
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
     @pytest.mark.parametrize(("num_rows", "width"), [(8, 1), (16, 1)])
     def test_loads_every_address(self, num_rows, width, num_swap_bits, dirty_seed):
-        assert _select_swap_ns().TestSelectSwapDirtyCorrectness(_make_table(num_rows, width), num_swap_bits, dirty_seed)
+        """Power-of-two tables are the baseline: every address is real, so nothing may alias.
+
+        ``dirty_seed`` varies the junk the borrowed register starts in, since a network that
+        only works from a zeroed borrow is not borrowing at all.
+        """
+        assert _select_swap_dirty_ns().TestSelectSwapDirtyCorrectness(
+            _make_table(num_rows, width), num_swap_bits, dirty_seed
+        )
 
     @pytest.mark.parametrize("dirty_seed", [0, 3])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     @pytest.mark.parametrize(("num_rows", "width"), [(5, 2), (6, 2), (7, 1), (11, 2)])
     def test_loads_every_address_when_length_is_not_a_power_of_two(self, num_rows, width, num_swap_bits, dirty_seed):
         """Surplus addresses have to alias exactly as the plain lookup aliases them."""
-        assert _select_swap_ns().TestSelectSwapDirtyCorrectness(_make_table(num_rows, width), num_swap_bits, dirty_seed)
+        assert _select_swap_dirty_ns().TestSelectSwapDirtyCorrectness(
+            _make_table(num_rows, width), num_swap_bits, dirty_seed
+        )
 
 
 class TestDirtyQROAMReturnsTheBorrowedQubits:
@@ -238,7 +262,7 @@ class TestDirtyQROAMReturnsTheBorrowedQubits:
         failures = sum(
             1
             for _ in range(_DIRTY_TRIALS)
-            if not _select_swap_ns().TestSelectSwapDirtyPhaseAgreement(data, num_swap_bits)
+            if not _select_swap_dirty_ns().TestSelectSwapDirtyPhaseAgreement(data, num_swap_bits)
         )
         assert failures == 0, (
             f"the borrowed register was not restored in {failures}/{_DIRTY_TRIALS} trials at "
@@ -256,7 +280,7 @@ class TestDirtyQROAMCostModel:
         twice the true cost and make every swap width look like an improvement over a
         baseline that was never real.
         """
-        cost = _select_swap_ns().DirtyQROAMCost
+        cost = _select_swap_dirty_ns().DirtyQROAMCost
         for num_data in (8, 15, 224, 864):
             assert cost(0, num_data, 10) == num_data - 1
 
@@ -268,12 +292,12 @@ class TestDirtyQROAMCostModel:
         only undercuts the plain ``d - 1`` once the table is tall relative to the word. Fe2S2's
         224-row, 15-bit angle table sits well under that line.
         """
-        assert _select_swap_ns().ComputeOptimalDirtySwapBits(num_data, num_bits, 4096) == 0
+        assert _select_swap_dirty_ns().ComputeOptimalDirtySwapBits(num_data, num_bits, 4096) == 0
 
     @pytest.mark.parametrize(("num_data", "num_bits"), [(864, 10), (2048, 8)])
     def test_tall_tables_borrow_and_come_out_ahead(self, num_data, num_bits):
         """Where the crossover is cleared the chosen width must actually beat the plain lookup."""
-        select_swap = _select_swap_ns()
+        select_swap = _select_swap_dirty_ns()
         width = select_swap.ComputeOptimalDirtySwapBits(num_data, num_bits, 4096)
 
         assert width > 0
@@ -281,7 +305,7 @@ class TestDirtyQROAMCostModel:
 
     def test_a_tight_dirty_budget_forces_the_plain_lookup(self):
         """Borrowing is only legal for qubits that exist; a short budget must fall back, not overdraw."""
-        select_swap = _select_swap_ns()
+        select_swap = _select_swap_dirty_ns()
         unconstrained = select_swap.ComputeOptimalDirtySwapBits(864, 10, 4096)
         assert unconstrained > 0
         assert select_swap.DirtyQROAMBorrowedQubits(unconstrained, 10) > 10
@@ -289,7 +313,12 @@ class TestDirtyQROAMCostModel:
         assert select_swap.ComputeOptimalDirtySwapBits(864, 10, 10) == 0
 
     def test_the_chosen_width_fits_the_budget_it_was_given(self):
-        select_swap = _select_swap_ns()
+        """Every budget must yield a width that borrows within it, not merely the loose ones.
+
+        Sweeping from zero upward catches a rule that clamps only at one end, which would
+        overdraw on the tight budgets while still passing a single generous-budget check.
+        """
+        select_swap = _select_swap_dirty_ns()
         for available in (0, 10, 40, 80, 160, 640):
             width = select_swap.ComputeOptimalDirtySwapBits(864, 10, available)
             assert select_swap.DirtyQROAMBorrowedQubits(width, 10) <= available or width == 0

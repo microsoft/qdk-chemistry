@@ -29,10 +29,10 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Arrays.Mapped;
     import Std.Arrays.Sorted;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
-    import QDKChemistry.Utils.SelectSwap.ComputeOptimalDirtySwapBits2D;
-    import QDKChemistry.Utils.SelectSwap.DirtyQROAMBorrowedQubits;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D;
+    import QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMBorrowedQubits;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
-    import QDKChemistry.Utils.SelectSwap.SelectSwap2DDirty;
+    import QDKChemistry.Utils.SelectSwapDirty.SelectSwap2DDirty;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
     import QDKChemistry.Utils.SelectSwap.LookupSelect, QDKChemistry.Utils.SelectSwap.LookupSelectSwap, QDKChemistry.Utils.SelectSwap.LookupDirtySelectSwap;
 
