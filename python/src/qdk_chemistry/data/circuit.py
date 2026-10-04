@@ -227,16 +227,17 @@ class Circuit(DataClass):
     def get_qsharp_circuit(
         self,
         prune_classical_qubits: bool = False,
-        generation_method: qsharp.CircuitGenerationMethod | None = None,
+        **kwargs: Any,
     ) -> QdkCircuitType:
         """Parse a Circuit object into a Q# circuit object.
 
         Args:
             prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
                 when converting from Q# factory data.
-            generation_method: The Q# circuit generation method, e.g.
-                ``qsharp.CircuitGenerationMethod.Simulate`` for programs that compare measurement results.
-                Defaults to ``None``, which lets Q# choose.
+            **kwargs: Forwarded verbatim to ``qsharp.circuit``, for options this class has no
+                reason to know about -- ``generation_method=qsharp.CircuitGenerationMethod.Simulate``
+                for programs that compare measurement results, say. Anything omitted keeps the
+                Q# default rather than being passed as ``None``.
 
         Returns:
             QdkCircuitType: A Q# Circuit object.
@@ -259,8 +260,8 @@ class Circuit(DataClass):
             return context.circuit(
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
-                generation_method=generation_method,
                 prune_classical_qubits=prune_classical_qubits,
+                **kwargs,
             )
         if self.qasm:
             return openqasm_circuit(self.qasm)

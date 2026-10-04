@@ -237,9 +237,6 @@ nitpick_ignore_regex = [
     (r"py:class", r"azure\.core\.polling\._poller\.(_SansIONoPolling|PollingMethod)"),
     (r"py:obj", r"azure\.core\.polling\._poller\.PollingReturnType_co"),
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
-    # Native qsharp enum: it reports __module__ == "builtins", so Sphinx renders the
-    # target unqualified and the qsharp.* pattern above cannot match it.
-    (r"py:class", r"^CircuitGenerationMethod$"),
     (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases
     (r"py:class", r"^PlanTerm$"),
     (r"py:class", r"^CommutatorPlan$"),
