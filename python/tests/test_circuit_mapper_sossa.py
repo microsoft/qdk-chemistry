@@ -13,7 +13,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS, rotation_batch_size_for
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS, _rotation_batch_size
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -581,6 +581,7 @@ class TestSelectFullFidelity:
         num_copies: int = 1,
         rotation_batch_size: int = 0,
         lookup_method: str = "select",
+        max_swap_bits: int = -1,
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -601,6 +602,7 @@ class TestSelectFullFidelity:
             "rotationBitPrecision": rotation_bit_precision,
             "rotationBatchSize": rotation_batch_size,
             "rotationLookupMethod": _LOOKUP_METHODS[lookup_method],
+            "maxSwapBits": max_swap_bits,
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -640,6 +642,7 @@ class TestSelectFullFidelity:
             "rotationBitPrecision": 14,
             "rotationBatchSize": 0,
             "rotationLookupMethod": _LOOKUP_METHODS["select"],
+            "maxSwapBits": -1,
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
@@ -834,7 +837,7 @@ class TestSOSSAWalkLogicalCounts:
 
 
 class TestRotationBatchSizeFor:
-    """The arithmetic behind the ``rotation_batch_size`` guidance."""
+    """The arithmetic behind the ``num_batches`` setting."""
 
     @pytest.mark.parametrize(
         ("num_batches", "expected"),
@@ -843,13 +846,13 @@ class TestRotationBatchSizeFor:
     def test_it_returns_the_smallest_batch_making_that_many_passes(self, num_batches, expected):
         """Each answer must make exactly the requested number of passes, and one less must not.
 
-        The helper only earns its place if it lands on the *first* lambda of each step, so
+        The derivation only earns its place if it lands on the *first* lambda of each step, so
         both halves are checked: the value makes ``num_batches`` passes, and shrinking it by
         one spills into another pass. The N = 20 shape is the one the resource-estimation
         pins use.
         """
         num_angles = 19
-        batch = rotation_batch_size_for(20, num_batches)
+        batch = _rotation_batch_size(20, num_batches)
 
         assert batch == expected
         assert math.ceil(num_angles / batch) == num_batches
@@ -860,32 +863,33 @@ class TestRotationBatchSizeFor:
     def test_one_batch_keeps_every_angle_resident(self):
         """One pass has to mean the whole table, which is the setting's resident behaviour."""
         for num_orbitals in (2, 8, 20, 57):
-            assert rotation_batch_size_for(num_orbitals, 1) == num_orbitals - 1
+            assert _rotation_batch_size(num_orbitals, 1) == num_orbitals - 1
 
     @pytest.mark.parametrize(
-        ("num_orbitals", "num_batches", "match"),
-        [
-            (1, 1, "num_orbitals must be at least 2"),
-            (0, 1, "num_orbitals must be at least 2"),
-            (20, 0, "num_batches must be between 1 and 19"),
-            (20, 20, "num_batches must be between 1 and 19"),
-            (20, -1, "num_batches must be between 1 and 19"),
-            (2, 2, "num_batches must be between 1 and 1"),
-        ],
+        ("num_orbitals", "num_batches"),
+        [(20, 20), (20, 21), (2, 2)],
     )
-    def test_it_rejects_shapes_that_cannot_be_batched(self, num_orbitals, num_batches, match):
-        """Out-of-range passes are a caller bug, not something to silently round into range.
+    def test_it_rejects_more_passes_than_there_are_angles(self, num_orbitals, num_batches):
+        """Asking for more passes than angles is a caller bug, not something to round down.
 
-        The message is matched as well as the type, because the two bounds fail for
-        different reasons and silently swapping which one fired would hide a sign or
-        off-by-one error in the other.
+        The setting's own range rejects anything below one pass, so this is the only bound
+        the derivation has to enforce, and it depends on a system size the range cannot see.
         """
-        with pytest.raises(ValueError, match=match):
-            rotation_batch_size_for(num_orbitals, num_batches)
+        with pytest.raises(ValueError, match="num_batches must be at most"):
+            _rotation_batch_size(num_orbitals, num_batches)
+
+    def test_a_system_with_no_angles_to_stream_is_not_an_error(self):
+        """One orbital has no Givens angle, so the default must not fault on it.
+
+        ``num_batches = 1`` is the shipped default and has to stay legal at every system
+        size. The loader reads 0 as "keep the whole angle word resident", which is what an
+        empty word already is, so the degenerate shape resolves rather than raising.
+        """
+        assert _rotation_batch_size(1, 1) == 0
 
 
-class TestInnerPrepareSwapBitsSetting:
-    """The ``inner_prepare_swap_bits`` setting's contract, without paying for an estimate."""
+class TestMaxSwapBitsSetting:
+    """The ``max_swap_bits`` setting's contract, without paying for an estimate."""
 
     def test_it_defaults_to_letting_the_library_choose(self):
         """The knob must be opt-in: shipping it may not move anyone's existing numbers.
@@ -893,21 +897,21 @@ class TestInnerPrepareSwapBitsSetting:
         ``-1`` is the sentinel the Q# side already understood before this setting existed,
         so the default routes to exactly the same selector that was hard-coded there.
         """
-        assert SOSSAMapper().settings().get("inner_prepare_swap_bits") == -1
+        assert SOSSAMapper().settings().get("max_swap_bits") == -1
 
     @pytest.mark.parametrize("swap_bits", [-1, 0, 1, 2, 3, 30])
     def test_it_accepts_the_sentinel_and_real_widths(self, swap_bits):
-        """``-1`` auto, ``0`` plain select, and positive widths are all meaningful."""
-        ref = AlgorithmRef("circuit_mapper", "sossa", inner_prepare_swap_bits=swap_bits)
+        """``-1`` uncapped, ``0`` plain select, and positive widths are all meaningful."""
+        ref = AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)
 
-        assert ref.settings.get("inner_prepare_swap_bits") == swap_bits
+        assert ref.settings.get("max_swap_bits") == swap_bits
 
     @pytest.mark.parametrize("swap_bits", [-2, 31])
     def test_it_rejects_widths_outside_the_declared_range(self, swap_bits):
         """Below the sentinel is meaningless and far above it is certainly a mistake.
 
-        The Q# side clamps an over-wide request to the table instead of faulting, so this
+        A cap above what any selector would choose is inert rather than dangerous, so this
         bound is about catching nonsense early rather than about safety.
         """
         with pytest.raises(ValueError, match="out of allowed range"):
-            AlgorithmRef("circuit_mapper", "sossa", inner_prepare_swap_bits=swap_bits)
+            AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)

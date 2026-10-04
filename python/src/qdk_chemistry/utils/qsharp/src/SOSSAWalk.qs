@@ -75,6 +75,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         /// Only consulted when the angles are actually streamed; a resident angle word is
         /// already wide enough that no swap network fits.
         rotationLookupMethod : Int,
+        /// Ceiling on the swap width any QROAM in the walk may take. -1 leaves each loader's
+        /// own selector alone; 0 forces plain unary-iteration lookups; a positive value caps
+        /// whatever the selector would have chosen. Capping only reroutes identical data, so
+        /// it trades Toffolis for width and never touches the state prepared.
+        maxSwapBits : Int,
         /// Number of free-rider bits at the end of innerReg loaded by inner PREPARE QROM.
         /// Must be at least 2.
         /// Layout: [sf_vs_dq(1), d_vs_q(1), r_bits(⌈log₂ R⌉)].
@@ -867,13 +872,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             params.rotationLookupMethod,
             Length(sfData),
             Length(sfData[0]),
-            Length(dirty)
+            Length(dirty),
+            params.maxSwapBits
         );
         let dqSwapBits = RotationSwapWidth(
             params.rotationLookupMethod,
             Length(dqData),
             Length(dqData[0]),
-            Length(dirty)
+            Length(dirty),
+            params.maxSwapBits
         );
 
         use rotTarget = Qubit[m];
@@ -899,20 +906,23 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///
     /// Each method's own cost model decides, and each returns 0 when no network beats the plain
     /// lookup, so an unprofitable shape falls back to `Select` instead of paying for scratch or
-    /// borrowing it cannot use.
+    /// borrowing it cannot use. `maxSwapBits` then caps that choice: -1 leaves it alone, and any
+    /// other value is an upper bound, so the cap can only ever narrow the register.
     internal function RotationSwapWidth(
         lookupMethod : Int,
         numData : Int,
         numBits : Int,
         availableDirty : Int,
+        maxSwapBits : Int,
     ) : Int {
-        if lookupMethod == LookupSelectSwap() {
+        let selected = if lookupMethod == LookupSelectSwap() {
             ComputeOptimalSwapBits(numData, numBits)
         } elif lookupMethod == LookupDirtySelectSwap() {
             ComputeOptimalDirtySwapBits(numData, numBits, availableDirty)
         } else {
             0
-        }
+        };
+        if maxSwapBits < 0 { selected } else { MinI(selected, maxSwapBits) }
     }
 
     /// Controlled Majorana Operator on single qubit (arXiv:2502.15882v1, Fig. 4 / Appendix B.6).
@@ -968,15 +978,15 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///   innerReg — target register layout: indexReg[nIdx] + uniformReg[μ]
     ///              + flagQubit[1] + qromOutput[μ + nIdx + 2] + freeRiderReg[nFR]
     ///
-    /// `numSwapBits` is the QROAM swap width: -1 picks the Toffoli-optimal one, 0 forces a
-    /// plain unary-iteration load, and a positive value fixes it. The swap network allocates
-    /// scratch proportional to `2^k` times the loaded word, which is where a qubit-limited
-    /// caller wants a say -- see the setting description in the Python mapper.
+    /// `maxSwapBits` caps the QROAM swap width: -1 leaves the loader's own selector alone, 0
+    /// forces a plain unary-iteration load, and a positive value is an upper bound on whatever
+    /// the selector chose. The swap network allocates scratch proportional to `2^k` times the
+    /// loaded word, which is where a qubit-limited caller wants a say.
     function MakeInnerPrepareAliasSampling(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
-        numSwapBits : Int,
+        maxSwapBits : Int,
         lookupMethod : Int,
     ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj {
         let nCoeffs = Length(innerCoefficients[0]);
@@ -990,7 +1000,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // A swap network cannot be wider than the table it routes, and `SwappedLoadShape`
         // asserts as much. Clamp rather than fault, so an over-large request degrades to the
         // widest usable network instead of crashing inside Q#.
-        let swapBits = if numSwapBits > 0 { MinI(numSwapBits, nIndexBits) } else { numSwapBits };
+        let swapBits = if maxSwapBits > 0 { MinI(maxSwapBits, nIndexBits) } else { maxSwapBits };
         (outerReg, innerReg, dirty) => {
             let indexReg = innerReg[0..nIndexBits - 1];
             let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
@@ -1035,13 +1045,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// `SelectSwapCost2D` already covers one lookup/uncompute pair. One SOSSA block applies
     /// two inner PREPARE/uncompute pairs and, if split out, one free-rider lookup pair.
     ///
-    /// `numSwapBits` must match what the lookups will actually use, or this compares the cost
+    /// `maxSwapBits` must cap what the lookups will actually use, or this compares the cost
     /// of two layouts neither of which gets built.
     internal function ShouldLoadFreeRiderSeparately(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
-        numSwapBits : Int,
+        maxSwapBits : Int,
     ) : Bool {
         let numConditions = Length(innerCoefficients);
         let nIndexBits = MaxI(1, AddressQubits(Length(innerCoefficients[0])));
@@ -1049,19 +1059,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let numWordBits = coefficientBitPrecision + nIndexBits + 2;
         let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let inlineBits = numWordBits + numExtraBits;
-        // Matches the clamp in `MakeInnerPrepareAliasSampling`, so this compares the cost of
-        // the layouts that will actually be built.
-        let forcedLambda = MinI(MaxI(0, numSwapBits), nIndexBits);
-        let inlineLambda = if numSwapBits == -1 {
-            ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true)
-        } else {
-            forcedLambda
-        };
-        let separateLambda = if numSwapBits == -1 {
-            ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true)
-        } else {
-            forcedLambda
-        };
+        // Mirrors the cap in `MakeInnerPrepareAliasSampling`, including its clamp to the table's
+        // address width, so this compares the cost of the layouts that will actually be built.
+        let cap = MinI(MaxI(0, maxSwapBits), nIndexBits);
+        let inlineSelected = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
+        let separateSelected = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
+        let inlineLambda = if maxSwapBits < 0 { inlineSelected } else { MinI(inlineSelected, cap) };
+        let separateLambda = if maxSwapBits < 0 { separateSelected } else { MinI(separateSelected, cap) };
         let innerPreparePairsPerBlock = 2;
         let freeRiderPairsPerBlock = 1;
         let inlineCost = innerPreparePairsPerBlock * SelectSwapCost2D(
@@ -1091,7 +1095,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
-        numSwapBits : Int,
+        maxSwapBits : Int,
         lookupMethod : Int,
     ) : (
         ((Qubit[], Qubit[], Qubit[]) => Unit is Adj),
@@ -1101,7 +1105,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             innerCoefficients,
             freeRiderData,
             coefficientBitPrecision,
-            numSwapBits
+            maxSwapBits
         );
         let inlineData = if loadSeparately { [] } else { freeRiderData };
         let separateData = if loadSeparately { freeRiderData } else { [] };
@@ -1111,7 +1115,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 innerCoefficients,
                 inlineData,
                 coefficientBitPrecision,
-                numSwapBits,
+                maxSwapBits,
                 lookupMethod
             ),
             MakeFreeRiderLoadOp(separateData)
@@ -1291,13 +1295,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
-        numSwapBits : Int,
+        maxSwapBits : Int,
     ) : Bool {
         ShouldLoadFreeRiderSeparately(
             innerCoefficients,
             freeRiderData,
             coefficientBitPrecision,
-            numSwapBits
+            maxSwapBits
         )
     }
 

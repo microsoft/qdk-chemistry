@@ -18,7 +18,6 @@ from .base import CircuitMapper
 __all__: list[str] = [
     "SOSSAMapper",
     "SOSSAMapperSettings",
-    "rotation_batch_size_for",
 ]
 
 #: Maps the ``lookup_method`` setting onto the Q# ``Lookup*`` constants.
@@ -29,44 +28,44 @@ _LOOKUP_METHODS: dict[str, int] = {
 }
 
 
-def rotation_batch_size_for(num_orbitals: int, num_batches: int) -> int:
-    r"""Smallest ``rotation_batch_size`` that still streams the angles in ``num_batches`` passes.
+def _rotation_batch_size(num_orbitals: int, num_batches: int) -> int:
+    r"""Resolve ``num_batches`` passes into the :math:`\lambda` the Q# loader takes.
 
-    Choose the number of passes, not :math:`\lambda`. Streaming costs one extra table
-    lookup per batch in each direction, so its Toffoli penalty tracks the batch count
-    :math:`\lceil (N-1)/\lambda \rceil` rather than :math:`\lambda` itself. That makes the
-    penalty a step function: every :math:`\lambda` inside one step buys exactly the same
-    Toffolis, while the rotation register keeps growing at ``b_rot`` qubits per angle. Only
-    the smallest member of each step can be optimal, and that is what this returns.
+    Returns the smallest :math:`\lambda` that still streams in ``num_batches`` passes, which
+    is the only member of each step worth taking *on width*: the register grows at ``b_rot``
+    qubits per angle right across a step, so every wider member costs qubits for the same
+    number of passes.
 
-    Picking :math:`\lambda` directly is how callers pay width for nothing. At Fe2S2-20
-    (:math:`N = 20`, so 19 angles) :math:`\lambda = 16` and :math:`\lambda = 10` both make
-    two passes and cost an identical 60.3M Toffolis, but 16 costs 13 more qubits.
+    The choice is width-biased, not free. Toffoli cost is not flat across a step: the
+    per-batch table grows with :math:`\lambda` and the shared swap network re-optimises
+    against it, so cost sawtooths. At Fe2S2-20 both :math:`\lambda = 10` and
+    :math:`\lambda = 18` make two passes, but 18 costs 58.6M Toffolis against 10's 60.5M --
+    3.2% cheaper, for 91 more qubits. Counting batches deliberately gives up that trade,
+    because this code path exists to minimise width; a Toffoli-bound caller is better served
+    by fewer passes than by a wider batch inside the same pass count.
 
     Args:
-        num_orbitals: Number of spatial orbitals :math:`N`. SELECT holds :math:`N - 1`
-            Givens angles, so that is the number being split into batches.
-        num_batches: Number of passes over the angle table, from 1 to :math:`N - 1`. One
-            pass keeps every angle resident, which is the cheapest in Toffolis and the
-            widest in qubits; more passes trade the one against the other.
+        num_orbitals: Number of spatial orbitals :math:`N`; SELECT holds :math:`N - 1` angles.
+        num_batches: Number of passes over the angle table, from 1 to :math:`N - 1`.
 
     Returns:
-        The value to pass as the ``rotation_batch_size`` setting.
+        The :math:`\lambda` to hand to the Q# loader.
 
     Raises:
-        ValueError: If ``num_orbitals`` is below 2, or ``num_batches`` is outside
-            ``1..num_orbitals - 1``.
+        ValueError: If ``num_batches`` exceeds the :math:`N - 1` available angles.
 
     """
-    if num_orbitals < 2:
-        raise ValueError(f"num_orbitals must be at least 2 to hold a rotation angle, got {num_orbitals}")
-
     num_angles = num_orbitals - 1
-    if not 1 <= num_batches <= num_angles:
+    if num_angles < 1:
+        # Nothing to split. The loader reads 0 as "keep the whole angle word resident",
+        # which is what an empty word already is, so this stays legal rather than faulting
+        # on a system too small to have a rotation to stream.
+        return 0
+    if num_batches > num_angles:
         raise ValueError(
-            f"num_batches must be between 1 and {num_angles} for {num_orbitals} orbitals, got {num_batches}"
+            f"num_batches must be at most the {num_angles} rotation angles of a {num_orbitals}-orbital "
+            f"system, got {num_batches}"
         )
-
     return -(-num_angles // num_batches)
 
 
@@ -103,19 +102,16 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
-            "rotation_batch_size",
+            "num_batches",
             "int",
-            0,
-            "Number of Givens angles held in the rotation register at once (the SOSSA lambda). "
-            "0 keeps all N-1 angles resident, which is the cheapest in Toffolis. Smaller values "
-            "stream the angles in batches, cutting the rotation register to lambda*b_rot qubits "
-            "at the cost of one extra table lookup per batch, in each direction. The Toffoli "
-            "penalty follows the batch count, ceil((N-1)/lambda), so it is a step function of "
-            "lambda: every lambda within one step costs the same Toffolis while the register "
-            "keeps growing, making all but the smallest of them strictly wasteful. Choose the "
-            "number of batches and derive lambda with rotation_batch_size_for() rather than "
-            "setting lambda directly.",
-            (0, 4096),
+            1,
+            "Number of passes SELECT makes over the N-1 Givens angles. 1 keeps every angle "
+            "resident, which is the cheapest in Toffolis and the widest in qubits. More passes "
+            "shrink the rotation register to about (N-1)/num_batches angles, at one extra table "
+            "lookup per batch in each direction. Cost tracks the pass count, not the register "
+            "width, so this is the knob that moves cost monotonically; setting lambda directly "
+            "is how callers used to pay width for nothing.",
+            (1, 4096),
         )
         self._set_default(
             "lookup_method",
@@ -144,21 +140,16 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
-            "inner_prepare_swap_bits",
+            "max_swap_bits",
             "int",
             -1,
-            "Swap width k of the QROAM that loads the inner alias-sampling tables. -1 lets the "
-            "library pick, 0 forces a plain unary-iteration lookup, and a positive value fixes "
-            "k, clamped to the table's address width. The swap network allocates scratch "
-            "proportional to 2^k times the loaded word, and that word carries "
-            "'coefficient_bit_precision', so k multiplies the cost of every coefficient bit. "
-            "The default selector takes the narrowest width within a fifth of the Toffoli "
-            "optimum, which declines the last widening or two that the Toffoli minimum would "
-            "take; set k explicitly to get that minimum back. Lowering k by one is exact -- it "
-            "changes only how identical data is routed, never the state prepared -- which "
-            "makes it the one width knob here that costs no accuracy. Expect a modest Toffoli "
-            "increase in return, and re-derive 'rotation_batch_size' afterwards, since "
-            "narrowing PREPARE can put SELECT back on the critical path.",
+            "Ceiling on the swap width k of every QROAM in the walk -- the inner alias-sampling "
+            "tables and the streamed rotation batches alike. -1 leaves each loader's own "
+            "selector alone, 0 forces plain unary-iteration lookups everywhere, and a positive "
+            "value caps whatever the selector would have chosen. A swap network allocates "
+            "scratch proportional to 2^k times the loaded word, so this is the direct lever on "
+            "the widest stage. Capping is exact -- it changes only how identical data is "
+            "routed, never the state prepared -- so it costs Toffolis and no accuracy.",
             (-1, 30),
         )
 
@@ -248,7 +239,7 @@ class SOSSAMapper(CircuitMapper):
                 coefficients,
                 free_rider_data,
                 coeff_bits,
-                self._settings.get("inner_prepare_swap_bits"),
+                self._settings.get("max_swap_bits"),
                 self._lookup_method(),
             )
         if algorithm == "direct":
@@ -312,8 +303,11 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
-            "rotationBatchSize": int(self._settings.get("rotation_batch_size")),
+            "rotationBatchSize": _rotation_batch_size(
+                meta.num_spatial_orbitals, int(self._settings.get("num_batches"))
+            ),
             "rotationLookupMethod": lookup_method,
+            "maxSwapBits": int(self._settings.get("max_swap_bits")),
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }

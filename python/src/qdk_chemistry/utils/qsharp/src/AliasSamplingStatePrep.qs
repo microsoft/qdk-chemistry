@@ -388,19 +388,16 @@ namespace QDKChemistry.Utils.AliasSampling {
         // optimum sits at a different width than the clean one -- picking with the clean model
         // would overshoot -- and it is additionally capped by what the caller actually lent.
         let wantDirty = lookupMethod == LookupDirtySelectSwap() and Length(dirty) > 0;
-        let lambda = if lookupMethod == LookupSelect() {
+        let selected = if lookupMethod == LookupSelect() {
             0
-        } elif numSwapBits == -1 {
-            if wantDirty {
-                ComputeOptimalDirtySwapBits2D(nCond, nInnerData, m, true, Length(dirty))
-            } else {
-                ComputeOptimalLambda2D(nCond, nInnerData, m, true)
-            }
-        } elif numSwapBits > 0 {
-            numSwapBits
+        } elif wantDirty {
+            ComputeOptimalDirtySwapBits2D(nCond, nInnerData, m, true, Length(dirty))
         } else {
-            0
+            ComputeOptimalLambda2D(nCond, nInnerData, m, true)
         };
+        // A cap, not an override: it can narrow what the selector chose but never widen it, so
+        // no setting can ask for a network the cost model already rejected.
+        let lambda = if numSwapBits < 0 { selected } else { MinI(selected, numSwapBits) };
         // A lender too short for an explicitly requested width is a fallback, not a fault.
         let borrowable = wantDirty and lambda > 0
             and Length(dirty) >= DirtyQROAMBorrowedQubits(lambda, m);
