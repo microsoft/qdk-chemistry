@@ -800,10 +800,18 @@ class TestSOSSAResourceEstimation:
         return counts["numQubits"], counts["cczCount"] + counts["ccixCount"]
 
     def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs."""
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
+
+        The tolerance is here for estimator noise, not for absorbing design changes. It
+        once did the latter: the swap-width selector declining ``k = 3`` for ``k = 2``
+        moved this count by 193,078 Toffolis, and because the nominal value was left at
+        its pre-decline figure the assertion kept passing while naming a number the code
+        no longer produced. Re-measure and re-pin when a change moves it, rather than
+        letting the band hide the drift.
+        """
         num_qubits, toffoli_count = self._fe2s2_logical_counts()
 
-        assert toffoli_count == pytest.approx(42_558_509, rel=0.01)
+        assert toffoli_count == pytest.approx(42_751_587, rel=0.01)
         assert num_qubits == 486
 
     def test_fe2s2_streamed_logical_resource_estimate(self):
