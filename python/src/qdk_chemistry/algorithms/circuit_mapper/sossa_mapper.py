@@ -61,12 +61,12 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
-            "num_batches",
+            "num_givens_rotation_batches",
             "int",
             1,
             "Number of passes SELECT makes over the N-1 Givens angles. 1 is the cheapest in Toffolis "
             "and the widest in qubits. More passes shrink the rotation register to about "
-            "(N-1)/num_batches angles, at one extra table lookup per batch in each direction.",
+            "(N-1)/num_givens_rotation_batches angles, at one extra table lookup per batch in each direction.",
             (1, 4096),
         )
         self._set_default(
@@ -214,11 +214,11 @@ class SOSSAMapper(CircuitMapper):
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
         num_angles = max(meta.num_spatial_orbitals - 1, 0)
-        num_batches = int(self._settings.get("num_batches"))
-        if 0 < num_angles < num_batches:
+        num_givens_rotation_batches = int(self._settings.get("num_givens_rotation_batches"))
+        if 0 < num_angles < num_givens_rotation_batches:
             raise ValueError(
-                f"num_batches must be at most the {num_angles} rotation angles of a "
-                f"{meta.num_spatial_orbitals}-orbital system, got {num_batches}"
+                f"num_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
+                f"{meta.num_spatial_orbitals}-orbital system, got {num_givens_rotation_batches}"
             )
 
         select_data = {
@@ -230,8 +230,8 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
-            # Smallest lambda making num_batches passes; a wider one costs width for the same passes.
-            "rotationBatchSize": -(-num_angles // num_batches),
+            # Smallest lambda making num_givens_rotation_batches passes; a wider one costs width for the same passes.
+            "rotationBatchSize": -(-num_angles // num_givens_rotation_batches),
             "borrowDirty": self._borrow_dirty,
             "maxSwapBits": self._max_swap_bits,
             "numFreeRiderBits": num_free_rider_bits,

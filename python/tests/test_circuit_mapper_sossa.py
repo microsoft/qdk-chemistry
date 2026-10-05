@@ -831,14 +831,14 @@ class TestSOSSAWalkLogicalCounts:
         )
 
 
-class TestNumBatchesSetting:
-    """The ``num_batches`` setting's one bound the settings range cannot see."""
+class TestNumGivensRotationBatchesSetting:
+    """The ``num_givens_rotation_batches`` setting's one bound the settings range cannot see."""
 
     def test_it_rejects_more_passes_than_there_are_angles(self):
         """Two passes over N = 2's single angle would otherwise clamp silently to one."""
         mapper = _make_sossa_mapper()
-        mapper.settings().set("num_batches", 2)
-        with pytest.raises(ValueError, match="num_batches must be at most"):
+        mapper.settings().set("num_givens_rotation_batches", 2)
+        with pytest.raises(ValueError, match="num_givens_rotation_batches must be at most"):
             mapper.run(_build_sossa_unitary(num_orbitals=2))
 
 
