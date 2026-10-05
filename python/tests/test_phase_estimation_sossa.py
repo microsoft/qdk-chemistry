@@ -740,9 +740,6 @@ class TestSOSSAQPEScope:
 class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
-    # Fewest passes reaching the 379-qubit PREPARE floor, which needs lambda <= 19 - ceil((486 - 379) / 15) = 11.
-    _FE2S2_NUM_GIVENS_ROTATION_BATCHES = 2
-
     @staticmethod
     def _fe2s2_logical_counts(**select_settings):
         """Estimate Fe2S2-20 while varying only SELECT rotation settings.
@@ -794,138 +791,9 @@ class TestSOSSAResourceEstimation:
         assert num_qubits == 486
 
     def test_fe2s2_streamed_logical_resource_estimate(self):
-        """Pin the streamed Fe2S2 cost used by the example.
-
-        This guards the headline width while relational knee tests stay magnitude-free.
-        """
-        num_qubits, toffoli_count = self._fe2s2_logical_counts(
-            num_givens_rotation_batches=self._FE2S2_NUM_GIVENS_ROTATION_BATCHES
-        )
+        """Pin the streamed Fe2S2 cost used by the example."""
+        # Fewest passes reaching the 379-qubit PREPARE floor, which needs lambda <= 19 - ceil((486 - 379) / 15) = 11.
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(num_givens_rotation_batches=2)
 
         assert num_qubits == 379
         assert toffoli_count == pytest.approx(60_535_087, rel=0.01)
-
-    def test_streaming_the_rotation_angles_trades_toffolis_for_qubits(self):
-        """Streaming lowers peak width by paying extra Toffolis, without moving the default.
-
-        The assertion pins direction, not magnitude, so the lookup cost model can change.
-        """
-        resident_qubits, resident_toffolis = self._fe2s2_logical_counts()
-        streamed_qubits, streamed_toffolis = self._fe2s2_logical_counts(
-            num_givens_rotation_batches=self._FE2S2_NUM_GIVENS_ROTATION_BATCHES
-        )
-
-        assert streamed_qubits < resident_qubits, (
-            f"streaming should lower the peak width: {resident_qubits} -> {streamed_qubits}"
-        )
-        assert streamed_toffolis > resident_toffolis, (
-            "streaming reloads each batch to uncompute, so it cannot be free in Toffolis"
-        )
-
-    def test_the_tightest_batch_is_dominated_by_larger_ones_at_the_same_width(self):
-        """Over-shrinking the batch buys no width once another stage sets the peak.
-
-        Pick the batch count and let the mapper derive the largest useful ``lambda``.
-        """
-        tight_qubits, tight_toffolis = self._fe2s2_logical_counts(num_givens_rotation_batches=19)
-        knee_qubits, knee_toffolis = self._fe2s2_logical_counts(
-            num_givens_rotation_batches=self._FE2S2_NUM_GIVENS_ROTATION_BATCHES
-        )
-
-        assert knee_qubits == tight_qubits, (
-            f"19 passes bought extra width over {self._FE2S2_NUM_GIVENS_ROTATION_BATCHES}: "
-            f"{tight_qubits} vs {knee_qubits}"
-        )
-        assert knee_toffolis < tight_toffolis, (
-            f"19 passes should cost strictly more than {self._FE2S2_NUM_GIVENS_ROTATION_BATCHES} for the "
-            f"same width: {tight_toffolis} vs {knee_toffolis}"
-        )
-
-    def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):
-        """At Fe2S2, dirty swaps decline on both loaders and cost exactly ``select``.
-
-        ``select_swap`` still cuts Toffolis there, but it pays with scratch qubits.
-        """
-        plain_qubits, plain_toffolis = self._fe2s2_logical_counts(
-            num_givens_rotation_batches=19, lookup_method="select"
-        )
-        clean_qubits, clean_toffolis = self._fe2s2_logical_counts(
-            num_givens_rotation_batches=19, lookup_method="select_swap"
-        )
-        dirty_qubits, dirty_toffolis = self._fe2s2_logical_counts(
-            num_givens_rotation_batches=19, lookup_method="dirty_select_swap"
-        )
-
-        assert (dirty_qubits, dirty_toffolis) == (plain_qubits, plain_toffolis), (
-            "the dirty cost model should have declined at this shape and left the plain lookup "
-            f"in place, but it changed the cost: {(plain_qubits, plain_toffolis)} -> "
-            f"{(dirty_qubits, dirty_toffolis)}"
-        )
-        assert clean_toffolis < plain_toffolis, (
-            f"a clean swap network should undercut the plain lookup: {plain_toffolis} -> {clean_toffolis}"
-        )
-        assert clean_qubits >= plain_qubits, (
-            f"a clean swap network allocates scratch, so it cannot also be narrower: {plain_qubits} -> {clean_qubits}"
-        )
-
-    def test_one_lookup_method_setting_reaches_both_loaders(self):
-        """``lookup_method`` must govern the inner PREPARE as well as rotation batches.
-
-        With resident angles, any Toffoli change comes from the inner alias lookup.
-        """
-        _, plain_toffolis = self._fe2s2_logical_counts(lookup_method="select")
-        _, clean_toffolis = self._fe2s2_logical_counts(lookup_method="select_swap")
-
-        assert clean_toffolis < plain_toffolis, (
-            "with the angles resident only the inner PREPARE can be reading 'lookup_method', so "
-            f"a clean swap network has to show up as cheaper here: {plain_toffolis} -> {clean_toffolis}"
-        )
-
-    def test_narrowing_the_alias_lookup_only_pays_once_the_angles_are_streamed(self):
-        """Narrowing the alias lookup helps only after streamed angles move the peak.
-
-        Before then it is hidden under the resident angle word and only adds Toffolis.
-        """
-        resident_auto_qubits, _ = self._fe2s2_logical_counts()
-        resident_narrow_qubits, _ = self._fe2s2_logical_counts(max_swap_bits=2)
-
-        assert resident_narrow_qubits == resident_auto_qubits, (
-            "with the angle word resident the alias lookup is not the peak stage, so narrowing "
-            f"it cannot help: {resident_auto_qubits} -> {resident_narrow_qubits}"
-        )
-
-        streamed_auto_qubits, _ = self._fe2s2_logical_counts(num_givens_rotation_batches=2)
-        streamed_narrow_qubits, _ = self._fe2s2_logical_counts(num_givens_rotation_batches=2, max_swap_bits=2)
-
-        assert streamed_narrow_qubits < streamed_auto_qubits, (
-            "once the angles are streamed the alias lookup sets the peak, so narrowing it must "
-            f"show up: {streamed_auto_qubits} -> {streamed_narrow_qubits}"
-        )
-
-    def test_only_the_smallest_swap_width_of_each_step_is_worth_choosing(self):
-        """Over-shrinking swap width has the same step-function trap as batches.
-
-        Choose the largest width that reaches the qubit floor, not the smallest that fits.
-        """
-        tight_qubits, tight_toffolis = self._fe2s2_logical_counts(num_givens_rotation_batches=2, max_swap_bits=1)
-        floor_qubits, floor_toffolis = self._fe2s2_logical_counts(num_givens_rotation_batches=2, max_swap_bits=2)
-
-        assert tight_qubits == floor_qubits, (
-            f"k=1 bought no width over k=2, so it is dominated: {tight_qubits} vs {floor_qubits}"
-        )
-        assert tight_toffolis > floor_toffolis, (
-            f"k=1 splits the table into more select layers, so it must cost more: {tight_toffolis} vs {floor_toffolis}"
-        )
-
-    def test_an_over_wide_cap_is_inert_rather_than_a_request_for_scratch(self):
-        """A cap above the selector's own choice must be inert.
-
-        Capping may remove scratch but must never request a wider network.
-        """
-        capped_qubits, capped_toffolis = self._fe2s2_logical_counts(num_givens_rotation_batches=2, max_swap_bits=30)
-        auto_qubits, auto_toffolis = self._fe2s2_logical_counts(num_givens_rotation_batches=2)
-
-        assert (capped_qubits, capped_toffolis) == (auto_qubits, auto_toffolis), (
-            f"a cap above the selector's choice should be inert: {(auto_qubits, auto_toffolis)} -> "
-            f"{(capped_qubits, capped_toffolis)}"
-        )

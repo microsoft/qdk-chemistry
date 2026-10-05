@@ -845,25 +845,12 @@ class TestNumGivensRotationBatchesSetting:
 class TestMaxSwapBitsSetting:
     """The ``max_swap_bits`` setting's contract, without paying for an estimate."""
 
-    def test_it_defaults_to_letting_the_library_choose(self):
-        """The setting stays opt-in by preserving the Q# sentinel default.
-
-        ``-1`` routes to the library's existing selector choice.
-        """
+    def test_it_defaults_to_the_sentinel_and_accepts_only_the_declared_range(self):
+        """``-1`` (uncapped) is the default, ``0`` is plain select, and widths outside ``[-1, 30]`` are rejected."""
         assert SOSSAMapper().settings().get("max_swap_bits") == -1
-
-    @pytest.mark.parametrize("swap_bits", [-1, 0, 1, 2, 3, 30])
-    def test_it_accepts_the_sentinel_and_real_widths(self, swap_bits):
-        """``-1`` uncapped, ``0`` plain select, and positive widths are all meaningful."""
-        ref = AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)
-
-        assert ref.settings.get("max_swap_bits") == swap_bits
-
-    @pytest.mark.parametrize("swap_bits", [-2, 31])
-    def test_it_rejects_widths_outside_the_declared_range(self, swap_bits):
-        """Reject nonsense below the sentinel or far above any useful cap.
-
-        Oversized caps are inert, so this bound catches mistakes rather than protecting Q#.
-        """
-        with pytest.raises(ValueError, match="out of allowed range"):
-            AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)
+        for swap_bits in (-1, 0, 1, 2, 3, 30):
+            ref = AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)
+            assert ref.settings.get("max_swap_bits") == swap_bits
+        for swap_bits in (-2, 31):
+            with pytest.raises(ValueError, match="out of allowed range"):
+                AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)

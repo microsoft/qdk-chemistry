@@ -273,122 +273,66 @@ class TestSelectSwap2DBorrowedMatchesClean:
 class TestSelectSwapDirtyCostModel:
     """The width is chosen by cost, so the cost model is what decides if borrowing happens."""
 
-    def test_width_zero_costs_the_plain_lookup(self):
-        """Zero swap bits must mean the plain lookup, not a one-block swap network.
-
-        Otherwise the fake baseline makes every swap width look cheaper.
-        """
+    def test_select_swap_dirty_cost_1d(self):
+        """Width 0 is the plain lookup; every wider width is the reference ``2*ceil(d/K) + 4b(K-1)``, less 2."""
         cost = _select_swap_dirty_ns().SelectSwapDirtyCost1D
         for num_data in (8, 15, 224, 864):
             assert cost(0, num_data, 10) == num_data - 1
 
-    @pytest.mark.parametrize(("num_data", "num_bits"), [(90, 15), (224, 15), (100, 8), (1000, 20), (4095, 8)])
-    def test_the_cost_tracks_the_reference_formula_at_every_width(self, num_data, num_bits):
-        """Each pass addresses ``ceil(d/K)`` rows, not the padded table height.
+        # (90, 15) is Fe2S2's inner PREPARE, just above 2^6 where padded-height chunking overcharges.
+        for num_data, num_bits in [(90, 15), (224, 15), (100, 8), (1000, 20), (4095, 8)]:
+            for num_swap_bits in range(1, math.ceil(math.log2(num_data)) + 1):
+                block = 1 << num_swap_bits
+                reference = 2 * math.ceil(num_data / block) + 4 * num_bits * (block - 1)
+                assert cost(num_swap_bits, num_data, num_bits) == reference - 2, (
+                    f"width {num_swap_bits} on a {num_data}x{num_bits} table should cost "
+                    f"{reference - 2}, got {cost(num_swap_bits, num_data, num_bits)}"
+                )
 
-        The ``- 2`` keeps the unary-iteration cost exactly aligned with the reference bound.
-        """
-        cost = _select_swap_dirty_ns().SelectSwapDirtyCost1D
-        for num_swap_bits in range(1, math.ceil(math.log2(num_data)) + 1):
-            block = 1 << num_swap_bits
-            reference = 2 * math.ceil(num_data / block) + 4 * num_bits * (block - 1)
-            assert cost(num_swap_bits, num_data, num_bits) == reference - 2, (
-                f"width {num_swap_bits} on a {num_data}x{num_bits} table should cost "
-                f"{reference - 2}, got {cost(num_swap_bits, num_data, num_bits)}"
-            )
-
-    def test_the_fe2s2_inner_shape_costs_what_the_reference_charges(self):
-        """Pin the overcharge shape so a padding regression names itself.
-
-        Here ``d = 90`` sits just above ``2^6``, where padded-height chunking overcharges.
-        """
-        select_cost = 2 * (math.ceil(90 / 4) - 1)
-        butterfly_cost = 4 * 15 * (4 - 1)
-
-        assert (select_cost, butterfly_cost) == (44, 180)
-        assert _select_swap_dirty_ns().SelectSwapDirtyCost1D(2, 90, 15) == select_cost + butterfly_cost
-
-    @pytest.mark.parametrize(("num_data", "num_bits"), [(20, 15), (224, 15), (64, 10)])
-    def test_short_tables_decline_to_borrow(self, num_data, num_bits):
-        """Short tables must decline borrowing when the swap network cannot win.
-
-        Fe2S2's 224-row, 15-bit angle table sits below the `numData > 32 * numBits` crossover.
-        """
-        assert _select_swap_dirty_ns().ComputeOptimalDirtySwapBits(num_data, num_bits, 4096) == 0
-
-    @pytest.mark.parametrize(("num_data", "num_bits"), [(864, 10), (2048, 8)])
-    def test_tall_tables_borrow_and_come_out_ahead(self, num_data, num_bits):
-        """Where the crossover is cleared the chosen width must actually beat the plain lookup."""
+    def test_compute_optimal_dirty_swap_bits(self):
+        """Borrows only past the crossover, then beats the plain lookup without overdrawing the budget."""
         select_swap = _select_swap_dirty_ns()
-        width = select_swap.ComputeOptimalDirtySwapBits(num_data, num_bits, 4096)
+        # Fe2S2's 224-row, 15-bit angle table sits below the ``numData > 32 * numBits`` crossover.
+        for num_data, num_bits in [(20, 15), (224, 15), (64, 10)]:
+            assert select_swap.ComputeOptimalDirtySwapBits(num_data, num_bits, 4096) == 0
 
-        assert width > 0
-        assert select_swap.SelectSwapDirtyCost1D(width, num_data, num_bits) < num_data - 1
+        for num_data, num_bits in [(864, 10), (2048, 8)]:
+            width = select_swap.ComputeOptimalDirtySwapBits(num_data, num_bits, 4096)
+            assert width > 0
+            assert select_swap.SelectSwapDirtyCost1D(width, num_data, num_bits) < num_data - 1
 
-    def test_a_tight_dirty_budget_forces_the_plain_lookup(self):
-        """Borrowing is only legal for qubits that exist; a short budget must fall back, not overdraw."""
-        select_swap = _select_swap_dirty_ns()
         unconstrained = select_swap.ComputeOptimalDirtySwapBits(864, 10, 4096)
-        assert unconstrained > 0
         assert select_swap.SelectSwapDirtyBorrowedQubits(unconstrained, 10) > 10
-
         assert select_swap.ComputeOptimalDirtySwapBits(864, 10, 10) == 0
-
-    def test_the_chosen_width_fits_the_budget_it_was_given(self):
-        """Every budget must yield a width that borrows within it.
-
-        Sweeping from zero catches rules that only clamp one end.
-        """
-        select_swap = _select_swap_dirty_ns()
         for available in (0, 10, 40, 80, 160, 640):
             width = select_swap.ComputeOptimalDirtySwapBits(864, 10, available)
-            assert select_swap.SelectSwapDirtyBorrowedQubits(width, 10) <= available or width == 0
+            assert width == 0 or select_swap.SelectSwapDirtyBorrowedQubits(width, 10) <= available
 
 
 class TestCleanSelectSwapForwardCostModel:
     """The clean network is chosen for a load that is erased by measurement, not by its adjoint."""
 
-    def test_width_zero_costs_the_plain_lookup(self):
-        """Zero swap bits means no network at all, so the baseline is the plain unary iteration."""
-        cost = _select_swap_ns().SelectSwapForwardCost
-        for num_data in (8, 15, 224, 864):
-            assert cost(0, num_data, 10) == num_data - 1
-
-    def test_the_forward_cost_is_cheaper_than_the_compute_uncompute_model(self):
-        """Pricing only the forward pass is why this model exists.
-
-        A streamed batch is erased by measurement, so swap-network uncompute is not charged.
-        """
+    def test_select_swap_forward_cost(self):
+        """Width 0 is the plain lookup; wider widths undercut ``SelectSwapCost1D``, which also prices uncompute."""
         select_swap = _select_swap_ns()
+        for num_data in (8, 15, 224, 864):
+            assert select_swap.SelectSwapForwardCost(0, num_data, 10) == num_data - 1
         for width in (1, 2, 3):
             assert select_swap.SelectSwapForwardCost(width, 224, 15) < select_swap.SelectSwapCost1D(width, 224, 15)
 
-    @pytest.mark.parametrize(("num_data", "num_bits"), [(224, 15), (64, 10), (864, 10), (32, 4)])
-    def test_the_chosen_width_beats_the_plain_lookup(self, num_data, num_bits):
-        """A clean network has no borrowing threshold: allocated scratch always buys Toffolis."""
+    def test_compute_optimal_swap_bits(self):
+        """Picks the true argmin over every width, which beats the plain lookup unless the word is too wide."""
         select_swap = _select_swap_ns()
-        width = select_swap.ComputeOptimalSwapBits(num_data, num_bits)
-
-        assert width > 0
-        assert select_swap.SelectSwapForwardCost(width, num_data, num_bits) < num_data - 1
-
-    @pytest.mark.parametrize(("num_data", "num_bits"), [(224, 15), (64, 10), (864, 10)])
-    def test_the_chosen_width_is_the_optimum_over_every_width(self, num_data, num_bits):
-        """The scan must be a true argmin, not merely an improvement over the baseline."""
-        select_swap = _select_swap_ns()
-        address_bits = math.ceil(math.log2(num_data))
-        chosen = select_swap.ComputeOptimalSwapBits(num_data, num_bits)
-        best = min(select_swap.SelectSwapForwardCost(k, num_data, num_bits) for k in range(address_bits + 1))
-
-        assert select_swap.SelectSwapForwardCost(chosen, num_data, num_bits) == best
-
-    def test_a_wide_word_against_a_short_table_declines_the_network(self):
-        """Scratch costs ``numBits * (2^k - 1)``, so a wide word can make every width a loss."""
-        select_swap = _select_swap_ns()
-
+        for num_data, num_bits in [(224, 15), (64, 10), (864, 10), (32, 4)]:
+            chosen = select_swap.ComputeOptimalSwapBits(num_data, num_bits)
+            address_bits = math.ceil(math.log2(num_data))
+            best = min(select_swap.SelectSwapForwardCost(k, num_data, num_bits) for k in range(address_bits + 1))
+            assert select_swap.SelectSwapForwardCost(chosen, num_data, num_bits) == best
+            assert best < num_data - 1
+        # Scratch costs ``numBits * (2^k - 1)``, so a wide word against a short table loses at every width.
         assert select_swap.ComputeOptimalSwapBits(4, 64) == 0
 
-    def test_the_scratch_cost_is_reported_for_the_width_that_was_chosen(self):
+    def test_select_swap_scratch_qubits(self):
         """The Toffoli saving is only half the trade; callers need the width it is bought with."""
         select_swap = _select_swap_ns()
         width = select_swap.ComputeOptimalSwapBits(224, 15)
