@@ -54,37 +54,6 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
-            "num_batches",
-            "int",
-            1,
-            "Number of passes SELECT makes over the N-1 Givens angles. 1 keeps every angle "
-            "resident, which is the cheapest in Toffolis and the widest in qubits. More passes "
-            "shrink the rotation register to about (N-1)/num_batches angles, at one extra table "
-            "lookup per batch in each direction. Cost tracks the pass count, not the register "
-            "width, so this is the knob that moves cost monotonically; setting lambda directly "
-            "is how callers used to pay width for nothing.",
-            (1, 4096),
-        )
-        self._set_default(
-            "lookup_method",
-            "string",
-            "select_swap",
-            "How every QROM table in the walk is routed. One choice governs both lookups -- the "
-            "streamed rotation batches and the inner alias-sampling tables -- because they draw "
-            "on the same budget and a caller who is short of qubits is short of them everywhere. "
-            "'select' is a plain unary-iteration lookup: no extra qubits, Toffoli cost one per "
-            "table row. 'select_swap' is a clean QROAM that cuts those Toffolis but allocates "
-            "scratch proportional to 2^k times the loaded word. 'dirty_select_swap' runs the "
-            "same network on borrowed qubits that are provably idle across the load, so it costs "
-            "no width at all, but it runs Select twice and the butterfly four times and so pays "
-            "roughly two to three times the Toffolis of the clean network at equal width. "
-            "Every method falls back to a plain lookup at shapes where its own cost model says "
-            "no network pays, so naming one can only ever spend qubits that buy something. "
-            "Borrowing in particular only undercuts a plain lookup on tables large relative to "
-            "the loaded word, roughly numData > 32 * numBits.",
-            ["select", "select_swap", "dirty_select_swap"],
-        )
-        self._set_default(
             "coefficient_bit_precision",
             "int",
             10,
@@ -92,16 +61,33 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
+            "num_batches",
+            "int",
+            1,
+            "Number of passes SELECT makes over the N-1 Givens angles. 1 is the cheapest in Toffolis "
+            "and the widest in qubits. More passes shrink the rotation register to about "
+            "(N-1)/num_batches angles, at one extra table lookup per batch in each direction.",
+            (1, 4096),
+        )
+        self._set_default(
+            "lookup_method",
+            "string",
+            "select_swap",
+            "How every QROM table in the walk is routed, including the Givens rotation tables and the "
+            "inner alias-sampling tables. 'select' is a plain unary-iteration lookup; 'select_swap' is "
+            "a clean QROAM that cuts Toffolis but allocates scratch. 'dirty_select_swap' runs the same "
+            "network on borrowed dirty qubits that are provably idle across the load, so it costs no "
+            "width at all, but it pays roughly two to three times the Toffolis of the clean network at "
+            "equal width. Every method falls back to a plain lookup at shapes where its own cost model "
+            "says no network pays.",
+            ["select", "select_swap", "dirty_select_swap"],
+        )
+        self._set_default(
             "max_swap_bits",
             "int",
             -1,
-            "Ceiling on the swap width k of every QROAM in the walk -- the inner alias-sampling "
-            "tables and the streamed rotation batches alike. -1 leaves each loader's own "
-            "selector alone, 0 forces plain unary-iteration lookups everywhere, and a positive "
-            "value caps whatever the selector would have chosen. A swap network allocates "
-            "scratch proportional to 2^k times the loaded word, so this is the direct lever on "
-            "the widest stage. Capping is exact -- it changes only how identical data is "
-            "routed, never the state prepared -- so it costs Toffolis and no accuracy.",
+            "Ceiling on the swap width k of every QROAM in the walk. -1 leaves each loader's own "
+            "selector alone, 0 forces plain select, and a positive value caps the swap bits.",
             (-1, 30),
         )
 
