@@ -64,9 +64,10 @@ class SOSSAMapperSettings(Settings):
             "num_givens_rotation_batches",
             "int",
             1,
-            "Number of passes SELECT makes over the N-1 Givens angles. 1 is the cheapest in Toffolis "
-            "and the widest in qubits. More passes shrink the rotation register to about "
-            "(N-1)/num_givens_rotation_batches angles, at one extra table lookup per batch in each direction.",
+            "Maximum number of passes SELECT makes over the N-1 Givens angles. 1 is the cheapest in Toffolis "
+            "and the widest in qubits. More passes shrink the rotation register to "
+            "ceil((N-1)/num_givens_rotation_batches) angles, at one extra table lookup per batch in each direction. "
+            "SELECT makes the fewest passes that register allows, which can be fewer than requested.",
             (1, 4096),
         )
         self._set_default(
@@ -230,7 +231,7 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
-            # Smallest lambda making num_givens_rotation_batches passes; a wider one costs width for the same passes.
+            # Narrowest lambda within num_givens_rotation_batches passes; 6 on 19 angles gives lambda 4, so 5 passes.
             "rotationBatchSize": -(-num_angles // num_givens_rotation_batches),
             "borrowDirty": self._borrow_dirty,
             "maxSwapBits": self._max_swap_bits,
