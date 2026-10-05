@@ -239,10 +239,77 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - int
      - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
 
+.. _mps-sequential:
+
+MPS Sequential
+~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"mps_sequential"``
+
+This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` one site at a time, following :cite:`Berry2025`.
+A site with the physical basis ``('0', 'u', 'd', '2')`` is a spatial orbital and is loaded onto the α and β qubits of that orbital in the blocked Jordan-Wigner layout (all α modes, then all β modes).
+A site with the physical basis ``('0', '1')`` is a single spinless mode and is loaded onto one qubit in the Jordan-Wigner layout.
+An ancilla register of :math:`\lceil \log_2 \chi \rceil` qubits carries the virtual bond of maximal dimension :math:`\chi`.
+Every site unitary acts on the qubits of its site and the full ancilla register. It is factored as in Appendix B of :cite:`Rupprecht2026` and synthesized from Givens rotation layers whose angles are loaded with QROM and applied through phase gradient rotations.
+A site with four physical states needs three uniformly controlled rotations and two mixing unitaries, while a site with two physical states needs one rotation and no mixing unitaries.
+MPS basis states are read with the modes of each site created in chain order, α before β, the usual DMRG convention.
+A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order, so the circuit matches the library's blocked Jordan-Wigner encoding.
+
+.. rubric:: Requirements
+
+The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, one site per molecular orbital (active spaces with inactive orbitals are not supported), and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``rotation_bits``
+     - int
+     - Size of the phase gradient register, which sets the precision of every rotation angle. Default is 10.
+   * - ``fast_resource_estimation``
+     - bool
+     - Replace the site decompositions with placeholder data that has the same gate structure. The circuit then supports resource estimation only and does not prepare the state, but it avoids densifying and decomposing large site tensors. The qubit count is exact. For the ``('0', '1')`` basis the Toffoli count is an upper bound, because sites whose bonds are smaller than the ancilla register, typically near the chain ends, need fewer Givens layers. Default is ``False``.
+
+.. _mps-sparse:
+
+MPS Sparse
+~~~~~~~~~~
+
+.. rubric:: Factory name: ``"mps_sparse"``
+
+This method prepares the same class of MPS as `MPS Sequential`_ but exploits the block sparsity that particle-number and spin symmetries induce in the site tensors, following :cite:`Rupprecht2026`.
+Each site unitary is factored as :math:`P_{\mathrm{row}} V P_{\mathrm{col}}`, where :math:`V` is block diagonal and :math:`P_{\mathrm{row}}` and :math:`P_{\mathrm{col}}` are permutations.
+Each permutation loads the permuted index into a fresh register with a table lookup and swaps it with the original register.
+The register then holds the inverse image of the new index, which is erased by measurement: it is measured in the X basis and the resulting signs are undone with a phase lookup, so the erasure costs :math:`O(\sqrt{N})` Toffoli gates for :math:`N` basis states instead of a second lookup.
+Each block of :math:`V` is synthesized from Givens rotation layers, so the cost is governed by the symmetry block sizes rather than the full bond dimension.
+
+.. rubric:: Requirements
+
+The requirements are the same as for `MPS Sequential`_.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``rotation_bits``
+     - int
+     - Size of the phase gradient register, which sets the precision of every rotation angle. Default is 10.
+
 Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.Wavefunction`: Input wavefunction for circuit construction
+- :class:`~qdk_chemistry.data.MPSContainer`: Matrix product state input for the MPS-based methods
 - :class:`~qdk_chemistry.data.Circuit`: Output circuit that prepares the wavefunction on qubits
 
 Further reading
