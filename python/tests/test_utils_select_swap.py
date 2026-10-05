@@ -284,6 +284,43 @@ class TestDirtyQROAMCostModel:
         for num_data in (8, 15, 224, 864):
             assert cost(0, num_data, 10) == num_data - 1
 
+    @pytest.mark.parametrize(("num_data", "num_bits"), [(90, 15), (224, 15), (100, 8), (1000, 20), (4095, 8)])
+    def test_the_cost_tracks_the_reference_formula_at_every_width(self, num_data, num_bits):
+        """Each pass must address ``ceil(d/K)`` rows, not the padded height ``2^ceil(lg d)``.
+
+        Chunking the table by stride instead of by contiguous block pins it to the full padded
+        height, because a strided select field is ``a % 2^(n-k)`` and so runs over every residue
+        as soon as ``d > 2^(n-k)``. Nothing relational can see that: the cost stays monotone in
+        the width, still declines on short tables, and still beats the plain lookup wherever it
+        claims to. It is only wrong against the *reference*, and only for a table far from a
+        power of two -- at ``d = 90, K = 4`` it charged 62 Toffolis of ``Select`` against
+        :cite:`Berry2019`'s 46, a 35% overcharge on the one term the width search minimises.
+
+        The ``- 2`` is not slack: ``ceil(d/K) - 1`` is the exact unary-iteration cost where the
+        reference quotes the bound ``ceil(d/K)``, once per pass.
+        """
+        cost = _select_swap_dirty_ns().DirtyQROAMCost
+        for num_swap_bits in range(1, math.ceil(math.log2(num_data)) + 1):
+            block = 1 << num_swap_bits
+            reference = 2 * math.ceil(num_data / block) + 4 * num_bits * (block - 1)
+            assert cost(num_swap_bits, num_data, num_bits) == reference - 2, (
+                f"width {num_swap_bits} on a {num_data}x{num_bits} table should cost "
+                f"{reference - 2}, got {cost(num_swap_bits, num_data, num_bits)}"
+            )
+
+    def test_the_fe2s2_inner_shape_costs_what_the_reference_charges(self):
+        """One magnitude pin on the shape the overcharge was found at, so a regression names itself.
+
+        ``d = 90`` is the worst case for padding: it sits just above ``2^6``, so a strided table
+        is rounded all the way to ``2^7`` rows and charges nearly 40% more ``Select`` than the
+        90 rows that exist.
+        """
+        select_cost = 2 * (math.ceil(90 / 4) - 1)
+        butterfly_cost = 4 * 15 * (4 - 1)
+
+        assert (select_cost, butterfly_cost) == (44, 180)
+        assert _select_swap_dirty_ns().DirtyQROAMCost(2, 90, 15) == select_cost + butterfly_cost
+
     @pytest.mark.parametrize(("num_data", "num_bits"), [(20, 15), (224, 15), (64, 10)])
     def test_short_tables_decline_to_borrow(self, num_data, num_bits):
         """Below roughly ``numData > 32 * numBits`` a swap network cannot win, so it is refused.

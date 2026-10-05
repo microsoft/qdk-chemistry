@@ -196,20 +196,24 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     /// charged separately, as for `SelectSwap2D`).
     ///
     /// At width 0 the load is a single plain `Select`, whose unary iteration over `numData`
-    /// rows costs `numData - 1`. Widths above that are two `Select` passes over `2^(n-k)`
-    /// aliased rows plus four butterflies of `numBits * (2^k - 1)` controlled swaps, which is
-    /// the structure of `2*ceil(d/K) + 4*b*(K-1)` in :cite:`Berry2019` (Appendix A, Theorem 1).
+    /// rows costs `numData - 1`. Widths above that are two `Select` passes over `ceil(d/K)`
+    /// aliased rows plus four butterflies of `numBits * (K - 1)` controlled swaps, for
+    /// `K = 2^numSwapBits` -- the structure of `2*ceil(d/K) + 4*b*(K-1)` in :cite:`Berry2019`
+    /// (Appendix A, Theorem 1).
     ///
-    /// The butterfly term is theirs exactly. The `Select` term is deliberately not: it is
-    /// `2*(2^(n-k) - 1)` rather than `2*ceil(d/K)`, which differs in two ways that pull in
-    /// opposite directions. The `-1` per pass is the exact unary-iteration cost rather than
-    /// their bound, so a power-of-two table costs 2 Toffolis less here than their formula
-    /// quotes. Against that, the table is padded to `2^ceil(lg d)` rows, so a table far from a
-    /// power of two is charged for the padding: at the Fe2S2 inner shape (`d = 90`, `K = 4`)
-    /// this is 62 against their 46. The padded form is what the implementation below actually
-    /// addresses, so costing the unpadded table would under-report a circuit nobody builds --
-    /// but it does mean this model is conservative about dirty loads at awkward table sizes,
-    /// which is the direction that makes borrowing look worse than it is.
+    /// Both terms are theirs, and the `Select` term is 2 Toffolis under their bound because
+    /// `ceil(d/K) - 1` is the exact unary-iteration cost where `ceil(d/K)` is a bound. Reaching
+    /// it depends on `CreateAliasedData` grouping the table into *contiguous* blocks of `K`
+    /// rather than by stride `2^(n-k)`. Under a strided split the select field of a real
+    /// address ranges over all `2^(n-k)` residues, so the table cannot stop short of the full
+    /// padded `2^(n-k)` rows and a table far from a power of two is charged for padding it
+    /// never addresses -- at the Fe2S2 inner shape (`d = 90`, `K = 4`) that was 62 against
+    /// their 46, where the contiguous form costs 44.
+    ///
+    /// The trim is free rather than a trade: blocking contiguously leaves the surplus-address
+    /// routing bit-identical to a plain `Select` over `numData` rows, because `K` is a power of
+    /// two and the block boundary therefore falls on a unary-iteration subtree boundary. See
+    /// `CreateAliasedData`.
     ///
     /// The width-0 case has to be the plain cost and not the `K = 1` limit of the swap formula:
     /// that limit charges two passes for a load that only makes one, and the doubled baseline
@@ -218,9 +222,10 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         if numSwapBits == 0 {
             numData - 1
         } else {
-            let addressBits = Ceiling(Lg(IntAsDouble(numData)));
-            let selectCost = 2 * (2^(addressBits - numSwapBits) - 1);
-            let swapCost = 4 * numBits * (2^numSwapBits - 1);
+            let blockSize = 1 <<< numSwapBits;
+            let numRows = (numData + blockSize - 1) / blockSize;
+            let selectCost = 2 * (numRows - 1);
+            let swapCost = 4 * numBits * (blockSize - 1);
             selectCost + swapCost
         }
     }
@@ -247,7 +252,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         bestBits
     }
 
-    /// Chunked table for a dirty load, with surplus addresses aliased the way `Select` does.
+    /// Blocked table for a dirty load, with surplus addresses aliased the way `Select` does.
     ///
     /// `CreatePaddedData` fills the surplus rows with zeros, which is what the clean swap path
     /// wants. A dirty load is a drop-in for a bare `Select`, and `Select` instead *aliases* the
@@ -255,11 +260,23 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     /// `ApplyBranchPhaseFixup` compensates for. Zero padding here would leave the forward load
     /// and that fixup disagreeing on exactly those addresses.
     ///
-    /// Row `i` holds chunk `p` = `data[i + p * 2^k]`, matching the little-endian split of the
-    /// address into `k` select bits and `numSwapBits` swap bits.
-    internal function CreateAliasedData(data : Bool[][], nRequired : Int, k : Int) : Bool[][] {
+    /// Row `s` holds chunk `p` = `data[s*K + p]` for `K = 2^numSwapBits`, matching a
+    /// little-endian split of the address into `numSwapBits` low swap bits and the remaining
+    /// high select bits. Grouping *contiguously* rather than by stride is what lets the table
+    /// stop at `ceil(d/K)` rows: the select field of a real address is `a / K`, which is below
+    /// that bound by construction, so the rows a strided table would still need are unreachable
+    /// here. Striding instead puts the select field at `a % 2^(n-k)`, which ranges over every
+    /// residue as soon as `d > 2^(n-k)`, pinning the table to the full padded height.
+    ///
+    /// Trimming costs nothing in aliasing fidelity. `K` is a power of two, so a block boundary
+    /// is also a unary-iteration subtree boundary, and descending the `ceil(d/K)`-row tree then
+    /// indexing within the block lands on the same row as descending the `d`-row tree directly:
+    /// `UnaryIterationActionIndex` agrees on every address state, surplus ones included.
+    internal function CreateAliasedData(data : Bool[][], nRequired : Int, numSwapBits : Int) : Bool[][] {
         let aliased = AliasToAddressSpace(data, nRequired);
-        MappedOverRange(i -> Flattened(aliased[i..2^k..2^nRequired - 1]), 0..2^k - 1)
+        let blockSize = 1 <<< numSwapBits;
+        let numRows = (Length(data) + blockSize - 1) / blockSize;
+        MappedOverRange(s -> Flattened(aliased[s * blockSize..(s + 1) * blockSize - 1]), 0..numRows - 1)
     }
 
     /// QROAM that borrows already-live qubits instead of allocating clean scratch.
@@ -273,8 +290,8 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     /// `psi_s` twice, which cancels, while the data word contributes once:
     ///
     ///   1. butterfly, `output ^= psi_s`, unbutterfly
-    ///   2. `Select`  — chunk `p` becomes `psi_p ^ data[select + p*2^k]`
-    ///   3. butterfly, `output ^= psi_s ^ data[select + s*2^k]`, unbutterfly
+    ///   2. `Select`  — chunk `p` becomes `psi_p ^ data[select*K + p]`
+    ///   3. butterfly, `output ^= psi_s ^ data[select*K + s]`, unbutterfly
     ///   4. `Select` again — XOR is an involution, so the borrowed block is restored
     ///
     /// Step 4 re-runs `Select` forward rather than taking its adjoint: the library adjoint is a
@@ -319,24 +336,28 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
                 let borrowed = dirty[...DirtyQROAMBorrowedQubits(numSwapBits, m) - 1];
                 let chunks = Chunks(m, borrowed);
                 let numSelectBits = nRequired - numSwapBits;
-                let addressParts = Partitioned([numSelectBits, numSwapBits], address[...nRequired - 1]);
-                let dataArray = CreateAliasedData(data, nRequired, numSelectBits);
+                // Swap bits are the LOW end of the address so the select field is `a / K`,
+                // which is what lets `CreateAliasedData` stop at `ceil(d/K)` rows.
+                let addressParts = Partitioned([numSwapBits, numSelectBits], address[...nRequired - 1]);
+                let swapAddress = addressParts[0];
+                let selectAddress = addressParts[1];
+                let dataArray = CreateAliasedData(data, nRequired, numSwapBits);
 
                 within {
-                    SwapDataOutputs(addressParts[1], chunks);
+                    SwapDataOutputs(swapAddress, chunks);
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(chunks[0], output));
                 }
 
-                Controlled Select(controls, (dataArray, addressParts[0], borrowed));
+                Controlled Select(controls, (dataArray, selectAddress, borrowed));
 
                 within {
-                    SwapDataOutputs(addressParts[1], chunks);
+                    SwapDataOutputs(swapAddress, chunks);
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(chunks[0], output));
                 }
 
-                Controlled Select(controls, (dataArray, addressParts[0], borrowed));
+                Controlled Select(controls, (dataArray, selectAddress, borrowed));
             }
         }
         adjoint self;
