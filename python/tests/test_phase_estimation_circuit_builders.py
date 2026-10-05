@@ -208,6 +208,23 @@ class TestIterativeQpeCircuitBuilder:
         num_bits = two_qubit_circuit_problem.num_bits
         assert recorded_powers == [2 ** (num_bits - k - 1) for k in range(num_bits)]
 
+    @pytest.mark.parametrize("ancilla_counts", [(1, 0), (0, 1)])
+    def test_combined_iterations_rejects_mismatched_ancillas(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem, monkeypatch, ancilla_counts: tuple[int, int]
+    ) -> None:
+        """Combined rounds must agree on the shared ancilla register size."""
+        problem = two_qubit_circuit_problem
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+        circuit, _ = builder._create_controlled_circuit(problem.hamiltonian, 1)
+        counts = iter(ancilla_counts)
+        monkeypatch.setattr(builder, "_create_controlled_circuit", lambda *_: (circuit, next(counts)))
+
+        with pytest.raises(
+            ValueError,
+            match=f"round 1 requires {ancilla_counts[0]}, but round 2 requires {ancilla_counts[1]}",
+        ):
+            builder.run(state_preparation=problem.state_prep, qubit_hamiltonian=problem.hamiltonian)
+
     def test_run_returns_circuits_four_qubit(self, four_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate circuit builder with a four-qubit Hamiltonian produces more circuits."""
         builder = QdkIterativeQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)

@@ -119,7 +119,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             ``combine_iterations`` is enabled).
 
         Raises:
-            ValueError: If ``num_iteration`` >= ``num_bits``, or if ``mid_shots`` is not positive in combined mode.
+            ValueError: If ``num_iteration`` >= ``num_bits``, ``mid_shots`` is not positive in combined mode,
+                or combined rounds require different ancilla counts.
 
         """
         num_bits = self.settings().get("num_bits")
@@ -268,7 +269,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the required Q# operations are not available, or if the active Q# target profile is Base.
-            ValueError: If the state preparation acts on more qubits than the system register.
+            ValueError: If the state preparation acts on more qubits than the system register,
+                or the controlled-unitary rounds require different ancilla counts.
 
         """
         num_system_qubits = qubit_hamiltonian.num_qubits
@@ -277,7 +279,14 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         ctrl_unitary_circuits: list[Circuit] = []
         num_ancilla_qubits = 0
         for k in range(num_bits):
-            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, 2 ** (num_bits - 1 - k))
+            circuit, round_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, 2 ** (num_bits - 1 - k))
+            if k == 0:
+                num_ancilla_qubits = round_ancilla_qubits
+            elif round_ancilla_qubits != num_ancilla_qubits:
+                raise ValueError(
+                    "Combined IQPE requires identical ancilla counts across rounds: "
+                    f"round 1 requires {num_ancilla_qubits}, but round {k + 1} requires {round_ancilla_qubits}."
+                )
             ctrl_unitary_circuits.append(circuit)
 
         if not (state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits)):  # noqa: SLF001
