@@ -202,14 +202,15 @@ namespace QDKChemistry.Utils.SelectSwap {
         return selectCost + swapCost + numErasures * eraseCost;
     }
 
-    /// Toffoli cost of the forward clean select-swap load alone, for a streamed batch erased
-    /// by measurement rather than by the compute/uncompute pair `SelectSwapCost1D` prices.
+    /// Toffoli cost of one controlled forward clean load, including the scratch cleanup that runs inside it.
     internal function SelectSwapForwardCost(numSwapBits : Int, numData : Int, numBits : Int) : Int {
         if numSwapBits <= 0 {
             return numData - 1;
         }
-        let addressBits = Ceiling(Lg(IntAsDouble(numData)));
-        2^(addressBits - numSwapBits) - 2 + (2^numSwapBits - 1) * numBits
+        let numSelectBits = Ceiling(Lg(IntAsDouble(numData))) - numSwapBits;
+        let swapCost = (2^numSwapBits - 1) * numBits;
+        // Swaps run twice and the copy out is controlled, then `Adjoint Select` unlooks up the scratch.
+        MaxI(0, 2^numSelectBits - 2) + 2 * swapCost + numBits + MeasurementUnlookupCost(numSelectBits)
     }
 
     /// Best clean swap width when only the forward load is paid for; 0 means stay on `Select`.

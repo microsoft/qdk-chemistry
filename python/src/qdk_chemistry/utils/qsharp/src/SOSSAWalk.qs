@@ -1163,4 +1163,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         All(result -> result == Zero, results)
     }
 
+    /// Traces one clean `LoadRotationWord`, so `SelectSwapForwardCost` can be checked against it.
+    operation TestLoadRotationWordResourceProbe(data : Bool[][], numSwapBits : Int) : Unit {
+        use isSF = Qubit();
+        use address = Qubit[AddressQubits(Length(data))];
+        use target = Qubit[Length(data[0])];
+        LoadRotationWord(data, numSwapBits, address, isSF, [], target);
+        ResetAll(target);
+    }
+
 }

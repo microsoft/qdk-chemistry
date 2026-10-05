@@ -313,24 +313,29 @@ class TestCleanSelectSwapForwardCostModel:
     """The clean network is chosen for a load that is erased by measurement, not by its adjoint."""
 
     def test_select_swap_forward_cost(self):
-        """Width 0 is the plain lookup; wider widths undercut ``SelectSwapCost1D``, which also prices uncompute."""
-        select_swap = _select_swap_ns()
-        for num_data in (8, 15, 224, 864):
-            assert select_swap.SelectSwapForwardCost(0, num_data, 10) == num_data - 1
-        for width in (1, 2, 3):
-            assert select_swap.SelectSwapForwardCost(width, 224, 15) < select_swap.SelectSwapCost1D(width, 224, 15)
+        """Matches the traced Toffolis of the clean rotation-word load at every width."""
+        ctx = get_qsharp_context()
+        probe = ctx.code.QDKChemistry.Utils.SOSSAWalk.TestLoadRotationWordResourceProbe
+        for num_data, num_bits in [(224, 15), (64, 10)]:
+            data = _make_table(num_data, num_bits)
+            for width in range(math.ceil(math.log2(num_data)) + 1):
+                counts = ctx.logical_counts(probe, data, width)
+                assert _select_swap_ns(ctx).SelectSwapForwardCost(width, num_data, num_bits) == (
+                    counts["cczCount"] + counts["ccixCount"]
+                ), f"width {width} on a {num_data}x{num_bits} table"
 
     def test_compute_optimal_swap_bits(self):
-        """Picks the true argmin over every width, which beats the plain lookup unless the word is too wide."""
+        """Picks the true argmin over every width, and stays on the plain lookup when no width beats it."""
         select_swap = _select_swap_ns()
-        for num_data, num_bits in [(224, 15), (64, 10), (864, 10), (32, 4)]:
+        for num_data, num_bits in [(224, 15), (864, 10), (32, 4)]:
             chosen = select_swap.ComputeOptimalSwapBits(num_data, num_bits)
             address_bits = math.ceil(math.log2(num_data))
             best = min(select_swap.SelectSwapForwardCost(k, num_data, num_bits) for k in range(address_bits + 1))
             assert select_swap.SelectSwapForwardCost(chosen, num_data, num_bits) == best
             assert best < num_data - 1
-        # Scratch costs ``numBits * (2^k - 1)``, so a wide word against a short table loses at every width.
-        assert select_swap.ComputeOptimalSwapBits(4, 64) == 0
+        # Every width pays the swaps twice plus a controlled copy, which these tables never win back.
+        for num_data, num_bits in [(64, 10), (4, 64)]:
+            assert select_swap.ComputeOptimalSwapBits(num_data, num_bits) == 0
 
     def test_select_swap_scratch_qubits(self):
         """The Toffoli saving is only half the trade; callers need the width it is bought with."""
