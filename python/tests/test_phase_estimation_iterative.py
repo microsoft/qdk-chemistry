@@ -606,13 +606,16 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
 
 
-def test_iterative_qpe_initialization() -> None:
+@pytest.mark.parametrize("combine_iterations", [False, True])
+def test_iterative_qpe_initialization(combine_iterations: bool) -> None:
     """Test IterativePhaseEstimation initialization."""
     shots_per_bit = 10
 
-    iqpe = IterativePhaseEstimation(shots_per_bit=shots_per_bit)
+    assert IterativePhaseEstimation().settings().get("combine_iterations") is False
+    iqpe = IterativePhaseEstimation(shots_per_bit=shots_per_bit, combine_iterations=combine_iterations)
 
     assert iqpe._settings.get("shots_per_bit") == shots_per_bit
+    assert iqpe.settings().get("combine_iterations") is combine_iterations
 
 
 def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
@@ -704,13 +707,13 @@ def test_combined_iqpe_matches_per_bit_on_ising_chain(power_strategy: str) -> No
         iqpe = create(
             "phase_estimation",
             "qdk_iterative",
+            combine_iterations=combine_iterations,
             qpe_circuit_builder=AlgorithmRef(
                 "qpe_circuit_builder",
                 "qdk_iterative",
                 num_bits=2,
                 unitary_builder=unitary_builder,
                 controlled_circuit_mapper=circuit_mapper,
-                combine_iterations=combine_iterations,
             ),
             circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
         )
@@ -750,13 +753,13 @@ def test_combined_iqpe_matches_per_bit_on_four_qubit_hamiltonian(
             "phase_estimation",
             "qdk_iterative",
             shots_per_bit=problem.shots_iterative,
+            combine_iterations=combine_iterations,
             qpe_circuit_builder=AlgorithmRef(
                 "qpe_circuit_builder",
                 "qdk_iterative",
                 num_bits=problem.num_bits,
                 unitary_builder=unitary_builder,
                 controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-                combine_iterations=combine_iterations,
             ),
             circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
         )
@@ -819,26 +822,28 @@ def test_combined_iqpe_repeats_and_votes_inside_the_circuit(
 
 
 @pytest.mark.parametrize("combine_iterations", [False, True])
-@pytest.mark.parametrize(("mid_shots", "shots_per_bit"), [(1, 5), (5, 1), (3, 7)])
-def test_iqpe_uses_independent_shot_counts(
-    two_qubit_phase_problem: PhaseEstimationProblem, combine_iterations: bool, mid_shots: int, shots_per_bit: int
+@pytest.mark.parametrize(("mid_shots", "shots_per_bit"), [(3, None), (1, 5), (5, 1), (3, 2), (3, 7)])
+def test_iqpe_preserves_samples_per_bit(
+    two_qubit_phase_problem: PhaseEstimationProblem, combine_iterations: bool, mid_shots: int, shots_per_bit: int | None
 ) -> None:
-    """The estimator controls executor shots without changing the builder's internal vote."""
+    """Both modes use the estimator's sample count, including defaults and builder overrides."""
     problem = two_qubit_phase_problem
     iqpe = create(
         "phase_estimation",
         "qdk_iterative",
-        shots_per_bit=shots_per_bit,
         qpe_circuit_builder=AlgorithmRef(
             "qpe_circuit_builder",
             "qdk_iterative",
             num_bits=problem.num_bits,
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
-            combine_iterations=combine_iterations,
             mid_shots=mid_shots,
         ),
         circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
     )
+    iqpe.settings().set("combine_iterations", combine_iterations)
+    if shots_per_bit is not None:
+        iqpe.settings().set("shots_per_bit", shots_per_bit)
+    samples_per_bit = 3 if shots_per_bit is None else shots_per_bit
     with (
         patch.object(
             QdkIterativeQpeCircuitBuilder, "run", autospec=True, side_effect=QdkIterativeQpeCircuitBuilder.run
@@ -857,7 +862,8 @@ def test_iqpe_uses_independent_shot_counts(
     assert result.raw_energy == pytest.approx(problem.expected_energy, abs=qpe_energy_tolerance)
     settings.assert_called_once()
     assert execute.call_count == (1 if combine_iterations else problem.num_bits)
-    assert all(call.kwargs["shots"] == shots_per_bit for call in execute.call_args_list)
+    executor_shots = 1 if combine_iterations else samples_per_bit
+    assert all(call.kwargs["shots"] == executor_shots for call in execute.call_args_list)
     if combine_iterations:
         build.assert_called_once()
         assert build.call_args.kwargs == {
@@ -866,68 +872,105 @@ def test_iqpe_uses_independent_shot_counts(
         }
         circuit = execute.call_args.args[1]
         qir = str(circuit.get_qir())
-        assert qir.count("call void @__quantum__qis__mresetz__body") == problem.num_bits * (mid_shots + 1)
+        assert qir.count("call void @__quantum__qis__mresetz__body") == problem.num_bits * (samples_per_bit + 1)
+        assert qir.count("call void @__quantum__rt__result_record_output") == problem.num_bits
         log.assert_any_call(
-            f"combine_iterations=True: shots_per_bit={shots_per_bit} runs the whole circuit {shots_per_bit} times; "
-            f"mid_shots={mid_shots} samples per phase bit in each execution."
+            "combine_iterations=True: running the whole circuit once (shots=1); "
+            f"shots_per_bit={samples_per_bit} samples per phase bit, voted inside the circuit."
         )
 
 
-@pytest.mark.parametrize(
-    ("counts", "expected_bitstring"),
-    [
-        ({"0000": 2, "1101": 3, "0001": 2}, "1101"),
-        ({"1101": 2, "0010": 2}, "0010"),
-    ],
-)
-def test_combined_iqpe_decodes_most_frequent_whole_bitstring(
-    two_qubit_phase_problem: PhaseEstimationProblem, counts: dict[str, int], expected_bitstring: str
+@pytest.mark.parametrize("expected_bitstring", ["0000", "1101", "0010"])
+def test_combined_iqpe_decodes_voted_bitstring(
+    two_qubit_phase_problem: PhaseEstimationProblem, expected_bitstring: str
 ) -> None:
-    """Decode the most frequent complete vote, not a bitwise majority, with deterministic ties."""
+    """Decode the voted bits from a single execution, preserving leading zeros and bit order."""
     problem = two_qubit_phase_problem
-    shots = sum(counts.values())
     iqpe = create(
         "phase_estimation",
         "qdk_iterative",
-        shots_per_bit=shots,
+        shots_per_bit=3,
+        combine_iterations=True,
         qpe_circuit_builder=AlgorithmRef(
             "qpe_circuit_builder",
             "qdk_iterative",
             num_bits=problem.num_bits,
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
-            combine_iterations=True,
             mid_shots=3,
         ),
         circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
     )
-    data = CircuitExecutorData(bitstring_counts=counts, total_shots=shots, executor="test")
+    data = CircuitExecutorData(bitstring_counts={expected_bitstring: 1}, total_shots=1, executor="test")
     with patch.object(QdkFullStateSimulator, "_run_impl", autospec=True, return_value=data) as execute:
         result = iqpe.run(state_preparation=problem.state_prep, qubit_hamiltonian=problem.hamiltonian)
 
     assert execute.call_count == 1
-    assert execute.call_args.kwargs["shots"] == shots
+    assert execute.call_args.kwargs["shots"] == 1
     assert result.bitstring_msb_first == expected_bitstring
     assert result.phase_fraction == pytest.approx(int(expected_bitstring, 2) / 2**problem.num_bits)
 
 
 @pytest.mark.parametrize("combine_iterations", [False, True])
 @pytest.mark.parametrize("shots_per_bit", [0, -1])
-def test_iqpe_rejects_non_positive_executor_shots(
+def test_iqpe_rejects_non_positive_shots_per_bit(
     two_qubit_phase_problem: PhaseEstimationProblem, combine_iterations: bool, shots_per_bit: int
 ) -> None:
-    """Both modes reject invalid execution counts before submitting a circuit."""
+    """Both modes reject invalid sample counts before submitting a circuit."""
     iqpe = create(
         "phase_estimation",
         "qdk_iterative",
         shots_per_bit=shots_per_bit,
-        qpe_circuit_builder=AlgorithmRef(
-            "qpe_circuit_builder", "qdk_iterative", num_bits=2, combine_iterations=combine_iterations
-        ),
+        combine_iterations=combine_iterations,
+        qpe_circuit_builder=AlgorithmRef("qpe_circuit_builder", "qdk_iterative", num_bits=2),
         circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
     )
     with (
         patch.object(QdkFullStateSimulator, "_run_impl", autospec=True) as execute,
         pytest.raises(ValueError, match="shots_per_bit must be a positive integer"),
+    ):
+        iqpe.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )
+    execute.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("builder_name", "combined", "builder_options", "message"),
+    [
+        (
+            "qdk_iterative",
+            False,
+            {"combine_iterations": True},
+            "Set combine_iterations=True on IterativePhaseEstimation",
+        ),
+        pytest.param(
+            "qiskit_iterative",
+            True,
+            {},
+            "requires a QDK iterative QPE circuit builder",
+            marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+        ),
+    ],
+)
+def test_iqpe_rejects_invalid_combined_configuration(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+    builder_name: str,
+    combined: bool,
+    builder_options: dict[str, bool],
+    message: str,
+) -> None:
+    """Reject nested-only activation and unsupported builders before circuit execution."""
+    iqpe = create(
+        "phase_estimation",
+        "qdk_iterative",
+        combine_iterations=combined,
+        qpe_circuit_builder=AlgorithmRef("qpe_circuit_builder", builder_name, num_bits=2, **builder_options),
+        circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+    )
+    with (
+        patch.object(QdkFullStateSimulator, "_run_impl", autospec=True) as execute,
+        pytest.raises(ValueError, match=message),
     ):
         iqpe.run(
             state_preparation=two_qubit_phase_problem.state_prep,

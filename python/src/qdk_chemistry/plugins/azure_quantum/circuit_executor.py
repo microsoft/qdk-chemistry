@@ -204,7 +204,7 @@ class AzureQuantumBackend(CircuitExecutor):
         if missing:
             raise ValueError("Azure Quantum target cannot be resolved; set " + ", ".join(missing))
 
-        qir_string = str(circuit.get_qir())
+        qir = circuit.get_qir()
         Logger.debug("QIR compiled")
 
         workspace = Workspace(
@@ -231,7 +231,7 @@ class AzureQuantumBackend(CircuitExecutor):
         job = target.submit(
             name=self._settings.get("job_name"),
             shots=shots,
-            input_data=qir_string,
+            input_data=qir,
             input_data_format="qir.v1",
             output_data_format="microsoft.quantum-results.v2",
             input_params=input_params,

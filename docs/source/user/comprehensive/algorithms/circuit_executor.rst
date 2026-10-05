@@ -198,6 +198,7 @@ Azure Quantum Backend
 
 Compiles circuits to :term:`QIR` and submits them to an Azure Quantum target, returning the measurement results.
 Available through the :doc:`Azure Quantum plugin <../plugins>`; requires ``azure-quantum`` and ``azure-identity``.
+Compiled QIR objects are passed directly to the SDK, preserving its QIR content type and submission metadata.
 
 The four workspace settings ``subscription_id``, ``resource_group``, ``workspace_name``, and ``target_name`` have no defaults and must be provided. ``location`` is optional.
 
@@ -259,9 +260,9 @@ If no clean measurement shots remain, the backend raises
 ``azure.quantum.job.JobFailedWithResultsError``, even if the service reports the job as
 succeeded. Its ``get_failure_results()`` method provides the same metadata, including the
 job ID, failed outcomes, and paths of saved attachments. No automatic retry is performed.
-Combined IQPE requests ``shots_per_bit`` whole-circuit executions, with ``mid_shots``
-internal samples per phase bit in each execution. If no clean whole-circuit shots remain,
-there is no phase or energy to decode.
+Combined IQPE requests one whole-circuit execution (``shots=1``), with ``shots_per_bit``
+internal samples per phase bit for in-circuit voting. If that execution yields no clean
+measurement result, there is no phase or energy to decode.
 
 .. note::
    Custom :class:`~qdk_chemistry.data.QuantumErrorProfile` noise models are not supported. Configure noise through the target's own ``input_params`` instead.

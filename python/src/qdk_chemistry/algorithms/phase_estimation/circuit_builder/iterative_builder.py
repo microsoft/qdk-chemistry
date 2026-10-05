@@ -39,14 +39,14 @@ class QdkIterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
             "combine_iterations",
             "bool",
             False,
-            "Build the full IQPE as one circuit with in-circuit classical feedback (needs an Adaptive target).",
+            "Build the full IQPE as one adaptive circuit. Set by the estimator when used through phase estimation.",
         )
         self._set_default(
             "mid_shots",
             "int",
             3,
             "Repetitions of each round that the combined circuit majority-votes to decide its bit."
-            " Only used when combine_iterations is enabled.",
+            " Only used when combine_iterations is enabled; overridden by the estimator's shots_per_bit.",
         )
 
 
@@ -76,10 +76,11 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             num_iteration: The specific iteration to build. Default to -1 (build all iterations).
             unitary_builder: Optional algorithm reference for the unitary builder.
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
-            combine_iterations: Build the full IQPE as one circuit with in-circuit classical feedback. Default to False.
+            combine_iterations: Build the full IQPE as one circuit with in-circuit classical feedback.
+                Defaults to False for standalone construction; the estimator supplies its own setting.
             mid_shots: Repetitions of each round that the combined circuit majority-votes to decide its bit.
-                Only used when ``combine_iterations`` is enabled. Independent of the estimator's
-                ``shots_per_bit``, which controls whole-circuit executions in combined mode. Default to 3.
+                Only used when ``combine_iterations`` is enabled. Defaults to 3 for standalone circuit
+                construction; the estimator overrides this with its ``shots_per_bit`` setting.
 
         """
         Logger.trace_entering()
