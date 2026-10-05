@@ -984,37 +984,7 @@ nlohmann::json StateVectorContainer::to_json() const {
 
   j["configuration_set"] = _configuration_set.to_json();
 
-  {
-    bool has_any_rdm = _one_rdm_spin_traced != nullptr ||
-                       _two_rdm_spin_traced != nullptr ||
-                       _active_one_rdm != nullptr || _active_two_rdm != nullptr;
-    if (has_any_rdm) {
-      nlohmann::json rdm_json;
-      if (_one_rdm_spin_traced != nullptr) {
-        bool rdm_is_complex =
-            detail::is_matrix_variant_complex(*_one_rdm_spin_traced);
-        rdm_json["is_one_rdm_spin_traced_complex"] = rdm_is_complex;
-        rdm_json["one_rdm_spin_traced"] =
-            matrix_variant_to_json(*_one_rdm_spin_traced, rdm_is_complex);
-      }
-      if (_two_rdm_spin_traced != nullptr) {
-        bool rdm_is_complex =
-            detail::is_vector_variant_complex(*_two_rdm_spin_traced);
-        rdm_json["is_two_rdm_spin_traced_complex"] = rdm_is_complex;
-        rdm_json["two_rdm_spin_traced"] =
-            vector_variant_to_json(*_two_rdm_spin_traced, rdm_is_complex);
-      }
-      if (_active_one_rdm != nullptr) {
-        rdm_json["active_one_rdm"] = std::visit(
-            [](const auto& t) { return t.to_json(); }, *_active_one_rdm);
-      }
-      if (_active_two_rdm != nullptr) {
-        rdm_json["active_two_rdm"] = std::visit(
-            [](const auto& t) { return t.to_json(); }, *_active_two_rdm);
-      }
-      j["rdms"] = std::move(rdm_json);
-    }
-  }
+  _serialize_rdms_to_json(j);
 
   _serialize_entropies_to_json(j);
 
