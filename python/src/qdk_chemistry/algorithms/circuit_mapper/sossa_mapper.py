@@ -370,8 +370,7 @@ class SOSSAMapper(CircuitMapper):
         outer_prepare_circuit = self._build_outer_prepare_circuit(container)
         regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
         outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
-        # Resolved per run, not in __init__: settings stay mutable until run. "select" is a
-        # swap network capped at width 0, so borrowing is the only other choice to pass on.
+        # Resolved per run (settings stay mutable); "select" is a width-0 cap, so only borrowing is passed on.
         lookup_method = self._settings.get("lookup_method")
         self._max_swap_bits = 0 if lookup_method == "select" else int(self._settings.get("max_swap_bits"))
         self._borrow_dirty = lookup_method == "dirty_select_swap"

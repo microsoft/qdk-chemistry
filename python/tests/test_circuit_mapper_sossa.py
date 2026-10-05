@@ -31,8 +31,7 @@ from .test_phase_estimation_sossa import (
     _python_to_qsharp_sign,
 )
 
-# The branched angle-word erasure measures, so a mismatched row only shows up for the
-# outcomes whose parity it changes; repeat to keep the check from passing by luck.
+# Measurement erasure exposes a bad row only on some outcomes, so repeat to avoid passing by luck.
 _ROUND_TRIP_TRIALS = 8
 
 
@@ -407,11 +406,9 @@ class TestSOSSAMapper:
         ids=["clean_network", "capped_to_select", "lender_too_small"],
     )
     def test_free_rider_placement_is_costed_at_the_width_actually_built(self, max_swap_bits, available_dirty, expected):
-        """Splitting the free-rider word out only pays where a swap network will be built.
+        """Splitting the free-rider word only pays where a swap network will be built.
 
-        A clean network here makes the wider inline word costly enough to split. Capped to width
-        0, or borrowing from a lender too small for any network, the load is a plain ``Select``
-        whose cost ignores the word width, so a split would only add a lookup.
+        Clean swaps make the inline word costly; width-0 or too-small borrowers leave a plain ``Select``.
         """
         coefficients = [[1.0] * 8 for _ in range(8)]
         free_rider_data = [[bool((row >> bit) & 1) for bit in range(4)] for row in range(8)]
@@ -442,17 +439,7 @@ class TestSOSSAMapper:
     ) -> None:
         """The measurement-based erasure must phase exactly what the forward load wrote.
 
-        Swept over both swap-network loaders and their widths: a select-swap has to leave the
-        angle word in the state the plain lookup would, or the shared erasure stops matching.
-        The row counts that are not powers of two are the ones that bite -- ``Select`` aliases
-        the surplus addresses onto real rows, so a loader that zero-filled them instead would
-        load a different word than the fixup table phases. The borrowed register is conjugated
-        along with the addresses, so a dirty network also has to come back unentangled.
-
-        One swap bit is the widest setting every shape here can take -- the narrowest table
-        has two rows, so a single address bit -- and it keeps the borrowed block out of the
-        simulated statevector. ``test_a_wider_borrowed_network_survives_the_erasure`` covers
-        a deeper network on a shape that can afford one.
+        Ragged tables alias surplus addresses through ``Select``, and dirty networks must return the lender.
         """
         width = 3
         sf_rows, sf_address_qubits, dq_rows, dq_address_qubits = table_shape
@@ -473,10 +460,9 @@ class TestSOSSAMapper:
 
     @pytest.mark.parametrize("dq_swap_bits", [2, 3])
     def test_a_wider_borrowed_network_survives_the_erasure(self, dq_swap_bits: int) -> None:
-        """A multi-level butterfly still hands back the same angle word the erasure expects.
+        """A deeper dirty butterfly must still return the angle word expected by erasure.
 
-        Kept to the single-bit DQ word so that ``numBits * 2**numSwapBits`` borrowed qubits
-        stay cheap to simulate as the network gets deeper.
+        The DQ word stays one bit so the borrowed statevector remains cheap to simulate.
         """
         sf_data = [[(i + j) % 3 == 0 for j in range(1)] for i in range(4)]
         dq_data = [[bool((i >> j) & 1) for j in range(1)] for i in range(8)]
@@ -748,26 +734,12 @@ class TestSelectFullFidelity:
         bit_precision: int,
         lookup_method: str,
     ):
-        """Streaming the Givens angles must not change what SELECT does, only what it costs.
+        """Streaming Givens angles must preserve SELECT while only changing cost.
 
-        Run for all three loaders, since each is a different forward path sharing one
-        measurement-based erasure: whichever one loads the angle word, the resulting state has
-        to be the resident register's.
-
-        Covers both branches of the angle lookup -- ``xo = 0`` takes the one-body DQ table and
-        ``xo = N`` takes the two-body SF table -- at both ``b`` values that matter, since
-        ``b = numBases`` is the one that sets the ``bEqB`` flag. That flag rides the resident
-        table for free but is computed arithmetically on the streamed path, so it needs a
-        branch of its own here.
-
-        Every streaming batch size is compared against the resident reference. The angle
-        chain is order sensitive, so a batch loop that walked the windows the wrong way would
-        show up immediately.
+        This covers both angle-table branches and batch orders for all three loaders.
         """
         num_orbitals, num_ranks, num_bases, num_copies = dims
-        # Annotated rather than inferred: mypy widens the literal dict to dict[str, int] and
-        # then checks it against every remaining keyword of _select_data, including the str
-        # lookup_method, which the ints cannot satisfy.
+        # Annotated so mypy does not widen this to dict[str, int] against _select_data's str keyword.
         kwargs: dict[str, Any] = {
             "rotation_bit_precision": bit_precision,
             "num_ranks": num_ranks,
@@ -796,9 +768,7 @@ class TestSelectFullFidelity:
                         b_value=b_value,
                         use_phase_gradient=True,
                     )
-                    # The angle word is erased by measurement and the per-branch fixup restores
-                    # the state only up to an outcome-dependent global phase, so overlap
-                    # magnitude is the comparison that means anything here.
+                    # Erasure leaves an outcome-dependent global phase, so compare overlap magnitude.
                     fidelity = abs(np.vdot(reference, streamed))
                     assert fidelity == pytest.approx(1.0, abs=1e-9), (
                         f"lambda={batch} lookup={lookup_method} xo={xo_value} b={b_value} "
@@ -876,10 +846,9 @@ class TestMaxSwapBitsSetting:
     """The ``max_swap_bits`` setting's contract, without paying for an estimate."""
 
     def test_it_defaults_to_letting_the_library_choose(self):
-        """The knob must be opt-in: shipping it may not move anyone's existing numbers.
+        """The setting stays opt-in by preserving the Q# sentinel default.
 
-        ``-1`` is the sentinel the Q# side already understood before this setting existed,
-        so the default routes to exactly the same selector that was hard-coded there.
+        ``-1`` routes to the library's existing selector choice.
         """
         assert SOSSAMapper().settings().get("max_swap_bits") == -1
 
@@ -892,10 +861,9 @@ class TestMaxSwapBitsSetting:
 
     @pytest.mark.parametrize("swap_bits", [-2, 31])
     def test_it_rejects_widths_outside_the_declared_range(self, swap_bits):
-        """Below the sentinel is meaningless and far above it is certainly a mistake.
+        """Reject nonsense below the sentinel or far above any useful cap.
 
-        A cap above what any selector would choose is inert rather than dangerous, so this
-        bound is about catching nonsense early rather than about safety.
+        Oversized caps are inert, so this bound catches mistakes rather than protecting Q#.
         """
         with pytest.raises(ValueError, match="out of allowed range"):
             AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)

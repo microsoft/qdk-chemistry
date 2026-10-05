@@ -341,10 +341,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///   5. Conditional swap index ↔ alt
     ///   6. Conditional swap signOrig ↔ signAlt
     ///   7. Z(signOrig) for sign encoding
-    ///
-    /// `numSwapBits` caps the QROAM swap width: -1 lets the cost model choose, 0 forces a plain
-    /// `Select`. A non-empty `dirty` lends the swap block instead of allocating it; it may be
-    /// entangled with anything and comes back untouched.
+    /// `numSwapBits` caps the swap width (-1 free, 0 `Select`); a non-empty `dirty` lends the block.
     operation ConditionalAliasSamplingPrepareWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
@@ -376,8 +373,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nCond = Length(table3D);
         let nInnerData = Length(table3D[0]);
         let m = Length(qromOutput) + Length(freeRiderRegister);
-        // A borrowed network runs `Select` twice and the butterfly four times, so its optimum sits
-        // at a different width than the clean one, and it is capped by what the caller lent.
+        // A borrowed network has its own cost optimum and is capped by what the caller lent.
         let selected = if IsEmpty(dirty) {
             ComputeOptimalLambda2D(nCond, nInnerData, m, true)
         } else {
@@ -427,9 +423,7 @@ namespace QDKChemistry.Utils.AliasSampling {
         AliasSamplingPrepare(params, qs);
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Test wrappers
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ═══ Test wrappers ══════════════════════════════════════════════════════════
 
     /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.
     internal function MakeConditionalAliasSamplingPrepOp(

@@ -137,12 +137,9 @@ class TestAliasSamplingStatePreparation:
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
 
     def test_the_swap_width_rule_declines_a_widening_that_does_not_pay(self):
-        """``ComputeOptimalLambda2D`` takes the narrowest width that is nearly Toffoli-optimal.
+        """The rule may reject cheaper Toffolis when the scratch widening is too large.
 
-        At this shape ``k = 3`` is the Toffoli minimum, but it doubles the scratch block to
-        get there. Pinning both widths side by side is what makes the rule's judgement
-        legible: the width it declines is genuinely cheaper in Toffolis, and the rule is
-        choosing to pay that rather than the scratch.
+        Pinning both widths shows the declined width is genuinely cheaper but wider.
         """
         context = create_qsharp_context()
         select_swap = context.code.QDKChemistry.Utils.SelectSwap
@@ -170,10 +167,7 @@ class TestAliasSamplingStatePreparation:
             f"and must cost Toffolis for it: {counts[chosen]['cczCount']} vs {counts[declined]['cczCount']}"
         )
 
-        # The premium the rule pays has to stay small next to the width it buys, or the
-        # tolerance is mis-set. This guards the tolerance itself rather than the width it
-        # happens to pick, and is the one place that ratio is checked now that the setting
-        # caps rather than overrides and so cannot reach the declined width end to end.
+        # Guard the tolerance itself: the Toffoli premium must stay small next to the width it buys.
         width_saved = (counts[declined]["numQubits"] - counts[chosen]["numQubits"]) / counts[declined]["numQubits"]
         toffoli_premium = (counts[chosen]["cczCount"] - counts[declined]["cczCount"]) / counts[declined]["cczCount"]
         assert toffoli_premium < width_saved, (
@@ -181,11 +175,7 @@ class TestAliasSamplingStatePreparation:
             f"tolerance is mis-set: {toffoli_premium:.1%} Toffolis for {width_saved:.1%} width"
         )
 
-        # And the margin is thin: the premium is ~19.6% against a 20% tolerance, so `k = 2`
-        # qualifies by about two Toffolis in 589. The width this shape lands on is therefore a
-        # property of the tolerance constant, not a comfortable feature of the shape. Pin the
-        # thinness so that lowering the tolerance fails here, naming the reason, rather than
-        # surfacing downstream as an unexplained widening of the whole algorithm.
+        # Thin margin (~19.6% vs 20%), pinned so lowering the tolerance fails here with a reason.
         assert 0.19 < toffoli_premium < 0.20, (
             f"the declined width is a near-miss at this shape ({toffoli_premium:.2%} premium "
             f"against a 20% tolerance); if this moved, the tolerance or the cost model changed "

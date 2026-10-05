@@ -187,11 +187,9 @@ def _select_swap_ns(ctx=None):
 
 
 def _select_swap_dirty_ns(ctx=None):
-    """The dirty-strategy namespace: loaders that borrow live caller qubits instead.
+    """Return the dirty-strategy namespace for loaders that borrow live caller qubits.
 
-    Split from ``_select_swap_ns`` because the two strategies now live in separate Q# files,
-    so a test that reaches for a dirty symbol through the clean namespace fails to resolve
-    rather than silently exercising the wrong loader.
+    Keeping it separate catches calls routed through the clean namespace.
     """
     return (ctx or get_qsharp_context()).code.QDKChemistry.Utils.SelectSwapDirty
 
@@ -205,26 +203,18 @@ def _make_table(num_rows: int, width: int) -> list[list[bool]]:
 
 
 class TestDirtyQROAMLoadsCorrectValues:
-    """Borrowing live qubits must load the same word a clean lookup would.
+    """Dirty loads must match clean lookup words and return borrowed qubits.
 
-    The borrowed register is mid-computation and entangled with the rest of the machine, so
-    the network has to put it back bit-for-bit. Sweeping the whole address space matters
-    because surplus addresses -- those past the end of a non-power-of-two table -- are
-    aliased onto real rows by ``Std.TableLookup.Select`` rather than reading as zero, and the
-    swap path has to alias them the same way.
-
-    Shapes are kept narrow on purpose: a swap width of ``k`` borrows ``width * 2**k`` qubits,
-    which lands in the simulated statevector, so a wide word at a wide swap is unsimulable.
+    Sweep aliases too, because ragged tables route surplus addresses through ``Select``.
     """
 
     @pytest.mark.parametrize("dirty_seed", [0, 1, 5])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
     @pytest.mark.parametrize(("num_rows", "width"), [(8, 1), (16, 1)])
     def test_loads_every_address(self, num_rows, width, num_swap_bits, dirty_seed):
-        """Power-of-two tables are the baseline: every address is real, so nothing may alias.
+        """Power-of-two tables are the baseline, with no surplus addresses to alias.
 
-        ``dirty_seed`` varies the junk the borrowed register starts in, since a network that
-        only works from a zeroed borrow is not borrowing at all.
+        ``dirty_seed`` catches loaders that only work from a zeroed borrow.
         """
         assert _select_swap_dirty_ns().TestSelectSwapDirtyCorrectness(
             _make_table(num_rows, width), num_swap_bits, dirty_seed
@@ -248,15 +238,9 @@ class TestDirtyQROAMReturnsTheBorrowedQubits:
         [(8, 1, 1), (8, 1, 2), (8, 1, 3), (6, 2, 1), (6, 2, 2), (5, 1, 2)],
     )
     def test_borrowed_register_is_restored_exactly(self, num_rows, width, num_swap_bits):
-        """A phase oracle sees any residue the load leaves behind on the lender.
+        """A phase oracle catches any entanglement left on the lender.
 
-        Restoring the borrowed qubits' *values* is not enough: if the load leaves them
-        correlated with the address, conjugating a phase kick will not close. Comparing
-        against the width-0 path rather than a bare ``Select`` keeps the measurement on this
-        network, since the library's measurement-based ``Adjoint Select`` is itself not
-        self-cancelling on non-power-of-two tables.
-
-        The load erases by measurement, so a single passing trial proves nothing.
+        Compare against width-0 select-swap so the same measurement-erasure path is used.
         """
         data = _make_table(num_rows, width)
         failures = sum(
@@ -290,11 +274,9 @@ class TestDirtyQROAMCostModel:
     """The width is chosen by cost, so the cost model is what decides if borrowing happens."""
 
     def test_width_zero_costs_the_plain_lookup(self):
-        """Zero swap bits has to mean *no swap network*, not a one-block swap network.
+        """Zero swap bits must mean the plain lookup, not a one-block swap network.
 
-        Modelling it as the ``K = 1`` limit of the two-pass formula would report roughly
-        twice the true cost and make every swap width look like an improvement over a
-        baseline that was never real.
+        Otherwise the fake baseline makes every swap width look cheaper.
         """
         cost = _select_swap_dirty_ns().DirtyQROAMCost
         for num_data in (8, 15, 224, 864):
@@ -302,16 +284,9 @@ class TestDirtyQROAMCostModel:
 
     @pytest.mark.parametrize(("num_data", "num_bits"), [(90, 15), (224, 15), (100, 8), (1000, 20), (4095, 8)])
     def test_the_cost_tracks_the_reference_formula_at_every_width(self, num_data, num_bits):
-        """Each pass must address ``ceil(d/K)`` rows, not the padded height ``2^ceil(lg d)``.
+        """Each pass addresses ``ceil(d/K)`` rows, not the padded table height.
 
-        A strided chunking pins the table to its padded height, which nothing relational can
-        see: the cost stays monotone in the width, still declines on short tables, still beats
-        the plain lookup wherever it claims to. It is wrong only against the *reference*, and
-        only far from a power of two -- at ``d = 90, K = 4`` it charged 62 Toffolis of
-        ``Select`` against :cite:`Berry2019`'s 46, on the term the width search minimises.
-
-        The ``- 2`` is not slack: ``ceil(d/K) - 1`` is the exact unary-iteration cost per pass
-        where the reference quotes the bound.
+        The ``- 2`` keeps the unary-iteration cost exactly aligned with the reference bound.
         """
         cost = _select_swap_dirty_ns().DirtyQROAMCost
         for num_swap_bits in range(1, math.ceil(math.log2(num_data)) + 1):
@@ -323,10 +298,9 @@ class TestDirtyQROAMCostModel:
             )
 
     def test_the_fe2s2_inner_shape_costs_what_the_reference_charges(self):
-        """One magnitude pin on the shape the overcharge was found at, so a regression names itself.
+        """Pin the overcharge shape so a padding regression names itself.
 
-        ``d = 90`` is the worst case for padding: just above ``2^6``, so a strided table rounds
-        all the way to ``2^7`` rows and charges nearly 40% more ``Select`` than it addresses.
+        Here ``d = 90`` sits just above ``2^6``, where padded-height chunking overcharges.
         """
         select_cost = 2 * (math.ceil(90 / 4) - 1)
         butterfly_cost = 4 * 15 * (4 - 1)
@@ -336,11 +310,9 @@ class TestDirtyQROAMCostModel:
 
     @pytest.mark.parametrize(("num_data", "num_bits"), [(20, 15), (224, 15), (64, 10)])
     def test_short_tables_decline_to_borrow(self, num_data, num_bits):
-        """Below roughly ``numData > 32 * numBits`` a swap network cannot win, so it is refused.
+        """Short tables must decline borrowing when the swap network cannot win.
 
-        The two-pass structure costs ``2*ceil(d/K) + 4*b*(K-1)``, whose optimum ``4*sqrt(2*b*d)``
-        only undercuts the plain ``d - 1`` once the table is tall relative to the word. Fe2S2's
-        224-row, 15-bit angle table sits well under that line.
+        Fe2S2's 224-row, 15-bit angle table sits below the `numData > 32 * numBits` crossover.
         """
         assert _select_swap_dirty_ns().ComputeOptimalDirtySwapBits(num_data, num_bits, 4096) == 0
 
@@ -363,10 +335,9 @@ class TestDirtyQROAMCostModel:
         assert select_swap.ComputeOptimalDirtySwapBits(864, 10, 10) == 0
 
     def test_the_chosen_width_fits_the_budget_it_was_given(self):
-        """Every budget must yield a width that borrows within it, not merely the loose ones.
+        """Every budget must yield a width that borrows within it.
 
-        Sweeping from zero upward catches a rule that clamps only at one end, which would
-        overdraw on the tight budgets while still passing a single generous-budget check.
+        Sweeping from zero catches rules that only clamp one end.
         """
         select_swap = _select_swap_dirty_ns()
         for available in (0, 10, 40, 80, 160, 640):
@@ -384,11 +355,9 @@ class TestCleanSelectSwapForwardCostModel:
             assert cost(0, num_data, 10) == num_data - 1
 
     def test_the_forward_cost_is_cheaper_than_the_compute_uncompute_model(self):
-        """Pricing only the forward pass is the whole reason this model exists.
+        """Pricing only the forward pass is why this model exists.
 
-        ``SelectSwapCost1D`` includes the swap network's own uncompute, which is right when the
-        adjoint erases the load. A streamed rotation batch is erased by a shared measurement
-        instead, so charging for that uncompute would pick a width tuned to a cost we never pay.
+        A streamed batch is erased by measurement, so swap-network uncompute is not charged.
         """
         select_swap = _select_swap_ns()
         for width in (1, 2, 3):
@@ -429,17 +398,9 @@ class TestCleanSelectSwapForwardCostModel:
 
 
 class TestSelectSwapAliasedMatchesPlainSelect:
-    """A loader sharing ``Select``'s measurement-based erasure must share its address routing.
+    """A loader sharing ``Select`` erasure must share its address routing.
 
-    ``SelectSwap`` zero-fills the addresses past the end of the table, which is correct when its
-    own adjoint erases the load. ``Select`` instead aliases them onto real rows, and the phase
-    fixup that erases a streamed rotation batch is written against that aliasing. A zero-filled
-    forward load would therefore be phased against a word it never wrote.
-
-    Checked by value rather than by phase: ``Select`` erases a ragged table by measurement, so
-    the phase-oracle harness used elsewhere in this file disagrees with ``Select`` even when
-    ``Select`` is compared against itself. The forward load is what the streamed rotation path
-    takes from ``Select``, and the forward load is what these compare.
+    The check is by value because phase-oracle harnesses disagree with ``Select`` on ragged tables.
     """
 
     @pytest.mark.parametrize("num_swap_bits", [-1, 0, 1, 2])

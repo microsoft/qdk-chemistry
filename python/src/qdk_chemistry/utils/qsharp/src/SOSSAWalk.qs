@@ -65,20 +65,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         OneBodyRotationAngles : Double[][],
         TwoBodyRotationAngles : Double[][],
         rotationBitPrecision : Int,
-        /// Number of Givens angles held in the rotation register at once (the paper's lambda).
-        /// Zero, or any value at or above `N - 1`, keeps the whole angle word resident, which is
-        /// the fastest setting and the historical behaviour. Smaller values stream the angles in
-        /// batches, trading Toffolis for a rotation register of `rotationBatchSize * b_rot`
-        /// qubits instead of `(N - 1) * b_rot`.
-        /// :cite:`Low2026` Appendix E 3.
+        /// Givens angles held at once (λ, :cite:`Low2026` E3); 0 or ≥ N-1 keeps them all resident.
         rotationBatchSize : Int,
-        /// Whether streamed rotation batches and inner alias tables borrow idle wavefunction
-        /// qubits for their swap networks instead of allocating clean scratch.
+        /// Whether streamed batches and inner alias tables borrow idle system qubits for swaps.
         borrowDirty : Bool,
-        /// Ceiling on the swap width any QROAM in the walk may take. -1 leaves each loader's
-        /// own selector alone; 0 forces plain unary-iteration lookups; a positive value caps
-        /// whatever the selector would have chosen. Capping only reroutes identical data, so
-        /// it trades Toffolis for width and never touches the state prepared.
+        /// Cap on any walk QROAM's swap width: -1 lets each selector choose, 0 forces plain `Select`.
         maxSwapBits : Int,
         /// Number of free-rider bits at the end of innerReg loaded by inner PREPARE QROM.
         /// Must be at least 2.
@@ -134,10 +125,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         [outerStart, innerStart, spinStart, gradientStart, gradientStart + layout.numPhaseGradientQubits]
     }
 
-    /// Angles `first..last` of the DQ table, quantized and concatenated low-index first.
-    ///
-    /// N entries addressed by xoReg[0..⌈log₂N⌉-1] (the orbital index for one-body terms). The
-    /// resident word is the whole range `0..N-2`; a streamed batch asks for a window.
+    /// Angles `first..last` of the DQ table, quantized and concatenated low-index first; the
+    /// resident word is the whole range `0..N-2`.
     internal function BuildDQRotationBatch(
         params : SelectParams,
         N : Int,
@@ -176,11 +165,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         (numBases + 1) * (1 <<< rankBits) < numRanks * (1 <<< bBits)
     }
 
-    /// Angles `first..last` of the SF table, plus a trailing `b == B` flag bit if `withBEqBFlag`.
-    ///
-    /// The resident word carries that flag for free, because unary iteration costs the same at any
-    /// output width. A streamed batch is loaded once per batch, so it leaves the flag out and the
-    /// caller sets it arithmetically instead of paying for it on every batch.
+    /// Angles `first..last` of the SF table, plus a trailing `b == B` flag bit if `withBEqBFlag`
+    /// (free on the resident word; streamed batches set it arithmetically instead).
     internal function BuildSFRotationBatch(
         params : SelectParams,
         R : Int,
@@ -255,11 +241,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         ((raw % (1 <<< bRot)) + (1 <<< bRot)) % (1 <<< bRot)
     }
 
-    /// Swap width one streamed batch table should use.
-    ///
-    /// With nothing to borrow the clean cost model decides, otherwise the dirty one; each returns 0
-    /// when no network beats the plain lookup. `maxSwapBits` then caps the choice: -1 leaves it
-    /// alone, and any other value is an upper bound, so the cap can only ever narrow the register.
+    /// Swap width for one streamed batch table: the clean or dirty selector's choice, capped by
+    /// `maxSwapBits` unless it is -1.
     internal function RotationSwapWidth(
         numData : Int,
         numBits : Int,
@@ -274,9 +257,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         if maxSwapBits < 0 { selected } else { MinI(selected, maxSwapBits) }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Factories
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ═══ Factories ══════════════════════════════════════════════════════════════
 
     /// Build an inner PREPARE using conditional alias sampling (2D QROM).
     ///
@@ -294,11 +275,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///   innerReg — target register layout: indexReg[nIdx] + uniformReg[μ]
     ///              + flagQubit[1] + qromOutput[μ + nIdx + 2] + freeRiderReg[nFR]
     ///
-    /// `maxSwapBits` caps the QROAM swap width: -1 leaves the loader's own selector alone, 0
-    /// forces a plain unary-iteration load, and a positive value is an upper bound on whatever
-    /// the selector chose. The swap network allocates scratch proportional to `2^k` times the
-    /// loaded word, which is where a qubit-limited caller wants a say. `borrowDirty` lends the
-    /// walk's system register to the network in place of that scratch.
+    /// `maxSwapBits` caps the QROAM swap width (-1 free, 0 plain); `borrowDirty` lends `systemReg`.
     function MakeInnerPrepareAliasSampling(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
@@ -307,16 +284,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         borrowDirty : Bool,
     ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj {
         let nCoeffs = Length(innerCoefficients[0]);
-        // A single inner entry still gets a one-qubit b register, matching MakeInnerPrepareDirect
-        // and the Python layout. Letting this fall to zero would leave the alias PREPARE treating
-        // innerReg[0] as its uniform register while SELECT treats it as b.
+        // Keep at least one b-register qubit, matching MakeInnerPrepareDirect and the Python layout.
         let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
         let mu = coefficientBitPrecision;
         let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
         let qromEnd = 2 * nIndexBits + 2 * mu + 2;
-        // A swap network cannot be wider than the table it routes, and `SwappedLoadShape`
-        // asserts as much. Clamp rather than fault, so an over-large request degrades to the
-        // widest usable network instead of crashing inside Q#.
+        // Clamp to the table's address width so an over-large cap degrades instead of faulting.
         let swapBits = if maxSwapBits > 0 { MinI(maxSwapBits, nIndexBits) } else { maxSwapBits };
         (outerReg, innerReg, dirty) => {
             let indexReg = innerReg[0..nIndexBits - 1];
@@ -360,10 +333,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ///
     /// `SelectSwapCost2D` already covers one lookup/uncompute pair. One SOSSA block applies
     /// two inner PREPARE/uncompute pairs and, if split out, one free-rider lookup pair.
-    ///
-    /// `maxSwapBits` and `availableDirty` must match what the lookups will actually use, or
-    /// this compares the cost of two layouts neither of which gets built. A lender switches
-    /// both the width selector and the cost model to the borrowed network's.
+    /// Both layouts are costed with the loader `maxSwapBits` and `availableDirty` select.
     internal function ShouldLoadFreeRiderSeparately(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
@@ -376,8 +346,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let numInnerSlots = 1 <<< nIndexBits;
         let numWordBits = coefficientBitPrecision + nIndexBits + 2;
         let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        // Mirrors the cap in `MakeInnerPrepareAliasSampling`, including its clamp to the table's
-        // address width, so this compares the cost of the layouts that will actually be built.
+        // Mirrors MakeInnerPrepareAliasSampling's clamped cap, so the costed layouts are the built ones.
         let cap = MinI(MaxI(0, maxSwapBits), nIndexBits);
         let innerPreparePairsPerBlock = 2;
         let freeRiderPairsPerBlock = 1;
@@ -407,10 +376,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// PREPARE/uncompute pairs in one block encoding. Loading it separately costs one `Select`
     /// round trip over the outer conditions but lets the inner table use a narrower output
     /// and potentially a different swap width.
-    ///
-    /// `availableDirty` is the size of the register the walk lends the inner PREPARE, or 0 to
-    /// load with clean scratch. The free-rider placement is costed at that lender size, so it
-    /// must match what the walk actually lends.
+    /// `availableDirty` is the lender size the walk passes the inner PREPARE, or 0 for clean scratch.
     function MakeInnerPrepareAliasSamplingOracles(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
@@ -455,8 +421,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let nCoeffs = Length(innerCoefficients[0]);
         let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
         let signData = BuildInnerSignTable(innerCoefficients, nIndexBits);
-        // Direct preparation has no lookup table, so there is nothing to borrow for; the
-        // lender is accepted and ignored purely to keep one inner-PREPARE signature.
+        // No lookup table here; the lender is accepted only to keep one inner-PREPARE signature.
         (outerReg, innerReg, _) => {
             let bReg = innerReg[0..nIndexBits - 1];
 
@@ -661,11 +626,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             } apply {
                 within {
                     within {
-                        // `systemReg` is lent to the inner PREPARE's QROAM: SELECT is the only
-                        // thing that touches the wavefunction, and it runs in the `apply` below,
-                        // so these qubits are provably idle for the whole of PREPARE. A dirty
-                        // load hands them back untouched, so the `within` uncompute still sees
-                        // exactly the state it would have seen from a clean load.
+                        // Only SELECT touches `systemReg`, and it runs in `apply`, so it is idle and lendable here.
                         innerPrepareOp(outerIndexReg, innerReg, systemReg);
                         H(spinReg[1]);
                     } apply {
@@ -817,11 +778,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Loads the branch-selected Givens angle word; the adjoint erases it by measurement.
     /// Both tables write the same `target` and measuring consumes it, so the adjoint measures once
     /// and repairs each branch's phase; letting `within` uncompute instead costs a second lookup.
-    ///
-    /// Each table has its own swap width because the two differ in row count, often by an order of
-    /// magnitude. Width 0 is a plain `Select`; otherwise an empty `dirty` allocates the swap block
-    /// and a non-empty one lends it. Every route leaves `target` exactly as a plain `Select` would,
-    /// surplus addresses included, which is why the measurement-based adjoint is shared unchanged.
+    /// Each table has its own swap width; every route loads `target` exactly as plain `Select` does.
     internal operation ControlledSelectWithUnlookup(
         sfData : Bool[][],
         dqData : Bool[][],
@@ -941,32 +898,24 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         } else {
             let numBatches = (numRotAngles + batch - 1) / batch;
             within {
-                // The bEqB flag rides the bulk table for free, but a streamed table would pay for
-                // it once per batch, so it is computed directly from b and isSF instead.
+                // Computed from b and isSF rather than loaded, which a streamed table would pay for per batch.
                 ApplyControlledOnInt(params.numBases, q => Controlled X([isSF], q), bReg, bEqBQubit);
 
-                // Descending batch order keeps the global angle order of the resident path: the
-                // rotation chain must run from the highest index down to zero.
+                // Descending batches keep the resident path's high-to-low rotation order.
                 for t in numBatches - 1..-1..0 {
                     let first = t * batch;
                     let last = MinI(first + batch, numRotAngles) - 1;
                     let dqData = BuildDQRotationBatch(params, N, first, last, bRot);
                     let sfData = BuildSFRotationBatch(params, R, first, last, bRot, bBits, Length(rBits), rankFirst, false);
 
-                    // Angles first..last rotate sysRegDown[first..last+1]. The spin-up half and the
-                    // rest of the spin-down half are live but untouched by this window, so they can
-                    // be lent to the swap network. :cite:`Low2026` Appendix E 3.
+                    // Outside sysRegDown[first..last+1] the system is live but untouched, so it is lent (:cite:`Low2026` E3).
                     let untouched = sysRegDown[0..first - 1] + sysRegDown[last + 2..N - 1];
                     let dirty = if params.borrowDirty { sysRegUp + untouched } else { [] };
-                    // Each table is sized on its own word width: the SF word spans the whole target
-                    // but the DQ word is only a prefix of it, and both the scratch a clean network
-                    // allocates and the block a dirty one borrows scale with that width.
+                    // Size each table's swap width on its own word: the DQ word is only a prefix of the SF word.
                     let sfSwapBits = RotationSwapWidth(Length(sfData), Length(sfData[0]), Length(dirty), params.maxSwapBits);
                     let dqSwapBits = RotationSwapWidth(Length(dqData), Length(dqData[0]), Length(dirty), params.maxSwapBits);
 
-                    // Only this window's angles are ever resident. The rotations act on sysRegDown
-                    // and so survive releasing the word, at the price of looking the window up again
-                    // when the enclosing `within` unwinds.
+                    // Only this window's angles are resident; the enclosing `within` looks them up again to unwind.
                     use rotTarget = Qubit[(last - first + 1) * bRot];
                     within {
                         ControlledSelectWithUnlookup(
@@ -1005,8 +954,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             within {
                 CNOT(sysRegDown[j], sysRegDown[j + 1]);
             } apply {
-                // :cite:`Low2026` FIG. 40. Implementation of a controlled RZ(2θ)
-                // gate using two parallel RZ(θ) gates without controls.
+                // :cite:`Low2026` FIG. 40: controlled RZ(2θ) from two parallel uncontrolled RZ(θ) gates.
                 within {
                     CNOT(sysRegDown[j + 1], sysRegDown[j]);
                 } apply {
@@ -1073,9 +1021,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// Adapter: outer PREPARE then inner PREPARE, over one flat register.
-    ///
-    /// Lends the inner PREPARE nothing, so this exercises the clean lookup. The fidelity it
-    /// checks is the state on `qs`, which a borrowed load leaves alone by construction.
+    /// Lends the inner PREPARE nothing, so this exercises the clean lookup.
     function MakeOuterInnerPrepOp(
         outerOp : (Qubit[]) => Unit is Adj + Ctl,
         innerOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
@@ -1175,10 +1121,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// what a fixup table that disagreed with the forward load would produce. Tables whose row
     /// count is not a power of two are the case worth covering: `Select` aliases the surplus
     /// addresses onto real rows instead of leaving them unloaded.
-    ///
-    /// The borrowed register is conjugated along with the addresses, so a dirty forward pass that
-    /// returned it in a different state -- or merely entangled with the angle word -- fails here
-    /// too. Swap width 0 runs the plain loader for that branch.
+    /// The borrowed register is conjugated too, so a dirty pass that disturbs it fails here.
     operation TestBranchedRotationWordRoundTrip(
         sfData : Bool[][],
         dqData : Bool[][],
