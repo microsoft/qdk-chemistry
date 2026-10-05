@@ -202,7 +202,7 @@ def _make_table(num_rows: int, width: int) -> list[list[bool]]:
     return [[(r * 37 + b * 11 + r * b) % 3 == 0 for b in range(width)] for r in range(num_rows)]
 
 
-class TestDirtyQROAMLoadsCorrectValues:
+class TestSelectSwapDirtyLoadsCorrectValues:
     """Dirty loads must match clean lookup words and return borrowed qubits.
 
     Sweep aliases too, because ragged tables route surplus addresses through ``Select``.
@@ -230,7 +230,7 @@ class TestDirtyQROAMLoadsCorrectValues:
         )
 
 
-class TestDirtyQROAMReturnsTheBorrowedQubits:
+class TestSelectSwapDirtyReturnsTheBorrowedQubits:
     """The lender comes back unentangled, or the borrowing silently corrupts the caller."""
 
     @pytest.mark.parametrize(
@@ -270,7 +270,7 @@ class TestSelectSwap2DBorrowedMatchesClean:
         )
 
 
-class TestDirtyQROAMCostModel:
+class TestSelectSwapDirtyCostModel:
     """The width is chosen by cost, so the cost model is what decides if borrowing happens."""
 
     def test_width_zero_costs_the_plain_lookup(self):
@@ -278,7 +278,7 @@ class TestDirtyQROAMCostModel:
 
         Otherwise the fake baseline makes every swap width look cheaper.
         """
-        cost = _select_swap_dirty_ns().DirtyQROAMCost
+        cost = _select_swap_dirty_ns().SelectSwapDirtyCost1D
         for num_data in (8, 15, 224, 864):
             assert cost(0, num_data, 10) == num_data - 1
 
@@ -288,7 +288,7 @@ class TestDirtyQROAMCostModel:
 
         The ``- 2`` keeps the unary-iteration cost exactly aligned with the reference bound.
         """
-        cost = _select_swap_dirty_ns().DirtyQROAMCost
+        cost = _select_swap_dirty_ns().SelectSwapDirtyCost1D
         for num_swap_bits in range(1, math.ceil(math.log2(num_data)) + 1):
             block = 1 << num_swap_bits
             reference = 2 * math.ceil(num_data / block) + 4 * num_bits * (block - 1)
@@ -306,7 +306,7 @@ class TestDirtyQROAMCostModel:
         butterfly_cost = 4 * 15 * (4 - 1)
 
         assert (select_cost, butterfly_cost) == (44, 180)
-        assert _select_swap_dirty_ns().DirtyQROAMCost(2, 90, 15) == select_cost + butterfly_cost
+        assert _select_swap_dirty_ns().SelectSwapDirtyCost1D(2, 90, 15) == select_cost + butterfly_cost
 
     @pytest.mark.parametrize(("num_data", "num_bits"), [(20, 15), (224, 15), (64, 10)])
     def test_short_tables_decline_to_borrow(self, num_data, num_bits):
@@ -323,14 +323,14 @@ class TestDirtyQROAMCostModel:
         width = select_swap.ComputeOptimalDirtySwapBits(num_data, num_bits, 4096)
 
         assert width > 0
-        assert select_swap.DirtyQROAMCost(width, num_data, num_bits) < num_data - 1
+        assert select_swap.SelectSwapDirtyCost1D(width, num_data, num_bits) < num_data - 1
 
     def test_a_tight_dirty_budget_forces_the_plain_lookup(self):
         """Borrowing is only legal for qubits that exist; a short budget must fall back, not overdraw."""
         select_swap = _select_swap_dirty_ns()
         unconstrained = select_swap.ComputeOptimalDirtySwapBits(864, 10, 4096)
         assert unconstrained > 0
-        assert select_swap.DirtyQROAMBorrowedQubits(unconstrained, 10) > 10
+        assert select_swap.SelectSwapDirtyBorrowedQubits(unconstrained, 10) > 10
 
         assert select_swap.ComputeOptimalDirtySwapBits(864, 10, 10) == 0
 
@@ -342,7 +342,7 @@ class TestDirtyQROAMCostModel:
         select_swap = _select_swap_dirty_ns()
         for available in (0, 10, 40, 80, 160, 640):
             width = select_swap.ComputeOptimalDirtySwapBits(864, 10, available)
-            assert select_swap.DirtyQROAMBorrowedQubits(width, 10) <= available or width == 0
+            assert select_swap.SelectSwapDirtyBorrowedQubits(width, 10) <= available or width == 0
 
 
 class TestCleanSelectSwapForwardCostModel:

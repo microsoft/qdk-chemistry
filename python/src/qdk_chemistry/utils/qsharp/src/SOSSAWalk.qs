@@ -47,8 +47,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits, QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
-    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMBorrowedQubits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirty;
-    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D, QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMCost2D;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirtyBorrowedQubits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirty;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirtyCost2D;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -359,7 +359,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             };
             let lambda = if maxSwapBits < 0 { selected } else { MinI(selected, cap) };
             let cost = if availableDirty > 0 {
-                DirtyQROAMCost2D(lambda, numConditions, numInnerSlots, numBits, true)
+                SelectSwapDirtyCost2D(lambda, numConditions, numInnerSlots, numBits, true)
             } else {
                 SelectSwapCost2D(lambda, numConditions, numInnerSlots, numBits, true)
             };
@@ -1138,8 +1138,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         // Only a dirty load borrows; the clean paths allocate their own scratch internally.
         let numDirty = if borrowDirty {
             MaxI(
-                if sfSwapBits == 0 { 0 } else { DirtyQROAMBorrowedQubits(sfSwapBits, Length(sfData[0])) },
-                if dqSwapBits == 0 { 0 } else { DirtyQROAMBorrowedQubits(dqSwapBits, Length(dqData[0])) }
+                if sfSwapBits == 0 { 0 } else { SelectSwapDirtyBorrowedQubits(sfSwapBits, Length(sfData[0])) },
+                if dqSwapBits == 0 { 0 } else { SelectSwapDirtyBorrowedQubits(dqSwapBits, Length(dqData[0])) }
             )
         } else {
             0

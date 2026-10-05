@@ -33,7 +33,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
 
     /// Toffoli cost of one borrowed `SelectSwap2D` load and its uncompute: Berry et al.'s
     /// `2*ceil(d/K) + 4*b*(K-1)` forward pass, plus one measurement erasure of the target.
-    internal function DirtyQROAMCost2D(
+    internal function SelectSwapDirtyCost2D(
         lambda : Int,
         numOuterData : Int,
         numInnerData : Int,
@@ -65,11 +65,11 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         availableDirty : Int,
     ) : Int {
         let innerAddressBits = Ceiling(Lg(IntAsDouble(numInnerData)));
-        mutable best = DirtyQROAMCost2D(0, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
+        mutable best = SelectSwapDirtyCost2D(0, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
         mutable bestLambda = 0;
         for lambda in 1..innerAddressBits {
-            if DirtyQROAMBorrowedQubits(lambda, numBits) <= availableDirty {
-                let cost = DirtyQROAMCost2D(
+            if SelectSwapDirtyBorrowedQubits(lambda, numBits) <= availableDirty {
+                let cost = SelectSwapDirtyCost2D(
                     lambda,
                     numOuterData,
                     numInnerData,
@@ -86,13 +86,13 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     }
 
     /// Qubits a `SelectSwapDirty` load borrows, `numBits * 2^numSwapBits`, returned unchanged.
-    function DirtyQROAMBorrowedQubits(numSwapBits : Int, numBits : Int) : Int {
+    function SelectSwapDirtyBorrowedQubits(numSwapBits : Int, numBits : Int) : Int {
         numBits * (1 <<< numSwapBits)
     }
 
     /// Toffoli cost of the forward `SelectSwapDirty` load: `numData - 1` at width 0, otherwise
     /// two `Select` passes over `ceil(d/K)` rows plus four `numBits * (K - 1)` butterflies.
-    internal function DirtyQROAMCost(numSwapBits : Int, numData : Int, numBits : Int) : Int {
+    internal function SelectSwapDirtyCost1D(numSwapBits : Int, numData : Int, numBits : Int) : Int {
         if numSwapBits == 0 {
             numData - 1
         } else {
@@ -107,11 +107,11 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     /// Best dirty swap width that fits in `availableDirty`; 0 (plain `Select`) when none pays.
     function ComputeOptimalDirtySwapBits(numData : Int, numBits : Int, availableDirty : Int) : Int {
         let addressBits = Ceiling(Lg(IntAsDouble(numData)));
-        mutable best = DirtyQROAMCost(0, numData, numBits);
+        mutable best = SelectSwapDirtyCost1D(0, numData, numBits);
         mutable bestBits = 0;
         for swapBits in 1..addressBits {
-            if DirtyQROAMBorrowedQubits(swapBits, numBits) <= availableDirty {
-                let cost = DirtyQROAMCost(swapBits, numData, numBits);
+            if SelectSwapDirtyBorrowedQubits(swapBits, numBits) <= availableDirty {
+                let cost = SelectSwapDirtyCost1D(swapBits, numData, numBits);
                 if cost < best {
                     set best = cost;
                     set bestBits = swapBits;
@@ -144,10 +144,10 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
                 Controlled Select(controls, (data, address[...nRequired - 1], output));
             } else {
                 Fact(
-                    Length(dirty) >= DirtyQROAMBorrowedQubits(numSwapBits, m),
-                    $"dirty register needs {DirtyQROAMBorrowedQubits(numSwapBits, m)} qubits, got {Length(dirty)}"
+                    Length(dirty) >= SelectSwapDirtyBorrowedQubits(numSwapBits, m),
+                    $"dirty register needs {SelectSwapDirtyBorrowedQubits(numSwapBits, m)} qubits, got {Length(dirty)}"
                 );
-                let borrowed = dirty[...DirtyQROAMBorrowedQubits(numSwapBits, m) - 1];
+                let borrowed = dirty[...SelectSwapDirtyBorrowedQubits(numSwapBits, m) - 1];
                 let chunks = Chunks(m, borrowed);
                 let numSelectBits = nRequired - numSwapBits;
                 // Swap bits low, so the select field is `a / K` and the table stops at ceil(d/K).
@@ -194,7 +194,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     ) : Bool {
         let m = Length(data[0]);
         let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
-        let numDirty = DirtyQROAMBorrowedQubits(numSwapBits, m);
+        let numDirty = SelectSwapDirtyBorrowedQubits(numSwapBits, m);
 
         use address = Qubit[nAddr];
         use dirty = Qubit[MaxI(1, numDirty)];
@@ -250,7 +250,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     ) : Bool {
         let m = Length(data[0]);
         let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
-        let numDirty = MaxI(1, DirtyQROAMBorrowedQubits(numSwapBits, m));
+        let numDirty = MaxI(1, SelectSwapDirtyBorrowedQubits(numSwapBits, m));
 
         use address = Qubit[nAddr];
         use dirty = Qubit[numDirty];
@@ -284,7 +284,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         let m = Length(data[0][0]);
         let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
         let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
-        let numDirty = DirtyQROAMBorrowedQubits(numSwapBits, m);
+        let numDirty = SelectSwapDirtyBorrowedQubits(numSwapBits, m);
 
         use outerAddr = Qubit[nOuterAddr];
         use innerAddr = Qubit[nInnerAddr];
