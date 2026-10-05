@@ -47,6 +47,7 @@ _ADAPTIVE_ONLY_MODULES = (
     "UnaryIteration",
     "UnaryPhaseEstimation",
     "SelectSwap",
+    "SelectSwapDirty",
     "AliasSamplingStatePrep",
     "QROMStatePrep",
     "PhaseGradient",
