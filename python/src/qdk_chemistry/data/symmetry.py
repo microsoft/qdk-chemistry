@@ -6,8 +6,8 @@ density matrices) by conserved single-particle quantum numbers, together with
 the symmetry-blocked tensor storage primitives (the rank/scalar variants listed
 below) and their index-set companion :class:`SymmetryBlockedIndexSet`.
 
-In this release only the spin axis (:math:`S_z`) is populated, supporting
-restricted (RHF/ROHF) and unrestricted (UHF) references.
+The spin axis (:math:`S_z`) supports restricted (RHF/ROHF) and unrestricted
+(UHF) references. The particle-number axis labels nonnegative particle counts.
 
 Exposed symmetry types are:
 
@@ -15,6 +15,7 @@ Exposed symmetry types are:
 - :func:`axis_name_to_string`: Human-readable name for an :class:`AxisName`.
 - :class:`SymmetryAxisValue`: Abstract value carried by a single symmetry axis.
 - :class:`SpinValue`: Concrete spin-1/2 axis value (stored as :math:`2 M_s`).
+- :class:`ParticleNumberValue`: Nonnegative particle-count axis value.
 - :class:`SymmetryAxis`: One named symmetry partition with its admissible labels.
 - :class:`SymmetryProduct`: An ordered set of axes a basis is blocked under.
 - :class:`SymmetryLabel`: A composite addressing key, one value per axis.
@@ -42,6 +43,7 @@ from collections.abc import Sequence
 
 from qdk_chemistry._core.data.symmetry import (
     AxisName,
+    ParticleNumberValue,
     SpinValue,
     SymmetryAxis,
     SymmetryAxisValue,
@@ -64,6 +66,7 @@ from qdk_chemistry._core.data.symmetry import (
 
 __all__ = [
     "AxisName",
+    "ParticleNumberValue",
     "SpinValue",
     "SymmetryAxis",
     "SymmetryAxisValue",

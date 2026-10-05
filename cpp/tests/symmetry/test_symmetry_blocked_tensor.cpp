@@ -11,6 +11,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <stdexcept>
+#include <type_traits>
 
 using namespace qdk::chemistry::data;
 
@@ -128,6 +129,20 @@ TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
   EXPECT_EQ(tensor.num_blocks(), 2u);
 }
 
+TEST(SymmetryBlockedTensorTest, PublicBlocksIncludeAliases) {
+  const auto tensor = make_simple_tensor();
+  static_assert(
+      std::is_same_v<decltype(tensor.blocks()), const SBT2::BlockMap&>);
+  EXPECT_EQ(tensor.blocks().size(), tensor.num_blocks());
+  EXPECT_EQ(tensor.blocks().at(aa()), tensor.blocks().at(bb()));
+  std::size_t count = 0;
+  for (const auto& [labels, block] : tensor.blocks()) {
+    EXPECT_EQ(block, tensor.block_ptr(labels));
+    ++count;
+  }
+  EXPECT_EQ(count, 2u);
+}
+
 TEST(SymmetryBlockedTensorTest, UnrestrictedKeepsDistinctBlocks) {
   auto sym = std::make_shared<const SymmetryProduct>(
       SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
@@ -156,6 +171,19 @@ TEST(SymmetryBlockedTensorTest, ExtentMismatchRejected) {
   blocks.emplace(aa(), block);
 
   EXPECT_THROW(SBT2({sym, sym}, extents2(3), blocks), std::invalid_argument);
+}
+
+TEST(SymmetryBlockedTensorTest, NullSlotSymmetryRejected) {
+  using SBT3 = SymmetryBlockedTensor<3>;
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  SBT3::ExtentsArray extents;
+  for (auto& slot : extents) slot[SymmetryLabel{}] = 1;
+  for (std::size_t slot = 0; slot < 3; ++slot) {
+    SBT3::SymmetriesArray symmetries{sym, sym, sym};
+    symmetries[slot] = nullptr;
+    EXPECT_THROW(SBT3(symmetries, extents, {}), std::invalid_argument);
+  }
 }
 
 TEST(SymmetryBlockedTensorTest, InvalidLabelRejected) {
