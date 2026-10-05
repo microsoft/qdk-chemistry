@@ -172,6 +172,12 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
                              "'. Only CPU ERI methods are supported now");
   }
 
+  // Use atomic accumulation (one shared buffer) instead of per-thread
+  // private buffers in the ERI backend.
+  bool eri_use_atomics = _settings->get<bool>("eri_use_atomics");
+  scf_config->eri.use_atomics = eri_use_atomics;
+  scf_config->k_eri.use_atomics = eri_use_atomics;
+
   // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
