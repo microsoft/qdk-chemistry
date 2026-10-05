@@ -36,6 +36,9 @@ class ERI {
   /// Orbital basis set in libint2 format for integral engine
   libint2::BasisSet obs_;
 
+  /// Dimension of the working basis, independent of integral provenance
+  size_t num_basis_functions_;
+
   /// Host memory storage for 4-center ERIs (N⁴ doubles, may be NULL on GPU-only
   /// builds)
   std::unique_ptr<double[]> h_eri_;
@@ -106,6 +109,9 @@ class ERI {
    */
   void generate_eri_();
 
+  /// Prepare host/device storage and contraction plans for the supplied ERIs.
+  void prepare_contractions_();
+
  public:
   /**
    * @brief Construct in-core conventional ERI calculator implementation
@@ -113,6 +119,10 @@ class ERI {
    */
   ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
       double omega);
+
+  /// Construct from a full real tensor in a common orthonormal orbital basis.
+  ERI(size_t spin_density_factor, size_t num_orbitals,
+      const Eigen::VectorXd& integrals, ParallelConfig mpi);
 
   /**
    * @brief Build Coulomb (J) and exchange (K) matrices from density matrix

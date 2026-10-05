@@ -251,9 +251,21 @@ class SCFImpl {
 
  protected:
   /**
+   * @brief Initialize the shared SCF state without a molecular geometry.
+   * Integral-input implementations supply one-body integrals, a constant
+   * energy, and an ERI engine before run().
+   */
+  SCFImpl(const SCFConfig& cfg, size_t num_basis_functions, int nalpha,
+          int nbeta);
+
+  /// Allocate common iteration state after the working basis is known.
+  void initialize_state_(size_t num_basis_functions, int nalpha, int nbeta,
+                         bool skip_verify = false);
+
+  /**
    * @brief Build one-electron integrals (overlap, kinetic, nuclear attraction)
    */
-  void build_one_electron_integrals_();
+  virtual void build_one_electron_integrals_();
 
   /**
    * @brief Compute orthogonalization matrix from overlap matrix
@@ -274,7 +286,7 @@ class SCFImpl {
    *
    * @return Nuclear-nuclear repulsion energy (Hartree)
    */
-  double calc_nuclear_repulsion_energy_();
+  virtual double calc_nuclear_repulsion_energy_();
 
   /**
    * @brief Run SCF iteration using the configured algorithm
@@ -284,7 +296,7 @@ class SCFImpl {
   /**
    * @brief Calculate molecular properties (dipole, quadrupole, populations)
    */
-  void properties_();
+  virtual void properties_();
 
   /**
    * @brief Update the Fock matrix (virtual method for HF/DFT specialization)
@@ -421,7 +433,7 @@ class SCFImpl {
                          ///< num_atomic_orbitals)
 #endif
 
-  bool density_matrix_initialized_;  ///< Whether density matrix has been
-                                     ///< initialized from input MO
+  bool density_matrix_initialized_ = false;  ///< Whether density matrix has
+                                             ///< been initialized from input MO
 };
 }  // namespace qdk::chemistry::scf

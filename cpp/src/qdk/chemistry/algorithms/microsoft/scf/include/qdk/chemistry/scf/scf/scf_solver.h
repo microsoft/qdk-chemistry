@@ -12,6 +12,7 @@
 #include <vector>
 
 namespace qdk::chemistry::scf {
+class ERI;
 
 // Forward declarations
 class SCFImpl;
@@ -154,6 +155,25 @@ class SCF {
    */
   static std::unique_ptr<SCF> make_hf_solver(std::shared_ptr<Molecule> mol,
                                              const SCFConfig& cfg);
+
+  /**
+   * @brief Create an HF solver in a common orthonormal MO basis.
+   *
+   * Uses the same iteration, convergence, incremental Fock, DIIS, and GDM
+   * implementations as the molecular solver. The first nalpha/nbeta input
+   * orbitals define the initial determinant. Set density_init_method to
+   * UserProvided. Molecular properties and multi-rank MPI are not supported.
+   *
+   * @param one_body_integrals Real symmetric one-body matrix
+   * @param eri Integral engine operating in the input MO basis
+   * @param nalpha Number of active alpha electrons
+   * @param nbeta Number of active beta electrons
+   * @param core_energy Constant energy, including any frozen-core contribution
+   * @param cfg HF configuration, retained by reference for the solver lifetime
+   */
+  static std::unique_ptr<SCF> make_mo_hf_solver(
+      const RowMajorMatrix& one_body_integrals, std::shared_ptr<ERI> eri,
+      int nalpha, int nbeta, double core_energy, const SCFConfig& cfg);
 
   /**
    * @brief Create a Hartree-Fock solver with user-provided initial density

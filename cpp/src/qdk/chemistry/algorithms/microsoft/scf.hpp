@@ -7,7 +7,34 @@
 #include <Eigen/Dense>
 #include <qdk/chemistry/algorithms/scf.hpp>
 
+namespace qdk::chemistry::scf {
+struct SCFConfig;
+}
+
 namespace qdk::chemistry::algorithms::microsoft {
+
+/** @brief Native iteration controls shared by AO- and MO-basis SCF. */
+class ScfIterationSettings : public ElectronicStructureSettings {
+ public:
+  ScfIterationSettings() {
+    set_default("level_shift", -1.0);
+    set_default("enable_gdm", true);
+    set_default("scf_algorithm", std::string("auto"),
+                "Native iteration algorithm; 'auto' honors enable_gdm",
+                data::ListConstraint<std::string>{{std::vector<std::string>{
+                    "auto", "diis", "gdm", "diis_gdm"}}});
+    set_default("energy_thresh_diis_switch", 1e-3);
+    set_default("gdm_max_diis_iteration", 50);
+    set_default("gdm_bfgs_history_size_limit", 50);
+    set_default(
+        "fock_reset_steps", 1073741824, "Interval between full Fock rebuilds",
+        data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
+  }
+};
+
+/// Translate shared native settings without coupling iteration to AO integrals.
+void configure_scf_iterations(const data::Settings& settings,
+                              scf::SCFConfig& config);
 
 /**
  * @brief Internal SCF result including optional analytic nuclear gradients.
@@ -43,8 +70,7 @@ struct ScfCalculationResult {
  * @see qdk::chemistry::algorithms::ElectronicStructureSettings
  * @see qdk::chemistry::algorithms::microsoft::ScfSolver
  */
-class ScfSettings
-    : public qdk::chemistry::algorithms::ElectronicStructureSettings {
+class ScfSettings : public ScfIterationSettings {
  public:
   /**
    * @brief Constructor that initializes default SCF settings
@@ -54,13 +80,7 @@ class ScfSettings
    * - Additional SCF-specific convergence and algorithm parameters
    *
    */
-  ScfSettings() : qdk::chemistry::algorithms::ElectronicStructureSettings() {
-    set_default("level_shift", -1.0);
-    set_default("enable_gdm", true);
-    set_default("energy_thresh_diis_switch", 1e-3);
-    set_default("gdm_max_diis_iteration", 50);
-    set_default("gdm_bfgs_history_size_limit", 50);
-    set_default("fock_reset_steps", 1073741824);
+  ScfSettings() {
     set_default("eri_use_atomics", false);
     set_default("eri_threshold", -1.0);
     set_default("shell_pair_threshold", 1e-12,

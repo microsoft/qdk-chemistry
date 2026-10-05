@@ -7,9 +7,19 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "scf/ks_impl.h"
+#include "scf/mo_scf_impl.h"
 #include "scf/scf_impl.h"
 
 namespace qdk::chemistry::scf {
+std::unique_ptr<SCF> SCF::make_mo_hf_solver(
+    const RowMajorMatrix& one_body_integrals, std::shared_ptr<ERI> eri,
+    int nalpha, int nbeta, double core_energy, const SCFConfig& cfg) {
+  QDK_LOG_TRACE_ENTERING();
+  auto impl = std::make_unique<MoSCFImpl>(one_body_integrals, std::move(eri),
+                                          nalpha, nbeta, core_energy, cfg);
+  return std::unique_ptr<SCF>(new SCF(std::move(impl)));
+}
+
 std::unique_ptr<SCF> SCF::make_hf_solver(std::shared_ptr<Molecule> mol,
                                          const SCFConfig& cfg) {
   QDK_LOG_TRACE_ENTERING();

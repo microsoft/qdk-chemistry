@@ -31,6 +31,7 @@
 #include <thread>
 
 #include "util/macros.h"
+#include "util/similarity_transform.h"
 #include "util/timer.h"
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -86,9 +87,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   }
   ctx_.result = {};
 
-  num_atomic_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
-  num_molecular_orbitals_ = ctx_.basis_set->num_atomic_orbitals;
-  ctx_.num_molecular_orbitals = num_molecular_orbitals_;
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
   add_mm_charge_ = cfg.pointcharges != nullptr;
 #endif
@@ -97,17 +95,12 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   auto spin = mol.multiplicity - 1;
   auto alpha = (mol.n_electrons - n_ecp_electrons + spin) / 2;
   auto beta = mol.n_electrons - n_ecp_electrons - alpha;
-  if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF &&
-      cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    throw std::runtime_error("ASAHF method cannot be used with ROHF!");
+  if (!skip_verify) {
+    VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
+                 "Invalid spin number or charge");
   }
-  num_density_matrices_ =
-      (cfg.scf_orbital_type == SCFOrbitalType::Unrestricted ||
-       cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell)
-          ? 2
-          : 1;
-  num_orbital_spin_blocks_ =
-      (cfg.scf_orbital_type == SCFOrbitalType::Unrestricted) ? 2 : 1;
+  initialize_state_(ctx_.basis_set->num_atomic_orbitals, alpha, beta,
+                    skip_verify);
 
   if (cfg.mpi.world_rank == 0) {
     std::string fock_string = "";
@@ -170,26 +163,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                       to_string(cfg.exc.method));
   }
 
-  if (!skip_verify) {
-    VERIFY_INPUT(alpha >= 0 && beta >= 0 && beta == alpha - spin,
-                 "Invalid spin number or charge");
-    VERIFY_INPUT(num_density_matrices_ == 2 || alpha == beta,
-                 "Restricted requires n_alpha == n_beta");
-  }
-
-  // MAX_N = 46340. Stop the calculation early if the basis set is too large
-  // A single MAX_NxMAX_N matrix will have ~2^31 double floating point numbers
-  // and will take about ~16GB memory
-  const int MAX_N =
-      static_cast<int>(std::floor(std::sqrt(std::numeric_limits<int>::max())));
-  if (num_atomic_orbitals_ > MAX_N) {
-    throw std::runtime_error(
-        fmt::format("Basis set too large: {}", num_atomic_orbitals_));
-  }
-
-  nelec_[0] = alpha;
-  nelec_[1] = beta;
-
   int1e_ = std::make_unique<OneBodyIntegral>(ctx_.basis_set.get(), ctx_.mol,
                                              cfg.mpi);
   if (not delay_eri) {
@@ -202,26 +175,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
              "SCFImpl::SCFImpl->ERI::create");
     }
   }
-
-  // Host allocations for purely AO quantities
-  P_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
-  J_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
-  K_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                            num_atomic_orbitals_);
-  if (cfg.mpi.world_rank == 0) {
-    F_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
-                              num_atomic_orbitals_);
-    scf_algorithm_ = SCFAlgorithm::create(ctx_);
-  }
-
-  // MO and mixed AO/MO quantities
-  // These may be resized after the orthonormality check
-  C_ = RowMajorMatrix::Zero(num_orbital_spin_blocks_ * num_atomic_orbitals_,
-                            num_molecular_orbitals_);
-  eigenvalues_ =
-      RowMajorMatrix::Zero(num_orbital_spin_blocks_, num_molecular_orbitals_);
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   ctx_.result.scf_dispersion_correction_energy = 0.0;
@@ -248,6 +201,64 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                                num_atomic_orbitals_);
     tFock_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
                                   num_atomic_orbitals_);
+  }
+}
+
+SCFImpl::SCFImpl(const SCFConfig& cfg, size_t num_basis_functions, int nalpha,
+                 int nbeta) {
+  if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF) {
+    throw std::invalid_argument("ASAHF requires an atomic basis.");
+  }
+  ctx_.cfg = &cfg;
+  ctx_.result = {};
+  initialize_state_(num_basis_functions, nalpha, nbeta);
+}
+
+void SCFImpl::initialize_state_(size_t num_basis_functions, int nalpha,
+                                int nbeta, bool skip_verify) {
+  QDK_LOG_TRACE_ENTERING();
+  const auto& cfg = *ctx_.cfg;
+  num_atomic_orbitals_ = num_basis_functions;
+  num_molecular_orbitals_ = num_basis_functions;
+  ctx_.num_basis_functions = num_basis_functions;
+  ctx_.num_molecular_orbitals = num_basis_functions;
+  ctx_.num_alpha_electrons = nalpha;
+  ctx_.num_beta_electrons = nbeta;
+  nelec_[0] = nalpha;
+  nelec_[1] = nbeta;
+  num_density_matrices_ =
+      cfg.scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2;
+  num_orbital_spin_blocks_ =
+      cfg.scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1;
+
+  if (cfg.scf_algorithm.method == SCFAlgorithmName::ASAHF &&
+      cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+    throw std::runtime_error("ASAHF method cannot be used with ROHF!");
+  }
+  if (!skip_verify) {
+    VERIFY_INPUT(nalpha >= 0 && nbeta >= 0 &&
+                     static_cast<size_t>(nalpha) <= num_basis_functions &&
+                     static_cast<size_t>(nbeta) <= num_basis_functions,
+                 "Electron counts must lie within the working basis");
+    VERIFY_INPUT(num_density_matrices_ == 2 || nalpha == nbeta,
+                 "Restricted requires n_alpha == n_beta");
+  }
+  // Matrix dimensions are passed to backends using signed 32-bit indices.
+  const auto max_n =
+      static_cast<size_t>(std::sqrt(std::numeric_limits<int>::max()));
+  if (num_basis_functions == 0 || num_basis_functions > max_n) {
+    throw std::invalid_argument("Invalid SCF working-basis dimension");
+  }
+  P_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                            num_atomic_orbitals_);
+  J_ = RowMajorMatrix::Zero(P_.rows(), P_.cols());
+  K_ = RowMajorMatrix::Zero(P_.rows(), P_.cols());
+  C_ = RowMajorMatrix::Zero(num_orbital_spin_blocks_ * num_atomic_orbitals_,
+                            num_molecular_orbitals_);
+  eigenvalues_ =
+      RowMajorMatrix::Zero(num_orbital_spin_blocks_, num_molecular_orbitals_);
+  if (cfg.mpi.world_rank == 0) {
+    F_ = RowMajorMatrix::Zero(P_.rows(), P_.cols());
   }
 }
 
@@ -282,8 +293,10 @@ const SCFContext& SCFImpl::run() {
     const auto& res = ctx_.result;
     std::ostringstream oss;
     oss << fmt::format("{:-^65}\n", "");
-    oss << fmt::format("Nuclear Repulsion Energy =         {:20.12f}\n",
-                       res.nuclear_repulsion_energy);
+    oss << fmt::format(
+        "{:<34}{:20.12f}\n",
+        ctx_.mol ? "Nuclear Repulsion Energy =" : "Constant Energy =",
+        res.nuclear_repulsion_energy);
     oss << fmt::format("One-Electron Energy =              {:20.12f}\n",
                        res.scf_one_electron_energy);
     oss << fmt::format("Two-Electron Energy =              {:20.12f}\n",
@@ -306,19 +319,22 @@ const SCFContext& SCFImpl::run() {
 #endif
     oss << fmt::format("Total Energy =                     {:20.12f}\n",
                        res.scf_total_energy);
-    oss << std::endl;
-    oss << fmt::format("Total Dipole (a.u.)\n");
-    oss << fmt::format("         X_ =                       {:20.12f}\n",
-                       res.scf_dipole[0]);
-    oss << fmt::format("         Y =                       {:20.12f}\n",
-                       res.scf_dipole[1]);
-    oss << fmt::format("         Z =                       {:20.12f}\n",
-                       res.scf_dipole[2]);
-    oss << std::endl;
-    oss << fmt::format("Mulliken Charges (a.u.)\n");
-    for (auto A = 0; A < ctx_.mol->n_atoms; ++A) {
-      oss << fmt::format(" Atom {:>5} Z={:>3}                    {:20.8e}\n", A,
-                         ctx_.mol->atomic_nums[A], res.mulliken_population[A]);
+    if (ctx_.mol) {
+      oss << std::endl;
+      oss << fmt::format("Total Dipole (a.u.)\n");
+      oss << fmt::format("         X_ =                       {:20.12f}\n",
+                         res.scf_dipole[0]);
+      oss << fmt::format("         Y =                       {:20.12f}\n",
+                         res.scf_dipole[1]);
+      oss << fmt::format("         Z =                       {:20.12f}\n",
+                         res.scf_dipole[2]);
+      oss << std::endl;
+      oss << fmt::format("Mulliken Charges (a.u.)\n");
+      for (auto A = 0; A < ctx_.mol->n_atoms; ++A) {
+        oss << fmt::format(" Atom {:>5} Z={:>3}                    {:20.8e}\n",
+                           A, ctx_.mol->atomic_nums[A],
+                           res.mulliken_population[A]);
+      }
     }
     oss << fmt::format("{:-^65}", "");
     QDK_LOGGER().info("SCF converged: steps={}, E={:.12f}\n{}",
@@ -501,31 +517,38 @@ void SCFImpl::iterate_() {
 
   auto& res = ctx_.result;
 
+  build_one_electron_integrals_();
+  if (cfg->mpi.world_rank == 0) {
+    VERIFY_INPUT(static_cast<size_t>(nelec_[0]) <= num_molecular_orbitals_ &&
+                     static_cast<size_t>(nelec_[1]) <= num_molecular_orbitals_,
+                 "Electron counts exceed the retained overlap rank");
+    // GDM sizes its rotation history from the retained, not the original, rank.
+    scf_algorithm_ = SCFAlgorithm::create(ctx_);
+  }
+
   // Handle zero-electron systems (e.g., H+)
   // For these systems, the SCF energy is just the nuclear repulsion energy
   // with zero electronic contribution
   if (nelec_[0] == 0 && nelec_[1] == 0) {
-    build_one_electron_integrals_();
     res.nuclear_repulsion_energy = calc_nuclear_repulsion_energy_();
     res.scf_one_electron_energy = 0.0;
     res.scf_two_electron_energy = 0.0;
     res.scf_total_energy = res.nuclear_repulsion_energy;
     res.scf_iterations = 0;
     res.converged = true;
-    // Initialize coefficient matrix with identity (virtual orbitals only)
-    C_ = RowMajorMatrix::Identity(num_molecular_orbitals_,
-                                  num_molecular_orbitals_);
-    // Initialize eigenvalues to zero for zero-electron system
-    eigenvalues_ =
-        RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
+    if (cfg->mpi.world_rank == 0) {
+      for (int spin = 0; spin < num_orbital_spin_blocks_; ++spin) {
+        scf_algorithm_->solve_fock_eigenproblem(
+            H_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
+            num_molecular_orbitals_, spin);
+      }
+    }
     QDK_LOGGER().info(
         "Zero-electron system detected. SCF energy = nuclear repulsion = "
         "{:.12f}",
         res.scf_total_energy);
     return;
   }
-
-  build_one_electron_integrals_();
 
   if (ctx_.cfg->mpi.world_rank == 0) {
     init_density_matrix_();
@@ -591,7 +614,7 @@ void SCFImpl::iterate_() {
       // Check convergence
       res.converged = scf_algorithm_->check_convergence(*this);
       // Perform SCF Algorithm iteration only if not converged
-      scf_algorithm_->iterate(*this);
+      if (!res.converged) scf_algorithm_->iterate(*this);
 
       res.scf_iterations = step + 1;
     }
@@ -609,9 +632,9 @@ void SCFImpl::iterate_() {
         fmt::format("SCF failed to converge after {} steps",
                     cfg->scf_algorithm.max_iteration));
   }
-  // update eigenvalues for GDM as GDM never updates eigenvalues_
-  if (ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::GDM ||
-      ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::DIIS_GDM) {
+  // Use the physical Fock, not DIIS's shifted/extrapolated eigenvalues.
+  // ASAHF retains its fractional-occupation atomic eigenvectors.
+  if (cfg->scf_algorithm.method != SCFAlgorithmName::ASAHF) {
     if (cfg->mpi.world_rank == 0) {
       QDK_LOGGER().info("Reset incremental Fock matrix");
       reset_fock_();
@@ -620,24 +643,58 @@ void SCFImpl::iterate_() {
     eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
     update_fock_();
 
-    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-      const auto rohf_convergence_matrices =
-          scf_algorithm_->build_rohf_convergence_matrices(*this);
-      const auto& effective_fock = std::get<0>(rohf_convergence_matrices);
-      scf_algorithm_->solve_fock_eigenproblem(
-          effective_fock, S_, X_, C_, eigenvalues_, P_, nelec_,
-          num_atomic_orbitals_, num_molecular_orbitals_, 0);
-    } else {
-      for (int i = 0; i < num_orbital_spin_blocks_; ++i) {
-        scf_algorithm_->solve_fock_eigenproblem(
-            F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
-            num_molecular_orbitals_, i);
+    if (cfg->mpi.world_rank == 0) {
+      RowMajorMatrix canonical_fock = F_;
+      const bool rohf =
+          ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell;
+      if (rohf) {
+        const auto rohf_convergence_matrices =
+            scf_algorithm_->build_rohf_convergence_matrices(*this);
+        canonical_fock = rohf_convergence_matrices.first;
       }
+      // Canonicalize only within equal-occupation subspaces. A full
+      // diagonalization could change the converged determinant.
+      for (int spin = 0; spin < num_orbital_spin_blocks_; ++spin) {
+        std::vector<size_t> boundaries{0, static_cast<size_t>(nelec_[spin]),
+                                       num_molecular_orbitals_};
+        if (rohf) {
+          boundaries = {0, static_cast<size_t>(nelec_[1]),
+                        static_cast<size_t>(nelec_[0]),
+                        num_molecular_orbitals_};
+        }
+        const RowMajorMatrix fock = canonical_fock.middleRows(
+            spin * num_atomic_orbitals_, num_atomic_orbitals_);
+        for (size_t block = 1; block < boundaries.size(); ++block) {
+          const size_t begin = boundaries[block - 1];
+          const size_t count = boundaries[block] - begin;
+          if (count == 0) continue;
+          const RowMajorMatrix subspace = C_.block(
+              spin * num_atomic_orbitals_, begin, num_atomic_orbitals_, count);
+          RowMajorMatrix rotated(num_atomic_orbitals_, count);
+          RowMajorMatrix block_energies(1, count);
+          scf_algorithm_->solve_fock_eigenproblem(
+              fock, S_, subspace, rotated, block_energies, P_, nelec_,
+              num_atomic_orbitals_, count, 0);
+          C_.block(spin * num_atomic_orbitals_, begin, num_atomic_orbitals_,
+                   count) = rotated;
+          eigenvalues_.block(spin, begin, 1, count) = block_energies;
+        }
+      }
+      scf_algorithm_->update_density_matrix(
+          P_, C_, ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted,
+          nelec_[0], nelec_[1]);
     }
-    scf_algorithm_->update_density_matrix(
-        P_, C_, ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted,
-        nelec_[0], nelec_[1]);
   }
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  MPI_Bcast(P_.data(),
+            num_density_matrices_ * num_atomic_orbitals_ * num_atomic_orbitals_,
+            MPI_DOUBLE, 0, MPI_COMM_WORLD);
+#endif
+  if (cfg->mpi.world_rank == 0) reset_fock_();
+  const auto [alpha, beta, omega] = get_hyb_coeff_();
+  eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
+  update_fock_();
+  res.scf_total_energy = total_energy_();
 }
 
 void SCFImpl::properties_() {
@@ -848,9 +905,9 @@ void SCFImpl::init_density_matrix_() {
   NVTX3_FUNC_RANGE();
 #endif
   AutoTimer timer("SCFImpl::init_density_matrix");
-  auto& mol = *ctx_.mol;
   auto method = ctx_.cfg->density_init_method;
   if (method == DensityInitializationMethod::SOAD) {
+    const auto& mol = *ctx_.mol;
     soad_initialize_density_matrix(P_.data(), num_atomic_orbitals_,
                                    mol.atomic_nums.data(), mol.n_atoms);
     P_ *= 2.0;
@@ -865,7 +922,7 @@ void SCFImpl::init_density_matrix_() {
         P_, C_, ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted,
         nelec_[0], nelec_[1]);
   } else if (method == DensityInitializationMethod::Atom) {
-    atom_guess(*ctx_.basis_set, mol, P_.data());
+    atom_guess(*ctx_.basis_set, *ctx_.mol, P_.data());
   } else if (method == DensityInitializationMethod::File) {
     std::ifstream ifsDM(ctx_.cfg->density_init_file, std::ios::binary);
     if (ifsDM.is_open()) {
@@ -900,6 +957,35 @@ void SCFImpl::init_density_matrix_() {
       QDK_LOGGER().warn(
           "Breaking symmetry not implemented for spin 0 molecule");
     }
+  }
+
+  if (ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::GDM &&
+      C_.isZero(0.0)) {
+    // A density-only guess has no orbitals for GDM to rotate. Project its
+    // most occupied natural orbitals onto a determinant with the requested
+    // spin counts; a user-provided idempotent density is preserved.
+    RowMajorMatrix natural_operator = RowMajorMatrix::Zero(
+        num_orbital_spin_blocks_ * num_atomic_orbitals_, num_atomic_orbitals_);
+    for (int spin = 0; spin < num_orbital_spin_blocks_; ++spin) {
+      RowMajorMatrix density =
+          P_.middleRows(spin * num_atomic_orbitals_, num_atomic_orbitals_);
+      if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+        density += P_.bottomRows(num_atomic_orbitals_);
+      }
+      similarity_transform(
+          blas::Layout::RowMajor, num_atomic_orbitals_, num_atomic_orbitals_,
+          -1.0, S_.data(), num_atomic_orbitals_, density.data(),
+          num_atomic_orbitals_, 0.0,
+          natural_operator.data() +
+              spin * num_atomic_orbitals_ * num_atomic_orbitals_,
+          num_atomic_orbitals_);
+      scf_algorithm_->solve_fock_eigenproblem(
+          natural_operator, S_, X_, C_, eigenvalues_, P_, nelec_,
+          num_atomic_orbitals_, num_molecular_orbitals_, spin);
+    }
+    scf_algorithm_->update_density_matrix(
+        P_, C_, ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted,
+        nelec_[0], nelec_[1]);
   }
 }
 

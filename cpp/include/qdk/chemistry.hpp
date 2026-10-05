@@ -12,6 +12,7 @@
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
+#include <qdk/chemistry/algorithms/mo_scf.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
 #include <qdk/chemistry/algorithms/population_analysis.hpp>

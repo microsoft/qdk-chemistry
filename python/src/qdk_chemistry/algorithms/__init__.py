@@ -38,6 +38,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
 )
 from qdk_chemistry.algorithms.hamiltonian_factorization import HamiltonianFactorization
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
+from qdk_chemistry.algorithms.mo_scf_solver import MoScfSolver, QdkMoScfSolver
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
     QdkMacisAsci,
@@ -90,6 +91,7 @@ __all__ = [
     "HamiltonianConstructor",
     "HamiltonianFactorization",
     "HamiltonianUnitaryBuilder",
+    "MoScfSolver",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
@@ -109,6 +111,7 @@ __all__ = [
     "QdkMacisAsci",
     "QdkMacisCas",
     "QdkMacisPmc",
+    "QdkMoScfSolver",
     "QdkNaturalOrbitalLocalizer",
     "QdkNuclearDerivativeCalculator",
     "QdkOccupationActiveSpaceSelector",

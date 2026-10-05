@@ -1559,6 +1559,9 @@ Examples:
 Notes:
     FCIDUMP format is a standard quantum chemistry format for storing
     molecular integrals and is widely supported by quantum chemistry codes.
+    Canonical unrestricted Hamiltonians use IUHF=1, with aaaa, bbbb, aabb,
+    alpha one-body, and beta one-body blocks separated by zero records.
+    Electron counts refer to the exported active space.
 )",
                   py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 

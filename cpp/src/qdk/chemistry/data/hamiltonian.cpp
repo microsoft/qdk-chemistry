@@ -312,15 +312,9 @@ const Eigen::MatrixXd& HamiltonianContainer::inactive_fock_block(
 void HamiltonianContainer::to_fcidump_file(const std::string& filename,
                                            size_t nalpha, size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
-
-  if (is_unrestricted()) {
-    throw std::runtime_error(
-        "FCIDUMP format is not supported for unrestricted Hamiltonians.");
-  }
-
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for writing: " + filename);
+  if (is_unrestricted() && !is_hermitian()) {
+    throw std::invalid_argument(
+        "Unrestricted FCIDUMP requires Hermitian integrals.");
   }
 
   size_t num_molecular_orbitals;
@@ -334,7 +328,7 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
 
       if (n_active_alpha != n_active_beta) {
         throw std::invalid_argument(
-            "For restricted Hamiltonian, alpha and beta active spaces must "
+            "For FCIDUMP, alpha and beta active spaces must "
             "have same size");
       }
       num_molecular_orbitals = n_active_alpha;
@@ -345,6 +339,16 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
     throw std::runtime_error("Orbitals are not set");
   }
 
+  if (num_molecular_orbitals == 0 || nalpha > num_molecular_orbitals ||
+      nbeta > num_molecular_orbitals) {
+    throw std::invalid_argument(
+        "FCIDUMP electron counts exceed the orbital space.");
+  }
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Cannot open file for writing: " + filename);
+  }
+  const bool unrestricted = is_unrestricted();
   const size_t nelec = nalpha + nbeta;
   const size_t num_molecular_orbitals2 =
       num_molecular_orbitals * num_molecular_orbitals;
@@ -363,14 +367,16 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
   file << "&FCI ";
   file << "NORB=" << num_molecular_orbitals << ", ";
   file << "NELEC=" << nelec << ", ";
-  file << "MS2=" << (nalpha - nbeta) << ",\n";
+  file << "MS2=" << (static_cast<int64_t>(nalpha) - static_cast<int64_t>(nbeta))
+       << ",\n";
   file << "ORBSYM=" << orb_string << ",\n";
   file << "ISYM=1,\n";
+  if (unrestricted) file << "IUHF=1,\n";
   file << "&END\n";
 
-  auto formatted_line = [&](size_t i, size_t j, size_t k, size_t l,
-                            double val) {
-    if (std::abs(val) < print_thresh) return;
+  auto formatted_line = [&](size_t i, size_t j, size_t k, size_t l, double val,
+                            bool required = false) {
+    if (!required && std::abs(val) < print_thresh) return;
 
     file << std::setw(28) << std::scientific << std::setprecision(16)
          << std::right << val << " ";
@@ -381,43 +387,72 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
   };
 
   // Get the two-electron integrals via the virtual accessor
-  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
+  const auto& [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
 
-  auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
+  auto write_eri = [&](const Eigen::VectorXd& integrals, size_t i, size_t j,
+                       size_t k, size_t l) {
     auto eri =
-        eri_aaaa(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-                 k * num_molecular_orbitals + l);
+        integrals(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
+                  k * num_molecular_orbitals + l);
 
     formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
     file << "\n";
   };
 
-  auto write_1body = [&](size_t i, size_t j) {
-    auto hel = _one_body->block({axes::alpha(), axes::alpha()})(i, j);
+  auto write_1body = [&](const Eigen::MatrixXd& integrals, size_t i, size_t j) {
+    auto hel = integrals(i, j);
 
     formatted_line(i + 1, j + 1, 0, 0, hel);
     file << "\n";
   };
 
-  // Write permutationally unique MO ERIs
-  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
-        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
-          if (ij <= kl) {
-            write_eri(i, j, k, l);
+  auto separator = [&]() {
+    formatted_line(0, 0, 0, 0, 0.0, true);
+    file << "\n";
+  };
+
+  auto write_two_body = [&](const Eigen::VectorXd& integrals, bool mixed_spin) {
+    for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
+      for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
+        for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
+          for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
+            // Unlike same-spin integrals, (pq|rs)_ab != (rs|pq)_ab.
+            if (mixed_spin || ij <= kl) {
+              write_eri(integrals, i, j, k, l);
+            }
           }
-        }
-    }
+      }
+  };
+
+  write_two_body(eri_aaaa, false);
+  if (unrestricted) {
+    separator();
+    write_two_body(eri_bbbb, false);
+    separator();
+    write_two_body(eri_aabb, true);
+    separator();
+  }
 
   // Write permutationally unique MO 1-body integrals
   for (size_t i = 0; i < num_molecular_orbitals; ++i)
     for (size_t j = 0; j <= i; ++j) {
-      write_1body(i, j);
+      write_1body(_one_body->block({axes::alpha(), axes::alpha()}), i, j);
     }
+  if (unrestricted) {
+    separator();
+    for (size_t i = 0; i < num_molecular_orbitals; ++i)
+      for (size_t j = 0; j <= i; ++j) {
+        write_1body(_one_body->block({axes::beta(), axes::beta()}), i, j);
+      }
+    separator();
+  }
 
   // Write core energy
-  formatted_line(0, 0, 0, 0, _core_energy);
+  formatted_line(0, 0, 0, 0, _core_energy, true);
+  file.close();
+  if (!file) {
+    throw std::runtime_error("Failed to write FCIDUMP file: " + filename);
+  }
 }
 
 std::string Hamiltonian::get_summary() const {

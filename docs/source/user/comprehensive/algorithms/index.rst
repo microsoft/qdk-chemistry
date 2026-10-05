@@ -20,6 +20,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    pmc
    qubit_mapper
    scf_solver
+   mo_scf_solver
    stability_checker
    state_preparation
    hadamard_test
@@ -49,6 +50,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`ScfSolver <scf_solver>`
      - Mean-field (:term:`HF`/:term:`DFT`) calculations
      - Structure → Orbitals
+   * - :doc:`MoScfSolver <mo_scf_solver>`
+     - Hartree-Fock orbital optimization from existing MO integrals
+     - Hamiltonian + electron counts → Energy + Ansatz
    * - :doc:`OrbitalLocalizer <localizer>`
      - Orbital transformations
      - Orbitals → Orbitals

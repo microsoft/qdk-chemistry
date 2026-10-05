@@ -12,6 +12,7 @@
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
+#include <qdk/chemistry/algorithms/mo_scf.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
 #include <qdk/chemistry/algorithms/population_analysis.hpp>
@@ -40,6 +41,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
 #define REGISTER_FACTORY_SETTINGS_INIT(NAME) \
   if (type == NAME::algorithm_type_name()) return try_factory<NAME>(name);
   REGISTER_FACTORY_SETTINGS_INIT(ScfSolverFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(MoScfSolverFactory)
   REGISTER_FACTORY_SETTINGS_INIT(ActiveSpaceSelectorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(HamiltonianConstructorFactory)
   REGISTER_FACTORY_SETTINGS_INIT(PopulationAnalyzerFactory)

@@ -57,6 +57,17 @@ class ERIINCORE : public ERI {
             ParallelConfig mpi, double omega);
 
   /**
+   * @brief Copy supplied real, chemists'-notation integrals into the existing
+   * in-core contraction engine.
+   * @param scf_orbital_type Spin symmetry classification
+   * @param num_orbitals Dimension of the orthonormal input basis
+   * @param integrals Full row-major tensor, indexed as ((p*n+q)*n+r)*n+s
+   * @param mpi Parallelism configuration (one rank only)
+   */
+  ERIINCORE(SCFOrbitalType scf_orbital_type, size_t num_orbitals,
+            const Eigen::VectorXd& integrals, ParallelConfig mpi);
+
+  /**
    * @brief Destructor - releases all stored integral data
    *
    * Frees memory used for storing the 4-center integral tensor. Marked noexcept

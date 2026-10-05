@@ -278,8 +278,8 @@ struct SCFResult {
  * Holds configuration, molecular data, basis sets, results, and timing.
  */
 struct SCFContext {
-  const SCFConfig* cfg;  ///< Pointer to SCF configuration settings
-  const Molecule* mol;   ///< Pointer to molecular structure
+  const SCFConfig* cfg = nullptr;  ///< Pointer to SCF configuration settings
+  const Molecule* mol = nullptr;   ///< Molecular structure, absent for MO input
   std::shared_ptr<BasisSet> basis_set;  ///< Primary basis set
   std::shared_ptr<BasisSet>
       aux_basis_set;  ///< Auxiliary basis set for density fitting (if used)
@@ -287,6 +287,10 @@ struct SCFContext {
       basis_set_raw;  ///< Basis set in RAW normalization (for output)
 
   int64_t num_molecular_orbitals = -1;  ///< Number of molecular orbitals
+  int64_t num_basis_functions =
+      -1;                       ///< Dimension of the working AO or MO basis
+  int num_alpha_electrons = 0;  ///< Electrons represented by the alpha density
+  int num_beta_electrons = 0;   ///< Electrons represented by the beta density
 
   SCFResult result;  ///< Results from the SCF calculation
 };

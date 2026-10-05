@@ -32,6 +32,7 @@ void bind_basis_set(py::module& m);
 void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
+void bind_mo_scf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_effective_hamiltonian_constructor(py::module& m);
 void bind_hamiltonian_factorization(py::module& m);
@@ -106,6 +107,7 @@ PYBIND11_MODULE(_core, m) {
   bind_localizer(algorithms);
   bind_mc(algorithms);
   bind_mcscf(algorithms);
+  bind_mo_scf(algorithms);
   bind_hamiltonian_constructor(algorithms);
   bind_effective_hamiltonian_constructor(algorithms);
   bind_hamiltonian_factorization(algorithms);

@@ -6,6 +6,9 @@
 
 #include <qdk/chemistry/scf/config.h>
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -32,6 +35,7 @@ ERI::ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
 
   spin_density_factor_ = spin_density_factor;
   obs_ = libint2_util::convert_to_libint_basisset(basis);
+  num_basis_functions_ = obs_.nbf();
   omega_ = omega;
   basis_mode_ = basis.mode;
   mpi_ = mpi;
@@ -47,16 +51,65 @@ ERI::ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
   generate_eri_();
 }
 
+ERI::ERI(size_t spin_density_factor, size_t num_orbitals,
+         const Eigen::VectorXd& integrals, ParallelConfig mpi)
+    : spin_density_factor_(spin_density_factor),
+      basis_mode_(BasisMode::RAW),
+      mpi_(mpi),
+      num_basis_functions_(num_orbitals),
+      omega_(0.0),
+      loc_i_st_(0),
+      loc_i_en_(num_orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+  if (mpi.world_size != 1 || mpi.world_rank != 0) {
+    throw std::invalid_argument(
+        "Supplied in-core integrals require one MPI rank.");
+  }
+  if (num_orbitals == 0 ||
+      num_orbitals > static_cast<size_t>(std::sqrt(std::sqrt(
+                         std::numeric_limits<Eigen::Index>::max())))) {
+    throw std::invalid_argument(
+        "Invalid orbital dimension for in-core integrals.");
+  }
+  const size_t n2 = num_orbitals * num_orbitals;
+  if (integrals.size() != static_cast<Eigen::Index>(n2 * n2) ||
+      !integrals.allFinite()) {
+    throw std::invalid_argument("Expected a finite, full n^4 integral tensor.");
+  }
+  const double symmetry_tolerance =
+      1e-12 * std::max(1.0, integrals.cwiseAbs().maxCoeff());
+  for (size_t p = 0; p < num_orbitals; ++p)
+    for (size_t q = 0; q < num_orbitals; ++q)
+      for (size_t r = 0; r < num_orbitals; ++r)
+        for (size_t s = 0; s < num_orbitals; ++s) {
+          const auto pqrs =
+              ((p * num_orbitals + q) * num_orbitals + r) * num_orbitals + s;
+          const auto qprs =
+              ((q * num_orbitals + p) * num_orbitals + r) * num_orbitals + s;
+          const auto pqsr =
+              ((p * num_orbitals + q) * num_orbitals + s) * num_orbitals + r;
+          const auto rspq =
+              ((r * num_orbitals + s) * num_orbitals + p) * num_orbitals + q;
+          if (std::abs(integrals[pqrs] - integrals[qprs]) >
+                  symmetry_tolerance ||
+              std::abs(integrals[pqrs] - integrals[pqsr]) >
+                  symmetry_tolerance ||
+              std::abs(integrals[pqrs] - integrals[rspq]) >
+                  symmetry_tolerance) {
+            throw std::invalid_argument(
+                "MO SCF requires real two-body integrals with eightfold "
+                "permutation symmetry.");
+          }
+        }
+  h_eri_ = std::make_unique<double[]>(integrals.size());
+  std::copy_n(integrals.data(), integrals.size(), h_eri_.get());
+  prepare_contractions_();
+}
+
 void ERI::generate_eri_() {
   QDK_LOG_TRACE_ENTERING();
 
   // Allocate and populate ERIs on host
-  const size_t num_atomic_orbitals = obs_.nbf();
-  const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
-  const size_t num_atomic_orbitals3 =
-      num_atomic_orbitals2 * num_atomic_orbitals;
-  const size_t eri_sz = num_atomic_orbitals3 * (loc_i_en_ - loc_i_st_);
-
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
   if (!mpi_.world_rank)
@@ -74,6 +127,16 @@ void ERI::generate_eri_() {
     h_eri_erf_ =
         libint2_util::opt_eri(basis_mode_, obs_, omega_, loc_i_st_, loc_i_en_);
 #endif
+
+  prepare_contractions_();
+}
+
+void ERI::prepare_contractions_() {
+  QDK_LOG_TRACE_ENTERING();
+  const size_t num_atomic_orbitals = num_basis_functions_;
+  const size_t eri_sz = num_atomic_orbitals * num_atomic_orbitals *
+                        num_atomic_orbitals * (loc_i_en_ - loc_i_st_);
+  const bool is_rsx = std::abs(omega_) > 1e-12;
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0 || \
     (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
@@ -140,7 +203,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
   const bool is_rsx = std::abs(omega_) > 1e-12;
 
-  const size_t num_atomic_orbitals = obs_.nbf();
+  const size_t num_atomic_orbitals = num_basis_functions_;
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t mat_size = spin_density_factor_ * num_atomic_orbitals2;
 
@@ -241,7 +304,7 @@ void ERI::get_gradients(const double* P, double* dJ, double* dK, double alpha,
 
 void ERI::quarter_trans(size_t nt, const double* C, double* out) {
   QDK_LOG_TRACE_ENTERING();
-  const size_t num_atomic_orbitals = obs_.nbf();
+  const size_t num_atomic_orbitals = num_basis_functions_;
   const size_t num_atomic_orbitals2 = num_atomic_orbitals * num_atomic_orbitals;
   const size_t num_atomic_orbitals3 =
       num_atomic_orbitals2 * num_atomic_orbitals;

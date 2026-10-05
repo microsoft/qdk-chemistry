@@ -10,6 +10,7 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <cmath>
 #include <numeric>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -29,6 +30,35 @@ using qcs::SCFOrbitalType;
 // Bring logger types into scope
 using qdk::chemistry::utils::Logger;
 using qdk::chemistry::utils::LogLevel;
+
+void configure_scf_iterations(const data::Settings& settings,
+                              qcs::SCFConfig& config) {
+  const double threshold = settings.get<double>("convergence_threshold");
+  if (!std::isfinite(threshold) || threshold <= 0.0) {
+    throw std::invalid_argument(
+        "convergence_threshold must be finite and positive.");
+  }
+  config.scf_algorithm.density_threshold = threshold * 1e2;
+  config.scf_algorithm.og_threshold = threshold;
+  config.scf_algorithm.max_iteration = settings.get<int>("max_iterations");
+  config.scf_algorithm.level_shift = settings.get<double>("level_shift");
+  config.fock_reset_steps = settings.get<int64_t>("fock_reset_steps");
+  const auto algorithm = settings.get<std::string>("scf_algorithm");
+  if (algorithm == "gdm") {
+    config.scf_algorithm.method = qcs::SCFAlgorithmName::GDM;
+  } else if (algorithm == "diis_gdm" ||
+             (algorithm == "auto" && settings.get<bool>("enable_gdm"))) {
+    config.scf_algorithm.method = qcs::SCFAlgorithmName::DIIS_GDM;
+  } else {
+    config.scf_algorithm.method = qcs::SCFAlgorithmName::DIIS;
+  }
+  config.scf_algorithm.gdm_config.energy_thresh_diis_switch =
+      settings.get<double>("energy_thresh_diis_switch");
+  config.scf_algorithm.gdm_config.gdm_max_diis_iteration =
+      settings.get<int>("gdm_max_diis_iteration");
+  config.scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
+      settings.get<int>("gdm_bfgs_history_size_limit");
+}
 
 // Helper function to calculate alpha and beta electron counts
 std::pair<int, int> calculate_electron_counts(
@@ -166,12 +196,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
 
   double convergence_threshold =
       _settings->get<double>("convergence_threshold");
-  int64_t max_iterations = _settings->get<int64_t>("max_iterations");
-
-  // Set different convergence threshold according to tolerance
-  double orbital_gradient_threshold = convergence_threshold;
-  // when convergence_threshold = 1e-7, density_threshold = 1e-5
-  double density_threshold = convergence_threshold * 1e2;
 
   // Create Molecule object
   auto ms_mol = qdk::chemistry::utils::microsoft::convert_to_molecule(
@@ -192,9 +216,7 @@ ScfCalculationResult ScfSolver::_run_with_options(
   ms_scf_config->basis = basis_set_name;
   ms_scf_config->basis_mode = qcs::BasisMode::PSI4;
   ms_scf_config->scf_orbital_type = scf_orbital_type;
-  ms_scf_config->scf_algorithm.density_threshold = density_threshold;
-  ms_scf_config->scf_algorithm.og_threshold = orbital_gradient_threshold;
-  ms_scf_config->scf_algorithm.max_iteration = max_iterations;
+  configure_scf_iterations(*_settings, *ms_scf_config);
   // Set density initialization method based on whether initial guess is
   // provided
   ms_scf_config->density_init_method =
@@ -225,27 +247,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
-  ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
-
-  // Convert enable_gdm boolean to algorithm method enum for backward
-  // compatibility
-  bool enable_gdm = _settings->get<bool>("enable_gdm");
-  if (enable_gdm) {
-    ms_scf_config->scf_algorithm.method = qcs::SCFAlgorithmName::DIIS_GDM;
-  } else {
-    ms_scf_config->scf_algorithm.method = qcs::SCFAlgorithmName::DIIS;
-  }
-
-  ms_scf_config->scf_algorithm.level_shift =
-      _settings->get<double>("level_shift");
-  ms_scf_config->scf_algorithm.max_iteration =
-      _settings->get<int64_t>("max_iterations");
-  ms_scf_config->scf_algorithm.gdm_config.energy_thresh_diis_switch =
-      _settings->get<double>("energy_thresh_diis_switch");
-  ms_scf_config->scf_algorithm.gdm_config.gdm_max_diis_iteration =
-      _settings->get<int64_t>("gdm_max_diis_iteration");
-  ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
-      _settings->get<int64_t>("gdm_bfgs_history_size_limit");
   if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
     ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;

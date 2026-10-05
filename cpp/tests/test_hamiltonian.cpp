@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -1767,7 +1768,7 @@ TEST_F(HamiltonianTest, FCIDUMPSerialization) {
   EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
 }
 
-TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
+TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestricted) {
   // Create unrestricted orbitals for this test
   auto unrestricted_orbitals =
       std::make_shared<ModelOrbitals>(2, model_spin_symmetry(false));
@@ -1778,6 +1779,9 @@ TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
 
   Eigen::VectorXd two_body_aaaa = Eigen::VectorXd::Ones(16);
   Eigen::VectorXd two_body_aabb = 2 * Eigen::VectorXd::Ones(16);
+  two_body_aabb(12) =
+      7.0;  // (22|11), without mixed-spin pair exchange symmetry
+  two_body_aabb(3) = 11.0;  // (11|22)
   Eigen::VectorXd two_body_bbbb = 3 * Eigen::VectorXd::Ones(16);
 
   Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
@@ -1786,17 +1790,59 @@ TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
   Hamiltonian h_unrestricted(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
-          empty_fock));
+          two_body_bbbb, unrestricted_orbitals, 0.0, empty_fock, empty_fock));
 
   // Verify it's actually unrestricted
   EXPECT_TRUE(h_unrestricted.is_unrestricted());
   EXPECT_FALSE(h_unrestricted.is_restricted());
 
-  // Test that FCIDUMP serialization throws an error for unrestricted case
-  EXPECT_THROW(h_unrestricted.to_fcidump_file(
-                   "test_unrestricted.hamiltonian.fcidump", 1, 1),
-               std::runtime_error);
+  const std::string filename = "test_unrestricted.hamiltonian.fcidump";
+  h_unrestricted.to_fcidump_file(filename, 0, 1);
+  std::ifstream file(filename);
+  std::string line, header;
+  while (std::getline(file, line)) {
+    header += line;
+    if (line == "&END") break;
+  }
+  EXPECT_NE(header.find("IUHF=1"), std::string::npos);
+  EXPECT_NE(header.find("MS2=-1"), std::string::npos);
+  size_t block = 0;
+  std::array<size_t, 5> block_sizes{};
+  bool saw_ab_2211 = false, saw_ab_1122 = false, saw_core = false;
+  double value;
+  size_t i, j, k, l;
+  while (file >> value >> i >> j >> k >> l) {
+    if (i == 0 && j == 0 && k == 0 && l == 0) {
+      EXPECT_DOUBLE_EQ(value, 0.0);
+      if (block == 5) saw_core = true;
+      ++block;
+    } else {
+      ASSERT_LT(block, 5);
+      ++block_sizes[block];
+      if (block == 2 && i == 2 && j == 2 && k == 1 && l == 1) {
+        EXPECT_DOUBLE_EQ(value, 7.0);
+        saw_ab_2211 = true;
+      }
+      if (block == 2 && i == 1 && j == 1 && k == 2 && l == 2) {
+        EXPECT_DOUBLE_EQ(value, 11.0);
+        saw_ab_1122 = true;
+      }
+    }
+  }
+  EXPECT_EQ(block, 6);
+  EXPECT_EQ(block_sizes, (std::array<size_t, 5>{6, 6, 9, 2, 3}));
+  EXPECT_TRUE(saw_ab_2211 && saw_ab_1122 && saw_core);
+  file.close();
+  std::filesystem::remove(filename);
+
+  Hamiltonian nonhermitian(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
+          two_body_bbbb, unrestricted_orbitals, 0.0, empty_fock, empty_fock,
+          HamiltonianType::NonHermitian));
+  EXPECT_THROW(nonhermitian.to_fcidump_file(filename, 1, 1),
+               std::invalid_argument);
+  EXPECT_FALSE(std::filesystem::exists(filename));
 }
 
 TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {

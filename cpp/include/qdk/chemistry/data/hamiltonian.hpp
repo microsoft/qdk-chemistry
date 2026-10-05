@@ -294,8 +294,10 @@ class HamiltonianContainer {
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs or Hamiltonian is
-   * unrestricted
+   * @throws std::runtime_error if an I/O error occurs
+   * @throws std::invalid_argument if electron counts exceed the orbital space
+   * @note Unrestricted output uses IUHF=1 with aaaa, bbbb, aabb, alpha
+   * one-body, and beta one-body blocks separated by zero records.
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
                                size_t nbeta) const;
@@ -633,6 +635,7 @@ class Hamiltonian : public DataClass,
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs
+   * @note Canonical unrestricted integrals use the IUHF=1 block layout.
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const;

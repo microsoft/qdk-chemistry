@@ -762,20 +762,11 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
       gdm_step_count_(0) {
   QDK_LOG_TRACE_ENTERING();
   const auto& cfg = *ctx.cfg;
-  const auto& mol = *ctx.mol;
-
   const int num_molecular_orbitals =
       static_cast<int>(ctx.num_molecular_orbitals);
 
-  auto n_ecp_electrons = ctx.basis_set->get_n_ecp_electrons();
-  auto spin = mol.multiplicity - 1;
-  auto num_alpha_electrons =
-      static_cast<int>((mol.n_electrons - n_ecp_electrons + spin) / 2);
-  auto num_beta_electrons =
-      static_cast<int>(mol.n_electrons - n_ecp_electrons - num_alpha_electrons);
-
   // Initialize member variables
-  num_electrons_ = {num_alpha_electrons, num_beta_electrons};
+  num_electrons_ = {ctx.num_alpha_electrons, ctx.num_beta_electrons};
   history_size_ = 0;
   pseudo_canonical_eigenvalues_ = Eigen::VectorXd::Zero(num_molecular_orbitals);
   if (history_size_limit < 1) {
@@ -905,6 +896,7 @@ static void calculate_pseudo_canonical_orbital_block(
     Eigen::VectorXd& eigenvalues, const int eigenvalue_start_index,
     Eigen::Block<RowMajorMatrix> transformed_orbitals,
     const int num_atomic_orbitals, const int num_molecular_orbitals) {
+  if (block_size == 0) return;
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, block_size,
                input_block_output_eigenvectors.data(), block_size,
                eigenvalues.data() + eigenvalue_start_index);
@@ -942,6 +934,7 @@ static void rotate_gradient_to_pseudo_canonical_basis(
     const int start_index, const int num_rows, const int num_cols,
     const RowMajorMatrix& u_left, const RowMajorMatrix& u_right,
     Eigen::Ref<Eigen::VectorXd> transformed_vector) {
+  if (num_rows == 0 || num_cols == 0) return;
   RowMajorMatrix current_matrix = Eigen::Map<const RowMajorMatrix>(
       current_vector.data() + start_index, num_rows, num_cols);
   RowMajorMatrix temp_matrix = RowMajorMatrix::Zero(num_rows, num_cols);

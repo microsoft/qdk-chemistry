@@ -18,6 +18,7 @@ target_sources(chemistry PRIVATE
     macis_cas.cpp
     macis_pmc.cpp
     mp2.cpp
+    mo_scf.cpp
     scf.cpp
     stabilized_scf.cpp
     stability.cpp

@@ -34,9 +34,20 @@ class ERI {
    */
   ERI(SCFOrbitalType scf_orbital_type, double tol, BasisSet& basis_set,
       ParallelConfig mpi)
+      : ERI(scf_orbital_type, tol, basis_set.num_atomic_orbitals, mpi) {}
+
+  /**
+   * @brief Construct an integral engine without an atomic basis.
+   * @param scf_orbital_type Spin symmetry classification
+   * @param tol Integral screening tolerance
+   * @param num_basis_functions Dimension of the working basis
+   * @param mpi Parallelism configuration
+   */
+  ERI(SCFOrbitalType scf_orbital_type, double tol, size_t num_basis_functions,
+      ParallelConfig mpi)
       : scf_orbital_type_(scf_orbital_type),
         tolerance_(tol),
-        basis_set_(basis_set),
+        num_basis_functions_(num_basis_functions),
         mpi_(mpi) {
     switch (scf_orbital_type_) {
       case SCFOrbitalType::Restricted:
@@ -54,6 +65,9 @@ class ERI {
    * @brief Virtual destructor
    */
   virtual ~ERI() = default;
+
+  /// Dimension of the basis in which densities and integrals are represented.
+  size_t num_basis_functions() const { return num_basis_functions_; }
 
   /**
    * @brief Build Coulomb (J) and exchange (K) matrices
@@ -171,7 +185,7 @@ class ERI {
 
   SCFOrbitalType scf_orbital_type_;
   double tolerance_;     ///< Integral screening threshold
-  BasisSet& basis_set_;  ///< Reference to the atomic orbital basis set
+  size_t num_basis_functions_;  ///< Dimension of the working AO or MO basis
   ParallelConfig mpi_;   ///< MPI parallelization configuration
 };
 }  // namespace qdk::chemistry::scf

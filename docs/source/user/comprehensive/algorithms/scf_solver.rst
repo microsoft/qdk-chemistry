@@ -177,6 +177,8 @@ QDK (Native)
 .. rubric:: Factory name: ``"qdk"`` (default)
 
 The native QDK/Chemistry implementation provides high-performance :term:`SCF` calculations using the built-in quantum chemistry engine.
+For calculations starting from existing MO integrals rather than a molecular geometry, use :doc:`mo_scf_solver`.
+The two entry points share the native iteration and in-core integral engines.
 
 .. rubric:: Capabilities
 
@@ -213,10 +215,12 @@ The :term:`GDM` algorithm then proceeds via a slightly modified :cite:`VanVoorhi
 
 .. rubric:: Hybrid DIIS-GDM Strategy
 
-By default, the native QDK implementation uses the hybrid strategy (``enable_gdm=True``), which provides enhanced robustness over using :term:`DIIS` alone (``enable_gdm=False``).
+By default, the native QDK implementation uses the hybrid strategy (``scf_algorithm="auto"`` and ``enable_gdm=True``).
+Set ``scf_algorithm`` to ``"diis"``, ``"gdm"``, or ``"diis_gdm"`` to select an algorithm explicitly.
+With ``"auto"``, ``enable_gdm=False`` retains the existing DIIS-only behavior.
 
 1. Start with :term:`DIIS` for rapid initial convergence
-2. Monitor energy changes; if the energy change exceeds ``energy_thresh_diis_switch`` (default: :math:`10^{-3}` Ha), switch to :term:`GDM`
+2. Switch to :term:`GDM` when the magnitude of the energy change falls below ``energy_thresh_diis_switch`` (default: :math:`10^{-3}` Ha), or the DIIS iteration limit is exceeded
 3. Once switched, continue with :term:`GDM` until convergence
 
 This hybrid approach combines the speed of :term:`DIIS` for typical systems with the robustness of :term:`GDM` for challenging cases.
@@ -251,6 +255,10 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - bool
      - ``True``
      - Enable geometric direct minimization (:term:`GDM`) algorithm
+   * - ``scf_algorithm``
+     - string
+     - ``"auto"``
+     - ``"diis"``, ``"gdm"``, or ``"diis_gdm"``; ``"auto"`` honors ``enable_gdm``
    * - ``gdm_max_diis_iteration``
      - int
      - ``50``

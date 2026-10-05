@@ -104,8 +104,7 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   int num_density_matrices = has_spin_split_density() ? 2 : 1;
-  int size = num_density_matrices * basis_set_.num_atomic_orbitals *
-             basis_set_.num_atomic_orbitals;
+  int size = num_density_matrices * num_basis_functions_ * num_basis_functions_;
   if (mpi_.world_size > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
     AutoTimer t("ERI::build_JK->MPI_Reduce");

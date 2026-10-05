@@ -26,7 +26,7 @@ One-electron integrals
    Matrix of one-electron integrals (h₁)
 
 Two-electron integrals
-   Vector of two-electron integrals (h₂) in physicist notation :math:`\left\langle ij|kl \right\rangle`
+   Vector of two-electron integrals in chemists' notation :math:`(ij|kl)`
 
 Core energy
    Constant energy term combining nuclear repulsion and inactive orbital contributions
@@ -54,7 +54,7 @@ The ``Hamiltonian`` class supports both restricted and unrestricted representati
 For unrestricted Hamiltonians, the one-electron and two-electron integrals are stored separately for each spin channel:
 
 - One-electron integrals: :math:`h_{\alpha\alpha}` and :math:`h_{\beta\beta}`
-- Two-electron integrals: :math:`h_{\alpha\alpha\alpha\alpha}`, :math:`h_{\alpha\beta\alpha\beta}`, and :math:`h_{\beta\beta\beta\beta}`
+- Two-electron integrals: :math:`g_{\alpha\alpha\alpha\alpha}`, :math:`g_{\alpha\alpha\beta\beta}`, and :math:`g_{\beta\beta\beta\beta}`, with spin labels grouped by electron
 
 Usage
 -----
@@ -92,17 +92,18 @@ Two-electron integral storage and notation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Two-electron integrals in quantum chemistry can be represented using different notations and storage formats.
-QDK/Chemistry uses the physicist notation by default, but it's important to understand the different conventions:
+QDK/Chemistry stores dense canonical integrals in chemists' notation, but it is important to distinguish the conventions:
 
 Physicist/Dirac notation :math:`\left\langle ij|kl \right\rangle` or :math:`\left\langle ij|kl \right\rangle`
    Represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`k`, while electron 2 occupies orbitals :math:`j` and :math:`l`.
-   This is the default representation in QDK/Chemistry.
    In this notation, the first index of each pair :math:`(i,k)` refers to electron 1, and the second index of each pair :math:`(j,l)` refers to electron 2, following a (1,2,1,2) electron indexing pattern.
 
 Chemist/Mulliken notation :math:`(ij|kl)` or :math:`[ij|kl]`
    Represents the Coulomb interaction where electron 1 occupies orbitals :math:`i` and :math:`j`, while electron 2 occupies orbitals :math:`k` and :math:`l`.
    In this notation, the first pair of indices :math:`(i,j)` refers to electron 1, and the second pair :math:`(k,l)` refers to electron 2, following a (1,1,2,2) electron indexing pattern.
    The symbols differ (parentheses vs square brackets), but the indexing convention is the same.
+   This is the storage convention for canonical QDK/Chemistry integrals: ``get_two_body_element(i, j, k, l)`` returns :math:`(ij|kl)`.
+   The dense tensor is flattened in row-major order, with index ``((i*n + j)*n + k)*n + l``.
 
 The relationship between physicist and chemist notation is:
 
@@ -110,7 +111,7 @@ The relationship between physicist and chemist notation is:
 
    \left\langle ij | kl \right\rangle = \left(ik|jl \right)
 
-Two-electron integrals with real-valued orbitals possess inherent symmetry properties.
+Spin-independent two-electron integrals with real-valued orbitals possess inherent symmetry properties.
 From a theoretical perspective, these symmetries can be expressed as:
 
 .. math::
@@ -139,6 +140,12 @@ Serialization
 
 The :class:`~qdk_chemistry.data.Hamiltonian` class supports serialization to and from JSON and HDF5 formats.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
+
+``to_fcidump_file(filename, nalpha, nbeta)`` exports active-space integrals and the constant energy.
+Canonical unrestricted Hamiltonians use the ``IUHF=1`` block layout: ``aaaa``, ``bbbb``, ``aabb``, alpha one-body, beta one-body, then the constant energy.
+The first five blocks are terminated by zero records.
+The mixed-spin block does not impose bra/ket-pair exchange symmetry.
+The supplied electron counts refer to the exported active space.
 
 Active space Hamiltonian
 ------------------------

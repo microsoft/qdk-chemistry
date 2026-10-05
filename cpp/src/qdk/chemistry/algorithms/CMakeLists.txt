@@ -7,6 +7,7 @@ target_sources(chemistry PRIVATE
     hamiltonian.cpp
     localization.cpp
     mc.cpp
+    mo_scf.cpp
     nuclear_derivative.cpp
     nuclear_derivative_detail.cpp
     pmc.cpp

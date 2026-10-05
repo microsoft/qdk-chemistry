@@ -22,6 +22,15 @@ ERIINCORE::ERIINCORE(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
 
 ERIINCORE::~ERIINCORE() noexcept = default;
 
+ERIINCORE::ERIINCORE(SCFOrbitalType scf_orbital_type, size_t num_orbitals,
+                     const Eigen::VectorXd& integrals, ParallelConfig mpi)
+    : ERI(scf_orbital_type, 0.0, num_orbitals, mpi),
+      eri_impl_(std::make_unique<incore::ERI>(
+          scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, num_orbitals,
+          integrals, mpi)) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
 void ERIINCORE::build_JK_impl_(const double* P, double* J, double* K,
                                double alpha, double beta, double omega) {
   QDK_LOG_TRACE_ENTERING();

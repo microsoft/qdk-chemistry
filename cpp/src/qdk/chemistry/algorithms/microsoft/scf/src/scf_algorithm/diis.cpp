@@ -132,7 +132,7 @@ void DIIS::iterate(const RowMajorMatrix& P, const RowMajorMatrix& F,
   const auto* cfg = ctx_.cfg;
   auto& res = ctx_.result;
 
-  int num_atomic_orbitals = ctx_.basis_set->num_atomic_orbitals;
+  int num_atomic_orbitals = ctx_.num_basis_functions;
   int num_orbital_sets =
       (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) ? 2 : 1;
 
