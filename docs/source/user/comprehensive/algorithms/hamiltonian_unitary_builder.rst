@@ -129,6 +129,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``order``
      - int
      - Trotter-Suzuki order (1 for first-order, 2+ for higher even orders). Default is 1.
+   * - ``minimize_pauli_exponentials``
+     - bool
+     - Reorder groups to minimize the number of Pauli exponentials for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
@@ -141,6 +144,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+   * - ``fuse_group_boundaries``
+     - bool
+     - Fuse matching commuting-group boundaries without unrolling repetitions. Default is ``False``; independent of ``minimize_pauli_exponentials``.
 
 
 .. _zassenhaus-builder:
@@ -207,10 +213,34 @@ Consuming term partitions
 When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
-* :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
+* :class:`~qdk_chemistry.data.FlatPartition` (group → index) supplies commuting groups, but does not certify disjoint qubit supports.
 
-In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
-This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
+The emitted formula retains each nonempty :class:`~qdk_chemistry.data.LayeredPartition` layer in ``layer_offsets``, after coefficient filtering and for every Suzuki schedule occurrence.
+The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper` uses these declared boundaries directly; no downstream regrouping is performed.
+Layer propagation is independent of ``minimize_pauli_exponentials`` and ``fuse_group_boundaries``.
+
+By default, groups are sorted by ascending layer count, preserving the historical splitting order.
+This ordering does not generally minimize the number of individual Pauli exponentials.
+
+Set ``minimize_pauli_exponentials=True`` on the ``"trotter"`` algorithm to place the group with the most active terms centrally and the second-largest group outside the Strang/Suzuki splitting.
+Group sizes are counted after ``weight_threshold`` filtering, rather than by their number of disjoint layers.
+Groups are moved only when this strictly lowers the structural count below; otherwise, including ties, the declared order and its Trotter error are kept.
+Other groups retain their relative order, and ties between group sizes are resolved stably from the existing order.
+Neither the input partition nor the layers within its groups are mutated.
+
+For order :math:`2k`, let :math:`f=5^{k-1}`, :math:`M` be the number of active terms, and :math:`a,c` the sizes of the outer and central groups.
+The internally fused one-step schedule contains :math:`2fM-(f-1)a-fc` individual Pauli exponentials.
+Thus the selected endpoints minimize this structural count over permutations of the given partition.
+The setting does not add fusion across symbolic repetitions, change the requested time or number of steps, or optimize angle-dependent gate synthesis.
+Reordering can change Trotter error, so a lower count at fixed step size is not an equal-accuracy guarantee.
+First-order formulas retain the default ordering even when the setting is enabled.
+
+This is an algorithm :class:`~qdk_chemistry.data.Settings` option: it can be supplied to :func:`~qdk_chemistry.algorithms.create`, updated through ``settings()``, or passed in a nested :class:`~qdk_chemistry.data.AlgorithmRef` used by evolution or QPE builders.
+
+Independently, ``fuse_group_boundaries=True`` retains ``group_offsets`` after ordering and ``weight_threshold`` filtering, with each group spanning all its layers, and calls :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.fuse_boundaries` with ``atol=0.0``.
+This preserves group order, requested time, and the Trotter approximation apart from floating-point rounding; see :ref:`compact-product-formulas` and :ref:`mapper compatibility <compact-formula-mappers>`.
+Fusion trades storage for executed rotations: the rewritten formula stores the interior of the step twice, roughly doubling :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms`, while saving about one boundary group per repetition in :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials`.
+The relative saving is small when the boundary group is small compared with the step, as in higher-order Suzuki steps whose internal boundaries are already merged.
 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
@@ -265,6 +295,36 @@ Example::
     #   exp(-i * +0.2500 * IIXI)
     #   exp(-i * +0.2500 * IXII)
     #   exp(-i * +0.2500 * XIII)
+
+
+.. _compact-product-formulas:
+
+Compact product-formula containers
+----------------------------------
+
+A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` executes ``prefix_terms`` once, then ``step_terms`` repeated ``step_reps`` times, then ``suffix_terms`` once.
+``step_terms`` is the repeated block: one product-formula step, or a rewritten block after boundary fusion.
+:attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials` counts ``len(prefix_terms) + step_reps * len(step_terms) + len(suffix_terms)``; :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms` counts ``len(prefix_terms) + len(step_terms) + len(suffix_terms)``.
+These are structural counts, not synthesized gate counts.
+
+Optional ``group_offsets`` delimit validated commuting groups in ``step_terms`` only, increasing strictly from zero to the body length.
+Without this metadata, boundary fusion treats each term as a singleton group.
+
+Optional ``layer_offsets`` delimit validated disjoint-support layers over the stored concatenation ``prefix_terms + step_terms + suffix_terms``.
+They increase strictly from zero to the stored term count and include both prefix/body and body/suffix boundaries; an empty formula uses ``(0,)``.
+Fusion and composition retain the surviving terms' declared layers without merging neighboring layers; arbitrary body reordering falls back to singleton body layers.
+Formulas without this metadata retain term-by-term controlled mapping.
+
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.fuse_boundaries` fuses repetition boundaries with equal commuting Pauli-word sets by adding signed angles, without unrolling.
+A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``prefix_terms`` or ``suffix_terms`` are returned unchanged, making the rewrite idempotent.
+The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
+
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
+It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
+
+:doc:`JSON and HDF5 serialization <../data/serialization>` write schema ``0.3.0`` without expanding repetitions; convert ``0.2.0`` files from earlier releases with the :doc:`migration tool <../../migrating-data-files>`.
+Plain formulas without prefix or suffix terms or group/layer metadata retain their legacy content hashes.
+Compact storage and :ref:`mapping <compact-formula-mappers>` do not guarantee compact circuit export, simulation, or resource estimation.
 
 
 .. _block-encoding-builder:

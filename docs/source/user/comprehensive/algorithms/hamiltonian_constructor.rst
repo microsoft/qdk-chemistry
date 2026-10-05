@@ -122,6 +122,9 @@ The native QDK/Chemistry implementation for Hamiltonian construction. Transforms
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
+   * - ``eri_use_atomics``
+     - bool
+     - Use atomic accumulation into one shared buffer instead of per-thread private buffers during the :term:`AO` to active :term:`MO` ERI transformation. Reduces peak memory usage for large systems but may be slower. Only affects ``eri_method="direct"``. Default: false
 
 QDK Cholesky
 ~~~~~~~~~~~~
