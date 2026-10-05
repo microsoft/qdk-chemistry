@@ -244,11 +244,6 @@ nitpick_ignore_regex = [
         r"py:class",
         r"^qdk_chemistry\.utils\.zassenhaus_generation\.(PlanExpr|PlanTerm|CommutatorPlan)$",
     ),
-    (r"py:class", r"^(PauliFactor|PauliWord)$"),  # Sparse Pauli type aliases
-    (
-        r"py:class",
-        r"^qdk_chemistry\.data\.qubit_operator\.containers\.sparse_pauli_decomposition\.(PauliFactor|PauliWord)$",
-    ),
     (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]
 
