@@ -48,6 +48,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits, QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
     import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMBorrowedQubits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirty;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D, QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMCost2D;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -360,44 +361,44 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// `SelectSwapCost2D` already covers one lookup/uncompute pair. One SOSSA block applies
     /// two inner PREPARE/uncompute pairs and, if split out, one free-rider lookup pair.
     ///
-    /// `maxSwapBits` must cap what the lookups will actually use, or this compares the cost
-    /// of two layouts neither of which gets built.
+    /// `maxSwapBits` and `availableDirty` must match what the lookups will actually use, or
+    /// this compares the cost of two layouts neither of which gets built. A lender switches
+    /// both the width selector and the cost model to the borrowed network's.
     internal function ShouldLoadFreeRiderSeparately(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         maxSwapBits : Int,
+        availableDirty : Int,
     ) : Bool {
         let numConditions = Length(innerCoefficients);
         let nIndexBits = MaxI(1, AddressQubits(Length(innerCoefficients[0])));
         let numInnerSlots = 1 <<< nIndexBits;
         let numWordBits = coefficientBitPrecision + nIndexBits + 2;
         let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let inlineBits = numWordBits + numExtraBits;
         // Mirrors the cap in `MakeInnerPrepareAliasSampling`, including its clamp to the table's
         // address width, so this compares the cost of the layouts that will actually be built.
         let cap = MinI(MaxI(0, maxSwapBits), nIndexBits);
-        let inlineSelected = ComputeOptimalLambda2D(numConditions, numInnerSlots, inlineBits, true);
-        let separateSelected = ComputeOptimalLambda2D(numConditions, numInnerSlots, numWordBits, true);
-        let inlineLambda = if maxSwapBits < 0 { inlineSelected } else { MinI(inlineSelected, cap) };
-        let separateLambda = if maxSwapBits < 0 { separateSelected } else { MinI(separateSelected, cap) };
         let innerPreparePairsPerBlock = 2;
         let freeRiderPairsPerBlock = 1;
-        let inlineCost = innerPreparePairsPerBlock * SelectSwapCost2D(
-            inlineLambda,
-            numConditions,
-            numInnerSlots,
-            inlineBits,
-            true
-        );
-        let separateCost = innerPreparePairsPerBlock * SelectSwapCost2D(
-            separateLambda,
-            numConditions,
-            numInnerSlots,
-            numWordBits,
-            true
-        ) + freeRiderPairsPerBlock * SelectSwapCost2D(0, numConditions, 1, numExtraBits, true);
-        numExtraBits > 0 and separateCost < inlineCost
+        mutable innerCosts = [];
+        for numBits in [numWordBits + numExtraBits, numWordBits] {
+            let selected = if availableDirty > 0 {
+                ComputeOptimalDirtySwapBits2D(numConditions, numInnerSlots, numBits, true, availableDirty)
+            } else {
+                ComputeOptimalLambda2D(numConditions, numInnerSlots, numBits, true)
+            };
+            let lambda = if maxSwapBits < 0 { selected } else { MinI(selected, cap) };
+            let cost = if availableDirty > 0 {
+                DirtyQROAMCost2D(lambda, numConditions, numInnerSlots, numBits, true)
+            } else {
+                SelectSwapCost2D(lambda, numConditions, numInnerSlots, numBits, true)
+            };
+            set innerCosts += [innerPreparePairsPerBlock * cost];
+        }
+        let separateCost = innerCosts[1]
+            + freeRiderPairsPerBlock * SelectSwapCost2D(0, numConditions, 1, numExtraBits, true);
+        numExtraBits > 0 and separateCost < innerCosts[0]
     }
 
     /// Build the inner alias-sampling PREPARE and its free-rider loader together.
@@ -406,12 +407,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// PREPARE/uncompute pairs in one block encoding. Loading it separately costs one `Select`
     /// round trip over the outer conditions but lets the inner table use a narrower output
     /// and potentially a different swap width.
+    ///
+    /// `availableDirty` is the size of the register the walk lends the inner PREPARE, or 0 to
+    /// load with clean scratch. The free-rider placement is costed at that lender size, so it
+    /// must match what the walk actually lends.
     function MakeInnerPrepareAliasSamplingOracles(
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         maxSwapBits : Int,
-        borrowDirty : Bool,
+        availableDirty : Int,
     ) : (
         ((Qubit[], Qubit[], Qubit[]) => Unit is Adj),
         ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
@@ -420,7 +425,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             innerCoefficients,
             freeRiderData,
             coefficientBitPrecision,
-            maxSwapBits
+            maxSwapBits,
+            availableDirty
         );
         let inlineData = if loadSeparately { [] } else { freeRiderData };
         let separateData = if loadSeparately { freeRiderData } else { [] };
@@ -431,7 +437,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 inlineData,
                 coefficientBitPrecision,
                 maxSwapBits,
-                borrowDirty
+                availableDirty > 0
             ),
             MakeFreeRiderLoadOp(separateData)
         )
@@ -1087,12 +1093,14 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
         maxSwapBits : Int,
+        availableDirty : Int,
     ) : Bool {
         ShouldLoadFreeRiderSeparately(
             innerCoefficients,
             freeRiderData,
             coefficientBitPrecision,
-            maxSwapBits
+            maxSwapBits,
+            availableDirty
         )
     }
 

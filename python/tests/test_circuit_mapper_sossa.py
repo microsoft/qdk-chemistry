@@ -396,9 +396,31 @@ class TestSOSSAMapper:
             free_rider_data,
             1,
             -1,
+            0,
         )
 
         assert load_separately is False
+
+    @pytest.mark.parametrize(
+        ("max_swap_bits", "available_dirty", "expected"),
+        [(-1, 0, True), (0, 0, False), (-1, 1, False)],
+        ids=["clean_network", "capped_to_select", "lender_too_small"],
+    )
+    def test_free_rider_placement_is_costed_at_the_width_actually_built(self, max_swap_bits, available_dirty, expected):
+        """Splitting the free-rider word out only pays where a swap network will be built.
+
+        A clean network here makes the wider inline word costly enough to split. Capped to width
+        0, or borrowing from a lender too small for any network, the load is a plain ``Select``
+        whose cost ignores the word width, so a split would only add a lookup.
+        """
+        coefficients = [[1.0] * 8 for _ in range(8)]
+        free_rider_data = [[bool((row >> bit) & 1) for bit in range(4)] for row in range(8)]
+
+        load_separately = QSHARP_UTILS.SOSSAWalk.TestShouldLoadFreeRiderSeparately(
+            coefficients, free_rider_data, 2, max_swap_bits, available_dirty
+        )
+
+        assert load_separately is expected
 
     @pytest.mark.parametrize(
         "table_shape",

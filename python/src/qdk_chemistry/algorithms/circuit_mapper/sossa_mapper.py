@@ -187,12 +187,14 @@ class SOSSAMapper(CircuitMapper):
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
+            # The walk lends its system register (2N qubits) to the inner PREPARE's QROAM.
+            available_dirty = 2 * container.metadata.num_spatial_orbitals if self._borrow_dirty else 0
             return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSamplingOracles(
                 coefficients,
                 free_rider_data,
                 coeff_bits,
                 self._max_swap_bits,
-                self._borrow_dirty,
+                available_dirty,
             )
         if algorithm == "direct":
             return (
