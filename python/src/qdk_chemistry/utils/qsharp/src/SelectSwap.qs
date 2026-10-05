@@ -146,37 +146,6 @@ namespace QDKChemistry.Utils.SelectSwap {
         return selectCost + swapCost + numErasures * eraseCost;
     }
 
-    operation SelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], output : Qubit[]) : Unit is Adj + Ctl {
-        let nRequired = DimensionsForSelect(data, address);
-        let addressFitted = address[...nRequired - 1];
-
-        let swapBits = numSwapBits == -1 ? ComputeOptimalLambda1D(Length(data), Length(data[0])) | numSwapBits;
-
-        Fact(swapBits <= nRequired, "Too many bits for SWAP network");
-
-        let padded = PadToAddressSpace(data, nRequired);
-        if swapBits == 0 {
-            Select(padded, addressFitted, output);
-        } else {
-            WithSelectSwap(swapBits, padded, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
-        }
-    }
-
-    /// Clean select-swap whose surplus addresses alias the way a bare `Select` reads them.
-    ///
-    /// `SelectSwap` zero-pads, which is right when its own adjoint erases the load. Here the
-    /// erasure is a shared measurement-based unlookup with a phase fixup written against
-    /// `Select`'s routing, so the forward load has to agree with that routing instead.
-    operation SelectSwapAliased(
-        numSwapBits : Int,
-        data : Bool[][],
-        address : Qubit[],
-        output : Qubit[],
-    ) : Unit is Adj + Ctl {
-        let nRequired = DimensionsForSelect(data, address);
-        SelectSwap(numSwapBits, AliasToAddressSpace(data, nRequired), address, output);
-    }
-
     /// Toffoli cost of the *forward* clean select-swap load only.
     ///
     /// `SelectSwapCost1D` prices a compute/uncompute pair, which is the right model when the
@@ -212,6 +181,37 @@ namespace QDKChemistry.Utils.SelectSwap {
     /// Clean scratch qubits a `SelectSwapAliased` load allocates at a given swap width.
     function SelectSwapScratchQubits(numSwapBits : Int, numBits : Int) : Int {
         if numSwapBits <= 0 { 0 } else { numBits * (2^numSwapBits - 1) }
+    }
+
+    operation SelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], output : Qubit[]) : Unit is Adj + Ctl {
+        let nRequired = DimensionsForSelect(data, address);
+        let addressFitted = address[...nRequired - 1];
+
+        let swapBits = numSwapBits == -1 ? ComputeOptimalLambda1D(Length(data), Length(data[0])) | numSwapBits;
+
+        Fact(swapBits <= nRequired, "Too many bits for SWAP network");
+
+        let padded = PadToAddressSpace(data, nRequired);
+        if swapBits == 0 {
+            Select(padded, addressFitted, output);
+        } else {
+            WithSelectSwap(swapBits, padded, address, intermediate => ApplyToEachCA(CNOT, Zipped(intermediate, output)));
+        }
+    }
+
+    /// Clean select-swap whose surplus addresses alias the way a bare `Select` reads them.
+    ///
+    /// `SelectSwap` zero-pads, which is right when its own adjoint erases the load. Here the
+    /// erasure is a shared measurement-based unlookup with a phase fixup written against
+    /// `Select`'s routing, so the forward load has to agree with that routing instead.
+    operation SelectSwapAliased(
+        numSwapBits : Int,
+        data : Bool[][],
+        address : Qubit[],
+        output : Qubit[],
+    ) : Unit is Adj + Ctl {
+        let nRequired = DimensionsForSelect(data, address);
+        SelectSwap(numSwapBits, AliasToAddressSpace(data, nRequired), address, output);
     }
 
     //  2D SELECT-SWAP (single select-swap over the combined outer×inner address)
@@ -603,4 +603,5 @@ namespace QDKChemistry.Utils.SelectSwap {
             Adjoint SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
         }
     }
+
 }

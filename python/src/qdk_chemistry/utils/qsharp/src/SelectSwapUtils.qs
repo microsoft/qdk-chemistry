@@ -150,7 +150,13 @@ namespace QDKChemistry.Utils.SelectSwapUtils {
         )
     }
 
-    //  1D SELECT-SWAP
+    /// Toffoli cost of erasing an `addressBits`-wide load by measurement and phase fixup.
+    ///
+    /// The `O(sqrt(N))` unlookup: measure the loaded word out in the X basis and repair the
+    /// phase it leaves on the address with a lookup over a table of parities.
+    internal function MeasurementUnlookupCost(addressBits : Int) : Int {
+        2^((addressBits + 1) / 2) + 2^(addressBits / 2) - (addressBits + 2)
+    }
 
     internal operation SwapDataOutputs(address : Qubit[], outputs : Qubit[][]) : Unit is Adj {
         let l = Length(address);
@@ -166,11 +172,4 @@ namespace QDKChemistry.Utils.SelectSwapUtils {
         }
     }
 
-    /// Toffoli cost of erasing an `addressBits`-wide load by measurement and phase fixup.
-    ///
-    /// The `O(sqrt(N))` unlookup: measure the loaded word out in the X basis and repair the
-    /// phase it leaves on the address with a lookup over a table of parities.
-    internal function MeasurementUnlookupCost(addressBits : Int) : Int {
-        2^((addressBits + 1) / 2) + 2^(addressBits / 2) - (addressBits + 2)
-    }
 }

@@ -252,83 +252,8 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         adjoint self;
     }
 
-    /// A borrowed `SelectSwap2D` loads exactly what the plain one loads, and returns the lender.
-    ///
-    /// The two loads are run back to back into the same `copy` register, so `copy` cancels to
-    /// zero precisely when they agree. Comparing against the clean path rather than against
-    /// `data[i][j]` is what lets the sweep cover the *whole* address space: surplus outer
-    /// addresses are aliased onto real rows by `Select`, and the point at issue is that the
-    /// borrowed path aliases them the same way, not what the alias happens to be.
-    ///
-    /// The borrowed register is seeded into a non-trivial product state, so a construction that
-    /// silently assumed `|0>` scratch shows up as either a wrong word or a disturbed lender.
-    internal operation TestSelectSwap2DDirtyMatchesClean(
-        data : Bool[][][],
-        numSwapBits : Int,
-        outerAddressAlwaysValid : Bool,
-        dirtySeed : Int,
-    ) : Bool {
-        let m = Length(data[0][0]);
-        let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
-        let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
-        let numDirty = DirtyQROAMBorrowedQubits(numSwapBits, m);
-
-        use outerAddr = Qubit[nOuterAddr];
-        use innerAddr = Qubit[nInnerAddr];
-        use dirty = Qubit[MaxI(1, numDirty)];
-        use target = Qubit[m];
-        use copy = Qubit[m];
-
-        mutable allCorrect = true;
-
-        for i in 0..2^nOuterAddr - 1 {
-            for j in 0..2^nInnerAddr - 1 {
-                ApplyXorInPlace(i, outerAddr);
-                ApplyXorInPlace(j, innerAddr);
-                if numDirty > 0 {
-                    ApplyXorInPlace(dirtySeed % 2^numDirty, dirty[...numDirty - 1]);
-                }
-
-                // Each `within` uncompute is the measurement erasure, which leaves a phase on
-                // the address but returns `target` to |0>. The address is a basis state here,
-                // so that phase is global and cannot affect the comparison.
-                within {
-                    SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, dirty, target);
-                } apply {
-                    ApplyToEachCA(CNOT, Zipped(target, copy));
-                }
-                within {
-                    SelectSwap2D(data, 0, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
-                } apply {
-                    ApplyToEachCA(CNOT, Zipped(target, copy));
-                }
-
-                let residue = MResetEachZ(copy);
-                if not All(r -> r == Zero, residue) {
-                    Message($"FAIL word: outer={i}, inner={j}, differs from clean in {residue}");
-                    set allCorrect = false;
-                }
-
-                // The lender must come back exactly as it went in.
-                if numDirty > 0 {
-                    ApplyXorInPlace(dirtySeed % 2^numDirty, dirty[...numDirty - 1]);
-                    let dirtyResidue = MResetEachZ(dirty);
-                    if not All(r -> r == Zero, dirtyResidue) {
-                        Message($"FAIL dirty disturbed: outer={i}, inner={j}, residue={dirtyResidue}");
-                        set allCorrect = false;
-                    }
-                }
-
-                ApplyXorInPlace(i, outerAddr);
-                ApplyXorInPlace(j, innerAddr);
-            }
-        }
-
-        allCorrect
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
-    // Dirty-qubit QROAM
+    // Test wrappers
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// `SelectSwapDirty` loads the addressed word and hands the borrowed qubits back untouched.
@@ -436,4 +361,80 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
 
         All(r -> r == Zero, MResetEachZ(address + dirty))
     }
+
+    /// A borrowed `SelectSwap2D` loads exactly what the plain one loads, and returns the lender.
+    ///
+    /// The two loads are run back to back into the same `copy` register, so `copy` cancels to
+    /// zero precisely when they agree. Comparing against the clean path rather than against
+    /// `data[i][j]` is what lets the sweep cover the *whole* address space: surplus outer
+    /// addresses are aliased onto real rows by `Select`, and the point at issue is that the
+    /// borrowed path aliases them the same way, not what the alias happens to be.
+    ///
+    /// The borrowed register is seeded into a non-trivial product state, so a construction that
+    /// silently assumed `|0>` scratch shows up as either a wrong word or a disturbed lender.
+    internal operation TestSelectSwap2DDirtyMatchesClean(
+        data : Bool[][][],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+        dirtySeed : Int,
+    ) : Bool {
+        let m = Length(data[0][0]);
+        let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
+        let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
+        let numDirty = DirtyQROAMBorrowedQubits(numSwapBits, m);
+
+        use outerAddr = Qubit[nOuterAddr];
+        use innerAddr = Qubit[nInnerAddr];
+        use dirty = Qubit[MaxI(1, numDirty)];
+        use target = Qubit[m];
+        use copy = Qubit[m];
+
+        mutable allCorrect = true;
+
+        for i in 0..2^nOuterAddr - 1 {
+            for j in 0..2^nInnerAddr - 1 {
+                ApplyXorInPlace(i, outerAddr);
+                ApplyXorInPlace(j, innerAddr);
+                if numDirty > 0 {
+                    ApplyXorInPlace(dirtySeed % 2^numDirty, dirty[...numDirty - 1]);
+                }
+
+                // Each `within` uncompute is the measurement erasure, which leaves a phase on
+                // the address but returns `target` to |0>. The address is a basis state here,
+                // so that phase is global and cannot affect the comparison.
+                within {
+                    SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, dirty, target);
+                } apply {
+                    ApplyToEachCA(CNOT, Zipped(target, copy));
+                }
+                within {
+                    SelectSwap2D(data, 0, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
+                } apply {
+                    ApplyToEachCA(CNOT, Zipped(target, copy));
+                }
+
+                let residue = MResetEachZ(copy);
+                if not All(r -> r == Zero, residue) {
+                    Message($"FAIL word: outer={i}, inner={j}, differs from clean in {residue}");
+                    set allCorrect = false;
+                }
+
+                // The lender must come back exactly as it went in.
+                if numDirty > 0 {
+                    ApplyXorInPlace(dirtySeed % 2^numDirty, dirty[...numDirty - 1]);
+                    let dirtyResidue = MResetEachZ(dirty);
+                    if not All(r -> r == Zero, dirtyResidue) {
+                        Message($"FAIL dirty disturbed: outer={i}, inner={j}, residue={dirtyResidue}");
+                        set allCorrect = false;
+                    }
+                }
+
+                ApplyXorInPlace(i, outerAddr);
+                ApplyXorInPlace(j, innerAddr);
+            }
+        }
+
+        allCorrect
+    }
+
 }

@@ -192,6 +192,11 @@ namespace QDKChemistry.Utils.AliasSampling {
         return result;
     }
 
+    /// Create an alias sampling state preparation callable.
+    function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {
+        AliasSamplingPrepare(params, _)
+    }
+
     /// Prepare a uniform superposition over |0⟩ .. |nStates - 1⟩ without ancillas.
     ///
     /// `Std.StatePreparation.PrepareUniformSuperposition` allocates an ancilla that is
@@ -405,11 +410,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         Z(signOrigQubit);
     }
 
-    /// Create an alias sampling state preparation callable.
-    function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {
-        AliasSamplingPrepare(params, _)
-    }
-
     /// Circuit entry point for alias sampling.
     operation MakeAliasSamplingCircuit(
         coefficients : Double[],
@@ -426,6 +426,10 @@ namespace QDKChemistry.Utils.AliasSampling {
         use qs = Qubit[numQubits];
         AliasSamplingPrepare(params, qs);
     }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Test wrappers
+    // ═══════════════════════════════════════════════════════════════════════════
 
     /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.
     internal function MakeConditionalAliasSamplingPrepOp(
