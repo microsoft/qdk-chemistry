@@ -107,6 +107,9 @@ Alias resolution is relevant for **time-evolution-based QPE** (Trotter) where th
 For qubitization a single walk phase determines one energy, but a walk raised to a power :math:`p > 1`
 can fold several energies onto one phase. Obtain those candidates with ``eigenvalue_branches_from_phase``
 and resolve the ambiguity explicitly before using ``from_phase_fraction`` with a scalar converter.
+In the CLI, ``--max-power`` (default: ``65536``) rejects larger walk powers before searching;
+all branches are returned for allowed powers. Raising the limit permits more time and memory use.
+``--max-power 0`` skips energy computation and returns an empty branch list and null energy fields and branch count.
 
 Phase estimation measures a phase :math:`\varphi \in [0, 1)`, but the underlying energy eigenvalue can be negative, positive, or arbitrarily large.
 Different energy values that differ by integer multiples of :math:`2\pi / t` all map to the same phase.

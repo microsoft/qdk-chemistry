@@ -319,8 +319,8 @@ Formulas without this metadata retain term-by-term controlled mapping.
 A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``prefix_terms`` or ``suffix_terms`` are returned unchanged, making the rewrite idempotent.
 The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
 
-:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
-It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values with a finite sum.
+It adds both formulas' ``scale`` values and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
 
 :doc:`JSON and HDF5 serialization <../data/serialization>` write schema ``0.3.0`` without expanding repetitions; convert ``0.2.0`` files from earlier releases with the :doc:`migration tool <../../migrating-data-files>`.
 Plain formulas without prefix or suffix terms or group/layer metadata retain their legacy content hashes.

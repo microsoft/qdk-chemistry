@@ -30,7 +30,6 @@ import json
 import os
 import re
 import sys
-from heapq import nsmallest
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +38,7 @@ import argcomplete
 from qdk_chemistry import algorithms, constants
 from qdk_chemistry import data as qdk_data
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR, BOHR_TO_ANGSTROM
+from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
 from qdk_chemistry.utils import compute_valence_space_parameters
 
 from .config import config
@@ -1160,33 +1160,36 @@ def cmd_utils_compute_valence_params(args):
 
 def cmd_utils_resolve_phase_energy(args):
     """Report phase-inversion branches and resolve energy using an external reference."""
-    if args.max_branches < 1:
-        raise ValueError("--max-branches must be a positive integer.")
+    if args.max_power < 0:
+        raise ValueError("--max-power must be a nonnegative integer.")
     filename = _strip(args.unitary_representation_filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
 
     unitary = load_data_object(filename, qdk_data.UnitaryRepresentation)
     container = unitary.get_container()
-    period = container.energy_period
-    branching = tuple(sorted(container.eigenvalue_branches_from_phase(args.phase_fraction)))
-    if not branching:
+    if args.max_power and isinstance(container, QuantumWalkContainer) and container.power > args.max_power:
+        raise ValueError(
+            f"Walk power {container.power} exceeds --max-power {args.max_power}. "
+            "Increase --max-power to allow the search or use --max-power 0 to skip it."
+        )
+    period = container.energy_period if args.max_power else None
+    branching = tuple(sorted(container.eigenvalue_branches_from_phase(args.phase_fraction))) if args.max_power else ()
+    if args.max_power and not branching:
         raise ValueError("eigenvalue_branches_from_phase returned no candidate energies.")
-    principal_energy = branching[0]
+    principal_energy = branching[0] if branching else None
     # An ambiguous powered phase has no single inverse, so report none rather than an arbitrary branch.
     raw_energy = principal_energy if len(branching) == 1 else None
     reference_energy = float(args.reference_energy)
-    if period is not None:
+    if period is not None and principal_energy is not None:
         alias_index = round((reference_energy - principal_energy) / period)
         resolved_energy = principal_energy + alias_index * period
-    else:
+    elif branching:
         resolved_energy = min(branching, key=lambda energy: abs(energy - reference_energy))
+    else:
+        resolved_energy = None
 
-    branch_count = len(branching)
-    if branch_count > args.max_branches:
-        branching = tuple(
-            sorted(nsmallest(args.max_branches, branching, key=lambda energy: abs(energy - reference_energy)))
-        )
+    branch_count = len(branching) if args.max_power else None
 
     print(
         json.dumps(
@@ -1839,9 +1842,9 @@ def _create_utils_parsers(subparsers):
         "resolve-phase-energy",
         help="List phase-inversion branches and resolve energy using a reference",
         description=(
-            "Report up to --max-branches principal-window candidates nearest the reference in branching "
-            "and their total branch_count. Resolve against all candidates and periodic aliases; "
-            "resolved_energy may lie outside the principal window."
+            "Report all principal-window candidates in branching and their branch_count. "
+            "Reject walk powers above --max-power before searching. Resolve against all candidates "
+            "and periodic aliases; resolved_energy may lie outside the principal window."
         ),
     )
     p.add_argument("--project-name", required=True, help="Project name")
@@ -1852,7 +1855,12 @@ def _create_utils_parsers(subparsers):
     )
     p.add_argument("--phase-fraction", type=float, required=True, help="Measured phase fraction from QPE")
     p.add_argument("--reference-energy", type=float, required=True, help="Reference energy for alias resolution")
-    p.add_argument("--max-branches", type=int, default=32, help="Maximum candidates to display (positive; default: 32)")
+    p.add_argument(
+        "--max-power",
+        type=int,
+        default=65536,
+        help="Maximum walk power to search (0 skips energy search; default: 65536)",
+    )
     p.set_defaults(func=cmd_utils_resolve_phase_energy)
 
 
