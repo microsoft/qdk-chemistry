@@ -13,7 +13,6 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -253,8 +252,9 @@ class TestInnerPrep:
         # Build inner prep
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
-        # Calling the builder directly skips _run_impl, which is what normally resolves this.
-        inner_mapper._lookup_tag = _LOOKUP_METHODS[inner_mapper.settings().get("lookup_method")]
+        # Calling the builder directly skips _run_impl, which is what normally resolves these.
+        inner_mapper._max_swap_bits = inner_mapper.settings().get("max_swap_bits")
+        inner_mapper._borrow_dirty = False
         inner_op, _ = inner_mapper._build_inner_oracles(container)
 
         # Compute register sizes
@@ -444,7 +444,7 @@ class TestSOSSAMapper:
                 dq_data,
                 sf_address_qubits,
                 dq_address_qubits,
-                _LOOKUP_METHODS[lookup_method],
+                lookup_method == "dirty_select_swap",
                 sf_swap_bits,
                 dq_swap_bits,
             )
@@ -461,7 +461,7 @@ class TestSOSSAMapper:
 
         for _ in range(_ROUND_TRIP_TRIALS):
             assert get_qsharp_context().code.QDKChemistry.Utils.SOSSAWalk.TestBranchedRotationWordRoundTrip(
-                sf_data, dq_data, 2, 3, _LOOKUP_METHODS["dirty_select_swap"], 1, dq_swap_bits
+                sf_data, dq_data, 2, 3, True, 1, dq_swap_bits
             )
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
@@ -599,12 +599,13 @@ class TestSelectFullFidelity:
             "numCopies": num_copies,
             "numPositiveOneBody": N,
             "OneBodyRotationAngles": [unit_angles() for _ in range(N)],
-            # Indexed b * R + r, matching both BuildSFBulkRotationData and the direct path.
+            # Indexed b * R + r, matching both BuildSFRotationBatch and the direct path.
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
             "rotationBatchSize": rotation_batch_size,
-            "rotationLookupMethod": _LOOKUP_METHODS[lookup_method],
-            "maxSwapBits": max_swap_bits,
+            # Mirrors SOSSAMapper._run_impl: "select" is a swap network capped at width 0.
+            "borrowDirty": lookup_method == "dirty_select_swap",
+            "maxSwapBits": 0 if lookup_method == "select" else max_swap_bits,
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -643,7 +644,7 @@ class TestSelectFullFidelity:
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
             "rotationBatchSize": 0,
-            "rotationLookupMethod": _LOOKUP_METHODS["select"],
+            "borrowDirty": False,
             "maxSwapBits": -1,
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,

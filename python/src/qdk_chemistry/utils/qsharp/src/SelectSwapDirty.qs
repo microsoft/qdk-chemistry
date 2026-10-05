@@ -31,7 +31,6 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     import Std.Measurement.MResetEachZ;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.SelectSwapUtils.AliasToAddressSpace;
-    import QDKChemistry.Utils.SelectSwapUtils.SwappedLoadShape;
     import QDKChemistry.Utils.SelectSwapUtils.DimensionsForSelect;
     import QDKChemistry.Utils.SelectSwapUtils.CreatePaddedData;
     import QDKChemistry.Utils.SelectSwapUtils.SwapDataOutputs;
@@ -40,7 +39,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
 
-    /// Toffoli cost of one `SelectSwap2DDirty` and its uncompute, for a given swap width.
+    /// Toffoli cost of one borrowed `SelectSwap2D` load and its uncompute, for a given swap width.
     ///
     /// Two differences from `SelectSwapCost2D`, both from borrowing rather than allocating.
     /// The forward pass runs `Select` twice and the butterfly four times instead of once each,
@@ -104,85 +103,6 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         bestLambda
     }
 
-    /// `SelectSwap2D` that borrows the swap block instead of allocating it.
-    ///
-    /// Same contract as `SelectSwap2D` — XORs `data[outer][inner]` into `target`, and its
-    /// adjoint is the same measurement-based erasure — but the `m * 2^numSwapBits` swap block
-    /// is lent by the caller, so the load costs no width at all. `dirty` may be entangled with
-    /// anything and is handed back exactly as it arrived; nothing there is measured or reset.
-    ///
-    /// The forward pass goes through `SwappedLoadShape`, so the flattened table, the select
-    /// address and the butterfly address are the ones the clean path builds. That is what keeps
-    /// the shared erasure valid: the adjoint reads the combined `(outer, inner)` address and is
-    /// indifferent to how the forward pass was routed, but only if both agree on which row the
-    /// address names.
-    ///
-    /// Cancellation, with the borrowed block as chunks `psi_0..psi_{K-1}` and `s` the swap
-    /// address, exactly as in `SelectSwapDirty`:
-    ///
-    ///   1. butterfly, `target ^= psi_s`, unbutterfly
-    ///   2. `Select` — chunk `p` becomes `psi_p ^ data[select + p*2^k]`
-    ///   3. butterfly, `target ^= psi_s ^ data[...]`, unbutterfly — the two `psi_s` cancel
-    ///   4. `Select` again — XOR is an involution, so the lender is restored
-    ///
-    /// Step 4 re-runs `Select` forward rather than taking its adjoint: the library adjoint is a
-    /// measurement-based unlookup, which would destroy the lender's state.
-    operation SelectSwap2DDirty(
-        data : Bool[][][],
-        outerAddress : Qubit[],
-        innerAddress : Qubit[],
-        numSwapBits : Int,
-        outerAddressAlwaysValid : Bool,
-        dirty : Qubit[],
-        target : Qubit[],
-    ) : Unit is Adj {
-        body (...) {
-            Fact(not IsEmpty(data), "data cannot be empty");
-            let m = Length(data[0][0]);
-            Fact(
-                Length(target) == m,
-                $"target holds one {m}-bit word, got {Length(target)} qubits"
-            );
-            let (flatData, selectAddress, swapAddress) = SwappedLoadShape(
-                data,
-                outerAddress,
-                innerAddress,
-                numSwapBits,
-                outerAddressAlwaysValid
-            );
-            if numSwapBits == 0 {
-                Select(flatData, selectAddress, target);
-            } else {
-                let needed = DirtyQROAMBorrowedQubits(numSwapBits, m);
-                Fact(
-                    Length(dirty) >= needed,
-                    $"dirty register needs {needed} qubits, got {Length(dirty)}"
-                );
-                let borrowed = dirty[...needed - 1];
-                let chunks = Chunks(m, borrowed);
-
-                within {
-                    SwapDataOutputs(swapAddress, chunks);
-                } apply {
-                    ApplyToEachCA(CNOT, Zipped(chunks[0], target));
-                }
-
-                Select(flatData, selectAddress, borrowed);
-
-                within {
-                    SwapDataOutputs(swapAddress, chunks);
-                } apply {
-                    ApplyToEachCA(CNOT, Zipped(chunks[0], target));
-                }
-
-                Select(flatData, selectAddress, borrowed);
-            }
-        }
-        adjoint (...) {
-            EraseSwappedLoad(data, outerAddress, innerAddress, 0, outerAddressAlwaysValid, target);
-        }
-    }
-
     /// Qubits a `SelectSwapDirty` load has to borrow for a given swap width.
     ///
     /// The butterfly needs the full `2^numSwapBits` chunks resident, so the borrowed block is
@@ -199,7 +119,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     /// passes over `ceil(d/K)` rows plus four butterflies of `numBits * (K - 1)` swaps, for
     /// `K = 2^numSwapBits`: the `2*ceil(d/K) + 4*b*(K-1)` of :cite:`Berry2019` (App. A, Thm 1),
     /// less 2 because `ceil(d/K) - 1` is the exact unary-iteration cost per pass where they
-    /// quote the bound. Reaching `ceil(d/K)` at all depends on `CreateAliasedData` blocking the
+    /// quote the bound. Reaching `ceil(d/K)` at all depends on `SelectSwapDirty` blocking the
     /// table contiguously; a strided split pins it to the padded `2^(n-k)`.
     ///
     /// Width 0 must be the plain cost and not the `K = 1` limit of the swap formula: that limit
@@ -237,26 +157,6 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
             }
         }
         bestBits
-    }
-
-    /// Blocked table for a dirty load, with surplus addresses aliased the way `Select` does.
-    ///
-    /// `CreatePaddedData` zero-fills surplus rows, which is what the clean path wants. A dirty
-    /// load is a drop-in for a bare `Select`, which instead *aliases* addresses at or above
-    /// `Length(data)` onto real rows -- the routing `ApplyBranchPhaseFixup` compensates for --
-    /// so zero padding would leave the forward load and that fixup disagreeing exactly there.
-    ///
-    /// Row `s` holds chunk `p` = `data[s*K + p]` for `K = 2^numSwapBits`, splitting the address
-    /// little-endian into low swap bits and high select bits. Blocking contiguously is what
-    /// lets the table stop at `ceil(d/K)` rows: the select field is `a / K`, below that bound by
-    /// construction, where a strided `a % 2^(n-k)` covers every residue once `d > 2^(n-k)`.
-    /// The trim is free -- `K` is a power of two, so a block boundary is a unary-iteration
-    /// subtree boundary and the surplus routing stays identical to a plain `Select` over `d`.
-    internal function CreateAliasedData(data : Bool[][], nRequired : Int, numSwapBits : Int) : Bool[][] {
-        let aliased = AliasToAddressSpace(data, nRequired);
-        let blockSize = 1 <<< numSwapBits;
-        let numRows = (Length(data) + blockSize - 1) / blockSize;
-        MappedOverRange(s -> Flattened(aliased[s * blockSize..(s + 1) * blockSize - 1]), 0..numRows - 1)
     }
 
     /// QROAM that borrows already-live qubits instead of allocating clean scratch.
@@ -320,7 +220,17 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
                 let addressParts = Partitioned([numSwapBits, numSelectBits], address[...nRequired - 1]);
                 let swapAddress = addressParts[0];
                 let selectAddress = addressParts[1];
-                let dataArray = CreateAliasedData(data, nRequired, numSwapBits);
+                // Row `s` holds chunks `data[s*K..s*K+K-1]`, with surplus addresses aliased onto real
+                // rows exactly as a bare `Select` (and so `ApplyBranchPhaseFixup`) routes them; zero
+                // padding would disagree there. Contiguous blocks stop the table at ceil(d/K) rows,
+                // and since `K` is a power of two each block is a unary-iteration subtree.
+                let aliased = AliasToAddressSpace(data, nRequired);
+                let blockSize = 1 <<< numSwapBits;
+                let numRows = (Length(data) + blockSize - 1) / blockSize;
+                let dataArray = MappedOverRange(
+                    s -> Flattened(aliased[s * blockSize..(s + 1) * blockSize - 1]),
+                    0..numRows - 1
+                );
 
                 within {
                     SwapDataOutputs(swapAddress, chunks);
@@ -342,7 +252,7 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         adjoint self;
     }
 
-    /// `SelectSwap2DDirty` loads exactly what `SelectSwap2D` loads, and returns the lender.
+    /// A borrowed `SelectSwap2D` loads exactly what the plain one loads, and returns the lender.
     ///
     /// The two loads are run back to back into the same `copy` register, so `copy` cancels to
     /// zero precisely when they agree. Comparing against the clean path rather than against
@@ -383,20 +293,12 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
                 // the address but returns `target` to |0>. The address is a basis state here,
                 // so that phase is global and cannot affect the comparison.
                 within {
-                    SelectSwap2DDirty(
-                        data,
-                        outerAddr,
-                        innerAddr,
-                        numSwapBits,
-                        outerAddressAlwaysValid,
-                        dirty,
-                        target
-                    );
+                    SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, dirty, target);
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(target, copy));
                 }
                 within {
-                    SelectSwap2D(data, outerAddr, innerAddr, 0, outerAddressAlwaysValid, target);
+                    SelectSwap2D(data, 0, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(target, copy));
                 }
@@ -423,51 +325,6 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
         }
 
         allCorrect
-    }
-
-    /// Traces `SelectSwap2DDirty` for a costing regression.
-    ///
-    /// The lender is allocated here because a standalone probe has nothing to borrow from, so
-    /// this measures Toffolis rather than width; the width saving only exists where the lender
-    /// is a register the caller already owns.
-    internal operation TestSelectSwap2DDirtyResourceProbe(
-        data : Bool[][][],
-        numSwapBits : Int,
-        outerAddressAlwaysValid : Bool,
-        applyForward : Bool,
-        applyAdjoint : Bool
-    ) : Unit {
-        let m = Length(data[0][0]);
-        let nOuterAddr = Ceiling(Lg(IntAsDouble(Length(data))));
-        let nInnerAddr = Ceiling(Lg(IntAsDouble(Length(data[0]))));
-
-        use outerAddr = Qubit[nOuterAddr];
-        use innerAddr = Qubit[nInnerAddr];
-        use target = Qubit[m];
-        use dirty = Qubit[MaxI(1, DirtyQROAMBorrowedQubits(numSwapBits, m))];
-
-        if applyForward {
-            SelectSwap2DDirty(
-                data,
-                outerAddr,
-                innerAddr,
-                numSwapBits,
-                outerAddressAlwaysValid,
-                dirty,
-                target
-            );
-        }
-        if applyAdjoint {
-            Adjoint SelectSwap2DDirty(
-                data,
-                outerAddr,
-                innerAddr,
-                numSwapBits,
-                outerAddressAlwaysValid,
-                dirty,
-                target
-            );
-        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

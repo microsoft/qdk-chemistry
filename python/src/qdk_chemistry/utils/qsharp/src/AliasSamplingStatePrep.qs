@@ -30,11 +30,9 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Arrays.Sorted;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D;
-    import QDKChemistry.Utils.SelectSwapDirty.DirtyQROAMBorrowedQubits;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
-    import QDKChemistry.Utils.SelectSwapDirty.SelectSwap2DDirty;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
-    import QDKChemistry.Utils.SelectSwap.LookupSelect, QDKChemistry.Utils.SelectSwap.LookupSelectSwap, QDKChemistry.Utils.SelectSwap.LookupDirtySelectSwap;
+    import Std.Arrays.IsEmpty;
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
@@ -302,26 +300,25 @@ namespace QDKChemistry.Utils.AliasSampling {
     operation ConditionalAliasSamplingPrepare(
         coefficients : Double[][],
         bitsPrecision : Int,
+        numSwapBits : Int,
         conditionalRegister : Qubit[],
         indexRegister : Qubit[],
         uniformRegister : Qubit[],
         flagQubit : Qubit,
         qromOutput : Qubit[],
-        numSwapBits : Int
     ) : Unit is Adj {
         ConditionalAliasSamplingPrepareWithFreeRider(
             coefficients,
             [],
             bitsPrecision,
+            numSwapBits,
             conditionalRegister,
             indexRegister,
             uniformRegister,
             flagQubit,
             qromOutput,
             [],
-            numSwapBits,
-            [],
-            LookupSelectSwap()
+            []
         );
     }
 
@@ -340,30 +337,21 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///   6. Conditional swap signOrig ↔ signAlt
     ///   7. Z(signOrig) for sign encoding
     ///
-    /// `dirty` is an optional lender for the QROAM swap block. `lookupMethod` names the routing
-    /// strategy, from the same `LookupSelect` / `LookupSelectSwap` / `LookupDirtySelectSwap` set
-    /// every other loader in this library uses, so one caller-level choice governs them all:
-    ///
-    ///   * `LookupSelect` loads with a plain unary iteration and allocates nothing. It forces
-    ///     width 0 regardless of `numSwapBits`, since naming the plain load and then asking for
-    ///     a swap network is a contradiction and the method is the more specific request.
-    ///   * `LookupSelectSwap` allocates clean scratch.
-    ///   * `LookupDirtySelectSwap` borrows from `dirty`, which may be entangled with anything
-    ///     and comes back untouched. Too short a lender falls back to the clean path rather
-    ///     than faulting.
+    /// `numSwapBits` caps the QROAM swap width: -1 lets the cost model choose, 0 forces a plain
+    /// `Select`. A non-empty `dirty` lends the swap block instead of allocating it; it may be
+    /// entangled with anything and comes back untouched.
     operation ConditionalAliasSamplingPrepareWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
         bitsPrecision : Int,
+        numSwapBits : Int,
         conditionalRegister : Qubit[],
         indexRegister : Qubit[],
         uniformRegister : Qubit[],
         flagQubit : Qubit,
         qromOutput : Qubit[],
         freeRiderRegister : Qubit[],
-        numSwapBits : Int,
         dirty : Qubit[],
-        lookupMethod : Int
     ) : Unit is Adj {
         let nIndexBits = Length(indexRegister);
         let nCoeffs = Length(coefficients[0]);
@@ -383,44 +371,24 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nCond = Length(table3D);
         let nInnerData = Length(table3D[0]);
         let m = Length(qromOutput) + Length(freeRiderRegister);
-        // A dirty load borrows the caller's live qubits for the swap block, so the lookup adds
-        // no width at all. It runs `Select` twice and the butterfly four times, so its Toffoli
-        // optimum sits at a different width than the clean one -- picking with the clean model
-        // would overshoot -- and it is additionally capped by what the caller actually lent.
-        let wantDirty = lookupMethod == LookupDirtySelectSwap() and Length(dirty) > 0;
-        let selected = if lookupMethod == LookupSelect() {
-            0
-        } elif wantDirty {
-            ComputeOptimalDirtySwapBits2D(nCond, nInnerData, m, true, Length(dirty))
-        } else {
+        // A borrowed network runs `Select` twice and the butterfly four times, so its optimum sits
+        // at a different width than the clean one, and it is capped by what the caller lent.
+        let selected = if IsEmpty(dirty) {
             ComputeOptimalLambda2D(nCond, nInnerData, m, true)
-        };
-        // A cap, not an override: it can narrow what the selector chose but never widen it, so
-        // no setting can ask for a network the cost model already rejected.
-        let lambda = if numSwapBits < 0 { selected } else { MinI(selected, numSwapBits) };
-        // A lender too short for an explicitly requested width is a fallback, not a fault.
-        let borrowable = wantDirty and lambda > 0
-            and Length(dirty) >= DirtyQROAMBorrowedQubits(lambda, m);
-        if borrowable {
-            SelectSwap2DDirty(
-                table3D,
-                conditionalRegister,
-                indexRegister,
-                lambda,
-                true,
-                dirty,
-                qromOutput + freeRiderRegister
-            );
         } else {
-            SelectSwap2D(
-                table3D,
-                conditionalRegister,
-                indexRegister,
-                lambda,
-                true,
-                qromOutput + freeRiderRegister
-            );
-        }
+            ComputeOptimalDirtySwapBits2D(nCond, nInnerData, m, true, Length(dirty))
+        };
+        // A cap, not an override: it can narrow what the selector chose but never widen it.
+        let lambda = if numSwapBits < 0 { selected } else { MinI(selected, numSwapBits) };
+        SelectSwap2D(
+            table3D,
+            lambda,
+            true,
+            conditionalRegister,
+            indexRegister,
+            dirty,
+            qromOutput + freeRiderRegister
+        );
 
         let keepCoeffLoaded = qromOutput[0..bitsPrecision - 1];
         let altIndexReg = qromOutput[bitsPrecision..bitsPrecision + nIndexBits - 1];
@@ -484,12 +452,12 @@ namespace QDKChemistry.Utils.AliasSampling {
             ConditionalAliasSamplingPrepare(
                 coefficients,
                 bitsPrecision,
+                numSwapBits,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
-                qromOut,
-                numSwapBits
+                qromOut
             );
         }
     }
@@ -521,12 +489,12 @@ namespace QDKChemistry.Utils.AliasSampling {
                 ConditionalAliasSamplingPrepare(
                     coefficients,
                     bitsPrecision,
+                    numSwapBits,
                     conditionalReg,
                     indexReg,
                     uniformReg,
                     flagQubit,
-                    qromOut,
-                    numSwapBits
+                    qromOut
                 );
             } apply {
                 Z(indexReg[0]);
@@ -562,15 +530,14 @@ namespace QDKChemistry.Utils.AliasSampling {
                 coefficients,
                 freeRiderData,
                 bitsPrecision,
+                0,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
                 qromOut,
                 freeRiderReg,
-                0,
-                [],
-                LookupSelectSwap()
+                []
             );
         }
     }

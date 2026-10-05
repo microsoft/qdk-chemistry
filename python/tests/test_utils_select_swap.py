@@ -270,6 +270,22 @@ class TestDirtyQROAMReturnsTheBorrowedQubits:
         )
 
 
+class TestSelectSwap2DBorrowedMatchesClean:
+    """Lending ``SelectSwap2D`` a register changes where the swap block lives, not what loads."""
+
+    @pytest.mark.parametrize("dirty_seed", [0, 5])
+    @pytest.mark.parametrize("outer_always_valid", [False, True])
+    @pytest.mark.parametrize("num_swap_bits", [1, 2])
+    @pytest.mark.parametrize("data", [_DATA_2D, _DATA_2D_RAGGED_OUTER], ids=["square", "ragged_outer"])
+    def test_every_address_loads_the_clean_word_and_returns_the_lender(
+        self, data, num_swap_bits, outer_always_valid, dirty_seed
+    ):
+        """Nothing else reaches the borrowed 2D branch: at the Fe2S2 shapes its cost model declines."""
+        assert _select_swap_dirty_ns().TestSelectSwap2DDirtyMatchesClean(
+            data, num_swap_bits, outer_always_valid, dirty_seed
+        )
+
+
 class TestDirtyQROAMCostModel:
     """The width is chosen by cost, so the cost model is what decides if borrowing happens."""
 

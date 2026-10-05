@@ -15,7 +15,8 @@
 ///   ApplyBranchPhaseFixup — repairs one branch's phase after a measurement-based erasure.
 ///
 /// 2D operations:
-///   SelectSwap2D — loads data[outer][inner] with one select-swap over the combined address
+///   SelectSwap2D — loads data[outer][inner] with one select-swap over the combined address,
+///     on allocated scratch or, given a lender, on borrowed qubits
 ///   ComputeOptimalLambda2D — optimal SWAP bits for 2D case
 ///
 /// References:
@@ -54,67 +55,7 @@ namespace QDKChemistry.Utils.SelectSwap {
     import QDKChemistry.Utils.SelectSwapUtils.SwapDataOutputs;
     import QDKChemistry.Utils.SelectSwapUtils.MeasurementUnlookupCost;
 
-    //  LOOKUP METHOD TAGS
-    //
-    //  The three ways any table in this library can be loaded. Shared by every loader --
-    //  the streamed rotation batches and the inner alias-sampling tables both select from
-    //  this one set -- so a caller names a routing strategy once and every lookup honours it.
-    //
-    //  Each tag is a strategy, not a guarantee. Every method falls back to `LookupSelect` when
-    //  its own cost model says no network beats the plain load at that shape, so naming a
-    //  method can never cost Toffolis relative to `LookupSelect`; it only grants permission to
-    //  spend qubits if doing so pays.
-    //
-    //  Three, where the reference library (microsoft/qdk `library/table_lookup`) has four: it
-    //  also loads via power products -- `LookupViaPP` and `LookupViaSplitPP`, after Gidney
-    //  (arXiv:2505.15917, section A.4) -- which we deliberately do not implement. Power products
-    //  put the address into a product basis, Mobius-transform the data, and emit one CCNOT per
-    //  set bit of the transformed mask *per output bit*, so the Toffoli cost scales with the word
-    //  width where a `Select` address iteration does not. That is least attractive at exactly our
-    //  shapes, which are narrow and deep -- order a hundred rows of a few tens of bits. The
-    //  argument is structural rather than benchmarked, so measure before concluding the gap is
-    //  real.
-
-    /// Plain unary-iteration `Select`: no scratch, no borrowing, `numData - 1` Toffolis.
-    ///
-    /// The widest-register, cheapest-space option, and the floor every other method falls back
-    /// to. Choose it when neither allocatable nor borrowable space exists.
-    function LookupSelect() : Int { 0 }
-
-    /// Clean select-swap (QROAM): allocates scratch to cut Toffolis.
-    ///
-    /// Trades `numBits * (2^k - 1)` fresh qubits for a shallower address iteration. The scratch
-    /// adds to peak width, so this pays when Toffolis bind and width does not.
-    function LookupSelectSwap() : Int { 1 }
-
-    /// Select-swap that borrows live caller qubits instead of allocating scratch.
-    ///
-    /// Costs no width at all, but runs `Select` twice and the butterfly four times, so it pays
-    /// roughly two to three times the Toffolis of the clean network at equal width. It only
-    /// undercuts a plain `Select` on tables large relative to the word -- roughly
-    /// `numData > 32 * numBits` -- and is additionally capped by how much the caller lent.
-    /// At shapes where neither holds it declines and falls back to `LookupSelect`.
-    function LookupDirtySelectSwap() : Int { 2 }
-
-    /// Largest relative Toffoli premium worth paying for a narrower swap network.
-    ///
-    /// Each extra swap bit doubles the scratch block, and for a caller not already wider
-    /// elsewhere that block sets the peak width of the whole algorithm. Scoring widths by
-    /// Toffoli count alone never sees that, so it keeps widening while the gains flatten.
-    ///
-    /// Measured at the inner-PREPARE shape this rule's test exercises (`d = 90`, `m = 16`,
-    /// `b = 21`): `k = 3` is the Toffoli minimum at 491, and this rule instead takes `k = 2`
-    /// at 587 -- 19.6% more Toffolis for 84 of 283 scratch qubits (30%) less width.
-    ///
-    /// That decision is narrow: 587 clears the `491 * 1.2 = 589.2` threshold by 2.2 Toffolis,
-    /// so a tolerance under roughly 0.195 would take `k = 3` and widen the algorithm instead.
-    /// The margin lives in this constant rather than in the shape, so treat it as load-bearing
-    /// rather than as a round number.
-    internal function MaxToffoliPremiumForNarrowing() : Double {
-        0.2
-    }
-
-    /// Narrowest swap width within `MaxToffoliPremiumForNarrowing()` of the cheapest.
+    /// Narrowest swap width within 20% of the cheapest one's Toffolis.
     ///
     /// Returns the *narrowest* qualifying width rather than the cheapest, so a width is taken
     /// only when the extra scratch is paying for itself. Widths are scanned in order, so the
@@ -135,7 +76,13 @@ namespace QDKChemistry.Utils.SelectSwap {
             }
         }
 
-        let threshold = IntAsDouble(best) * (1.0 + MaxToffoliPremiumForNarrowing());
+        // Largest relative Toffoli premium worth paying for a narrower swap network, since scoring
+        // widths by Toffolis alone never sees the scratch each extra swap bit doubles.
+        // At the inner-PREPARE shape `d = 90`, `m = 16`, `b = 21` it takes `k = 2` at 587 Toffolis
+        // over the minimum `k = 3` at 491: 19.6% more Toffolis for 30% less scratch.
+        // The margin is narrow -- below about 0.195 the rule takes `k = 3` -- so 0.2 is load-bearing.
+        let maxToffoliPremium = 0.2;
+        let threshold = IntAsDouble(best) * (1.0 + maxToffoliPremium);
         for lambda in 0..addressBits - 1 {
             let cost = SelectSwapCost2D(lambda, numOuterData, numInnerData, numBits, outerAddressAlwaysValid);
             if IntAsDouble(cost) <= threshold {
@@ -271,16 +218,19 @@ namespace QDKChemistry.Utils.SelectSwap {
 
     /// Loads the single `m`-bit word `data[outer][inner]` into an `m`-bit `target`.
     ///
-    /// At `numSwapBits > 0`, the lookup writes `m * 2^numSwapBits` scratch bits, moves the
-    /// addressed word to the first chunk, copies it to `target`, and erases the scratch by
-    /// measurement. Its custom adjoint erases `target` with a phase fixup over the combined
-    /// `(outer, inner)` address, independent of the swap width used by the forward pass.
+    /// At `numSwapBits > 0` the swap network needs an `m * 2^numSwapBits` block. With `dirty`
+    /// empty that block is allocated and erased by measurement. Otherwise it is borrowed from
+    /// `dirty`, which may be entangled with anything and comes back exactly as it arrived, at
+    /// the price of running `Select` twice and the butterfly four times. Either way the adjoint
+    /// erases `target` with a phase fixup over the combined `(outer, inner)` address, so it is
+    /// indifferent to how the forward pass was routed.
     operation SelectSwap2D(
         data : Bool[][][],
-        outerAddress : Qubit[],
-        innerAddress : Qubit[],
         numSwapBits : Int,
         outerAddressAlwaysValid : Bool,
+        outerAddress : Qubit[],
+        innerAddress : Qubit[],
+        dirty : Qubit[],
         target : Qubit[],
     ) : Unit is Adj {
         body (...) {
@@ -297,10 +247,11 @@ namespace QDKChemistry.Utils.SelectSwap {
                 numSwapBits,
                 outerAddressAlwaysValid
             );
+            let blockSize = m * (1 <<< numSwapBits);
             if numSwapBits == 0 {
                 Select(flatData, selectAddress, target);
-            } else {
-                use swapTarget = Qubit[m * (1 <<< numSwapBits)];
+            } elif IsEmpty(dirty) {
+                use swapTarget = Qubit[blockSize];
                 Select(flatData, selectAddress, swapTarget);
                 SwapDataOutputs(swapAddress, Chunks(m, swapTarget));
                 ApplyToEachCA(CNOT, Zipped(swapTarget[0..m - 1], target));
@@ -312,6 +263,24 @@ namespace QDKChemistry.Utils.SelectSwap {
                     outerAddressAlwaysValid,
                     swapTarget
                 );
+            } else {
+                Fact(
+                    Length(dirty) >= blockSize,
+                    $"dirty register needs {blockSize} qubits, got {Length(dirty)}"
+                );
+                let borrowed = dirty[...blockSize - 1];
+                let chunks = Chunks(m, borrowed);
+                // Twice, because XOR is an involution: the second `Select` restores the lender
+                // and the two copies of its addressed chunk cancel in `target`. Re-running
+                // `Select` forward, not its measurement-based adjoint, keeps the lender intact.
+                for _ in 1..2 {
+                    within {
+                        SwapDataOutputs(swapAddress, chunks);
+                    } apply {
+                        ApplyToEachCA(CNOT, Zipped(chunks[0], target));
+                    }
+                    Select(flatData, selectAddress, borrowed);
+                }
             }
         }
         adjoint (...) {
@@ -549,7 +518,7 @@ namespace QDKChemistry.Utils.SelectSwap {
                 // The `within` uncompute is the measurement erasure, so this also checks that
                 // the erasure returns `target` to |0> and not merely that the load was right.
                 within {
-                    SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+                    SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
                 } apply {
                     ApplyToEachCA(CNOT, Zipped(target, copy));
                 }
@@ -592,7 +561,7 @@ namespace QDKChemistry.Utils.SelectSwap {
             {
                 use target = Qubit[m];
                 within {
-                    SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+                    SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
                 } apply {
                     Z(target[0]);
                 }
@@ -628,10 +597,10 @@ namespace QDKChemistry.Utils.SelectSwap {
         use target = Qubit[Length(data[0][0])];
 
         if applyForward {
-            SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+            SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
         }
         if applyAdjoint {
-            Adjoint SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+            Adjoint SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
         }
     }
 }

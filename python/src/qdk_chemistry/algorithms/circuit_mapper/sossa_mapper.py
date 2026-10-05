@@ -20,13 +20,6 @@ __all__: list[str] = [
     "SOSSAMapperSettings",
 ]
 
-#: Maps the ``lookup_method`` setting onto the Q# ``Lookup*`` constants.
-_LOOKUP_METHODS: dict[str, int] = {
-    "select": 0,
-    "select_swap": 1,
-    "dirty_select_swap": 2,
-}
-
 
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
@@ -198,8 +191,8 @@ class SOSSAMapper(CircuitMapper):
                 coefficients,
                 free_rider_data,
                 coeff_bits,
-                self._settings.get("max_swap_bits"),
-                self._lookup_tag,
+                self._max_swap_bits,
+                self._borrow_dirty,
             )
         if algorithm == "direct":
             return (
@@ -251,8 +244,8 @@ class SOSSAMapper(CircuitMapper):
             "rotationBitPrecision": rot_bits,
             # Smallest lambda making num_batches passes; a wider one costs width for the same passes.
             "rotationBatchSize": -(-num_angles // num_batches),
-            "rotationLookupMethod": self._lookup_tag,
-            "maxSwapBits": int(self._settings.get("max_swap_bits")),
+            "borrowDirty": self._borrow_dirty,
+            "maxSwapBits": self._max_swap_bits,
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
@@ -375,8 +368,11 @@ class SOSSAMapper(CircuitMapper):
         outer_prepare_circuit = self._build_outer_prepare_circuit(container)
         regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
         outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
-        # Resolved per run, not in __init__: settings stay mutable until run.
-        self._lookup_tag = _LOOKUP_METHODS[self._settings.get("lookup_method")]
+        # Resolved per run, not in __init__: settings stay mutable until run. "select" is a
+        # swap network capped at width 0, so borrowing is the only other choice to pass on.
+        lookup_method = self._settings.get("lookup_method")
+        self._max_swap_bits = 0 if lookup_method == "select" else int(self._settings.get("max_swap_bits"))
+        self._borrow_dirty = lookup_method == "dirty_select_swap"
         inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         select_op = self._build_select(container)
 
