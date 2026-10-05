@@ -257,223 +257,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         if maxSwapBits < 0 { selected } else { MinI(selected, maxSwapBits) }
     }
 
-    // ═══ Factories ══════════════════════════════════════════════════════════════
-
-    /// Build an inner PREPARE using conditional alias sampling (2D QROM).
-    ///
-    /// Uses ConditionalAliasSamplingPrepareWithFreeRider to prepare:
-    ///   |x_o⟩|0⟩ → |x_o⟩ Σ_b √(p̃_{x_o,b}) e^{iπ·sign} |b⟩|garbage⟩
-    ///
-    /// Pass `freeRiderData = []` to leave the free-rider word to `MakeFreeRiderLoadOp`. That
-    /// pays off only when the lookup takes the select-swap path, where the word widens the
-    /// QROAM output the swap network is charged for, four times per block encoding. On the
-    /// unary-iteration path the cost does not depend on the output width, so carrying it here
-    /// is free and a separate load would be pure overhead.
-    ///
-    /// The returned callable expects:
-    ///   outerReg — conditional address register (x_o)
-    ///   innerReg — target register layout: indexReg[nIdx] + uniformReg[μ]
-    ///              + flagQubit[1] + qromOutput[μ + nIdx + 2] + freeRiderReg[nFR]
-    ///
-    /// `maxSwapBits` caps the QROAM swap width (-1 free, 0 plain); `borrowDirty` lends `systemReg`.
-    function MakeInnerPrepareAliasSampling(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][],
-        coefficientBitPrecision : Int,
-        maxSwapBits : Int,
-        borrowDirty : Bool,
-    ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj {
-        let nCoeffs = Length(innerCoefficients[0]);
-        // Keep at least one b-register qubit, matching MakeInnerPrepareDirect and the Python layout.
-        let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
-        let mu = coefficientBitPrecision;
-        let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        let qromEnd = 2 * nIndexBits + 2 * mu + 2;
-        // Clamp to the table's address width so an over-large cap degrades instead of faulting.
-        let swapBits = if maxSwapBits > 0 { MinI(maxSwapBits, nIndexBits) } else { maxSwapBits };
-        (outerReg, innerReg, dirty) => {
-            let indexReg = innerReg[0..nIndexBits - 1];
-            let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
-            let flagQubit = innerReg[nIndexBits + mu];
-            let qromOut = innerReg[nIndexBits + mu + 1..qromEnd];
-            let freeRiderReg = if nFreeRider > 0 {
-                innerReg[qromEnd + 1..qromEnd + nFreeRider]
-            } else {
-                []
-            };
-            ConditionalAliasSamplingPrepareWithFreeRider(
-                innerCoefficients,
-                freeRiderData,
-                mu,
-                swapBits,
-                outerReg,
-                indexReg,
-                uniformReg,
-                flagQubit,
-                qromOut,
-                freeRiderReg,
-                if borrowDirty { dirty } else { [] }
-            );
-        }
-    }
-
-    /// Load the free-rider word (G, r) for the current x_o.
-    ///
-    /// It is a function of x_o alone, so the block encoding loads it once around both inner
-    /// PREPARE/uncompute pairs rather than letting each pair carry it in the alias QROAM output.
-    function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        (outerReg, freeRiderReg) => {
-            if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
-                Select(freeRiderData, outerReg, freeRiderReg);
-            }
-        }
-    }
-
-    /// Whether the free-rider word should be loaded separately from the inner alias tables.
-    ///
-    /// `SelectSwapCost2D` already covers one lookup/uncompute pair. One SOSSA block applies
-    /// two inner PREPARE/uncompute pairs and, if split out, one free-rider lookup pair.
-    /// Both layouts are costed with the loader `maxSwapBits` and `availableDirty` select.
-    internal function ShouldLoadFreeRiderSeparately(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][],
-        coefficientBitPrecision : Int,
-        maxSwapBits : Int,
-        availableDirty : Int,
-    ) : Bool {
-        let numConditions = Length(innerCoefficients);
-        let nIndexBits = MaxI(1, AddressQubits(Length(innerCoefficients[0])));
-        let numInnerSlots = 1 <<< nIndexBits;
-        let numWordBits = coefficientBitPrecision + nIndexBits + 2;
-        let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
-        // Mirrors MakeInnerPrepareAliasSampling's clamped cap, so the costed layouts are the built ones.
-        let cap = MinI(MaxI(0, maxSwapBits), nIndexBits);
-        let innerPreparePairsPerBlock = 2;
-        let freeRiderPairsPerBlock = 1;
-        mutable innerCosts = [];
-        for numBits in [numWordBits + numExtraBits, numWordBits] {
-            let selected = if availableDirty > 0 {
-                ComputeOptimalDirtySwapBits2D(numConditions, numInnerSlots, numBits, true, availableDirty)
-            } else {
-                ComputeOptimalLambda2D(numConditions, numInnerSlots, numBits, true)
-            };
-            let lambda = if maxSwapBits < 0 { selected } else { MinI(selected, cap) };
-            let cost = if availableDirty > 0 {
-                SelectSwapDirtyCost2D(lambda, numConditions, numInnerSlots, numBits, true)
-            } else {
-                SelectSwapCost2D(lambda, numConditions, numInnerSlots, numBits, true)
-            };
-            set innerCosts += [innerPreparePairsPerBlock * cost];
-        }
-        let separateCost = innerCosts[1]
-            + freeRiderPairsPerBlock * SelectSwapCost2D(0, numConditions, 1, numExtraBits, true);
-        numExtraBits > 0 and separateCost < innerCosts[0]
-    }
-
-    /// Build the inner alias-sampling PREPARE and its free-rider loader together.
-    ///
-    /// Carrying the free-rider word widens the QROAM output charged on each of the two inner
-    /// PREPARE/uncompute pairs in one block encoding. Loading it separately costs one `Select`
-    /// round trip over the outer conditions but lets the inner table use a narrower output
-    /// and potentially a different swap width.
-    /// `availableDirty` is the lender size the walk passes the inner PREPARE, or 0 for clean scratch.
-    function MakeInnerPrepareAliasSamplingOracles(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][],
-        coefficientBitPrecision : Int,
-        maxSwapBits : Int,
-        availableDirty : Int,
-    ) : (
-        ((Qubit[], Qubit[], Qubit[]) => Unit is Adj),
-        ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
-    ) {
-        let loadSeparately = ShouldLoadFreeRiderSeparately(
-            innerCoefficients,
-            freeRiderData,
-            coefficientBitPrecision,
-            maxSwapBits,
-            availableDirty
-        );
-        let inlineData = if loadSeparately { [] } else { freeRiderData };
-        let separateData = if loadSeparately { freeRiderData } else { [] };
-
-        (
-            MakeInnerPrepareAliasSampling(
-                innerCoefficients,
-                inlineData,
-                coefficientBitPrecision,
-                maxSwapBits,
-                availableDirty > 0
-            ),
-            MakeFreeRiderLoadOp(separateData)
-        )
-    }
-
-    /// Build an inner PREPARE using direct controlled preparation.
-    ///
-    /// innerReg layout: bReg[nIndexBits] + signQubit[1] + freeRiderReg[nFR]. The sign qubit
-    /// mirrors the alias-sampling QROM's sign output, so SELECT finds the LCU sign of the
-    /// sampled `(x_o, b)` in the same kind of place whichever inner backend is in use.
-    function MakeInnerPrepareDirect(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][]
-    ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        let nCoeffs = Length(innerCoefficients[0]);
-        let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
-        let signData = BuildInnerSignTable(innerCoefficients, nIndexBits);
-        // No lookup table here; the lender is accepted only to keep one inner-PREPARE signature.
-        (outerReg, innerReg, _) => {
-            let bReg = innerReg[0..nIndexBits - 1];
-
-            let xo = Length(innerCoefficients);
-            for i in 0..xo - 1 {
-                let nPadded = 1 <<< nIndexBits;
-                let paddedAmps = Padded(-nPadded, 0.0, innerCoefficients[i]);
-                ApplyControlledOnInt(
-                    i,
-                    PreparePureStateD(paddedAmps, _),
-                    outerReg,
-                    Reversed(bReg),
-                );
-            }
-            Select(signData, bReg + outerReg, [innerReg[nIndexBits]]);
-        }
-    }
-
-    /// Build a SELECT using QROM + phase gradient rotation.
-    function MakeSelectPhaseGradient(
-        params : SelectParams
-    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
-            SelectImpl(params, true, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
-        }
-    }
-
-    /// Build a SELECT using direct rotation synthesis.
-    function MakeSelectDirectRotation(
-        params : SelectParams
-    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
-        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
-            SelectImpl(params, false, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
-        }
-    }
-
-    /// The SOSSA block encoding B as the `Qubit[] => Unit is Adj` callable QPE consumes.
-    ///
-    /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
-    /// the gradient tail is only present when `layout.numPhaseGradientQubits > 0`.
-    function MakeSOSSABlockEncodingOp(
-        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
-        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
-        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        layout : SOSSAWalkLayout,
-    ) : (Qubit[] => Unit is Adj) {
-        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, _)
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
-    // Quantum operations and circuit entry point
+    // Quantum operations
     // ═══════════════════════════════════════════════════════════════════════════
 
     /// SELECT implementation (arXiv:2502.15882v1, Appendix B.3, B.5-B.6).
@@ -997,6 +782,224 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Factories and circuit entry points
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Build an inner PREPARE using conditional alias sampling (2D QROM).
+    ///
+    /// Uses ConditionalAliasSamplingPrepareWithFreeRider to prepare:
+    ///   |x_o⟩|0⟩ → |x_o⟩ Σ_b √(p̃_{x_o,b}) e^{iπ·sign} |b⟩|garbage⟩
+    ///
+    /// Pass `freeRiderData = []` to leave the free-rider word to `MakeFreeRiderLoadOp`. That
+    /// pays off only when the lookup takes the select-swap path, where the word widens the
+    /// QROAM output the swap network is charged for, four times per block encoding. On the
+    /// unary-iteration path the cost does not depend on the output width, so carrying it here
+    /// is free and a separate load would be pure overhead.
+    ///
+    /// The returned callable expects:
+    ///   outerReg — conditional address register (x_o)
+    ///   innerReg — target register layout: indexReg[nIdx] + uniformReg[μ]
+    ///              + flagQubit[1] + qromOutput[μ + nIdx + 2] + freeRiderReg[nFR]
+    ///
+    /// `maxSwapBits` caps the QROAM swap width (-1 free, 0 plain); `borrowDirty` lends `systemReg`.
+    function MakeInnerPrepareAliasSampling(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+        maxSwapBits : Int,
+        borrowDirty : Bool,
+    ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj {
+        let nCoeffs = Length(innerCoefficients[0]);
+        // Keep at least one b-register qubit, matching MakeInnerPrepareDirect and the Python layout.
+        let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
+        let mu = coefficientBitPrecision;
+        let nFreeRider = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        let qromEnd = 2 * nIndexBits + 2 * mu + 2;
+        // Clamp to the table's address width so an over-large cap degrades instead of faulting.
+        let swapBits = if maxSwapBits > 0 { MinI(maxSwapBits, nIndexBits) } else { maxSwapBits };
+        (outerReg, innerReg, dirty) => {
+            let indexReg = innerReg[0..nIndexBits - 1];
+            let uniformReg = innerReg[nIndexBits..nIndexBits + mu - 1];
+            let flagQubit = innerReg[nIndexBits + mu];
+            let qromOut = innerReg[nIndexBits + mu + 1..qromEnd];
+            let freeRiderReg = if nFreeRider > 0 {
+                innerReg[qromEnd + 1..qromEnd + nFreeRider]
+            } else {
+                []
+            };
+            ConditionalAliasSamplingPrepareWithFreeRider(
+                innerCoefficients,
+                freeRiderData,
+                mu,
+                swapBits,
+                outerReg,
+                indexReg,
+                uniformReg,
+                flagQubit,
+                qromOut,
+                freeRiderReg,
+                if borrowDirty { dirty } else { [] }
+            );
+        }
+    }
+
+    /// Load the free-rider word (G, r) for the current x_o.
+    ///
+    /// It is a function of x_o alone, so the block encoding loads it once around both inner
+    /// PREPARE/uncompute pairs rather than letting each pair carry it in the alias QROAM output.
+    function MakeFreeRiderLoadOp(freeRiderData : Bool[][]) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, freeRiderReg) => {
+            if Length(freeRiderData) > 0 and Length(freeRiderReg) > 0 {
+                Select(freeRiderData, outerReg, freeRiderReg);
+            }
+        }
+    }
+
+    /// Whether the free-rider word should be loaded separately from the inner alias tables.
+    ///
+    /// `SelectSwapCost2D` already covers one lookup/uncompute pair. One SOSSA block applies
+    /// two inner PREPARE/uncompute pairs and, if split out, one free-rider lookup pair.
+    /// Both layouts are costed with the loader `maxSwapBits` and `availableDirty` select.
+    internal function ShouldLoadFreeRiderSeparately(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+        maxSwapBits : Int,
+        availableDirty : Int,
+    ) : Bool {
+        let numConditions = Length(innerCoefficients);
+        let nIndexBits = MaxI(1, AddressQubits(Length(innerCoefficients[0])));
+        let numInnerSlots = 1 <<< nIndexBits;
+        let numWordBits = coefficientBitPrecision + nIndexBits + 2;
+        let numExtraBits = if Length(freeRiderData) > 0 { Length(freeRiderData[0]) } else { 0 };
+        // Mirrors MakeInnerPrepareAliasSampling's clamped cap, so the costed layouts are the built ones.
+        let cap = MinI(MaxI(0, maxSwapBits), nIndexBits);
+        let innerPreparePairsPerBlock = 2;
+        let freeRiderPairsPerBlock = 1;
+        mutable innerCosts = [];
+        for numBits in [numWordBits + numExtraBits, numWordBits] {
+            let selected = if availableDirty > 0 {
+                ComputeOptimalDirtySwapBits2D(numConditions, numInnerSlots, numBits, true, availableDirty)
+            } else {
+                ComputeOptimalLambda2D(numConditions, numInnerSlots, numBits, true)
+            };
+            let lambda = if maxSwapBits < 0 { selected } else { MinI(selected, cap) };
+            let cost = if availableDirty > 0 {
+                SelectSwapDirtyCost2D(lambda, numConditions, numInnerSlots, numBits, true)
+            } else {
+                SelectSwapCost2D(lambda, numConditions, numInnerSlots, numBits, true)
+            };
+            set innerCosts += [innerPreparePairsPerBlock * cost];
+        }
+        let separateCost = innerCosts[1]
+            + freeRiderPairsPerBlock * SelectSwapCost2D(0, numConditions, 1, numExtraBits, true);
+        numExtraBits > 0 and separateCost < innerCosts[0]
+    }
+
+    /// Build the inner alias-sampling PREPARE and its free-rider loader together.
+    ///
+    /// Carrying the free-rider word widens the QROAM output charged on each of the two inner
+    /// PREPARE/uncompute pairs in one block encoding. Loading it separately costs one `Select`
+    /// round trip over the outer conditions but lets the inner table use a narrower output
+    /// and potentially a different swap width.
+    /// `availableDirty` is the lender size the walk passes the inner PREPARE, or 0 for clean scratch.
+    function MakeInnerPrepareAliasSamplingOracles(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+        maxSwapBits : Int,
+        availableDirty : Int,
+    ) : (
+        ((Qubit[], Qubit[], Qubit[]) => Unit is Adj),
+        ((Qubit[], Qubit[]) => Unit is Adj + Ctl)
+    ) {
+        let loadSeparately = ShouldLoadFreeRiderSeparately(
+            innerCoefficients,
+            freeRiderData,
+            coefficientBitPrecision,
+            maxSwapBits,
+            availableDirty
+        );
+        let inlineData = if loadSeparately { [] } else { freeRiderData };
+        let separateData = if loadSeparately { freeRiderData } else { [] };
+
+        (
+            MakeInnerPrepareAliasSampling(
+                innerCoefficients,
+                inlineData,
+                coefficientBitPrecision,
+                maxSwapBits,
+                availableDirty > 0
+            ),
+            MakeFreeRiderLoadOp(separateData)
+        )
+    }
+
+    /// Build an inner PREPARE using direct controlled preparation.
+    ///
+    /// innerReg layout: bReg[nIndexBits] + signQubit[1] + freeRiderReg[nFR]. The sign qubit
+    /// mirrors the alias-sampling QROM's sign output, so SELECT finds the LCU sign of the
+    /// sampled `(x_o, b)` in the same kind of place whichever inner backend is in use.
+    function MakeInnerPrepareDirect(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][]
+    ) : (Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        let nCoeffs = Length(innerCoefficients[0]);
+        let nIndexBits = MaxI(1, AddressQubits(nCoeffs));
+        let signData = BuildInnerSignTable(innerCoefficients, nIndexBits);
+        // No lookup table here; the lender is accepted only to keep one inner-PREPARE signature.
+        (outerReg, innerReg, _) => {
+            let bReg = innerReg[0..nIndexBits - 1];
+
+            let xo = Length(innerCoefficients);
+            for i in 0..xo - 1 {
+                let nPadded = 1 <<< nIndexBits;
+                let paddedAmps = Padded(-nPadded, 0.0, innerCoefficients[i]);
+                ApplyControlledOnInt(
+                    i,
+                    PreparePureStateD(paddedAmps, _),
+                    outerReg,
+                    Reversed(bReg),
+                );
+            }
+            Select(signData, bReg + outerReg, [innerReg[nIndexBits]]);
+        }
+    }
+
+    /// Build a SELECT using QROM + phase gradient rotation.
+    function MakeSelectPhaseGradient(
+        params : SelectParams
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
+            SelectImpl(params, true, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+        }
+    }
+
+    /// Build a SELECT using direct rotation synthesis.
+    function MakeSelectDirectRotation(
+        params : SelectParams
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, innerReg, spinReg, systemReg, phaseGradientReg) => {
+            SelectImpl(params, false, outerReg, innerReg, spinReg, systemReg, phaseGradientReg);
+        }
+    }
+
+    /// The SOSSA block encoding B as the `Qubit[] => Unit is Adj` callable QPE consumes.
+    ///
+    /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
+    /// the gradient tail is only present when `layout.numPhaseGradientQubits > 0`.
+    function MakeSOSSABlockEncodingOp(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+    ) : (Qubit[] => Unit is Adj) {
+        SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, _)
+    }
+
     /// Circuit entry point: allocates the flat register and applies the block encoding once.
     /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
     operation MakeSOSSABlockEncodingCircuit(
@@ -1016,6 +1019,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         ResetAll(allQubits);
     }
 
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Test wrappers
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1034,21 +1038,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
-    function TestShouldLoadFreeRiderSeparately(
-        innerCoefficients : Double[][],
-        freeRiderData : Bool[][],
-        coefficientBitPrecision : Int,
-        maxSwapBits : Int,
-        availableDirty : Int,
-    ) : Bool {
-        ShouldLoadFreeRiderSeparately(
-            innerCoefficients,
-            freeRiderData,
-            coefficientBitPrecision,
-            maxSwapBits,
-            availableDirty
-        )
-    }
 
     /// Test the full SELECT on an entry with known angles.
     operation TestSelectDQ(
@@ -1112,6 +1101,22 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         } else {
             SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg, []);
         }
+    }
+
+    function TestShouldLoadFreeRiderSeparately(
+        innerCoefficients : Double[][],
+        freeRiderData : Bool[][],
+        coefficientBitPrecision : Int,
+        maxSwapBits : Int,
+        availableDirty : Int,
+    ) : Bool {
+        ShouldLoadFreeRiderSeparately(
+            innerCoefficients,
+            freeRiderData,
+            coefficientBitPrecision,
+            maxSwapBits,
+            availableDirty
+        )
     }
 
     /// Checks that loading and then erasing the branched angle word leaves the address
