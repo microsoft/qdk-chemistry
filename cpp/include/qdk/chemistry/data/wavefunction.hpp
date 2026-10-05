@@ -786,7 +786,7 @@ class WavefunctionContainer {
    * @return True if orbitals are restricted and the spin multiplicity is
    * singlet
    */
-  bool _is_restricted_closed_shell() const;
+  virtual bool _is_restricted_closed_shell() const;
 
   /**
    * @brief Build a symmetry-blocked particle count from per-spin counts.
@@ -854,6 +854,27 @@ class WavefunctionContainer {
 
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;
+
+  /**
+   * @brief Serialize stored RDMs without computing missing ones.
+   * @param j Container JSON receiving an optional "rdms" member.
+   */
+  void _serialize_rdms_to_json(nlohmann::json& j) const;
+  /**
+   * @brief Replace RDM storage from a container JSON payload.
+   * @param j Container JSON with an optional "rdms" member.
+   */
+  void _deserialize_rdms_from_json(const nlohmann::json& j);
+  /**
+   * @brief Write stored RDMs to an optional "rdms" HDF5 subgroup.
+   * @param group Container group receiving the RDM payload.
+   */
+  void _serialize_rdms_to_hdf5(H5::Group& group) const;
+  /**
+   * @brief Replace RDM storage from an optional "rdms" HDF5 subgroup.
+   * @param group Container group containing the RDM payload.
+   */
+  void _deserialize_rdms_from_hdf5(H5::Group& group);
 
   /**
    * @brief Serialize single-orbital entropies and mutual information to JSON

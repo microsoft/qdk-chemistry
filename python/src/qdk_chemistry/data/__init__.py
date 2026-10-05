@@ -29,6 +29,8 @@ Exposed classes are:
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
+- :class:`MPSContainer`: Storage-only matrix product state with optional producer metadata.
+- :class:`MPSSite`: Explicit rank-3 site tensor with its own physical basis and sector orders.
 - :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
 - :class:`NuclearHessian`: Nuclear Hessian matrix associated with a molecular structure.
 - :class:`Orbitals`: Molecular orbital information and properties.
@@ -88,6 +90,8 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
+    MPSContainer,
+    MPSSite,
     NuclearGradients,
     NuclearHessian,
     Orbitals,
@@ -165,6 +169,8 @@ __all__ = [
     "HamiltonianType",
     "LatticeGraph",
     "LayeredPartition",
+    "MPSContainer",
+    "MPSSite",
     "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
