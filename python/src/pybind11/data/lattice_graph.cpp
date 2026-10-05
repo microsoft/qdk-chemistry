@@ -59,7 +59,7 @@ void bind_lattice_graph(pybind11::module &m) {
 
   py::class_<BondFlavorDefinition, py::smart_holder>(
       m, "BondFlavorDefinition", "Semantic label for a shell-axis class.")
-      .def(py::init<std::uint64_t, Eigen::RowVectorXd, BondFlavorId>(),
+      .def(py::init<std::uint64_t, Eigen::RowVectorXd, std::uint32_t>(),
            py::arg("shell"), py::arg("axis"), py::arg("flavor"), R"(
 Define a semantic label to resolve onto lattice graph edges.
 
@@ -79,11 +79,11 @@ Args:
   py::class_<EdgeLabel, py::smart_holder>(
       m, "EdgeLabel",
       "Geometric shell and optional semantic flavor of an edge.")
-      .def(
-          py::init([](std::uint64_t shell, std::optional<BondFlavorId> flavor) {
-            return EdgeLabel{shell, flavor};
-          }),
-          py::arg("shell"), py::arg("flavor") = py::none(), R"(
+      .def(py::init(
+               [](std::uint64_t shell, std::optional<std::uint32_t> flavor) {
+                 return EdgeLabel{shell, flavor};
+               }),
+           py::arg("shell"), py::arg("flavor") = py::none(), R"(
 Label one edge with its neighbor shell and optional semantic flavor.
 
 Args:

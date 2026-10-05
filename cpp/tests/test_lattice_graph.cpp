@@ -25,29 +25,27 @@ using namespace qdk::chemistry::data;
 
 class LatticeGraphTest : public ::testing::Test {};
 
-namespace {
 using Edge = std::pair<std::uint64_t, std::uint64_t>;
-// Dynamic-size record vectors need an explicit type for two-component literals.
-using Vec2 = Eigen::RowVector2d;
-constexpr BondFlavorId flavor_x = 10;
-constexpr BondFlavorId flavor_y = 20;
-constexpr BondFlavorId flavor_z = 30;
+constexpr std::uint32_t flavor_x = 10;
+constexpr std::uint32_t flavor_y = 20;
+constexpr std::uint32_t flavor_z = 30;
 
-std::vector<BondFlavorDefinition> honeycomb_flavor_ids() {
+static std::vector<BondFlavorDefinition> honeycomb_flavor_ids() {
   const double root_three = std::sqrt(3.0);
+  // Two-component axes need an explicit fixed-size type to convert to
+  // RowVectorXd.
   return {
-      {1, Vec2(0.5, root_three / 2.0), flavor_x},
-      {1, Vec2(0.5, -root_three / 2.0), flavor_y},
-      {1, Vec2(1.0, 0.0), flavor_z},
-      {2, Vec2(1.5, -root_three / 2.0), flavor_x},
-      {2, Vec2(1.5, root_three / 2.0), flavor_y},
-      {2, Vec2(0.0, root_three), flavor_z},
-      {3, Vec2(1.0, root_three), flavor_x},
-      {3, Vec2(1.0, -root_three), flavor_y},
-      {3, Vec2(2.0, 0.0), flavor_z},
+      {1, Eigen::RowVector2d(0.5, root_three / 2.0), flavor_x},
+      {1, Eigen::RowVector2d(0.5, -root_three / 2.0), flavor_y},
+      {1, Eigen::RowVector2d(1.0, 0.0), flavor_z},
+      {2, Eigen::RowVector2d(1.5, -root_three / 2.0), flavor_x},
+      {2, Eigen::RowVector2d(1.5, root_three / 2.0), flavor_y},
+      {2, Eigen::RowVector2d(0.0, root_three), flavor_z},
+      {3, Eigen::RowVector2d(1.0, root_three), flavor_x},
+      {3, Eigen::RowVector2d(1.0, -root_three), flavor_y},
+      {3, Eigen::RowVector2d(2.0, 0.0), flavor_z},
   };
 }
-}  // namespace
 
 TEST_F(LatticeGraphTest, ChainConstructor) {
   // 4-site chain
@@ -189,7 +187,7 @@ TEST_F(LatticeGraphTest, HoneycombFlavorsResolveSelectedShells) {
       LatticeGraph::from_geometry(LatticeGeometry::honeycomb(5, 5), {1, 2, 3},
                                   honeycomb_flavor_ids(), 2.5, 1.0e-9);
   constexpr std::uint64_t center = 24;
-  std::map<std::uint64_t, std::map<BondFlavorId, std::size_t>> flavor_degree;
+  std::map<std::uint64_t, std::map<std::uint32_t, std::size_t>> flavor_degree;
   for (const auto& [edge, label] : honeycomb.edge_labels()) {
     ASSERT_TRUE(label.flavor.has_value());
     EXPECT_DOUBLE_EQ(honeycomb.weight(edge.first, edge.second), 2.5);
@@ -197,7 +195,7 @@ TEST_F(LatticeGraphTest, HoneycombFlavorsResolveSelectedShells) {
       ++flavor_degree[label.shell][*label.flavor];
     }
   }
-  for (BondFlavorId flavor : {flavor_x, flavor_y, flavor_z}) {
+  for (std::uint32_t flavor : {flavor_x, flavor_y, flavor_z}) {
     EXPECT_EQ(flavor_degree.at(1).at(flavor), 1);
     EXPECT_EQ(flavor_degree.at(2).at(flavor), 2);
     EXPECT_EQ(flavor_degree.at(3).at(flavor), 1);
@@ -233,13 +231,13 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
 
   const auto flavored_hexagon = LatticeGraph::from_geometry(
       geometry, {1, 2, 3}, honeycomb_flavor_ids(), 2.5, 1.0e-9);
-  std::map<std::uint64_t, std::map<BondFlavorId, std::size_t>> counts;
+  std::map<std::uint64_t, std::map<std::uint32_t, std::size_t>> counts;
   for (const auto& [edge, label] : flavored_hexagon.edge_labels()) {
     ASSERT_TRUE(label.flavor.has_value());
     EXPECT_DOUBLE_EQ(flavored_hexagon.weight(edge.first, edge.second), 2.5);
     ++counts[label.shell][*label.flavor];
   }
-  for (BondFlavorId flavor : {flavor_x, flavor_y, flavor_z}) {
+  for (std::uint32_t flavor : {flavor_x, flavor_y, flavor_z}) {
     EXPECT_EQ(counts.at(1).at(flavor), 2);
     EXPECT_EQ(counts.at(2).at(flavor), 2);
     EXPECT_EQ(counts.at(3).at(flavor), 1);
@@ -276,9 +274,11 @@ TEST_F(LatticeGraphTest, FromGeometryRejectsRepeatedPeriodicImages) {
 }
 
 TEST_F(LatticeGraphTest, EdgeLabelsSurviveDataOperations) {
-  const auto graph = LatticeGraph::from_geometry(
-      LatticeGeometry::square(3, 2), {1, 2, 7},
-      {{1, Vec2(1.0, 0.0), flavor_x}, {2, Vec2(1.0, 1.0), flavor_y}}, 2.5);
+  const auto graph =
+      LatticeGraph::from_geometry(LatticeGeometry::square(3, 2), {1, 2, 7},
+                                  {{1, Eigen::RowVector2d(1.0, 0.0), flavor_x},
+                                   {2, Eigen::RowVector2d(1.0, 1.0), flavor_y}},
+                                  2.5);
   const auto& labels = graph.edge_labels();
   EXPECT_EQ(labels.size(), graph.num_edges());
   EXPECT_EQ(labels.at({0, 1}), (EdgeLabel{1, flavor_x}));
@@ -319,11 +319,11 @@ TEST_F(LatticeGraphTest, EdgeLabelsSurviveDataOperations) {
 
 TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
   const auto geometry = LatticeGeometry::square(2, 2);
-  const auto expected =
-      LatticeGraph::from_geometry(geometry, {1}, {{1, Vec2(1.0, 0.0), 1000}});
+  const auto expected = LatticeGraph::from_geometry(
+      geometry, {1}, {{1, Eigen::RowVector2d(1.0, 0.0), 1000}});
   for (double scale : {1.0e-200, 1.0e200, -1.0e-200, -1.0e200}) {
     const auto flavored = LatticeGraph::from_geometry(
-        geometry, {1}, {{1, Vec2(scale, 0.0), 1000}});
+        geometry, {1}, {{1, Eigen::RowVector2d(scale, 0.0), 1000}});
     EXPECT_EQ(flavored.edge_labels(), expected.edge_labels());
     EXPECT_EQ(std::count_if(
                   flavored.edge_labels().begin(), flavored.edge_labels().end(),
@@ -337,12 +337,13 @@ TEST_F(LatticeGraphTest, OppositeFlavorAxesMatchAboveHalfRootTwoTolerance) {
   auto json = LatticeGeometry::square(3, 3).to_json();
   json["integer_embedding"]["primitive_vectors"] = {{1.0, 1.0}, {1.0, -1.0}};
   const auto geometry = LatticeGeometry::from_json(json);
-  const auto flavored = [&](const Vec2& axis) {
+  const auto flavored = [&](const Eigen::RowVector2d& axis) {
     return LatticeGraph::from_geometry(geometry, {1}, {{1, axis, flavor_x}},
                                        1.0, 0.72)
         .edge_labels();
   };
-  for (const auto& axis : {Vec2(1.0, -1.0), Vec2(1.0, 1.0)}) {
+  for (const auto& axis :
+       {Eigen::RowVector2d(1.0, -1.0), Eigen::RowVector2d(1.0, 1.0)}) {
     const auto labels = flavored(axis);
     EXPECT_EQ(flavored(-axis), labels);
     EXPECT_TRUE(std::any_of(labels.begin(), labels.end(), [](const auto& item) {
@@ -358,8 +359,9 @@ TEST_F(LatticeGraphTest, NearbyFlavorAxesMatchAcrossSignFlipPoint) {
   json["integer_embedding"]["primitive_vectors"] = {{0.29, -0.957},
                                                     {0.957, 0.29}};
   const auto labels =
-      LatticeGraph::from_geometry(LatticeGeometry::from_json(json), {1},
-                                  {{1, Vec2(0.31, -0.95), flavor_x}}, 1.0, 0.3)
+      LatticeGraph::from_geometry(
+          LatticeGeometry::from_json(json), {1},
+          {{1, Eigen::RowVector2d(0.31, -0.95), flavor_x}}, 1.0, 0.3)
           .edge_labels();
   EXPECT_TRUE(std::any_of(labels.begin(), labels.end(), [](const auto& item) {
     return item.second.flavor == flavor_x;
@@ -370,7 +372,8 @@ TEST_F(LatticeGraphTest, BondAxisMatchingSeveralFlavorsIsRejected) {
   // At tolerance 0.8 the diagonals join shell 1, about 0.77 from both axes.
   const auto geometry = LatticeGeometry::square(3, 3);
   const std::vector<BondFlavorDefinition> definitions = {
-      {1, Vec2(1.0, 0.0), flavor_x}, {1, Vec2(0.0, 1.0), flavor_y}};
+      {1, Eigen::RowVector2d(1.0, 0.0), flavor_x},
+      {1, Eigen::RowVector2d(0.0, 1.0), flavor_y}};
   EXPECT_THROW(
       LatticeGraph::from_geometry(geometry, {1}, definitions, 1.0, 0.8),
       std::invalid_argument);
@@ -466,15 +469,16 @@ TEST_F(LatticeGraphTest, SerializationRequiresCompatibleVersion) {
 
 TEST_F(LatticeGraphTest, FromGeometrySelectsShellsAndWeights) {
   const auto geometry = LatticeGeometry::chain(4);
-  const auto graph = LatticeGraph::from_geometry(
-      geometry, {3, 1, 5, 3},
-      {{1, Vec2(1.0, 0.0), flavor_x}, {2, Vec2(1.0, 0.0), flavor_y}}, -2.5,
-      1.0e-9);
+  const auto graph =
+      LatticeGraph::from_geometry(geometry, {3, 1, 5, 3},
+                                  {{1, Eigen::RowVector2d(1.0, 0.0), flavor_x},
+                                   {2, Eigen::RowVector2d(1.0, 0.0), flavor_y}},
+                                  -2.5, 1.0e-9);
   ASSERT_EQ(graph.edge_labels().size(), 4);
   for (const auto& [edge, label] : graph.edge_labels()) {
     EXPECT_DOUBLE_EQ(graph.weight(edge.first, edge.second), -2.5);
     EXPECT_EQ(label.flavor, label.shell == 1
-                                ? std::optional<BondFlavorId>(flavor_x)
+                                ? std::optional<std::uint32_t>(flavor_x)
                                 : std::nullopt);
   }
   EXPECT_DOUBLE_EQ(graph.weight(0, 3), -2.5);
@@ -572,26 +576,30 @@ TEST_F(LatticeGraphTest, FromGeometryRejectsInvalidInputs) {
                  std::invalid_argument);
   }
   // Axis normalization uses its own bound, but still rejects subnormal axes.
-  EXPECT_EQ(
-      LatticeGraph::from_geometry(LatticeGeometry::square(2, 2), {2},
-                                  {{2, Vec2(1.0, 1.0), flavor_x}}, 1.0, 1.0e-16)
-          .edge_labels()
-          .at({0, 3})
-          .flavor,
-      flavor_x);
+  EXPECT_EQ(LatticeGraph::from_geometry(
+                LatticeGeometry::square(2, 2), {2},
+                {{2, Eigen::RowVector2d(1.0, 1.0), flavor_x}}, 1.0, 1.0e-16)
+                .edge_labels()
+                .at({0, 3})
+                .flavor,
+            flavor_x);
   const double subnormal = std::numeric_limits<double>::denorm_min();
   EXPECT_THROW(LatticeGraph::from_geometry(
-                   geometry, {1}, {{1, Vec2(subnormal, subnormal), flavor_x}}),
+                   geometry, {1},
+                   {{1, Eigen::RowVector2d(subnormal, subnormal), flavor_x}}),
                std::invalid_argument);
-  EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
-                                           {{0, Vec2(1.0, 0.0), flavor_x}}),
-               std::invalid_argument);
-  EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
-                                           {{1, Vec2(0.0, 0.0), flavor_x}}),
-               std::invalid_argument);
-  EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1},
-                                           {{1, Vec2(1.0, 0.0), flavor_x},
-                                            {1, Vec2(-2.0, 0.0), flavor_y}}),
+  EXPECT_THROW(
+      LatticeGraph::from_geometry(
+          geometry, {1}, {{0, Eigen::RowVector2d(1.0, 0.0), flavor_x}}),
+      std::invalid_argument);
+  EXPECT_THROW(
+      LatticeGraph::from_geometry(
+          geometry, {1}, {{1, Eigen::RowVector2d(0.0, 0.0), flavor_x}}),
+      std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::from_geometry(
+                   geometry, {1},
+                   {{1, Eigen::RowVector2d(1.0, 0.0), flavor_x},
+                    {1, Eigen::RowVector2d(-2.0, 0.0), flavor_y}}),
                std::invalid_argument);
   EXPECT_THROW(
       LatticeGraph::from_geometry(

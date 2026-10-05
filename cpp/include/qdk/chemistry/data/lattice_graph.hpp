@@ -32,7 +32,8 @@ using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 struct EdgeLabel {
   /// One-based neighbor shell, at most 2^53 so that HDF5 stores it exactly.
   std::uint64_t shell;
-  std::optional<BondFlavorId> flavor;
+  /// Opaque semantic flavor ID, if any.
+  std::optional<std::uint32_t> flavor;
   bool operator==(const EdgeLabel&) const = default;
 };
 
@@ -43,7 +44,7 @@ using EdgeLabels = std::map<std::pair<std::uint64_t, std::uint64_t>, EdgeLabel>;
 struct BondFlavorDefinition {
   std::uint64_t shell;
   Eigen::RowVectorXd axis;
-  BondFlavorId flavor;
+  std::uint32_t flavor;
 };
 
 // ---- Free coloring functions ------------------------------------------------

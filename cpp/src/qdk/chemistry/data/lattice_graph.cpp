@@ -97,10 +97,10 @@ static std::vector<BondFlavorDefinition> prepare_flavors(
   return definitions;
 }
 
-static std::optional<BondFlavorId> flavor_of(
+static std::optional<std::uint32_t> flavor_of(
     const std::vector<BondFlavorDefinition>& definitions, std::uint64_t shell,
     const Eigen::RowVector2d& axis, double tolerance) {
-  std::optional<BondFlavorId> flavor;
+  std::optional<std::uint32_t> flavor;
   for (const auto& definition : definitions) {
     if (definition.shell != shell ||
         axis_distance(definition.axis, axis) > tolerance) {
@@ -778,6 +778,8 @@ static EdgeColoring color_edges(
       best_count = distinct;
       best = coloring;
     }
+    // A proper edge coloring needs at least max_degree colors.
+    if (best_count == max_degree) break;
   }
   EdgeColoring result;
   for (std::size_t pos = 0; pos < edges_in.size(); ++pos) {
@@ -1200,9 +1202,9 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
         throw std::invalid_argument(
             "Edge labels require [i, j, shell, flavor].");
       }
-      std::optional<BondFlavorId> flavor;
+      std::optional<std::uint32_t> flavor;
       if (!entry[3].is_null()) {
-        flavor = detail::json_integer<BondFlavorId>(entry[3]);
+        flavor = detail::json_integer<std::uint32_t>(entry[3]);
       }
       if (!graph._edge_labels
                .try_emplace({detail::json_integer<std::uint64_t>(entry[0]),
@@ -1342,7 +1344,7 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
         const double flavor = labels[i + 3];
         if (!(shell >= 1.0 && shell <= 0x1p53 && shell == std::trunc(shell)) ||
             !(flavor >= -1.0 &&
-              flavor <= std::numeric_limits<BondFlavorId>::max() &&
+              flavor <= std::numeric_limits<std::uint32_t>::max() &&
               flavor == std::trunc(flavor)) ||
             !graph._edge_labels
                  .try_emplace(
@@ -1350,8 +1352,8 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
                       static_cast<std::uint64_t>(site_index(labels[i + 1]))},
                      static_cast<std::uint64_t>(shell),
                      flavor < 0.0 ? std::nullopt
-                                  : std::optional<BondFlavorId>(
-                                        static_cast<BondFlavorId>(flavor)))
+                                  : std::optional<std::uint32_t>(
+                                        static_cast<std::uint32_t>(flavor)))
                  .second) {
           throw std::invalid_argument(
               "Invalid or duplicate stored edge label.");

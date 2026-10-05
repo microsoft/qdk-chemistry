@@ -22,15 +22,14 @@ using namespace qdk::chemistry::data;
 
 class LatticeGeometryTest : public ::testing::Test {};
 
-namespace {
 using Edge = std::pair<std::uint64_t, std::uint64_t>;
 using ShellPairs = std::map<std::uint64_t, std::vector<Edge>>;
 
-const std::vector<std::pair<bool, bool>> boundary_modes = {
+static const std::vector<std::pair<bool, bool>> boundary_modes = {
     {false, false}, {true, false}, {false, true}, {true, true}};
 
-ShellPairs shell_pairs(const LatticeGeometry& geometry,
-                       const std::vector<std::uint64_t>& shells) {
+static ShellPairs shell_pairs(const LatticeGeometry& geometry,
+                              const std::vector<std::uint64_t>& shells) {
   ShellPairs result;
   for (std::uint64_t shell : shells) result[shell];
   const auto graph = LatticeGraph::from_geometry(geometry, shells);
@@ -40,7 +39,7 @@ ShellPairs shell_pairs(const LatticeGeometry& geometry,
   return result;
 }
 
-auto degree(const std::vector<Edge>& pairs, std::uint64_t site) {
+static auto degree(const std::vector<Edge>& pairs, std::uint64_t site) {
   return std::count_if(pairs.begin(), pairs.end(), [site](const auto& edge) {
     return edge.first == site || edge.second == site;
   });
@@ -48,7 +47,7 @@ auto degree(const std::vector<Edge>& pairs, std::uint64_t site) {
 
 // Oracle for the stencil search: rank every site-to-image distance directly.
 // Two images per periodic direction reach beyond shell three on these cells.
-std::map<Edge, std::uint64_t> brute_force_shells(
+static std::map<Edge, std::uint64_t> brute_force_shells(
     const LatticeGeometry& geometry, std::uint64_t max_shell) {
   const auto& positions = geometry.positions();
   const Eigen::MatrixXd periods =
@@ -82,7 +81,6 @@ std::map<Edge, std::uint64_t> brute_force_shells(
   }
   return result;
 }
-}  // namespace
 
 TEST_F(LatticeGeometryTest, FactoryDimensionsAreValidated) {
   EXPECT_THROW(LatticeGeometry::chain(0), std::invalid_argument);
