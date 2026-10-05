@@ -22,7 +22,7 @@ from qdk_chemistry.algorithms.expectation_estimator.qdk import (
     _parity,
     _paulis_to_nonid_masks,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, MeasurementData, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, MeasurementData, QubitOperator
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils import Logger
 
@@ -436,3 +436,24 @@ def test_estimator_multiple_identity_terms(wavefunction_4e4o):
         atol=float_comparison_absolute_tolerance,
         rtol=float_comparison_relative_tolerance,
     )
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.parametrize(
+    "partition",
+    [None, FlatPartition(strategy="manual", groups=((0, 3), (1,), (2,)))],
+    ids=["unpartitioned", "partitioned"],
+)
+def test_estimator_sparse_matches_dense(partition):
+    """Sparse storage yields the dense energy, measuring the Bell state's ZZ, XX and YY eigenvalues exactly."""
+    circuit = Circuit(qasm='OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n')
+    labels, coefficients = ["ZZ", "XX", "YY", "II"], np.array([1.0, 0.5, -0.25, 2.0])
+    dense = QubitOperator(labels, coefficients, term_partition=partition)
+    words = [{0: label[1], 1: label[0]} if label != "II" else {} for label in labels]
+    sparse = QubitOperator.from_sparse_terms(2, words, coefficients, term_partition=partition)
+    estimator = QdkExpectationEstimator()
+    estimator.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    energies = [estimator.run(circuit, op, total_shots=300)[0].energy_expectation_value for op in (dense, sparse)]
+
+    np.testing.assert_allclose(energies, 3.75, atol=float_comparison_absolute_tolerance)
