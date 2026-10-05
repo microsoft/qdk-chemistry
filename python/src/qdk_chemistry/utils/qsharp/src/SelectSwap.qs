@@ -2,32 +2,18 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// SELECT-SWAP network for efficient QROM data loading (1D and 2D).
-///
-/// This file holds the *clean* strategy: the swap block is allocated as scratch, so the
-/// network costs width the caller did not already have. Its siblings are
-/// `SelectSwapDirty` (borrows live caller qubits instead) and `SelectSwapUtils` (the table
-/// and address-space helpers both strategies share). The lookup-method tags below route
-/// between them and stay here, with the loaders they dispatch to.
-///
-/// 1D operations:
-///   SelectSwap — loads data[address] into output.
-///   ApplyBranchPhaseFixup — repairs one branch's phase after a measurement-based erasure.
-///
-/// 2D operations:
-///   SelectSwap2D — loads data[outer][inner] with one select-swap over the combined address,
-///     on allocated scratch or, given a lender, on borrowed qubits
-///   ComputeOptimalLambda2D — optimal SWAP bits for 2D case
-///
-/// References:
-///   Low, Kliuchnikov, Schaeffer (arXiv:1812.00954)
+/// SELECT-SWAP QROM loaders (1D and 2D), their Toffoli cost models, and shared table helpers.
+/// Reference: Low, Kliuchnikov, Schaeffer (arXiv:1812.00954).
 namespace QDKChemistry.Utils.SelectSwap {
 
     import Std.Arrays.All;
     import Std.Arrays.Chunks;
+    import Std.Arrays.Enumerated;
+    import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
     import Std.Arrays.IsEmpty;
     import Std.Arrays.MappedOverRange;
+    import Std.Arrays.Padded;
     import Std.Arrays.Partitioned;
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyToEachA;
@@ -44,22 +30,12 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Measurement.MResetEachZ;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.TableLookup.Select;
+    import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
-    import QDKChemistry.Utils.SelectSwapUtils.PadToAddressSpace;
-    import QDKChemistry.Utils.SelectSwapUtils.AliasToAddressSpace;
-    import QDKChemistry.Utils.SelectSwapUtils.SwappedLoadShape;
-    import QDKChemistry.Utils.SelectSwapUtils.SwapPermutedTable;
-    import QDKChemistry.Utils.SelectSwapUtils.DimensionsForSelect;
-    import QDKChemistry.Utils.SelectSwapUtils.CreatePaddedData;
-    import QDKChemistry.Utils.SelectSwapUtils.SwapDataOutputs;
-    import QDKChemistry.Utils.SelectSwapUtils.MeasurementUnlookupCost;
 
-    /// Narrowest swap width within 20% of the cheapest one's Toffolis.
-    ///
-    /// Returns the *narrowest* qualifying width rather than the cheapest, so a width is taken
-    /// only when the extra scratch is paying for itself. Widths are scanned in order, so the
-    /// first qualifier is the narrowest by construction.
+    /// Narrowest swap width within 20% of the cheapest one's Toffolis, so extra scratch is
+    /// only taken when it pays for itself.
     function ComputeOptimalLambda2D(
         numOuterData : Int,
         numInnerData : Int,
@@ -76,11 +52,7 @@ namespace QDKChemistry.Utils.SelectSwap {
             }
         }
 
-        // Largest relative Toffoli premium worth paying for a narrower swap network, since scoring
-        // widths by Toffolis alone never sees the scratch each extra swap bit doubles.
-        // At the inner-PREPARE shape `d = 90`, `m = 16`, `b = 21` it takes `k = 2` at 587 Toffolis
-        // over the minimum `k = 3` at 491: 19.6% more Toffolis for 30% less scratch.
-        // The margin is narrow -- below about 0.195 the rule takes `k = 3` -- so 0.2 is load-bearing.
+        // Max Toffoli premium for a narrower network; load-bearing, as below ~0.195 the inner PREPARE takes k = 3.
         let maxToffoliPremium = 0.2;
         let threshold = IntAsDouble(best) * (1.0 + maxToffoliPremium);
         for lambda in 0..addressBits - 1 {
@@ -146,12 +118,8 @@ namespace QDKChemistry.Utils.SelectSwap {
         return selectCost + swapCost + numErasures * eraseCost;
     }
 
-    /// Toffoli cost of the *forward* clean select-swap load only.
-    ///
-    /// `SelectSwapCost1D` prices a compute/uncompute pair, which is the right model when the
-    /// swap network erases itself. A streamed rotation batch is erased by measurement instead,
-    /// so only the forward pass is paid for and the optimal width is wider than that model
-    /// would choose.
+    /// Toffoli cost of the forward clean select-swap load alone, for a streamed batch erased
+    /// by measurement rather than by the compute/uncompute pair `SelectSwapCost1D` prices.
     internal function SelectSwapForwardCost(numSwapBits : Int, numData : Int, numBits : Int) : Int {
         if numSwapBits <= 0 {
             return numData - 1;
@@ -160,10 +128,7 @@ namespace QDKChemistry.Utils.SelectSwap {
         2^(addressBits - numSwapBits) - 2 + (2^numSwapBits - 1) * numBits
     }
 
-    /// Best clean swap width when only the forward load is paid for, and the ancilla it costs.
-    ///
-    /// Returns 0 when no network beats the plain lookup, in which case the caller should stay on
-    /// `Select` rather than allocate scratch for nothing.
+    /// Best clean swap width when only the forward load is paid for; 0 means stay on `Select`.
     function ComputeOptimalSwapBits(numData : Int, numBits : Int) : Int {
         let addressBits = Ceiling(Lg(IntAsDouble(numData)));
         mutable bestBits = 0;
@@ -183,6 +148,65 @@ namespace QDKChemistry.Utils.SelectSwap {
         if numSwapBits <= 0 { 0 } else { numBits * (2^numSwapBits - 1) }
     }
 
+    /// Zero-pads a lookup table out to the full `2^nRequired` address space.
+    internal function PadToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
+        Padded(-2^nRequired, [false, size = Length(data[0])], data)
+    }
+
+    /// Pads a table to `2^nRequired` rows, aliasing surplus addresses as `Select` does.
+    internal function AliasToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
+        MappedOverRange(
+            i -> data[UnaryIterationActionIndex(Length(data), i)],
+            0..2^nRequired - 1
+        )
+    }
+
+    /// Flat table and `(select, swap)` address split shared by a 2D swapped load and its erasure.
+    internal function SwappedLoadShape(
+        data : Bool[][][],
+        outerAddress : Qubit[],
+        innerAddress : Qubit[],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+    ) : (Bool[][], Qubit[], Qubit[]) {
+        let nRequired = DimensionsForSelect(data[0], innerAddress);
+        Fact(numSwapBits <= nRequired, "Too many bits for SWAP network");
+        let m = Length(data[0][0]);
+        let k = nRequired - numSwapBits;
+        let innerAddressParts = Partitioned([k, numSwapBits], innerAddress[...nRequired - 1]);
+        // One row-major table over every outer state, so `(innerSelect, outer)` indexes it directly.
+        let numOuterStates = if outerAddressAlwaysValid { Length(data) } else { 1 <<< AddressQubits(Length(data)) };
+        let flatData = Flattened(
+            MappedOverRange(
+                state -> CreatePaddedData(data[UnaryIterationActionIndex(Length(data), state)], nRequired, m, k),
+                0..numOuterStates - 1
+            )
+        );
+        let selectAddress = innerAddressParts[0] + outerAddress[...AddressQubits(Length(data)) - 1];
+        (flatData, selectAddress, innerAddressParts[1])
+    }
+
+    internal function DimensionsForSelect(data : Bool[][], address : Qubit[]) : Int {
+        let N = Length(data);
+        Fact(N > 0, "data cannot be empty");
+
+        let n = Ceiling(Lg(IntAsDouble(N)));
+        Fact(Length(address) >= n, $"address register is too small, requires at least {n} qubits");
+
+        return n;
+    }
+
+    internal function CreatePaddedData(data : Bool[][], nRequired : Int, m : Int, k : Int) : Bool[][] {
+        let dataPadded = Padded(-2^nRequired, [false, size = m], data);
+
+        MappedOverRange(i -> Flattened(dataPadded[i..2^k..2^nRequired - 1]), 0..2^k - 1)
+    }
+
+    /// Toffoli cost of erasing an `addressBits`-wide load by measurement and phase fixup.
+    internal function MeasurementUnlookupCost(addressBits : Int) : Int {
+        2^((addressBits + 1) / 2) + 2^(addressBits / 2) - (addressBits + 2)
+    }
+
     operation SelectSwap(numSwapBits : Int, data : Bool[][], address : Qubit[], output : Qubit[]) : Unit is Adj + Ctl {
         let nRequired = DimensionsForSelect(data, address);
         let addressFitted = address[...nRequired - 1];
@@ -199,11 +223,8 @@ namespace QDKChemistry.Utils.SelectSwap {
         }
     }
 
-    /// Clean select-swap whose surplus addresses alias the way a bare `Select` reads them.
-    ///
-    /// `SelectSwap` zero-pads, which is right when its own adjoint erases the load. Here the
-    /// erasure is a shared measurement-based unlookup with a phase fixup written against
-    /// `Select`'s routing, so the forward load has to agree with that routing instead.
+    /// Clean select-swap whose surplus addresses alias the way a bare `Select` reads them, so
+    /// a measurement-based erasure with a `Select`-routed phase fixup stays valid.
     operation SelectSwapAliased(
         numSwapBits : Int,
         data : Bool[][],
@@ -216,14 +237,8 @@ namespace QDKChemistry.Utils.SelectSwap {
 
     //  2D SELECT-SWAP (single select-swap over the combined outer×inner address)
 
-    /// Loads the single `m`-bit word `data[outer][inner]` into an `m`-bit `target`.
-    ///
-    /// At `numSwapBits > 0` the swap network needs an `m * 2^numSwapBits` block. With `dirty`
-    /// empty that block is allocated and erased by measurement. Otherwise it is borrowed from
-    /// `dirty`, which may be entangled with anything and comes back exactly as it arrived, at
-    /// the price of running `Select` twice and the butterfly four times. Either way the adjoint
-    /// erases `target` with a phase fixup over the combined `(outer, inner)` address, so it is
-    /// indifferent to how the forward pass was routed.
+    /// Loads `data[outer][inner]` into `target` on allocated scratch or, if `dirty` is non-empty,
+    /// on borrowed qubits returned unchanged. The adjoint erases `target` by measurement.
     operation SelectSwap2D(
         data : Bool[][][],
         numSwapBits : Int,
@@ -270,9 +285,7 @@ namespace QDKChemistry.Utils.SelectSwap {
                 );
                 let borrowed = dirty[...blockSize - 1];
                 let chunks = Chunks(m, borrowed);
-                // Twice, because XOR is an involution: the second `Select` restores the lender
-                // and the two copies of its addressed chunk cancel in `target`. Re-running
-                // `Select` forward, not its measurement-based adjoint, keeps the lender intact.
+                // Twice: XOR is an involution, so the second forward `Select` restores the lender.
                 for _ in 1..2 {
                     within {
                         SwapDataOutputs(swapAddress, chunks);
@@ -343,11 +356,41 @@ namespace QDKChemistry.Utils.SelectSwap {
             outerAddressAlwaysValid
         );
         // `Adjoint Select` is the measurement-based unlookup; `Unlookup` itself is not exported.
-        Adjoint Select(
-            SwapPermutedTable(flatData, Length(data[0][0]), numSwapBits, 1 <<< Length(selectAddress)),
-            selectAddress + swapAddress,
-            target
-        );
+        // Its table is the post-butterfly target, indexed by `select + swap * numSelectStates`.
+        let m = Length(data[0][0]);
+        let numChunks = 1 <<< numSwapBits;
+        let numSelectStates = 1 <<< Length(selectAddress);
+        mutable table : Bool[][] = [];
+        for swap in 0..numChunks - 1 {
+            // Replay the butterfly: beyond one swap bit its permutation is not `position XOR swap`.
+            mutable permutation = MappedOverRange(chunk -> chunk, 0..numChunks - 1);
+            for bit in 0..numSwapBits - 1 {
+                if (swap >>> bit) &&& 1 == 1 {
+                    let innerStep = 1 <<< bit;
+                    let outerStep = 1 <<< (bit + 1);
+                    for pair in 0..numChunks / outerStep - 1 {
+                        let low = pair * outerStep;
+                        let high = low + innerStep;
+                        let held = permutation[low];
+                        set permutation w/= low <- permutation[high];
+                        set permutation w/= high <- held;
+                    }
+                }
+            }
+            for index in 0..numSelectStates - 1 {
+                if index < Length(flatData) {
+                    let chunks = Chunks(m, flatData[index]);
+                    mutable permuted : Bool[] = [];
+                    for position in 0..numChunks - 1 {
+                        set permuted += chunks[permutation[position]];
+                    }
+                    set table += [permuted];
+                } else {
+                    set table += [[false, size = m * numChunks]];
+                }
+            }
+        }
+        Adjoint Select(table, selectAddress + swapAddress, target);
     }
 
     /// Runs `action` on the data word addressed by `address`, then uncomputes the lookup.
@@ -380,6 +423,20 @@ namespace QDKChemistry.Utils.SelectSwap {
                 SwapDataOutputs(addressParts[1], chunkedDataRegister);
             } apply {
                 action(chunkedDataRegister[0]);
+            }
+        }
+    }
+
+    internal operation SwapDataOutputs(address : Qubit[], outputs : Qubit[][]) : Unit is Adj {
+        let l = Length(address);
+        for (i, control) in Enumerated(address) {
+            let innerStepSize = 2^i;
+            let outerStepSize = 2^(i + 1);
+            let numSwaps = 2^l / 2^(i + 1);
+            for j in 0..numSwaps - 1 {
+                let targets1 = outputs[j * outerStepSize];
+                let targets2 = outputs[j * outerStepSize + innerStepSize];
+                ApplyToEachA(ts => Controlled SWAP([control], ts), Zipped(targets1, targets2));
             }
         }
     }
@@ -451,16 +508,8 @@ namespace QDKChemistry.Utils.SelectSwap {
         All(r -> r == Zero, MResetEachZ(address))
     }
 
-    /// Cross-checks `SelectSwapAliased` against a bare `Select` on every address, by value.
-    ///
-    /// The comparison is deliberately against `Select` and not `SelectSwap(0, ...)`: the zero-pad
-    /// and the alias differ precisely at the surplus addresses, which is the disagreement this
-    /// operation exists to catch.
-    ///
-    /// It compares loaded values rather than phases because `Select` erases a ragged table by
-    /// measurement, so `within { Select(...) } apply { Z(...) }` is not a phase oracle there --
-    /// it disagrees even with itself. The forward load is the only thing the streamed rotation
-    /// path uses `Select` for, and the forward load is what this checks.
+    /// Checks `SelectSwapAliased` against a bare `Select` by value on every address, including
+    /// the surplus ones where zero-padding and aliasing differ.
     internal operation TestSelectSwapAliasedMatchesSelect1D(data : Bool[][], numSwapBits : Int) : Bool {
         let m = Length(data[0]);
         let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
