@@ -96,6 +96,12 @@ class TestLCUBuilder:
         result3 = builder3.run(hamiltonian3)
         assert result3.get_container().num_prepare_ancillas == 2
 
+        # A below-threshold term is dropped from PREPARE and SELECT, so it does not widen the register.
+        roundoff = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 1e-17]))
+        container = LCUBuilder().run(roundoff).get_container()
+        assert container.num_prepare_ancillas == 1
+        assert len(container.select.controlled_operations) == 2
+
     def test_lcu_builder_registered_in_registry(self):
         """Verify block encoding builder is accessible via the registry."""
         builder = registry.create("hamiltonian_unitary_builder", "lcu")

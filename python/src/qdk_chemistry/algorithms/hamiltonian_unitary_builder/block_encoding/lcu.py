@@ -128,10 +128,10 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         if not qubit_hamiltonian.is_hermitian():
             raise ValueError("LCU block encoding requires a Hermitian Hamiltonian.")
 
-        coefficients = qubit_hamiltonian.coefficients
-        num_terms = len(coefficients)
-        if num_terms == 0:
+        if len(qubit_hamiltonian.coefficients) == 0:
             raise ValueError("LCU block encoding requires a non-empty Hamiltonian.")
+        # PREPARE and SELECT keep only the terms get_real_coefficients retains.
+        num_terms = max(1, len(qubit_hamiltonian.get_real_coefficients()))
         num_prepare_ancillas = int(np.ceil(np.log2(num_terms)))
 
         prepare_wfn = self._build_prepare(qubit_hamiltonian, num_prepare_ancillas, self._settings.get("tolerance"))
