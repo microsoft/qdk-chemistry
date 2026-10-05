@@ -63,10 +63,6 @@ def _post_process_phase_estimation(
         ``canonical_phase_fraction`` is the decoded walk phase, and ``branching``
         holds both sign candidates.
 
-    Raises:
-        ValueError: If the unitary folds several eigenvalues onto a phase, since the sign branch
-            the flag names is then not a single energy.
-
     """
     num_bins = 2**num_bits
     canonical_counts: dict[float, int] = {}

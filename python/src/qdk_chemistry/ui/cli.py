@@ -27,10 +27,10 @@ Use ``--dry-run`` before any command to preview parameters without executing.
 import argparse
 import inspect
 import json
-import math
 import os
 import re
 import sys
+from heapq import nsmallest
 from pathlib import Path
 from typing import Any
 
@@ -1166,8 +1166,7 @@ def cmd_utils_resolve_phase_energy(args):
 
     unitary = load_data_object(filename, qdk_data.UnitaryRepresentation)
     container = unitary.get_container()
-    if container.type == "pauli_product_formula" and container.scale == 0:
-        raise ValueError("The unitary representation has a zero evolution-time scale")
+    period = container.energy_period
     branching = tuple(sorted(container.eigenvalue_branches_from_phase(args.phase_fraction)))
     if not branching:
         raise ValueError("eigenvalue_branches_from_phase returned no candidate energies.")
@@ -1175,12 +1174,15 @@ def cmd_utils_resolve_phase_energy(args):
     # An ambiguous powered phase has no single inverse, so report none rather than an arbitrary branch.
     raw_energy = principal_energy if len(branching) == 1 else None
     reference_energy = float(args.reference_energy)
-    if container.type == "pauli_product_formula":
-        period = 2.0 * math.pi / abs(float(container.scale))
+    if period is not None:
         alias_index = round((reference_energy - principal_energy) / period)
         resolved_energy = principal_energy + alias_index * period
     else:
         resolved_energy = min(branching, key=lambda energy: abs(energy - reference_energy))
+
+    branch_count = len(branching)
+    if branch_count > 32:
+        branching = tuple(sorted(nsmallest(32, branching, key=lambda energy: abs(energy - reference_energy))))
 
     print(
         json.dumps(
@@ -1190,6 +1192,7 @@ def cmd_utils_resolve_phase_energy(args):
                 "container_type": container.type,
                 "raw_energy": raw_energy,
                 "branching": list(branching),
+                "branch_count": branch_count,
                 "resolved_energy": resolved_energy,
             },
             indent=2,
@@ -1831,7 +1834,11 @@ def _create_utils_parsers(subparsers):
     p = subparsers.add_parser(
         "resolve-phase-energy",
         help="List phase-inversion branches and resolve energy using a reference",
-        description="Report container branches and select the nearest walk candidate or periodic time-evolution alias.",
+        description=(
+            "Report up to 32 principal-window candidates nearest the reference in branching "
+            "and their total branch_count. Resolve against all candidates and periodic aliases; "
+            "resolved_energy may lie outside the principal window."
+        ),
     )
     p.add_argument("--project-name", required=True, help="Project name")
     p.add_argument(

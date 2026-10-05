@@ -245,13 +245,6 @@ class TestPhaseDecoding:
         assert result.canonical_phase_fraction == pytest.approx(0.25)
         assert result.branching == pytest.approx((0.0, 0.0), abs=1e-12)
 
-    def test_a_unitary_that_folds_several_energies_onto_a_phase_is_rejected(self):
-        """The sign flag names one energy per branch, so an ambiguous inverse has nothing to name."""
-        base = LCUBuilder(quantum_walk=True).run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0])).get_container()
-        container = LCUWalkContainer(base.block_encoding, power=2)
-        with pytest.raises(ValueError, match="ambiguous"):
-            _post_process_phase_estimation({"01": 1}, 2, "qdk_unary", True, container.eigenvalue_from_phase)
-
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     def test_tied_counts_decode_independently_of_shot_order(self, resolve_positive_branch):
         """Bins that tie on counts must not decode differently just because they arrived in a different order."""

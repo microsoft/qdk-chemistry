@@ -195,7 +195,8 @@ def test_create_parser():
     assert args.algorithm_type == "scf_solver"
 
 
-def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, capsys, monkeypatch):
+@pytest.mark.parametrize("container_type", ["pauli_product_formula", "custom_product_formula"])
+def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, capsys, monkeypatch, container_type):
     """Report the principal branch and resolve its periodic alias in the CLI."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
@@ -209,6 +210,7 @@ def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, cap
     )
     filename = "evolution.unitary_representation.json"
     unitary.to_json_file(str(project_path / filename))
+    monkeypatch.setattr(PauliProductFormulaContainer, "type", property(lambda _self: container_type))
     monkeypatch.setattr(
         sys,
         "argv",
@@ -230,8 +232,9 @@ def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, cap
     main()
 
     result = json.loads(capsys.readouterr().out)
-    assert result["container_type"] == "pauli_product_formula"
+    assert result["container_type"] == container_type
     assert result["branching"] == pytest.approx([-np.pi / 4.0])
+    assert result["branch_count"] == 1
     assert result["raw_energy"] == pytest.approx(-np.pi / 4.0)
     assert result["resolved_energy"] == pytest.approx(3.0 * np.pi / 4.0)
 
@@ -269,13 +272,13 @@ def test_resolve_phase_energy_uses_quantum_walk_mapping(temp_project_dir, capsys
     assert result["resolved_energy"] == pytest.approx(0.0, abs=1e-12)
 
 
-@pytest.mark.parametrize("power", [2, 3])
+@pytest.mark.parametrize("power", [2, 3, 2**16])
 @pytest.mark.parametrize("reference_energy", [-5.8, 5.8])
 @pytest.mark.parametrize("file_format", ["json", "hdf5"])
 def test_resolve_phase_energy_selects_serialized_walk_branch(
     temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format
 ):
-    """The CLI reports every saved walk branch and resolves the one nearest the reference."""
+    """The CLI bounds its output without losing the nearest saved walk branch."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
     builder = algorithms.create("hamiltonian_unitary_builder", "lcu", quantum_walk=True, power=power)
@@ -302,14 +305,18 @@ def test_resolve_phase_energy_selects_serialized_walk_branch(
 
     main()
 
-    result = json.loads(capsys.readouterr().out)
+    output = capsys.readouterr().out
+    result = json.loads(output)
     expected = sorted(6.0 * np.cos(2 * np.pi * (0.1 + branch) / power) for branch in range(power))
+    nearest = sorted(expected, key=lambda energy: abs(energy - reference_energy))
     assert result["success"] is True
     assert result["container_type"] == "lcu_walk"
     assert result["phase_fraction"] == 0.1
-    assert result["branching"] == pytest.approx(expected)
+    assert result["branching"] == pytest.approx(sorted(nearest[:32]))
+    assert result["branch_count"] == power
+    assert len(output) < 3000
     assert result["raw_energy"] is None
-    assert result["resolved_energy"] == pytest.approx(expected[-1] if reference_energy > 0 else expected[0])
+    assert result["resolved_energy"] == pytest.approx(nearest[0])
 
 
 def test_resolve_phase_energy_walk_reference_selects_positive_branch(temp_project_dir, capsys, monkeypatch):

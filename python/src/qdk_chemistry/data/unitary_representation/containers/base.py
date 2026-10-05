@@ -122,7 +122,12 @@ class UnitaryContainer(DataClass):
         """
 
     def eigenvalue_branches_from_phase(self, phase_fraction: float) -> tuple[float, ...]:
-        r"""Recover every eigenvalue consistent with a measured phase.
+        r"""Recover all eigenvalues consistent with the phase in the representation's principal energy window.
+
+        Windows are :math:`[-\lambda, \lambda]` for LCU walks and
+        :math:`[-\pi/t, \pi/t)` for time evolution with :math:`t > 0`.
+        Periodic aliases are left to the caller; see ``energy_period``.
+        Prefer this method when scalar inversion may raise for ambiguity.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
@@ -133,6 +138,11 @@ class UnitaryContainer(DataClass):
 
         """
         return (self.eigenvalue_from_phase(phase_fraction),)
+
+    @property
+    def energy_period(self) -> float | None:
+        """Return the energy-alias period, or ``None`` if there are no periodic aliases."""
+        return None
 
     @abstractmethod
     def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":

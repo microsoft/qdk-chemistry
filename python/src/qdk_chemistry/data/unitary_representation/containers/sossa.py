@@ -398,7 +398,12 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
 
+        Raises:
+            ValueError: If ``power`` is not one; powered SOSSA inversion is unsupported.
+
         """
+        if self.power != 1:
+            raise ValueError("SOSSA phase inversion is only supported for power=1.")
         phi = phase_fraction % 1.0
         return float(2.0 * self.normalization * np.cos(np.pi * phi) ** 2 + self.metadata.energy_shift)
 

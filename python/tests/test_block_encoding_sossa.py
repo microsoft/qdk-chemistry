@@ -183,6 +183,25 @@ def _sossa_operator_with_one_body(
 class TestSOSSABlockEncodingContainer:
     """Tests for the SOSSA container serialization."""
 
+    @pytest.mark.parametrize("power", [1, 2])
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_serialized_phase_inversion(self, tmp_path, power, file_format):
+        """Powered SOSSA inverses must not silently return the power-one energy."""
+        unitary = _make_sossa_unitary_representation(power=power)
+        filename = str(tmp_path / f"walk.unitary_representation.{file_format}")
+        unitary.to_file(filename, file_format)
+        container = UnitaryRepresentation.from_file(filename, file_format).get_container()
+
+        if power == 1:
+            expected = container.normalization + container.metadata.energy_shift
+            assert container.eigenvalue_from_phase(0.25) == pytest.approx(expected)
+            assert container.eigenvalue_branches_from_phase(0.25) == pytest.approx((expected,))
+        else:
+            with pytest.raises(ValueError, match="power=1"):
+                container.eigenvalue_from_phase(0.25)
+            with pytest.raises(ValueError, match="power=1"):
+                container.eigenvalue_branches_from_phase(0.25)
+
     def test_json_roundtrip(self):
         """Test JSON serialization/deserialization round-trip and wrapper dispatch."""
         result = _make_sossa_unitary_representation(power=3, lambda_eff=0.75)

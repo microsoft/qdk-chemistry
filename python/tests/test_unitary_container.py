@@ -68,6 +68,18 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
 
+    @pytest.mark.parametrize("scale", [-2.0, 0.5, 2.0])
+    def test_energy_period(self, step_terms, scale):
+        """Periodic aliases acquire the same phase for either evolution direction."""
+        container = PauliProductFormulaContainer(step_terms, step_reps=1, num_qubits=2, scale=scale)
+        assert container.energy_period == pytest.approx(2 * np.pi / abs(scale))
+
+    def test_zero_scale_has_no_energy_period(self, step_terms):
+        """An identity evolution cannot resolve energy aliases."""
+        container = PauliProductFormulaContainer(step_terms, step_reps=1, num_qubits=2, scale=0.0)
+        with pytest.raises(ValueError, match="zero evolution-time scale"):
+            _ = container.energy_period
+
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
         """A step repeated zero or fewer times has no defined unitary."""

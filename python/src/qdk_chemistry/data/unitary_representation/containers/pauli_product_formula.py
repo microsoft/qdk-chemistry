@@ -77,7 +77,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_reps: The number of repetitions of the single step.
             num_qubits: The number of qubits the unitary acts on.
             scale: The total evolution time represented by the container, including
-                any repetitions folded into ``step_reps``.
+                any repetitions folded into ``step_reps``. Combined containers instead
+                retain the operands' scale, not the concatenated duration.
 
         Raises:
             TypeError: If ``step_reps`` is not an integer.
@@ -114,6 +115,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if angle > np.pi:
             angle -= 2 * np.pi
         return float(-angle / self.scale)
+
+    @property
+    def energy_period(self) -> float:
+        """Return the energy-alias period; raise ``ValueError`` for zero evolution time."""
+        if self.scale == 0:
+            raise ValueError("The unitary representation has a zero evolution-time scale")
+        return float(2 * np.pi / abs(self.scale))
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
