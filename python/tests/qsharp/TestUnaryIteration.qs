@@ -55,7 +55,7 @@ namespace QDKChemistry.TestUtils.UnaryIterationTests {
                 X(flags[index]);
             });
             ApplyXorInPlace(addressValue, address);
-        }
+        };
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
