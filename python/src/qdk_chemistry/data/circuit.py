@@ -234,8 +234,7 @@ class Circuit(DataClass):
         Args:
             prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
                 when converting from Q# factory data.
-            **kwargs: Forwarded verbatim to ``qsharp.circuit``; anything omitted keeps its Q#
-                default rather than being passed as ``None``. Pass
+            **kwargs: Forwarded verbatim to ``qsharp.circuit``. Pass
                 ``generation_method=qsharp.CircuitGenerationMethod.Simulate`` for programs whose
                 circuit depends on measurement results.
 

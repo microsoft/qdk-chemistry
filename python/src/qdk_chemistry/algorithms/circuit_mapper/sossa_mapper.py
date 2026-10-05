@@ -28,47 +28,6 @@ _LOOKUP_METHODS: dict[str, int] = {
 }
 
 
-def _rotation_batch_size(num_orbitals: int, num_batches: int) -> int:
-    r"""Resolve ``num_batches`` passes into the :math:`\lambda` the Q# loader takes.
-
-    Returns the smallest :math:`\lambda` that still streams in ``num_batches`` passes, which
-    is the only member of each step worth taking *on width*: the register grows at ``b_rot``
-    qubits per angle right across a step, so every wider member costs qubits for the same
-    number of passes.
-
-    The choice is width-biased, not free. Toffoli cost is not flat across a step: the
-    per-batch table grows with :math:`\lambda` and the shared swap network re-optimises
-    against it, so cost sawtooths. At Fe2S2-20 both :math:`\lambda = 10` and
-    :math:`\lambda = 18` make two passes, but 18 costs 58.6M Toffolis against 10's 60.5M --
-    3.2% cheaper, for 91 more qubits. Counting batches deliberately gives up that trade,
-    because this code path exists to minimise width; a Toffoli-bound caller is better served
-    by fewer passes than by a wider batch inside the same pass count.
-
-    Args:
-        num_orbitals: Number of spatial orbitals :math:`N`; SELECT holds :math:`N - 1` angles.
-        num_batches: Number of passes over the angle table, from 1 to :math:`N - 1`.
-
-    Returns:
-        The :math:`\lambda` to hand to the Q# loader.
-
-    Raises:
-        ValueError: If ``num_batches`` exceeds the :math:`N - 1` available angles.
-
-    """
-    num_angles = num_orbitals - 1
-    if num_angles < 1:
-        # Nothing to split. The loader reads 0 as "keep the whole angle word resident",
-        # which is what an empty word already is, so this stays legal rather than faulting
-        # on a system too small to have a rotation to stream.
-        return 0
-    if num_batches > num_angles:
-        raise ValueError(
-            f"num_batches must be at most the {num_angles} rotation angles of a {num_orbitals}-orbital "
-            f"system, got {num_batches}"
-        )
-    return -(-num_angles // num_batches)
-
-
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
 
@@ -240,7 +199,7 @@ class SOSSAMapper(CircuitMapper):
                 free_rider_data,
                 coeff_bits,
                 self._settings.get("max_swap_bits"),
-                self._lookup_method(),
+                self._lookup_tag,
             )
         if algorithm == "direct":
             return (
@@ -248,25 +207,6 @@ class SOSSAMapper(CircuitMapper):
                 QSHARP_UTILS.SOSSAWalk.MakeFreeRiderLoadOp(free_rider_data),
             )
         raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{algorithm}'.")
-
-    def _lookup_method(self) -> int:
-        r"""Resolve ``lookup_method`` to the Q# tag both loaders branch on.
-
-        One setting feeds the streamed rotation batches and the inner alias-sampling
-        tables alike, so a caller cannot accidentally route one table through borrowed
-        qubits and the other through allocated scratch.
-
-        Returns:
-            The Q# ``Lookup*`` constant for the configured method.
-
-        Raises:
-            ValueError: If the configured method is not one of the three known tags.
-
-        """
-        method = self._settings.get("lookup_method")
-        if method not in _LOOKUP_METHODS:
-            raise ValueError(f"Unsupported SOSSA lookup method '{method}'.")
-        return _LOOKUP_METHODS[method]
 
     def _build_select(self, container: SOSSABlockEncodingContainer) -> Any:
         r"""Build the SELECT step.
@@ -292,7 +232,13 @@ class SOSSAMapper(CircuitMapper):
         else:
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
-        lookup_method = self._lookup_method()
+        num_angles = max(meta.num_spatial_orbitals - 1, 0)
+        num_batches = int(self._settings.get("num_batches"))
+        if 0 < num_angles < num_batches:
+            raise ValueError(
+                f"num_batches must be at most the {num_angles} rotation angles of a "
+                f"{meta.num_spatial_orbitals}-orbital system, got {num_batches}"
+            )
 
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
@@ -303,10 +249,9 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
-            "rotationBatchSize": _rotation_batch_size(
-                meta.num_spatial_orbitals, int(self._settings.get("num_batches"))
-            ),
-            "rotationLookupMethod": lookup_method,
+            # Smallest lambda making num_batches passes; a wider one costs width for the same passes.
+            "rotationBatchSize": -(-num_angles // num_batches),
+            "rotationLookupMethod": self._lookup_tag,
             "maxSwapBits": int(self._settings.get("max_swap_bits")),
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
@@ -430,6 +375,8 @@ class SOSSAMapper(CircuitMapper):
         outer_prepare_circuit = self._build_outer_prepare_circuit(container)
         regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
         outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
+        # Resolved per run, not in __init__: settings stay mutable until run.
+        self._lookup_tag = _LOOKUP_METHODS[self._settings.get("lookup_method")]
         inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         select_op = self._build_select(container)
 

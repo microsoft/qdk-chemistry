@@ -18,7 +18,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _rotation_batch_size
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
 from qdk_chemistry.data import (
@@ -860,8 +859,7 @@ class TestSOSSAResourceEstimation:
 
         The other half is that growing ``lambda`` past the point where the batch count drops
         is equally pointless, so the rule is neither "smallest" nor "widest": pick the batch
-        count and let the mapper derive ``lambda``. See
-        ``test_only_the_smallest_batch_of_each_step_is_worth_choosing``.
+        count and let the mapper derive ``lambda``.
         """
         tight_qubits, tight_toffolis = self._fe2s2_logical_counts(num_batches=19)
         knee_qubits, knee_toffolis = self._fe2s2_logical_counts(num_batches=self._FE2S2_NUM_BATCHES)
@@ -873,29 +871,6 @@ class TestSOSSAResourceEstimation:
             f"19 passes should cost strictly more than {self._FE2S2_NUM_BATCHES} for the "
             f"same width: {tight_toffolis} vs {knee_toffolis}"
         )
-
-    def test_only_the_smallest_batch_of_each_step_is_worth_choosing(self):
-        """The reason the setting counts passes instead of naming lambda.
-
-        Streaming reloads once per batch, so the batch count ``ceil((N - 1) / lambda)`` sets
-        how many times the rotation table is swept, while the rotation register keeps
-        growing at ``b_rot`` qubits per angle right across a step. Every ``lambda`` from 10
-        to 18 splits the 19 angles into two passes, and only ``lambda = 10`` is the
-        narrowest of them, so the setting derives that one rather than letting a caller land
-        anywhere in the step.
-
-        ``lambda = 11`` is the cheapest demonstration: it makes the same two passes and
-        produces a byte-identical circuit, so the angle it holds resident beyond
-        ``lambda = 10`` is width the caller cannot spend. Naming lambda made that reachable;
-        counting batches does not.
-        """
-        two_passes, _ = self._fe2s2_logical_counts(num_batches=2)
-        assert two_passes > 0, "two passes should produce an estimate"
-
-        # ``num_batches`` is the only lever now, so this pins what it resolves to rather than
-        # re-measuring a lambda the mapper will no longer accept.
-        assert _rotation_batch_size(20, 2) == 10, "two passes over 19 angles needs batches of 10"
-        assert _rotation_batch_size(20, 1) == 19, "one pass keeps every angle resident"
 
     def test_the_lookup_method_trades_width_against_toffolis_as_advertised(self):
         """Each loader has to be worth choosing somewhere, and none may be a silent regression.

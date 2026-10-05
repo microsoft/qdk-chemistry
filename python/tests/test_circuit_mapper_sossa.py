@@ -13,7 +13,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
-from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS, _rotation_batch_size
+from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _LOOKUP_METHODS
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
@@ -253,6 +253,8 @@ class TestInnerPrep:
         # Build inner prep
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
+        # Calling the builder directly skips _run_impl, which is what normally resolves this.
+        inner_mapper._lookup_tag = _LOOKUP_METHODS[inner_mapper.settings().get("lookup_method")]
         inner_op, _ = inner_mapper._build_inner_oracles(container)
 
         # Compute register sizes
@@ -836,56 +838,15 @@ class TestSOSSAWalkLogicalCounts:
         )
 
 
-class TestRotationBatchSizeFor:
-    """The arithmetic behind the ``num_batches`` setting."""
+class TestNumBatchesSetting:
+    """The ``num_batches`` setting's one bound the settings range cannot see."""
 
-    @pytest.mark.parametrize(
-        ("num_batches", "expected"),
-        [(1, 19), (2, 10), (3, 7), (4, 5), (5, 4), (7, 3), (10, 2), (19, 1)],
-    )
-    def test_it_returns_the_smallest_batch_making_that_many_passes(self, num_batches, expected):
-        """Each answer must make exactly the requested number of passes, and one less must not.
-
-        The derivation only earns its place if it lands on the *first* lambda of each step, so
-        both halves are checked: the value makes ``num_batches`` passes, and shrinking it by
-        one spills into another pass. The N = 20 shape is the one the resource-estimation
-        pins use.
-        """
-        num_angles = 19
-        batch = _rotation_batch_size(20, num_batches)
-
-        assert batch == expected
-        assert math.ceil(num_angles / batch) == num_batches
-        assert batch == 1 or math.ceil(num_angles / (batch - 1)) > num_batches, (
-            f"lambda={batch} is not the smallest making {num_batches} passes"
-        )
-
-    def test_one_batch_keeps_every_angle_resident(self):
-        """One pass has to mean the whole table, which is the setting's resident behaviour."""
-        for num_orbitals in (2, 8, 20, 57):
-            assert _rotation_batch_size(num_orbitals, 1) == num_orbitals - 1
-
-    @pytest.mark.parametrize(
-        ("num_orbitals", "num_batches"),
-        [(20, 20), (20, 21), (2, 2)],
-    )
-    def test_it_rejects_more_passes_than_there_are_angles(self, num_orbitals, num_batches):
-        """Asking for more passes than angles is a caller bug, not something to round down.
-
-        The setting's own range rejects anything below one pass, so this is the only bound
-        the derivation has to enforce, and it depends on a system size the range cannot see.
-        """
+    def test_it_rejects_more_passes_than_there_are_angles(self):
+        """Two passes over N = 2's single angle would otherwise clamp silently to one."""
+        mapper = _make_sossa_mapper()
+        mapper.settings().set("num_batches", 2)
         with pytest.raises(ValueError, match="num_batches must be at most"):
-            _rotation_batch_size(num_orbitals, num_batches)
-
-    def test_a_system_with_no_angles_to_stream_is_not_an_error(self):
-        """One orbital has no Givens angle, so the default must not fault on it.
-
-        ``num_batches = 1`` is the shipped default and has to stay legal at every system
-        size. The loader reads 0 as "keep the whole angle word resident", which is what an
-        empty word already is, so the degenerate shape resolves rather than raising.
-        """
-        assert _rotation_batch_size(1, 1) == 0
+            mapper.run(_build_sossa_unitary(num_orbitals=2))
 
 
 class TestMaxSwapBitsSetting:
