@@ -27,6 +27,7 @@ Each test runs ExaChem via MPI, so they are marked ``slow``. The calculator find
 
 from __future__ import annotations
 
+import os
 import shutil
 
 import numpy as np
@@ -65,6 +66,15 @@ pytestmark = [
         reason="Requires ExaChem on PATH, an MPI runtime, and PySCF",
     ),
 ]
+
+
+@pytest.fixture(autouse=True)
+def _allow_openmpi_as_root(monkeypatch):
+    # The CI wheel-test container runs as root; OpenMPI's mpirun refuses root unless both are set.
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        monkeypatch.setenv("OMPI_ALLOW_RUN_AS_ROOT", "1")
+        monkeypatch.setenv("OMPI_ALLOW_RUN_AS_ROOT_CONFIRM", "1")
+
 
 # With run_coupled_cluster's thresholds the codes agree to ~1e-9 Eh and ~1e-8 in amplitudes (ExaChem 45c192e8).
 _energy_tolerance = 100 * mp2_energy_tolerance
