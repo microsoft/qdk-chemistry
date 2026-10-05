@@ -34,6 +34,90 @@ namespace QDKChemistry.Utils.SelectSwap {
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
 
+    /// Zero-pads a lookup table out to the full `2^nRequired` address space.
+    internal function PadToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
+        Padded(-2^nRequired, [false, size = Length(data[0])], data)
+    }
+
+    /// Pads a table to `2^nRequired` rows, aliasing surplus addresses as `Select` does.
+    internal function AliasToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
+        MappedOverRange(
+            i -> data[UnaryIterationActionIndex(Length(data), i)],
+            0..2^nRequired - 1
+        )
+    }
+
+    /// Register slices and the flattened table shared by the swap path and its erasure.
+    internal function SwappedLoadShape(
+        data : Bool[][][],
+        outerAddress : Qubit[],
+        innerAddress : Qubit[],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool,
+    ) : (Bool[][], Qubit[], Qubit[]) {
+        let nRequired = DimensionsForSelect(data[0], innerAddress);
+        Fact(numSwapBits <= nRequired, "Too many bits for SWAP network");
+        let m = Length(data[0][0]);
+        let k = nRequired - numSwapBits;
+        let innerAddressParts = Partitioned([k, numSwapBits], innerAddress[...nRequired - 1]);
+        let flatData = FlattenPaddedData(data, nRequired, m, k, outerAddressAlwaysValid);
+        let selectAddress = innerAddressParts[0] + outerAddress[...AddressQubits(Length(data)) - 1];
+        (flatData, selectAddress, innerAddressParts[1])
+    }
+
+    /// Where each chunk ends up after `SwapDataOutputs` runs for a given swap value.
+    ///
+    /// `result[position]` is the chunk index the butterfly leaves at `position`. Only
+    /// `result[0] == swap` is the point of the network; the rest are a permutation that is
+    /// *not* `position XOR swap` beyond one swap bit, so it is replayed here rather than
+    /// assumed.
+    internal function SwapNetworkPermutation(numSwapBits : Int, swap : Int) : Int[] {
+        let numChunks = 1 <<< numSwapBits;
+        mutable permutation = MappedOverRange(chunk -> chunk, 0..numChunks - 1);
+        for bit in 0..numSwapBits - 1 {
+            if (swap >>> bit) &&& 1 == 1 {
+                let innerStep = 1 <<< bit;
+                let outerStep = 1 <<< (bit + 1);
+                for pair in 0..numChunks / outerStep - 1 {
+                    let low = pair * outerStep;
+                    let high = low + innerStep;
+                    let held = permutation[low];
+                    set permutation w/= low <- permutation[high];
+                    set permutation w/= high <- held;
+                }
+            }
+        }
+        permutation
+    }
+
+    /// The post-butterfly target contents indexed by `select + swap * numSelectStates`.
+    internal function SwapPermutedTable(
+        flatData : Bool[][],
+        m : Int,
+        numSwapBits : Int,
+        numSelectStates : Int,
+    ) : Bool[][] {
+        let numChunks = 1 <<< numSwapBits;
+        let unreachable = [false, size = m * numChunks];
+        mutable table : Bool[][] = [];
+        for swap in 0..numChunks - 1 {
+            let permutation = SwapNetworkPermutation(numSwapBits, swap);
+            for index in 0..numSelectStates - 1 {
+                if index < Length(flatData) {
+                    let chunks = Chunks(m, flatData[index]);
+                    mutable permuted : Bool[] = [];
+                    for position in 0..numChunks - 1 {
+                        set permuted += chunks[permutation[position]];
+                    }
+                    set table += [permuted];
+                } else {
+                    set table += [unreachable];
+                }
+            }
+        }
+        table
+    }
+
     /// Narrowest swap width within 20% of the cheapest one's Toffolis, so extra scratch is
     /// only taken when it pays for itself.
     function ComputeOptimalLambda2D(
@@ -148,44 +232,6 @@ namespace QDKChemistry.Utils.SelectSwap {
         if numSwapBits <= 0 { 0 } else { numBits * (2^numSwapBits - 1) }
     }
 
-    /// Zero-pads a lookup table out to the full `2^nRequired` address space.
-    internal function PadToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
-        Padded(-2^nRequired, [false, size = Length(data[0])], data)
-    }
-
-    /// Pads a table to `2^nRequired` rows, aliasing surplus addresses as `Select` does.
-    internal function AliasToAddressSpace(data : Bool[][], nRequired : Int) : Bool[][] {
-        MappedOverRange(
-            i -> data[UnaryIterationActionIndex(Length(data), i)],
-            0..2^nRequired - 1
-        )
-    }
-
-    /// Flat table and `(select, swap)` address split shared by a 2D swapped load and its erasure.
-    internal function SwappedLoadShape(
-        data : Bool[][][],
-        outerAddress : Qubit[],
-        innerAddress : Qubit[],
-        numSwapBits : Int,
-        outerAddressAlwaysValid : Bool,
-    ) : (Bool[][], Qubit[], Qubit[]) {
-        let nRequired = DimensionsForSelect(data[0], innerAddress);
-        Fact(numSwapBits <= nRequired, "Too many bits for SWAP network");
-        let m = Length(data[0][0]);
-        let k = nRequired - numSwapBits;
-        let innerAddressParts = Partitioned([k, numSwapBits], innerAddress[...nRequired - 1]);
-        // One row-major table over every outer state, so `(innerSelect, outer)` indexes it directly.
-        let numOuterStates = if outerAddressAlwaysValid { Length(data) } else { 1 <<< AddressQubits(Length(data)) };
-        let flatData = Flattened(
-            MappedOverRange(
-                state -> CreatePaddedData(data[UnaryIterationActionIndex(Length(data), state)], nRequired, m, k),
-                0..numOuterStates - 1
-            )
-        );
-        let selectAddress = innerAddressParts[0] + outerAddress[...AddressQubits(Length(data)) - 1];
-        (flatData, selectAddress, innerAddressParts[1])
-    }
-
     internal function DimensionsForSelect(data : Bool[][], address : Qubit[]) : Int {
         let N = Length(data);
         Fact(N > 0, "data cannot be empty");
@@ -200,6 +246,24 @@ namespace QDKChemistry.Utils.SelectSwap {
         let dataPadded = Padded(-2^nRequired, [false, size = m], data);
 
         MappedOverRange(i -> Flattened(dataPadded[i..2^k..2^nRequired - 1]), 0..2^k - 1)
+    }
+
+    /// Concatenates the per-outer-index padded lookup tables into one row-major table, so a
+    /// combined `(innerSelect, outer)` address indexes it directly.
+    internal function FlattenPaddedData(
+        data : Bool[][][],
+        nRequired : Int,
+        m : Int,
+        k : Int,
+        trimToValidOuter : Bool,
+    ) : Bool[][] {
+        let numOuterStates = if trimToValidOuter { Length(data) } else { 1 <<< AddressQubits(Length(data)) };
+        Flattened(
+            MappedOverRange(
+                state -> CreatePaddedData(data[UnaryIterationActionIndex(Length(data), state)], nRequired, m, k),
+                0..numOuterStates - 1
+            )
+        )
     }
 
     /// Toffoli cost of erasing an `addressBits`-wide load by measurement and phase fixup.
@@ -356,41 +420,11 @@ namespace QDKChemistry.Utils.SelectSwap {
             outerAddressAlwaysValid
         );
         // `Adjoint Select` is the measurement-based unlookup; `Unlookup` itself is not exported.
-        // Its table is the post-butterfly target, indexed by `select + swap * numSelectStates`.
-        let m = Length(data[0][0]);
-        let numChunks = 1 <<< numSwapBits;
-        let numSelectStates = 1 <<< Length(selectAddress);
-        mutable table : Bool[][] = [];
-        for swap in 0..numChunks - 1 {
-            // Replay the butterfly: beyond one swap bit its permutation is not `position XOR swap`.
-            mutable permutation = MappedOverRange(chunk -> chunk, 0..numChunks - 1);
-            for bit in 0..numSwapBits - 1 {
-                if (swap >>> bit) &&& 1 == 1 {
-                    let innerStep = 1 <<< bit;
-                    let outerStep = 1 <<< (bit + 1);
-                    for pair in 0..numChunks / outerStep - 1 {
-                        let low = pair * outerStep;
-                        let high = low + innerStep;
-                        let held = permutation[low];
-                        set permutation w/= low <- permutation[high];
-                        set permutation w/= high <- held;
-                    }
-                }
-            }
-            for index in 0..numSelectStates - 1 {
-                if index < Length(flatData) {
-                    let chunks = Chunks(m, flatData[index]);
-                    mutable permuted : Bool[] = [];
-                    for position in 0..numChunks - 1 {
-                        set permuted += chunks[permutation[position]];
-                    }
-                    set table += [permuted];
-                } else {
-                    set table += [[false, size = m * numChunks]];
-                }
-            }
-        }
-        Adjoint Select(table, selectAddress + swapAddress, target);
+        Adjoint Select(
+            SwapPermutedTable(flatData, Length(data[0][0]), numSwapBits, 1 <<< Length(selectAddress)),
+            selectAddress + swapAddress,
+            target
+        );
     }
 
     /// Runs `action` on the data word addressed by `address`, then uncomputes the lookup.
