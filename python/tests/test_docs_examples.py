@@ -16,6 +16,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import ClassVar
 
+import pytest
+
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
@@ -161,10 +163,6 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_azure_quantum = True
 
-    # Expectation estimator examples run circuit simulations and are slow
-    if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
-        is_slow = True
-
     # Individual examples can declare intentionally long execution explicitly.
     if "# docs-example: slow" in content:
         is_slow = True
@@ -260,7 +258,6 @@ def _create_test_methods():
                 needs_geometric,
                 needs_azure_quantum,
                 needs_external_service,
-                slow,
             ):
                 """Create a test method for the given example file."""
 
@@ -292,30 +289,30 @@ def _create_test_methods():
                         self.skipTest("Azure Quantum not available")
                     if needs_external_service:
                         self.skipTest("Example requires an external service")
-                    if slow and not _RUN_SLOW_TESTS:
-                        self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
                     self._run_python_example(filepath)
 
                 return test_method
 
             # Add the test method to the TestExampleScripts class
-            setattr(
-                TestExampleScripts,
-                test_name,
-                make_test(
-                    example_file,
-                    requires_pyscf,
-                    requires_qiskit,
-                    requires_qiskit_aer,
-                    requires_qiskit_nature,
-                    requires_openfermion,
-                    requires_geometric,
-                    requires_azure_quantum,
-                    requires_external_service,
-                    is_slow,
-                ),
+            generated_test = make_test(
+                example_file,
+                requires_pyscf,
+                requires_qiskit,
+                requires_qiskit_aer,
+                requires_qiskit_nature,
+                requires_openfermion,
+                requires_geometric,
+                requires_azure_quantum,
+                requires_external_service,
             )
+            if is_slow:
+                generated_test = pytest.mark.slow(generated_test)
+                generated_test = unittest.skipUnless(
+                    _RUN_SLOW_TESTS, "Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable."
+                )(generated_test)
+
+            setattr(TestExampleScripts, test_name, generated_test)
 
 
 # Generate test methods when the module is loaded

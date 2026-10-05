@@ -75,6 +75,34 @@ if build_dir.exists():
             break
 
 
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolate_worker_temporary_directory(tmp_path_factory):
+    """Keep native basis archive extraction private to each xdist worker."""
+    if os.getenv("PYTEST_XDIST_WORKER"):
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            worker_temp = str(tmp_path_factory.mktemp("native"))
+            monkeypatch.setenv("TMPDIR", worker_temp)
+            monkeypatch.setenv("TMP", worker_temp)
+            monkeypatch.setenv("TEMP", worker_temp)
+            yield
+    else:
+        yield
+
+
+def pytest_collection_modifyitems(items):
+    """Skip slow-marked tests unless QDK_CHEMISTRY_RUN_SLOW_TESTS is set."""
+    if _RUN_SLOW_TESTS:
+        return
+
+    skip_slow = pytest.mark.skip(reason="Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
 @pytest.fixture
 def basic_orbital():
     """Create a basic valid Orbitals object for testing."""
