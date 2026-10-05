@@ -34,6 +34,7 @@ The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.b
 TimeDependentQubitHamiltonian
    A :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` specifying the time-evolution schedule.
    For static Hamiltonians, use ``DrivenQubitHamiltonian(h0)`` without a drive; the propagator then returns ``h0`` unchanged, including its term partition.
+   Every step then evolves the same ``h0``, so ``dt = total_time`` gives an equivalent evolution to many short steps; set the product-formula step count through the evolution builder's ``num_divisions`` instead.
 
 State preparation circuit
    A :class:`~qdk_chemistry.data.circuit.Circuit` that prepares the initial state.
@@ -63,7 +64,7 @@ The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.b
      - Total evolution time :math:`T`. Default: ``1.0``.
    * - ``dt``
      - float
-     - Time step for evolution discretization. Must be nonzero, match the sign of ``total_time``, and not exceed it in magnitude. Default: ``0.0`` (invalid; user must set).
+     - Time step for evolution discretization. Must be nonzero, match the sign of ``total_time``, and not exceed it in magnitude. For a static Hamiltonian, ``dt = total_time`` is sufficient and avoids rebuilding the same step. Default: ``0.0`` (invalid; user must set).
 
 Once configured, the builder can be executed:
 
@@ -87,6 +88,8 @@ Euler Evolution Circuit Builder
 Divides :math:`[0, T]` into Euler steps of size ``dt``.  At each step, the configured propagator (default: Magnus order-1) evaluates the effective Hamiltonian and the evolution builder constructs the time-evolution unitary.
 
 The default propagator (``magnus``) computes the Magnus-expanded Hamiltonian over each interval, giving second-order global accuracy for smooth drives.  Other propagators can be substituted via the ``propagator`` setting.
+
+A drive makes the step size matter, because the averaged Hamiltonian changes between steps.  Without a drive, every step evolves the same Hamiltonian, so a single step with ``dt = total_time`` gives an equivalent evolution to many short steps and builds faster; set the product-formula step count through the evolution builder's ``num_divisions``.
 
 **Usage example:**
 
