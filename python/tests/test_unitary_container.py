@@ -99,6 +99,24 @@ class TestPauliProductFormulaContainer:
             container.step_terms[1].pauli_term[0] = "Z"  # type: ignore[index]
         assert container.step_terms[1].pauli_term == {1: "Z"}
 
+    def test_stored_terms_share_one_copy_per_source_map(self):
+        """Terms that share a source map share one read-only copy across all segments."""
+        x, z = {0: "X"}, {1: "Z"}
+        container = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(x, 0.5), ExponentiatedPauliTerm(z, 0.25), ExponentiatedPauliTerm(x, 0.5)],
+            2,
+            2,
+            prefix_terms=[ExponentiatedPauliTerm(x, 0.25)],
+            suffix_terms=[ExponentiatedPauliTerm(z, 0.125)],
+        )
+        stored = [*container.prefix_terms, *container.step_terms, *container.suffix_terms]
+        assert len({id(term.pauli_term) for term in stored}) == 2
+        assert [dict(term.pauli_term) for term in stored] == [x, x, z, x, z]
+
+        # Sources freed mid-construction must not alias a later map through a reused id.
+        fresh = PauliProductFormulaContainer((ExponentiatedPauliTerm({q: "Y"}, 0.1) for q in range(64)), 1, 64)
+        assert [dict(term.pauli_term) for term in fresh.step_terms] == [{q: "Y"} for q in range(64)]
+
     def test_stored_terms_pickle_and_copy(self, container):
         """Read-only stored terms still pickle and deep-copy."""
         term = container.step_terms[2]
