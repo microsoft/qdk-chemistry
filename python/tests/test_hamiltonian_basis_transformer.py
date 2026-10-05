@@ -1,0 +1,277 @@
+"""Tests for the Hamiltonian basis-transformer Python API."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
+
+import numpy as np
+import pytest
+
+from qdk_chemistry.algorithms import QdkHamiltonianBasisTransformer, available, create, inspect_settings
+from qdk_chemistry.data import CholeskyHamiltonianContainer, Hamiltonian, Orbitals, SettingsAreLocked, Structure
+from qdk_chemistry.data._spin_channels import spin_channel_matrix
+from qdk_chemistry.data.symmetry import axes, spin_index_set
+
+from .test_helpers import create_test_basis_set, create_test_hamiltonian
+
+
+def test_qdk_transformer_registry():
+    """The concrete transformer is registered with its native run binding."""
+    assert "qdk" in available("hamiltonian_basis_transformer")
+    transformer = create("hamiltonian_basis_transformer")
+    assert isinstance(transformer, QdkHamiltonianBasisTransformer)
+    assert "run" in QdkHamiltonianBasisTransformer.__dict__
+    assert transformer.name() == "qdk"
+    assert transformer.aliases() == ["qdk"]
+    assert transformer.settings().get("validation_tolerance") == pytest.approx(1.0e-10)
+    assert inspect_settings("hamiltonian_basis_transformer", "qdk")[0][0] == "validation_tolerance"
+
+
+def test_qdk_transformer_rejects_non_cholesky_hamiltonian():
+    """The QDK implementation rejects unsupported Hamiltonian containers."""
+    source = create_test_hamiltonian(2)
+    transformer = create("hamiltonian_basis_transformer")
+    assert transformer.hash(source, source.get_orbitals())
+
+    with pytest.raises(ValueError, match="requires a Cholesky Hamiltonian"):
+        transformer.run(source, source.get_orbitals())
+
+    with pytest.raises(SettingsAreLocked):
+        transformer.settings().set("validation_tolerance", 1.0e-9)
+
+
+@pytest.mark.parametrize("direct", [False, True])
+def test_qdk_transformer_concurrent_calls(direct):
+    """Shared native instances freeze settings safely across Python threads."""
+    basis_set = create_test_basis_set(2, "test-concurrent-basis-transform")
+    active_indices = spin_index_set(2, [0, 1], [0, 1])
+    source_orbitals = Orbitals(np.eye(2), None, np.eye(2), basis_set, active_indices, None)
+    rotation = np.array([[0.0, 1.0], [-1.0, 0.0]])
+    target_orbitals = Orbitals(rotation, None, np.eye(2), basis_set, active_indices, None)
+    source = Hamiltonian(
+        CholeskyHamiltonianContainer(np.diag([1.0, 2.0]), np.ones((4, 1)), source_orbitals, 1.25, np.empty((0, 0)))
+    )
+    transformer = QdkHamiltonianBasisTransformer() if direct else create("hamiltonian_basis_transformer")
+    barrier = Barrier(4)
+
+    def run():
+        barrier.wait(timeout=10)
+        for _ in range(20):
+            result = transformer.run(source, target_orbitals)
+            np.testing.assert_allclose(result.get_one_body_integrals()[0], np.diag([2.0, 1.0]), atol=1.0e-13)
+            assert result.get_orbitals() is target_orbitals
+            assert result.get_core_energy() == pytest.approx(1.25)
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(run) for _ in range(4)]
+        for future in futures:
+            future.result()
+
+    with pytest.raises(SettingsAreLocked):
+        transformer.settings().set("validation_tolerance", 1.0e-9)
+
+
+@pytest.mark.parametrize(("file_type", "suffix"), [("json", "json"), ("hdf5", "h5")])
+def test_qdk_transformer_accepts_serialized_molecular_hamiltonian(tmp_path, file_type, suffix):
+    """Stored molecular Hamiltonians retain the AO basis identity needed for rotation."""
+    structure = Structure.from_xyz("2\nH2\nH 0 0 0\nH 0 0 0.74\n")
+    _, wavefunction = create("scf_solver", "qdk").run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    source_orbitals = wavefunction.get_orbitals()
+    source = create("hamiltonian_constructor", "qdk_cholesky").run(source_orbitals)
+    rotation = np.array([[0.8, -0.6], [0.6, 0.8]])
+    target_orbitals = Orbitals(
+        spin_channel_matrix(source_orbitals.coefficients(), axes.alpha()) @ rotation,
+        None,
+        source_orbitals.get_overlap_matrix(),
+        source_orbitals.get_basis_set(),
+        source_orbitals.active_indices(),
+        source_orbitals.inactive_indices(),
+    )
+    filename = tmp_path / f"source.hamiltonian.{suffix}"
+    source.to_file(filename, file_type)
+    restored = Hamiltonian.from_file(filename, file_type)
+
+    transformer = create("hamiltonian_basis_transformer")
+    expected = transformer.run(source, target_orbitals)
+    actual = transformer.run(restored, target_orbitals)
+
+    assert restored.content_hash() == source.content_hash()
+    np.testing.assert_allclose(
+        actual.get_one_body_integrals()[0], expected.get_one_body_integrals()[0], atol=1.0e-12, rtol=0
+    )
+    np.testing.assert_allclose(
+        actual.get_two_body_integrals()[0], expected.get_two_body_integrals()[0], atol=1.0e-12, rtol=0
+    )
+    assert actual.get_core_energy() == pytest.approx(expected.get_core_energy())
+    assert actual.get_orbitals() is target_orbitals
+
+
+@pytest.mark.parametrize("source_null_eigenvalue", [0.0, 1.0e-30])
+def test_qdk_transformer_rejects_target_metric_null_mode_amplification(source_null_eigenvalue):
+    """Differences in a source-null AO mode cannot become large in the target metric."""
+    angle = 0.3
+    source_coefficients = np.eye(3)
+    target_coefficients = source_coefficients.copy()
+    target_coefficients[:, 0] = [np.cos(angle), np.sin(angle), 1.0e6]
+    target_coefficients[:, 1] = [-np.sin(angle), np.cos(angle), 0.0]
+    source_overlap = np.diag([1.0, 1.0, source_null_eigenvalue])
+    target_overlap = source_overlap.copy()
+    target_overlap[2, 2] = 5.0e-11
+    basis_set = create_test_basis_set(3, "test-python-target-metric-transform")
+    active_indices = spin_index_set(3, [0, 1], [0, 1])
+    inactive_indices = spin_index_set(3, [2], [2])
+    source_orbitals = Orbitals(
+        source_coefficients,
+        None,
+        source_overlap,
+        basis_set,
+        active_indices,
+        inactive_indices,
+    )
+    target_orbitals = Orbitals(
+        target_coefficients,
+        None,
+        target_overlap,
+        basis_set,
+        active_indices,
+        inactive_indices,
+    )
+    source = Hamiltonian(
+        CholeskyHamiltonianContainer(
+            np.eye(2),
+            np.ones((4, 1)),
+            source_orbitals,
+            0.0,
+            np.empty((0, 0)),
+        )
+    )
+
+    with pytest.raises(ValueError, match="target AO metric"):
+        create("hamiltonian_basis_transformer").run(source, target_orbitals)
+
+
+def test_qdk_transformer_matches_molecular_rebuild_with_frozen_core():
+    """A real, noncontiguous active-space rotation agrees with fresh AO reconstruction."""
+    structure = Structure.from_xyz("2\nLiH\nLi 0 0 0\nH 0 0 1.60\n")
+    _, wavefunction = create("scf_solver", "qdk").run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    scf_orbitals = wavefunction.get_orbitals()
+    coefficients = spin_channel_matrix(scf_orbitals.coefficients(), axes.alpha())
+    nmo = coefficients.shape[1]
+    active_indices = [1, 3, 5]
+    active = spin_index_set(nmo, active_indices, active_indices)
+    inactive = spin_index_set(nmo, [0], [0])
+    source_orbitals = Orbitals(
+        coefficients, None, scf_orbitals.get_overlap_matrix(), scf_orbitals.get_basis_set(), active, inactive
+    )
+    rotation, _ = np.linalg.qr(np.random.default_rng(588).normal(size=(3, 3)))
+    target_coefficients = coefficients.copy()
+    target_coefficients[:, active_indices] = coefficients[:, active_indices] @ rotation
+    target_orbitals = Orbitals(
+        target_coefficients, None, scf_orbitals.get_overlap_matrix(), scf_orbitals.get_basis_set(), active, inactive
+    )
+    constructor = create(
+        "hamiltonian_constructor",
+        "qdk_cholesky",
+        cholesky_tolerance=1e-10,
+        store_ao_cholesky_vectors=True,
+    )
+    source = constructor.run(source_orbitals)
+    source_hash = source.content_hash()
+    source_ao_factors = source.get_container().get_ao_cholesky_vectors().copy()
+
+    transformed = create("hamiltonian_basis_transformer").run(source, target_orbitals)
+    rebuilt = constructor.run(target_orbitals)
+
+    assert transformed.has_inactive_fock_matrix()
+    for actual, expected in (
+        (transformed.get_one_body_integrals()[0], rebuilt.get_one_body_integrals()[0]),
+        (
+            transformed.get_container().get_three_center_integrals()[0],
+            rebuilt.get_container().get_three_center_integrals()[0],
+        ),
+        (transformed.get_two_body_integrals()[0], rebuilt.get_two_body_integrals()[0]),
+        (transformed.get_inactive_fock_matrix()[0], rebuilt.get_inactive_fock_matrix()[0]),
+    ):
+        np.testing.assert_allclose(actual, expected, atol=1e-10, rtol=0, equal_nan=False)
+    assert transformed.get_core_energy() == pytest.approx(rebuilt.get_core_energy(), abs=1e-12, rel=0)
+    assert transformed.get_orbitals() is target_orbitals
+    assert transformed.get_container().get_ao_cholesky_vectors() is None
+    assert source.content_hash() == source_hash
+    np.testing.assert_array_equal(source.get_container().get_ao_cholesky_vectors(), source_ao_factors)
+
+    solver = create("multi_configuration_calculator", "macis_cas", ci_residual_tolerance=1e-12)
+    source_energy, _ = solver.run(source, 1, 1)
+    transformed_energy, _ = solver.run(transformed, 1, 1)
+    rebuilt_energy, _ = solver.run(rebuilt, 1, 1)
+    np.testing.assert_allclose([transformed_energy, rebuilt_energy], source_energy, atol=1e-10, rtol=0, equal_nan=False)
+
+
+def test_qdk_transformer_runs_successfully():
+    """The transformer rotates every supported Hamiltonian component."""
+    angle = 0.3
+    rotation = np.array(
+        [
+            [np.cos(angle), -np.sin(angle)],
+            [np.sin(angle), np.cos(angle)],
+        ]
+    )
+    basis_set = create_test_basis_set(2, "test-python-basis-transform")
+    active_indices = spin_index_set(2, [0, 1], [0, 1])
+    source_orbitals = Orbitals(
+        np.eye(2),
+        None,
+        np.eye(2),
+        basis_set,
+        active_indices,
+        spin_index_set(2, [], []),
+    )
+    target_orbitals = Orbitals(
+        rotation,
+        None,
+        np.eye(2),
+        basis_set,
+        active_indices,
+        spin_index_set(2, [], []),
+    )
+
+    one_body = np.array([[1.2, -0.3], [-0.3, 0.7]])
+    factor_0 = np.array([[0.9, 0.2], [0.2, 0.4]])
+    factor_1 = np.array([[0.1, -0.5], [-0.5, 0.8]])
+    factors = (factor_0, factor_1)
+    three_center = np.column_stack([factor.reshape(-1, order="F") for factor in factors])
+    inactive_fock = np.array([[2.0, 0.1], [0.1, 1.7]])
+    source = Hamiltonian(
+        CholeskyHamiltonianContainer(
+            one_body,
+            three_center,
+            source_orbitals,
+            1.25,
+            inactive_fock,
+        )
+    )
+
+    transformed = create("hamiltonian_basis_transformer").run(source, target_orbitals)
+
+    np.testing.assert_allclose(
+        transformed.get_one_body_integrals()[0],
+        rotation.T @ one_body @ rotation,
+        atol=1.0e-13,
+    )
+    transformed_factors = [rotation.T @ factor @ rotation for factor in factors]
+    for p in range(2):
+        for q in range(2):
+            for r in range(2):
+                for s in range(2):
+                    expected = sum(factor[p, q] * factor[r, s] for factor in transformed_factors)
+                    assert transformed.get_two_body_element(p, q, r, s) == pytest.approx(expected, abs=1.0e-13)
+    np.testing.assert_allclose(
+        transformed.get_inactive_fock_matrix()[0],
+        rotation.T @ inactive_fock @ rotation,
+        atol=1.0e-13,
+    )
+    assert transformed.get_core_energy() == pytest.approx(1.25)
+    assert transformed.get_orbitals() is target_orbitals
