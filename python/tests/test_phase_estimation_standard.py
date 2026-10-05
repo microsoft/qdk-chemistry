@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pytest
@@ -245,6 +245,22 @@ _controlled_mapper_params = [
     pytest.param("pauli_sequence", id="pauli_sequence"),
     pytest.param("cswap_pauli_sequence", id="cswap_pauli_sequence"),
 ]
+
+
+@pytest.mark.parametrize("packed", [False, True])
+def test_standard_phase_estimation_retains_identity_shift(two_qubit_phase_problem, packed: bool) -> None:
+    """An identity energy shift remains a measurable controlled-evolution phase."""
+    coefficients = np.array([0.25, 0.5, 0.25])
+    hamiltonian = (
+        QubitOperator.from_sparse_terms(2, [{0: "X", 1: "X"}, {0: "Z", 1: "Z"}, {}], coefficients)
+        if packed
+        else QubitOperator(["XX", "ZZ", "II"], coefficients)
+    )
+    problem = replace(two_qubit_phase_problem, hamiltonian=hamiltonian)
+    result = _run_standard(problem)
+    assert result.bitstring_msb_first == "1100"
+    assert result.phase_fraction == pytest.approx(0.75, abs=qpe_phase_fraction_tolerance)
+    assert result.raw_energy == pytest.approx(1.0, abs=qpe_energy_tolerance)
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)

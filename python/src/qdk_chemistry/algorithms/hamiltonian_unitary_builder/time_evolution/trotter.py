@@ -20,15 +20,16 @@ References:
 
 from __future__ import annotations
 
+import numpy as np
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import (
-    QubitOperator,
-    UnitaryRepresentation,
-)
+from qdk_chemistry.data import LayeredPartition, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -45,11 +46,13 @@ class TrotterSettings(TimeEvolutionSettings):
         """Initialize TrotterSettings with default values.
 
         Attributes:
-            order: The order of the Trotter decomposition (currently only first order is supported).
+            order: The order of the Trotter decomposition (1 or a positive even integer).
             target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).
             num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).
             error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
+            minimize_pauli_exponentials: Place the largest active groups at the Suzuki endpoints. Defaults to False.
+            fuse_group_boundaries: Fuse repeated commuting group boundaries without unrolling. Defaults to False.
 
         """
         super().__init__()
@@ -76,6 +79,18 @@ class TrotterSettings(TimeEvolutionSettings):
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
+        self._set_default(
+            "minimize_pauli_exponentials",
+            "bool",
+            False,
+            "Reorder groups to minimize the Pauli exponentials of a fixed partition at even Suzuki order.",
+        )
+        self._set_default(
+            "fuse_group_boundaries",
+            "bool",
+            False,
+            "Fuse matching commuting groups across repetitions while retaining compact loops.",
+        )
 
 
 class Trotter(TimeEvolutionBuilder):
@@ -92,6 +107,8 @@ class Trotter(TimeEvolutionBuilder):
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
+        minimize_pauli_exponentials: bool = False,
+        fuse_group_boundaries: bool = False,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -129,6 +146,15 @@ class Trotter(TimeEvolutionBuilder):
         directly for schedule-level grouping.  When no partition is present, each Pauli term
         is exponentiated as its own group.
 
+        With ``minimize_pauli_exponentials=True``, even-order formulas place the group with
+        the most active Pauli terms centrally and the second-largest group outside
+        when that strictly reduces the formula's Pauli exponentials; otherwise, including ties,
+        the declared order is kept. Remaining groups keep their relative order.
+        This minimizes the Pauli exponentials for a fixed partition and step count,
+        not angle-dependent synthesis cost or simulation error. It does not fuse
+        repetition boundaries. First-order formulas retain their original ordering.
+        Automatic step counts bound the emitted group order.
+
         Args:
             order: Trotter decomposition order (1, 2, or any positive even integer). Defaults to 1.
             time: The evolution time. Defaults to 0.0.
@@ -138,6 +164,8 @@ class Trotter(TimeEvolutionBuilder):
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
+            minimize_pauli_exponentials: Reorder even-order groups to minimize Pauli exponentials. Defaults to False.
+            fuse_group_boundaries: Return a compact boundary-fused formula with certified groups. Defaults to False.
 
         """
         super().__init__()
@@ -150,6 +178,8 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
+        self._settings.set("minimize_pauli_exponentials", minimize_pauli_exponentials)
+        self._settings.set("fuse_group_boundaries", fuse_group_boundaries)
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
@@ -162,7 +192,7 @@ class Trotter(TimeEvolutionBuilder):
 
         """
         container_type = qubit_hamiltonian.get_container_type()
-        if container_type != "pauli_decomposition":
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(
                 f"Trotter time evolution requires a Pauli decomposition qubit operator; "
                 f"got the {container_type!r} representation."
@@ -204,11 +234,9 @@ class Trotter(TimeEvolutionBuilder):
         """
         weight_threshold = self._settings.get("weight_threshold")
 
-        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
-
-        delta = time / num_divisions
-
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
+        terms, group_offsets, layer_offsets, num_divisions = self._decompose_grouped_trotter_step(
+            qubit_hamiltonian, time=time, atol=weight_threshold
+        )
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -217,12 +245,18 @@ class Trotter(TimeEvolutionBuilder):
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
             scale=time * power_repetitions,
+            group_offsets=group_offsets if self._settings.get("fuse_group_boundaries") else None,
+            layer_offsets=layer_offsets,
         )
 
+        if self._settings.get("fuse_group_boundaries"):
+            container = container.fuse_boundaries(atol=0.0)
         return UnitaryRepresentation(container=container)
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitOperator, time: float) -> int:
-        """Determine the number of Trotter divisions to use.
+    def _resolve_num_divisions(
+        self, num_qubits: int, terms: list[dict[int, str]], coefficients: list[float], time: float
+    ) -> int:
+        """Determine the number of Trotter divisions for terms in emitted order.
 
         When both *num_divisions* and *target_accuracy* are provided, the
         larger value wins.  When neither is provided, the default is 1.
@@ -232,16 +266,17 @@ class Trotter(TimeEvolutionBuilder):
         manual = num_divisions if num_divisions > 0 else 1
 
         target_accuracy = self._settings.get("target_accuracy")
-        if target_accuracy <= 0.0:
+        if target_accuracy <= 0.0 or not terms:
             return manual
 
+        hamiltonian = QubitOperator.from_sparse_terms(num_qubits, terms, np.array(coefficients))
         order = self._settings.get("order")
         weight_threshold = self._settings.get("weight_threshold")
 
         error_bound = self._settings.get("error_bound")
         if error_bound == "commutator":
             auto = trotter_steps_commutator(
-                hamiltonian=qubit_hamiltonian,
+                hamiltonian=hamiltonian,
                 time=time,
                 target_accuracy=target_accuracy,
                 order=order,
@@ -250,7 +285,7 @@ class Trotter(TimeEvolutionBuilder):
 
         else:
             auto = trotter_steps_naive(
-                hamiltonian=qubit_hamiltonian,
+                hamiltonian=hamiltonian,
                 time=time,
                 target_accuracy=target_accuracy,
                 order=order,
@@ -258,106 +293,107 @@ class Trotter(TimeEvolutionBuilder):
             )
         return max(manual, auto)
 
-    def _decompose_trotter_step(
+    def _decompose_grouped_trotter_step(
         self,
         qubit_hamiltonian: QubitOperator,
         time: float,
         *,
         atol: float = 1e-12,
-    ) -> list[ExponentiatedPauliTerm]:
-        """Decompose a single Trotter step into exponentiated Pauli terms.
-
-        The order of the Trotter decomposition is taken from the settings associated
-        with this builder.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
-            time: The evolution time for the single step.
-            atol: Absolute tolerance for filtering small coefficients.
-
-        Returns:
-            A list of ``ExponentiatedPauliTerm`` representing the decomposed terms.
-
-        """
+    ) -> tuple[list[ExponentiatedPauliTerm], tuple[int, ...], tuple[int, ...] | None, int]:
+        """Return one step with its group and layer boundaries, and the step count for the emitted order."""
         terms: list[ExponentiatedPauliTerm] = []
+        offsets = [0]
+        partition = qubit_hamiltonian.term_partition
+        layer_offsets = [0] if isinstance(partition, LayeredPartition) else None
 
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        # If all coefficients are below the tolerance, there is nothing to decompose.
-        if not any(abs(complex(c).real) > atol for c in qubit_hamiltonian.coefficients):
+        # Convert each active word once, reusing maps throughout the Suzuki schedule.
+        labels = qubit_hamiltonian.pauli_strings
+        coefficients = [complex(c).real for c in qubit_hamiltonian.coefficients]
+        maps = {
+            index: dict(labels.factors(index))
+            if isinstance(labels, SparsePauliTerms)
+            else self._pauli_label_to_map(labels[index])
+            for index, coefficient in enumerate(coefficients)
+            if abs(coefficient) > atol
+        }
+        groups: list[list[tuple[int, ...]]] = (
+            self._partition_indices(partition) if partition is not None else [[(i,)] for i in range(len(coefficients))]
+        )
+        if not maps:
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
-            return terms
+            groups = []
+        elif not groups:
+            Logger.warn("Term partition produced no groups; returning empty term list.")
 
         order = self._settings.get("order")
-        grouped_hamiltonians = self._group_terms(qubit_hamiltonian)
+        if order > 1 and self._settings.get("minimize_pauli_exponentials") and len(groups) > 1:
+            # For order 2k, f=5**(k-1): endpoint multiplicities are f+1 (outer) and f
+            # (central), versus 2f internally, saving (f-1)*w_outer + f*w_central.
+            # Count after filtering, not by layer count.
+            multiplicity = 5 ** (order // 2 - 1)
+            weights = [sum(i in maps for layer in group for i in layer) for group in groups]
+            central, outer = sorted(range(len(groups)), key=lambda i: weights[i], reverse=True)[:2]
 
-        if not grouped_hamiltonians:
-            Logger.warn("Term partition produced no groups; returning empty term list.")
-            return terms
+            def savings(outer_index: int, central_index: int) -> int:
+                return (multiplicity - 1) * weights[outer_index] + multiplicity * weights[central_index]
 
+            # Reorder only for a strict reduction; ties keep the declared order and error.
+            if savings(outer, central) > savings(0, len(groups) - 1):
+                groups = [
+                    groups[outer],
+                    *(group for i, group in enumerate(groups) if i not in (outer, central)),
+                    groups[central],
+                ]
+
+        # The second-order commutator bound depends on term order, so bound the emitted order.
+        emitted = [i for group in groups for layer in group for i in layer if i in maps]
+        num_divisions = self._resolve_num_divisions(
+            qubit_hamiltonian.num_qubits, [maps[i] for i in emitted], [coefficients[i] for i in emitted], time
+        )
+        delta = time / num_divisions
+        for fraction, group_index in self._trotter_schedule(len(groups)):
+            stage_time = delta * fraction
+            for layer in groups[group_index]:
+                terms.extend(ExponentiatedPauliTerm(maps[i], coefficients[i] * stage_time) for i in layer if i in maps)
+                if layer_offsets is not None and len(terms) != layer_offsets[-1]:
+                    layer_offsets.append(len(terms))
+            if len(terms) != offsets[-1]:
+                offsets.append(len(terms))
+
+        return terms, tuple(offsets), None if layer_offsets is None else tuple(layer_offsets), num_divisions
+
+    def _trotter_schedule(self, num_groups: int) -> list[tuple[float, int]]:
+        """Return shared Strang/Suzuki time fractions and group indices for one step."""
+        if num_groups == 0:
+            return []
+        order = self._settings.get("order")
         if order == 1:
-            for group in grouped_hamiltonians:
-                for subgroup in group:
-                    terms.extend(
-                        self._exponentiate_commuting(
-                            subgroup,
-                            time=time,
-                            atol=atol,
-                        )
-                    )
+            return [(1.0, group_index) for group_index in range(num_groups)]
 
-        # order = 2 or order = 2k with k>1
-        else:
-            # Build an abstract schedule of (time_fraction, group_index) entries.
-            # The Strang splitting puts group 0..L-2 at half-time on the outside
-            # and group L-1 at full-time in the middle:
-            #   S2(t) = [t/2 * G0, ..., t/2 * G_{L-2}, t * G_{L-1}, t/2 * G_{L-2}, ..., t/2 * G0]
-            n_groups = len(grouped_hamiltonians)
-            schedule: list[tuple[float, int]] = []
-            for g in range(n_groups - 1):
-                schedule.append((0.5, g))
-            schedule.append((1.0, n_groups - 1))
-            for g in range(n_groups - 2, -1, -1):
-                schedule.append((0.5, g))
+        # Strang splitting: half-time outer groups around a full-time central group.
+        schedule = [(0.5, group_index) for group_index in range(num_groups - 1)]
+        schedule.append((1.0, num_groups - 1))
+        schedule.extend((0.5, group_index) for group_index in range(num_groups - 2, -1, -1))
 
-            # Apply Suzuki recursion at the schedule level for order > 2
-            if order > 2 and order % 2 == 0:
-                for k in range(2, int(order / 2) + 1):
-                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
-                    new_schedule: list[tuple[float, int]] = []
-                    # S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2
-                    for _ in range(2):
-                        for frac, g in schedule:
-                            new_schedule.append((frac * u_k, g))
-                    for frac, g in schedule:
-                        new_schedule.append((frac * (1 - 4 * u_k), g))
-                    for _ in range(2):
-                        for frac, g in schedule:
-                            new_schedule.append((frac * u_k, g))
-                    schedule = new_schedule
+        # S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k)t) S_{2k-2}(u_k t)^2.
+        for k in range(2, order // 2 + 1):
+            u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
+            schedule = [
+                (fraction * factor, group_index)
+                for factor in (u_k, u_k, 1 - 4 * u_k, u_k, u_k)
+                for fraction, group_index in schedule
+            ]
 
-            # Reduce the schedule: merge consecutive entries with the same group index
-            reduced: list[tuple[float, int]] = []
-            for frac, g in schedule:
-                if reduced and reduced[-1][1] == g:
-                    reduced[-1] = (reduced[-1][0] + frac, g)
-                else:
-                    reduced.append((frac, g))
-            schedule = reduced
-
-            # Expand the schedule into exponentiated Pauli terms
-            for frac, g in schedule:
-                for subgroup in grouped_hamiltonians[g]:
-                    terms.extend(
-                        self._exponentiate_commuting(
-                            subgroup,
-                            time=time * frac,
-                            atol=atol,
-                        )
-                    )
-
-        return terms
+        reduced: list[tuple[float, int]] = []
+        for fraction, group_index in schedule:
+            if reduced and reduced[-1][1] == group_index:
+                reduced[-1] = (reduced[-1][0] + fraction, group_index)
+            else:
+                reduced.append((fraction, group_index))
+        return reduced
 
     def name(self) -> str:
         """Return the name of the unitary builder."""

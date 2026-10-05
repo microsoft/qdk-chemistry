@@ -659,14 +659,20 @@ class TestSOSSAQPEIntegration:
         "mapper_overrides",
         [
             {},
-            {
-                "outer_prepare_algorithm": "alias_sampling",
-                "coefficient_bit_precision": 4,
-            },
-            {
-                "inner_prepare_algorithm": "controlled_alias_sampling",
-                "coefficient_bit_precision": 4,
-            },
+            pytest.param(
+                {
+                    "outer_prepare_algorithm": "alias_sampling",
+                    "coefficient_bit_precision": 4,
+                },
+                marks=pytest.mark.slow,
+            ),
+            pytest.param(
+                {
+                    "inner_prepare_algorithm": "controlled_alias_sampling",
+                    "coefficient_bit_precision": 4,
+                },
+                marks=pytest.mark.slow,
+            ),
         ],
         ids=["direct", "alias_outer", "alias_inner"],
     )
@@ -674,6 +680,7 @@ class TestSOSSAQPEIntegration:
         """QPE over 8 phase bins of the H2 data, with the direct backends and each alias variant."""
         _run_sossa_unary_qpe(num_queries=7, mapper_kwargs=mapper_overrides)
 
+    @pytest.mark.slow
     def test_unary_qpe_recovers_the_h2_ground_state_energy(self):
         """Recover the H2 ground-state energy end-to-end with unary-iteration QPE.
 
