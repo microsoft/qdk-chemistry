@@ -51,6 +51,9 @@ _ADAPTIVE_ONLY_MODULES = (
     "QROMStatePrep",
     "PhaseGradient",
     "SOSSAWalk",
+    "GivensDecomposition",
+    "MPSSequential",
+    "MPSSparse",
 )
 
 
