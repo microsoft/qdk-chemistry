@@ -288,16 +288,14 @@ class TestDirtyQROAMCostModel:
     def test_the_cost_tracks_the_reference_formula_at_every_width(self, num_data, num_bits):
         """Each pass must address ``ceil(d/K)`` rows, not the padded height ``2^ceil(lg d)``.
 
-        Chunking the table by stride instead of by contiguous block pins it to the full padded
-        height, because a strided select field is ``a % 2^(n-k)`` and so runs over every residue
-        as soon as ``d > 2^(n-k)``. Nothing relational can see that: the cost stays monotone in
-        the width, still declines on short tables, and still beats the plain lookup wherever it
-        claims to. It is only wrong against the *reference*, and only for a table far from a
-        power of two -- at ``d = 90, K = 4`` it charged 62 Toffolis of ``Select`` against
-        :cite:`Berry2019`'s 46, a 35% overcharge on the one term the width search minimises.
+        A strided chunking pins the table to its padded height, which nothing relational can
+        see: the cost stays monotone in the width, still declines on short tables, still beats
+        the plain lookup wherever it claims to. It is wrong only against the *reference*, and
+        only far from a power of two -- at ``d = 90, K = 4`` it charged 62 Toffolis of
+        ``Select`` against :cite:`Berry2019`'s 46, on the term the width search minimises.
 
-        The ``- 2`` is not slack: ``ceil(d/K) - 1`` is the exact unary-iteration cost where the
-        reference quotes the bound ``ceil(d/K)``, once per pass.
+        The ``- 2`` is not slack: ``ceil(d/K) - 1`` is the exact unary-iteration cost per pass
+        where the reference quotes the bound.
         """
         cost = _select_swap_dirty_ns().DirtyQROAMCost
         for num_swap_bits in range(1, math.ceil(math.log2(num_data)) + 1):
@@ -311,9 +309,8 @@ class TestDirtyQROAMCostModel:
     def test_the_fe2s2_inner_shape_costs_what_the_reference_charges(self):
         """One magnitude pin on the shape the overcharge was found at, so a regression names itself.
 
-        ``d = 90`` is the worst case for padding: it sits just above ``2^6``, so a strided table
-        is rounded all the way to ``2^7`` rows and charges nearly 40% more ``Select`` than the
-        90 rows that exist.
+        ``d = 90`` is the worst case for padding: just above ``2^6``, so a strided table rounds
+        all the way to ``2^7`` rows and charges nearly 40% more ``Select`` than it addresses.
         """
         select_cost = 2 * (math.ceil(90 / 4) - 1)
         butterfly_cost = 4 * 15 * (4 - 1)
