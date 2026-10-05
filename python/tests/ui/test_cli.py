@@ -275,8 +275,9 @@ def test_resolve_phase_energy_uses_quantum_walk_mapping(temp_project_dir, capsys
 @pytest.mark.parametrize("power", [2, 3, 2**16])
 @pytest.mark.parametrize("reference_energy", [-5.8, 5.8])
 @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+@pytest.mark.parametrize("max_branches", [None, 1, 64])
 def test_resolve_phase_energy_selects_serialized_walk_branch(
-    temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format
+    temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format, max_branches
 ):
     """The CLI bounds its output without losing the nearest saved walk branch."""
     project_path = temp_project_dir / "test_project"
@@ -300,7 +301,8 @@ def test_resolve_phase_energy_selects_serialized_walk_branch(
             "0.1",
             "--reference-energy",
             str(reference_energy),
-        ],
+        ]
+        + (["--max-branches", str(max_branches)] if max_branches is not None else []),
     )
 
     main()
@@ -312,9 +314,9 @@ def test_resolve_phase_energy_selects_serialized_walk_branch(
     assert result["success"] is True
     assert result["container_type"] == "lcu_walk"
     assert result["phase_fraction"] == 0.1
-    assert result["branching"] == pytest.approx(sorted(nearest[:32]))
+    limit = 32 if max_branches is None else max_branches
+    assert result["branching"] == pytest.approx(sorted(nearest[:limit]))
     assert result["branch_count"] == power
-    assert len(output) < 3000
     assert result["raw_energy"] is None
     assert result["resolved_energy"] == pytest.approx(nearest[0])
 
@@ -353,6 +355,13 @@ def test_resolve_phase_energy_walk_reference_selects_positive_branch(temp_projec
     assert result["resolved_energy"] == pytest.approx(5.7063390977)
 
 
+@pytest.mark.parametrize("max_branches", [0, -1])
+def test_resolve_phase_energy_rejects_invalid_branch_limit(max_branches):
+    """Reject nonpositive limits before loading a representation."""
+    with pytest.raises(ValueError, match="--max-branches must be a positive integer"):
+        cmd_utils_resolve_phase_energy(argparse.Namespace(max_branches=max_branches))
+
+
 def test_resolve_phase_energy_rejects_empty_candidates(temp_project_dir, monkeypatch):
     """An invalid empty inverse gets a clear error rather than an indexing failure."""
     project_path = temp_project_dir / "test_project"
@@ -365,6 +374,7 @@ def test_resolve_phase_energy_rejects_empty_candidates(temp_project_dir, monkeyp
         project_name="test_project",
         phase_fraction=0.1,
         reference_energy=5.8,
+        max_branches=32,
     )
 
     with pytest.raises(ValueError, match="returned no candidate energies"):

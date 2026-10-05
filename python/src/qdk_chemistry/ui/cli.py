@@ -1160,6 +1160,8 @@ def cmd_utils_compute_valence_params(args):
 
 def cmd_utils_resolve_phase_energy(args):
     """Report phase-inversion branches and resolve energy using an external reference."""
+    if args.max_branches < 1:
+        raise ValueError("--max-branches must be a positive integer.")
     filename = _strip(args.unitary_representation_filename)
     project_dir = _resolve_cli_project_path(args.project_name)
     os.chdir(project_dir)
@@ -1181,8 +1183,10 @@ def cmd_utils_resolve_phase_energy(args):
         resolved_energy = min(branching, key=lambda energy: abs(energy - reference_energy))
 
     branch_count = len(branching)
-    if branch_count > 32:
-        branching = tuple(sorted(nsmallest(32, branching, key=lambda energy: abs(energy - reference_energy))))
+    if branch_count > args.max_branches:
+        branching = tuple(
+            sorted(nsmallest(args.max_branches, branching, key=lambda energy: abs(energy - reference_energy)))
+        )
 
     print(
         json.dumps(
@@ -1835,7 +1839,7 @@ def _create_utils_parsers(subparsers):
         "resolve-phase-energy",
         help="List phase-inversion branches and resolve energy using a reference",
         description=(
-            "Report up to 32 principal-window candidates nearest the reference in branching "
+            "Report up to --max-branches principal-window candidates nearest the reference in branching "
             "and their total branch_count. Resolve against all candidates and periodic aliases; "
             "resolved_energy may lie outside the principal window."
         ),
@@ -1848,6 +1852,7 @@ def _create_utils_parsers(subparsers):
     )
     p.add_argument("--phase-fraction", type=float, required=True, help="Measured phase fraction from QPE")
     p.add_argument("--reference-energy", type=float, required=True, help="Reference energy for alias resolution")
+    p.add_argument("--max-branches", type=int, default=32, help="Maximum candidates to display (positive; default: 32)")
     p.set_defaults(func=cmd_utils_resolve_phase_energy)
 
 
