@@ -148,8 +148,8 @@ export QSHARP_PYTHON_TELEMETRY=false
 # ExaChem/TAMM is optional: only present for the Linux x86_64 leg (built separately, downloaded as an artifact).
 if [ -d "$EXACHEM_INSTALL_DIR" ]; then
 
-    # Libint expects the directory containing basis files, not the install prefix.
-    export LIBINT_DATA_PATH="${EXACHEM_INSTALL_DIR}/basis"
+    # Libint reads basis files from $LIBINT_DATA_PATH/basis.
+    export LIBINT_DATA_PATH="${EXACHEM_INSTALL_DIR}"
     # Scoped to just this pytest invocation, for the (upcoming, PR #611) ExaChem CCSD integration test's
     # shutil.which("ExaChem") lookup.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"

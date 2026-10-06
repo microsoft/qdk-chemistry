@@ -1,13 +1,14 @@
 # exachem-libint2-datadir.patch
-# Keep ExaChem's basis-file check compatible with Libint2 2.13.1 and aligned with runtime basis lookup:
-# use LIBINT_DATADIR for the compiled default and honor LIBINT_DATA_PATH when set.
-# Drop the DATADIR rename when the ExaChem pin includes it; retain the environment override.
+# Keep ExaChem's basis-file check compatible with Libint2 2.13.1 and aligned with its runtime lookup:
+# use LIBINT_DATADIR for the compiled default, honor LIBINT_DATA_PATH when set, and accept either a
+# directory containing basis/ or the basis directory itself, as Libint does.
+# Drop the DATADIR rename when the ExaChem pin includes it; retain the rest.
 # Apply with: git -C <exachem-src> apply exachem-libint2-datadir.patch
 diff --git a/exachem/common/ec_basis.cpp b/exachem/common/ec_basis.cpp
-index ba76deb..4befedf 100644
+index ba76deb..57a21d5 100644
 --- a/exachem/common/ec_basis.cpp
 +++ b/exachem/common/ec_basis.cpp
-@@ -7,9 +7,29 @@
+@@ -7,9 +7,21 @@
   */
  
  #include "exachem/common/ec_basis.hpp"
@@ -16,28 +17,20 @@ index ba76deb..4befedf 100644
  namespace fs = std::filesystem;
  
 +namespace {
-+// The directory actually containing the .g94/.ecp files, mirroring libint2::BasisSet's own
-+// data_path()-based lookup (LIBINT_DATA_PATH env var first, else the LIBINT_DATADIR compiled
-+// into this translation unit) so this pre-flight existence check looks in the same place the
-+// actual shell construction (construct_shells(), via libint2::BasisSet's constructor) will
-+// read from. Without this, LIBINT_DATADIR here is whatever CMSB's TargetMacros.cmake compiled
-+// in, which does not track a runtime override and can point at a different, smaller basis-set
-+// library than the one actually used.
-+//
-+// The two branches have different conventions and are not interchangeable: LIBINT_DATA_PATH is
-+// itself the basis directory (libint2's own file lookup uses it directly, appending nothing),
-+// while the compiled-in LIBINT_DATADIR is the install prefix *above* it (CMSB's own
-+// convention), so only that branch appends "/basis".
++// Resolve the basis directory exactly as libint2::BasisSet does, so this pre-flight check reads the
++// same files as the actual shell construction: the LIBINT_DATA_PATH env var if set, else the
++// compiled-in LIBINT_DATADIR, then <path>/basis if that exists, else <path> itself.
 +std::string basis_data_dir() {
-+  if(const char* env = std::getenv("LIBINT_DATA_PATH")) return std::string(env);
-+  return std::string(LIBINT_DATADIR) + "/basis";
++  const char* env        = std::getenv("LIBINT_DATA_PATH");
++  const std::string root = env ? env : LIBINT_DATADIR;
++  return fs::is_directory(root + "/basis") ? root + "/basis" : root;
 +}
 +} // namespace
 +
  // ca_symbol represents each unique atom symbol in the geometry
  void ECBasis::parse_ecp_basis_file(ExecutionContext& exc, std::string ca_symbol,
                                     std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
-@@ -173,8 +193,8 @@ void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector
+@@ -173,8 +185,8 @@ void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector
  
  void check_basis_file(ExecutionContext& exc, bool single_basis, const ECAtom& ecatom,
                        bool ecp_check = false) {
@@ -48,7 +41,7 @@ index ba76deb..4befedf 100644
    int basis_file_exists = 0;
    if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
    exc.pg().broadcast(&basis_file_exists, 0);
-@@ -197,7 +217,7 @@ void ECBasis::parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
+@@ -197,7 +209,7 @@ void ECBasis::parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
      // There is no global ecp basis specification for all atoms.
      // single_basis=false, ecp=true
      check_basis_file(exc, false, ecatom, true);

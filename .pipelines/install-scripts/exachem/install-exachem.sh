@@ -271,12 +271,42 @@ fi
 SMOKE_TEST_INPUT="${BUILD_ROOT}/exachem/inputs/ci/hub_1d_6s.json"
 SMOKE_TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "${SMOKE_TEST_DIR}"' EXIT
-echo "==> Running minimal ExaChem example: ${SMOKE_TEST_INPUT}"
-( cd "${SMOKE_TEST_DIR}" && OMP_NUM_THREADS=1 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
-    LIBINT_DATA_PATH="${INSTALL_PREFIX}/basis" mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" )
-# (cleanup of SMOKE_TEST_DIR is handled by the trap above, on every exit path -- including a failed mpirun run)
 
-echo "==> Smoke test OK: ${INSTALL_PREFIX}/bin/ExaChem installed, fully linked, and ran a minimal example."
+# ExaChem exits 0 even when it aborts (e.g. on a missing basis file), so judge each run by its output.
+# $1 is LIBINT_DATA_PATH: either a directory containing basis/, or the basis directory itself.
+# Succeeds only if the CCSD calculation completed.
+run_smoke_test() {
+  local rundir log
+  rundir="$(mktemp -d "${SMOKE_TEST_DIR}/run.XXXXXX")"
+  log="${rundir}/output.log"
+  ( cd "${rundir}" && OMP_NUM_THREADS=1 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
+      LIBINT_DATA_PATH="$1" mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" ) 2>&1 \
+    | tee "${log}" || true
+  ! grep -q 'terminating program' "${log}" && grep -q 'CCSD correlation energy' "${log}"
+}
+
+echo "==> Running minimal ExaChem example: ${SMOKE_TEST_INPUT}"
+run_smoke_test "${INSTALL_PREFIX}" || { echo "ERROR: ExaChem smoke test failed with the installed basis files" >&2; exit 1; }
+
+# Basis files are looked up at runtime, so also run from a relocated copy (as when the install is mounted
+# elsewhere for testing), pointing at the directory containing basis/ and at the basis directory itself.
+mkdir -p "${SMOKE_TEST_DIR}/relocated"
+cp -r "${INSTALL_PREFIX}/basis" "${SMOKE_TEST_DIR}/relocated/basis"
+echo "==> Re-running with relocated basis files (LIBINT_DATA_PATH is the directory containing basis/)"
+run_smoke_test "${SMOKE_TEST_DIR}/relocated" || { echo "ERROR: ExaChem smoke test failed with relocated basis files" >&2; exit 1; }
+echo "==> Re-running with relocated basis files (LIBINT_DATA_PATH is the basis directory itself)"
+run_smoke_test "${SMOKE_TEST_DIR}/relocated/basis" || { echo "ERROR: ExaChem smoke test failed with a relocated basis directory" >&2; exit 1; }
+
+# A directory without basis files must fail, otherwise LIBINT_DATA_PATH is being ignored.
+mkdir -p "${SMOKE_TEST_DIR}/empty"
+echo "==> Re-running with an empty directory (expected to fail)"
+if run_smoke_test "${SMOKE_TEST_DIR}/empty"; then
+  echo "ERROR: ExaChem succeeded without basis files, so LIBINT_DATA_PATH is not being honored" >&2
+  exit 1
+fi
+# (cleanup of SMOKE_TEST_DIR is handled by the trap above, on every exit path -- including a failed run)
+
+echo "==> Smoke test OK: ${INSTALL_PREFIX}/bin/ExaChem installed, fully linked, and completed a CCSD run from the installed and relocated basis files."
 
 if [ "${KEEP_BUILD_DIR}" != "1" ]; then
   rm -rf "${BUILD_ROOT}"
