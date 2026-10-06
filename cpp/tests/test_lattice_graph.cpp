@@ -26,9 +26,9 @@ using namespace qdk::chemistry::data;
 class LatticeGraphTest : public ::testing::Test {};
 
 using Edge = std::pair<std::uint64_t, std::uint64_t>;
-constexpr std::uint32_t flavor_x = 10;
-constexpr std::uint32_t flavor_y = 20;
-constexpr std::uint32_t flavor_z = 30;
+constexpr std::uint64_t flavor_x = 10;
+constexpr std::uint64_t flavor_y = 20;
+constexpr std::uint64_t flavor_z = 30;
 
 static std::vector<BondFlavorDefinition> honeycomb_flavor_ids() {
   const double root_three = std::sqrt(3.0);
@@ -187,7 +187,7 @@ TEST_F(LatticeGraphTest, HoneycombFlavorsResolveSelectedShells) {
       LatticeGraph::from_geometry(LatticeGeometry::honeycomb(5, 5), {1, 2, 3},
                                   honeycomb_flavor_ids(), 2.5, 1.0e-9);
   constexpr std::uint64_t center = 24;
-  std::map<std::uint64_t, std::map<std::uint32_t, std::size_t>> flavor_degree;
+  std::map<std::uint64_t, std::map<std::uint64_t, std::size_t>> flavor_degree;
   for (const auto& [edge, label] : honeycomb.edge_labels()) {
     ASSERT_TRUE(label.flavor.has_value());
     EXPECT_DOUBLE_EQ(honeycomb.weight(edge.first, edge.second), 2.5);
@@ -195,7 +195,7 @@ TEST_F(LatticeGraphTest, HoneycombFlavorsResolveSelectedShells) {
       ++flavor_degree[label.shell][*label.flavor];
     }
   }
-  for (std::uint32_t flavor : {flavor_x, flavor_y, flavor_z}) {
+  for (std::uint64_t flavor : {flavor_x, flavor_y, flavor_z}) {
     EXPECT_EQ(flavor_degree.at(1).at(flavor), 1);
     EXPECT_EQ(flavor_degree.at(2).at(flavor), 2);
     EXPECT_EQ(flavor_degree.at(3).at(flavor), 1);
@@ -231,13 +231,13 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
 
   const auto flavored_hexagon = LatticeGraph::from_geometry(
       geometry, {1, 2, 3}, honeycomb_flavor_ids(), 2.5, 1.0e-9);
-  std::map<std::uint64_t, std::map<std::uint32_t, std::size_t>> counts;
+  std::map<std::uint64_t, std::map<std::uint64_t, std::size_t>> counts;
   for (const auto& [edge, label] : flavored_hexagon.edge_labels()) {
     ASSERT_TRUE(label.flavor.has_value());
     EXPECT_DOUBLE_EQ(flavored_hexagon.weight(edge.first, edge.second), 2.5);
     ++counts[label.shell][*label.flavor];
   }
-  for (std::uint32_t flavor : {flavor_x, flavor_y, flavor_z}) {
+  for (std::uint64_t flavor : {flavor_x, flavor_y, flavor_z}) {
     EXPECT_EQ(counts.at(1).at(flavor), 2);
     EXPECT_EQ(counts.at(2).at(flavor), 2);
     EXPECT_EQ(counts.at(3).at(flavor), 1);
@@ -386,8 +386,7 @@ TEST_F(LatticeGraphTest, BondAxisMatchingSeveralFlavorsIsRejected) {
 TEST_F(LatticeGraphTest, JsonRejectsMalformedEdgeLabels) {
   const auto valid =
       LatticeGraph::from_geometry(LatticeGeometry::chain(3)).to_json();
-  const auto out_of_range =
-      static_cast<std::uint64_t>(std::numeric_limits<std::uint32_t>::max()) + 1;
+  const auto out_of_range = (std::uint64_t{1} << 53) + 1;
   const std::vector<std::pair<std::string, nlohmann::json>> invalid = {
       {"/edge_labels/0/1", 5},
       {"/edge_labels/1/1", 0},
@@ -427,7 +426,7 @@ TEST_F(LatticeGraphTest, Hdf5RejectsMalformedEdgeLabels) {
   };
   const double narrow[3] = {0.0, 1.0, 1.0};
   replace("edge_labels", H5::PredType::NATIVE_DOUBLE, {1, 3}, narrow);
-  for (const double flavor : {-2.0, 0.5, 4294967296.0}) {
+  for (const double flavor : {-2.0, 0.5, 0x1p54}) {
     const double label[4] = {0.0, 1.0, 1.0, flavor};
     replace("edge_labels", H5::PredType::NATIVE_DOUBLE, {1, 4}, label);
   }
@@ -478,7 +477,7 @@ TEST_F(LatticeGraphTest, FromGeometrySelectsShellsAndWeights) {
   for (const auto& [edge, label] : graph.edge_labels()) {
     EXPECT_DOUBLE_EQ(graph.weight(edge.first, edge.second), -2.5);
     EXPECT_EQ(label.flavor, label.shell == 1
-                                ? std::optional<std::uint32_t>(flavor_x)
+                                ? std::optional<std::uint64_t>(flavor_x)
                                 : std::nullopt);
   }
   EXPECT_DOUBLE_EQ(graph.weight(0, 3), -2.5);
@@ -509,7 +508,8 @@ TEST_F(LatticeGraphTest, CustomGraphsAcceptEdgeLabels) {
   EXPECT_EQ(restored.edge_labels(), labels);
   EXPECT_EQ(restored.content_hash(), graph.content_hash());
 
-  // Labels must cover exactly the stored pairs, each with a shell in [1, 2^53].
+  // Labels must cover exactly the stored pairs, each with a shell in [1, 2^53]
+  // and a flavor of at most 2^53.
   auto missing = labels;
   missing.erase({0, 2});
   auto extra = labels;
@@ -518,7 +518,10 @@ TEST_F(LatticeGraphTest, CustomGraphsAcceptEdgeLabels) {
   zero_shell.at({0, 1}).shell = 0;
   auto huge_shell = labels;
   huge_shell.at({0, 1}).shell = (std::uint64_t{1} << 53) + 1;
-  for (const auto& invalid : {missing, extra, zero_shell, huge_shell}) {
+  auto huge_flavor = labels;
+  huge_flavor.at({0, 1}).flavor = (std::uint64_t{1} << 53) + 1;
+  for (const auto& invalid :
+       {missing, extra, zero_shell, huge_shell, huge_flavor}) {
     EXPECT_THROW((LatticeGraph(upper, 0, invalid)), std::invalid_argument);
     EXPECT_THROW(
         LatticeGraph::from_dense_matrix(graph.adjacency_matrix(), invalid),
@@ -529,6 +532,7 @@ TEST_F(LatticeGraphTest, CustomGraphsAcceptEdgeLabels) {
   }
   auto largest = labels;
   largest.at({0, 1}).shell = std::uint64_t{1} << 53;
+  largest.at({0, 1}).flavor = std::uint64_t{1} << 53;
   const LatticeGraph exact(upper, 0, largest);
   const std::string filename = "test_largest_shell.lattice_graph.h5";
   exact.to_hdf5_file(filename);
