@@ -29,12 +29,23 @@ function(qdk_select_blas_thread_backend src_dir out_src)
     set(link ${BLAS_LIBRARIES})
   endif()
 
-  if(QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "AUTO")
+  # Backend names use the FindBLAS spellings;  accept any casing
+  # so the values documented through v2.2.1 (OPENBLAS, INTELMKL) keep working.
+  string(TOUPPER "${QDK_CHEMISTRY_BLAS_THREAD_API}" requested)
+  set(api "${requested}")
+  foreach(vendor IN LISTS QDK_CHEMISTRY_BLAS_VENDORS)
+    string(TOUPPER "${vendor}" upper)
+    if(requested STREQUAL upper)
+      set(api "${vendor}")
+    endif()
+  endforeach()
+
+  if(api STREQUAL "AUTO")
     set(candidates ${QDK_CHEMISTRY_BLAS_VENDORS})
-  elseif(QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "NONE")
+  elseif(api STREQUAL "NONE")
     set(candidates "")
-  elseif(QDK_CHEMISTRY_BLAS_THREAD_API IN_LIST QDK_CHEMISTRY_BLAS_VENDORS)
-    set(candidates ${QDK_CHEMISTRY_BLAS_THREAD_API})
+  elseif(api IN_LIST QDK_CHEMISTRY_BLAS_VENDORS)
+    set(candidates ${api})
   else()
     message(FATAL_ERROR
       "Invalid QDK_CHEMISTRY_BLAS_THREAD_API='${QDK_CHEMISTRY_BLAS_THREAD_API}'. "
@@ -69,12 +80,12 @@ function(qdk_select_blas_thread_backend src_dir out_src)
     set(QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR "${backend}" CACHE INTERNAL
         "BLAS vendor whose thread-control symbols are bound into the library")
   else()
-    if(NOT QDK_CHEMISTRY_BLAS_THREAD_API MATCHES "^(AUTO|NONE)$")
+    if(NOT api MATCHES "^(AUTO|NONE)$")
       message(FATAL_ERROR
         "QDK_CHEMISTRY_BLAS_THREAD_API='${QDK_CHEMISTRY_BLAS_THREAD_API}' does not "
         "link against the BLAS resolved here (${BLAS_LIBRARIES}).")
     endif()
-    if(NOT QDK_CHEMISTRY_BLAS_THREAD_API STREQUAL "NONE")
+    if(NOT api STREQUAL "NONE")
       message(WARNING
         "No BLAS thread-control API links against the BLAS resolved here "
         "(${BLAS_LIBRARIES}), so ScopedBlasThreads is a no-op and BLAS threads "
