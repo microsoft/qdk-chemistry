@@ -307,7 +307,10 @@ class Circuit(DataClass):
                 ``qdk.qre`` trace backend instead of the logical-counts backend. The trace
                 backend keeps ``RepeatEstimates`` blocks as repeated trace blocks but ignores
                 ``EnableMemoryComputeArchitecture``, so pass ``False`` to estimate a
-                memory-compute layout. Ignored for QASM and QIR circuits.
+                memory-compute layout. It also draws the outcomes of measurements the circuit
+                branches on at random, so traces of circuits that uncompute with measurements,
+                such as LCU and SOSSA block encodings, vary between runs; the logical-counts
+                backend uses a fixed seed. Ignored for QASM and QIR circuits.
 
         Returns:
             A ``qdk.qre`` Application instance suitable for passing to ``qdk.qre.estimate()``.

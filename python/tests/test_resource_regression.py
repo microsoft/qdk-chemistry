@@ -16,7 +16,6 @@ from functools import cache
 from pathlib import Path
 
 import pytest
-from qdk.qsharp import QSharpError
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -196,8 +195,18 @@ _PINNED: dict[tuple[str, str], dict] = {
     },
 }
 
+#: Cheapest trace-backend point of the Trotter circuits. LCU and SOSSA uncompute with
+#: measurements, whose outcomes the trace backend draws at random, so their trace-backend
+#: estimates vary between runs and are not pinned.
+_PINNED_TRACE_BACKEND_TROTTER: dict[str, dict] = {
+    "ethylene_4e4o": {"qubits": 28585, "runtime_ns": 14936661000, "usd": 2.9},
+    "f2_10e6o": {"qubits": 30034, "runtime_ns": 33934923000, "usd": 6.89},
+    "h2_dfthc": {"qubits": 32495, "runtime_ns": 1382017000, "usd": 0.3},
+}
+
 
 def _hartree_fock_state_prep(num_orbitals: int, num_alpha: int, num_beta: int) -> Circuit:
+    """Prepare the canonical Hartree-Fock determinant of the active space."""
     configuration = Configuration.canonical_hf_configuration(num_alpha, num_beta, num_orbitals)
     wavefunction = Wavefunction(StateVectorContainer(configuration, ModelOrbitals(num_orbitals)))
     return create("state_prep", "sparse_isometry").run(wavefunction)
@@ -247,6 +256,7 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
 
 
 def _logical_counts(circuit: Circuit) -> dict[str, int]:
+    """Return the pinned subset of the circuit's logical counts."""
     factory = circuit._qsharp_factory
     counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
     return {key: counts.get(key, 0) for key in _PINNED_LOGICAL_COUNT_KEYS}
@@ -293,8 +303,8 @@ def test_logical_counts(hamiltonian_name, algorithm):
 def test_physical_estimate_and_dollar_cost(hamiltonian_name, algorithm):
     """The cheapest point's physical qubits, runtime, and USD cost must match the pinned values.
 
-    The trace backend cannot evaluate these circuits yet (see the canary below), so the
-    estimate runs on the logical-counts backend.
+    The estimate runs on the logical-counts backend, which seeds the random measurement
+    outcomes it branches on, so every run gives the same estimate.
     """
     pinned = _PINNED[(hamiltonian_name, algorithm)]
     application = _circuit(hamiltonian_name, algorithm).get_qre_application(use_trace_backend=False)
@@ -306,14 +316,35 @@ def test_physical_estimate_and_dollar_cost(hamiltonian_name, algorithm):
     assert cheapest["usd"] == pytest.approx(pinned["usd"])
 
 
+@pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
+def test_the_default_trace_backend_estimates_the_circuit(hamiltonian_name, algorithm):
+    """The default ``get_qre_application`` traces every circuit on its logical qubits.
+
+    Only the Trotter estimates are pinned; see ``_PINNED_TRACE_BACKEND_TROTTER``.
+    """
+    application = _circuit(hamiltonian_name, algorithm).get_qre_application()
+
+    trace = application.get_trace()
+    cheapest = _cheapest_estimate(application)
+
+    assert trace.compute_qubits == _PINNED[(hamiltonian_name, algorithm)]["logical_counts"]["numQubits"]
+    if algorithm == "trotter":
+        pinned = _PINNED_TRACE_BACKEND_TROTTER[hamiltonian_name]
+        assert cheapest["qubits"] == pinned["qubits"]
+        assert cheapest["runtime_ns"] == pinned["runtime_ns"]
+        assert cheapest["usd"] == pytest.approx(pinned["usd"])
+
+
 @pytest.mark.xfail(
-    raises=QSharpError,
     strict=True,
-    reason="The qdk.qre trace backend has no IsResourceEstimating intrinsic, which Loop and the "
-    "unary QPE schedule branch on. Once it does, pin the trace-backend estimates and drop "
-    "use_trace_backend=False above.",
+    reason="The qdk.qre trace backend draws measurement outcomes from an unseeded random "
+    "generator, so circuits that uncompute with measurements trace differently on every run. "
+    "Once it is seeded, pin the LCU and SOSSA trace-backend estimates as well.",
 )
-@pytest.mark.parametrize("algorithm", ["trotter", "lcu", "sossa"])
-def test_the_default_trace_backend_estimates_the_circuit(algorithm):
-    """Canary: the default ``get_qre_application`` uses the trace backend."""
-    _cheapest_estimate(_circuit("h2_dfthc", algorithm).get_qre_application())
+def test_the_trace_backend_traces_reproducibly():
+    """Canary: tracing a SOSSA circuit, which uncomputes with measurements, is reproducible."""
+    circuit = _circuit("h2_dfthc", "sossa")
+
+    traces = [circuit.get_qre_application().get_trace() for _ in range(3)]
+
+    assert len({(trace.num_gates, trace.depth) for trace in traces}) == 1

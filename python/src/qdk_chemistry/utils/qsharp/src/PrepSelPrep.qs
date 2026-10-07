@@ -10,15 +10,13 @@
 /// the two callables and this module handles the stitching.
 namespace QDKChemistry.Utils.PrepSelPrep {
 
+    import QDKChemistry.Utils.Loop.LoopCA;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyToEachCA;
     import Std.Core.Length;
-    import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
     import Std.Intrinsic.R;
     import Std.Math.PI;
-    import Std.ResourceEstimation.IsResourceEstimating;
-    import Std.ResourceEstimation.RepeatEstimates;
 
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
@@ -167,13 +165,8 @@ namespace QDKChemistry.Utils.PrepSelPrep {
 
     /// # Summary
     /// Applies the block encoding, followed by the walk reflection when `useWalk`, `power`
-    /// times; under resource estimation one application is repeated symbolically.
-    ///
-    /// # Description
-    /// This is `QDKChemistry.Utils.Loop.LoopCA` with no warm-up iterations, written out
-    /// because QIR generation in qdk 1.32.3 fails once PREPARE and SELECT are captured by a
-    /// `LoopCA` iteration (compiler panic "LocalVarId consistency") or passed through a
-    /// generic loop argument ("callable argument could not be resolved statically").
+    /// times through `QDKChemistry.Utils.Loop.LoopCA` without warm-up iterations, so under
+    /// resource estimation one application is repeated symbolically.
     operation ApplyPrepSelPrepPower(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -184,25 +177,26 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         useWalk : Bool,
         power : Int,
     ) : Unit is Adj + Ctl {
-        Fact(power >= 0, "power must be non-negative");
-        if IsResourceEstimating() {
-            if power > 0 {
-                within {
-                    RepeatEstimates(power);
-                } apply {
-                    PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
-                    if useWalk {
-                        Reflect(blockAncilla);
-                    }
-                }
-            }
-        } else {
-            for _ in 1..power {
-                PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
-                if useWalk {
-                    Reflect(blockAncilla);
-                }
-            }
+        LoopCA(
+            power,
+            0,
+            _ => ApplyPrepSelPrepOnce(prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk)
+        );
+    }
+
+    /// Applies the block encoding once, followed by the walk reflection when `useWalk`.
+    internal operation ApplyPrepSelPrepOnce(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        systems : Qubit[],
+        prepareRegister : Qubit[],
+        numSelectQubits : Int,
+        blockAncilla : Qubit[],
+        useWalk : Bool,
+    ) : Unit is Adj + Ctl {
+        PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
+        if useWalk {
+            Reflect(blockAncilla);
         }
     }
 
