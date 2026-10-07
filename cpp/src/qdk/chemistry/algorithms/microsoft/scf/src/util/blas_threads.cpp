@@ -16,9 +16,10 @@ namespace {
 /// @brief Whether a thread-control API is bound, warning once if not.
 bool blas_thread_control_available() {
   static const bool available = [] {
-    const char* const name = detail::blas_backend_name();
-    if (name != nullptr) {
-      QDK_LOGGER().debug("Using {} thread control (bound at link time)", name);
+    // The fallback backend reports 0, as does a vendor API that cannot answer;
+    // neither can be pinned.
+    if (detail::blas_backend_get_num_threads() > 0) {
+      QDK_LOGGER().debug("BLAS thread control is bound at link time");
       return true;
     }
     QDK_LOGGER().warn(

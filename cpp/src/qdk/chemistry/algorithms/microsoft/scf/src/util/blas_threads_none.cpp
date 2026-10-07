@@ -8,8 +8,6 @@
 
 namespace qdk::chemistry::scf::util::detail {
 
-const char* blas_backend_name() { return nullptr; }
-
 int blas_backend_get_num_threads() { return 0; }
 
 void blas_backend_set_num_threads(int) {}

@@ -14,11 +14,9 @@
 
 namespace qdk::chemistry::scf::util::detail {
 
-/// @brief Name of the bound backend, or nullptr if this build has no BLAS
-/// thread-control API, in which case the calls below are no-ops.
-const char* blas_backend_name();
-
-/// @brief Current BLAS thread count, or 0 if the backend cannot report one.
+/// @brief Current BLAS thread count, or 0 if this build has no thread-control
+/// API or the backend cannot report one. A 0 means the count cannot be pinned,
+/// and blas_backend_set_num_threads is a no-op.
 int blas_backend_get_num_threads();
 
 /// @brief Request `n` BLAS threads.

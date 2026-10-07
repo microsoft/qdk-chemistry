@@ -12,6 +12,16 @@
 # install prefix on CMAKE_PREFIX_PATH instead and let find_package(BLAS)
 # identify it.
 
+# Removed after v2.2.1. CMake only reports an unused -D once, and never for a
+# value inherited from an existing cache, so say so on every configure.
+if(DEFINED QDK_CHEMISTRY_BLAS_THREAD_API)
+  message(WARNING
+    "QDK_CHEMISTRY_BLAS_THREAD_API is no longer used and is ignored. The "
+    "thread-control backend now follows the vendor find_package(BLAS) "
+    "reports; put the BLAS install prefix on CMAKE_PREFIX_PATH to choose "
+    "one. Remove this variable from the command line and the CMake cache.")
+endif()
+
 set(QDK_CHEMISTRY_BLAS_VENDORS OpenBLAS IntelMKL BLIS)
 set(QDK_CHEMISTRY_BLAS_SRC_OpenBLAS blas_threads_openblas.cpp)
 set(QDK_CHEMISTRY_BLAS_SRC_IntelMKL blas_threads_mkl.cpp)

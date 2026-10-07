@@ -15,8 +15,6 @@
 
 namespace qdk::chemistry::scf::util::detail {
 
-const char* blas_backend_name() { return "BLIS"; }
-
 int blas_backend_get_num_threads() {
   return static_cast<int>(bli_thread_get_num_threads());
 }
