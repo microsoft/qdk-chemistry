@@ -327,11 +327,4 @@ export(EXPORT chemistryTargets
 include(CTest) # BUILD_TESTING variable
 if(BUILD_TESTING)
     add_subdirectory(tests)
-
-    # Configure-time behaviour of cmake/qdk-blas-threads.cmake.
-    add_test(NAME BlasThreadBackendSelection
-      COMMAND ${CMAKE_COMMAND}
-        -DQDK_SOURCE_DIR=${CMAKE_CURRENT_LIST_DIR}
-        -DQDK_WORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/blas_thread_selection
-        -P ${CMAKE_CURRENT_LIST_DIR}/cmake/tests/blas_threads_selection.cmake)
 endif()

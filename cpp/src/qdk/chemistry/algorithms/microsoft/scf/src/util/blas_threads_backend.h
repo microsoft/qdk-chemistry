@@ -7,9 +7,10 @@
 /// @file Contract between ScopedBlasThreads and the vendor-specific backend.
 ///
 /// One blas_threads_<vendor>.cpp implements this per vendor, and
-/// cmake/qdk-blas-threads.cmake compiles in whichever one links against the
-/// resolved BLAS, falling back to blas_threads_none.cpp. Selecting a file
-/// rather than a branch keeps every build free of symbols it does not link.
+/// cmake/qdk-blas-threads.cmake compiles in the one its BLAS vendor label
+/// selects, after verifying that it links; otherwise blas_threads_none.cpp.
+/// Selecting a file rather than a branch keeps every build free of symbols it
+/// does not link.
 
 namespace qdk::chemistry::scf::util::detail {
 

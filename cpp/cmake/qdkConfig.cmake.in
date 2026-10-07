@@ -103,7 +103,7 @@ if(QDK_CHEMISTRY_BLAS_THREAD_SYMBOLS)
       "with an unresolved symbol. Point this project at the same BLAS "
       "qdk-chemistry was built against (e.g. -DBLAS_LIBRARIES=... or "
       "-DBLAS_PREFERENCE_LIST=${QDK_CHEMISTRY_REQUIRED_BLAS_VENDOR}), or "
-      "rebuild qdk-chemistry with -DQDK_CHEMISTRY_BLAS_THREAD_API=NONE.")
+      "rebuild qdk-chemistry against the BLAS this project resolves.")
   endif()
 endif()
 

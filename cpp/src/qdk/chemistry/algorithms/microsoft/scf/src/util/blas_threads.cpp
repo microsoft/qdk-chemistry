@@ -27,7 +27,7 @@ bool blas_thread_control_available() {
         "thread via its environment variable (OPENBLAS_NUM_THREADS, "
         "MKL_NUM_THREADS, BLIS_NUM_THREADS, VECLIB_MAXIMUM_THREADS), or "
         "rebuild against a BLAS that exports one (the configure step reports "
-        "which backend, if any, was bound).");
+        "which backend was bound, or why none was).");
     return false;
   }();
   return available;

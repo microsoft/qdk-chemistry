@@ -3,7 +3,8 @@
 // license information.
 
 // Driver for the link probe in cmake/qdk-blas-threads.cmake: linking this
-// against a candidate backend is what forces its vendor symbols to resolve.
+// against the selected backend is what verifies that its vendor symbols
+// resolve against the BLAS this build uses.
 
 #include "blas_threads_backend.h"
 
