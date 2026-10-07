@@ -324,6 +324,7 @@ jobs:
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
         OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
         PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
@@ -753,6 +754,7 @@ jobs:
 
     - name: Run Python tests
       shell: pwsh
+      timeout-minutes: 90
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
@@ -1125,6 +1127,7 @@ jobs:
         python -m pip show qdk
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
