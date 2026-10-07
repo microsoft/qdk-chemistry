@@ -68,16 +68,6 @@ print(f"reduction          : {100 * (1 - lambda_after / lambda_before):.2f}%")
 ################################################################################
 
 ################################################################################
-# start-cell-inspect-shift
-# Inspect the (mu1, mu2, xi) parameters that the last run applied
-shift = shifter.last_shift()
-print(f"mu1: {shift.mu1:.8f}")
-print(f"mu2: {shift.mu2:.8f}")
-print(f"xi shape: {shift.xi.shape}")
-# end-cell-inspect-shift
-################################################################################
-
-################################################################################
 # start-cell-persist
 # The shifted Hamiltonian stays factorized, so it round-trips without
 # re-factorization and can be block-encoded directly.

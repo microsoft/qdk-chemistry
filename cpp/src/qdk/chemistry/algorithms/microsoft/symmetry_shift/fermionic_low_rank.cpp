@@ -317,14 +317,12 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
   QDK_LOGGER().info(
       "solve_fermionic_low_rank_shift: lambda_total before={} ({} + {}), "
       "after={} ({} + {}); lambda_DF baseline={}, shifted={}; lambda_1e "
-      "baseline={}, "
-      "shifted={}; mu1={}, mu2={}",
+      "baseline={}, shifted={}",
       lambda_total_before, one_electron.lambda_1e_baseline,
       accumulation.lambda_df_baseline, lambda_total_after,
       one_electron.lambda_1e, accumulation.lambda_df_shifted,
       accumulation.lambda_df_baseline, accumulation.lambda_df_shifted,
-      one_electron.lambda_1e_baseline, one_electron.lambda_1e, one_electron.mu1,
-      accumulation.mu2);
+      one_electron.lambda_1e_baseline, one_electron.lambda_1e);
 
   // The two-body and one-body 1-norms are minimized sequentially, not jointly,
   // so the total can come out worse. Fall back to a zero shift, which leaves
@@ -341,6 +339,17 @@ FermionicLowRankSolution solve_fermionic_low_rank_shift(
                                               static_cast<Eigen::Index>(norb));
     return {identity_shift, Eigen::VectorXd::Zero(accumulation.phi.size())};
   }
+
+  // Logged only on the accepted path, so this always describes the shift that
+  // is actually applied. phi is summarized rather than printed: it has one
+  // entry per fragment.
+  const Eigen::Index num_phi = accumulation.phi.size();
+  QDK_LOGGER().info(
+      "solve_fermionic_low_rank_shift: applied shift mu1={}, mu2={}; phi: "
+      "num_ranks={}, min={}, max={}",
+      one_electron.mu1, accumulation.mu2, num_phi,
+      num_phi > 0 ? accumulation.phi.minCoeff() : 0.0,
+      num_phi > 0 ? accumulation.phi.maxCoeff() : 0.0);
 
   SymmetryShiftCoeffs shift;
   shift.mu1 = one_electron.mu1;
@@ -451,10 +460,6 @@ std::shared_ptr<data::Hamiltonian> FermionicLowRankShifter::_run_impl(
 
   auto shifted = rebuild_shifted_factorized_hamiltonian(
       *hamiltonian, container, solution, n_alpha_electrons + n_beta_electrons);
-
-  // Record only after the shift has actually been applied, so a failed
-  // rebuild cannot leave last_shift() reporting a shift that never happened.
-  _record_shift(solution.shift);
 
   return shifted;
 }

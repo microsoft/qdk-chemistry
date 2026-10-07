@@ -72,7 +72,6 @@ from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, Stab
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
 from qdk_chemistry.algorithms.symmetry_shift import (
     FermionicLowRankShifter,
-    SymmetryShiftCoeffs,
     SymmetryShifter,
 )
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
@@ -132,7 +131,6 @@ __all__ = [
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
-    "SymmetryShiftCoeffs",
     "SymmetryShifter",
     "TimeEvolutionBuilder",
     # Factory functions

@@ -45,31 +45,6 @@ class SymmetryShifterBase : public SymmetryShifter,
 };
 
 void bind_symmetry_shift(py::module &m) {
-  // SymmetryShiftCoeffs: the (mu1, mu2, xi) shift parameters, decoupled from
-  // how they were produced so they can be inspected or supplied from any
-  // source.
-  py::class_<SymmetryShiftCoeffs>(m, "SymmetryShiftCoeffs", R"(
-Number-symmetry shift parameters.
-
-Bundles the three quantities (mu1, mu2, xi) that define the symmetry-shift
-operator subtracted from a Hamiltonian to reduce its fermionic 1-norm while
-leaving the target electron-number sector's energy invariant. A SymmetryShiftCoeffs
-carries only the *result* of a shift computation, so it can come from
-:meth:`SymmetryShifter.last_shift` or from an external source. Applying one
-is :meth:`SymmetryShifter.run`'s job.
-)")
-      .def(py::init<>())
-      .def_readwrite("mu1", &SymmetryShiftCoeffs::mu1, "One-electron shift.")
-      .def_readwrite("mu2", &SymmetryShiftCoeffs::mu2, "Two-electron shift.")
-      .def_readwrite("xi", &SymmetryShiftCoeffs::xi,
-                     "Two-electron shift matrix (norb x norb).")
-      .def("__repr__", [](const SymmetryShiftCoeffs &s) {
-        return "<qdk_chemistry.algorithms.SymmetryShiftCoeffs mu1=" +
-               std::to_string(s.mu1) + " mu2=" + std::to_string(s.mu2) +
-               " xi=" + std::to_string(s.xi.rows()) + "x" +
-               std::to_string(s.xi.cols()) + ">";
-      });
-
   // SymmetryShifter abstract base class
   py::class_<SymmetryShifter, SymmetryShifterBase, py::smart_holder> shifter(
       m, "SymmetryShifter",
@@ -84,8 +59,6 @@ coefficients (e.g. the fermionic 1-norm lambda) may be reduced.
 :meth:`run` computes the shift and applies it in one step; computing one
 without applying it is deliberately not exposed, since how a shift folds into
 the Hamiltonian depends on the representation the implementation consumes.
-The parameters that were applied can be read back afterwards from
-:meth:`last_shift`.
 
 Concrete implementations should inherit from this class.
 
@@ -93,7 +66,6 @@ Examples:
     >>> import qdk_chemistry.algorithms as alg
     >>> shifter = alg.FermionicLowRankShifter()
     >>> shifted = shifter.run(hamiltonian, n_alpha, n_beta)
-    >>> shift = shifter.last_shift()
 
 )");
 
@@ -132,21 +104,6 @@ Raises:
 )",
               py::arg("hamiltonian"), py::arg("n_alpha_electrons"),
               py::arg("n_beta_electrons"));
-
-  shifter.def("last_shift", &SymmetryShifter::last_shift,
-              R"(
-The symmetry shift (mu1, mu2, xi) applied by the most recent :meth:`run`.
-
-Returns:
-    qdk_chemistry.algorithms.SymmetryShiftCoeffs | None: The shift the last
-    :meth:`run` on this instance applied, or None if it has not been run or
-    the implementation does not report one.
-
-Note:
-    Not synchronized. Use one shifter instance per thread if you intend to
-    read this back.
-
-)");
 
   shifter.def("settings", &SymmetryShifter::settings,
               R"(
@@ -260,7 +217,6 @@ Typical usage:
 
     shifter = alg.FermionicLowRankShifter()
     shifted = shifter.run(factorized, n_alpha, n_beta)
-    shift = shifter.last_shift()
 
 See Also:
     :class:`SymmetryShifter`

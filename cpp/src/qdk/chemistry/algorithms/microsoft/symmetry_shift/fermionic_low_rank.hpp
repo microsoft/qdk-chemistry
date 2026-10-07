@@ -252,8 +252,7 @@ class FermionicLowRankShifterSettings : public qdk::chemistry::data::Settings {
  * BLISS method of Patel et al. (arXiv:2409.18277): read the fragments off an
  * already double-factorized Hamiltonian, take the closed-form per-fragment
  * median shift, and solve for the optimal one-electron shift against the
- * effective one-electron operator. The shift that was applied is reported by
- * SymmetryShifter::last_shift().
+ * effective one-electron operator. The applied shift is reported in the log.
  *
  * PRECONDITIONS. The input must be restricted (spin-restricted), Hermitian
  * with a symmetric one-body matrix, and backed by
@@ -309,8 +308,7 @@ class FermionicLowRankShifter : public SymmetryShifter {
  protected:
   /**
    * @brief Composes solve_fermionic_low_rank_shift() and
-   *        rebuild_shifted_factorized_hamiltonian(), solving once and
-   *        recording the applied shift for last_shift().
+   *        rebuild_shifted_factorized_hamiltonian(), solving once.
    */
   std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,

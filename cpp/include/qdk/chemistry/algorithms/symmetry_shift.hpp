@@ -5,7 +5,6 @@
 #pragma once
 #include <Eigen/Dense>
 #include <memory>
-#include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
@@ -41,8 +40,8 @@ namespace qdk::chemistry::algorithms {
  * This parameterization is shared by every SymmetryShifter implementation
  * (BLISS [1] and its fermionic low-rank variant [2] included); only the way
  * (mu1, mu2, xi) are *computed* differs. A SymmetryShiftCoeffs therefore
- * carries only the *result* of a shift computation, reported by
- * SymmetryShifter::last_shift() after a run.
+ * carries only the *result* of a shift computation, internal to the
+ * implementation that produced it.
  *
  * APPLYING ONE BY HAND: Eqs. 6-7 of [2] are written for the paper's
  * non-normal-ordered Hamiltonian (its Eq. 1) and for the physical coefficient
@@ -74,10 +73,8 @@ struct SymmetryShiftCoeffs {
  * qubitized phase estimation.
  *
  * run() is the whole interface: it computes the shift and applies it, and the
- * shifted Hamiltonian is the result. The (mu1, mu2, xi) that produced it are
- * an OPTIONAL by-product, reported by last_shift() for callers that want to
- * inspect or compare shifts. Applying a shift is deliberately not public: how
- * it folds into the Hamiltonian depends on the representation the
+ * shifted Hamiltonian is the result. Applying a shift is deliberately not
+ * public: how it folds into the Hamiltonian depends on the representation the
  * implementation consumes, and may need more than (mu1, mu2, xi) carries.
  *
  * What a shifter accepts -- which container types, which spin cases -- is a
@@ -90,7 +87,6 @@ struct SymmetryShiftCoeffs {
  *   qdk::chemistry::algorithms::SymmetryShifterFactory::create("algorithm_name");
  * shifter->settings().set("parameter_name", value);
  * auto shifted = shifter->run(hamiltonian, n_alpha, n_beta);
- * auto shift = shifter->last_shift();  // optional, for inspection
  * @endcode
  *
  * @see SymmetryShiftCoeffs
@@ -130,22 +126,6 @@ class SymmetryShifter
   using Algorithm::run;
 
   /**
-   * @brief The shift applied by the most recent run(), if any.
-   *
-   * Implementations record (mu1, mu2, xi) as they apply it, so this costs
-   * nothing beyond the run itself and cannot disagree with the Hamiltonian
-   * run() returned. Reporting a shift is optional: an implementation whose
-   * shift is not expressible as a SymmetryShiftCoeffs leaves this empty.
-   *
-   * @return The recorded shift, or std::nullopt if run() has not been called
-   *         or the implementation does not report one.
-   *
-   * @note Not synchronized. Concurrent run() calls on ONE shifter instance
-   *       race on this slot; give each thread its own instance.
-   */
-  std::optional<SymmetryShiftCoeffs> last_shift() const { return _last_shift; }
-
-  /**
    * @brief Access the algorithm's name.
    *
    * @return The algorithm's name.
@@ -161,13 +141,6 @@ class SymmetryShifter
 
  protected:
   /**
-   * @brief Record the shift that _run_impl() is applying, for last_shift().
-   */
-  void _record_shift(SymmetryShiftCoeffs shift) const {
-    _last_shift = std::move(shift);
-  }
-
-  /**
    * @brief Implementation of the symmetry shift.
    *
    * Computes the shift and applies it. Called by run() after settings have
@@ -176,10 +149,6 @@ class SymmetryShifter
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
       std::shared_ptr<data::Hamiltonian> hamiltonian,
       unsigned int n_alpha_electrons, unsigned int n_beta_electrons) const = 0;
-
- private:
-  /// Written by _record_shift() from the const _run_impl(); see last_shift().
-  mutable std::optional<SymmetryShiftCoeffs> _last_shift;
 };
 
 /**

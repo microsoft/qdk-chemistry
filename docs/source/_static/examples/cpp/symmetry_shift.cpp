@@ -82,18 +82,6 @@ H   -0.758602    0.000000    0.504284
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
-  // start-cell-inspect-shift
-  // Inspect the (mu1, mu2, xi) parameters that the last run applied
-  if (auto shift = shifter->last_shift()) {
-    std::cout << "mu1: " << shift->mu1 << "\n"
-              << "mu2: " << shift->mu2 << "\n"
-              << "xi: " << shift->xi.rows() << "x" << shift->xi.cols()
-              << std::endl;
-  }
-  // end-cell-inspect-shift
-  // --------------------------------------------------------------------------------------------
-
-  // --------------------------------------------------------------------------------------------
   // start-cell-persist
   // The shifted Hamiltonian stays factorized, so it round-trips without
   // re-factorization and can be block-encoded directly.

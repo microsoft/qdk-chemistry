@@ -288,8 +288,11 @@ TEST_F(SymmetryShiftTest, ShiftedFactorizationReproducesDenseShiftedIntegrals) {
   ASSERT_NE(shifted, nullptr);
   ASSERT_TRUE(shifted->has_container_type<FactorizedHamiltonianContainer>());
 
-  ASSERT_TRUE(shifter->last_shift().has_value());
-  const SymmetryShiftCoeffs shift = *shifter->last_shift();
+  // Solve again independently: the shifter applies exactly this shift, so the
+  // dense reconstruction below is checked against a value the rebuild path
+  // did not itself publish.
+  const SymmetryShiftCoeffs shift =
+      microsoft::solve_fermionic_low_rank_shift(*factorized, 5, 5).shift;
 
   auto [h0, h0_beta] = factorized->get_one_body_integrals();
   (void)h0_beta;
@@ -497,8 +500,8 @@ TEST_F(SymmetryShiftTest, FallsBackToZeroShiftWhenLambdaWouldIncrease) {
   auto shifter = SymmetryShifterFactory::create("fermionic_low_rank");
   auto shifted = shifter->run(hamiltonian, 4, 4);
 
-  ASSERT_TRUE(shifter->last_shift().has_value());
-  const SymmetryShiftCoeffs shift = *shifter->last_shift();
+  const SymmetryShiftCoeffs shift =
+      microsoft::solve_fermionic_low_rank_shift(*hamiltonian, 4, 4).shift;
   EXPECT_EQ(shift.mu1, 0.0);
   EXPECT_EQ(shift.mu2, 0.0);
   EXPECT_EQ(shift.xi.cwiseAbs().maxCoeff(), 0.0);

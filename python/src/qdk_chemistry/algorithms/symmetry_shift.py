@@ -1,9 +1,8 @@
 """Public entry point for the symmetry shift algorithm.
 
-This module re-exports the abstract :class:`SymmetryShifter` interface, the
-:class:`FermionicLowRankShifter` implementation, and the :class:`SymmetryShiftCoeffs`
-parameter container so that consumers can import them directly from ``qdk_chemistry.algorithms`` without
-depending on internal package paths.
+This module re-exports the abstract :class:`SymmetryShifter` interface and the
+:class:`FermionicLowRankShifter` implementation so that consumers can import them directly
+from ``qdk_chemistry.algorithms`` without depending on internal package paths.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -13,6 +12,5 @@ depending on internal package paths.
 
 from qdk_chemistry._core._algorithms import (
     FermionicLowRankShifter,  # noqa: F401 - re-export
-    SymmetryShiftCoeffs,  # noqa: F401 - re-export
     SymmetryShifter,  # noqa: F401 - re-export
 )

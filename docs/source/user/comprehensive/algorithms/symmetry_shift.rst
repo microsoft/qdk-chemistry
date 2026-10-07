@@ -75,7 +75,7 @@ Running a symmetry shift
 ------------------------
 
 The ``run`` method takes a :class:`~qdk_chemistry.data.Hamiltonian` and the target electron counts and returns a new, shifted :class:`~qdk_chemistry.data.Hamiltonian`.
-Computing a shift without applying it is deliberately not exposed, since how a shift folds into a Hamiltonian depends on the representation the implementation consumes; the applied parameters are read back afterwards with ``last_shift()``.
+Computing a shift without applying it is deliberately not exposed, since how a shift folds into a Hamiltonian depends on the representation the implementation consumes.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -152,22 +152,8 @@ The fermionic 1-norm is a property of the factorized representation, so both the
 
 .. rubric:: Inspecting the applied shift
 
-``last_shift()`` reports the :math:`(\mu_1, \mu_2, \xi)` of the most recent run as a :class:`~qdk_chemistry.algorithms.SymmetryShiftCoeffs`, or ``None`` if the shifter has not been run.
-It is not synchronized: use one shifter instance per thread if you intend to read it back.
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/symmetry_shift.py
-      :language: python
-      :start-after: # start-cell-inspect-shift
-      :end-before: # end-cell-inspect-shift
-
-.. tab:: C++ API
-
-   .. literalinclude:: ../../../_static/examples/cpp/symmetry_shift.cpp
-      :language: cpp
-      :start-after: // start-cell-inspect-shift
-      :end-before: // end-cell-inspect-shift
+The shifted Hamiltonian is the whole result; the :math:`(\mu_1, \mu_2, \xi)` parameters are internal to the implementation and are not returned.
+``fermionic_low_rank`` logs the applied :math:`\mu_1` and :math:`\mu_2`, together with a summary of the per-fragment medians, at ``info`` level.
 
 .. rubric:: Persisting the shifted Hamiltonian
 
@@ -207,7 +193,6 @@ Related classes
 
 - :class:`~qdk_chemistry.data.Hamiltonian`: The input and output of a shift
 - :class:`~qdk_chemistry.data.FactorizedHamiltonianContainer`: Holds the double factorization and exposes ``get_lambda()``
-- :class:`~qdk_chemistry.algorithms.SymmetryShiftCoeffs`: The :math:`(\mu_1, \mu_2, \xi)` parameters reported by ``last_shift()``
 - :class:`~qdk_chemistry.algorithms.DoubleFactorization`: Produces the factorized Hamiltonian the shifter consumes
 
 Further reading
