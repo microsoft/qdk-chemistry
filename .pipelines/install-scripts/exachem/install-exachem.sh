@@ -272,17 +272,25 @@ SMOKE_TEST_INPUT="${BUILD_ROOT}/exachem/inputs/ci/hub_1d_6s.json"
 SMOKE_TEST_DIR="$(mktemp -d)"
 trap 'rm -rf "${SMOKE_TEST_DIR}"' EXIT
 
-# ExaChem exits 0 even when it aborts (e.g. on a missing basis file), so judge each run by its output.
+# ExaChem exits 0 even when it aborts (e.g. on a missing basis file), so a run counts as successful only if
+# MPI exits cleanly AND the output shows a converged CCSD run with the reference energy. Requiring positive
+# evidence, rather than matching error messages, also catches aborts we don't know about.
 # $1 is LIBINT_DATA_PATH: either a directory containing basis/, or the basis directory itself.
-# Succeeds only if the CCSD calculation completed.
+SMOKE_TEST_REFERENCE_ENERGY="-1.717094647467447"  # CCSD correlation energy of the input above
+SMOKE_TEST_ENERGY_TOLERANCE="1e-6"                  # loose enough to hold across BLAS vendors
 run_smoke_test() {
-  local rundir log
+  local rundir log energy
   rundir="$(mktemp -d "${SMOKE_TEST_DIR}/run.XXXXXX")"
   log="${rundir}/output.log"
+  # pipefail makes this fail on a non-zero mpirun exit even though the output is piped through tee.
   ( cd "${rundir}" && OMP_NUM_THREADS=1 OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 \
-      LIBINT_DATA_PATH="$1" mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" ) 2>&1 \
-    | tee "${log}" || true
-  ! grep -q 'terminating program' "${log}" && grep -q 'CCSD correlation energy' "${log}"
+      LIBINT_DATA_PATH="$1" timeout 600 mpirun -n 2 "${INSTALL_PREFIX}/bin/ExaChem" "${SMOKE_TEST_INPUT}" ) 2>&1 \
+    | tee "${log}" || return 1
+  ! grep -q 'terminating program' "${log}" || return 1
+  grep -q 'Iterations converged' "${log}" || return 1
+  energy="$(sed -n 's/^ *CCSD correlation energy \/ hartree *= *//p' "${log}" | tail -n 1)"
+  awk -v e="${energy}" -v ref="${SMOKE_TEST_REFERENCE_ENERGY}" -v tol="${SMOKE_TEST_ENERGY_TOLERANCE}" \
+    'BEGIN { exit !(e ~ /^-?[0-9]+(\.[0-9]*)?([eE][-+]?[0-9]+)?$/ && (e - ref < tol) && (ref - e < tol)) }'
 }
 
 echo "==> Running minimal ExaChem example: ${SMOKE_TEST_INPUT}"
