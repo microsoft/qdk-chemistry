@@ -4,10 +4,9 @@
 
 namespace QDKChemistry.Utils.PauliExp {
 
+    import QDKChemistry.Utils.Loop.LoopCA;
     import Std.Arrays.Subarray;
     import Std.Math.Max;
-    import Std.ResourceEstimation.IsResourceEstimating;
-    import Std.ResourceEstimation.RepeatEstimates;
 
     /// Non-identity qubit positions and axes for each term; an empty row is identity.
     struct RepPauliExpParams {
@@ -43,17 +42,11 @@ namespace QDKChemistry.Utils.PauliExp {
         let step = params.numPrefixTerms..suffixStart - 1;
         let suffix = suffixStart..Length(params.pauliCoefficients) - 1;
         PauliExp(params.pauliIndices[prefix], params.pauliOps[prefix], params.pauliCoefficients[prefix], systems);
-        if IsResourceEstimating() {
-            within {
-                RepeatEstimates(params.repetitions);
-            } apply {
-                PauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems);
-            }
-        } else {
-            for _ in 1..params.repetitions {
-                PauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems);
-            }
-        }
+        LoopCA(
+            params.repetitions,
+            0,
+            _ => PauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems)
+        );
         PauliExp(params.pauliIndices[suffix], params.pauliOps[suffix], params.pauliCoefficients[suffix], systems);
     }
 

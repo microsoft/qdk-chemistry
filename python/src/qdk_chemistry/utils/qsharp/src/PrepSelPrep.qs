@@ -10,15 +10,13 @@
 /// the two callables and this module handles the stitching.
 namespace QDKChemistry.Utils.PrepSelPrep {
 
+    import QDKChemistry.Utils.Loop.LoopCA;
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyToEachCA;
     import Std.Core.Length;
     import Std.Intrinsic.AND;
     import Std.Intrinsic.R;
     import Std.Math.PI;
-    import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EndEstimateCaching;
-    import Std.ResourceEstimation.SingleVariant;
 
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
@@ -165,6 +163,43 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
+    /// # Summary
+    /// Applies the block encoding, followed by the walk reflection when `useWalk`, `power`
+    /// times through `QDKChemistry.Utils.Loop.LoopCA` without warm-up iterations, so under
+    /// resource estimation one application is repeated symbolically.
+    operation ApplyPrepSelPrepPower(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        systems : Qubit[],
+        prepareRegister : Qubit[],
+        numSelectQubits : Int,
+        blockAncilla : Qubit[],
+        useWalk : Bool,
+        power : Int,
+    ) : Unit is Adj + Ctl {
+        LoopCA(
+            power,
+            0,
+            _ => ApplyPrepSelPrepOnce(prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk)
+        );
+    }
+
+    /// Applies the block encoding once, followed by the walk reflection when `useWalk`.
+    internal operation ApplyPrepSelPrepOnce(
+        prepareOp : Qubit[] => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        systems : Qubit[],
+        prepareRegister : Qubit[],
+        numSelectQubits : Int,
+        blockAncilla : Qubit[],
+        useWalk : Bool,
+    ) : Unit is Adj + Ctl {
+        PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
+        if useWalk {
+            Reflect(blockAncilla);
+        }
+    }
+
     /// Circuit entry point: allocates the register and applies the block encoding `power` times.
     operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
@@ -179,15 +214,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
-        for _ in 1..power {
-            if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
-                PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
-                if useWalk {
-                    Reflect(blockAncilla);
-                }
-                EndEstimateCaching();
-            }
-        }
+        ApplyPrepSelPrepPower(prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk, power);
     }
 
     /// Circuit entry point for the singly-controlled block encoding
@@ -205,18 +232,10 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
-        for _ in 1..power {
-            if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
-                Controlled PrepSelPrep(
-                    [control],
-                    (prepareOp, selectOp, systems, prepareRegister, numSelectQubits)
-                );
-                if useWalk {
-                    Controlled Reflect([control], blockAncilla);
-                }
-                EndEstimateCaching();
-            }
-        }
+        Controlled ApplyPrepSelPrepPower(
+            [control],
+            (prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk, power)
+        );
     }
 
     /// # Summary
