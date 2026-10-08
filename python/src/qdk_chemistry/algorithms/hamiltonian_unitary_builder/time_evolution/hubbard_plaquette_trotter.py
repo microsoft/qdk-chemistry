@@ -36,9 +36,9 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             "target_accuracy",
             "double",
             0.0,
-            "Energy error budget that sizes the automatic plaquette step count (0.0 means disabled). The step "
-            "count comes from Campbell's IPG error constant, an estimate for the emitted PIG ordering rather than "
-            "a guarantee.",
+            "Energy error budget that sizes the automatic plaquette step count (0.0 means disabled). The number "
+            "of Trotter steps comes from Campbell's IPG error constant, an estimate for the emitted PIG ordering "
+            "rather than a guarantee.",
         )
         self._set_default(
             "num_divisions",
@@ -52,7 +52,7 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             "num_electrons",
             "int",
             -1,
-            "Electron count for the scalar shift to the conventional model; -1 leaves it unshifted.",
+            "Electron count for the scalar shift to the estimated energy; -1 leaves it unshifted.",
         )
 
 
