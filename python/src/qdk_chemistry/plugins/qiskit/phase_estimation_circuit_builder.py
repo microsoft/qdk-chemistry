@@ -314,15 +314,21 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit, _, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, num_system, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
-            return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)
+            return self._create_circuit_from_qiskit(
+                state_preparation, ctrl_unitary_circuit, phase_correction, num_system
+            )
 
         raise RuntimeError("Failed to create iteration circuit without circuit interoperable Qiskit circuits.")
 
     def _create_circuit_from_qiskit(
-        self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float
+        self,
+        state_preparation: Circuit,
+        controlled_unitary_circuit: Circuit,
+        phase_correction: float,
+        num_system: int,
     ) -> Circuit:
         """Create a Circuit object from Qiskit QuantumCircuit objects.
 
@@ -330,16 +336,24 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
             controlled_unitary_circuit: Circuit object containing a Qiskit QuantumCircuit for the controlled unitary.
             phase_correction: Feedback phase angle to apply before controlled unitary.
+            num_system: Number of system qubits the unitary acts on.
 
         Returns:
             A Circuit object representing the IQPE iteration.
+
+        Raises:
+            ValueError: If the state preparation does not act on exactly ``num_system`` qubits.
 
         """
         from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
 
         state_prep_qc = state_preparation.get_qiskit_circuit()
         ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
-        num_system = state_prep_qc.num_qubits
+        if state_prep_qc.num_qubits != num_system:
+            raise ValueError(
+                "state_preparation must prepare the same number of system qubits as the Hamiltonian "
+                f"(expected {num_system}, received {state_prep_qc.num_qubits}).",
+            )
         num_unitary_ancilla = ctrl_unitary_qc.num_qubits - 1 - num_system
 
         phase = QuantumRegister(1, "phase")
