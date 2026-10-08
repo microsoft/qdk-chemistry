@@ -75,8 +75,7 @@ class PhaseEstimation(Algorithm):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian whose eigenvalues to estimate, as any
-                :class:`~qdk_chemistry.data.UnitaryBuilderInput` the configured unitary builder takes.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.UnitaryBuilderInput` whose eigenvalues to estimate.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
