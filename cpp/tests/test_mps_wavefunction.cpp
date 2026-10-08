@@ -154,6 +154,17 @@ TEST_F(MPSContainerTest, BlockedSitePreservesBlocksAndSectorOrder) {
   expected.block(5, 1, 2, 2) = block.bottomRows(2);
   EXPECT_TRUE(std::get<Eigen::MatrixXd>(site.to_dense())
                   .isApprox(expected, testing::wf_tolerance));
+  for (std::size_t slot = 0; slot < 3; ++slot) {
+    auto invalid_order = orders;
+    invalid_order[slot].pop_back();
+    EXPECT_THROW(MPSSite(tensor, invalid_order), std::invalid_argument);
+    invalid_order = orders;
+    invalid_order[slot].back() = invalid_order[slot].front();
+    EXPECT_THROW(MPSSite(tensor, invalid_order), std::invalid_argument);
+    invalid_order = orders;
+    invalid_order[slot].front() = SymmetryLabel{};
+    EXPECT_THROW(MPSSite(tensor, invalid_order), std::invalid_argument);
+  }
 }
 
 TEST_F(MPSContainerTest, SerializationAndClone) {
@@ -310,8 +321,11 @@ TEST_F(MPSContainerTest, RejectsDifferentBondSectorsWithEqualDimensions) {
     ASSERT_EQ(first->right_bond_dimension(), second->left_bond_dimension());
     if (mismatch == "none") {
       EXPECT_NO_THROW(MPSContainer({first, second}, orbitals));
+      EXPECT_NO_THROW(MPSContainer::validate_sites({first, second}));
     } else {
       EXPECT_THROW(MPSContainer({first, second}, orbitals),
+                   std::invalid_argument);
+      EXPECT_THROW(MPSContainer::validate_sites({first, second}),
                    std::invalid_argument);
     }
   }
@@ -410,6 +424,10 @@ TEST_F(MPSContainerTest, SuppliedRdms) {
 
 TEST_F(MPSContainerTest, RejectsInvalidStructure) {
   EXPECT_THROW(MPSContainer({}, orbitals), std::invalid_argument);
+  EXPECT_THROW(MPSContainer::validate_sites({}), std::invalid_argument);
+  EXPECT_THROW(MPSContainer::validate_sites({nullptr, sites[1]}),
+               std::invalid_argument);
+  EXPECT_NO_THROW(MPSContainer::validate_sites(sites));
   EXPECT_THROW(MPSContainer({nullptr, sites[1]}, orbitals),
                std::invalid_argument);
   EXPECT_THROW(MPSContainer(sites, nullptr), std::invalid_argument);
@@ -424,6 +442,8 @@ TEST_F(MPSContainerTest, RejectsInvalidStructure) {
   const Eigen::MatrixXd nonfinite =
       Eigen::MatrixXd::Constant(4, 1, std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(make_site(nonfinite), std::invalid_argument);
+  const Eigen::MatrixXd zero = Eigen::MatrixXd::Zero(4, 1);
+  EXPECT_NO_THROW(make_site(zero));
   auto json = make_container()->to_json();
   json["version"] = "9.0.0";
   EXPECT_THROW(MPSContainer::from_json(json), std::runtime_error);
