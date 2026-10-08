@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
@@ -23,9 +24,12 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    LatticeGeometry,
     QubitOperator,
+    UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 
@@ -364,3 +368,24 @@ class TestStandardQpeCircuitBuilder:
         builder = QdkStandardQpeCircuitBuilder()
         assert builder.name() == "qdk_standard"
         assert builder.type_name() == "qpe_circuit_builder"
+
+
+def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """QPE sizes the system register from the unitary, not the input, so a geometry with ancillas works."""
+    unitary_builder = Mock()
+    unitary_builder.run.return_value = UnitaryRepresentation(
+        Mock(spec=UnitaryContainer, num_qubits=5, num_system_qubits=3)
+    )
+    controlled_circuit = object()
+    circuit_mapper = Mock()
+    circuit_mapper.run.return_value = controlled_circuit
+    builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+    nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
+    monkeypatch.setattr(builder, "_create_nested", nested.__getitem__)
+    geometry = LatticeGeometry.chain(3)
+
+    circuit, num_system_qubits, num_ancilla_qubits = builder._create_controlled_circuit(geometry, power=1)
+
+    unitary_builder.run.assert_called_once_with(geometry)
+    assert circuit is controlled_circuit
+    assert (num_system_qubits, num_ancilla_qubits) == (3, 2)

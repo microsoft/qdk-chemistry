@@ -328,7 +328,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
             AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=four_qubit_circuit_problem.evolution_time),
         )
 
-        with pytest.raises(ValueError, match="same number of system qubits"):
+        with pytest.raises(ValueError, match="unitary's system register"):
             builder.run(
                 state_preparation=two_qubit_circuit_problem.state_prep,
                 qubit_hamiltonian=four_qubit_circuit_problem.hamiltonian,

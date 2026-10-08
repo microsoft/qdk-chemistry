@@ -133,7 +133,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         state_prep = state_preparation.get_qiskit_circuit()
         if state_prep.num_qubits != num_system:
             raise ValueError(
-                "state_preparation must prepare the same number of system qubits as the Hamiltonian "
+                "state_preparation must act on the same number of qubits as the unitary's system register "
                 f"(expected {num_system}, received {state_prep.num_qubits}).",
             )
 
@@ -351,7 +351,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
         if state_prep_qc.num_qubits != num_system:
             raise ValueError(
-                "state_preparation must prepare the same number of system qubits as the Hamiltonian "
+                "state_preparation must act on the same number of qubits as the unitary's system register "
                 f"(expected {num_system}, received {state_prep_qc.num_qubits}).",
             )
         num_unitary_ancilla = ctrl_unitary_qc.num_qubits - 1 - num_system
