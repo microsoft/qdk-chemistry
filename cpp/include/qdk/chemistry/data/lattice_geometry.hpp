@@ -15,9 +15,6 @@ namespace qdk::chemistry::data {
 
 class LatticeGraph;
 
-/** @brief Opaque semantic label assigned to a lattice edge. */
-using BondFlavorId = std::uint32_t;
-
 /**
  * @brief Immutable two-dimensional geometry of a built-in lattice.
  *
