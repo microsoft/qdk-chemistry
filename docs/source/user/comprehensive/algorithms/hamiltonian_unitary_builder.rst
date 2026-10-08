@@ -32,7 +32,7 @@ The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the fo
 HamiltonianDescription
    A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters.
    A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
-   The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`.
+   The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`.
 
 .. rubric:: Creating a builder
 
@@ -214,14 +214,14 @@ Hubbard plaquette Trotterization
 .. rubric:: Factory name: ``"hubbard_plaquette"``
 
 The plaquette builder Trotterizes the Fermi-Hubbard model with uniform hopping :math:`t` and on-site interaction :math:`U` on a two-dimensional square lattice, two spin orbitals per site.
-Unlike the other builders, it takes a :class:`~qdk_chemistry.data.LatticeGeometry` rather than a :class:`~qdk_chemistry.data.QubitOperator`, and builds the Hamiltonian from the lattice itself.
+Unlike the other builders, it takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` rather than a :class:`~qdk_chemistry.data.QubitOperator`, and builds the Hamiltonian from its lattice and its parameters ``t``, ``u`` and ``epsilon``.
 The lattice has to be periodic in both directions, with both sides even and at least four, or 2x2, because only then do the two plaquette tilings cover every bond exactly once.
 
 The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
 The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
 Each second-order step is the symmetric product :math:`P^{1/2} I^{1/2} G I^{1/2} P^{1/2}`, the "PIG" ordering of :cite:`Apel2026`.
 The half-angle pink layers of neighbouring steps merge into one full-angle layer, so a repeated evolution emits a single half-angle pink layer only at each end.
-Setting ``num_electrons`` records the scalar offset to the conventional :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model, so that phase estimation reports the conventional energy.
+Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
 
 The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
 It is consumed by the ``"hubbard_plaquette"`` controlled circuit mapper, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
@@ -240,12 +240,6 @@ The number of steps can be set directly (``num_divisions``) or estimated from ``
    * - ``order``
      - int
      - Trotter order. Only 2 is supported. Default is 2.
-   * - ``t``
-     - float
-     - Uniform hopping amplitude. Default is 1.0.
-   * - ``u``
-     - float
-     - Uniform on-site interaction. Default is 0.0.
    * - ``num_electrons``
      - int
      - Electron count for the scalar shift to the estimated energy. When set to -1 (default), the particle-hole symmetric model's energy is reported.

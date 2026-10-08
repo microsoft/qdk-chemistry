@@ -14,13 +14,14 @@ import scipy.linalg
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation import identity_state_prep
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.hubbard_plaquette_trotter import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
     HubbardPlaquetteTrotter,
 )
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    FermiHubbardModelHamiltonianDescription,
     LatticeGeometry,
     LatticeGraph,
     MajoranaMapping,
@@ -37,14 +38,27 @@ _PLAQUETTE = "QDKChemistry.Utils.HubbardPlaquette"
 _HWP = "QDKChemistry.Utils.HammingWeightPhasing"
 
 
-def _reference_hamiltonian(width: int, height: int, *, t: float, u: float, symmetric: bool = True) -> np.ndarray:
-    """Return the dense Jordan-Wigner Hubbard Hamiltonian, particle-hole symmetric or conventional."""
-    lattice = LatticeGraph.square(width, height, periodic_x=True, periodic_y=True)
-    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-0.5 * u if symmetric else 0.0, t=t, U=u)
-    mapped = create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(2 * width * height))
+def _model(
+    size: int, *, t: float = 1.0, u: float = 0.0, epsilon: float = 0.0, periodic: bool = True
+) -> FermiHubbardModelHamiltonianDescription:
+    """Return a Hubbard model on a ``size`` x ``size`` square lattice."""
+    lattice = LatticeGeometry.square(size, size, periodic_x=periodic, periodic_y=periodic)
+    return FermiHubbardModelHamiltonianDescription(lattice, t=t, u=u, epsilon=epsilon)
+
+
+def _reference_hamiltonian(model: FermiHubbardModelHamiltonianDescription, *, symmetric: bool = True) -> np.ndarray:
+    """Return the dense Jordan-Wigner matrix of the 2x2 ``model``, or of its particle-hole symmetric form.
+
+    ``materialize()`` rejects the 2x2 torus, whose periodic images join each pair twice, so the
+    graph comes from ``LatticeGraph.square``, which doubles those bonds.
+    """
+    t, u, epsilon = (model.parameters[name] for name in ("t", "u", "epsilon"))
+    lattice = LatticeGraph.square(2, 2, periodic_x=True, periodic_y=True)
+    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-0.5 * u if symmetric else epsilon, t=t, U=u)
+    mapped = create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(8))
     labels, coefficients = zip(*mapped.get_real_coefficients(tolerance=1e-14), strict=True)
     dense = pauli_to_dense_matrix(list(labels), list(coefficients))
-    return dense + 0.25 * u * width * height * np.eye(len(dense)) if symmetric else dense
+    return dense + 0.25 * u * model.lattice.num_sites * np.eye(len(dense)) if symmetric else dense
 
 
 def _operation(name: str, args: str, *, controlled: bool = False, namespace: str = _PLAQUETTE) -> str:
@@ -145,7 +159,7 @@ class TestPhaseEstimationAccuracy:
     )
     def test_recovers_the_ground_energy(self, method, power_strategy, t, u, num_divisions, energy):
         num_bits = 4
-        values, vectors = np.linalg.eigh(_reference_hamiltonian(2, 2, t=t, u=u))
+        values, vectors = np.linalg.eigh(_reference_hamiltonian(_model(2, t=t, u=u)))
         assert values[0] == pytest.approx(energy, abs=1e-9)
         ground = np.real(vectors[:, 0]) / np.linalg.norm(np.real(vectors[:, 0]))
         params = {"rowMap": list(range(7, -1, -1)), "stateVector": ground.tolist(), "expansionOps": [], "numQubits": 8}
@@ -160,8 +174,6 @@ class TestPhaseEstimationAccuracy:
             "hamiltonian_unitary_builder",
             "hubbard_plaquette",
             order=2,
-            t=t,
-            u=u,
             # The ground phase is exactly 1/16, so every bit is deterministic.
             time=2 * np.pi / (2**num_bits * abs(energy)),
             num_divisions=num_divisions,
@@ -182,8 +194,7 @@ class TestPhaseEstimationAccuracy:
             ),
             circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
         )
-        geometry = LatticeGeometry.square(2, 2, periodic_x=True, periodic_y=True)
-        result = qpe.run(state_preparation=preparation, qubit_hamiltonian=geometry)
+        result = qpe.run(state_preparation=preparation, qubit_hamiltonian=_model(2, t=t, u=u))
         assert result.raw_energy == pytest.approx(energy, rel=1e-6)
 
 
@@ -222,13 +233,12 @@ class TestPlaquetteCircuit:
     def test_single_term_evolution_is_exact(self, t, u):
         """With only hopping or only interaction the 2x2 step has no Trotter error, so it is exp(-iHt)."""
         time = 0.23
-        geometry = LatticeGeometry.square(2, 2, periodic_x=True, periodic_y=True)
-        step = HubbardPlaquetteTrotter(order=2, t=t, u=u, time=time, num_divisions=1, target_accuracy=0.0)
-        c = step.run(geometry).get_container()
+        step = HubbardPlaquetteTrotter(order=2, time=time, num_divisions=1, target_accuracy=0.0)
+        c = step.run(_model(2, t=t, u=u)).get_container()
         params = (
             f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {c.interaction_angle}, {c.hopping_angle}, {c.step_reps}, -1)"
         )
-        propagator = scipy.linalg.expm(-1j * time * _reference_hamiltonian(2, 2, t=t, u=u))
+        propagator = scipy.linalg.expm(-1j * time * _reference_hamiltonian(_model(2, t=t, u=u)))
         state = _random_state(8, seed=7)
         actual = _apply(_operation("RepPlaquetteExp", params + ", {qs}"), state)
         assert abs(np.vdot(propagator @ state, actual)) == pytest.approx(1.0, abs=1e-9)
@@ -272,8 +282,6 @@ def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
             "hamiltonian_unitary_builder",
             "hubbard_plaquette",
             order=2,
-            t=1.0,
-            u=8.0,
             # A sine window over 2^bits - 1 queries has spread tan(pi / (2^bits + 1)).
             time=math.tan(math.pi / (2**num_bits + 1)) / qpe_budget,
             power_strategy="rescale",
@@ -283,8 +291,8 @@ def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
             "controlled_circuit_mapper", "hubbard_plaquette", max_hamming_weight_phasing_batch_size=max_batch_size
         ),
     )
-    lattice = LatticeGeometry.square(size, size, periodic_x=True, periodic_y=True)
-    factory = builder.run(identity_state_prep(num_qubits=2 * size * size), lattice)[0]._qsharp_factory
+    model = _model(size, t=1.0, u=8.0)
+    factory = builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0]._qsharp_factory
     counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
     return {key: int(counts.get(key, 0)) for key in _COUNT_KEYS}
 
@@ -349,14 +357,13 @@ class TestStepCountAndShift:
         manual = HubbardPlaquetteTrotter(order=2, time=time, num_divisions=7, target_accuracy=0.0)
         assert manual._step_count(t, u, width, height, time) == 7
 
-    @pytest.mark.parametrize("num_electrons", [0, 2, 6])
-    def test_electron_count_shifts_onto_the_conventional_spectrum(self, num_electrons):
-        """The shift equals the conventional-minus-symmetric gap from exact diagonalization."""
-        u = 8.0
-        geometry = LatticeGeometry.square(2, 2, periodic_x=True, periodic_y=True)
+    @pytest.mark.parametrize(("num_electrons", "epsilon"), [(0, 0.0), (2, 0.0), (6, -1.5)])
+    def test_electron_count_shifts_onto_the_described_spectrum(self, num_electrons, epsilon):
+        """The shift equals the described-minus-symmetric gap from exact diagonalization."""
+        model = _model(2, u=8.0, epsilon=epsilon)
         unshifted, shifted = (
-            HubbardPlaquetteTrotter(order=2, t=1.0, u=u, time=0.3, num_divisions=2, target_accuracy=0.0, **extra)
-            .run(geometry)
+            HubbardPlaquetteTrotter(order=2, time=0.3, num_divisions=2, target_accuracy=0.0, **extra)
+            .run(model)
             .get_container()
             for extra in ({}, {"num_electrons": num_electrons})
         )
@@ -367,11 +374,10 @@ class TestStepCountAndShift:
         # N is conserved, so within its sector the two models differ by a constant.
         sector = np.flatnonzero([index.bit_count() == num_electrons for index in range(256)])
         block = np.ix_(sector, sector)
-        conventional, symmetric = (
-            np.linalg.eigvalsh(_reference_hamiltonian(2, 2, t=1.0, u=u, symmetric=flag)[block])
-            for flag in (False, True)
+        described, symmetric = (
+            np.linalg.eigvalsh(_reference_hamiltonian(model, symmetric=flag)[block]) for flag in (False, True)
         )
-        gap = conventional - symmetric
+        gap = described - symmetric
         assert np.allclose(gap, gap[0], atol=1e-10)
         shift = shifted.eigenvalue_from_phase(0.125) - unshifted.eigenvalue_from_phase(0.125)
         assert shift == pytest.approx(gap[0])
@@ -385,8 +391,7 @@ class TestContainerAndValidation:
 
     def test_serialization_round_trip(self, tmp_path):
         """A step survives JSON and HDF5 round trips."""
-        geometry = LatticeGeometry.square(4, 4, periodic_x=True, periodic_y=True)
-        step = HubbardPlaquetteTrotter(order=2, t=1.0, u=8.0, time=0.1, num_divisions=2).run(geometry)
+        step = HubbardPlaquetteTrotter(order=2, time=0.1, num_divisions=2).run(_model(4, u=8.0))
         with h5py.File(tmp_path / "step.h5", "w") as file:
             step.to_hdf5(file.create_group("step"))
         with h5py.File(tmp_path / "step.h5", "r") as file:
@@ -399,16 +404,16 @@ class TestContainerAndValidation:
         [
             pytest.param(lambda: HubbardPlaquetteTrotter(order=4), ValueError, "order 2 only", id="order"),
             pytest.param(
-                lambda: HubbardPlaquetteTrotter(order=2, time=0.05).run(
-                    LatticeGeometry.square(4, 4, periodic_x=False, periodic_y=False)
-                ),
+                lambda: HubbardPlaquetteTrotter(order=2, time=0.05).run(_model(4, periodic=False)),
                 ValueError,
                 "periodic in both directions",
                 id="open-boundaries",
             ),
             pytest.param(
                 lambda: HubbardPlaquetteTrotter(order=2, time=0.05).run(
-                    LatticeGeometry.triangular(4, 4, periodic_x=True, periodic_y=True)
+                    FermiHubbardModelHamiltonianDescription(
+                        LatticeGeometry.triangular(4, 4, periodic_x=True, periodic_y=True), t=1.0, u=0.0
+                    )
                 ),
                 ValueError,
                 "unit-spaced square lattice",
@@ -416,17 +421,17 @@ class TestContainerAndValidation:
             ),
             pytest.param(
                 lambda: HubbardPlaquetteTrotter(order=2, time=0.05).run(
-                    LatticeGraph.square(4, 4, periodic_x=True, periodic_y=True)
+                    LatticeGeometry.square(4, 4, periodic_x=True, periodic_y=True)
                 ),
                 TypeError,
-                "LatticeGeometry",
-                id="lattice-graph",
+                "FermiHubbardModelHamiltonianDescription",
+                id="bare-lattice",
             ),
             *[
                 pytest.param(
                     lambda num_electrons=num_electrons: HubbardPlaquetteTrotter(
                         order=2, time=0.05, num_electrons=num_electrons
-                    ).run(LatticeGeometry.square(4, 4, periodic_x=True, periodic_y=True)),
+                    ).run(_model(4)),
                     ValueError,
                     "num_electrons",
                     id=f"num-electrons-{num_electrons}",
