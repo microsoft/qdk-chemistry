@@ -219,7 +219,8 @@ The lattice has to be periodic in both directions, with both sides even and at l
 
 The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
 The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
-Each second-order step applies :math:`I^{1/2} G I^{1/2} P`, the ordering of :cite:`Apel2026`.
+Each second-order step is the symmetric product :math:`P^{1/2} I^{1/2} G I^{1/2} P^{1/2}`, the "PIG" ordering of :cite:`Apel2026`.
+The half-angle pink layers of neighbouring steps merge into one full-angle layer, so a repeated evolution emits a single half-angle pink layer only at each end.
 Setting ``num_electrons`` records the scalar offset to the conventional :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model, so that phase estimation reports the conventional energy.
 
 The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
