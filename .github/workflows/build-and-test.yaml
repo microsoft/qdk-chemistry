@@ -325,6 +325,7 @@ jobs:
       timeout-minutes: 90
       env:
         OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
+        PYTEST_TIMEOUT: '1800'
         PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
@@ -760,6 +761,7 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
         New-Item -ItemType Directory -Force -Path test-results | Out-Null
@@ -1026,6 +1028,7 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
         New-Item -ItemType Directory -Force -Path test-results | Out-Null
@@ -1131,6 +1134,7 @@ jobs:
     - name: Run Python tests
       timeout-minutes: 90
       env:
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
