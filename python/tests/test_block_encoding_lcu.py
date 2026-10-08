@@ -17,6 +17,7 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
@@ -101,6 +102,43 @@ class TestLCUBuilder:
         container = LCUBuilder().run(roundoff).get_container()
         assert container.num_prepare_ancillas == 1
         assert len(container.select.controlled_operations) == 2
+
+        single = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 1e-12, 1e-17]))
+        container = LCUBuilder().run(single).get_container()
+        assert container.num_prepare_ancillas == 0
+        assert [op.operation for op in container.select.controlled_operations] == ["XX"]
+
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("quantum_walk", [False, True])
+    @pytest.mark.parametrize("coefficients", [[6e-13, 6e-13], [1e-12, -1e-12]])
+    def test_rejects_all_filtered_terms(self, sparse: bool, quantum_walk: bool, coefficients: list[float]) -> None:
+        """A positive raw L1 norm does not make an empty filtered Hamiltonian encodable."""
+        hamiltonian = (
+            QubitOperator.from_sparse_terms(2, [{0: "X"}, {1: "Z"}], np.array(coefficients))
+            if sparse
+            else QubitOperator(["IX", "ZI"], np.array(coefficients))
+        )
+        with pytest.raises(ValueError, match="non-empty Hamiltonian after coefficient filtering"):
+            LCUBuilder(quantum_walk=quantum_walk).run(hamiltonian)
+
+    def test_sparse_labels_are_materialized_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Sizing, PREPARE and SELECT reuse the same retained labels instead of expanding them repeatedly."""
+        hamiltonian = QubitOperator.from_sparse_terms(
+            1000, [{0: "X"}, {999: "Z"}, {2: "Y"}], np.array([0.25, 0.5, 1e-17])
+        )
+        label_reads: list[int] = []
+        original = SparsePauliTerms.__getitem__
+
+        def track_label(terms: SparsePauliTerms, index: int) -> str:
+            """Record each full-width label expansion."""
+            label_reads.append(index)
+            return original(terms, index)
+
+        monkeypatch.setattr(SparsePauliTerms, "__getitem__", track_label)
+        container = LCUBuilder().run(hamiltonian).get_container()
+        assert label_reads == [0, 1]
+        assert container.num_prepare_ancillas == 1
+        assert [op.operation for op in container.select.controlled_operations] == ["I" * 999 + "X", "Z" + "I" * 999]
 
     def test_lcu_builder_registered_in_registry(self):
         """Verify block encoding builder is accessible via the registry."""
@@ -190,13 +228,21 @@ class TestLCUBuilder:
         assert isinstance(container_no_walk, LCUContainer)
         assert not isinstance(container_no_walk, LCUWalkContainer)
 
-    def test_rejects_zero_l1_norm(self):
+    def test_rejects_zero_coefficients(self):
         """Verify LCUBuilder raises ValueError when all coefficients are zero."""
         hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.0, 0.0]),
         )
         builder = LCUBuilder()
+        with pytest.raises(ValueError, match="non-empty Hamiltonian after coefficient filtering"):
+            builder.run(hamiltonian)
+
+    def test_rejects_l1_norm_below_tolerance(self) -> None:
+        """The norm tolerance remains independent of per-coefficient filtering."""
+        hamiltonian = QubitOperator(["XX", "ZZ"], np.array([0.25, 0.5]))
+        builder = LCUBuilder()
+        builder.settings().set("tolerance", 1.0)
         with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
 
