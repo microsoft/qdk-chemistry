@@ -139,7 +139,7 @@ Related Classes
 Further Reading
 ---------------
 
-- :doc:`hamiltonian_unitary_builder`: Constructs unitary operators for Hamiltonian time evolution
+- :doc:`unitary_builder`: Constructs unitary operators for Hamiltonian time evolution
 - :doc:`circuit_executor`: Executes quantum circuits
 - :doc:`../design/index`: QDK/Chemistry algorithm design principles
 - :doc:`settings`: Configuration and settings management
